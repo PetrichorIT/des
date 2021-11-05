@@ -1,0 +1,18 @@
+[package]
+edition = "2021"
+name = "des"
+version = "0.1.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "dse"
+path = "src/lib.rs"
+
+[[bin]]
+name = "dse-tests"
+path = "test/main.rs"
+
+[dependencies]
+queue = "*"
+rand = "*"
