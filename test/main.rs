@@ -1,6 +1,5 @@
-use queue::Queue;
-use rand::*;
-use std::fmt::Debug;
+use rand::{distributions::Standard, prelude::StdRng, Rng, SeedableRng};
+use std::{collections::VecDeque, fmt::Debug};
 
 use dse::*;
 
@@ -16,7 +15,7 @@ struct Application {
     n: usize,
     l: f64,
     m: f64,
-    queue: Queue<Customer>,
+    queue: VecDeque<Customer>,
     busy: bool,
 
     // Metrics
@@ -49,11 +48,11 @@ struct ServerDone {
 }
 
 impl Event<Application> for ServerDone {
-    fn handle(&self, rt: &mut Runtime<Application>) {
+    fn handle(&mut self, rt: &mut Runtime<Application>) {
         let busy_interval = rt.sim_time() - self.started;
         rt.app.busy_time += busy_interval;
 
-        let customer = rt.app.queue.dequeue();
+        let customer = rt.app.queue.pop_front();
         match customer {
             Some(customer) => {
                 // log wait time
@@ -79,14 +78,14 @@ struct CustomerArrival {
 }
 
 impl Event<Application> for CustomerArrival {
-    fn handle(&self, rt: &mut Runtime<Application>) {
+    fn handle(&mut self, rt: &mut Runtime<Application>) {
         if self.idx > rt.app.n {
             return;
         }
 
         // Gen next event
-        let duration = expdist(1.0 / rt.app.l);
-        let next = expdist(1.0 / rt.app.m);
+        let duration = expdist(rt, 1.0 / rt.app.l);
+        let next = expdist(rt, 1.0 / rt.app.m);
 
         let customer = Customer {
             arrived: rt.sim_time(),
@@ -94,7 +93,7 @@ impl Event<Application> for CustomerArrival {
         };
 
         if rt.app.busy {
-            rt.app.queue.queue(customer).unwrap();
+            rt.app.queue.push_back(customer);
         } else {
             rt.app.busy = true;
             rt.app.wait_times.push(SimTime::ZERO);
@@ -109,28 +108,38 @@ impl Event<Application> for CustomerArrival {
         rt.add_event_in(CustomerArrival { idx: self.idx + 1 }, next.into());
     }
 }
-fn expdist(p: f64) -> f64 {
-    let x: f64 = random::<f64>().abs();
-    p * f64::exp(-p * x)
+
+fn expdist<A>(rt: &mut Runtime<A>, p: f64) -> f64 {
+    let x: f64 = rt.rng().sample(Standard);
+    x.ln() / -p
 }
 
 fn main() {
     let app = Application {
-        n: 10_000,
+        n: 100_000,
         l: 1.0,
-        m: 0.5,
+        m: 2.0,
 
-        queue: Queue::with_capacity(10_000),
+        queue: VecDeque::new(),
         busy: false,
 
         wait_times: Vec::new(),
         busy_time: SimTime::ZERO,
     };
 
-    let mut rt = Runtime::new(app);
-    rt.add_event_in(CustomerArrival { idx: 0 }, expdist(rt.app.l).into());
+    let opts = RuntimeOptions {
+        sim_base_unit: SimTimeUnit::Nanoseconds,
+        rng: StdRng::seed_from_u64(0x42069),
+        max_itr: !0,
+    };
 
-    rt.set_max_itr(100_000);
+    let mut rt = Runtime::new_with(app, opts);
+
+    // Create first event
+    let l = rt.app.l;
+    let dur = expdist(&mut rt, l).into();
+    rt.add_event_in(CustomerArrival { idx: 0 }, dur);
+
     let (app, t_max) = rt.run().unwrap();
     app.eval(t_max);
 }

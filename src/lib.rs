@@ -1,15 +1,22 @@
-pub mod event;
-pub mod runtime;
-pub mod simtime;
+pub(crate) mod core;
+pub(crate) mod metrics;
+pub(crate) mod misc;
+pub(crate) mod net;
 
-pub use event::*;
-pub use runtime::*;
-pub use simtime::*;
+pub use crate::core::event::*;
+pub use crate::core::runtime::*;
+pub use crate::core::sim_time::*;
+pub use crate::metrics::*;
+
+#[cfg(feature = "net")]
+pub use crate::net::*;
+
+#[allow(unused_imports)]
+pub(crate) use crate::misc::*;
 
 #[cfg(test)]
 mod tests {
+
     #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4)
-    }
+    fn it_works() {}
 }

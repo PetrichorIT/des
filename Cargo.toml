@@ -5,6 +5,11 @@ version = "0.1.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+default = ["net"]
+net = []
+netipv6 = ["net"]
+
 [lib]
 name = "dse"
 path = "src/lib.rs"
@@ -14,5 +19,6 @@ name = "dse-tests"
 path = "test/main.rs"
 
 [dependencies]
-queue = "*"
-rand = "*"
+log = "*"
+num-traits = "0.2"
+rand = {version = "*", features = ["std_rng"]}

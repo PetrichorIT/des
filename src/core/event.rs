@@ -1,23 +1,29 @@
-use super::*;
-use std::cmp::*;
-use std::fmt::*;
+use crate::*;
+use std::{
+    cmp::*,
+    fmt::{Debug, Display},
+};
 
-pub trait Event<A>: Debug {
-    fn handle(&self, rt: &mut Runtime<A>);
+///
+/// A trait that provides the possibility of the type to be called by a runtime
+/// of generic type A
+///
+pub trait Event<A> {
+    fn handle(&mut self, rt: &mut Runtime<A>);
 }
 
-#[derive(Debug)]
-pub struct EventNode<A> {
+pub(crate) struct EventNode<A> {
     time: SimTime,
     id: usize,
     event: Box<dyn Event<A>>,
 }
 
-impl<A: Debug> EventNode<A> {
+impl<A> EventNode<A> {
     ///
     /// Returns the id of the given event.
     ///
     #[inline(always)]
+    #[allow(unused)]
     pub fn id(&self) -> usize {
         self.id
     }
@@ -33,7 +39,7 @@ impl<A: Debug> EventNode<A> {
     /// Calls the embedded event handler.
     ///
     #[inline(always)]
-    pub fn handle(&self, rt: &mut Runtime<A>) {
+    pub fn handle(&mut self, rt: &mut Runtime<A>) {
         self.event.handle(rt)
     }
 
@@ -68,12 +74,36 @@ impl<A> Ord for EventNode<A> {
     fn cmp(&self, other: &Self) -> Ordering {
         if self == other {
             Ordering::Equal
+        } else if self.time < other.time {
+            Ordering::Greater
         } else {
-            if self.time < other.time {
-                Ordering::Greater
-            } else {
-                Ordering::Less
-            }
+            Ordering::Less
         }
+    }
+}
+
+impl<A> Debug for EventNode<A>
+where
+    dyn Event<A>: Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "EventNode {{ id: {} time: {} event: {:?} }}",
+            self.id, self.time, self.event
+        )
+    }
+}
+
+impl<A> Display for EventNode<A>
+where
+    dyn Event<A>: Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "EventNode {{ id: {} time: {} event: {} }}",
+            self.id, self.time, self.event
+        )
     }
 }
