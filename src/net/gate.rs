@@ -62,7 +62,7 @@ impl Display for GateDescription {
     }
 }
 
-static mut NEXT_GATE_ID: GateId = 1;
+static mut NEXT_GATE_ID: GateId = 0xff;
 fn get_gate_id() -> GateId {
     unsafe {
         let id = NEXT_GATE_ID;
@@ -128,5 +128,47 @@ impl Gate {
             channel_id: channel.id,
             next_gate,
         }
+    }
+}
+
+pub trait IntoModuleGate: Sized {
+    fn into_gate(self, _module: &Module) -> Option<usize> {
+        None
+    }
+}
+
+impl IntoModuleGate for Gate {
+    fn into_gate(self, module: &Module) -> Option<usize> {
+        let element = module
+            .gates
+            .iter()
+            .enumerate()
+            .find(|&(_idx, g)| g == &self)?;
+
+        Some(element.0)
+    }
+}
+
+impl IntoModuleGate for GateId {
+    fn into_gate(self, module: &Module) -> Option<usize> {
+        let element = module
+            .gates
+            .iter()
+            .enumerate()
+            .find(|&(_idx, g)| g.id() == self)?;
+
+        Some(element.0)
+    }
+}
+
+impl IntoModuleGate for (&str, usize) {
+    fn into_gate(self, module: &Module) -> Option<usize> {
+        let element = module
+            .gates
+            .iter()
+            .enumerate()
+            .find(|&(_idx, g)| g.name() == &self.0 && g.pos() == self.1)?;
+
+        Some(element.0)
     }
 }

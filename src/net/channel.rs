@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
-use super::{GateId, MessageBody};
-use crate::SimTime;
+use super::GateId;
+use crate::{Message, SimTime};
 
 /// A runtime-unqiue identifier for a end-to-end connection.
 pub type ConnectionId = usize;
@@ -43,7 +43,7 @@ impl ChannelMetrics {
     ///
     /// Calcualtes the duration a message travels on a link.
     ///
-    pub fn calculate_duration<T: MessageBody>(&self, msg: &T) -> SimTime {
+    pub fn calculate_duration(&self, msg: &Message) -> SimTime {
         let len = msg.bit_len();
         let transmission_time = len as f64 / self.bitrate as f64;
         if self.jitter == SimTime::ZERO {
@@ -53,7 +53,7 @@ impl ChannelMetrics {
         }
     }
 
-    pub fn calculate_busy<T: MessageBody>(&self, msg: &T) -> SimTime {
+    pub fn calculate_busy(&self, msg: &Message) -> SimTime {
         let len = msg.bit_len();
         SimTime::new(len as f64 / self.bitrate as f64)
     }
@@ -109,11 +109,11 @@ impl Channel {
         }
     }
 
-    pub fn calculate_duration<T: MessageBody>(&self, msg: &T) -> SimTime {
+    pub fn calculate_duration(&self, msg: &Message) -> SimTime {
         self.metrics.calculate_duration(msg)
     }
 
-    pub fn calculate_busy<T: MessageBody>(&self, msg: &T) -> SimTime {
+    pub fn calculate_busy(&self, msg: &Message) -> SimTime {
         self.metrics.calculate_busy(msg)
     }
 }

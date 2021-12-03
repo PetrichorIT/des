@@ -4,7 +4,7 @@ use std::{
 };
 
 use super::*;
-use crate::{Runtime, SimTime};
+use crate::SimTime;
 
 /// A runtime-unqiue identifier for a message or a message inherintance tree.
 pub type MessageId = u32;
@@ -34,10 +34,12 @@ fn get_message_id() -> MessageId {
 ///
 /// A generic network message holding a payload.
 ///
-pub struct Message<T: MessageBody> {
+pub struct Message {
     pub kind: MessageKind,
     pub timestamp: SimTime,
-    pub content: T,
+
+    content: usize,
+    bit_len: usize,
 
     // === Sender ===
     sender_module_id: ModuleId,
@@ -58,7 +60,7 @@ pub struct Message<T: MessageBody> {
     message_tree_id: MessageId,
 }
 
-impl<T: MessageBody> Message<T> {
+impl Message {
     ///
     /// # Primitiv Getters
     ///
@@ -98,6 +100,10 @@ impl<T: MessageBody> Message<T> {
         self.message_tree_id
     }
 
+    pub fn bit_len(&self) -> usize {
+        self.bit_len
+    }
+
     ///
     /// # Additional fn
     ///
@@ -113,9 +119,8 @@ impl<T: MessageBody> Message<T> {
         self.hop_counter += 1;
     }
 
-    pub fn set_arrival(&mut self, module_id: ModuleId, gate_id: GateId) {
+    pub fn set_target_module(&mut self, module_id: ModuleId) {
         self.target_module_id = module_id;
-        self.last_gate = gate_id;
     }
 
     ///
@@ -134,7 +139,8 @@ impl<T: MessageBody> Message<T> {
         timestamp: SimTime,
         message_id: MessageId,
         message_tree_id: MessageId,
-        content: T,
+        content: usize,
+        bit_len: usize,
     ) -> Self {
         register_message();
 
@@ -150,11 +156,11 @@ impl<T: MessageBody> Message<T> {
             message_id,
             message_tree_id,
             content,
+            bit_len,
         }
     }
 
-    pub fn new<A>(
-        rt: &mut Runtime<A>,
+    pub fn new<T: MessageBody>(
         kind: MessageKind,
         last_gate: GateId,
         sender_module_id: ModuleId,
@@ -163,18 +169,26 @@ impl<T: MessageBody> Message<T> {
         content: T,
     ) -> Self {
         let id = get_message_id();
+
+        let bit_len = content.bit_len();
+
+        let boxed = Box::new(content);
+        let ptr: *const T = Box::into_raw(boxed);
+        let ptr = ptr as usize;
+
         Self::new_raw(
             kind,
             last_gate,
             0,
             sender_module_id,
             target_module_id,
-            rt.sim_time(),
+            SimTime::now(),
             SimTime::ZERO,
             timestamp,
             id,
             id,
-            content,
+            ptr,
+            bit_len,
         )
     }
 
@@ -185,9 +199,14 @@ impl<T: MessageBody> Message<T> {
     pub fn total_message_count() -> usize {
         unsafe { MSG_COUNT }
     }
+
+    pub fn extract_content<T: MessageBody>(self) -> Box<T> {
+        let ptr = self.content as *mut T;
+        unsafe { Box::from_raw(ptr) }
+    }
 }
 
-impl<T: MessageBody + Clone> Clone for Message<T> {
+impl Clone for Message {
     fn clone(&self) -> Self {
         Self::new_raw(
             self.kind,
@@ -200,18 +219,19 @@ impl<T: MessageBody + Clone> Clone for Message<T> {
             self.timestamp,
             get_message_id(),
             self.message_tree_id,
-            self.content.clone(),
+            self.content,
+            self.bit_len,
         )
     }
 }
 
-impl<T: MessageBody> Drop for Message<T> {
+impl Drop for Message {
     fn drop(&mut self) {
         unregister_message()
     }
 }
 
-impl<T: MessageBody> Debug for Message<T> {
+impl Debug for Message {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Message")
             .field("id", &self.message_id)

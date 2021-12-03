@@ -6,7 +6,7 @@ mod packet;
 
 mod tests;
 
-use std::{fmt::Debug, mem::ManuallyDrop};
+use std::mem::ManuallyDrop;
 
 pub use channel::*;
 pub use gate::*;
@@ -71,28 +71,28 @@ impl<A> NetworkRuntime<A> {
     }
 }
 
-pub struct MessageAtGateEvent<T: MessageBody> {
+pub struct MessageAtGateEvent {
     gate_id: GateId,
-    message: ManuallyDrop<Message<T>>,
+    message: ManuallyDrop<Message>,
     handled: bool,
 }
 
-impl<A, T> Event<NetworkRuntime<A>> for MessageAtGateEvent<T>
-where
-    T: MessageBody + Debug + 'static,
-{
+impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
     fn handle(&mut self, rt: &mut crate::Runtime<NetworkRuntime<A>>) {
         let gate = rt.app.gate(self.gate_id);
         if let Some(gate) = gate {
-            let ptr: *const Message<T> = unsafe { &ManuallyDrop::take(&mut self.message) };
+            let ptr: *const Message = unsafe { &ManuallyDrop::take(&mut self.message) };
             let mut message = unsafe { std::ptr::read(ptr) };
             message.register_hop(gate.id());
 
             self.handled = true;
 
-            println!("Gate [{}] handling event {:?}", self.gate_id, message);
-
             if gate.next_gate() == GATE_SELF || gate.next_gate() == GATE_NULL {
+                println!(
+                    "Gate [{}] handling event {:?} >>> ONTO CHANNEL",
+                    self.gate_id, message
+                );
+
                 // handle message
                 // calulate busy time at last hop
                 let id = gate.channel();
@@ -101,8 +101,8 @@ where
                 let channel = rt.app.channel_mut(id).unwrap();
                 assert!(!channel.busy);
 
-                let dur = channel.calculate_duration(&message.content);
-                let busy = channel.calculate_busy(&message.content);
+                let dur = channel.calculate_duration(&message);
+                let busy = channel.calculate_busy(&message);
                 channel.busy = true;
 
                 rt.add_event_in(ChannelUnbusyNotif { channel_id: id }, busy);
@@ -110,6 +110,7 @@ where
                     HandleMessageEvent {
                         module_id: module,
                         message: ManuallyDrop::new(message),
+                        handled: false,
                     },
                     dur,
                 );
@@ -117,9 +118,14 @@ where
                 // redirect to next channel
                 let next_gate = gate.next_gate();
 
+                println!(
+                    "Gate [{}] handling event {:?} >>> TOO NEXT GATE {}",
+                    self.gate_id, message, next_gate
+                );
+
                 let channel = rt.app.channel(gate.channel()).unwrap();
                 if channel.busy {
-                    error!(
+                    println!(
                         "Dropping message {:?} pushed onto busy channel {:?}",
                         message, channel
                     );
@@ -137,7 +143,7 @@ where
                 )
             }
         } else {
-            error!(
+            panic!(
                 "Message {:?} dropped after gate id {} was not found",
                 self.message, self.gate_id
             )
@@ -145,7 +151,7 @@ where
     }
 }
 
-impl<T: MessageBody> Drop for MessageAtGateEvent<T> {
+impl Drop for MessageAtGateEvent {
     fn drop(&mut self) {
         if !self.handled {
             unsafe { ManuallyDrop::drop(&mut self.message) }
@@ -153,27 +159,46 @@ impl<T: MessageBody> Drop for MessageAtGateEvent<T> {
     }
 }
 
-pub struct HandleMessageEvent<T: MessageBody> {
+pub struct HandleMessageEvent {
     module_id: ModuleId,
-    #[allow(dead_code)]
-    message: ManuallyDrop<Message<T>>,
+    message: ManuallyDrop<Message>,
+    handled: bool,
 }
 
-impl<A, T: MessageBody> Event<NetworkRuntime<A>> for HandleMessageEvent<T> {
+impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
     fn handle(&mut self, rt: &mut crate::Runtime<NetworkRuntime<A>>) {
-        if let Some(_module) = rt.app.module(self.module_id) {
-            println!(
-                "[Module {}] handle message {:?}",
-                self.module_id, self.message
-            )
+        if let Some(module) = rt.app.module_mut(self.module_id) {
+            let ptr: *const Message = unsafe { &ManuallyDrop::take(&mut self.message) };
+            let mut message = unsafe { std::ptr::read(ptr) };
+            message.set_target_module(module.id);
+
+            self.handled = true;
+
+            println!("[Module {}] handle message {:?}", self.module_id, message);
+
+            let events = module.handle_message::<A>(message);
+            for (msg, gate_id) in events {
+                rt.add_event(
+                    MessageAtGateEvent {
+                        gate_id,
+                        message: ManuallyDrop::new(msg),
+                        handled: false,
+                    },
+                    SimTime::now(),
+                )
+            }
         } else {
-            error!("Dropped message for module id {}", self.module_id)
+            error!("Dropped message for module id {}", self.module_id);
         }
     }
 }
 
-impl<T: MessageBody> Drop for HandleMessageEvent<T> {
-    fn drop(&mut self) {}
+impl Drop for HandleMessageEvent {
+    fn drop(&mut self) {
+        if !self.handled {
+            unsafe { ManuallyDrop::drop(&mut self.message) }
+        }
+    }
 }
 
 pub struct CoroutineMessageEvent {}

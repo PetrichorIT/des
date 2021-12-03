@@ -1,4 +1,6 @@
-use crate::{Channel, Gate, GateDescription, GateId, GateType, GATE_NULL};
+use std::{cell::UnsafeCell, fmt::Display};
+
+use crate::{Channel, Gate, GateDescription, GateId, GateType, IntoModuleGate, Message, GATE_NULL};
 
 /// A runtime-unqiue identifier for a module / submodule inheritence tree.
 pub type ModuleId = u16;
@@ -15,16 +17,24 @@ fn register_module() -> ModuleId {
     }
 }
 
+pub type HandlerFunction = dyn Fn(&mut Module, Message);
+
 pub struct Module {
     pub id: ModuleId,
     pub gates: Vec<Gate>,
+    pub handle: UnsafeCell<Box<HandlerFunction>>,
+
+    out_queue: Vec<(Message, usize)>,
 }
 
 impl Module {
-    pub fn new() -> Self {
+    pub fn new(handler: &'static HandlerFunction) -> Self {
         Self {
             id: register_module(),
             gates: Vec::new(),
+            handle: UnsafeCell::new(Box::new(handler)),
+
+            out_queue: Vec::new(),
         }
     }
 
@@ -74,10 +84,44 @@ impl Module {
         }
         ids
     }
+
+    pub fn handle_message<A>(&mut self, message: Message) -> Vec<(Message, GateId)> {
+        let f = self.handle.get();
+        let f = unsafe { &*f };
+
+        // Handler
+        f(self, message);
+
+        // Compute results
+        self.out_queue
+            .drain(0..)
+            .map(|(msg, idx)| (msg, self.gates[idx].id()))
+            .collect()
+    }
+
+    // UTIL
+
+    pub fn send<T>(&mut self, message: Message, gate: T)
+    where
+        T: IntoModuleGate,
+    {
+        let gate_idx = gate.into_gate(self);
+        if let Some(gate_idx) = gate_idx {
+            self.out_queue.push((message, gate_idx))
+        } else {
+            eprintln!("Error: Could not find gate in current module");
+        }
+    }
 }
 
 impl Default for Module {
     fn default() -> Self {
-        Self::new()
+        Self::new(&|_b, _c| {})
+    }
+}
+
+impl Display for Module {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Module [{}]", self.id)
     }
 }
