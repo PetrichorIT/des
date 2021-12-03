@@ -123,6 +123,13 @@ impl Message {
         self.target_module_id = module_id;
     }
 
+    pub fn str(&self) -> String {
+        format!(
+            "#{}({}) {} bits",
+            self.message_id, self.message_tree_id, self.bit_len
+        )
+    }
+
     ///
     /// # Constructors
     ///

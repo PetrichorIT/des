@@ -131,73 +131,29 @@ impl Gate {
     }
 }
 
-// === OLD ===
-
-pub trait IntoModuleGate: Sized {
-    fn into_gate(self, _module: &Module) -> Option<usize> {
-        None
-    }
-}
-
-impl IntoModuleGate for Gate {
-    fn into_gate(self, module: &Module) -> Option<usize> {
-        let element = module
-            .gates
-            .iter()
-            .enumerate()
-            .find(|&(_idx, g)| g == &self)?;
-
-        Some(element.0)
-    }
-}
-
-impl IntoModuleGate for GateId {
-    fn into_gate(self, module: &Module) -> Option<usize> {
-        let element = module
-            .gates
-            .iter()
-            .enumerate()
-            .find(|&(_idx, g)| g.id() == self)?;
-
-        Some(element.0)
-    }
-}
-
-impl IntoModuleGate for (&str, usize) {
-    fn into_gate(self, module: &Module) -> Option<usize> {
-        let element = module
-            .gates
-            .iter()
-            .enumerate()
-            .find(|&(_idx, g)| g.name() == self.0 && g.pos() == self.1)?;
-
-        Some(element.0)
-    }
-}
-
 // == NEW ==
 
-pub trait IntoModuleGateTrait<T: ModuleTrait>: Sized {
+pub trait IntoModuleGate<T: Module>: Sized {
     fn into_gate(self, _module: &T) -> Option<GateId> {
         None
     }
 }
 
-impl<T: ModuleTrait> IntoModuleGateTrait<T> for Gate {
+impl<T: Module> IntoModuleGate<T> for Gate {
     fn into_gate(self, module: &T) -> Option<GateId> {
         let element = module.gates().iter().find(|&g| g == &self)?;
         Some(element.id())
     }
 }
 
-impl<T: ModuleTrait> IntoModuleGateTrait<T> for GateId {
+impl<T: Module> IntoModuleGate<T> for GateId {
     fn into_gate(self, module: &T) -> Option<GateId> {
         let element = module.gates().iter().find(|&g| g.id() == self)?;
         Some(element.id())
     }
 }
 
-impl<T: ModuleTrait> IntoModuleGateTrait<T> for (&str, usize) {
+impl<T: Module> IntoModuleGate<T> for (&str, usize) {
     fn into_gate(self, module: &T) -> Option<GateId> {
         let element = module
             .gates()

@@ -1,8 +1,5 @@
-use std::{cell::UnsafeCell, fmt::Display};
-
 use crate::{
-    Channel, Gate, GateDescription, GateId, GateType, IntoModuleGate, IntoModuleGateTrait, Message,
-    SimTime, GATE_NULL,
+    Channel, Gate, GateDescription, GateId, GateType, IntoModuleGate, Message, SimTime, GATE_NULL,
 };
 
 /// A runtime-unqiue identifier for a module / submodule inheritence tree.
@@ -20,11 +17,9 @@ fn register_module() -> ModuleId {
     }
 }
 
-pub type HandlerFunction = dyn Fn(&mut Module, Message);
-
 ///
 /// A trait that defines a module
-pub trait ModuleTrait {
+pub trait Module {
     ///
     /// Returns a pointer to the modules core, used for handling event and
     /// buffers that are use case unspecific.
@@ -82,7 +77,7 @@ pub trait ModuleTrait {
     /// Creates a gate on the current module, returning its ID.
     ///
     fn create_gate(&mut self, name: String, typ: GateType, channel: &Channel) -> GateId {
-        self.create_gate_cluster(name, 0, typ, channel)[0]
+        self.create_gate_cluster(name, 1, typ, channel)[0]
     }
 
     ///
@@ -96,7 +91,7 @@ pub trait ModuleTrait {
         channel: &Channel,
         next_hop: GateId,
     ) -> GateId {
-        self.create_gate_cluster_into(name, 0, typ, channel, vec![next_hop])[0]
+        self.create_gate_cluster_into(name, 1, typ, channel, vec![next_hop])[0]
     }
 
     ///
@@ -133,8 +128,8 @@ pub trait ModuleTrait {
         let descriptor = GateDescription::new(typ, name, size, self.id());
         let mut ids = Vec::new();
 
-        for i in 0..size {
-            let gate = Gate::new(descriptor.clone(), i, channel, next_hops[i]);
+        for (i, item) in next_hops.iter().enumerate() {
+            let gate = Gate::new(descriptor.clone(), i, channel, *item);
             ids.push(gate.id());
             self.gates_mut().push(gate);
         }
@@ -155,7 +150,7 @@ pub trait ModuleTrait {
     ///
     fn send<T>(&mut self, msg: Message, gate: T)
     where
-        T: IntoModuleGateTrait<Self>,
+        T: IntoModuleGate<Self>,
         Self: Sized,
     {
         let gate_idx = gate.into_gate(self);
@@ -172,6 +167,27 @@ pub trait ModuleTrait {
     fn schedule_at(&mut self, msg: Message, time: SimTime) {
         assert!(time >= SimTime::now());
         self.module_core_mut().loopback_buffer.push((msg, time))
+    }
+
+    ///
+    /// A periodic activity handler.
+    ///
+    fn activity(&mut self) {}
+
+    ///
+    /// Enables the activity corountine using the given period.
+    /// This function should only be called from [Self::handle_message].
+    ///
+    fn enable_activity(&mut self, period: SimTime) {
+        self.module_core_mut().activity_period = period;
+        self.module_core_mut().activity_active = false;
+    }
+
+    ///
+    /// Disables the activity coroutine cancelling the next call.
+    ///
+    fn disable_activity(&mut self) {
+        self.module_core_mut().activity_period = SimTime::ZERO;
     }
 }
 
@@ -191,111 +207,29 @@ pub struct ModuleCore {
 
     /// A buffer of wakeup calls to be enqueued, after the current handle message terminates.
     pub loopback_buffer: Vec<(Message, SimTime)>,
+
+    /// The period of the activity coroutine (if zero than there is no coroutine).
+    pub activity_period: SimTime,
+
+    /// An indicator whether a valid activity timeout is existent.
+    pub activity_active: bool,
 }
 
-pub struct Module {
-    pub id: ModuleId,
-    pub gates: Vec<Gate>,
-    pub handle: UnsafeCell<Box<HandlerFunction>>,
-
-    out_queue: Vec<(Message, usize)>,
-}
-
-impl Module {
-    pub fn new(handler: &'static HandlerFunction) -> Self {
+impl ModuleCore {
+    pub fn new() -> Self {
         Self {
             id: register_module(),
             gates: Vec::new(),
-            handle: UnsafeCell::new(Box::new(handler)),
-
-            out_queue: Vec::new(),
-        }
-    }
-
-    pub fn gate(&self, name: &str, idx: usize) -> Option<&Gate> {
-        self.gates
-            .iter()
-            .find(|g| g.name() == name && g.pos() == idx)
-    }
-
-    pub fn gate_mut(&mut self, name: &str, idx: usize) -> Option<&mut Gate> {
-        self.gates
-            .iter_mut()
-            .find(|g| g.name() == name && g.pos() == idx)
-    }
-
-    #[inline(always)]
-    pub fn create_gate(&mut self, name: String, typ: GateType, channel: &Channel) -> GateId {
-        self.create_gate_cluster(name, 1, typ, channel)[0]
-    }
-
-    pub fn create_gate_into(
-        &mut self,
-        name: String,
-        typ: GateType,
-        channel: &Channel,
-        next_hop: GateId,
-    ) -> GateId {
-        let id = self.create_gate_cluster(name, 1, typ, channel)[0];
-        self.gates.last_mut().unwrap().set_next_gate(next_hop);
-        id
-    }
-
-    pub fn create_gate_cluster(
-        &mut self,
-        name: String,
-        size: usize,
-        typ: GateType,
-        channel: &Channel,
-    ) -> Vec<GateId> {
-        let descriptor = GateDescription::new(typ, name, size, self.id);
-        let mut ids = Vec::new();
-
-        for i in 0..size {
-            let gate = Gate::new(descriptor.clone(), i, channel, GATE_NULL);
-            ids.push(gate.id());
-            self.gates.push(gate);
-        }
-        ids
-    }
-
-    pub fn handle_message<A>(&mut self, message: Message) -> Vec<(Message, GateId)> {
-        let f = self.handle.get();
-        let f = unsafe { &*f };
-
-        // Handler
-        f(self, message);
-
-        // Compute results
-        self.out_queue
-            .drain(0..)
-            .map(|(msg, idx)| (msg, self.gates[idx].id()))
-            .collect()
-    }
-
-    // UTIL
-
-    pub fn send<T>(&mut self, message: Message, gate: T)
-    where
-        T: IntoModuleGate,
-    {
-        let gate_idx = gate.into_gate(self);
-        if let Some(gate_idx) = gate_idx {
-            self.out_queue.push((message, gate_idx))
-        } else {
-            eprintln!("Error: Could not find gate in current module");
+            out_buffer: Vec::new(),
+            loopback_buffer: Vec::new(),
+            activity_period: SimTime::ZERO,
+            activity_active: false,
         }
     }
 }
 
-impl Default for Module {
+impl Default for ModuleCore {
     fn default() -> Self {
-        Self::new(&|_b, _c| {})
-    }
-}
-
-impl Display for Module {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Module [{}]", self.id)
+        Self::new()
     }
 }

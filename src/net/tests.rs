@@ -7,34 +7,54 @@ fn it_works() {
 
     struct A();
 
+    struct Alice(ModuleCore);
+
+    impl Module for Alice {
+        fn module_core(&self) -> &ModuleCore {
+            &self.0
+        }
+
+        fn module_core_mut(&mut self) -> &mut ModuleCore {
+            &mut self.0
+        }
+
+        fn handle_message(&mut self, msg: Message) {
+            info!(target: "Alice", "Received at {}: message #{:?} content: {}", sim_time_fmt(),msg.id(), msg.extract_content::<String>());
+
+            self.send(
+                Message::new(
+                    1,
+                    GATE_NULL,
+                    self.id(),
+                    43,
+                    SimTime::ZERO,
+                    String::from("Pong"),
+                ),
+                ("netOut", 0),
+            )
+        }
+    }
+
+    struct Bob(ModuleCore);
+
+    impl Module for Bob {
+        fn module_core(&self) -> &ModuleCore {
+            &self.0
+        }
+
+        fn module_core_mut(&mut self) -> &mut ModuleCore {
+            &mut self.0
+        }
+
+        fn handle_message(&mut self, msg: Message) {
+            info!(target: "Bob", "Received at {}: message #{:?} content: {}", sim_time_fmt(),msg.id(), msg.extract_content::<String>());
+        }
+    }
+
+    let mut alice = Alice(ModuleCore::new());
+    let mut bob = Bob(ModuleCore::new());
+
     let mut app: NetworkRuntime<A> = NetworkRuntime::new(A());
-
-    let mut alice = Module::new(&|module, msg| {
-        println!("=== BOB APP ===");
-        println!("t   := {}", sim_time_fmt());
-        println!("mod := {}", module);
-        println!("msg := {:?}", msg);
-        println!("c   := {}", msg.extract_content::<String>());
-
-        module.send(
-            Message::new(
-                1,
-                GATE_NULL,
-                module.id,
-                43,
-                SimTime::ZERO,
-                String::from("Pong"),
-            ),
-            ("netOut", 0),
-        )
-    });
-    let mut bob = Module::new(&|module, msg| {
-        println!("=== ALUICE APP ===");
-        println!("t   := {}", sim_time_fmt());
-        println!("mod := {}", module);
-        println!("msg := {:?}", msg);
-        println!("c   := {}", msg.extract_content::<String>());
-    });
 
     app.channels.push(Channel::new(
         GATE_NULL,
@@ -61,14 +81,14 @@ fn it_works() {
     let r3 = alice.create_gate_into(String::from("netOut"), GateType::Output, channel, r2);
     let _r4 = alice.create_gate_into(String::from("netOut"), GateType::Output, channel, r3);
 
-    app.modules.push(alice);
-    app.modules.push(bob);
+    app.modules.push(Box::new(alice));
+    app.modules.push(Box::new(bob));
 
     let mut rt = Runtime::new_with(
         app,
         RuntimeOptions {
             sim_base_unit: SimTimeUnit::Seconds,
-            max_itr: !0,
+            max_itr: 200,
             rng: StdRng::seed_from_u64(0x56123),
         },
     );

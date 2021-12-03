@@ -22,3 +22,4 @@ path = "test/main.rs"
 log = "*"
 num-traits = "0.2"
 rand = {version = "*", features = ["std_rng"]}
+termcolor = "*"

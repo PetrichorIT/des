@@ -15,10 +15,10 @@ pub use module::*;
 pub use packet::*;
 
 use crate::{Event, SimTime};
-use log::error;
+use log::{error, info, warn};
 
 pub struct NetworkRuntime<A> {
-    pub modules: Vec<Module>,
+    pub modules: Vec<Box<dyn Module>>,
     pub channels: Vec<Channel>,
 
     pub inner: A,
@@ -34,17 +34,20 @@ impl<A> NetworkRuntime<A> {
         }
     }
 
-    pub fn module(&self, module_id: ModuleId) -> Option<&Module> {
-        self.modules.iter().find(|m| m.id == module_id)
+    pub fn module(&self, module_id: ModuleId) -> Option<&dyn Module> {
+        self.modules
+            .iter()
+            .find(|m| m.id() == module_id)
+            .map(|c| c.as_ref())
     }
 
-    pub fn module_mut(&mut self, module_id: ModuleId) -> Option<&mut Module> {
-        self.modules.iter_mut().find(|m| m.id == module_id)
+    pub fn module_mut(&mut self, module_id: ModuleId) -> Option<&mut Box<dyn Module>> {
+        self.modules.iter_mut().find(|m| m.id() == module_id)
     }
 
     pub fn gate(&self, id: GateId) -> Option<&Gate> {
         for module in &self.modules {
-            for gate in &module.gates {
+            for gate in module.gates() {
                 if gate.id() == id {
                     return Some(gate);
                 }
@@ -71,7 +74,7 @@ impl<A> NetworkRuntime<A> {
     }
 }
 
-pub struct MessageAtGateEvent {
+pub(crate) struct MessageAtGateEvent {
     gate_id: GateId,
     message: ManuallyDrop<Message>,
     handled: bool,
@@ -88,9 +91,11 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
             self.handled = true;
 
             if gate.next_gate() == GATE_SELF || gate.next_gate() == GATE_NULL {
-                println!(
-                    "Gate [{}] handling event {:?} >>> ONTO CHANNEL",
-                    self.gate_id, message
+                info!(
+                    target: &format!("Gate #{}", self.gate_id),
+                    "Forwarding message [{}] to module #{}",
+                    message.str(),
+                    gate.module()
                 );
 
                 // handle message
@@ -118,16 +123,20 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
                 // redirect to next channel
                 let next_gate = gate.next_gate();
 
-                println!(
-                    "Gate [{}] handling event {:?} >>> TOO NEXT GATE {}",
-                    self.gate_id, message, next_gate
+                info!(
+                    target: &format!("Gate #{}", self.gate_id),
+                    "Forwarding message [{}] to next gate #{}",
+                    message.str(),
+                    next_gate
                 );
 
                 let channel = rt.app.channel(gate.channel()).unwrap();
                 if channel.busy {
-                    println!(
-                        "Dropping message {:?} pushed onto busy channel {:?}",
-                        message, channel
+                    warn!(
+                        target: &format!("Gate #{}", self.gate_id),
+                        "Dropping message {} pushed onto busy channel #{:?}",
+                        message.str(),
+                        channel
                     );
                     drop(message);
                     return;
@@ -143,9 +152,10 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
                 )
             }
         } else {
-            panic!(
-                "Message {:?} dropped after gate id {} was not found",
-                self.message, self.gate_id
+            error!(
+                target: &format!("Undefined Gate #{}", self.gate_id),
+                "Message {:?} dropped after gate was not found",
+                self.message.str()
             )
         }
     }
@@ -159,7 +169,7 @@ impl Drop for MessageAtGateEvent {
     }
 }
 
-pub struct HandleMessageEvent {
+pub(crate) struct HandleMessageEvent {
     module_id: ModuleId,
     message: ManuallyDrop<Message>,
     handled: bool,
@@ -170,14 +180,33 @@ impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
         if let Some(module) = rt.app.module_mut(self.module_id) {
             let ptr: *const Message = unsafe { &ManuallyDrop::take(&mut self.message) };
             let mut message = unsafe { std::ptr::read(ptr) };
-            message.set_target_module(module.id);
+            message.set_target_module(module.id());
 
             self.handled = true;
 
-            println!("[Module {}] handle message {:?}", self.module_id, message);
+            info!(
+                target: &format!("Module #{}", self.module_id),
+                "Handling message {:?}",
+                message.str()
+            );
 
-            let events = module.handle_message::<A>(message);
-            for (msg, gate_id) in events {
+            module.handle_message(message);
+
+            // Send out events
+            let out_buffer: Vec<(Message, GateId)> =
+                module.module_core_mut().out_buffer.drain(0..).collect();
+
+            // Schedule own wakeups
+            let loopback_buffer: Vec<(Message, SimTime)> = module
+                .module_core_mut()
+                .loopback_buffer
+                .drain(0..)
+                .collect();
+
+            let enqueue_activity_msg = module.module_core_mut().activity_period != SimTime::ZERO
+                && !module.module_core_mut().activity_active;
+
+            for (msg, gate_id) in out_buffer {
                 rt.add_event(
                     MessageAtGateEvent {
                         gate_id,
@@ -187,8 +216,32 @@ impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
                     SimTime::now(),
                 )
             }
+
+            for (msg, time) in loopback_buffer {
+                rt.add_event(
+                    HandleMessageEvent {
+                        module_id: self.module_id,
+                        message: ManuallyDrop::new(msg),
+                        handled: false,
+                    },
+                    time,
+                )
+            }
+
+            if enqueue_activity_msg {
+                rt.add_event(
+                    CoroutineMessageEvent {
+                        module_id: self.module_id,
+                    },
+                    SimTime::now(),
+                )
+            }
         } else {
-            error!("Dropped message for module id {}", self.module_id);
+            error!(
+                target: &format!("Unknown module #{}", self.module_id),
+                "Dropped message {} since module was not found",
+                self.message.str()
+            );
         }
     }
 }
@@ -201,9 +254,34 @@ impl Drop for HandleMessageEvent {
     }
 }
 
-pub struct CoroutineMessageEvent {}
+pub(crate) struct CoroutineMessageEvent {
+    module_id: ModuleId,
+}
 
-pub struct ChannelUnbusyNotif {
+impl<A> Event<NetworkRuntime<A>> for CoroutineMessageEvent {
+    fn handle(&mut self, rt: &mut crate::Runtime<NetworkRuntime<A>>) {
+        if let Some(module) = rt.app.module_mut(self.module_id) {
+            let dur = module.module_core().activity_period;
+            if dur != SimTime::ZERO {
+                module.activity();
+
+                rt.add_event_in(
+                    CoroutineMessageEvent {
+                        module_id: self.module_id,
+                    },
+                    dur,
+                )
+            }
+        } else {
+            error!(
+                target: &format!("Module #{}", self.module_id),
+                " Coroutine call",
+            );
+        }
+    }
+}
+
+pub(crate) struct ChannelUnbusyNotif {
     channel_id: ChannelId,
 }
 

@@ -12,6 +12,8 @@ use std::{
     fmt::{Debug, Display},
 };
 
+use super::logger::StandardLogger;
+
 static mut RT_CORE: Option<RuntimeCore> = None;
 
 /// Return the simulation time of the current runtime.
@@ -19,6 +21,7 @@ pub fn sim_time() -> SimTime {
     unsafe { RT_CORE.as_ref().unwrap().sim_time }
 }
 
+/// Returns the simulation time formated as a [String].
 pub fn sim_time_fmt() -> String {
     unsafe {
         SimTimeUnit::fmt_compact(
@@ -67,6 +70,10 @@ impl RuntimeCore {
             max_itr,
             rng,
         };
+
+        if let Err(e) = StandardLogger::setup() {
+            eprintln!("{}", e)
+        }
 
         unsafe {
             RT_CORE = Some(rtc);
@@ -183,12 +190,6 @@ impl<A> Runtime<A> {
 
         let mut node = self.future_event_heap.pop().unwrap();
         self.core.sim_time = node.time();
-
-        println!(
-            ">> Event [{}] at {}",
-            node.id(),
-            SimTimeUnit::fmt_compact(self.core.sim_time, self.core.sim_base_unit)
-        );
 
         node.handle(self);
         !self.future_event_heap.is_empty()
