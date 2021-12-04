@@ -98,7 +98,7 @@ impl SimTime {
     /// use dse::SimTime;
     ///
     /// let st_1 = SimTime::new(3.4);
-    /// let st_2 = SimTime::new(-1.4);
+    /// let st_2 = SimTime::new(1.4);
     ///
     /// assert!((st_1.fract().abs() - 0.4).abs() < 1e-10);
     /// assert!((st_2.fract().abs() - 0.4).abs() < 1e-10);

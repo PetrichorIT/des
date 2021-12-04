@@ -15,6 +15,9 @@ pub const CHANNEL_NULL: ChannelId = 0;
 /// A reference to other channel in a two directional configuration.
 pub const CHANNEL_SELF: ChannelId = 1;
 
+/// The id of a general purpose non-delay channel
+pub const CHANNEL_INSTANTANEOUS: GateId = 2;
+
 ///
 /// Metrics that define a channels capabilitites.
 ///
@@ -30,6 +33,15 @@ pub struct ChannelMetrics {
 
 impl ChannelMetrics {
     ///
+    /// A channel metric that does not take up time.
+    ///
+    pub const INSTANTANEOUS: ChannelMetrics = ChannelMetrics {
+        bitrate: 0,
+        latency: SimTime::ZERO,
+        jitter: SimTime::ZERO,
+    };
+
+    ///
     /// Creates a new instance of channel metrics.
     ///
     pub fn new(bitrate: usize, latency: SimTime, jitter: SimTime) -> Self {
@@ -44,6 +56,10 @@ impl ChannelMetrics {
     /// Calcualtes the duration a message travels on a link.
     ///
     pub fn calculate_duration(&self, msg: &Message) -> SimTime {
+        if self.bitrate == 0 {
+            return SimTime::ZERO;
+        }
+
         let len = msg.bit_len();
         let transmission_time = len as f64 / self.bitrate as f64;
         if self.jitter == SimTime::ZERO {
@@ -53,6 +69,10 @@ impl ChannelMetrics {
         }
     }
 
+    ///
+    /// Calculate the duration the channel is busy transmitting the
+    /// message onto the channel.
+    ///
     pub fn calculate_busy(&self, msg: &Message) -> SimTime {
         let len = msg.bit_len();
         SimTime::new(len as f64 / self.bitrate as f64)
@@ -86,33 +106,46 @@ pub struct Channel {
     /// A unique identifier for a channel.
     pub id: ChannelId,
 
-    /// The source of the channel.
-    pub src: GateId,
-
-    /// The connection bound to the channel.
-    pub trg: GateId,
-
     /// The capabilities of the channel.
     pub metrics: ChannelMetrics,
 
+    /// A indicator whether a channel is busy transmitting a packet.
     pub busy: bool,
 }
 
 impl Channel {
-    pub fn new(src: GateId, trg: GateId, metrics: ChannelMetrics) -> Self {
+    ///
+    /// A channel metric that does not take up time.
+    ///
+    pub const INSTANTANEOUS: Channel = Channel {
+        id: 2,
+        metrics: ChannelMetrics::INSTANTANEOUS,
+        busy: false,
+    };
+
+    ///
+    /// Creates a new channel using tthe given metrics.
+    ///
+    pub fn new(metrics: ChannelMetrics) -> Self {
         Self {
             id: register_channel(),
-            src,
-            trg,
             metrics,
             busy: false,
         }
     }
 
+    ///
+    /// Calcualtes the packet travel duration using the
+    /// underlying metric.
+    ///
     pub fn calculate_duration(&self, msg: &Message) -> SimTime {
         self.metrics.calculate_duration(msg)
     }
 
+    ///
+    /// Calcualtes the busy time of the channel using
+    /// the underlying metric.
+    ///
     pub fn calculate_busy(&self, msg: &Message) -> SimTime {
         self.metrics.calculate_busy(msg)
     }

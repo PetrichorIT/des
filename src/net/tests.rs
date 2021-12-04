@@ -56,15 +56,11 @@ fn it_works() {
 
     let mut app: NetworkRuntime<A> = NetworkRuntime::new(A());
 
-    app.channels.push(Channel::new(
-        GATE_NULL,
-        GATE_NULL,
-        ChannelMetrics {
-            bitrate: 5_000_000,
-            latency: 0.1.into(),
-            jitter: 0.0.into(),
-        },
-    ));
+    app.channels.push(Channel::new(ChannelMetrics {
+        bitrate: 5_000_000,
+        latency: 0.1.into(),
+        jitter: 0.0.into(),
+    }));
 
     let channel = &app.channels[0];
 

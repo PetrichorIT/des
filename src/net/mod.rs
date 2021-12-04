@@ -34,6 +34,11 @@ impl<A> NetworkRuntime<A> {
         }
     }
 
+    pub fn create_module(&mut self, module: Box<dyn Module>) -> &mut Box<dyn Module> {
+        self.modules.push(module);
+        self.modules.last_mut().unwrap()
+    }
+
     pub fn module(&self, module_id: ModuleId) -> Option<&dyn Module> {
         self.modules
             .iter()
@@ -65,6 +70,12 @@ impl<A> NetworkRuntime<A> {
         Some(gate)
     }
 
+    pub fn create_channel(&mut self, metrics: ChannelMetrics) -> &Channel {
+        let channel = Channel::new(metrics);
+        self.channels.push(channel);
+        self.channels.last().unwrap()
+    }
+
     pub fn channel(&self, id: ChannelId) -> Option<&Channel> {
         self.channels.iter().find(|c| c.id == id)
     }
@@ -74,10 +85,10 @@ impl<A> NetworkRuntime<A> {
     }
 }
 
-pub(crate) struct MessageAtGateEvent {
-    gate_id: GateId,
-    message: ManuallyDrop<Message>,
-    handled: bool,
+pub struct MessageAtGateEvent {
+    pub gate_id: GateId,
+    pub message: ManuallyDrop<Message>,
+    pub handled: bool,
 }
 
 impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
