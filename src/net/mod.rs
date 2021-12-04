@@ -4,8 +4,6 @@ mod message;
 mod module;
 mod packet;
 
-mod tests;
-
 use std::mem::ManuallyDrop;
 
 pub use channel::*;
@@ -174,7 +172,10 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
 
 impl Drop for MessageAtGateEvent {
     fn drop(&mut self) {
-        if !self.handled {
+        if !self.handled && std::mem::needs_drop::<Message>() {
+            // SAFTY:
+            // If the message was no forwarded to another party
+            // drop it manully
             unsafe { ManuallyDrop::drop(&mut self.message) }
         }
     }

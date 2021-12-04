@@ -1,13 +1,17 @@
+use global_uid::GlobalUID;
 use std::fmt::{Debug, Display};
 
 use super::*;
 
 /// A runtime-unquie identifier for a gate.
-pub type GateId = u32;
+#[derive(GlobalUID)]
+#[repr(transparent)]
+pub struct GateId(u32);
+
 /// A non-initalized gate.
-pub const GATE_NULL: GateId = 0;
+pub const GATE_NULL: GateId = GateId(0);
 /// A referecne to the current working gate.
-pub const GATE_SELF: GateId = 1;
+pub const GATE_SELF: GateId = GateId(1);
 
 ///
 /// The type of a gate, defining the message flow
@@ -71,15 +75,6 @@ impl GateDescription {
 impl Display for GateDescription {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Debug::fmt(&self, f)
-    }
-}
-
-static mut NEXT_GATE_ID: GateId = 0xff;
-fn get_gate_id() -> GateId {
-    unsafe {
-        let id = NEXT_GATE_ID;
-        NEXT_GATE_ID += 1;
-        id
     }
 }
 
@@ -155,7 +150,7 @@ impl Gate {
         next_gate: GateId,
     ) -> Self {
         Self {
-            id: get_gate_id(),
+            id: GateId::gen(),
             description,
             pos,
             channel_id: channel.id,

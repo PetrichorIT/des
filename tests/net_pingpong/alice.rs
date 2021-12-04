@@ -1,4 +1,4 @@
-use dse::{sim_time_fmt, Message, Module, ModuleCore, SimTime, GATE_NULL};
+use dse::{sim_time_fmt, Message, Module, ModuleCore, SimTime, GATE_NULL, MODULE_NULL};
 use log::info;
 
 pub struct Alice(pub ModuleCore);
@@ -20,7 +20,7 @@ impl Module for Alice {
                 1,
                 GATE_NULL,
                 self.id(),
-                43,
+                MODULE_NULL,
                 SimTime::ZERO,
                 String::from("Pong"),
             ),

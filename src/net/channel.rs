@@ -1,22 +1,25 @@
 use std::fmt::Display;
 
-use super::GateId;
+use global_uid::GlobalUID;
+
 use crate::{Message, SimTime};
 
 /// A runtime-unqiue identifier for a end-to-end connection.
 pub type ConnectionId = usize;
 
 /// A runtime-unique identifier for a one directional channel.
-pub type ChannelId = usize;
+#[derive(GlobalUID)]
+#[repr(transparent)]
+pub struct ChannelId(usize);
 
 /// A not defined channel aka a missing link.
-pub const CHANNEL_NULL: ChannelId = 0;
+pub const CHANNEL_NULL: ChannelId = ChannelId(0);
 
 /// A reference to other channel in a two directional configuration.
-pub const CHANNEL_SELF: ChannelId = 1;
+pub const CHANNEL_SELF: ChannelId = ChannelId(1);
 
 /// The id of a general purpose non-delay channel
-pub const CHANNEL_INSTANTANEOUS: GateId = 2;
+pub const CHANNEL_INSTANTANEOUS: ChannelId = ChannelId(2);
 
 ///
 /// Metrics that define a channels capabilitites.
@@ -89,15 +92,6 @@ impl Display for ChannelMetrics {
     }
 }
 
-static mut CHANNEL_ID: ChannelId = 0xff;
-fn register_channel() -> ChannelId {
-    unsafe {
-        let r = CHANNEL_ID;
-        CHANNEL_ID += 1;
-        r
-    }
-}
-
 ///
 /// A representation of a one directional link.
 ///
@@ -118,7 +112,7 @@ impl Channel {
     /// A channel metric that does not take up time.
     ///
     pub const INSTANTANEOUS: Channel = Channel {
-        id: 2,
+        id: CHANNEL_INSTANTANEOUS,
         metrics: ChannelMetrics::INSTANTANEOUS,
         busy: false,
     };
@@ -128,7 +122,7 @@ impl Channel {
     ///
     pub fn new(metrics: ChannelMetrics) -> Self {
         Self {
-            id: register_channel(),
+            id: ChannelId::gen(),
             metrics,
             busy: false,
         }

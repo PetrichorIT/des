@@ -1,21 +1,16 @@
+use global_uid::GlobalUID;
+
 use crate::{
     Channel, Gate, GateDescription, GateId, GateType, IntoModuleGate, Message, SimTime, GATE_NULL,
 };
 
 /// A runtime-unqiue identifier for a module / submodule inheritence tree.
-pub type ModuleId = u16;
+#[derive(GlobalUID)]
+#[repr(transparent)]
+pub struct ModuleId(u16);
 
 /// A indication that the referenced module does not exist.
-pub const MODULE_NULL: ModuleId = 0;
-
-static mut MODULE_ID: ModuleId = 0xff;
-fn register_module() -> ModuleId {
-    unsafe {
-        let r = MODULE_ID;
-        MODULE_ID += 1;
-        r
-    }
-}
+pub const MODULE_NULL: ModuleId = ModuleId(0);
 
 ///
 /// A trait that defines a module
@@ -218,7 +213,7 @@ pub struct ModuleCore {
 impl ModuleCore {
     pub fn new() -> Self {
         Self {
-            id: register_module(),
+            id: ModuleId::gen(),
             gates: Vec::new(),
             out_buffer: Vec::new(),
             loopback_buffer: Vec::new(),

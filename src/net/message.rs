@@ -3,33 +3,17 @@ use std::{
     fmt::Debug,
 };
 
+use global_uid::GlobalUID;
+
 use super::*;
 use crate::SimTime;
 
-/// A runtime-unqiue identifier for a message or a message inherintance tree.
-pub type MessageId = u32;
+#[derive(GlobalUID)]
+#[repr(transparent)]
+pub struct MessageId(u32);
+
 /// The type of messages, similar to the TOS field in IP packets.
 pub type MessageKind = u16;
-
-static mut MSG_COUNT: usize = 0;
-fn register_message() {
-    // unsafe { MSG_COUNT += 1 }
-}
-
-fn unregister_message() {
-    // unsafe { MSG_COUNT -= 1 }
-}
-
-static mut NEXT_MESSAGE_ID: MessageId = 1;
-fn get_message_id() -> MessageId {
-    // SAFTEY:
-    // Since we'll run single_threaded this be safe
-    unsafe {
-        let id = NEXT_MESSAGE_ID;
-        NEXT_MESSAGE_ID += 1;
-        id
-    }
-}
 
 ///
 /// A generic network message holding a payload.
@@ -149,8 +133,6 @@ impl Message {
         content: usize,
         bit_len: usize,
     ) -> Self {
-        register_message();
-
         Self {
             kind,
             last_gate,
@@ -175,7 +157,7 @@ impl Message {
         timestamp: SimTime,
         content: T,
     ) -> Self {
-        let id = get_message_id();
+        let id = MessageId::gen();
 
         let bit_len = content.bit_len();
 
@@ -203,12 +185,11 @@ impl Message {
     /// # Static methods
     ///
 
-    pub fn total_message_count() -> usize {
-        unsafe { MSG_COUNT }
-    }
-
     pub fn extract_content<T: MessageBody>(self) -> Box<T> {
         let ptr = self.content as *mut T;
+        // SAFTY:
+        // Note that this function is incredbilly unsafe but nessecary
+        // due to the constrains of the user-defined content.
         unsafe { Box::from_raw(ptr) }
     }
 }
@@ -224,17 +205,11 @@ impl Clone for Message {
             self.creation_time,
             self.send_time,
             self.timestamp,
-            get_message_id(),
+            MessageId::gen(),
             self.message_tree_id,
             self.content,
             self.bit_len,
         )
-    }
-}
-
-impl Drop for Message {
-    fn drop(&mut self) {
-        unregister_message()
     }
 }
 

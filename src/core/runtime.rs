@@ -1,3 +1,4 @@
+use lazy_static::lazy_static;
 use rand::{
     distributions::Standard,
     prelude::{Distribution, StdRng},
@@ -10,33 +11,33 @@ use std::{
     any::type_name,
     collections::BinaryHeap,
     fmt::{Debug, Display},
+    sync::RwLock,
 };
 
 use super::logger::StandardLogger;
 
-static mut RT_CORE: Option<RuntimeCore> = None;
+lazy_static! {
+    static ref RTCORE: RwLock<Option<RuntimeCore>> = RwLock::new(None);
+}
 
-/// Return the simulation time of the current runtime.
+#[inline(always)]
 pub fn sim_time() -> SimTime {
-    unsafe { RT_CORE.as_ref().unwrap().sim_time }
+    RTCORE.read().unwrap().as_ref().unwrap().sim_time
 }
 
-/// Returns the simulation time formated as a [String].
+#[inline(always)]
 pub fn sim_time_fmt() -> String {
-    unsafe {
-        SimTimeUnit::fmt_compact(
-            RT_CORE.as_ref().unwrap().sim_time,
-            RT_CORE.as_ref().unwrap().sim_base_unit,
-        )
-    }
+    SimTimeUnit::fmt_compact(
+        RTCORE.read().unwrap().as_ref().unwrap().sim_time,
+        RTCORE.read().unwrap().as_ref().unwrap().sim_base_unit,
+    )
 }
 
-/// Return the rng of the current runtime.
 pub fn rng<T>() -> T
 where
     Standard: Distribution<T>,
 {
-    unsafe { RT_CORE.as_mut().unwrap().rng.gen() }
+    RTCORE.write().unwrap().as_mut().unwrap().rng.gen()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -61,7 +62,7 @@ impl RuntimeCore {
         itr: usize,
         max_itr: usize,
         rng: StdRng,
-    ) -> &'static mut Self {
+    ) -> &'static RwLock<Option<RuntimeCore>> {
         let rtc = Self {
             sim_time,
             sim_base_unit,
@@ -75,10 +76,9 @@ impl RuntimeCore {
             eprintln!("{}", e)
         }
 
-        unsafe {
-            RT_CORE = Some(rtc);
-            RT_CORE.as_mut().unwrap()
-        }
+        *RTCORE.write().unwrap() = Some(rtc);
+
+        &RTCORE
     }
 }
 
@@ -90,7 +90,7 @@ impl RuntimeCore {
 pub struct Runtime<A> {
     pub app: A,
 
-    core: &'static mut RuntimeCore,
+    core: &'static RwLock<Option<RuntimeCore>>,
     future_event_heap: BinaryHeap<EventNode<A>>,
 }
 
@@ -100,7 +100,7 @@ impl<A> Runtime<A> {
     ///
     #[inline(always)]
     pub fn num_events_dispatched(&self) -> usize {
-        self.core.event_id
+        self.core.read().unwrap().as_ref().unwrap().event_id
     }
 
     ///
@@ -108,7 +108,7 @@ impl<A> Runtime<A> {
     ///
     #[inline(always)]
     pub fn num_events_received(&self) -> usize {
-        self.core.itr
+        self.core.read().unwrap().as_ref().unwrap().itr
     }
 
     ///
@@ -117,7 +117,7 @@ impl<A> Runtime<A> {
     ///
     #[inline(always)]
     pub fn max_itr(&self) -> usize {
-        self.core.max_itr
+        self.core.read().unwrap().as_ref().unwrap().max_itr
     }
 
     ///
@@ -125,22 +125,42 @@ impl<A> Runtime<A> {
     ///
     #[inline(always)]
     pub fn set_max_itr(&mut self, value: usize) {
-        self.core.max_itr = value;
+        self.core.write().unwrap().as_mut().unwrap().max_itr = value;
     }
 
     ///
     /// Returns the current simulation time.
     ///
     pub fn sim_time(&self) -> SimTime {
-        self.core.sim_time
+        self.core.read().unwrap().as_ref().unwrap().sim_time
     }
 
     ///
     /// Returns the rng.
     ///
-    pub fn rng(&mut self) -> &mut StdRng {
-        &mut self.core.rng
+    pub fn rng<T>(&self) -> T
+    where
+        Standard: Distribution<T>,
+    {
+        self.core.write().unwrap().as_mut().unwrap().rng.gen()
     }
+
+    ///
+    /// Returns the rng.
+    ///
+    pub fn rng_sample<T, D>(&self, distribution: D) -> T
+    where
+        D: Distribution<T>,
+    {
+        self.core
+            .write()
+            .unwrap()
+            .as_mut()
+            .unwrap()
+            .rng
+            .sample(distribution)
+    }
+
     ///
     /// Creates a new [Runtime] Instance using an application as core,
     /// and accepting events of type [Event<A>].
@@ -182,14 +202,14 @@ impl<A> Runtime<A> {
     ///
     #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> bool {
-        if self.core.itr > self.max_itr() {
+        if self.num_events_received() > self.max_itr() {
             return false;
         }
 
-        self.core.itr += 1;
+        self.core.write().unwrap().as_mut().unwrap().itr += 1;
 
         let mut node = self.future_event_heap.pop().unwrap();
-        self.core.sim_time = node.time();
+        self.core.write().unwrap().as_mut().unwrap().sim_time = node.time();
 
         node.handle(self);
         !self.future_event_heap.is_empty()
@@ -212,7 +232,8 @@ impl<A> Runtime<A> {
     /// Decontructs the runtime and returns the application and the final sim_time.
     ///
     pub fn finish(self) -> (A, SimTime) {
-        (self.app, self.core.sim_time)
+        let t1 = self.sim_time();
+        (self.app, t1)
     }
 
     ///
@@ -220,7 +241,7 @@ impl<A> Runtime<A> {
     /// time units.
     ///
     pub fn add_event_in<T: 'static + Event<A>>(&mut self, event: T, duration: SimTime) {
-        self.add_event(event, self.core.sim_time + duration)
+        self.add_event(event, self.sim_time() + duration)
     }
 
     ///
@@ -229,10 +250,10 @@ impl<A> Runtime<A> {
     /// function will panic.
     ///
     pub fn add_event<T: 'static + Event<A>>(&mut self, event: T, time: SimTime) {
-        assert!(time >= self.core.sim_time);
+        assert!(time >= self.sim_time());
 
         let node = EventNode::create_into(self, event, time);
-        self.core.event_id += 1;
+        self.core.write().unwrap().as_mut().unwrap().event_id += 1;
         self.future_event_heap.push(node);
     }
 }
@@ -243,12 +264,12 @@ impl<A> Debug for Runtime<A> {
             f,
             "Runtime<{}> {{ sim_time: {} (itr {} / {}) dispached: {} enqueued: {} }}",
             type_name::<A>(),
-            self.core.sim_time,
-            self.core.itr,
-            if self.core.max_itr == !0 {
+            self.sim_time(),
+            self.num_events_received(),
+            if self.max_itr() == !0 {
                 String::from("inf")
             } else {
-                format!("{}", self.core.max_itr)
+                format!("{}", self.max_itr())
             },
             self.num_events_dispatched(),
             self.future_event_heap.len()
@@ -262,12 +283,12 @@ impl<A> Display for Runtime<A> {
             f,
             "Runtime<{}> {{ sim_time: {} (itr {} / {}) dispached: {} enqueued: {} }}",
             type_name::<A>(),
-            self.core.sim_time,
-            self.core.itr,
-            if self.core.max_itr == !0 {
+            self.sim_time(),
+            self.num_events_received(),
+            if self.max_itr() == !0 {
                 String::from("inf")
             } else {
-                format!("{}", self.core.max_itr)
+                format!("{}", self.max_itr())
             },
             self.num_events_dispatched(),
             self.future_event_heap.len()

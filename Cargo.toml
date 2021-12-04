@@ -15,7 +15,9 @@ name = "dse"
 path = "src/lib.rs"
 
 [dependencies]
-log = "*"
+global_uid = {path = "global_uid"}
+lazy_static = "1.4.0"
+log = "0.4.14"
 num-traits = "0.2"
 rand = {version = "*", features = ["std_rng"]}
-termcolor = "*"
+termcolor = "1.1.2"

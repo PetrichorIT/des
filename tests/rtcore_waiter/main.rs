@@ -1,4 +1,4 @@
-use rand::{distributions::Standard, prelude::StdRng, Rng, SeedableRng};
+use rand::{distributions::Standard, prelude::StdRng, SeedableRng};
 use std::{collections::VecDeque, fmt::Debug};
 
 use dse::*;
@@ -110,7 +110,7 @@ impl Event<Application> for CustomerArrival {
 }
 
 fn expdist<A>(rt: &mut Runtime<A>, p: f64) -> f64 {
-    let x: f64 = rt.rng().sample(Standard);
+    let x: f64 = rt.rng_sample(Standard);
     x.ln() / -p
 }
 
