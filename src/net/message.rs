@@ -33,7 +33,6 @@ pub struct Message {
 
     // === Last Gate ===
     last_gate: GateId,
-    hop_counter: usize,
 
     // === Timings ===
     creation_time: SimTime,
@@ -88,6 +87,10 @@ impl Message {
         self.bit_len
     }
 
+    pub fn set_last_gate(&mut self, gate: GateId) {
+        self.last_gate = gate;
+    }
+
     ///
     /// # Additional fn
     ///
@@ -95,12 +98,6 @@ impl Message {
     #[inline(always)]
     pub fn is_self_msg(&self) -> bool {
         self.sender_module_id == self.target_module_id
-    }
-
-    #[inline(always)]
-    pub fn register_hop(&mut self, gate_id: GateId) {
-        self.last_gate = gate_id;
-        self.hop_counter += 1;
     }
 
     pub fn set_target_module(&mut self, module_id: ModuleId) {
@@ -122,7 +119,6 @@ impl Message {
     fn new_raw(
         kind: MessageKind,
         last_gate: GateId,
-        hop_counter: usize,
         sender_module_id: ModuleId,
         target_module_id: ModuleId,
         creation_time: SimTime,
@@ -136,7 +132,6 @@ impl Message {
         Self {
             kind,
             last_gate,
-            hop_counter,
             sender_module_id,
             target_module_id,
             creation_time,
@@ -147,6 +142,34 @@ impl Message {
             content,
             bit_len,
         }
+    }
+
+    pub fn new_boxed<T: MessageBody>(
+        kind: MessageKind,
+        sender_module_id: ModuleId,
+        timestamp: SimTime,
+        content: Box<T>,
+    ) -> Self {
+        let bit_len = content.bit_len();
+
+        let ptr: *const T = Box::into_raw(content);
+        let ptr = ptr as usize;
+
+        let id = MessageId::gen();
+
+        Self::new_raw(
+            kind,
+            GATE_NULL,
+            sender_module_id,
+            MODULE_NULL,
+            SimTime::now(),
+            SimTime::now(),
+            timestamp,
+            id,
+            id,
+            ptr,
+            bit_len,
+        )
     }
 
     pub fn new<T: MessageBody>(
@@ -168,7 +191,6 @@ impl Message {
         Self::new_raw(
             kind,
             last_gate,
-            0,
             sender_module_id,
             target_module_id,
             SimTime::now(),
@@ -199,7 +221,6 @@ impl Clone for Message {
         Self::new_raw(
             self.kind,
             self.last_gate,
-            self.hop_counter,
             self.sender_module_id,
             self.target_module_id,
             self.creation_time,
@@ -220,7 +241,6 @@ impl Debug for Message {
             .field("tree_id", &self.message_tree_id)
             .field("kind", &self.kind)
             .field("last_gate", &self.last_gate)
-            .field("hop_counter", &self.hop_counter)
             .field("sender_module_id", &self.sender_module_id)
             .field("target_module_id", &self.target_module_id)
             .field(

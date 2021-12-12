@@ -58,6 +58,10 @@ pub trait Module {
             .find(|&gate| gate.name() == name && gate.pos() == pos)
     }
 
+    fn gate_by_id(&self, id: GateId) -> Option<&Gate> {
+        self.gates().iter().find(|&gate| gate.id() == id)
+    }
+
     ///
     /// Returns a mutable ref to a gate of the current module dependent on its name and cluster position
     /// if possible.
@@ -66,6 +70,10 @@ pub trait Module {
         self.gates_mut()
             .iter_mut()
             .find(|gate| gate.name() == name && gate.pos() == pos)
+    }
+
+    fn gate_by_id_mut(&mut self, id: GateId) -> Option<&mut Gate> {
+        self.gates_mut().iter_mut().find(|gate| gate.id() == id)
     }
 
     ///
@@ -184,6 +192,52 @@ pub trait Module {
     fn disable_activity(&mut self) {
         self.module_core_mut().activity_period = SimTime::ZERO;
     }
+
+    ///
+    /// Indicates wether the module has a parent module.
+    ///
+    fn has_parent(&self) -> bool {
+        self.module_core().parent_ptr.is_some()
+    }
+}
+
+pub trait ModuleExt: Module {
+    ///
+    /// Returns the parent element.
+    ///
+    fn parent<T: Module>(&self) -> Option<&Box<T>> {
+        unsafe {
+            let ptr = self.module_core().parent_ptr?;
+            let ptr: *const Box<T> = ptr as *const Box<T>;
+            Some(&*ptr)
+        }
+    }
+
+    ///
+    /// Returns the parent element mutablly.
+    ///
+    fn parent_mut<T: Module>(&mut self) -> Option<&mut Box<T>> {
+        unsafe {
+            let ptr = self.module_core_mut().parent_ptr?;
+            let ptr: *mut Box<T> = ptr as *mut Box<T>;
+            println!("AAA {:?}", ptr);
+            let ptr = &mut *ptr;
+            println!("ID {}", ptr.id());
+            println!("GL {}", ptr.module_core().gates.len());
+
+            todo!()
+        }
+    }
+
+    ///
+    /// Sets the parent element.
+    ///
+    fn set_parent<T: Module>(&mut self, module: &mut Box<T>) {
+        let ptr: *mut Box<T> = module;
+        let ptr = ptr as usize;
+        println!("parent module > 0x{:x}", ptr);
+        self.module_core_mut().parent_ptr = Some(ptr);
+    }
 }
 
 ///
@@ -208,6 +262,9 @@ pub struct ModuleCore {
 
     /// An indicator whether a valid activity timeout is existent.
     pub activity_active: bool,
+
+    /// The module identificator for the parent module.
+    pub parent_ptr: Option<usize>,
 }
 
 impl ModuleCore {
@@ -219,6 +276,7 @@ impl ModuleCore {
             loopback_buffer: Vec::new(),
             activity_period: SimTime::ZERO,
             activity_active: false,
+            parent_ptr: None,
         }
     }
 }

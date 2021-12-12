@@ -14,6 +14,18 @@ netipv6 = ["net"]
 name = "dse"
 path = "src/lib.rs"
 
+[[bin]]
+name = "test_inet"
+path = "tests/inet/main.rs"
+
+[[bin]]
+name = "test_pingpong"
+path = "tests/net_pingpong/main.rs"
+
+[[bin]]
+name = "test_waiter"
+path = "tests/rtcore_waiter/main.rs"
+
 [dependencies]
 global_uid = {path = "global_uid"}
 lazy_static = "1.4.0"

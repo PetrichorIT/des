@@ -9,8 +9,10 @@ mod bob;
 struct Application();
 
 fn main() {
-    let mut alice = alice::Alice(ModuleCore::new());
-    let mut bob = bob::Bob(ModuleCore::new());
+    let mut alice = Box::new(alice::Alice(ModuleCore::new()));
+    let mut bob = Box::new(bob::Bob(ModuleCore::new()));
+
+    alice.set_parent(&mut bob);
 
     let mut app = NetworkRuntime::new(Application());
 
@@ -30,8 +32,8 @@ fn main() {
     let r3 = alice.create_gate_into(String::from("netOut"), GateType::Output, channel, r2);
     let _r4 = alice.create_gate_into(String::from("netOut"), GateType::Output, channel, r3);
 
-    app.create_module(Box::new(alice));
-    app.create_module(Box::new(bob));
+    app.create_module(alice);
+    app.create_module(bob);
 
     let mut rt = Runtime::new_with(
         app,

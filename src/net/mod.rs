@@ -26,7 +26,7 @@ impl<A> NetworkRuntime<A> {
     pub fn new(inner: A) -> Self {
         Self {
             modules: Vec::new(),
-            channels: Vec::new(),
+            channels: vec![Channel::INSTANTANEOUS],
 
             inner,
         }
@@ -95,13 +95,13 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
         if let Some(gate) = gate {
             let ptr: *const Message = unsafe { &ManuallyDrop::take(&mut self.message) };
             let mut message = unsafe { std::ptr::read(ptr) };
-            message.register_hop(gate.id());
+            message.set_last_gate(self.gate_id);
 
             self.handled = true;
 
             if gate.next_gate() == GATE_SELF || gate.next_gate() == GATE_NULL {
                 info!(
-                    target: &format!("Gate #{}", self.gate_id),
+                    target: &format!("Gate #{} ({})", self.gate_id, gate.name()),
                     "Forwarding message [{}] to module #{}",
                     message.str(),
                     gate.module()
@@ -133,7 +133,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
                 let next_gate = gate.next_gate();
 
                 info!(
-                    target: &format!("Gate #{}", self.gate_id),
+                    target: &format!("Gate #{} ({})", self.gate_id, gate.name()),
                     "Forwarding message [{}] to next gate #{}",
                     message.str(),
                     next_gate

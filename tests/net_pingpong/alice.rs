@@ -1,4 +1,4 @@
-use dse::{sim_time_fmt, Message, Module, ModuleCore, SimTime, GATE_NULL, MODULE_NULL};
+use dse::{sim_time_fmt, Message, Module, ModuleCore, ModuleExt, SimTime, GATE_NULL, MODULE_NULL};
 use log::info;
 
 pub struct Alice(pub ModuleCore);
@@ -25,6 +25,19 @@ impl Module for Alice {
                 String::from("Pong"),
             ),
             ("netOut", 0),
-        )
+        );
+
+        self.parent_mut::<super::bob::Bob>()
+            .unwrap()
+            .handle_message(Message::new(
+                31,
+                GATE_NULL,
+                MODULE_NULL,
+                MODULE_NULL,
+                SimTime::ZERO,
+                String::from("Pang"),
+            ));
     }
 }
+
+impl ModuleExt for Alice {}
