@@ -108,6 +108,10 @@ impl Gate {
         self.pos
     }
 
+    pub fn size(&self) -> usize {
+        self.description.size
+    }
+
     /// The human-readable name for the allocated gate cluster.
     #[inline(always)]
     pub fn name(&self) -> &String {
@@ -153,7 +157,7 @@ impl Gate {
             id: GateId::gen(),
             description,
             pos,
-            channel_id: channel.id,
+            channel_id: channel.id(),
             next_gate,
         }
     }

@@ -26,8 +26,8 @@ fn main() {
     //
     // ALICE
     //
-    let mut node_alice = Box::new(NetworkNode::new());
-    let mut stack_alice = NetworkStack::new(RandomRoutingDeamon::new());
+    let mut node_alice = Box::new(NetworkNode::named("Alice"));
+    let mut stack_alice = NetworkStack::new(0x00_00_00_ff, RandomRoutingDeamon::new());
     stack_alice.set_parent(&mut node_alice);
 
     let internal_out = node_alice.create_gate(
@@ -59,8 +59,8 @@ fn main() {
     //
     // BOB
     //
-    let mut node_bob = Box::new(NetworkNode::new());
-    let mut stack_bob = NetworkStack::new(RandomRoutingDeamon::new());
+    let mut node_bob = Box::new(NetworkNode::named("Bob"));
+    let mut stack_bob = NetworkStack::new(0x00_00_00_ee, RandomRoutingDeamon::new());
 
     stack_bob.set_parent(&mut node_bob);
 
@@ -94,8 +94,8 @@ fn main() {
     // EVE
     //
 
-    let mut node_eve = Box::new(NetworkNode::new());
-    let mut stack_eve = NetworkStack::new(RandomRoutingDeamon::new());
+    let mut node_eve = Box::new(NetworkNode::named("Eve"));
+    let mut stack_eve = NetworkStack::new(0x00_00_00_dd, RandomRoutingDeamon::new());
 
     stack_eve.set_parent(&mut node_eve);
 
@@ -141,28 +141,7 @@ fn main() {
         jitter: 0.0.into(),
     });
 
-    let alice_in = node_alice.create_gate_cluster(
-        String::from("channelIncoming"),
-        2,
-        dse::GateType::Input,
-        &channel,
-    );
-
-    node_eve.create_gate_into(
-        String::from("channelOutgoing"),
-        dse::GateType::Output,
-        &channel,
-        alice_in[0],
-    );
-
-    node_bob.create_gate_into(
-        String::from("channelOutgoing"),
-        dse::GateType::Output,
-        &channel,
-        alice_in[1],
-    );
-
-    let eve_in = node_eve.create_gate(
+    let alice_in = node_alice.create_gate(
         String::from("channelIncoming"),
         dse::GateType::Input,
         &channel,
@@ -174,12 +153,32 @@ fn main() {
         &channel,
     );
 
-    node_alice.create_gate_cluster_into(
+    node_eve.create_gate_cluster_into(
         String::from("channelOutgoing"),
         2,
         dse::GateType::Output,
         &channel,
-        vec![eve_in, bob_in],
+        vec![alice_in, bob_in],
+    );
+
+    let eve_in = node_eve.create_gate_cluster(
+        String::from("channelIncoming"),
+        2,
+        dse::GateType::Input,
+        &channel,
+    );
+
+    node_alice.create_gate_into(
+        String::from("channelOutgoing"),
+        dse::GateType::Output,
+        &channel,
+        eve_in[0],
+    );
+    node_bob.create_gate_into(
+        String::from("channelOutgoing"),
+        dse::GateType::Output,
+        &channel,
+        eve_in[1],
     );
 
     app.create_module(node_alice);
@@ -209,7 +208,7 @@ fn main() {
 
     rt.add_event_in(
         MessageAtGateEvent {
-            gate_id: eve_in,
+            gate_id: alice_in,
             handled: false,
             message: ManuallyDrop::new(msg),
         },

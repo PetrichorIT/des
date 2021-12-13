@@ -1,4 +1,5 @@
 use global_uid::GlobalUID;
+use log::error;
 
 use crate::{
     Channel, Gate, GateDescription, GateId, GateType, IntoModuleGate, Message, SimTime, GATE_NULL,
@@ -32,6 +33,13 @@ pub trait Module {
     ///
     fn id(&self) -> ModuleId {
         self.module_core().id
+    }
+
+    ///
+    /// Returns a human readable representation of the modules identity.
+    ///
+    fn identifier(&self) -> String {
+        self.module_core().identifier()
     }
 
     ///
@@ -160,7 +168,7 @@ pub trait Module {
         if let Some(gate_idx) = gate_idx {
             self.module_core_mut().out_buffer.push((msg, gate_idx))
         } else {
-            eprintln!("Error: Could not find gate in current module");
+            error!(target: &self.identifier(),"Error: Could not find gate in current module");
         }
     }
 
@@ -205,10 +213,10 @@ pub trait ModuleExt: Module {
     ///
     /// Returns the parent element.
     ///
-    fn parent<T: Module>(&self) -> Option<&Box<T>> {
+    fn parent<T: Module>(&self) -> Option<&T> {
         unsafe {
             let ptr = self.module_core().parent_ptr?;
-            let ptr: *const Box<T> = ptr as *const Box<T>;
+            let ptr: *const T = ptr as *const T;
             Some(&*ptr)
         }
     }
@@ -216,16 +224,11 @@ pub trait ModuleExt: Module {
     ///
     /// Returns the parent element mutablly.
     ///
-    fn parent_mut<T: Module>(&mut self) -> Option<&mut Box<T>> {
+    fn parent_mut<T: Module>(&mut self) -> Option<&mut T> {
         unsafe {
             let ptr = self.module_core_mut().parent_ptr?;
-            let ptr: *mut Box<T> = ptr as *mut Box<T>;
-            println!("AAA {:?}", ptr);
-            let ptr = &mut *ptr;
-            println!("ID {}", ptr.id());
-            println!("GL {}", ptr.module_core().gates.len());
-
-            todo!()
+            let ptr: *mut T = ptr as *mut T;
+            Some(&mut *ptr)
         }
     }
 
@@ -233,9 +236,8 @@ pub trait ModuleExt: Module {
     /// Sets the parent element.
     ///
     fn set_parent<T: Module>(&mut self, module: &mut Box<T>) {
-        let ptr: *mut Box<T> = module;
+        let ptr: *mut T = &mut (**module);
         let ptr = ptr as usize;
-        println!("parent module > 0x{:x}", ptr);
         self.module_core_mut().parent_ptr = Some(ptr);
     }
 }
@@ -247,6 +249,9 @@ pub trait ModuleExt: Module {
 pub struct ModuleCore {
     /// A runtime specific but unqiue identifier for a given module.
     pub id: ModuleId,
+
+    /// A human readable identifier for the module.
+    pub name: Option<String>,
 
     /// A collection of all gates register to the current module
     pub gates: Vec<Gate>,
@@ -268,7 +273,19 @@ pub struct ModuleCore {
 }
 
 impl ModuleCore {
-    pub fn new() -> Self {
+    pub fn identifier(&self) -> String {
+        format!(
+            "#{} {}",
+            self.id,
+            if self.name.is_some() {
+                format!("({})", self.name.as_ref().unwrap())
+            } else {
+                "".into()
+            }
+        )
+    }
+
+    pub fn new_with(name: Option<String>) -> Self {
         Self {
             id: ModuleId::gen(),
             gates: Vec::new(),
@@ -277,12 +294,17 @@ impl ModuleCore {
             activity_period: SimTime::ZERO,
             activity_active: false,
             parent_ptr: None,
+            name: name,
         }
+    }
+
+    pub fn new() -> Self {
+        Self::new_with(None)
     }
 }
 
 impl Default for ModuleCore {
     fn default() -> Self {
-        Self::new()
+        Self::new_with(None)
     }
 }

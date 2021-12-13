@@ -77,8 +77,12 @@ impl ChannelMetrics {
     /// message onto the channel.
     ///
     pub fn calculate_busy(&self, msg: &Message) -> SimTime {
-        let len = msg.bit_len();
-        SimTime::new(len as f64 / self.bitrate as f64)
+        if self.bitrate == 0 {
+            SimTime::ZERO
+        } else {
+            let len = msg.bit_len();
+            SimTime::new(len as f64 / self.bitrate as f64)
+        }
     }
 }
 
@@ -98,16 +102,32 @@ impl Display for ChannelMetrics {
 #[derive(Debug)]
 pub struct Channel {
     /// A unique identifier for a channel.
-    pub id: ChannelId,
+    id: ChannelId,
 
     /// The capabilities of the channel.
-    pub metrics: ChannelMetrics,
+    metrics: ChannelMetrics,
 
     /// A indicator whether a channel is busy transmitting a packet.
-    pub busy: bool,
+    busy: bool,
 }
 
 impl Channel {
+    pub fn id(&self) -> ChannelId {
+        self.id
+    }
+
+    pub fn metrics(&self) -> &ChannelMetrics {
+        &self.metrics
+    }
+
+    pub fn is_busy(&self) -> bool {
+        self.busy
+    }
+
+    pub fn set_busy(&mut self, busy_state: bool) {
+        self.busy = busy_state
+    }
+
     ///
     /// A channel metric that does not take up time.
     ///

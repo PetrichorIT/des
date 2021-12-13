@@ -1,29 +1,27 @@
 use std::collections::HashMap;
 
 use dse::{rng, GateId, Message, Module, ModuleCore, ModuleExt, NodeAddress, Packet, SimTime};
+use log::info;
 
 use crate::routing_deamon::RandomRoutingDeamon;
 
 pub struct NetworkStack {
     core: ModuleCore,
 
-    forwarding_table: HashMap<NodeAddress, GateId>,
+    address: NodeAddress,
 
+    forwarding_table: HashMap<NodeAddress, GateId>,
     routing_deamon: Option<Box<RandomRoutingDeamon>>,
 }
 
 impl NetworkStack {
-    pub fn new(mut router: RandomRoutingDeamon) -> Box<Self> {
+    pub fn new(address: NodeAddress, mut router: RandomRoutingDeamon) -> Box<Self> {
         let mut obj = Box::new(Self {
-            core: ModuleCore::new(),
+            core: ModuleCore::new_with(Some(String::from("NetworkStack"))),
+            address,
             forwarding_table: HashMap::new(),
             routing_deamon: None,
         });
-
-        let ptr: *mut Box<NetworkStack> = &mut obj;
-        println!("parent module # {:?}", ptr);
-        let o = unsafe { &mut *ptr };
-        println!("ID {}", o.id());
 
         router.set_parent(&mut obj);
         obj.routing_deamon = Some(Box::new(router));
@@ -48,35 +46,44 @@ impl Module for NetworkStack {
         &mut self.core
     }
 
+    fn identifier(&self) -> String {
+        format!("{} \"{:x}\"", self.core.identifier(), self.address)
+    }
+
     fn handle_message(&mut self, msg: dse::Message) {
         let incoming = msg.arrival_gate();
         let mut pkt = msg.extract_content::<Packet>();
 
         pkt.set_hop_count(pkt.hop_count() + 1);
-
-        println!("***");
-
         self.routing_deamon.as_mut().unwrap().handle(&pkt, incoming);
 
-        println!("###");
-
-        if let Some(&route) = self.lookup_route(pkt.target_addr()) {
-            // PATH ROUTE
-            let msg = Message::new_boxed(2, self.id(), SimTime::now(), pkt);
-            self.send(msg, route);
+        // Route packet
+        if pkt.target_addr() == self.address {
+            info!(target: "Application Layer", "=== Received packet ===");
         } else {
-            // RANDOM ROUTE
-            let gate_idx = rng::<usize>() % self.gates().len();
-            let mut gate_id = self.gate("netOut", gate_idx).unwrap().id();
-            if gate_id == incoming {
-                gate_id = self
-                    .gate("netOut", (gate_idx + 1) % self.gates().len())
-                    .unwrap()
-                    .id()
-            }
+            if let Some(&route) = self.lookup_route(pkt.target_addr()) {
+                // PATH ROUTE
+                info!(target: "NetworkStack", "Routing over backproc path");
+                let msg = Message::new_boxed(2, self.id(), SimTime::now(), pkt);
+                self.send(msg, route);
+            } else {
+                // RANDOM ROUTE
+                info!(target: "NetworkStack", "Routing random path");
 
-            let msg = Message::new_boxed(2, self.id(), SimTime::now(), pkt);
-            self.send(msg, gate_id);
+                let out_size = self.gate("netOut", 0).unwrap().size();
+                let idx = rng::<usize>() % out_size;
+
+                let mut gate_id = self.gate("netOut", idx).unwrap().id();
+                if gate_id == incoming {
+                    gate_id = self
+                        .gate("netOut", (idx + 1) % self.gates().len())
+                        .unwrap()
+                        .id()
+                }
+
+                let msg = Message::new_boxed(2, self.id(), SimTime::now(), pkt);
+                self.send(msg, gate_id);
+            }
         }
     }
 }

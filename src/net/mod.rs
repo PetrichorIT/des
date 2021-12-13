@@ -75,11 +75,11 @@ impl<A> NetworkRuntime<A> {
     }
 
     pub fn channel(&self, id: ChannelId) -> Option<&Channel> {
-        self.channels.iter().find(|c| c.id == id)
+        self.channels.iter().find(|c| c.id() == id)
     }
 
     pub fn channel_mut(&mut self, id: ChannelId) -> Option<&mut Channel> {
-        self.channels.iter_mut().find(|c| c.id == id)
+        self.channels.iter_mut().find(|c| c.id() == id)
     }
 }
 
@@ -113,11 +113,12 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
                 let module = gate.module();
 
                 let channel = rt.app.channel_mut(id).unwrap();
-                assert!(!channel.busy);
+                assert!(!channel.is_busy());
 
                 let dur = channel.calculate_duration(&message);
                 let busy = channel.calculate_busy(&message);
-                channel.busy = true;
+
+                channel.set_busy(true);
 
                 rt.add_event_in(ChannelUnbusyNotif { channel_id: id }, busy);
                 rt.add_event_in(
@@ -140,7 +141,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
                 );
 
                 let channel = rt.app.channel(gate.channel()).unwrap();
-                if channel.busy {
+                if channel.is_busy() {
                     warn!(
                         target: &format!("Gate #{}", self.gate_id),
                         "Dropping message {} pushed onto busy channel #{:?}",
@@ -197,7 +198,7 @@ impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
             self.handled = true;
 
             info!(
-                target: &format!("Module #{}", self.module_id),
+                target: &format!("Module {}", module.identifier()),
                 "Handling message {:?}",
                 message.str()
             );
@@ -299,8 +300,13 @@ pub(crate) struct ChannelUnbusyNotif {
 
 impl<A> Event<NetworkRuntime<A>> for ChannelUnbusyNotif {
     fn handle(&mut self, rt: &mut crate::Runtime<NetworkRuntime<A>>) {
-        if let Some(channel) = rt.app.channels.iter_mut().find(|c| c.id == self.channel_id) {
-            channel.busy = false;
+        if let Some(channel) = rt
+            .app
+            .channels
+            .iter_mut()
+            .find(|c| c.id() == self.channel_id)
+        {
+            channel.set_busy(false);
         }
     }
 }

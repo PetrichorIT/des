@@ -1,4 +1,5 @@
 use dse::{Module, ModuleCore};
+use log::warn;
 
 pub struct NetworkNode {
     core: ModuleCore,
@@ -7,7 +8,13 @@ pub struct NetworkNode {
 impl NetworkNode {
     pub fn new() -> Self {
         Self {
-            core: ModuleCore::new(),
+            core: ModuleCore::new_with(Some("NetworkNode".to_string())),
+        }
+    }
+
+    pub fn named(name: &str) -> Self {
+        Self {
+            core: ModuleCore::new_with(Some(format!("NetworkNode - {}", name))),
         }
     }
 }
@@ -25,6 +32,7 @@ impl Module for NetworkNode {
         let incoming = self.gate_by_id(msg.arrival_gate()).unwrap();
 
         let pos = incoming.pos();
+        warn!(target: &self.identifier(), "Node incoming at gate {:?}", incoming);
         if incoming.name().eq("channelIncoming") {
             // From channel
             self.send(msg, ("toStack", pos))

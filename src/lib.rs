@@ -3,6 +3,8 @@ pub(crate) mod metrics;
 pub(crate) mod misc;
 pub(crate) mod net;
 
+pub mod ndl;
+
 pub use crate::core::event::*;
 pub use crate::core::runtime::*;
 pub use crate::core::sim_time::*;

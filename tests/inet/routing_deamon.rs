@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use dse::{GateId, Module, ModuleCore, ModuleExt, NodeAddress, Packet};
+use log::info;
 
 pub struct RandomRoutingDeamon {
     core: ModuleCore,
@@ -11,7 +12,7 @@ pub struct RandomRoutingDeamon {
 impl RandomRoutingDeamon {
     pub fn new() -> Self {
         Self {
-            core: ModuleCore::new(),
+            core: ModuleCore::new_with(Some(String::from("RoutingDaemon"))),
             hop_counts: HashMap::new(),
         }
     }
@@ -20,7 +21,7 @@ impl RandomRoutingDeamon {
         let source = pkt.source_addr();
         if let Some(path_cost) = self.hop_counts.get_mut(&source) {
             // Allready knows path
-            println!("111");
+            info!(target: "RandomRoutingDeamon", "Updating backproc path");
             if pkt.hop_count() < *path_cost {
                 *path_cost = pkt.hop_count();
                 self.parent_mut::<super::network_stack::NetworkStack>()
@@ -28,14 +29,12 @@ impl RandomRoutingDeamon {
                     .add_route(source, incoming)
             }
         } else {
-            println!("222");
             // Does not know path
+            info!(target: "RandomRoutingDeamon", "Recording new backproc path");
             self.hop_counts.insert(source, pkt.hop_count());
-            println!("222# {} {:?}", self.has_parent(), self.core.parent_ptr);
             self.parent_mut::<super::network_stack::NetworkStack>()
                 .unwrap()
                 .add_route(source, incoming);
-            println!("222#*");
         }
     }
 }
