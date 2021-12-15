@@ -5,7 +5,7 @@ module NetworkStack {
         RoutingDamon router
 
     gates:
-        netOut[5
+        netOut[5]
         netIn[5]
 
         fromAppl[5]

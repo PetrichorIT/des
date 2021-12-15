@@ -6,6 +6,7 @@ pub struct NetworkNode {
 }
 
 impl NetworkNode {
+    #[allow(unused)]
     pub fn new() -> Self {
         Self {
             core: ModuleCore::new_with(Some("NetworkNode".to_string())),

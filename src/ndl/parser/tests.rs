@@ -2,7 +2,7 @@
 fn t() {
     use crate::ndl::parser::Parser;
 
-    let mut parser = Parser::new(String::from("./src/ndl/examples/NetworkNode.ndl"));
+    let mut parser = Parser::new(String::from("./src/ndl/examples/NetworkStack.ndl"));
 
     let success = parser.parse();
 

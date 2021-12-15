@@ -294,7 +294,7 @@ impl ModuleCore {
             activity_period: SimTime::ZERO,
             activity_active: false,
             parent_ptr: None,
-            name: name,
+            name,
         }
     }
 

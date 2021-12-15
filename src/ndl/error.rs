@@ -16,6 +16,10 @@ impl ErrorContext {
         self.errors.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.errors.is_empty()
+    }
+
     pub fn record(&mut self, code: ErrorCode, msg: String, pos: usize, len: usize) {
         self.errors.push(Error {
             code,
@@ -29,6 +33,12 @@ impl ErrorContext {
 
     pub fn reset_transient(&mut self) {
         self.transient = false;
+    }
+}
+
+impl Default for ErrorContext {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

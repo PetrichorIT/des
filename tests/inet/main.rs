@@ -144,20 +144,20 @@ fn main() {
     let alice_in = node_alice.create_gate(
         String::from("channelIncoming"),
         dse::GateType::Input,
-        &channel,
+        channel,
     );
 
     let bob_in = node_bob.create_gate(
         String::from("channelIncoming"),
         dse::GateType::Input,
-        &channel,
+        channel,
     );
 
     node_eve.create_gate_cluster_into(
         String::from("channelOutgoing"),
         2,
         dse::GateType::Output,
-        &channel,
+        channel,
         vec![alice_in, bob_in],
     );
 
@@ -165,19 +165,19 @@ fn main() {
         String::from("channelIncoming"),
         2,
         dse::GateType::Input,
-        &channel,
+        channel,
     );
 
     node_alice.create_gate_into(
         String::from("channelOutgoing"),
         dse::GateType::Output,
-        &channel,
+        channel,
         eve_in[0],
     );
     node_bob.create_gate_into(
         String::from("channelOutgoing"),
         dse::GateType::Output,
-        &channel,
+        channel,
         eve_in[1],
     );
 

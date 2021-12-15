@@ -1,5 +1,3 @@
-include std/fs
-
 link FastLink {
     bitrate:
         1000

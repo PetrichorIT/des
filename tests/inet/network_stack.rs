@@ -60,30 +60,28 @@ impl Module for NetworkStack {
         // Route packet
         if pkt.target_addr() == self.address {
             info!(target: "Application Layer", "=== Received packet ===");
+        } else if let Some(&route) = self.lookup_route(pkt.target_addr()) {
+            // PATH ROUTE
+            info!(target: "NetworkStack", "Routing over backproc path");
+            let msg = Message::new_boxed(2, self.id(), SimTime::now(), pkt);
+            self.send(msg, route);
         } else {
-            if let Some(&route) = self.lookup_route(pkt.target_addr()) {
-                // PATH ROUTE
-                info!(target: "NetworkStack", "Routing over backproc path");
-                let msg = Message::new_boxed(2, self.id(), SimTime::now(), pkt);
-                self.send(msg, route);
-            } else {
-                // RANDOM ROUTE
-                info!(target: "NetworkStack", "Routing random path");
+            // RANDOM ROUTE
+            info!(target: "NetworkStack", "Routing random path");
 
-                let out_size = self.gate("netOut", 0).unwrap().size();
-                let idx = rng::<usize>() % out_size;
+            let out_size = self.gate("netOut", 0).unwrap().size();
+            let idx = rng::<usize>() % out_size;
 
-                let mut gate_id = self.gate("netOut", idx).unwrap().id();
-                if gate_id == incoming {
-                    gate_id = self
-                        .gate("netOut", (idx + 1) % self.gates().len())
-                        .unwrap()
-                        .id()
-                }
-
-                let msg = Message::new_boxed(2, self.id(), SimTime::now(), pkt);
-                self.send(msg, gate_id);
+            let mut gate_id = self.gate("netOut", idx).unwrap().id();
+            if gate_id == incoming {
+                gate_id = self
+                    .gate("netOut", (idx + 1) % self.gates().len())
+                    .unwrap()
+                    .id()
             }
+
+            let msg = Message::new_boxed(2, self.id(), SimTime::now(), pkt);
+            self.send(msg, gate_id);
         }
     }
 }

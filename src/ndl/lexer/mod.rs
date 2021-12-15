@@ -1,12 +1,11 @@
-use cursor::Cursor;
+use super::cursor::Cursor;
 
 use self::LiteralKind::*;
 use self::TokenKind::*;
 
-mod cursor;
 mod tests;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Token {
     pub kind: TokenKind,
     pub pos: usize,

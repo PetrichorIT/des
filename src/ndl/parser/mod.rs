@@ -1,5 +1,6 @@
 use std::fmt::{Display};
 use std::io::Write;
+use std::path::Path;
 use std::{collections::VecDeque};
 
 use termcolor::Color;
@@ -10,29 +11,27 @@ use termcolor::WriteColor;
 
 use crate::{ChannelMetrics};
 
-use self::error::ErrorCode::*;
-use self::error::ErrorContext;
-
+use super::error::ErrorCode::*;
+use super::error::ErrorContext;
 use super::lexer::{LiteralKind, Token, TokenKind, tokenize};
 
-mod error;
 mod tests;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct IncludeDef {
-    path: Vec<String>,
+pub(crate) struct IncludeDef {
+    pub path: String,
 }
 
 impl Display for IncludeDef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.path.join("/"))
+        write!(f, "{}", self.path)
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct LinkDef {
-    name: String,
-    metrics: ChannelMetrics,
+pub(crate) struct LinkDef {
+    pub name: String,
+    pub metrics: ChannelMetrics,
 }
 
 impl Display for LinkDef {
@@ -49,17 +48,17 @@ impl Display for LinkDef {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct ModuleDef {
-    name: String,
-    submodule: Vec<(String, String)>,
-    gates: Vec<GateDef>,
-    connections: Vec<ConDef>,
+pub(crate) struct ModuleDef {
+    pub name: String,
+    pub submodule: Vec<(String, String)>,
+    pub gates: Vec<GateDef>,
+    pub connections: Vec<ConDef>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct GateDef {
-    name: String,
-    size: usize
+pub(crate) struct GateDef {
+    pub name: String,
+    pub size: usize
 }
 
 impl Display for GateDef {
@@ -69,10 +68,10 @@ impl Display for GateDef {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct ConDef {
-    from: ConNodeIdent,
-    channel: Option<String>,
-    to: ConNodeIdent
+pub(crate) struct ConDef {
+    pub from: ConNodeIdent,
+    pub channel: Option<String>,
+    pub to: ConNodeIdent
 }
 
 impl Display for ConDef {
@@ -87,9 +86,9 @@ impl Display for ConDef {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct ConNodeIdent {
-    ident: String,
-    subident: Option<String>
+pub(crate) struct ConNodeIdent {
+    pub ident: String,
+    pub subident: Option<String>
 }
 
 impl Display for ConNodeIdent {
@@ -103,7 +102,7 @@ impl Display for ConNodeIdent {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct NetworkDef {}
+pub(crate) struct NetworkDef {}
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -113,26 +112,26 @@ pub enum ParserState {
     Validated,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Parser {
     state: ParserState,
 
-    filepath: String,
+    pub(crate) filepath: String,
     raw: String,
     /// A mapping (idx == line_number) --> (pos == char idx.) of endl char
     raw_line_map: Vec<usize>,
     tokens: VecDeque<Token>,
 
-    includes: Vec<IncludeDef>,
-    links: Vec<LinkDef>,
-    modules: Vec<ModuleDef>,
-    networks: Vec<NetworkDef>,
+    pub(crate) includes: Vec<IncludeDef>,
+    pub(crate) links: Vec<LinkDef>,
+    pub(crate) modules: Vec<ModuleDef>,
+    pub(crate) networks: Vec<NetworkDef>,
 
     errors: ErrorContext,
 }
 
 impl Parser {
-    pub fn new(filepath: String) -> Self {
+    pub fn new<P: AsRef<Path>>(filepath: P) -> Self {
         
         let raw = std::fs::read_to_string(&filepath)
             .expect("Failed to read file");
@@ -142,7 +141,7 @@ impl Parser {
         Self {
             state: ParserState::Loaded,
 
-            filepath,
+            filepath: filepath.as_ref().to_str().unwrap().to_owned(),
             raw,
             raw_line_map: Vec::new(),
             tokens ,
@@ -157,33 +156,31 @@ impl Parser {
     }
 
     pub fn parse(&mut self) -> bool {
-        while self.tokens.len() > 0 {
-            match self.next_token() {
-                Some((token, raw_parts)) => {
-                    match token.kind {
-                        TokenKind::LineComment => continue,
-                        TokenKind::Whitespace => continue,
+        while !self.tokens.is_empty() {
+           
+            if let Some((token, raw_parts)) = self.next_token() {
+                match token.kind {
+                    TokenKind::LineComment => continue,
+                    TokenKind::Whitespace => continue,
 
-                        TokenKind::Ident => {
-                            let ident = raw_parts;
-                            match ident {
-                                "include" => self.parse_include(),
-                                "module" => self.parse_module(),
-                                "link" => self.parse_link(),
-                                "network" => self.parse_network(),
-                                _ => {}
-                            }
+                    TokenKind::Ident => {
+                        let ident = raw_parts;
+                        match ident {
+                            "include" => self.parse_include(),
+                            "module" => self.parse_module(),
+                            "link" => self.parse_link(),
+                            "network" => self.parse_network(),
+                            _ => {}
                         }
-                        _ => {}
                     }
+                    _ => {}
                 }
-                None => {}
             }
 
             self.state = ParserState::Parsed;
         }
 
-        self.errors.len() == 0
+        self.errors.is_empty()
     }
 
     pub fn print_errors(&mut self) -> std::io::Result<()> {
@@ -199,7 +196,7 @@ impl Parser {
             write!(&mut stream, "error: ")?;
             
             stream.reset()?;
-            write!(&mut stream, "{}\n", e.msg)?;
+            writeln!(&mut stream, "{}", e.msg)?;
         
             stream.set_color(
                 ColorSpec::new().set_fg(Some(Color::Blue))
@@ -207,23 +204,23 @@ impl Parser {
             write!(&mut stream, "   --> ")?;
 
             stream.reset()?;
-            write!(&mut stream, "{}\n", self.filepath)?;
+            writeln!(&mut stream, "{}", self.filepath)?;
             
-            write!(&mut stream, "{}\n", fragement)?;
+            writeln!(&mut stream, "{}", fragement)?;
         }
 
         Ok(())
     }
 
     fn select_code_fragment(&mut self, pos: usize, len: usize) -> String {
-        if self.raw_line_map.len() == 0 {
+        if self.raw_line_map.is_empty() {
             self.generate_line_map()
         }
 
         let base_line_start = self.get_line_for_pos(pos);
         let base_line_end = self.get_line_for_pos(pos + len);
 
-        let fragement_start_line = base_line_start.checked_sub(2).unwrap_or(0);
+        let fragement_start_line = base_line_start.saturating_sub(2);
         let fragement_end_line = (base_line_end + 1).min(self.raw_line_map.len() - 1);
 
         String::from(&self.raw
@@ -268,7 +265,7 @@ impl Parser {
         }
 
         self.includes.push(IncludeDef {
-            path: path_comps,
+            path: path_comps.join("/"),
         });
 
         self.eat_whitespace();
@@ -387,7 +384,8 @@ impl Parser {
                 // Single size gate
                 if token.kind == TokenKind::Whitespace {
                     module_def.gates.push(GateDef { name, size: 1 })
-                } if token.kind == TokenKind::Colon {
+                }
+                else  if token.kind == TokenKind::Colon {
                     // New identifer
                     self.tokens.push_front(token);
                     self.tokens.push_front(name_token);
@@ -683,11 +681,11 @@ impl Parser {
                 }
 
                 self.errors.reset_transient();
-                return Result(ConNodeIdent { ident: id, subident: Some(id_second) } )
+                Result(ConNodeIdent { ident: id, subident: Some(id_second) } )
             },
             TokenKind::Whitespace => {
                 self.errors.reset_transient();
-                return Result(ConNodeIdent { ident: id, subident: None })
+                 Result(ConNodeIdent { ident: id, subident: None })
             },
             TokenKind::Colon => {
                 self.errors.reset_transient();
@@ -695,7 +693,7 @@ impl Parser {
                 self.tokens.push_front(token);
                 self.tokens.push_front(first_token);
 
-                return NewSubsection;
+                 NewSubsection
             },
             _ => {
                 self.errors.record(
@@ -704,7 +702,8 @@ impl Parser {
                     token.pos,
                     token.len,
                 );
-                return Error;
+                 
+                Error
             },
         }
     }

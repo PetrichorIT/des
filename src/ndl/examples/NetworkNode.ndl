@@ -1,4 +1,4 @@
-include Link
+include std/Link
 include NetworkStack
 
 module NetworkNode {
@@ -18,7 +18,7 @@ module NetworkNode {
     connections:
 
         toStack --> FastLink --> stack/netIn
-        netOut <-- stack/fromStack
+        fromStack <-- stack/netOut
         
         fromAppl --> stack/fromAppl
         toAppl <-- stack/toAppl
