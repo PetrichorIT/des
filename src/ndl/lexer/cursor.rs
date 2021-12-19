@@ -8,7 +8,10 @@ pub(crate) struct Cursor<'a> {
     initial_len: usize,
     /// Iterator over chars. Slightly faster than a &str.
     chars: Chars<'a>,
+
     pub idx: usize,
+    pub line: usize,
+
     #[cfg(debug_assertions)]
     prev: char,
 }
@@ -20,7 +23,10 @@ impl<'a> Cursor<'a> {
         Cursor {
             initial_len: input.len(),
             chars: input.chars(),
+
             idx: 0,
+            line: 1,
+
             #[cfg(debug_assertions)]
             prev: EOF_CHAR,
         }
@@ -89,7 +95,9 @@ impl<'a> Cursor<'a> {
         // It was tried making optimized version of this for eg. line comments, but
         // LLVM can inline all of this and compile it down to fast iteration over bytes.
         while predicate(self.first()) && !self.is_eof() {
-            self.bump();
+            if matches!(self.bump(), Some('\n')) {
+                self.line += 1;
+            }
         }
     }
 }

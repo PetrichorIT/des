@@ -2,10 +2,20 @@
 fn test_parser() {
     use super::tokenize;
 
-    let contents = std::fs::read_to_string("./src/ndl/examples/Test.ndl").expect("msg");
+    let contents = std::fs::read_to_string("./src/ndl/examples/NetworkStack.ndl").expect("msg");
 
     let res = tokenize(&contents);
-    for r in res {
-        println!("{:?}", r)
+
+    let mut validated_token_stream = std::collections::VecDeque::new();
+
+    for token in res {
+        if !token.kind.valid() {
+            // ERRs
+            continue;
+        }
+
+        if !token.kind.reducable() {
+            validated_token_stream.push_back(token)
+        }
     }
 }

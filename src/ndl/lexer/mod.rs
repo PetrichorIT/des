@@ -1,42 +1,45 @@
-use super::cursor::Cursor;
+use super::loc::Loc;
+use cursor::Cursor;
 
 use self::LiteralKind::*;
 use self::TokenKind::*;
 
+mod cursor;
 mod tests;
 
 #[derive(Debug, Clone)]
 pub struct Token {
     pub kind: TokenKind,
-    pub pos: usize,
-    pub len: usize,
+    pub loc: Loc,
 }
 
 impl Token {
-    pub fn new(kind: TokenKind, pos: usize, len: usize) -> Self {
-        Self { kind, pos, len }
+    pub fn new(kind: TokenKind, pos: usize, len: usize, line: usize) -> Self {
+        Self {
+            kind,
+            loc: Loc::new(pos, len, line),
+        }
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TokenKind {
-    // Multi-char tokens:
-    LineComment,
+    // A single line comment
+    Comment,
     /// Any whitespace characters sequence.
     Whitespace,
-    /// "ident" or "continue"
-    /// At this step keywords are also considered identifiers.
+    /// Any token that can be either type, var name or keyqord
     Ident,
+    /// A invalid identifer.
     InvalidIdent,
-
+    /// A nonterminated token prefix.
     UnknownPrefix,
-    /// "12_u8", "1.0e-40", "b"123"". See `LiteralKind` for more details.
+    /// A literal value.
     Literal {
         kind: LiteralKind,
         suffix_start: usize,
     },
 
-    // One-char tokens:
     /// ";"
     Semi,
     /// ","
@@ -96,6 +99,31 @@ pub enum TokenKind {
     Unknown,
 }
 
+impl TokenKind {
+    pub fn reducable(&self) -> bool {
+        matches!(self, Comment)
+    }
+
+    pub fn valid(&self) -> bool {
+        matches!(
+            self,
+            Comment
+                | Whitespace
+                | Ident
+                | Literal { .. }
+                | OpenBrace
+                | OpenBracket
+                | CloseBrace
+                | CloseBracket
+                | Colon
+                | Lt
+                | Gt
+                | Minus
+                | Slash
+        )
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum LiteralKind {
     Int { base: Base, empty_int: bool },
@@ -140,15 +168,8 @@ pub fn tokenize(input: &str) -> impl Iterator<Item = Token> + '_ {
     })
 }
 
-/// True if `c` is considered a whitespace according to Rust language definition.
-/// See [Rust language reference](https://doc.rust-lang.org/reference/whitespace.html)
-/// for definitions of these classes.
+/// True if `c` is considered a whitespace.
 pub fn is_whitespace(c: char) -> bool {
-    // This is Pattern_White_Space.
-    //
-    // Note that this set is stable (ie, it doesn't change with different
-    // Unicode versions), so it's ok to just hard-code the values.
-
     matches!(
         c,
         // Usual ASCII suspects
@@ -173,16 +194,12 @@ pub fn is_whitespace(c: char) -> bool {
 }
 
 /// True if `c` is valid as a first character of an identifier.
-/// See [Rust language reference](https://doc.rust-lang.org/reference/identifiers.html) for
-/// a formal definition of valid identifier name.
 pub fn is_id_start(c: char) -> bool {
     // This is XID_Start OR '_' (which formally is not a XID_Start).
     c == '_' || unicode_xid::UnicodeXID::is_xid_start(c)
 }
 
 /// True if `c` is valid as a non-first character of an identifier.
-/// See [Rust language reference](https://doc.rust-lang.org/reference/identifiers.html) for
-/// a formal definition of valid identifier name.
 pub fn is_id_continue(c: char) -> bool {
     unicode_xid::UnicodeXID::is_xid_continue(c)
 }
@@ -200,6 +217,8 @@ pub fn is_ident(string: &str) -> bool {
 impl Cursor<'_> {
     /// Parses a token from the input string.
     fn advance_token(&mut self) -> Token {
+        let line = self.line;
+
         let first_char = self.bump().unwrap();
         let token_kind = match first_char {
             // Slash, comment or block comment.
@@ -211,6 +230,10 @@ impl Cursor<'_> {
             c if is_id_start(c) => self.ident_or_unknown_prefix(),
 
             // Whitespace sequence.
+            c if is_whitespace(c) && c == '\n' => {
+                self.line += 1;
+                self.whitespace()
+            }
             c if is_whitespace(c) => self.whitespace(),
 
             // Numeric literal.
@@ -256,7 +279,8 @@ impl Cursor<'_> {
         };
         let idx = self.idx;
         self.idx += self.len_consumed();
-        Token::new(token_kind, idx, self.len_consumed())
+
+        Token::new(token_kind, idx, self.len_consumed(), line)
     }
 
     fn line_comment(&mut self) -> TokenKind {
@@ -264,7 +288,7 @@ impl Cursor<'_> {
         self.bump();
 
         self.eat_while(|c| c != '\n');
-        LineComment
+        Comment
     }
 
     fn whitespace(&mut self) -> TokenKind {
@@ -417,8 +441,6 @@ impl Cursor<'_> {
         has_digits
     }
 
-    /// Eats the float exponent. Returns true if at least one digit was met,
-    /// and returns false otherwise.
     fn eat_float_exponent(&mut self) -> bool {
         debug_assert!(self.prev() == 'e' || self.prev() == 'E');
         if self.first() == '-' || self.first() == '+' {
@@ -427,12 +449,9 @@ impl Cursor<'_> {
         self.eat_decimal_digits()
     }
 
-    // Eats the suffix of the literal, e.g. "_u8".
     fn eat_literal_suffix(&mut self) {
         self.eat_identifier();
     }
-
-    // Eats the identifier.
     fn eat_identifier(&mut self) {
         if !is_id_start(self.first()) {
             return;

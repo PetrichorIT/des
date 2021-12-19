@@ -1,5 +1,5 @@
-include std/Link
 include NetworkStack
+include std/Link
 
 module NetworkNode {
     submodules:
