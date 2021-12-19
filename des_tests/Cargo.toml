@@ -1,0 +1,28 @@
+[package]
+edition = "2021"
+name = "des_tests"
+version = "0.1.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name = "net"
+path = "inet/main.rs"
+
+[[bin]]
+name = "pingpong"
+path = "net_pingpong/main.rs"
+
+[[bin]]
+name = "waiter"
+path = "rtcore_waiter/main.rs"
+
+[[bin]]
+name = "ndl"
+path = "ndl/main.rs"
+
+[dependencies]
+des_core = {path = "../des_core"}
+des_ndl = {path = "../des_ndl"}
+log = "*"
+rand = "*"
