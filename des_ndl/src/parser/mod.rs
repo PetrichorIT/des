@@ -3,12 +3,13 @@ use std::collections::VecDeque;
 
 use des_core::ChannelMetrics;
 
+use crate::error::ErrorSolution;
 use crate::loc::LocAssetEntity;
 
 use super::loc::Loc;
 use super::error::Error;
 use super::error::ErrorCode::*;
-use super::error::LocalParsingErrorContext;
+use super::error::ParsingErrorContext;
 use super::lexer::{LiteralKind, Token, TokenKind};
 use super::source::{SourceAsset, SourceAssetDescriptor};
 
@@ -17,11 +18,17 @@ mod tests;
 const MODULE_SUBSECTION_IDENT: [&str; 4] = ["gates", "submodules", "connections", "parameters"];
 
 ///
+/// A semi-public type to handle unexpected ends of token streams.
+/// 
+pub type ParResult<T> = Result<T, &'static str>;
+
+///
 /// Parses the given asset and its associated tokenstream
 /// returning a parsing result that may or may not contain errors.
 /// 
 #[allow(unused)]
 pub fn parse(asset: &SourceAsset, tokens: VecDeque<Token>) -> ParsingResult {
+    let timer = utils::ScopeTimer::new("parse");
 
     let result = ParsingResult {
         asset: asset.descriptor.clone(),
@@ -35,26 +42,39 @@ pub fn parse(asset: &SourceAsset, tokens: VecDeque<Token>) -> ParsingResult {
     };
 
 
-    let mut parser = Parser { result, tokens, asset,  ectx: LocalParsingErrorContext::new(asset) };
+    let mut parser = Parser { result, tokens, asset,  ectx: ParsingErrorContext::new(asset) };
 
-    while !parser.is_done() {
-        if let Some((token, raw_parts)) = parser.next_token() {
-            match token.kind {
-                TokenKind::Whitespace => continue,
-                TokenKind::Ident => {
-                    let ident = raw_parts;
-                    match ident {
-                        "include" => parser.parse_include(),
-                        "module" => parser.parse_module(),
-                        "link" => parser.parse_link(),
-                        "network" => parser.parse_network(),
-                        _ => {}
+    let p_state: ParResult<()> = (||{
+        while !parser.is_done() {
+            if let Ok((token, raw_parts)) = parser.next_token() {
+                match token.kind {
+                    TokenKind::Whitespace => continue,
+                    TokenKind::Ident => {
+                        let ident = raw_parts;
+                        match ident {
+                            "include" => parser.parse_include()?,
+                            "module" => parser.parse_module()?,
+                            "link" => parser.parse_link()?,
+                            "network" => parser.parse_network()?,
+                            _ => {}
+                        }
                     }
+                    _ => {}
                 }
-                _ => {}
             }
         }
+        Ok(())
+    })();
+
+    if let Err(e) = p_state {
+        parser.ectx.record(
+            ParUnexpectedEOF, 
+            e.into(), 
+            Loc::new(parser.asset.chars - 1,1, parser.asset.lines)
+        );
     }
+
+    drop(timer);
 
     parser.finish()
 }
@@ -85,7 +105,7 @@ struct Parser<'a> {
 
     asset: &'a SourceAsset,
     tokens: VecDeque<Token>,
-    ectx: LocalParsingErrorContext<'a>,
+    ectx: ParsingErrorContext<'a>,
 }
 
 impl<'a> Parser<'a> {
@@ -95,44 +115,66 @@ impl<'a> Parser<'a> {
     }
 
     fn finish(mut self) -> ParsingResult {
-        self.result.errors.append(&mut self.ectx.errors);
-        self.result
+        // Add +5 to prevent errors at low files sizes
+        if self.ectx.errors.len() > self.asset.lines + 5 {
+            // Assume to many errors --> non-NDL file
+            self.result.errors.push(Error::new(
+                TooManyErrors,
+                format!("Too many errors. Found {} errors in '{}'", self.ectx.errors.len(), self.asset.descriptor.alias),
+                Loc::new(0, 1, 1),
+                false,
+                self.asset
+            ));
+            self.result
+        } else {
+            self.result.errors.append(&mut self.ectx.errors);
+            self.result
+        }
+
+       
     }
 
     fn eat_while(&mut self, mut predicate: impl FnMut(&Token) -> bool) {
-        while self.tokens.front().is_some() && predicate(self.tokens.front().unwrap()) {
+        while self.tokens.front().is_some() && predicate(self.peek_token().unwrap()) {
            self.tokens.pop_front();
         }
     }
 
     fn eat_whitespace(&mut self) {
-        while self.tokens.front().is_some()
-            && self.tokens.front().unwrap().kind == TokenKind::Whitespace
-        {
-             self.tokens.pop_front();
-        }
+        self.eat_while(|t| t.kind == TokenKind::Whitespace)
     }
     
-    fn next_token(&mut self) -> Option<(Token, &str)> {
-        let token = self.tokens.pop_front()?;
-        let raw_parts = token.loc.referenced_slice_in(&self.asset.data);
-        Some((token, raw_parts))
+    fn next_token(&mut self) -> ParResult<(Token, &str)> {
+        match self.tokens.pop_front() {
+            Some(token) => {
+                let raw_parts = token.loc.referenced_slice_in(&self.asset.data);
+                Ok((token, raw_parts))
+            },
+            None => Err("Unexpected end of token stream.")
+        }
+    }
+
+    fn peek_token(&mut self) -> ParResult<&Token> {
+        match self.tokens.front() {
+            Some(token) => Ok(token),
+            None => Err("Unexpected peek at end of token stream.")
+        }
     }
 }
 
 impl<'a> Parser<'a> {
-    fn parse_include(&mut self) {
+    fn parse_include(&mut self) -> ParResult<()> {
         self.ectx.reset_transient();
         self.eat_whitespace();
 
         let mut path_comps = Vec::new();
         let mut expects_comp = true;
 
-        let start_line = self.tokens.front().map(|t| t.loc.line).unwrap_or(0);
-        let start_pos = self.tokens.front().map(|t| t.loc.pos).unwrap_or_else(|| self.asset.data.len());
+        let start_line = self.peek_token().map(|t| t.loc.line)?;
+        let start_pos = self.peek_token().map(|t| t.loc.pos)?;
 
         let end_pos = (|| loop {
-            if let Some((token, raw_parts)) = self.next_token() {
+            if let Ok((token, raw_parts)) = self.next_token() {
                 match token.kind {
                     TokenKind::Ident if expects_comp => {
                         path_comps.push(String::from(raw_parts));
@@ -153,35 +195,41 @@ impl<'a> Parser<'a> {
         });
 
         self.eat_whitespace();
+
+        Ok(())
     }
 
-    fn parse_module(&mut self) {
+    fn parse_module(&mut self) -> ParResult<()> {
         self.ectx.reset_transient();
         self.eat_whitespace();
 
-        let (id_token, id) = self.next_token().unwrap();
+        let (id_token, id) = self.next_token()?;
         let id = String::from(id);
         if id_token.kind != TokenKind::Ident {
-            self.ectx.record(ParModuleMissingIdentifer, String::from("Invalid token. Expected module identfier."), id_token.loc);
-            return;
+            self.ectx.record(
+                ParModuleMissingIdentifer, 
+                String::from("Invalid token. Expected module identfier."), 
+                id_token.loc
+            )?;
+            return Ok(());
         }
 
 
         self.eat_whitespace();
-        let (token, _raw) = self.next_token().unwrap();
+        let (token, _raw) = self.next_token()?;
         if token.kind != TokenKind::OpenBrace {
             self.ectx.record(
                 ParModuleMissingDefBlockOpen, 
                 String::from("Invalid token. Expected module definition block (OpenBrace)"), 
                 token.loc,
-            );
-            return;
+            )?;
+            return Ok(());
         }
 
         // Contents reading
 
         let mut module_def = ModuleDef {
-            loc: Loc::new(0, 0, 0),
+            loc: Loc::new(0, 1, 1),
             asset: self.asset.descriptor.clone(),
 
             name: id,
@@ -194,22 +242,24 @@ impl<'a> Parser<'a> {
         loop {
             self.eat_whitespace();
 
-            let (subsec_token, subsection_id) = self.next_token().unwrap();
+            let (subsec_token, subsection_id) = self.next_token()?;
             let subsection_id = String::from(subsection_id);
             if subsec_token.kind != TokenKind::Ident {
 
                 if subsec_token.kind == TokenKind::CloseBrace {
                     self.ectx.reset_transient();
+
+                    module_def.loc = Loc::fromto(id_token.loc, subsec_token.loc);
                     self.result.modules.push(module_def);
-                    return;
+                    return Ok(());
                 }
 
                 self.ectx.record(
                     ParModuleMissingSectionIdentifier, 
                     String::from("Invalid token. Expected identifier for subsection (gates / submodules / connections)."), 
                     subsec_token.loc,
-                );
-                return;
+                )?;
+                return Ok(());
             }
 
             if !MODULE_SUBSECTION_IDENT.contains(&&subsection_id[..]) {
@@ -217,26 +267,26 @@ impl<'a> Parser<'a> {
                     ParModuleInvalidSectionIdentifer,
                     format!("Invalid subsection identifier '{}'. Possibilities are gates / submodules / connections.", subsection_id),
                     subsec_token.loc,
-                );
-                return;
+                )?;
+                return Ok(());
             }
 
-            let (token, _raw) = self.next_token().unwrap();
+            let (token, _raw) = self.next_token()?;
             if token.kind != TokenKind::Colon {
                 self.ectx.record(
                     ParModuleInvalidSeperator,
                     String::from("Unexpected token. Expected colon ':'."),
                     token.loc,
-                )
+                )?;
             };
 
             self.ectx.reset_transient();
 
             let done = match &subsection_id[..] {
-                "gates" => self.parse_module_gates(&mut module_def),
-                "submodules" => self.parse_module_submodules(&mut module_def),
-                "connections" => self.parse_module_connections(&mut module_def),
-                "parameters" => self.parse_module_par(&mut module_def),
+                "gates" => self.parse_module_gates(&mut module_def)?,
+                "submodules" => self.parse_module_submodules(&mut module_def)?,
+                "connections" => self.parse_module_connections(&mut module_def)?,
+                "parameters" => self.parse_module_par(&mut module_def)?,
                 _ => unreachable!()
             };
 
@@ -245,37 +295,38 @@ impl<'a> Parser<'a> {
             }
         }
 
-        let len = self.tokens.front().map(|t| t.loc.pos).unwrap_or_else(|| self.asset.data.len()) - id_token.loc.pos;
+        let len = self.peek_token().map(|t| t.loc.pos).unwrap_or_else(|_| self.asset.data.len()) - id_token.loc.pos;
 
         module_def.loc = Loc::new(id_token.loc.pos, len, id_token.loc.line);
 
         self.result.modules.push(module_def);
+
+        Ok(())
     }
 
-    fn parse_module_par(&mut self, module_def: &mut ModuleDef) -> bool {
-
+    fn parse_module_par(&mut self, module_def: &mut ModuleDef) -> ParResult<bool> {
 
         loop {
             self.eat_whitespace();
-            let (first_token, ident) = self.next_token().unwrap();
+            let (first_token, ident) = self.next_token()?;
             let ident = String::from(ident);
             match first_token.kind {
                 TokenKind::CloseBrace => {
                     self.ectx.reset_transient();
-                    return true;
+                    return Ok(true);
                 },
                 TokenKind::Ident => {
 
                     self.eat_whitespace();
 
-                    let (token, _raw) = self.next_token().unwrap();
+                    let (token, _raw) = self.next_token()?;
                     if token.kind != TokenKind::Colon {
                         self.ectx.record(
                             ParModuleSubInvalidSeperator,
                             String::from("Unexpected token. Expected colon ':'."),
                             token.loc,
-                        );
-                        return false;
+                        )?;
+                        return Ok(false);
                     }
 
                     if MODULE_SUBSECTION_IDENT.contains(&&ident[..]) {
@@ -283,20 +334,20 @@ impl<'a> Parser<'a> {
                         self.tokens.push_front(token);
                         self.tokens.push_front(first_token);
                         self.ectx.reset_transient();
-                        return false;
+                        return Ok(false);
                     } else {
                         // new submodule def.
                         self.eat_whitespace();
 
-                        let (second_token, ty) = self.next_token().unwrap();
+                        let (second_token, ty) = self.next_token()?;
                         let ty = String::from(ty);
                         if second_token.kind != TokenKind::Ident {
                             self.ectx.record(
                                 ParModuleSubInvalidIdentiferToken,
                                 String::from("Unexpected token. Expected type identifer."),
                                 second_token.loc
-                            );
-                            return false;
+                            )?;
+                            return Ok(false);
                         }
 
                         module_def.parameters.push(ParamDef { loc: Loc::fromto(first_token.loc, second_token.loc), ty, ident });
@@ -307,37 +358,37 @@ impl<'a> Parser<'a> {
                         ParModuleSubInvalidIdentiferToken,
                         String::from("Unexpected token. Expected submodule type."),
                         first_token.loc,
-                    );
-                    return false;
+                    )?;
+                    return Ok(false);
                 }
             }
 
         }
     }
 
-    fn parse_module_gates(&mut self, module_def: &mut ModuleDef) -> bool {
+    fn parse_module_gates(&mut self, module_def: &mut ModuleDef) -> ParResult<bool> {
         'mloop: loop {
             self.eat_whitespace();
 
-            let (name_token, name) = self.next_token().unwrap();
+            let (name_token, name) = self.next_token()?;
             let name = String::from(name);
             if name_token.kind != TokenKind::Ident {
 
                 if name_token.kind == TokenKind::CloseBrace {
                     self.ectx.reset_transient();
-                    return true;
+                    return Ok(true);
                 }
 
                 self.ectx.record(
                     ParModuleInvalidKeyToken,
                     String::from("Invalid token. Expected gate identifier."),
                     name_token.loc,
-                );
+                )?;
                 
                 continue 'mloop;
             }
 
-            let (token, _raw) = self.next_token().unwrap();
+            let (token, _raw) = self.next_token()?;
             if token.kind != TokenKind::OpenBracket {
                 // Single size gate
                 if token.kind == TokenKind::Whitespace {
@@ -347,13 +398,13 @@ impl<'a> Parser<'a> {
                     self.tokens.push_front(token);
                     self.tokens.push_front(name_token);
                     self.ectx.reset_transient();
-                    return false;
+                    return Ok(false);
                 } else {
                     self.ectx.record(
                         ParModuleGateInvalidIdentifierToken,
                         String::from("Unexpected token. Expected whitespace."),
                         token.loc,
-                    );
+                    )?;
                     
                     continue 'mloop
                 }
@@ -361,7 +412,7 @@ impl<'a> Parser<'a> {
             } else {
                 // cluster gate
 
-                let (token, literal) = self.next_token().unwrap();
+                let (token, literal) = self.next_token()?;
                 #[allow(clippy::collapsible_match)]
                 match token.kind {
                     TokenKind::Literal { kind, ..} => {
@@ -369,13 +420,13 @@ impl<'a> Parser<'a> {
                             match usize::from_str_radix(literal, base.radix()) {
                                 Ok(value) => {
                                     self.eat_whitespace();
-                                    let (token, _raw) = self.next_token().unwrap();
+                                    let (token, _raw) = self.next_token()?;
                                     if token.kind != TokenKind::CloseBracket {
                                         self.ectx.record(
                                             ParModuleGateMissingClosingBracket,
                                             String::from("Unexpected token. Expected closing bracket."),
                                             token.loc,
-                                        );
+                                        )?;
                                         
                                         continue 'mloop;
                                     }
@@ -387,7 +438,7 @@ impl<'a> Parser<'a> {
                                         LiteralIntParseError, 
                                         format!("Failed to parse integer: {}", e), 
                                         token.loc,
-                                    );
+                                    )?;
                                     
                                     self.eat_while(|t| matches!(t.kind, TokenKind::Whitespace | TokenKind::CloseBracket));
                                     continue 'mloop;
@@ -399,7 +450,7 @@ impl<'a> Parser<'a> {
                                 ParModuleGateInvalidGateSize,
                                 String::from("Unexpected token. Expected gate size (Int)."),
                                 token.loc,
-                            );
+                            )?;
 
                             self.eat_while(|t| matches!(t.kind, TokenKind::Whitespace | TokenKind::CloseBracket));
                             continue 'mloop;
@@ -410,7 +461,7 @@ impl<'a> Parser<'a> {
                             ParModuleGateInvalidGateSize,
                             String::from("Unexpected token. Expected gate size (Int)."),
                             token.loc,
-                        );
+                        )?;
 
                         self.eat_while(|t| matches!(t.kind, TokenKind::Whitespace | TokenKind::CloseBracket));
                         continue 'mloop;
@@ -422,29 +473,29 @@ impl<'a> Parser<'a> {
 
     }
 
-    fn parse_module_submodules(&mut self, module_def: &mut ModuleDef) -> bool {
+    fn parse_module_submodules(&mut self, module_def: &mut ModuleDef) -> ParResult<bool> {
 
         loop {
             self.eat_whitespace();
-            let (first_token, ident) = self.next_token().unwrap();
+            let (first_token, ident) = self.next_token()?;
             let ident = String::from(ident);
             match first_token.kind {
                 TokenKind::CloseBrace => {
                     self.ectx.reset_transient();
-                    return true;
+                    return Ok(true);
                 },
                 TokenKind::Ident => {
 
                     self.eat_whitespace();
 
-                    let (token, _raw) = self.next_token().unwrap();
+                    let (token, _raw) = self.next_token()?;
                     if token.kind != TokenKind::Colon {
                         self.ectx.record(
                             ParModuleSubInvalidSeperator,
                             String::from("Unexpected token. Expected colon ':'."),
                             token.loc,
-                        );
-                        return false;
+                        )?;
+                        return Ok(false);
                     }
 
                     if MODULE_SUBSECTION_IDENT.contains(&&ident[..]) {
@@ -452,20 +503,20 @@ impl<'a> Parser<'a> {
                         self.tokens.push_front(token);
                         self.tokens.push_front(first_token);
                         self.ectx.reset_transient();
-                        return false;
+                        return Ok(false);
                     } else {
                         // new submodule def.
                         self.eat_whitespace();
 
-                        let (second_token, ty) = self.next_token().unwrap();
+                        let (second_token, ty) = self.next_token()?;
                         let ty = String::from(ty);
                         if second_token.kind != TokenKind::Ident {
                             self.ectx.record(
                                 ParModuleSubInvalidIdentiferToken,
                                 String::from("Unexpected token. Expected type identifer."),
                                 second_token.loc
-                            );
-                            return false;
+                            )?;
+                            return Ok(false);
                         }
 
                         module_def.submodule.push(SubmoduleDef { loc: Loc::fromto(first_token.loc, second_token.loc), ty, descriptor: ident });
@@ -476,8 +527,8 @@ impl<'a> Parser<'a> {
                         ParModuleSubInvalidIdentiferToken,
                         String::from("Unexpected token. Expected submodule type."),
                         first_token.loc,
-                    );
-                    return false;
+                    )?;
+                    return Ok(false);
                 }
             }
 
@@ -485,20 +536,20 @@ impl<'a> Parser<'a> {
 
     }
 
-    fn parse_module_connections(&mut self, module_def: &mut ModuleDef) -> bool {
+    fn parse_module_connections(&mut self, module_def: &mut ModuleDef) -> ParResult<bool> {
         loop {
-            let front_ident = match self.parse_connetion_identifer_token() {
+            let front_ident = match self.parse_connetion_identifer_token()? {
                 ConIdentiferResult::Result(ident) => ident,
-                ConIdentiferResult::Error => return false,
-                ConIdentiferResult::NewSubsection => return false,
-                ConIdentiferResult::Done => return true,
+                ConIdentiferResult::Error => return Ok(false),
+                ConIdentiferResult::NewSubsection => return Ok(false),
+                ConIdentiferResult::Done => return Ok(true),
             };
 
             self.eat_whitespace();
 
-            let (t1, _raw) = self.next_token().unwrap();
-            let (t2, _raw) = self.next_token().unwrap();
-            let (t3, _raw) = self.next_token().unwrap();
+            let (t1, _raw) = self.next_token()?;
+            let (t2, _raw) = self.next_token()?;
+            let (t3, _raw) = self.next_token()?;
 
 
             use TokenKind::*;
@@ -510,17 +561,17 @@ impl<'a> Parser<'a> {
                         ParModuleConInvaldiChannelSyntax,
                         String::from("Unexpected token. Expected arrow syntax."),
                         Loc::fromto(t1.loc, t3.loc),
-                    );
-                    return false;
+                    )?;
+                    return Ok(false);
                 }
             };
 
 
-            let mid_ident = match self.parse_connetion_identifer_token() {
+            let mid_ident = match self.parse_connetion_identifer_token()? {
                 ConIdentiferResult::Result(ident) => ident,
-                ConIdentiferResult::Error => return false,
-                ConIdentiferResult::NewSubsection => return false,
-                ConIdentiferResult::Done => return true,
+                ConIdentiferResult::Error => return Ok(false),
+                ConIdentiferResult::NewSubsection => return Ok(false),
+                ConIdentiferResult::Done => return Ok(true),
             };
 
             if mid_ident.subident.is_some() {
@@ -547,15 +598,15 @@ impl<'a> Parser<'a> {
                 self.eat_whitespace();
 
                 // check for second arrow
-                let (t1, _raw) = self.next_token().unwrap();
+                let (t1, _raw) = self.next_token()?;
 
                 if t1.kind == TokenKind::Ident {
                     self.tokens.push_front(t1);
                     continue;
                 }
                 
-                let (t2, _raw) = self.next_token().unwrap();
-                let (t3, _raw) = self.next_token().unwrap();
+                let (t2, _raw) = self.next_token()?;
+                let (t3, _raw) = self.next_token()?;
 
                 let to_right2 = match (t1.kind, t2.kind, t3.kind) {
                     (Minus, Minus, Gt) => true,
@@ -565,18 +616,18 @@ impl<'a> Parser<'a> {
                             ParModuleConInvaldiChannelSyntax,
                             String::from("Unexpected token. Expected arrow syntax"),
                             Loc::fromto(t1.loc, t3.loc),
-                        );
-                        return false;
+                        )?;
+                        return Ok(false);
                     }
                 };
 
                 if (to_right && to_right2) || (!to_right && !to_right2) {
 
-                    let last_ident = match self.parse_connetion_identifer_token() {
+                    let last_ident = match self.parse_connetion_identifer_token()? {
                         ConIdentiferResult::Result(ident) => ident,
-                        ConIdentiferResult::Error => return false,
-                        ConIdentiferResult::NewSubsection => return false,
-                        ConIdentiferResult::Done => return true,
+                        ConIdentiferResult::Error => return Ok(false),
+                        ConIdentiferResult::NewSubsection => return Ok(false),
+                        ConIdentiferResult::Done => return Ok(true),
                     };
 
                     if to_right {
@@ -602,56 +653,56 @@ impl<'a> Parser<'a> {
                         ParModuleConInvaldiChannelSyntax,
                         String::from("Invalid arrow syntax. Both arrows must match."),
                         Loc::fromto(t1.loc, t3.loc),
-                    );
-                    return false;
+                    )?;
+                    return Ok(false);
                 }
             }
         }
     }
 
-    fn parse_connetion_identifer_token(&mut self) -> ConIdentiferResult {
+    fn parse_connetion_identifer_token(&mut self) -> ParResult<ConIdentiferResult> {
         use ConIdentiferResult::*;
 
         self.eat_whitespace();
 
-        let (first_token, id) = self.next_token().unwrap();
+        let (first_token, id) = self.next_token()?;
         let id = String::from(id);
 
         if first_token.kind != TokenKind::Ident {
             
             if first_token.kind == TokenKind::CloseBrace {
                 self.ectx.reset_transient();
-                return Done
+                return Ok(Done)
             }
 
             self.ectx.record(
                 ParModuleConInvalidIdentiferToken,
                 String::from("Unexpected token. Expected identifer."),
                 first_token.loc,
-            );
-            return Error;
+            )?;
+            return Ok(Error);
         }
 
-        let (token, _raw) = self.next_token().unwrap();
+        let (token, _raw) = self.next_token()?;
         match token.kind {
             TokenKind::Slash => {
-                let (token, id_second) = self.next_token().unwrap();
+                let (token, id_second) = self.next_token()?;
                 let id_second = String::from(id_second);
                 if token.kind != TokenKind::Ident {
                     self.ectx.record(
                         ParModuleConInvalidIdentiferToken,
                         String::from("Unexpected token. Expected second part identifer"),
                         token.loc,
-                    );
-                    return Error;
+                    )?;
+                    return Ok(Error);
                 }
 
                 self.ectx.reset_transient();
-                Result(ConNodeIdent { loc: Loc::fromto(first_token.loc, token.loc), ident: id, subident: Some(id_second) } )
+                Ok(Result(ConNodeIdent { loc: Loc::fromto(first_token.loc, token.loc), ident: id, subident: Some(id_second) }))
             },
             TokenKind::Whitespace => {
                 self.ectx.reset_transient();
-                Result(ConNodeIdent { loc: Loc::fromto(first_token.loc, token.loc), ident: id, subident: None })
+                Ok(Result(ConNodeIdent { loc: Loc::fromto(first_token.loc, token.loc), ident: id, subident: None }))
             },
             TokenKind::Colon => {
                 self.ectx.reset_transient();
@@ -659,45 +710,45 @@ impl<'a> Parser<'a> {
                 self.tokens.push_front(token);
                 self.tokens.push_front(first_token);
 
-                NewSubsection
+                Ok(NewSubsection)
             },
             _ => {
                 self.ectx.record(
                     ParModuleConInvalidIdentiferToken,
                     String::from("Unexpected token. Expected whitespace or slash."),
                     token.loc,
-                );
+                )?;
                 
-                Error
+                Ok(Error)
             },
         }
     }
 
-    fn parse_link(&mut self) {
+    fn parse_link(&mut self) -> ParResult<()> {
         self.ectx.reset_transient();
 
         self.eat_whitespace();
-        let (id_token, identifier) = self.next_token().unwrap();
+        let (id_token, identifier) = self.next_token()?;
         if id_token.kind != TokenKind::Ident {
             self.ectx.record(
                 ParLinkMissingIdentifier,
                 String::from("Unexpected token. Expected identifer for link definition"),
                 id_token.loc,
-            );
-            return;
+            )?;
+            return Ok(());
         }
 
         let identifier = String::from(identifier);
         
         self.eat_whitespace();
-        let (paran_open, _raw) = self.next_token().unwrap();
+        let (paran_open, _raw) = self.next_token()?;
         if paran_open.kind != TokenKind::OpenBrace {
             self.ectx.record(
                 ParLinkMissingDefBlockOpen,
                 String::from("Unexpected token. Expected block for link definition"),
                 paran_open.loc,
-            );
-            return;
+            )?;
+            return Ok(());
         }
 
         let mut bitrate: Option<usize> = None;
@@ -707,20 +758,27 @@ impl<'a> Parser<'a> {
         while bitrate.is_none() || jitter.is_none() || latency.is_none() {
             self.eat_whitespace();
 
-            let (key_token, raw) = self.next_token().unwrap();
+            let (key_token, raw) = self.next_token()?;
             if key_token.kind != TokenKind::Ident {
+
+                if key_token.kind == TokenKind::CloseBrace {
+                    // Unfinished def. Add to stack anyway but print error
+                    self.tokens.push_front(key_token);
+                    break;
+                }
+
                 self.ectx.record(
                     ParLinkInvalidKeyToken,
                     String::from("Unexpected token. Expected identifer for definition key."),
                     key_token.loc,
-                );
-                return;
+                )?;
+                return Ok(());
             }
             let identifier = String::from(raw);
 
             self.eat_whitespace();
 
-            let (token, _raw) = self.next_token().unwrap();
+            let (token, _raw) = self.next_token()?;
             if token.kind != TokenKind::Colon {
                 self.ectx.record(
                     ParLinkInvalidKvSeperator,
@@ -728,12 +786,12 @@ impl<'a> Parser<'a> {
                         "Unexpected token. Expected colon ':' between definition key and value",
                     ),
                     token.loc,
-                );
-                return;
+                )?;
+                return Ok(());
             }
 
             self.eat_whitespace();
-            let (token, raw) = self.next_token().unwrap();
+            let (token, raw) = self.next_token()?;
 
             match token.kind {
                 TokenKind::Literal { kind, .. } => match &identifier[..] {
@@ -746,8 +804,8 @@ impl<'a> Parser<'a> {
                                         LiteralIntParseError,
                                         format!("Int parsing error: {}", e), 
                                         token.loc,
-                                    );
-                                    return;
+                                    )?;
+                                    return Ok(());
                                 }
                             }
                         } else {
@@ -755,8 +813,8 @@ impl<'a> Parser<'a> {
                                 ParLinkInvalidValueType, 
                                 String::from("Invalid value type. Expected integer."), 
                                 token.loc,
-                            );
-                            return;
+                            )?;
+                            return Ok(());
                         }
                     }
 
@@ -771,8 +829,8 @@ impl<'a> Parser<'a> {
                                         LiteralFloatParseError,
                                         format!("Float parsing error: {}", e), 
                                         token.loc
-                                    );
-                                    return;
+                                    )?;
+                                    return Ok(());
                                 }
                             }
                         } else {
@@ -780,8 +838,8 @@ impl<'a> Parser<'a> {
                                 ParLinkInvalidValueType, 
                                 String::from("Invalid value type. Expected float."), 
                                 token.loc,
-                            );
-                            return;
+                            )?;
+                            return Ok(());
                         }
                     }
                     "jitter" => {
@@ -795,8 +853,8 @@ impl<'a> Parser<'a> {
                                         LiteralFloatParseError,
                                         format!("Float parsing error: {}", e), 
                                         token.loc,
-                                    );
-                                    return;
+                                    )?;
+                                    return Ok(());
                                 }
                             }
                         } else {
@@ -804,8 +862,8 @@ impl<'a> Parser<'a> {
                                 ParLinkInvalidValueType, 
                                 String::from("Invalid value type. Expected float."), 
                                 token.loc
-                            );
-                            return;
+                            )?;
+                            return Ok(());
                         }
                     }
                     _ => {
@@ -813,8 +871,8 @@ impl<'a> Parser<'a> {
                             ParLinkInvalidKey, 
                             format!("Invlaid key '{}' in kv-pair. Valid keys are latency, bitrate or jitter.", identifier), 
                             key_token.loc,
-                        );
-                        return;
+                        )?;
+                        return Ok(());
                     }
                 },
                 _ => {
@@ -822,18 +880,43 @@ impl<'a> Parser<'a> {
                         ParLinkInvalidValueToken,
                         String::from("Unexpected token. Expected literal"),
                         token.loc,
-                    );
-                    return;
+                    )?;
+                    return Ok(());
                 }
             }
         }
 
         self.eat_whitespace();
 
-        let (token, _raw) = self.next_token().unwrap();
+        let (token, _raw) = self.next_token()?;
         if token.kind != TokenKind::CloseBrace {
-            self.ectx.record(ParLinkMissingDefBlockClose, String::from("Unexpected token. Expected closing brace."), token.loc);
-            return;
+            self.ectx.record(
+                ParLinkMissingDefBlockClose, 
+                String::from("Unexpected token. Expected closing brace."), 
+                token.loc
+            )?;
+            return Ok(());
+        }
+
+        if bitrate.is_none() || latency.is_none() || jitter.is_none() {
+            // Broke read loop with incomplete def.
+
+            let missing_par = [(bitrate.is_some(), "bitrate"), (jitter.is_some(), "jitter"), (latency.is_some(), "latency")]
+                .iter()
+                .filter_map(|(v, n)| if *v { Some(*n) } else { None })
+                .collect::<Vec<&str>>()
+                .join(" + ");
+
+            self.ectx.record_with_solution(
+                ParLinkIncompleteDefinition,
+                format!("Channel '{}' was missing some parameters.", identifier),
+                Loc::fromto(id_token.loc, token.loc),
+                ErrorSolution::new(
+                    format!("Add parameters {}", missing_par),
+                    id_token.loc,
+                    self.asset.descriptor.clone(),
+                ),
+            )?;
         }
 
         self.result.links.push(LinkDef {
@@ -842,16 +925,18 @@ impl<'a> Parser<'a> {
 
             name: identifier,
             metrics: ChannelMetrics::new(
-                bitrate.unwrap(),
-                latency.unwrap().into(),
-                jitter.unwrap().into(),
+                bitrate.unwrap_or(1_000),
+                latency.unwrap_or(0.1).into(),
+                jitter.unwrap_or(0.1).into(),
             ),
         });
 
-        self.ectx.reset_transient()
+        self.ectx.reset_transient();
+
+        Ok(())
     }
 
-    fn parse_network(&mut self) {
+    fn parse_network(&mut self) -> ParResult<()> {
         unimplemented!()
     }
 }

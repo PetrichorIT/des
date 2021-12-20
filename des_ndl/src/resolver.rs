@@ -1,4 +1,3 @@
-use std::collections::VecDeque;
 use std::fmt::Display;
 use std::{
     collections::HashMap,
@@ -6,8 +5,8 @@ use std::{
 };
 
 use crate::{
-    parse, tokenize, validate, Error, ErrorCode::*, GlobalErrorContext, ParsingResult, SourceAsset,
-    SourceAssetDescriptor, TokenKind, TyContext,
+    parse, tokenize_and_validate, validate, Error, ErrorCode, GlobalErrorContext, Loc,
+    ParsingResult, SourceAsset, SourceAssetDescriptor, TyContext,
 };
 
 ///
@@ -71,29 +70,21 @@ impl NdlResolver {
                 }
             };
 
-            let token_stream = tokenize(&asset.data);
-            // Validated token stream
-            let mut validated_token_stream = VecDeque::new();
+            // === Lexing ===
 
-            for token in token_stream {
-                if !token.kind.valid() {
-                    self.ectx.lexing_errors.push(Error::new_lex(
-                        if matches!(token.kind, TokenKind::InvalidIdent) {
-                            LexInvalidSouceIdentifier
-                        } else {
-                            LexInvalidSouceToken
-                        },
-                        token.loc,
+            let validated_token_stream = match tokenize_and_validate(&asset, &mut self.ectx) {
+                Ok(v) => v,
+                Err(_e) => {
+                    self.ectx.lexing_errors.push(Error::new(
+                        ErrorCode::TooManyErrors,
+                        format!("Too many errors in '{}'", asset.descriptor.alias),
+                        Loc::new(0, 1, 1),
+                        false,
                         &asset,
                     ));
-
                     continue;
                 }
-
-                if !token.kind.reducable() {
-                    validated_token_stream.push_back(token)
-                }
-            }
+            };
 
             // === Compile Unit parsing
 

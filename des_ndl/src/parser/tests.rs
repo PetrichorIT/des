@@ -13,6 +13,8 @@ fn test_parser() {
     ))
     .expect("Failed to load test asset 'ParTest.ndl'");
 
+    println!("{}", asset.lines);
+
     let tokens = tokenize(&asset.data);
     let tokens = tokens.filter(|t| t.kind.valid());
     let tokens = tokens.filter(|t| !t.kind.reducable());

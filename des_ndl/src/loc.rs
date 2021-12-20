@@ -1,3 +1,5 @@
+use crate::SourceAsset;
+
 use super::SourceAssetDescriptor;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -19,6 +21,10 @@ impl Loc {
     /// Creates a new unchecked instance using the given values.
     ///
     pub fn new(pos: usize, len: usize, line: usize) -> Self {
+        assert_ne!(
+            len, 0,
+            "Any described object must have at least one associated source character"
+        );
         Self { pos, len, line }
     }
 
@@ -47,30 +53,17 @@ impl Loc {
     /// Extracts the raw string slice referenced by the [Loc],
     /// padding it with one extra line (aboth and below) from the source.
     ///
-    pub fn padded_referenced_slice_in<'a>(&self, str: &'a str) -> &'a str {
-        let mut start_lf = 2;
-        let mut start = self.pos;
-        while start > 0 && start_lf > 0 {
-            start -= 1;
-            if str.chars().nth(start).unwrap() == '\n' {
-                start_lf -= 1;
-            }
-        }
+    pub fn padded_referenced_slice_in<'a>(&self, asset: &'a SourceAsset) -> &'a str {
+        let start_line = self.line;
+        let end_line = asset.line_of_pos(self.pos + self.len);
 
-        let mut end_lf = 2;
-        let mut end = self.pos + self.len - 1;
-        while end < (str.len() - 1) && end_lf > 0 {
-            end += 1;
-            if str.chars().nth(end).unwrap() == '\n' {
-                end_lf -= 1;
-            }
-        }
+        let padded_start_line = start_line.saturating_sub(1);
+        let padded_end_line = (end_line + 1).min(asset.lines);
 
-        if start == 0 {
-            &str[start..end]
-        } else {
-            &str[(start + 1)..end]
-        }
+        let padded_start_pos = asset.line_pos_mapping[padded_start_line];
+        let padded_end_pos = asset.line_pos_mapping[padded_end_line];
+
+        &asset.data[padded_start_pos..=padded_end_pos]
     }
 }
 

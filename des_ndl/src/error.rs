@@ -1,7 +1,7 @@
 use std::{io::Write, mem::MaybeUninit};
 use termcolor::*;
 
-use crate::loc::LocAssetEntity;
+use crate::{loc::LocAssetEntity, parser::ParResult, Token, TokenKind};
 
 use super::{
     loc::Loc,
@@ -57,8 +57,11 @@ impl GlobalErrorContext {
     /// Indicates whether typchecking can be done.
     ///
     pub fn can_tycheck(&self) -> bool {
-        // TODO
-        true
+        use ErrorCode::*;
+        !self
+            .parsing_errors
+            .iter()
+            .any(|e| matches!(e.code, ParUnexpectedEOF | TooManyErrors))
     }
 }
 
@@ -69,11 +72,77 @@ impl Default for GlobalErrorContext {
 }
 
 ///
+/// A local error context for the lexcheck phase.
+///
+#[derive(Debug)]
+pub struct LexingErrorContext<'a> {
+    errors: Vec<Error>,
+    asset: &'a SourceAsset,
+}
+
+impl<'a> LexingErrorContext<'a> {
+    ///
+    /// Creates a new lexing error context.
+    ///
+    pub fn new(asset: &'a SourceAsset) -> Self {
+        Self {
+            errors: Vec::new(),
+            asset: asset,
+        }
+    }
+
+    /// The number of errors in this context.1
+    pub fn len(&self) -> usize {
+        self.errors.len()
+    }
+
+    ///
+    ///  An indicator whether too many errors have occurred.
+    ///
+    pub fn exceeded_error_limit(&self) -> bool {
+        self.len() > self.asset.lines + 5
+    }
+
+    ///
+    /// A function to add another error to the context.
+    ///
+    pub fn record(&mut self, token: &Token) -> ParResult<()> {
+        self.errors.push(Error::new_lex(
+            if matches!(token.kind, TokenKind::InvalidIdent) {
+                ErrorCode::LexInvalidSouceIdentifier
+            } else {
+                ErrorCode::LexInvalidSouceToken
+            },
+            token.loc,
+            self.asset,
+        ));
+
+        if self.exceeded_error_limit() {
+            Err("Too many lexing errors.")
+        } else {
+            Ok(())
+        }
+    }
+
+    ///
+    /// An extraction function that returns the collected errors or
+    /// non if they exceed the error limit.
+    ///
+    pub fn finish(self) -> Vec<Error> {
+        if self.exceeded_error_limit() {
+            Vec::new()
+        } else {
+            self.errors
+        }
+    }
+}
+
+///
 /// A local error context for creating transient errors
 /// during the parsing stage.
 ///
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LocalParsingErrorContext<'a> {
+pub struct ParsingErrorContext<'a> {
     /// A list of the collect errors, including transients.
     pub errors: Vec<Error>,
 
@@ -81,7 +150,7 @@ pub struct LocalParsingErrorContext<'a> {
     transient: bool,
 }
 
-impl IntoIterator for LocalParsingErrorContext<'_> {
+impl IntoIterator for ParsingErrorContext<'_> {
     type Item = Error;
     type IntoIter = std::vec::IntoIter<Self::Item>;
 
@@ -90,7 +159,7 @@ impl IntoIterator for LocalParsingErrorContext<'_> {
     }
 }
 
-impl<'a> LocalParsingErrorContext<'a> {
+impl<'a> ParsingErrorContext<'a> {
     ///
     /// Creates an error context without asset binding.
     /// This cannot be usied without binding to an asset.
@@ -133,11 +202,11 @@ impl<'a> LocalParsingErrorContext<'a> {
     ///
     /// Records an error, determining transients automaticly.
     ///
-    pub fn record(&mut self, code: ErrorCode, msg: String, loc: Loc) {
+    pub fn record(&mut self, code: ErrorCode, msg: String, loc: Loc) -> ParResult<()> {
         self.errors.push(Error {
             code,
             msg,
-            source: loc.padded_referenced_slice_in(&self.asset.data).to_string(),
+            source: loc.padded_referenced_slice_in(&self.asset).to_string(),
             solution: None,
 
             loc,
@@ -146,6 +215,42 @@ impl<'a> LocalParsingErrorContext<'a> {
             transient: self.transient,
         });
         self.transient = true;
+
+        if self.errors.len() > self.asset.lines + 5 {
+            Err("Too many errors")
+        } else {
+            Ok(())
+        }
+    }
+
+    ///
+    /// Records an error with solution, determining transients automaticly.
+    ///
+    pub fn record_with_solution(
+        &mut self,
+        code: ErrorCode,
+        msg: String,
+        loc: Loc,
+        solution: ErrorSolution,
+    ) -> ParResult<()> {
+        self.errors.push(Error {
+            code,
+            msg,
+            source: loc.padded_referenced_slice_in(&self.asset).to_string(),
+            solution: Some(solution),
+
+            loc,
+            asset: self.asset.descriptor.clone(),
+
+            transient: self.transient,
+        });
+        self.transient = true;
+
+        if self.errors.len() > self.asset.lines + 5 {
+            Err("Too many errors")
+        } else {
+            Ok(())
+        }
     }
 
     ///
@@ -216,7 +321,7 @@ impl Error {
         transient: bool,
         asset: &SourceAsset,
     ) -> Self {
-        let source = loc.padded_referenced_slice_in(&asset.data).to_string();
+        let source = loc.padded_referenced_slice_in(&asset).to_string();
         let asset = asset.descriptor.clone();
 
         Self {
@@ -233,12 +338,12 @@ impl Error {
     }
 
     pub fn new_lex(code: ErrorCode, loc: Loc, asset: &SourceAsset) -> Self {
-        let source = loc.padded_referenced_slice_in(&asset.data).to_string();
+        let source = loc.padded_referenced_slice_in(&asset).to_string();
         let asset_d = asset.descriptor.clone();
 
         let solution = Some(ErrorSolution::new(
             format!(
-                "Try removing token '{}'.",
+                "Try removing token '{}'",
                 loc.referenced_slice_in(&asset.data)
             ),
             loc,
@@ -273,14 +378,14 @@ impl Error {
     ) -> Self {
         let solution = match gty {
             Some(gty) => Some(ErrorSolution::new(
-                format!("Try including '{}'.", gty.asset_descriptor().alias),
-                Loc::new(0, 0, 1),
+                format!("Try including '{}'", gty.asset_descriptor().alias),
+                Loc::new(0, 1, 1),
                 asset.descriptor.clone(),
             )),
             None => None,
         };
 
-        let source = loc.padded_referenced_slice_in(&asset.data).to_string();
+        let source = loc.padded_referenced_slice_in(&asset).to_string();
         let asset = asset.descriptor.clone();
 
         Self {
@@ -367,14 +472,18 @@ impl Error {
 ///
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorCode {
-    ParLinkMissingIdentifier = 1,
-    ParLinkMissingDefBlockOpen = 2,
-    ParLinkMissingDefBlockClose = 3,
-    ParLinkInvalidKeyToken = 4,
-    ParLinkInvalidKey = 5,
-    ParLinkInvalidKvSeperator = 6,
-    ParLinkInvalidValueToken = 7,
-    ParLinkInvalidValueType = 8,
+    ParUnexpectedEOF = 0,
+    TooManyErrors = 1,
+
+    ParLinkMissingIdentifier = 11,
+    ParLinkMissingDefBlockOpen = 12,
+    ParLinkMissingDefBlockClose = 13,
+    ParLinkInvalidKeyToken = 14,
+    ParLinkInvalidKey = 15,
+    ParLinkInvalidKvSeperator = 16,
+    ParLinkInvalidValueToken = 17,
+    ParLinkInvalidValueType = 18,
+    ParLinkIncompleteDefinition = 19,
 
     ParModuleMissingIdentifer = 20,
     ParModuleMissingDefBlockOpen = 21,
@@ -408,4 +517,6 @@ pub enum ErrorCode {
     TycGateFieldDuplication = 341,
     TycParInvalidType = 360,
     TycParAllreadyDefined = 361,
+    TycModuleAllreadyDefined = 362,
+    TycChannelAllreadyDefined = 363,
 }

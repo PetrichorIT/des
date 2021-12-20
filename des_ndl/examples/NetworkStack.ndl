@@ -4,7 +4,7 @@ module RoutingDamon {}
 module NetworkStack {
 
     parameters:
-        addr: usizea
+        addr: i32
 
     submodules:
         router: RoutingDamon

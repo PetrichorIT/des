@@ -1,3 +1,10 @@
+use std::collections::VecDeque;
+
+use crate::error::LexingErrorContext;
+use crate::parser::ParResult;
+use crate::GlobalErrorContext;
+use crate::SourceAsset;
+
 use super::loc::Loc;
 use cursor::Cursor;
 
@@ -6,6 +13,51 @@ use self::TokenKind::*;
 
 mod cursor;
 mod tests;
+
+/// Creates an iterator that produces tokens from the input string.
+pub fn tokenize(input: &str) -> impl Iterator<Item = Token> + '_ {
+    let mut cursor = Cursor::new(input);
+    std::iter::from_fn(move || {
+        if cursor.is_eof() {
+            None
+        } else {
+            cursor.reset_len_consumed();
+            Some(cursor.advance_token())
+        }
+    })
+}
+
+///
+/// Performs the entire lexing process for a given asset.
+///
+pub fn tokenize_and_validate(
+    asset: &SourceAsset,
+    global_ectx: &mut GlobalErrorContext,
+) -> ParResult<VecDeque<Token>> {
+    let timer = utils::ScopeTimer::new("tokenize_and_validate");
+
+    let token_stream = tokenize(&asset.data).collect::<Vec<Token>>();
+    let mut validated_token_stream = VecDeque::with_capacity(token_stream.len());
+
+    let mut ectx = LexingErrorContext::new(asset);
+
+    for token in token_stream {
+        if !token.kind.valid() {
+            ectx.record(&token)?;
+            continue;
+        }
+
+        if !token.kind.reducable() {
+            validated_token_stream.push_back(token)
+        }
+    }
+
+    global_ectx.lexing_errors.append(&mut ectx.finish());
+
+    drop(timer);
+
+    Ok(validated_token_stream)
+}
 
 ///
 /// A raw syntactical element in of the given source asset.
@@ -175,19 +227,6 @@ impl Base {
             &Base::Hexadecimal => 16,
         }
     }
-}
-
-/// Creates an iterator that produces tokens from the input string.
-pub fn tokenize(input: &str) -> impl Iterator<Item = Token> + '_ {
-    let mut cursor = Cursor::new(input);
-    std::iter::from_fn(move || {
-        if cursor.is_eof() {
-            None
-        } else {
-            cursor.reset_len_consumed();
-            Some(cursor.advance_token())
-        }
-    })
 }
 
 /// True if `c` is considered a whitespace.

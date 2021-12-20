@@ -26,6 +26,8 @@ pub fn validate(
     unit: &ParsingResult,
     global_tyctx: &TyContext,
 ) -> Vec<Error> {
+    let timer = utils::ScopeTimer::new("tycheck");
+
     let mut tyctx = TyContext::new();
     let mut errors = Vec::new();
     let asset = resolver
@@ -42,8 +44,23 @@ pub fn validate(
             // === Module check ===
             //
 
+            let mut module_names = Vec::new();
+
             for module in &unit.modules {
                 let self_ty = &module.name;
+
+                if module_names.contains(&self_ty) {
+                    errors.push(Error::new(
+                        TycModuleAllreadyDefined,
+                        format!("Module '{}' was allready defined.", self_ty),
+                        module.loc,
+                        false,
+                        asset,
+                    ))
+                } else {
+                    module_names.push(self_ty)
+                }
+
                 // Check submodule namespaces and types
                 let mut descriptors = Vec::new();
 
@@ -269,15 +286,34 @@ pub fn validate(
                     }
                 }
             }
+
+            let mut channel_names = Vec::new();
+            for channel in &unit.links {
+                let self_ty = &channel.name;
+
+                if channel_names.contains(&self_ty) {
+                    errors.push(Error::new(
+                        TycChannelAllreadyDefined,
+                        format!("Channel '{}' was already defined.", self_ty),
+                        channel.loc,
+                        false,
+                        asset,
+                    ))
+                } else {
+                    channel_names.push(self_ty)
+                }
+            }
         }
         Err(_e) => errors.push(Error::new(
             TycDefNameCollission,
             format!("Name collision in '{}'", unit.asset.alias),
-            Loc::new(0, 0, 1),
+            Loc::new(0, 1, 1),
             false,
             asset,
         )),
     }
+
+    drop(timer);
 
     errors
 }

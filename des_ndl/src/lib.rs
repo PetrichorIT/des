@@ -2,7 +2,7 @@ mod error;
 mod loc;
 mod source;
 
-pub use error::{Error, ErrorCode, GlobalErrorContext, LocalParsingErrorContext};
+pub use error::{Error, ErrorCode, GlobalErrorContext, ParsingErrorContext};
 pub use loc::Loc;
 pub use source::{SourceAsset, SourceAssetDescriptor};
 
@@ -11,7 +11,7 @@ mod parser;
 mod resolver;
 mod tycheck;
 
-pub use lexer::{tokenize, Token, TokenKind};
+pub use lexer::{tokenize, tokenize_and_validate, Token, TokenKind};
 pub use parser::{
     parse, ConDef, ConNodeIdent, GateDef, LinkDef, ModuleDef, NetworkDef, ParsingResult,
 };
@@ -27,8 +27,7 @@ mod tests {
             .expect("Failed to create test resolver from examples directory");
 
         resolver.run();
-        println!("{}", resolver);
-
-        // panic!("WOLOLOL")
+        // println!("{}", resolver);
+        // panic!("WOLOLO");
     }
 }

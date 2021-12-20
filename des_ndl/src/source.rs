@@ -64,6 +64,11 @@ pub struct SourceAsset {
     pub descriptor: SourceAssetDescriptor,
     /// A buffer storing the raw data.
     pub data: String,
+
+    // Statistics
+    pub lines: usize,
+    pub chars: usize,
+    pub line_pos_mapping: Vec<usize>,
 }
 
 impl SourceAsset {
@@ -73,6 +78,41 @@ impl SourceAsset {
     ///
     pub fn load(descriptor: SourceAssetDescriptor) -> std::io::Result<Self> {
         let data = std::fs::read_to_string(&descriptor.path)?;
-        Ok(Self { descriptor, data })
+
+        let mut pos = 0;
+        let mut lines = 0;
+        let mut chars = 0;
+        let mut line_pos_mapping = Vec::new();
+
+        line_pos_mapping.push(0); // "ZERO" Line
+        line_pos_mapping.push(0); // First Line
+
+        for c in data.chars() {
+            if c == '\n' {
+                line_pos_mapping.push(pos + 1);
+                lines += 1
+            }
+
+            pos += 1;
+            chars += 1;
+        }
+
+        Ok(Self {
+            descriptor,
+            data,
+            lines,
+            chars,
+            line_pos_mapping,
+        })
+    }
+
+    pub fn line_of_pos(&self, pos: usize) -> usize {
+        for (line, line_start) in self.line_pos_mapping.iter().enumerate() {
+            if *line_start > pos {
+                // return line;
+                return line.saturating_sub(1).max(1);
+            }
+        }
+        return self.lines;
     }
 }
