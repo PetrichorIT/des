@@ -1,0 +1,27 @@
+include A
+include std/A
+
+link NewLink {
+    bitrate: 300
+    jitter: 0.1
+    latency: 0.1
+}
+
+module SubM {
+    gates:
+        another[5]
+}
+
+module Main {
+    submodules:
+        SubM m
+
+    gates:
+        some[5]
+        same[5]
+        sike
+
+    connections:
+        some --> m/another
+        same <-- NewLink <-- sike 
+}

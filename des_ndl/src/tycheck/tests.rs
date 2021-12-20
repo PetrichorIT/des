@@ -3,13 +3,13 @@ fn it_works() {
     use crate::*;
 
     let mut resolver =
-        NdlResolver::new("./examples").expect("Failed to create resovler with valid root.");
+        NdlResolver::new("./tests/TycTest").expect("Failed to create resovler with valid root.");
 
     resolver.run();
 
     println!("{}", resolver);
 
-    let unit = resolver.units.get("NetworkNode").unwrap();
+    let unit = resolver.units.get("Main").unwrap();
 
     let tyctx = TyContext::new();
 

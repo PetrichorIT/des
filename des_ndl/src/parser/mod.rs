@@ -8,12 +8,16 @@ use super::error::Error;
 use super::error::ErrorCode::*;
 use super::error::LocalParsingErrorContext;
 use super::lexer::{LiteralKind, Token, TokenKind};
-use super::souce::{SourceAsset, SourceAssetDescriptor};
+use super::source::{SourceAsset, SourceAssetDescriptor};
 
 mod tests;
 
+///
+/// Parses the given asset and its associated tokenstream
+/// returning a parsing result that may or may not contain errors.
+/// 
 #[allow(unused)]
-pub(crate) fn parse(asset: &SourceAsset, tokens: VecDeque<Token>) -> ParsingResult {
+pub fn parse(asset: &SourceAsset, tokens: VecDeque<Token>) -> ParsingResult {
 
     let result = ParsingResult {
         asset: asset.descriptor.clone(),
@@ -52,20 +56,25 @@ pub(crate) fn parse(asset: &SourceAsset, tokens: VecDeque<Token>) -> ParsingResu
 }
 
 
-
+///
+/// The result of parsing an asset.
+/// 
 #[derive(Debug, Clone)]
-pub(crate) struct ParsingResult {
-    #[allow(unused)]
-    pub(crate) asset: SourceAssetDescriptor,
+pub struct ParsingResult {
+    /// The descriptor of the asset that was parsed.
+    pub asset: SourceAssetDescriptor,
 
-    pub(crate) includes: Vec<IncludeDef>,
-    pub(crate) links: Vec<LinkDef>,
-    pub(crate) modules: Vec<ModuleDef>,
-    #[allow(unused)]
-    pub(crate) networks: Vec<NetworkDef>,
+    /// A collection of all unchecked includes.
+    pub includes: Vec<IncludeDef>,
+    /// A collection of all unchecked channel definitions.
+    pub links: Vec<LinkDef>,
+    /// A collection of all unchecked modules definitions.
+    pub modules: Vec<ModuleDef>,
+    /// A collection of all unchecked network definitions.
+    pub networks: Vec<NetworkDef>,
 
-    #[allow(unused)]
-    pub(crate) errors: Vec<Error>,
+    /// A list of all parsing errors that were encountered.
+    pub errors: Vec<Error>,
 }
 
 struct Parser<'a> {
@@ -119,18 +128,21 @@ impl<'a> Parser<'a> {
         let start_line = self.tokens.front().map(|t| t.loc.line).unwrap_or(0);
         let start_pos = self.tokens.front().map(|t| t.loc.pos).unwrap_or_else(|| self.asset.data.len());
 
-        while let Some((token, raw_parts)) = self.next_token() {
-            match token.kind {
-                TokenKind::Ident if expects_comp => {
-                    path_comps.push(String::from(raw_parts));
-                    expects_comp = false;
+        let end_pos = (|| loop {
+            if let Some((token, raw_parts)) = self.next_token() {
+                match token.kind {
+                    TokenKind::Ident if expects_comp => {
+                        path_comps.push(String::from(raw_parts));
+                        expects_comp = false;
+                    }
+                    TokenKind::Slash if !expects_comp => expects_comp = true,
+                    _ => return token.loc.pos,
                 }
-                TokenKind::Slash if !expects_comp => expects_comp = true,
-                _ => break,
+            } else {
+                return self.asset.data.len();
             }
-        }
+        })();
 
-        let end_pos = self.tokens.front().map(|t| t.loc.pos).unwrap_or_else(|| self.asset.data.len());
 
         self.result.includes.push(IncludeDef {
             loc: Loc::new(start_pos, end_pos - start_pos, start_line),
@@ -147,7 +159,7 @@ impl<'a> Parser<'a> {
         let (id_token, id) = self.next_token().unwrap();
         let id = String::from(id);
         if id_token.kind != TokenKind::Ident {
-            self.ectx.record(ParModuleMissingIdentifer, String::from("Unexpected token. Expected module identfier."), id_token.loc);
+            self.ectx.record(ParModuleMissingIdentifer, String::from("Invalid token. Expected module identfier."), id_token.loc);
             return;
         }
 
@@ -157,7 +169,7 @@ impl<'a> Parser<'a> {
         if token.kind != TokenKind::OpenBrace {
             self.ectx.record(
                 ParModuleMissingDefBlockOpen, 
-                String::from("Unexpected token. Expected module definition block"), 
+                String::from("Invalid token. Expected module definition block (OpenBrace)"), 
                 token.loc,
             );
             return;
@@ -190,7 +202,7 @@ impl<'a> Parser<'a> {
 
                 self.ectx.record(
                     ParModuleMissingSectionIdentifier, 
-                    String::from("Unexpected token. Expected identifier for subsection"), 
+                    String::from("Invalid token. Expected identifier for subsection (gates / submodules / connections)."), 
                     subsec_token.loc,
                 );
                 return;
@@ -199,7 +211,7 @@ impl<'a> Parser<'a> {
             if !(vec!["gates", "submodules", "connections"]).contains(&&subsection_id[..]) {
                 self.ectx.record(
                     ParModuleInvalidSectionIdentifer,
-                    String::from("Invalid subsection identifier. Valid are gates / submodules or connections"),
+                    format!("Invalid subsection identifier '{}'. Possibilities are gates / submodules / connections.", subsection_id),
                     subsec_token.loc,
                 );
                 return;
@@ -209,7 +221,7 @@ impl<'a> Parser<'a> {
             if token.kind != TokenKind::Colon {
                 self.ectx.record(
                     ParModuleInvalidSeperator,
-                    String::from("Unexpected token. Expected colon ':'"),
+                    String::from("Unexpected token. Expected colon ':'."),
                     token.loc,
                 )
             };
@@ -251,7 +263,7 @@ impl<'a> Parser<'a> {
 
                 self.ectx.record(
                     ParModuleInvalidKeyToken,
-                    String::from("Invalid key token. Expected gate identifer"),
+                    String::from("Invalid token. Expected gate identifier."),
                     name_token.loc,
                 );
                 
@@ -288,13 +300,13 @@ impl<'a> Parser<'a> {
                     TokenKind::Literal { kind, ..} => {
                         if let LiteralKind::Int { base, .. } = kind {
                             match usize::from_str_radix(literal, base.radix()) {
-                                Ok(value) => { 
+                                Ok(value) => {
                                     self.eat_whitespace();
                                     let (token, _raw) = self.next_token().unwrap();
                                     if token.kind != TokenKind::CloseBracket {
                                         self.ectx.record(
                                             ParModuleGateMissingClosingBracket,
-                                            String::from("Unexpected token. Expected closing bracket"),
+                                            String::from("Unexpected token. Expected closing bracket."),
                                             token.loc,
                                         );
                                         
@@ -306,7 +318,7 @@ impl<'a> Parser<'a> {
                                 Err(e) => {
                                     self.ectx.record(
                                         LiteralIntParseError, 
-                                        format!("Int parse error: {}", e), 
+                                        format!("Failed to parse integer: {}", e), 
                                         token.loc,
                                     );
                                     
@@ -318,7 +330,7 @@ impl<'a> Parser<'a> {
                         } else {
                             self.ectx.record(
                                 ParModuleGateInvalidGateSize,
-                                String::from("Unexpected token. Expected literal gate size definition (Int)."),
+                                String::from("Unexpected token. Expected gate size (Int)."),
                                 token.loc,
                             );
 
@@ -329,7 +341,7 @@ impl<'a> Parser<'a> {
                     _ => {
                         self.ectx.record(
                             ParModuleGateInvalidGateSize,
-                            String::from("Unexpected token. Expected literal gate size definition (Int)."),
+                            String::from("Unexpected token. Expected gate size (Int)."),
                             token.loc,
                         );
 
@@ -378,7 +390,7 @@ impl<'a> Parser<'a> {
                     if token.kind != TokenKind::Ident {
                         self.ectx.record(
                             ParModuleSubInvalidIdentiferToken, 
-                            String::from("Unexpected token. Expected submodule identifer"),
+                            String::from("Unexpected token. Expected submodule identifier."),
                             token.loc,
                         );
                         return false;
@@ -387,10 +399,9 @@ impl<'a> Parser<'a> {
                 module_def.submodule.push(SubmoduleDef { loc: Loc::fromto(ty_token.loc, token.loc), ty, descriptor: defname });
                 },
                 _ => {
-                    println!("{:?}", ty_token);
                     self.ectx.record(
                         ParModuleSubInvalidIdentiferToken,
-                        String::from("Unexpected token. Expected submodule type"),
+                        String::from("Unexpected token. Expected submodule type."),
                         ty_token.loc,
                     );
                     return false;
@@ -816,18 +827,21 @@ impl Display for ParsingResult {
     }
 }
 
-pub(crate) enum ConIdentiferResult {
+enum ConIdentiferResult {
     Error,
     Result(ConNodeIdent),
     NewSubsection,
     Done
 }
 
-
+///
+/// A definition of a include statement.
+/// 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct IncludeDef {
+pub struct IncludeDef {
+    /// The token location of the include.
     pub loc: Loc,
-
+    /// The imported modules alias.
     pub path: String,
 }
 
@@ -837,12 +851,19 @@ impl Display for IncludeDef {
     }
 }
 
+///
+/// A definition of a channel.
+/// 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct LinkDef {
+pub struct LinkDef {
+    /// The tokens location in the source asset.
     pub loc: Loc,
+    /// The asset the channel was defined (used for import suggestions).
     pub asset: SourceAssetDescriptor,
 
+    /// The identifier of the channel.
     pub name: String,
+    /// The defining metric for the channel.
     pub metrics: ChannelMetrics,
 }
 
@@ -859,30 +880,51 @@ impl Display for LinkDef {
     }
 }
 
+///
+/// A definition of a module.
+/// 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ModuleDef {
+pub struct ModuleDef {
+    /// The tokens location in the source asset.
     pub loc: Loc,
+    /// The asset the module was defined in (used for import suggestions).
     pub asset: SourceAssetDescriptor,
 
+    /// The identifier of the module.
     pub name: String,
+    /// The local submodules defined for this module.
     pub submodule: Vec<SubmoduleDef>,
+    /// The gates exposed on this module.
     pub gates: Vec<GateDef>,
+    /// The connections defined by this module.
     pub connections: Vec<ConDef>,
 }
 
+///
+/// A definition of a local submodule, in a modules definition.
+/// 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct SubmoduleDef {
+pub struct SubmoduleDef {
+    /// The location of the source tokens.
     pub loc: Loc,
 
+    /// The type of the submodule.
     pub ty: String,
+    /// A module internal descriptor for the created submodule.
     pub descriptor: String,
 }
 
+///
+/// A definition of a Gate, in a modules definition.
+/// 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct GateDef {
+pub struct GateDef {
+    /// The tokens location in the source asset.
     pub loc: Loc,
 
+    /// The identifier of the local gate cluster.
     pub name: String,
+    /// The size of the local gate cluster.
     pub size: usize
 }
 
@@ -892,12 +934,19 @@ impl Display for GateDef {
     }
 }
 
+///
+/// A description of a connection, in a modules definition.
+/// 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ConDef {
+pub struct ConDef {
+    /// The tokens location in the source asset.
     pub loc: Loc,
 
+    /// The origin gate cluster the connection starts from.
     pub from: ConNodeIdent,
+    /// The channel that is used to creat delays on this connection.
     pub channel: Option<String>,
+    /// The target gate cluster the connection points to.
     pub to: ConNodeIdent
 }
 
@@ -912,11 +961,18 @@ impl Display for ConDef {
     }
 }
 
+///
+/// A gate cluster definition, that may reference a submodules gate cluster,
+/// inside a modules connection definition.
+/// 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ConNodeIdent {
+pub struct ConNodeIdent {
+    /// The tokens location in the source asset.
     pub loc: Loc,
 
+    /// The primary identifier either being the a local gate or a submodule name.
     pub ident: String,
+    /// The secondary identifier either being the submodules gate or None.
     pub subident: Option<String>
 }
 
@@ -930,5 +986,8 @@ impl Display for ConNodeIdent {
     }
 }
 
+///
+/// A definition of a Network.
+/// 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct NetworkDef {}
+pub struct NetworkDef {}

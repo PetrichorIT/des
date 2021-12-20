@@ -1,0 +1,18 @@
+
+module RoutingDamon {}
+
+module NetworkStack {
+
+    // THIS IS GOOD STUFF
+
+    submodules:
+        RoutingDamon router
+
+    gates:
+        netOut[5]
+        netIn[5]
+
+        fromAppl[5]
+        toAppl[5]
+}
+

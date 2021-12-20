@@ -1,28 +1,35 @@
+use crate::SourceAsset;
+
 use super::{
     error::{Error, ErrorCode::*},
     loc::Loc,
     parser::{LinkDef, ModuleDef, NetworkDef, ParsingResult},
-    souce::SourceAssetDescriptor,
+    source::SourceAssetDescriptor,
     NdlResolver,
 };
 
 mod tests;
 
+///
+/// Validates the given [ParsingResult] 'unit' using the resovler and the global [TyContext]
+/// as parameters.
+/// Returns all sematic errors that were encountered.
+///
 #[allow(unused)]
-pub(crate) fn validate(
+pub fn validate(
     resolver: &NdlResolver,
     unit: &ParsingResult,
     global_tyctx: &TyContext,
 ) -> Vec<Error> {
     let mut tyctx = TyContext::new();
-    resolve_includes(resolver, unit, &mut tyctx);
-
+    let mut errors = Vec::new();
     let asset = resolver
         .assets
         .iter()
         .find(|a| a.descriptor == unit.asset)
         .unwrap();
-    let mut errors = Vec::new();
+
+    resolve_includes(resolver, unit, &mut tyctx, &mut errors, asset);
 
     match tyctx.check_name_collision() {
         Ok(()) => {
@@ -84,7 +91,33 @@ pub(crate) fn validate(
                     }
                 }
 
-                //
+                // Check Gate
+
+                let mut self_gates = Vec::new();
+                for gate in &module.gates {
+                    if gate.size == 0 {
+                        errors.push(Error::new(
+                            TycGateInvalidNullGate,
+                            String::from("Cannot create gate of size 0."),
+                            gate.loc,
+                            false,
+                            asset,
+                        ))
+                        // Still hold the descriptor to prevent transient errors
+                    }
+
+                    if self_gates.iter().any(|&n| n == &gate.name) {
+                        errors.push(Error::new(
+                            TycGateFieldDuplication,
+                            format!("Gate '{}' was allready defined.", gate.name),
+                            gate.loc,
+                            false,
+                            asset,
+                        ))
+                    } else {
+                        self_gates.push(&gate.name);
+                    }
+                }
 
                 // Check connection definition.
 
@@ -122,7 +155,7 @@ pub(crate) fn validate(
                     }
 
                     // check peers
-                    for peer in [&connection.from, &connection.to] {
+                    let peers = [&connection.from, &connection.to].map(|peer| {
                         if let Some(subident) = &peer.subident {
                             // Referencing subvalue
                             let peer_ident_valid = descriptors.contains(&&peer.ident);
@@ -138,7 +171,7 @@ pub(crate) fn validate(
                                     asset,
                                 ));
 
-                                continue;
+                                return None;
                             }
 
                             let submod = module
@@ -152,15 +185,15 @@ pub(crate) fn validate(
                             if mod_def.is_none() {
                                 // referenced submodule has invalid ty
                                 // this error was already handled
-                                continue;
+                                return None;
                             }
 
                             let mod_def = mod_def.unwrap();
 
                             let peer_subident_valid =
-                                mod_def.gates.iter().any(|g| g.name == *subident);
+                                mod_def.gates.iter().find(|g| g.name == *subident);
 
-                            if !peer_subident_valid {
+                            if peer_subident_valid.is_none() {
                                 errors.push(Error::new(
                                     TycModuleConUnknownIdentSymbol,
                                     format!(
@@ -170,12 +203,16 @@ pub(crate) fn validate(
                                     peer.loc,
                                     false,
                                     asset,
-                                ))
+                                ));
+
+                                return None;
                             }
+
+                            peer_subident_valid
                         } else {
                             // referencing direct value
-                            let peer_valid = module.gates.iter().any(|g| g.name == peer.ident);
-                            if !peer_valid {
+                            let peer_valid = module.gates.iter().find(|g| g.name == peer.ident);
+                            if peer_valid.is_none() {
                                 errors.push(Error::new(
                                     TycModuleConUnknownIdentSymbol,
                                     format!(
@@ -185,6 +222,28 @@ pub(crate) fn validate(
                                     peer.loc,
                                     false,
                                     asset,
+                                ));
+
+                                return None;
+                            }
+
+                            peer_valid
+                        }
+                    });
+
+                    if let Some(from) = peers[0] {
+                        if let Some(to) = peers[1] {
+                            if from.size != to.size {
+                                // This could only be a warning once handeling procedures
+                                // are implemented
+
+                                errors.push(
+                                    Error::new(
+                                    TycModuleConNonMatchingGateSizes,
+                                    format!("Gates '{}' and '{}' cannot be connected since they have different sizes.", from, to),
+                                    connection.loc,
+                                    false,
+                                    asset
                                 ))
                             }
                         }
@@ -208,26 +267,52 @@ fn resolve_includes<'a>(
     resolver: &'a NdlResolver,
     unit: &'a ParsingResult,
     tyctx: &mut TyContext<'a>,
+    errors: &mut Vec<Error>,
+    asset: &SourceAsset,
 ) {
     let new_unit = tyctx.include(unit);
     if new_unit {
         // resolve meta imports.
         for include in &unit.includes {
-            resolve_includes(resolver, resolver.units.get(&include.path).unwrap(), tyctx);
+            if let Some(unit) = resolver.units.get(&include.path) {
+                resolve_includes(resolver, unit, tyctx, errors, asset);
+            } else {
+                errors.push(Error::new(
+                    TycIncludeInvalidAlias,
+                    format!(
+                        "Include '{}' cannot be resolved. No such file exists. {:?}",
+                        include.path, include.loc
+                    ),
+                    include.loc,
+                    false,
+                    asset,
+                ))
+            }
         }
     }
 }
 
+///
+/// A collection of all existing types available
+/// in this scope.
+///
 #[derive(Debug)]
-pub(crate) struct TyContext<'a> {
+pub struct TyContext<'a> {
+    /// A reference of all included assets.
     pub included: Vec<SourceAssetDescriptor>,
 
+    /// A collection of all included channel definitions.
     pub links: Vec<&'a LinkDef>,
+    /// A collection of all included module definitions.
     pub modules: Vec<&'a ModuleDef>,
+    /// A collection of all included network definitions.
     pub networks: Vec<&'a NetworkDef>,
 }
 
 impl<'a> TyContext<'a> {
+    ///
+    /// Creates a new empty type context.
+    ///
     pub fn new() -> Self {
         Self {
             included: Vec::new(),
@@ -238,6 +323,9 @@ impl<'a> TyContext<'a> {
         }
     }
 
+    ///
+    /// Checks the type context for name collsions.
+    ///
     pub fn check_name_collision(&self) -> Result<(), &'static str> {
         let dup_links = (1..self.links.len()).any(|i| self.links[i..].contains(&self.links[i - 1]));
         let dup_modules =
@@ -254,7 +342,8 @@ impl<'a> TyContext<'a> {
 
     ///
     /// Includes all definitions from the given parsing result (by ref)
-    /// and returns whether any new defs were added (or all was allready imported)
+    /// and returns whether any new defs were added (or all was allready imported).
+    ///
     pub fn include(&mut self, unit: &'a ParsingResult) -> bool {
         if self.included.contains(&unit.asset) {
             return false;
@@ -275,5 +364,11 @@ impl<'a> TyContext<'a> {
         }
 
         true
+    }
+}
+
+impl Default for TyContext<'_> {
+    fn default() -> Self {
+        Self::new()
     }
 }

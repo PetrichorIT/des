@@ -3,17 +3,27 @@ use termcolor::*;
 
 use super::{
     loc::Loc,
-    souce::{SourceAsset, SourceAssetDescriptor},
+    source::{SourceAsset, SourceAssetDescriptor},
 };
 
+///
+/// A global context for storing errors, and if nessecary stopping
+/// the next resolving steps.
+///
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GlobalErrorContext {
+    /// The errors that were found as invalid tokens in the token stream.
     pub lexing_errors: Vec<Error>,
+    /// The syntatic errors found while parsing an asset.
     pub parsing_errors: Vec<Error>,
+    /// The semantic errors found while evaluating the workspace.
     pub tychecking_errors: Vec<Error>,
 }
 
 impl GlobalErrorContext {
+    ///
+    /// Creates a new raw instace.
+    ///
     pub fn new() -> Self {
         Self {
             lexing_errors: Vec::new(),
@@ -22,12 +32,18 @@ impl GlobalErrorContext {
         }
     }
 
+    ///
+    /// Indicates whether an error has occured.
+    ///
     pub fn has_errors(&self) -> bool {
         !(self.lexing_errors.is_empty()
             && self.parsing_errors.is_empty()
             && self.tychecking_errors.is_empty())
     }
 
+    ///
+    /// Indicates whether the parsing step can be done.
+    ///
     pub fn can_parse(&self) -> bool {
         !self
             .lexing_errors
@@ -35,6 +51,9 @@ impl GlobalErrorContext {
             .any(|e| e.code == ErrorCode::LexInvalidSouceIdentifier)
     }
 
+    ///
+    /// Indicates whether typchecking can be done.
+    ///
     pub fn can_tycheck(&self) -> bool {
         // TODO
         true
@@ -47,8 +66,13 @@ impl Default for GlobalErrorContext {
     }
 }
 
+///
+/// A local error context for creating transient errors
+/// during the parsing stage.
+///
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LocalParsingErrorContext<'a> {
+    /// A list of the collect errors, including transients.
     pub errors: Vec<Error>,
 
     asset: &'a SourceAsset,
@@ -65,6 +89,10 @@ impl IntoIterator for LocalParsingErrorContext<'_> {
 }
 
 impl<'a> LocalParsingErrorContext<'a> {
+    ///
+    /// Creates an error context without asset binding.
+    /// This cannot be usied without binding to an asset.
+    ///
     pub fn null() -> Self {
         Self {
             errors: Vec::new(),
@@ -74,6 +102,9 @@ impl<'a> LocalParsingErrorContext<'a> {
         }
     }
 
+    ///
+    /// Creates a new context bound to the given asset.
+    ///
     pub fn new(asset: &'a SourceAsset) -> Self {
         Self {
             errors: Vec::new(),
@@ -83,14 +114,23 @@ impl<'a> LocalParsingErrorContext<'a> {
         }
     }
 
+    ///
+    /// The number of errors record.
+    ///
     pub fn len(&self) -> usize {
         self.errors.len()
     }
 
+    ///
+    /// Imdicates whether any errors have occured.
+    ///
     pub fn is_empty(&self) -> bool {
         self.errors.is_empty()
     }
 
+    ///
+    /// Records an error, determining transients automaticly.
+    ///
     pub fn record(&mut self, code: ErrorCode, msg: String, loc: Loc) {
         self.errors.push(Error {
             code,
@@ -105,24 +145,39 @@ impl<'a> LocalParsingErrorContext<'a> {
         self.transient = true;
     }
 
+    ///
+    /// Resets the transient flag.
+    ///
     pub fn reset_transient(&mut self) {
         self.transient = false;
     }
 }
 
+///
+/// A generic NDL error.
+///
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Error {
+    /// An unquie identifer for the error class.
     pub code: ErrorCode,
+    /// An instance-specific error message.
     pub msg: String,
+    /// The souce code lines the error occurred in.
     pub source: String,
 
+    /// The descirptor of the asset the error occured in.
     pub asset: SourceAssetDescriptor,
+    /// The exact location of the error.
     pub loc: Loc,
 
+    /// A indicator whether this error syntacticly was caused by another.
     pub transient: bool,
 }
 
 impl Error {
+    ///
+    /// Creates a new instance.
+    ///
     pub fn new(
         code: ErrorCode,
         msg: String,
@@ -145,6 +200,9 @@ impl Error {
         }
     }
 
+    ///
+    /// Prints the error to stderr (colored) using termcolor.
+    ///
     pub fn print(&self) -> std::io::Result<()> {
         let mut stream = StandardStream::stderr(ColorChoice::Always);
 
@@ -171,7 +229,7 @@ impl Error {
         )?;
 
         stream.set_color(ColorSpec::new().set_fg(Some(Color::Blue)).set_bold(true))?;
-        write!(&mut stream, "    |")?;
+        write!(&mut stream, "    | ")?;
         stream.reset()?;
 
         let mut line_drawn = false;
@@ -182,9 +240,9 @@ impl Error {
                 stream.set_color(ColorSpec::new().set_fg(Some(Color::Blue)).set_bold(true))?;
 
                 if line_drawn {
-                    write!(&mut stream, "    |")?;
+                    write!(&mut stream, "    | ")?;
                 } else {
-                    write!(&mut stream, "{:>3} |", self.loc.line)?;
+                    write!(&mut stream, "{:>3} | ", self.loc.line)?;
                     line_drawn = true
                 }
                 stream.reset()?;
@@ -195,6 +253,9 @@ impl Error {
     }
 }
 
+///
+/// Classes of NDL errors.
+///
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorCode {
     ParLinkMissingIdentifier = 1,
@@ -232,4 +293,8 @@ pub enum ErrorCode {
     TycModuleSubmoduleInvalidTy = 303,
     TycModuleConInvalidChannelTy = 304,
     TycModuleConUnknownIdentSymbol = 305,
+    TycModuleConNonMatchingGateSizes = 306,
+    TycIncludeInvalidAlias = 330,
+    TycGateInvalidNullGate = 340,
+    TycGateFieldDuplication = 341,
 }

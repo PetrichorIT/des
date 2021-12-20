@@ -7,13 +7,23 @@ use self::TokenKind::*;
 mod cursor;
 mod tests;
 
-#[derive(Debug, Clone)]
+///
+/// A raw syntactical element in of the given source asset.
+/// Note that the [Loc] allways references a [Asset](crate::SourceAsset) without
+/// defining which asset is referenced (for memory efficency).
+///
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Token {
+    /// The type of token encountered.
     pub kind: TokenKind,
+    /// The location of the token in the source asset.
     pub loc: Loc,
 }
 
 impl Token {
+    ///
+    /// Creates a new token from the given raw parameters.
+    ///
     pub fn new(kind: TokenKind, pos: usize, len: usize, line: usize) -> Self {
         Self {
             kind,
@@ -22,6 +32,9 @@ impl Token {
     }
 }
 
+///
+/// The tokens type.
+///
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TokenKind {
     // A single line comment
@@ -100,10 +113,19 @@ pub enum TokenKind {
 }
 
 impl TokenKind {
+    ///
+    /// Indicates whether this token is nessecary for the parser,
+    /// assuming the token is valid.
+    ///
     pub fn reducable(&self) -> bool {
         matches!(self, Comment)
     }
 
+    ///
+    /// Indicates whether the token is valid in a NDL file.
+    /// If not it will be stripped from the token stream,
+    /// and ignored in further processing (generally.)
+    ///
     pub fn valid(&self) -> bool {
         matches!(
             self,
@@ -124,12 +146,18 @@ impl TokenKind {
     }
 }
 
+///
+/// A literal value definition token.
+///
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum LiteralKind {
     Int { base: Base, empty_int: bool },
     Float { base: Base, empty_exp: bool },
 }
 
+///
+/// The numeric bases numbers can be wirtten in.
+///
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Base {
     Binary,
@@ -147,12 +175,6 @@ impl Base {
             &Base::Hexadecimal => 16,
         }
     }
-}
-
-/// Parses the first token from the provided input string.
-pub fn first_token(input: &str) -> Token {
-    debug_assert!(!input.is_empty());
-    Cursor::new(input).advance_token()
 }
 
 /// Creates an iterator that produces tokens from the input string.
@@ -204,15 +226,15 @@ pub fn is_id_continue(c: char) -> bool {
     unicode_xid::UnicodeXID::is_xid_continue(c)
 }
 
-/// The passed string is lexically an identifier.
-pub fn is_ident(string: &str) -> bool {
-    let mut chars = string.chars();
-    if let Some(start) = chars.next() {
-        is_id_start(start) && chars.all(is_id_continue)
-    } else {
-        false
-    }
-}
+// /// The passed string is lexically an identifier.
+// pub fn is_ident(string: &str) -> bool {
+//     let mut chars = string.chars();
+//     if let Some(start) = chars.next() {
+//         is_id_start(start) && chars.all(is_id_continue)
+//     } else {
+//         false
+//     }
+// }
 
 impl Cursor<'_> {
     /// Parses a token from the input string.

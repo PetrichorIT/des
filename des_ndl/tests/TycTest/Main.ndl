@@ -1,0 +1,26 @@
+include Sub
+include std/Link
+
+module NetworkNode {
+    submodules:
+        NetworkStack stack
+
+    gates:
+        toStack[5]
+        fromStack[5]
+
+        channelIncoming[5]
+        channelOutgoing[5]
+
+        toAppl[5]
+        fromAppl[5]
+
+    connections:
+
+        toStack --> FastLink --> stack/netIn
+        fromStack <-- stack/netOut
+        
+        fromAppl --> stack/fromAppl
+        toAppl <-- stack/toAppl
+
+}

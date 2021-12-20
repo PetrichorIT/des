@@ -4,7 +4,7 @@ use std::str::Chars;
 ///
 /// Next characters can be peeked via `first` method,
 /// and position can be shifted forward via `bump` method.
-pub(crate) struct Cursor<'a> {
+pub struct Cursor<'a> {
     initial_len: usize,
     /// Iterator over chars. Slightly faster than a &str.
     chars: Chars<'a>,
@@ -16,10 +16,11 @@ pub(crate) struct Cursor<'a> {
     prev: char,
 }
 
-pub(crate) const EOF_CHAR: char = '\0';
+/// The end of file character.
+pub const EOF_CHAR: char = '\0';
 
 impl<'a> Cursor<'a> {
-    pub(crate) fn new(input: &'a str) -> Cursor<'a> {
+    pub fn new(input: &'a str) -> Cursor<'a> {
         Cursor {
             initial_len: input.len(),
             chars: input.chars(),
@@ -34,7 +35,7 @@ impl<'a> Cursor<'a> {
 
     /// Returns the last eaten symbol (or `'\0'` in release builds).
     /// (For debug assertions only.)
-    pub(crate) fn prev(&self) -> char {
+    pub fn prev(&self) -> char {
         #[cfg(debug_assertions)]
         {
             self.prev
@@ -50,13 +51,13 @@ impl<'a> Cursor<'a> {
     /// If requested position doesn't exist, `EOF_CHAR` is returned.
     /// However, getting `EOF_CHAR` doesn't always mean actual end of file,
     /// it should be checked with `is_eof` method.
-    pub(crate) fn first(&self) -> char {
+    pub fn first(&self) -> char {
         // `.next()` optimizes better than `.nth(0)`
         self.chars.clone().next().unwrap_or(EOF_CHAR)
     }
 
     /// Peeks the second symbol from the input stream without consuming it.
-    pub(crate) fn second(&self) -> char {
+    pub fn second(&self) -> char {
         // `.next()` optimizes better than `.nth(1)`
         let mut iter = self.chars.clone();
         iter.next();
@@ -64,22 +65,22 @@ impl<'a> Cursor<'a> {
     }
 
     /// Checks if there is nothing more to consume.
-    pub(crate) fn is_eof(&self) -> bool {
+    pub fn is_eof(&self) -> bool {
         self.chars.as_str().is_empty()
     }
 
     /// Returns amount of already consumed symbols.
-    pub(crate) fn len_consumed(&self) -> usize {
+    pub fn len_consumed(&self) -> usize {
         self.initial_len - self.chars.as_str().len()
     }
 
     /// Resets the number of bytes consumed to 0.
-    pub(crate) fn reset_len_consumed(&mut self) {
+    pub fn reset_len_consumed(&mut self) {
         self.initial_len = self.chars.as_str().len();
     }
 
     /// Moves to the next character.
-    pub(crate) fn bump(&mut self) -> Option<char> {
+    pub fn bump(&mut self) -> Option<char> {
         let c = self.chars.next()?;
 
         #[cfg(debug_assertions)]
@@ -91,7 +92,7 @@ impl<'a> Cursor<'a> {
     }
 
     /// Eats symbols while predicate returns true or until the end of file is reached.
-    pub(crate) fn eat_while(&mut self, mut predicate: impl FnMut(char) -> bool) {
+    pub fn eat_while(&mut self, mut predicate: impl FnMut(char) -> bool) {
         // It was tried making optimized version of this for eg. line comments, but
         // LLVM can inline all of this and compile it down to fast iteration over bytes.
         while predicate(self.first()) && !self.is_eof() {
