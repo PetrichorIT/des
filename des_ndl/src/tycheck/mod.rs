@@ -10,6 +10,11 @@ use super::{
 
 mod tests;
 
+const PAR_TYPES: [&str; 15] = [
+    "usize", "u8", "u16", "u32", "u64", "u128", "isize", "i8", "i16", "i32", "i64", "i128", "bool",
+    "char", "String",
+];
+
 ///
 /// Validates the given [ParsingResult] 'unit' using the resovler and the global [TyContext]
 /// as parameters.
@@ -33,6 +38,10 @@ pub fn validate(
 
     match tyctx.check_name_collision() {
         Ok(()) => {
+            //
+            // === Module check ===
+            //
+
             for module in &unit.modules {
                 let self_ty = &module.name;
                 // Check submodule namespaces and types
@@ -61,37 +70,27 @@ pub fn validate(
                             asset
                         ))
                     } else if !ty_valid {
-                        if let Some(gty) = global_tyctx
+                        let gty = global_tyctx
                             .modules
                             .iter()
-                            .find(|&m| m.name == *submodule.ty)
-                        {
-                            errors.push(Error::new(
-                                TycModuleSubmoduleInvalidTy,
-                                format!(
-                                    "No module '{}' does not exist for module '{}'. Try including '{}'",
-                                    submodule.ty, module.name, gty.asset.alias
-                                ),
-                                submodule.loc,
-                                false,
-                                asset,
-                            ))
-                        } else {
-                            errors.push(Error::new(
-                                TycModuleSubmoduleInvalidTy,
-                                format!(
-                                    "No module '{}' does not exist for module {}",
-                                    submodule.ty, module.name
-                                ),
-                                submodule.loc,
-                                false,
-                                asset,
-                            ))
-                        }
+                            .find(|&m| m.name == *submodule.ty);
+
+                        errors.push(Error::new_ty_missing(
+                            TycModuleSubmoduleInvalidTy,
+                            format!(
+                                "No module with name '{}' exists in the scope of module '{}'.",
+                                submodule.ty, module.name
+                            ),
+                            submodule.loc,
+                            asset,
+                            gty,
+                        ));
                     }
                 }
 
-                // Check Gate
+                //
+                // === Gate check ===
+                //
 
                 let mut self_gates = Vec::new();
                 for gate in &module.gates {
@@ -119,38 +118,25 @@ pub fn validate(
                     }
                 }
 
-                // Check connection definition.
+                //
+                // === Connection check ===
+                //
 
                 for connection in &module.connections {
                     // check channel
                     if let Some(channel) = &connection.channel {
                         let ch_valid = tyctx.links.iter().any(|&l| l.name == *channel);
                         if !ch_valid {
-                            if let Some(gty) =
-                                global_tyctx.links.iter().find(|l| l.name == *channel)
-                            {
-                                errors.push(Error::new(
-                                    TycModuleConInvalidChannelTy,
-                                    format!(
-                                        "No channel '{}' exists for module {}. Try including '{}'.",
-                                        channel, module.name, gty.asset.alias
-                                    ),
-                                    connection.loc,
-                                    false,
-                                    asset,
-                                ))
-                            } else {
-                                errors.push(Error::new(
-                                    TycModuleConInvalidChannelTy,
-                                    format!(
-                                        "No channel '{}' exists for module {}.",
-                                        channel, module.name
-                                    ),
-                                    connection.loc,
-                                    false,
-                                    asset,
-                                ))
-                            }
+                            errors.push(Error::new_ty_missing(
+                                TycModuleConInvalidChannelTy,
+                                format!(
+                                    "No channel named '{}' exists in the scope of module '{}'.",
+                                    channel, module.name
+                                ),
+                                connection.loc,
+                                asset,
+                                global_tyctx.links.iter().find(|l| l.name == *channel),
+                            ));
                         }
                     }
 
@@ -247,6 +233,39 @@ pub fn validate(
                                 ))
                             }
                         }
+                    }
+                }
+
+                //
+                // === Par check ===
+                //
+
+                let mut par_names = Vec::new();
+
+                for par in &module.parameters {
+                    // Check ty
+                    if !PAR_TYPES.contains(&&par.ty[..]) {
+                        errors.push(Error::new(
+                            TycParInvalidType,
+                            format!("Parameter type '{}' does not exist.", par.ty),
+                            par.loc,
+                            false,
+                            asset,
+                        ));
+                        continue;
+                    }
+
+                    if par_names.contains(&&par.ident) {
+                        errors.push(Error::new(
+                            TycParAllreadyDefined,
+                            format!("Parameter '{}' was already defined.", par.ident),
+                            par.loc,
+                            false,
+                            asset,
+                        ));
+                        continue;
+                    } else {
+                        par_names.push(&par.ident);
                     }
                 }
             }

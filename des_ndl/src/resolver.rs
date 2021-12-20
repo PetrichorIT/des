@@ -77,35 +77,16 @@ impl NdlResolver {
 
             for token in token_stream {
                 if !token.kind.valid() {
-                    if matches!(token.kind, TokenKind::InvalidIdent) {
-                        self.ectx.lexing_errors.push(Error {
-                            code: LexInvalidSouceIdentifier,
-                            msg: String::from("Found invalid identifer in token stream"),
+                    self.ectx.lexing_errors.push(Error::new_lex(
+                        if matches!(token.kind, TokenKind::InvalidIdent) {
+                            LexInvalidSouceIdentifier
+                        } else {
+                            LexInvalidSouceToken
+                        },
+                        token.loc,
+                        &asset,
+                    ));
 
-                            loc: token.loc,
-                            asset: asset.descriptor.clone(),
-                            source: token
-                                .loc
-                                .padded_referenced_slice_in(&asset.data)
-                                .to_string(),
-
-                            transient: false,
-                        })
-                    } else {
-                        self.ectx.lexing_errors.push(Error {
-                            code: LexInvalidSouceToken,
-                            msg: String::from("Found invalid token in token stream"),
-
-                            loc: token.loc,
-                            asset: asset.descriptor.clone(),
-                            source: token
-                                .loc
-                                .padded_referenced_slice_in(&asset.data)
-                                .to_string(),
-
-                            transient: false,
-                        })
-                    }
                     continue;
                 }
 

@@ -3,7 +3,7 @@ include std/Link
 
 module NetworkNode {
     submodules:
-        NetworkStack stack
+        stack: NetworkStack
 
     gates:
         toStack[5]

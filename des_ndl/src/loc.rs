@@ -1,3 +1,5 @@
+use super::SourceAssetDescriptor;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 ///
 /// The syntactic placement of a token or definition in
@@ -70,4 +72,12 @@ impl Loc {
             &str[(start + 1)..end]
         }
     }
+}
+
+///
+/// A type that contains exact information about its location.
+///
+pub trait LocAssetEntity {
+    fn loc(&self) -> Loc;
+    fn asset_descriptor(&self) -> &SourceAssetDescriptor;
 }

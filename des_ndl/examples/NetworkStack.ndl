@@ -3,10 +3,11 @@ module RoutingDamon {}
 
 module NetworkStack {
 
-    // THIS IS GOOD STUFF
+    parameters:
+        addr: usizea
 
     submodules:
-        RoutingDamon router
+        router: RoutingDamon
 
     gates:
         netOut[5]

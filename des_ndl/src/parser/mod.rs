@@ -3,6 +3,8 @@ use std::collections::VecDeque;
 
 use des_core::ChannelMetrics;
 
+use crate::loc::LocAssetEntity;
+
 use super::loc::Loc;
 use super::error::Error;
 use super::error::ErrorCode::*;
@@ -11,6 +13,8 @@ use super::lexer::{LiteralKind, Token, TokenKind};
 use super::source::{SourceAsset, SourceAssetDescriptor};
 
 mod tests;
+
+const MODULE_SUBSECTION_IDENT: [&str; 4] = ["gates", "submodules", "connections", "parameters"];
 
 ///
 /// Parses the given asset and its associated tokenstream
@@ -54,7 +58,6 @@ pub fn parse(asset: &SourceAsset, tokens: VecDeque<Token>) -> ParsingResult {
 
     parser.finish()
 }
-
 
 ///
 /// The result of parsing an asset.
@@ -185,6 +188,7 @@ impl<'a> Parser<'a> {
             gates: Vec::new(),
             submodule: Vec::new(),
             connections: Vec::new(),
+            parameters: Vec::new(),
         };
 
         loop {
@@ -208,7 +212,7 @@ impl<'a> Parser<'a> {
                 return;
             }
 
-            if !(vec!["gates", "submodules", "connections"]).contains(&&subsection_id[..]) {
+            if !MODULE_SUBSECTION_IDENT.contains(&&subsection_id[..]) {
                 self.ectx.record(
                     ParModuleInvalidSectionIdentifer,
                     format!("Invalid subsection identifier '{}'. Possibilities are gates / submodules / connections.", subsection_id),
@@ -232,6 +236,7 @@ impl<'a> Parser<'a> {
                 "gates" => self.parse_module_gates(&mut module_def),
                 "submodules" => self.parse_module_submodules(&mut module_def),
                 "connections" => self.parse_module_connections(&mut module_def),
+                "parameters" => self.parse_module_par(&mut module_def),
                 _ => unreachable!()
             };
 
@@ -247,8 +252,70 @@ impl<'a> Parser<'a> {
         self.result.modules.push(module_def);
     }
 
-    fn parse_module_gates(&mut self, module_def: &mut ModuleDef) -> bool {
+    fn parse_module_par(&mut self, module_def: &mut ModuleDef) -> bool {
 
+
+        loop {
+            self.eat_whitespace();
+            let (first_token, ident) = self.next_token().unwrap();
+            let ident = String::from(ident);
+            match first_token.kind {
+                TokenKind::CloseBrace => {
+                    self.ectx.reset_transient();
+                    return true;
+                },
+                TokenKind::Ident => {
+
+                    self.eat_whitespace();
+
+                    let (token, _raw) = self.next_token().unwrap();
+                    if token.kind != TokenKind::Colon {
+                        self.ectx.record(
+                            ParModuleSubInvalidSeperator,
+                            String::from("Unexpected token. Expected colon ':'."),
+                            token.loc,
+                        );
+                        return false;
+                    }
+
+                    if MODULE_SUBSECTION_IDENT.contains(&&ident[..]) {
+                        // new subsection ident
+                        self.tokens.push_front(token);
+                        self.tokens.push_front(first_token);
+                        self.ectx.reset_transient();
+                        return false;
+                    } else {
+                        // new submodule def.
+                        self.eat_whitespace();
+
+                        let (second_token, ty) = self.next_token().unwrap();
+                        let ty = String::from(ty);
+                        if second_token.kind != TokenKind::Ident {
+                            self.ectx.record(
+                                ParModuleSubInvalidIdentiferToken,
+                                String::from("Unexpected token. Expected type identifer."),
+                                second_token.loc
+                            );
+                            return false;
+                        }
+
+                        module_def.parameters.push(ParamDef { loc: Loc::fromto(first_token.loc, second_token.loc), ty, ident });
+                    }
+                },
+                _ => {
+                    self.ectx.record(
+                        ParModuleSubInvalidIdentiferToken,
+                        String::from("Unexpected token. Expected submodule type."),
+                        first_token.loc,
+                    );
+                    return false;
+                }
+            }
+
+        }
+    }
+
+    fn parse_module_gates(&mut self, module_def: &mut ModuleDef) -> bool {
         'mloop: loop {
             self.eat_whitespace();
 
@@ -359,50 +426,56 @@ impl<'a> Parser<'a> {
 
         loop {
             self.eat_whitespace();
-            let (ty_token, ty) = self.next_token().unwrap();
-            let ty = String::from(ty);
-            match ty_token.kind {
+            let (first_token, ident) = self.next_token().unwrap();
+            let ident = String::from(ident);
+            match first_token.kind {
                 TokenKind::CloseBrace => {
                     self.ectx.reset_transient();
                     return true;
                 },
                 TokenKind::Ident => {
 
-                    let (token, _raw) = self.next_token().unwrap();
-                    if token.kind != TokenKind::Whitespace {
-                        if token.kind == TokenKind::Colon {
-                            // new subsection
-                            self.tokens.push_front(token);
-                            self.tokens.push_front(ty_token);
-                            self.ectx.reset_transient();
-                        } else {
-                            self.ectx.record(
-                                ParModuleSubInvalidSeperator,
-                                String::from("Unexpected token. Expected whitespace."),
-                                token.loc,
-                            );
-                        }
-                        return false;
-                    }
+                    self.eat_whitespace();
 
-                    let (token, defname) = self.next_token().unwrap();
-                    let defname = String::from(defname);
-                    if token.kind != TokenKind::Ident {
+                    let (token, _raw) = self.next_token().unwrap();
+                    if token.kind != TokenKind::Colon {
                         self.ectx.record(
-                            ParModuleSubInvalidIdentiferToken, 
-                            String::from("Unexpected token. Expected submodule identifier."),
+                            ParModuleSubInvalidSeperator,
+                            String::from("Unexpected token. Expected colon ':'."),
                             token.loc,
                         );
                         return false;
                     }
 
-                module_def.submodule.push(SubmoduleDef { loc: Loc::fromto(ty_token.loc, token.loc), ty, descriptor: defname });
+                    if MODULE_SUBSECTION_IDENT.contains(&&ident[..]) {
+                        // new subsection ident
+                        self.tokens.push_front(token);
+                        self.tokens.push_front(first_token);
+                        self.ectx.reset_transient();
+                        return false;
+                    } else {
+                        // new submodule def.
+                        self.eat_whitespace();
+
+                        let (second_token, ty) = self.next_token().unwrap();
+                        let ty = String::from(ty);
+                        if second_token.kind != TokenKind::Ident {
+                            self.ectx.record(
+                                ParModuleSubInvalidIdentiferToken,
+                                String::from("Unexpected token. Expected type identifer."),
+                                second_token.loc
+                            );
+                            return false;
+                        }
+
+                        module_def.submodule.push(SubmoduleDef { loc: Loc::fromto(first_token.loc, second_token.loc), ty, descriptor: ident });
+                    }
                 },
                 _ => {
                     self.ectx.record(
                         ParModuleSubInvalidIdentiferToken,
                         String::from("Unexpected token. Expected submodule type."),
-                        ty_token.loc,
+                        first_token.loc,
                     );
                     return false;
                 }
@@ -867,6 +940,16 @@ pub struct LinkDef {
     pub metrics: ChannelMetrics,
 }
 
+impl LocAssetEntity for LinkDef {
+    fn loc(&self) -> Loc {
+        self.loc
+    }
+
+    fn asset_descriptor(&self) -> &SourceAssetDescriptor {
+        &self.asset
+    }
+}
+
 impl Display for LinkDef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -898,6 +981,18 @@ pub struct ModuleDef {
     pub gates: Vec<GateDef>,
     /// The connections defined by this module.
     pub connections: Vec<ConDef>,
+    /// The parameters expected by this module.
+    pub parameters: Vec<ParamDef>,
+}
+
+impl LocAssetEntity for ModuleDef {
+    fn loc(&self) -> Loc {
+        self.loc
+    }
+
+    fn asset_descriptor(&self) -> &SourceAssetDescriptor {
+        &self.asset
+    }
 }
 
 ///
@@ -947,7 +1042,7 @@ pub struct ConDef {
     /// The channel that is used to creat delays on this connection.
     pub channel: Option<String>,
     /// The target gate cluster the connection points to.
-    pub to: ConNodeIdent
+    pub to: ConNodeIdent,
 }
 
 impl Display for ConDef {
@@ -984,6 +1079,20 @@ impl Display for ConNodeIdent {
             write!(f, "{}", self.ident)
         }
     }
+}
+
+///
+/// A parameter for a module.
+/// 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParamDef {
+    /// The tokens location in the source asset.
+    pub loc: Loc,
+
+    /// The identifier for the parameter.
+    pub ident: String,
+    /// The type of the parameter.
+    pub ty: String,
 }
 
 ///

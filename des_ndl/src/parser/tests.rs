@@ -40,6 +40,10 @@ fn test_parser() {
     assert_eq!(result.modules[0].gates[0].name, "another");
     assert_eq!(result.modules[0].gates[0].size, 5);
 
+    assert_eq!(result.modules[0].parameters.len(), 1);
+    assert_eq!(result.modules[0].parameters[0].ident, "addr");
+    assert_eq!(result.modules[0].parameters[0].ty, "usize");
+
     assert_eq!(result.modules[1].name, "Main");
     assert_eq!(result.modules[1].gates.len(), 3);
     assert_eq!(result.modules[1].gates[0].name, "some");

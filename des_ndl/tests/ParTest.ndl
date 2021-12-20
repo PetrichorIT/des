@@ -8,13 +8,16 @@ link NewLink {
 }
 
 module SubM {
+    parameters:
+        addr: usize
+
     gates:
         another[5]
 }
 
 module Main {
     submodules:
-        SubM m
+        m: SubM
 
     gates:
         some[5]

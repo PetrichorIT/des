@@ -6,7 +6,7 @@ module NetworkStack {
     // THIS IS GOOD STUFF
 
     submodules:
-        RoutingDamon router
+        router: RoutingDamon 
 
     gates:
         netOut[5]

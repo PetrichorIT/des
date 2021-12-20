@@ -1,6 +1,8 @@
 use std::{io::Write, mem::MaybeUninit};
 use termcolor::*;
 
+use crate::loc::LocAssetEntity;
+
 use super::{
     loc::Loc,
     source::{SourceAsset, SourceAssetDescriptor},
@@ -136,6 +138,7 @@ impl<'a> LocalParsingErrorContext<'a> {
             code,
             msg,
             source: loc.padded_referenced_slice_in(&self.asset.data).to_string(),
+            solution: None,
 
             loc,
             asset: self.asset.descriptor.clone(),
@@ -153,6 +156,32 @@ impl<'a> LocalParsingErrorContext<'a> {
     }
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ErrorSolution {
+    pub msg: String,
+
+    pub loc: Loc,
+    pub asset: SourceAssetDescriptor,
+    // ### Autofix properties ###
+    // pub insert_loc: Loc
+    // pub insert_ele: String
+    //
+    // pub remove_loc: Loc,
+}
+
+impl ErrorSolution {
+    ///
+    /// Creates a new ErrorSolution.
+    ///
+    pub fn new(msg: String, loc: Loc, asset: SourceAssetDescriptor) -> Self {
+        Self {
+            msg: msg,
+            loc: loc,
+            asset: asset,
+        }
+    }
+}
+
 ///
 /// A generic NDL error.
 ///
@@ -164,6 +193,8 @@ pub struct Error {
     pub msg: String,
     /// The souce code lines the error occurred in.
     pub source: String,
+    /// A possible solution for the error.
+    pub solution: Option<ErrorSolution>,
 
     /// The descirptor of the asset the error occured in.
     pub asset: SourceAssetDescriptor,
@@ -192,11 +223,76 @@ impl Error {
             code,
             msg,
             source,
+            solution: None,
 
             asset,
             loc,
 
             transient,
+        }
+    }
+
+    pub fn new_lex(code: ErrorCode, loc: Loc, asset: &SourceAsset) -> Self {
+        let source = loc.padded_referenced_slice_in(&asset.data).to_string();
+        let asset_d = asset.descriptor.clone();
+
+        let solution = Some(ErrorSolution::new(
+            format!(
+                "Try removing token '{}'.",
+                loc.referenced_slice_in(&asset.data)
+            ),
+            loc,
+            asset_d.clone(),
+        ));
+
+        Self {
+            code,
+            msg: format!(
+                "Unexpected token '{}'",
+                loc.referenced_slice_in(&asset.data)
+            ),
+            source,
+            solution,
+
+            asset: asset_d,
+            loc,
+
+            transient: false,
+        }
+    }
+
+    ///
+    /// Creates a new error for missing a type, provinding a fix if a gty exists.
+    ///
+    pub fn new_ty_missing<T: LocAssetEntity>(
+        code: ErrorCode,
+        msg: String,
+        loc: Loc,
+        asset: &SourceAsset,
+        gty: Option<&&T>,
+    ) -> Self {
+        let solution = match gty {
+            Some(gty) => Some(ErrorSolution::new(
+                format!("Try including '{}'.", gty.asset_descriptor().alias),
+                Loc::new(0, 0, 1),
+                asset.descriptor.clone(),
+            )),
+            None => None,
+        };
+
+        let source = loc.padded_referenced_slice_in(&asset.data).to_string();
+        let asset = asset.descriptor.clone();
+
+        Self {
+            code,
+            msg,
+            source,
+            solution,
+
+            asset,
+            loc,
+
+            transient: false,
         }
     }
 
@@ -249,7 +345,20 @@ impl Error {
             }
         }
 
-        writeln!(&mut stream)
+        writeln!(&mut stream)?;
+
+        if let Some(solution) = &self.solution {
+            stream.set_color(ColorSpec::new().set_fg(Some(Color::Blue)).set_bold(true))?;
+            writeln!(&mut stream, "    = {}", solution.msg)?;
+            writeln!(
+                &mut stream,
+                "       in {}:{}",
+                solution.asset.path.to_str().unwrap(),
+                solution.loc.line
+            )?;
+        }
+
+        stream.reset()
     }
 }
 
@@ -297,4 +406,6 @@ pub enum ErrorCode {
     TycIncludeInvalidAlias = 330,
     TycGateInvalidNullGate = 340,
     TycGateFieldDuplication = 341,
+    TycParInvalidType = 360,
+    TycParAllreadyDefined = 361,
 }
