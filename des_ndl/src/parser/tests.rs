@@ -1,11 +1,9 @@
 #[test]
 fn test_parser() {
-    use des_core::ChannelMetrics;
-    use std::collections::VecDeque;
-
-    use crate::lexer::Token;
     use crate::source::SourceAsset;
+    use crate::TokenStream;
     use crate::{lexer::tokenize, parser::parse, SourceAssetDescriptor};
+    use des_core::ChannelMetrics;
 
     let asset = SourceAsset::load(SourceAssetDescriptor::new(
         "./tests/ParTest.ndl".into(),
@@ -18,7 +16,7 @@ fn test_parser() {
     let tokens = tokenize(&asset.data);
     let tokens = tokens.filter(|t| t.kind.valid());
     let tokens = tokens.filter(|t| !t.kind.reducable());
-    let tokens = tokens.collect::<VecDeque<Token>>();
+    let tokens = tokens.collect::<TokenStream>();
 
     let result = parse(&asset, tokens);
 

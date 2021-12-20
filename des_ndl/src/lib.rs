@@ -11,7 +11,7 @@ mod parser;
 mod resolver;
 mod tycheck;
 
-pub use lexer::{tokenize, tokenize_and_validate, Token, TokenKind};
+pub use lexer::{tokenize, tokenize_and_validate, Token, TokenKind, TokenStream};
 pub use parser::{
     parse, ConDef, ConNodeIdent, GateDef, LinkDef, ModuleDef, NetworkDef, ParsingResult,
 };
@@ -28,6 +28,6 @@ mod tests {
 
         resolver.run();
         // println!("{}", resolver);
-        // panic!("WOLOLO");
+        panic!("WOLOLO");
     }
 }

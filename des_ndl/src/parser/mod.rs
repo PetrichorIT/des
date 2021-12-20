@@ -1,8 +1,8 @@
 use std::fmt::{Display};
-use std::collections::VecDeque;
 
 use des_core::ChannelMetrics;
 
+use crate::TokenStream;
 use crate::error::ErrorSolution;
 use crate::loc::LocAssetEntity;
 
@@ -27,7 +27,7 @@ pub type ParResult<T> = Result<T, &'static str>;
 /// returning a parsing result that may or may not contain errors.
 /// 
 #[allow(unused)]
-pub fn parse(asset: &SourceAsset, tokens: VecDeque<Token>) -> ParsingResult {
+pub fn parse(asset: &SourceAsset, tokens: TokenStream) -> ParsingResult {
     let timer = utils::ScopeTimer::new("parse");
 
     let result = ParsingResult {
@@ -42,7 +42,8 @@ pub fn parse(asset: &SourceAsset, tokens: VecDeque<Token>) -> ParsingResult {
     };
 
 
-    let mut parser = Parser { result, tokens, asset,  ectx: ParsingErrorContext::new(asset) };
+    let mut parser = Parser { result, tokens, asset };
+    let mut ectx = ParsingErrorContext::new(asset);
 
     let p_state: ParResult<()> = (||{
         while !parser.is_done() {
@@ -52,10 +53,10 @@ pub fn parse(asset: &SourceAsset, tokens: VecDeque<Token>) -> ParsingResult {
                     TokenKind::Ident => {
                         let ident = raw_parts;
                         match ident {
-                            "include" => parser.parse_include()?,
-                            "module" => parser.parse_module()?,
-                            "link" => parser.parse_link()?,
-                            "network" => parser.parse_network()?,
+                            "include" => parser.parse_include(&mut ectx)?,
+                            "module" => parser.parse_module(&mut ectx)?,
+                            "link" => parser.parse_link(&mut ectx)?,
+                            "network" => parser.parse_network(&mut ectx)?,
                             _ => {}
                         }
                     }
@@ -67,7 +68,7 @@ pub fn parse(asset: &SourceAsset, tokens: VecDeque<Token>) -> ParsingResult {
     })();
 
     if let Err(e) = p_state {
-        parser.ectx.record(
+        ectx.record(
             ParUnexpectedEOF, 
             e.into(), 
             Loc::new(parser.asset.chars - 1,1, parser.asset.lines)
@@ -76,7 +77,7 @@ pub fn parse(asset: &SourceAsset, tokens: VecDeque<Token>) -> ParsingResult {
 
     drop(timer);
 
-    parser.finish()
+    parser.finish(ectx)
 }
 
 ///
@@ -104,8 +105,8 @@ struct Parser<'a> {
     result: ParsingResult,
 
     asset: &'a SourceAsset,
-    tokens: VecDeque<Token>,
-    ectx: ParsingErrorContext<'a>,
+    tokens: TokenStream,
+    //ectx: ParsingErrorContext<'a>,
 }
 
 impl<'a> Parser<'a> {
@@ -114,64 +115,54 @@ impl<'a> Parser<'a> {
         self.tokens.is_empty()
     }
 
-    fn finish(mut self) -> ParsingResult {
+    fn finish(mut self, mut ectx: ParsingErrorContext<'_>) -> ParsingResult {
         // Add +5 to prevent errors at low files sizes
-        if self.ectx.errors.len() > self.asset.lines + 5 {
+        if ectx.errors.len() > self.asset.lines + 5 {
             // Assume to many errors --> non-NDL file
             self.result.errors.push(Error::new(
                 TooManyErrors,
-                format!("Too many errors. Found {} errors in '{}'", self.ectx.errors.len(), self.asset.descriptor.alias),
+                format!("Too many errors. Found {} errors in '{}'", ectx.errors.len(), self.asset.descriptor.alias),
                 Loc::new(0, 1, 1),
                 false,
                 self.asset
             ));
             self.result
         } else {
-            self.result.errors.append(&mut self.ectx.errors);
+            self.result.errors.append(&mut ectx.errors);
             self.result
         }
 
        
     }
 
-    fn eat_while(&mut self, mut predicate: impl FnMut(&Token) -> bool) {
-        while self.tokens.front().is_some() && predicate(self.peek_token().unwrap()) {
-           self.tokens.pop_front();
+    fn eat_while(&self, mut predicate: impl FnMut(&Token) -> bool) {
+        while self.tokens.peek().is_ok() && predicate(self.tokens.peek().unwrap()) {
+           self.tokens.bump().expect("unreachable");
         }
     }
 
-    fn eat_whitespace(&mut self) {
+    fn eat_whitespace(&self) {
         self.eat_while(|t| t.kind == TokenKind::Whitespace)
     }
     
-    fn next_token(&mut self) -> ParResult<(Token, &str)> {
-        match self.tokens.pop_front() {
-            Some(token) => {
-                let raw_parts = token.loc.referenced_slice_in(&self.asset.data);
-                Ok((token, raw_parts))
-            },
-            None => Err("Unexpected end of token stream.")
-        }
-    }
+    fn next_token(&self) -> ParResult<(&Token, &str)> {
+        let token = self.tokens.bump()?;
+        let raw_parts = &self.asset.data[token.loc.pos..(token.loc.pos + token.loc.len)];
 
-    fn peek_token(&mut self) -> ParResult<&Token> {
-        match self.tokens.front() {
-            Some(token) => Ok(token),
-            None => Err("Unexpected peek at end of token stream.")
-        }
+        Ok((token, raw_parts))
     }
 }
 
 impl<'a> Parser<'a> {
-    fn parse_include(&mut self) -> ParResult<()> {
-        self.ectx.reset_transient();
+    fn parse_include(&mut self, ectx: &mut ParsingErrorContext<'_>) -> ParResult<()> {
+        ectx.reset_transient();
         self.eat_whitespace();
 
         let mut path_comps = Vec::new();
         let mut expects_comp = true;
 
-        let start_line = self.peek_token().map(|t| t.loc.line)?;
-        let start_pos = self.peek_token().map(|t| t.loc.pos)?;
+        let start_line = self.tokens.peek().map(|t| t.loc.line)?;
+        let start_pos = self.tokens.peek().map(|t| t.loc.pos)?;
 
         let end_pos = (|| loop {
             if let Ok((token, raw_parts)) = self.next_token() {
@@ -199,14 +190,15 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    fn parse_module(&mut self) -> ParResult<()> {
-        self.ectx.reset_transient();
+    fn parse_module(&mut self, ectx: &mut ParsingErrorContext<'_>) -> ParResult<()> {
+        ectx.reset_transient();
         self.eat_whitespace();
 
         let (id_token, id) = self.next_token()?;
+        let id_token_loc = id_token.loc;
         let id = String::from(id);
         if id_token.kind != TokenKind::Ident {
-            self.ectx.record(
+            ectx.record(
                 ParModuleMissingIdentifer, 
                 String::from("Invalid token. Expected module identfier."), 
                 id_token.loc
@@ -218,7 +210,7 @@ impl<'a> Parser<'a> {
         self.eat_whitespace();
         let (token, _raw) = self.next_token()?;
         if token.kind != TokenKind::OpenBrace {
-            self.ectx.record(
+            ectx.record(
                 ParModuleMissingDefBlockOpen, 
                 String::from("Invalid token. Expected module definition block (OpenBrace)"), 
                 token.loc,
@@ -247,14 +239,14 @@ impl<'a> Parser<'a> {
             if subsec_token.kind != TokenKind::Ident {
 
                 if subsec_token.kind == TokenKind::CloseBrace {
-                    self.ectx.reset_transient();
+                    ectx.reset_transient();
 
-                    module_def.loc = Loc::fromto(id_token.loc, subsec_token.loc);
+                    module_def.loc = Loc::fromto(id_token_loc, subsec_token.loc);
                     self.result.modules.push(module_def);
                     return Ok(());
                 }
 
-                self.ectx.record(
+                ectx.record(
                     ParModuleMissingSectionIdentifier, 
                     String::from("Invalid token. Expected identifier for subsection (gates / submodules / connections)."), 
                     subsec_token.loc,
@@ -263,7 +255,7 @@ impl<'a> Parser<'a> {
             }
 
             if !MODULE_SUBSECTION_IDENT.contains(&&subsection_id[..]) {
-                self.ectx.record(
+                ectx.record(
                     ParModuleInvalidSectionIdentifer,
                     format!("Invalid subsection identifier '{}'. Possibilities are gates / submodules / connections.", subsection_id),
                     subsec_token.loc,
@@ -273,20 +265,20 @@ impl<'a> Parser<'a> {
 
             let (token, _raw) = self.next_token()?;
             if token.kind != TokenKind::Colon {
-                self.ectx.record(
+                ectx.record(
                     ParModuleInvalidSeperator,
                     String::from("Unexpected token. Expected colon ':'."),
                     token.loc,
                 )?;
             };
 
-            self.ectx.reset_transient();
+            ectx.reset_transient();
 
             let done = match &subsection_id[..] {
-                "gates" => self.parse_module_gates(&mut module_def)?,
-                "submodules" => self.parse_module_submodules(&mut module_def)?,
-                "connections" => self.parse_module_connections(&mut module_def)?,
-                "parameters" => self.parse_module_par(&mut module_def)?,
+                "gates" => self.parse_module_gates(&mut module_def, ectx)?,
+                "submodules" => self.parse_module_submodules(&mut module_def, ectx)?,
+                "connections" => self.parse_module_connections(&mut module_def, ectx)?,
+                "parameters" => self.parse_module_par(&mut module_def, ectx)?,
                 _ => unreachable!()
             };
 
@@ -295,16 +287,17 @@ impl<'a> Parser<'a> {
             }
         }
 
-        let len = self.peek_token().map(|t| t.loc.pos).unwrap_or_else(|_| self.asset.data.len()) - id_token.loc.pos;
-
-        module_def.loc = Loc::new(id_token.loc.pos, len, id_token.loc.line);
+        let len = self.tokens.peek()
+            .map(|t| t.loc.pos)
+            .unwrap_or_else(|_| self.asset.data.len()) - id_token_loc.pos;
+        module_def.loc = Loc::new(id_token_loc.pos, len, id_token_loc.line);
 
         self.result.modules.push(module_def);
 
         Ok(())
     }
 
-    fn parse_module_par(&mut self, module_def: &mut ModuleDef) -> ParResult<bool> {
+    fn parse_module_par(&mut self, module_def: &mut ModuleDef, ectx: &mut ParsingErrorContext<'_>) -> ParResult<bool> {
 
         loop {
             self.eat_whitespace();
@@ -312,7 +305,7 @@ impl<'a> Parser<'a> {
             let ident = String::from(ident);
             match first_token.kind {
                 TokenKind::CloseBrace => {
-                    self.ectx.reset_transient();
+                    ectx.reset_transient();
                     return Ok(true);
                 },
                 TokenKind::Ident => {
@@ -321,7 +314,7 @@ impl<'a> Parser<'a> {
 
                     let (token, _raw) = self.next_token()?;
                     if token.kind != TokenKind::Colon {
-                        self.ectx.record(
+                        ectx.record(
                             ParModuleSubInvalidSeperator,
                             String::from("Unexpected token. Expected colon ':'."),
                             token.loc,
@@ -331,9 +324,8 @@ impl<'a> Parser<'a> {
 
                     if MODULE_SUBSECTION_IDENT.contains(&&ident[..]) {
                         // new subsection ident
-                        self.tokens.push_front(token);
-                        self.tokens.push_front(first_token);
-                        self.ectx.reset_transient();
+                        self.tokens.bump_back(2);
+                        ectx.reset_transient();
                         return Ok(false);
                     } else {
                         // new submodule def.
@@ -342,7 +334,7 @@ impl<'a> Parser<'a> {
                         let (second_token, ty) = self.next_token()?;
                         let ty = String::from(ty);
                         if second_token.kind != TokenKind::Ident {
-                            self.ectx.record(
+                            ectx.record(
                                 ParModuleSubInvalidIdentiferToken,
                                 String::from("Unexpected token. Expected type identifer."),
                                 second_token.loc
@@ -354,7 +346,7 @@ impl<'a> Parser<'a> {
                     }
                 },
                 _ => {
-                    self.ectx.record(
+                    ectx.record(
                         ParModuleSubInvalidIdentiferToken,
                         String::from("Unexpected token. Expected submodule type."),
                         first_token.loc,
@@ -366,7 +358,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_module_gates(&mut self, module_def: &mut ModuleDef) -> ParResult<bool> {
+    fn parse_module_gates(&mut self, module_def: &mut ModuleDef, ectx: &mut ParsingErrorContext<'_>) -> ParResult<bool> {
         'mloop: loop {
             self.eat_whitespace();
 
@@ -375,11 +367,11 @@ impl<'a> Parser<'a> {
             if name_token.kind != TokenKind::Ident {
 
                 if name_token.kind == TokenKind::CloseBrace {
-                    self.ectx.reset_transient();
+                    ectx.reset_transient();
                     return Ok(true);
                 }
 
-                self.ectx.record(
+                ectx.record(
                     ParModuleInvalidKeyToken,
                     String::from("Invalid token. Expected gate identifier."),
                     name_token.loc,
@@ -395,12 +387,11 @@ impl<'a> Parser<'a> {
                     module_def.gates.push(GateDef { loc: Loc::fromto(name_token.loc, token.loc), name, size: 1 })
                 } else if token.kind == TokenKind::Colon {
                     // New identifer
-                    self.tokens.push_front(token);
-                    self.tokens.push_front(name_token);
-                    self.ectx.reset_transient();
+                    self.tokens.bump_back(2);
+                    ectx.reset_transient();
                     return Ok(false);
                 } else {
-                    self.ectx.record(
+                    ectx.record(
                         ParModuleGateInvalidIdentifierToken,
                         String::from("Unexpected token. Expected whitespace."),
                         token.loc,
@@ -422,7 +413,7 @@ impl<'a> Parser<'a> {
                                     self.eat_whitespace();
                                     let (token, _raw) = self.next_token()?;
                                     if token.kind != TokenKind::CloseBracket {
-                                        self.ectx.record(
+                                        ectx.record(
                                             ParModuleGateMissingClosingBracket,
                                             String::from("Unexpected token. Expected closing bracket."),
                                             token.loc,
@@ -434,7 +425,7 @@ impl<'a> Parser<'a> {
                                     module_def.gates.push(GateDef { loc: Loc::fromto(name_token.loc, token.loc), name, size: value }); 
                                 },
                                 Err(e) => {
-                                    self.ectx.record(
+                                    ectx.record(
                                         LiteralIntParseError, 
                                         format!("Failed to parse integer: {}", e), 
                                         token.loc,
@@ -446,7 +437,7 @@ impl<'a> Parser<'a> {
                             }
 
                         } else {
-                            self.ectx.record(
+                            ectx.record(
                                 ParModuleGateInvalidGateSize,
                                 String::from("Unexpected token. Expected gate size (Int)."),
                                 token.loc,
@@ -457,7 +448,7 @@ impl<'a> Parser<'a> {
                         }
                     }
                     _ => {
-                        self.ectx.record(
+                        ectx.record(
                             ParModuleGateInvalidGateSize,
                             String::from("Unexpected token. Expected gate size (Int)."),
                             token.loc,
@@ -473,7 +464,7 @@ impl<'a> Parser<'a> {
 
     }
 
-    fn parse_module_submodules(&mut self, module_def: &mut ModuleDef) -> ParResult<bool> {
+    fn parse_module_submodules(&mut self, module_def: &mut ModuleDef, ectx: &mut ParsingErrorContext<'_>) -> ParResult<bool> {
 
         loop {
             self.eat_whitespace();
@@ -481,7 +472,7 @@ impl<'a> Parser<'a> {
             let ident = String::from(ident);
             match first_token.kind {
                 TokenKind::CloseBrace => {
-                    self.ectx.reset_transient();
+                    ectx.reset_transient();
                     return Ok(true);
                 },
                 TokenKind::Ident => {
@@ -490,7 +481,7 @@ impl<'a> Parser<'a> {
 
                     let (token, _raw) = self.next_token()?;
                     if token.kind != TokenKind::Colon {
-                        self.ectx.record(
+                        ectx.record(
                             ParModuleSubInvalidSeperator,
                             String::from("Unexpected token. Expected colon ':'."),
                             token.loc,
@@ -500,9 +491,8 @@ impl<'a> Parser<'a> {
 
                     if MODULE_SUBSECTION_IDENT.contains(&&ident[..]) {
                         // new subsection ident
-                        self.tokens.push_front(token);
-                        self.tokens.push_front(first_token);
-                        self.ectx.reset_transient();
+                        self.tokens.bump_back(2);
+                        ectx.reset_transient();
                         return Ok(false);
                     } else {
                         // new submodule def.
@@ -511,7 +501,7 @@ impl<'a> Parser<'a> {
                         let (second_token, ty) = self.next_token()?;
                         let ty = String::from(ty);
                         if second_token.kind != TokenKind::Ident {
-                            self.ectx.record(
+                            ectx.record(
                                 ParModuleSubInvalidIdentiferToken,
                                 String::from("Unexpected token. Expected type identifer."),
                                 second_token.loc
@@ -523,7 +513,7 @@ impl<'a> Parser<'a> {
                     }
                 },
                 _ => {
-                    self.ectx.record(
+                    ectx.record(
                         ParModuleSubInvalidIdentiferToken,
                         String::from("Unexpected token. Expected submodule type."),
                         first_token.loc,
@@ -536,9 +526,9 @@ impl<'a> Parser<'a> {
 
     }
 
-    fn parse_module_connections(&mut self, module_def: &mut ModuleDef) -> ParResult<bool> {
+    fn parse_module_connections(&mut self, module_def: &mut ModuleDef, ectx: &mut ParsingErrorContext<'_>) -> ParResult<bool> {
         loop {
-            let front_ident = match self.parse_connetion_identifer_token()? {
+            let front_ident = match self.parse_connetion_identifer_token(ectx)? {
                 ConIdentiferResult::Result(ident) => ident,
                 ConIdentiferResult::Error => return Ok(false),
                 ConIdentiferResult::NewSubsection => return Ok(false),
@@ -551,13 +541,14 @@ impl<'a> Parser<'a> {
             let (t2, _raw) = self.next_token()?;
             let (t3, _raw) = self.next_token()?;
 
+            let t3_loc = t3.loc;
 
             use TokenKind::*;
             let to_right = match (t1.kind, t2.kind, t3.kind) {
                 (Minus, Minus, Gt) => true,
                 (Lt, Minus, Minus) => false,
                 _ => {
-                    self.ectx.record(
+                    ectx.record(
                         ParModuleConInvaldiChannelSyntax,
                         String::from("Unexpected token. Expected arrow syntax."),
                         Loc::fromto(t1.loc, t3.loc),
@@ -567,7 +558,7 @@ impl<'a> Parser<'a> {
             };
 
 
-            let mid_ident = match self.parse_connetion_identifer_token()? {
+            let mid_ident = match self.parse_connetion_identifer_token(ectx)? {
                 ConIdentiferResult::Result(ident) => ident,
                 ConIdentiferResult::Error => return Ok(false),
                 ConIdentiferResult::NewSubsection => return Ok(false),
@@ -578,7 +569,7 @@ impl<'a> Parser<'a> {
                 // Direct connection to stack frame
                 if to_right {
                     module_def.connections.push(ConDef {
-                        loc: Loc::fromto(front_ident.loc, t3.loc),
+                        loc: Loc::fromto(front_ident.loc, t3_loc),
 
                         from: front_ident,
                         to: mid_ident,
@@ -586,7 +577,7 @@ impl<'a> Parser<'a> {
                     })
                 } else {
                     module_def.connections.push(ConDef {
-                        loc: Loc::fromto(front_ident.loc, t3.loc),
+                        loc: Loc::fromto(front_ident.loc, t3_loc),
 
                         from: mid_ident,
                         to: front_ident,
@@ -601,18 +592,20 @@ impl<'a> Parser<'a> {
                 let (t1, _raw) = self.next_token()?;
 
                 if t1.kind == TokenKind::Ident {
-                    self.tokens.push_front(t1);
+                    self.tokens.bump_back(1);
                     continue;
                 }
                 
                 let (t2, _raw) = self.next_token()?;
                 let (t3, _raw) = self.next_token()?;
 
+                let t3_loc = t3.loc;
+
                 let to_right2 = match (t1.kind, t2.kind, t3.kind) {
                     (Minus, Minus, Gt) => true,
                     (Lt, Minus, Minus) => false,
                     _ => {
-                        self.ectx.record(
+                        ectx.record(
                             ParModuleConInvaldiChannelSyntax,
                             String::from("Unexpected token. Expected arrow syntax"),
                             Loc::fromto(t1.loc, t3.loc),
@@ -623,7 +616,7 @@ impl<'a> Parser<'a> {
 
                 if (to_right && to_right2) || (!to_right && !to_right2) {
 
-                    let last_ident = match self.parse_connetion_identifer_token()? {
+                    let last_ident = match self.parse_connetion_identifer_token(ectx)? {
                         ConIdentiferResult::Result(ident) => ident,
                         ConIdentiferResult::Error => return Ok(false),
                         ConIdentiferResult::NewSubsection => return Ok(false),
@@ -632,7 +625,7 @@ impl<'a> Parser<'a> {
 
                     if to_right {
                         module_def.connections.push(ConDef {
-                            loc: Loc::fromto(front_ident.loc, t3.loc),
+                            loc: Loc::fromto(front_ident.loc, t3_loc),
 
                             from: front_ident,
                             to: last_ident,
@@ -640,7 +633,7 @@ impl<'a> Parser<'a> {
                         })
                     } else {
                         module_def.connections.push(ConDef {
-                            loc: Loc::fromto(front_ident.loc, t3.loc),
+                            loc: Loc::fromto(front_ident.loc, t3_loc),
 
                             from: last_ident,
                             to: front_ident,
@@ -649,7 +642,7 @@ impl<'a> Parser<'a> {
                     }
 
                 } else {
-                    self.ectx.record(
+                    ectx.record(
                         ParModuleConInvaldiChannelSyntax,
                         String::from("Invalid arrow syntax. Both arrows must match."),
                         Loc::fromto(t1.loc, t3.loc),
@@ -660,7 +653,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_connetion_identifer_token(&mut self) -> ParResult<ConIdentiferResult> {
+    fn parse_connetion_identifer_token(&mut self, ectx: &mut ParsingErrorContext<'_>) -> ParResult<ConIdentiferResult> {
         use ConIdentiferResult::*;
 
         self.eat_whitespace();
@@ -671,11 +664,11 @@ impl<'a> Parser<'a> {
         if first_token.kind != TokenKind::Ident {
             
             if first_token.kind == TokenKind::CloseBrace {
-                self.ectx.reset_transient();
+                ectx.reset_transient();
                 return Ok(Done)
             }
 
-            self.ectx.record(
+            ectx.record(
                 ParModuleConInvalidIdentiferToken,
                 String::from("Unexpected token. Expected identifer."),
                 first_token.loc,
@@ -689,7 +682,7 @@ impl<'a> Parser<'a> {
                 let (token, id_second) = self.next_token()?;
                 let id_second = String::from(id_second);
                 if token.kind != TokenKind::Ident {
-                    self.ectx.record(
+                    ectx.record(
                         ParModuleConInvalidIdentiferToken,
                         String::from("Unexpected token. Expected second part identifer"),
                         token.loc,
@@ -697,23 +690,20 @@ impl<'a> Parser<'a> {
                     return Ok(Error);
                 }
 
-                self.ectx.reset_transient();
+                ectx.reset_transient();
                 Ok(Result(ConNodeIdent { loc: Loc::fromto(first_token.loc, token.loc), ident: id, subident: Some(id_second) }))
             },
             TokenKind::Whitespace => {
-                self.ectx.reset_transient();
+                ectx.reset_transient();
                 Ok(Result(ConNodeIdent { loc: Loc::fromto(first_token.loc, token.loc), ident: id, subident: None }))
             },
             TokenKind::Colon => {
-                self.ectx.reset_transient();
-
-                self.tokens.push_front(token);
-                self.tokens.push_front(first_token);
-
+                self.tokens.bump_back(2);
+                ectx.reset_transient();
                 Ok(NewSubsection)
             },
             _ => {
-                self.ectx.record(
+                ectx.record(
                     ParModuleConInvalidIdentiferToken,
                     String::from("Unexpected token. Expected whitespace or slash."),
                     token.loc,
@@ -724,13 +714,14 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_link(&mut self) -> ParResult<()> {
-        self.ectx.reset_transient();
+    fn parse_link(&mut self, ectx: &mut ParsingErrorContext<'_>) -> ParResult<()> {
+        ectx.reset_transient();
 
         self.eat_whitespace();
         let (id_token, identifier) = self.next_token()?;
+        let id_token_loc = id_token.loc;
         if id_token.kind != TokenKind::Ident {
-            self.ectx.record(
+            ectx.record(
                 ParLinkMissingIdentifier,
                 String::from("Unexpected token. Expected identifer for link definition"),
                 id_token.loc,
@@ -743,7 +734,7 @@ impl<'a> Parser<'a> {
         self.eat_whitespace();
         let (paran_open, _raw) = self.next_token()?;
         if paran_open.kind != TokenKind::OpenBrace {
-            self.ectx.record(
+            ectx.record(
                 ParLinkMissingDefBlockOpen,
                 String::from("Unexpected token. Expected block for link definition"),
                 paran_open.loc,
@@ -763,11 +754,11 @@ impl<'a> Parser<'a> {
 
                 if key_token.kind == TokenKind::CloseBrace {
                     // Unfinished def. Add to stack anyway but print error
-                    self.tokens.push_front(key_token);
+                    self.tokens.bump_back(1);
                     break;
                 }
 
-                self.ectx.record(
+                ectx.record(
                     ParLinkInvalidKeyToken,
                     String::from("Unexpected token. Expected identifer for definition key."),
                     key_token.loc,
@@ -780,7 +771,7 @@ impl<'a> Parser<'a> {
 
             let (token, _raw) = self.next_token()?;
             if token.kind != TokenKind::Colon {
-                self.ectx.record(
+                ectx.record(
                     ParLinkInvalidKvSeperator,
                     String::from(
                         "Unexpected token. Expected colon ':' between definition key and value",
@@ -800,7 +791,7 @@ impl<'a> Parser<'a> {
                             match usize::from_str_radix(raw, base.radix()) {
                                 Ok(value) => bitrate = Some(value),
                                 Err(e) => {
-                                    self.ectx.record(
+                                    ectx.record(
                                         LiteralIntParseError,
                                         format!("Int parsing error: {}", e), 
                                         token.loc,
@@ -809,7 +800,7 @@ impl<'a> Parser<'a> {
                                 }
                             }
                         } else {
-                            self.ectx.record(
+                            ectx.record(
                                 ParLinkInvalidValueType, 
                                 String::from("Invalid value type. Expected integer."), 
                                 token.loc,
@@ -825,7 +816,7 @@ impl<'a> Parser<'a> {
                             match f64::from_str(raw) {
                                 Ok(value) => latency = Some(value),
                                 Err(e) => {
-                                    self.ectx.record(
+                                    ectx.record(
                                         LiteralFloatParseError,
                                         format!("Float parsing error: {}", e), 
                                         token.loc
@@ -834,7 +825,7 @@ impl<'a> Parser<'a> {
                                 }
                             }
                         } else {
-                            self.ectx.record(
+                            ectx.record(
                                 ParLinkInvalidValueType, 
                                 String::from("Invalid value type. Expected float."), 
                                 token.loc,
@@ -849,7 +840,7 @@ impl<'a> Parser<'a> {
                             match f64::from_str(raw) {
                                 Ok(value) => jitter = Some(value),
                                 Err(e) => {
-                                    self.ectx.record(
+                                    ectx.record(
                                         LiteralFloatParseError,
                                         format!("Float parsing error: {}", e), 
                                         token.loc,
@@ -858,7 +849,7 @@ impl<'a> Parser<'a> {
                                 }
                             }
                         } else {
-                            self.ectx.record(
+                            ectx.record(
                                 ParLinkInvalidValueType, 
                                 String::from("Invalid value type. Expected float."), 
                                 token.loc
@@ -867,7 +858,7 @@ impl<'a> Parser<'a> {
                         }
                     }
                     _ => {
-                        self.ectx.record(
+                        ectx.record(
                             ParLinkInvalidKey, 
                             format!("Invlaid key '{}' in kv-pair. Valid keys are latency, bitrate or jitter.", identifier), 
                             key_token.loc,
@@ -876,7 +867,7 @@ impl<'a> Parser<'a> {
                     }
                 },
                 _ => {
-                    self.ectx.record(
+                    ectx.record(
                         ParLinkInvalidValueToken,
                         String::from("Unexpected token. Expected literal"),
                         token.loc,
@@ -890,7 +881,7 @@ impl<'a> Parser<'a> {
 
         let (token, _raw) = self.next_token()?;
         if token.kind != TokenKind::CloseBrace {
-            self.ectx.record(
+            ectx.record(
                 ParLinkMissingDefBlockClose, 
                 String::from("Unexpected token. Expected closing brace."), 
                 token.loc
@@ -907,7 +898,7 @@ impl<'a> Parser<'a> {
                 .collect::<Vec<&str>>()
                 .join(" + ");
 
-            self.ectx.record_with_solution(
+            ectx.record_with_solution(
                 ParLinkIncompleteDefinition,
                 format!("Channel '{}' was missing some parameters.", identifier),
                 Loc::fromto(id_token.loc, token.loc),
@@ -919,8 +910,10 @@ impl<'a> Parser<'a> {
             )?;
         }
 
+        let token_loc = token.loc;
+
         self.result.links.push(LinkDef {
-            loc: Loc::fromto(id_token.loc, token.loc),
+            loc: Loc::fromto(id_token_loc, token_loc),
             asset: self.asset.descriptor.clone(),
 
             name: identifier,
@@ -931,12 +924,12 @@ impl<'a> Parser<'a> {
             ),
         });
 
-        self.ectx.reset_transient();
+        ectx.reset_transient();
 
         Ok(())
     }
 
-    fn parse_network(&mut self) -> ParResult<()> {
+    fn parse_network(&mut self, _ectx: &mut ParsingErrorContext<'_>) -> ParResult<()> {
         unimplemented!()
     }
 }

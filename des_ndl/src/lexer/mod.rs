@@ -1,5 +1,3 @@
-use std::collections::VecDeque;
-
 use crate::error::LexingErrorContext;
 use crate::parser::ParResult;
 use crate::GlobalErrorContext;
@@ -8,11 +6,13 @@ use crate::SourceAsset;
 use super::loc::Loc;
 use cursor::Cursor;
 
+pub use self::token_stream::TokenStream;
 use self::LiteralKind::*;
 use self::TokenKind::*;
 
 mod cursor;
 mod tests;
+mod token_stream;
 
 /// Creates an iterator that produces tokens from the input string.
 pub fn tokenize(input: &str) -> impl Iterator<Item = Token> + '_ {
@@ -33,30 +33,16 @@ pub fn tokenize(input: &str) -> impl Iterator<Item = Token> + '_ {
 pub fn tokenize_and_validate(
     asset: &SourceAsset,
     global_ectx: &mut GlobalErrorContext,
-) -> ParResult<VecDeque<Token>> {
+) -> ParResult<TokenStream> {
     let timer = utils::ScopeTimer::new("tokenize_and_validate");
-
-    let token_stream = tokenize(&asset.data).collect::<Vec<Token>>();
-    let mut validated_token_stream = VecDeque::with_capacity(token_stream.len());
-
     let mut ectx = LexingErrorContext::new(asset);
 
-    for token in token_stream {
-        if !token.kind.valid() {
-            ectx.record(&token)?;
-            continue;
-        }
-
-        if !token.kind.reducable() {
-            validated_token_stream.push_back(token)
-        }
-    }
-
+    let token_stream = TokenStream::new(asset, &mut ectx)?;
     global_ectx.lexing_errors.append(&mut ectx.finish());
 
     drop(timer);
 
-    Ok(validated_token_stream)
+    Ok(token_stream)
 }
 
 ///
