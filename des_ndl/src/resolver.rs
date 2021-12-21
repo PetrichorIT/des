@@ -17,6 +17,8 @@ use crate::{
 pub struct NdlResolver {
     /// A indicator in which state the resolver is / may have stopped.
     pub state: NdlResolverState,
+    /// The config of the resolver.
+    pub options: NdlResolverOptions,
     /// The root directory of the NDL workspace.
     pub root_dir: PathBuf,
     /// A list of all loaded assets in the current workspace.
@@ -32,6 +34,13 @@ impl NdlResolver {
     /// Creats a new resolver of the given workspace directory.
     ///
     pub fn new(raw_path: &str) -> Result<Self, &'static str> {
+        Self::new_with(raw_path, NdlResolverOptions::default())
+    }
+
+    ///
+    /// Creats a new resolver of the given workspace directory adn options.
+    ///
+    pub fn new_with(raw_path: &str, options: NdlResolverOptions) -> Result<Self, &'static str> {
         let root_dir = Path::new(raw_path).to_owned();
         if !root_dir.exists() {
             return Err("Resolver must point to valid root.");
@@ -39,6 +48,7 @@ impl NdlResolver {
 
         Ok(Self {
             state: NdlResolverState::Idle,
+            options,
 
             assets: Vec::new(),
             root_dir,
@@ -112,7 +122,7 @@ impl NdlResolver {
 
         // === FIN ===
 
-        if self.ectx.has_errors() {
+        if self.ectx.has_errors() && !self.options.silent {
             let mut errs = Vec::new();
 
             for le in &self.ectx.lexing_errors {
@@ -200,6 +210,23 @@ pub enum NdlResolverState {
     Validated,
     /// The resolver finished.
     Done,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NdlResolverOptions {
+    pub silent: bool,
+}
+
+impl NdlResolverOptions {
+    pub fn bench() -> Self {
+        Self { silent: true }
+    }
+}
+
+impl Default for NdlResolverOptions {
+    fn default() -> Self {
+        Self { silent: false }
+    }
 }
 
 mod tests {

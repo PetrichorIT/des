@@ -1,0 +1,24 @@
+module RoutingDamon {
+    gates:
+        a[3]
+}
+
+module NetworkStack {
+
+    // This is a comment
+    parameters:
+        addr: i32
+
+    submodules:
+        router: RoutingDamon
+
+    gates:
+        netOut[5]
+        netIn[5]
+
+        fromAppl[5]
+        toAppl[5]
+
+    connections:
+        toAppl --> FastLink --> router/a
+}

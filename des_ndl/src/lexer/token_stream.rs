@@ -64,6 +64,15 @@ impl TokenStream {
     }
 }
 
+impl Clone for TokenStream {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            head: UnsafeCell::new(unsafe { *self.head.get() }),
+        }
+    }
+}
+
 impl FromIterator<Token> for TokenStream {
     fn from_iter<T: IntoIterator<Item = Token>>(iter: T) -> Self {
         Self {

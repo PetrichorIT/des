@@ -26,8 +26,6 @@ pub fn validate(
     unit: &ParsingResult,
     global_tyctx: &TyContext,
 ) -> Vec<Error> {
-    let timer = utils::ScopeTimer::new("tycheck");
-
     let mut tyctx = TyContext::new();
     let mut errors = Vec::new();
     let asset = resolver
@@ -312,8 +310,6 @@ pub fn validate(
             asset,
         )),
     }
-
-    drop(timer);
 
     errors
 }

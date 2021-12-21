@@ -15,7 +15,7 @@ pub use lexer::{tokenize, tokenize_and_validate, Token, TokenKind, TokenStream};
 pub use parser::{
     parse, ConDef, ConNodeIdent, GateDef, LinkDef, ModuleDef, NetworkDef, ParsingResult,
 };
-pub use resolver::{NdlResolver, NdlResolverOptions};
+pub use resolver::NdlResolver;
 pub use tycheck::{validate, TyContext};
 
 mod tests {

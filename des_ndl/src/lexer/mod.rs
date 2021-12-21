@@ -34,13 +34,10 @@ pub fn tokenize_and_validate(
     asset: &SourceAsset,
     global_ectx: &mut GlobalErrorContext,
 ) -> ParResult<TokenStream> {
-    let timer = utils::ScopeTimer::new("tokenize_and_validate");
     let mut ectx = LexingErrorContext::new(asset);
 
     let token_stream = TokenStream::new(asset, &mut ectx)?;
     global_ectx.lexing_errors.append(&mut ectx.finish());
-
-    drop(timer);
 
     Ok(token_stream)
 }

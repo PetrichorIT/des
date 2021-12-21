@@ -1,0 +1,6 @@
+link FastLink {
+    bitrate:
+        0
+    latency:
+        0.1
+}

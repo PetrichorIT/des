@@ -1,0 +1,53 @@
+include Link
+
+module RoutingDamon {
+    gates:
+        a[5]
+}
+
+module NetworkStack {
+
+    // This is a comment
+    parameters:
+        addr: i32io
+
+    submodules:
+        router: RoutingDamon
+
+    gates:
+        netOut[5]
+        netIn[5]
+
+        fromAppl[5]
+        toAppl[5]
+
+    connections:
+        toAppl --> FastLink --> router/a
+}
+
+include NetworkStackIO
+include std/Link
+
+module NetworkNode {
+    submodules:
+        stack: NetworkStackio
+
+    gates:
+        toStack[3]
+        fromStack[5]
+
+        channelIncoming[5]
+        channelOutgoing[5]
+
+        toAppl[5]
+        fromAppl[5]
+
+    connections:
+
+        toStack --> FastLink --> stack/netIn
+        fromStackio <-- stack/netOut
+        
+        fromAppl --> stack/fromAppl
+        toAppl <-- stack/toApplio
+
+}
