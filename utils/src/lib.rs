@@ -2,6 +2,7 @@ pub mod bench {
 
     use std::{
         io::Write,
+        path::PathBuf,
         time::{Duration, Instant},
     };
 
@@ -150,8 +151,11 @@ pub mod bench {
 
             if write_to_file {
                 let str = serde_yaml::to_string(&self).unwrap();
-                let mut file =
-                    std::fs::File::create(format!("benches/results/{}.yaml", self.name))?;
+                let path = PathBuf::from(format!("benches/results/{}.yaml", self.name));
+                let prefix = path.parent().unwrap();
+                std::fs::create_dir_all(prefix)?;
+
+                let mut file = std::fs::File::create(path)?;
 
                 write!(file, "{}", str).expect("Failed to write to file");
             }
