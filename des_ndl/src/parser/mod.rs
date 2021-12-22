@@ -115,21 +115,8 @@ impl<'a> Parser<'a> {
     }
 
     fn finish(mut self, mut ectx: ParsingErrorContext<'_>) -> ParsingResult {
-        // Add +5 to prevent errors at low files sizes
-        // if ectx.errors.len() > self.smap.lines + 5 {
-        //     // Assume to many errors --> non-NDL file
-        //     self.result.errors.push(Error::new(
-        //         TooManyErrors,
-        //         format!("Too many errors. Found {} errors in '{}'", ectx.errors.len(), self.smap.descriptor.alias),
-        //         Loc::new(0, 1, 1),
-        //         false,
-        //         self.smap
-        //     ));
-        //     self.result
-        // } else {
-            self.result.errors.append(&mut ectx.errors);
-            self.result
-        // }
+        self.result.errors.append(&mut ectx.errors);
+        self.result
     }
 
     fn eat_while(&self, mut predicate: impl FnMut(&Token) -> bool) {

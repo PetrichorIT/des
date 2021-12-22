@@ -109,14 +109,22 @@ impl SourceMap {
         loc: Loc,
         asset: &MappedAssetDescriptor,
     ) -> &str {
+        // println!("{:?} {}", loc, self.referenced_slice_for(loc));
+
         let start_line = loc.line;
         let end_line = asset.line_of_pos(loc.pos + loc.len);
 
+        // println!("{} \t{}", start_line, end_line);
+
         let padded_start_line = start_line.saturating_sub(1);
-        let padded_end_line = (end_line + 1).min(asset.len_lines);
+        let padded_end_line = (end_line + 1).min(asset.len_lines - 1);
+
+        // println!("{} \t{}", padded_start_line, padded_end_line);
 
         let padded_start_pos = asset.line_pos_mapping[padded_start_line] + asset.pos;
-        let padded_end_pos = asset.line_pos_mapping[padded_end_line] + asset.pos;
+        let padded_end_pos = asset.line_pos_mapping[padded_end_line + 1] - 1 + asset.pos;
+
+        // println!("{} \t{}", padded_start_pos, padded_end_pos);
 
         &self.buffer[padded_start_pos..padded_end_pos]
     }
