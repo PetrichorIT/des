@@ -1,7 +1,7 @@
 use std::cell::UnsafeCell;
 
 use super::{tokenize, Token};
-use crate::{error::LexingErrorContext, parser::ParResult, SourceAsset};
+use crate::{error::LexingErrorContext, parser::ParResult, source::Asset};
 
 #[derive(Debug)]
 pub struct TokenStream {
@@ -10,9 +10,9 @@ pub struct TokenStream {
 }
 
 impl TokenStream {
-    pub fn new(asset: &SourceAsset, ectx: &mut LexingErrorContext) -> ParResult<Self> {
+    pub fn new(asset: Asset<'_>, ectx: &mut LexingErrorContext) -> ParResult<Self> {
         let mut inner = Vec::new();
-        for token in tokenize(&asset.data) {
+        for token in tokenize(asset.source(), asset.start_pos()) {
             if token.kind.valid() && !token.kind.reducable() {
                 inner.push(token)
             } else if !token.kind.valid() {

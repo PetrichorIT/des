@@ -1,12 +1,9 @@
 use std::{io::Write, mem::MaybeUninit};
 use termcolor::*;
 
-use crate::{loc::LocAssetEntity, parser::ParResult, Token, TokenKind};
+use crate::{parser::ParResult, source::Asset, SourceMap, Token, TokenKind};
 
-use super::{
-    loc::Loc,
-    source::{SourceAsset, SourceAssetDescriptor},
-};
+use super::loc::Loc;
 
 ///
 /// A global context for storing errors, and if nessecary stopping
@@ -77,17 +74,17 @@ impl Default for GlobalErrorContext {
 #[derive(Debug)]
 pub struct LexingErrorContext<'a> {
     errors: Vec<Error>,
-    asset: &'a SourceAsset,
+    asset: Asset<'a>,
 }
 
 impl<'a> LexingErrorContext<'a> {
     ///
     /// Creates a new lexing error context.
     ///
-    pub fn new(asset: &'a SourceAsset) -> Self {
+    pub fn new(asset: Asset<'a>) -> Self {
         Self {
             errors: Vec::new(),
-            asset: asset,
+            asset,
         }
     }
 
@@ -100,7 +97,7 @@ impl<'a> LexingErrorContext<'a> {
     ///  An indicator whether too many errors have occurred.
     ///
     pub fn exceeded_error_limit(&self) -> bool {
-        self.len() > self.asset.lines + 5
+        self.len() > self.asset.mapped_asset().len_lines + 5
     }
 
     ///
@@ -141,12 +138,12 @@ impl<'a> LexingErrorContext<'a> {
 /// A local error context for creating transient errors
 /// during the parsing stage.
 ///
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct ParsingErrorContext<'a> {
     /// A list of the collect errors, including transients.
     pub errors: Vec<Error>,
 
-    asset: &'a SourceAsset,
+    asset: &'a Asset<'a>,
     transient: bool,
 }
 
@@ -168,7 +165,7 @@ impl<'a> ParsingErrorContext<'a> {
         Self {
             errors: Vec::new(),
 
-            asset: unsafe { &*MaybeUninit::<SourceAsset>::uninit().as_ptr() },
+            asset: unsafe { &*MaybeUninit::<Asset>::uninit().as_ptr() },
             transient: false,
         }
     }
@@ -176,7 +173,7 @@ impl<'a> ParsingErrorContext<'a> {
     ///
     /// Creates a new context bound to the given asset.
     ///
-    pub fn new(asset: &'a SourceAsset) -> Self {
+    pub fn new(asset: &'a Asset) -> Self {
         Self {
             errors: Vec::new(),
 
@@ -206,17 +203,16 @@ impl<'a> ParsingErrorContext<'a> {
         self.errors.push(Error {
             code,
             msg,
-            source: loc.padded_referenced_slice_in(&self.asset).to_string(),
+
             solution: None,
 
             loc,
-            asset: self.asset.descriptor.clone(),
 
             transient: self.transient,
         });
         self.transient = true;
 
-        if self.errors.len() > self.asset.lines + 5 {
+        if self.errors.len() > self.asset.mapped_asset().len_lines + 5 {
             Err("Too many errors")
         } else {
             Ok(())
@@ -236,17 +232,15 @@ impl<'a> ParsingErrorContext<'a> {
         self.errors.push(Error {
             code,
             msg,
-            source: loc.padded_referenced_slice_in(&self.asset).to_string(),
             solution: Some(solution),
 
             loc,
-            asset: self.asset.descriptor.clone(),
 
             transient: self.transient,
         });
         self.transient = true;
 
-        if self.errors.len() > self.asset.lines + 5 {
+        if self.errors.len() > self.asset.mapped_asset().len_lines + 5 {
             Err("Too many errors")
         } else {
             Ok(())
@@ -266,7 +260,6 @@ pub struct ErrorSolution {
     pub msg: String,
 
     pub loc: Loc,
-    pub asset: SourceAssetDescriptor,
     // ### Autofix properties ###
     // pub insert_loc: Loc
     // pub insert_ele: String
@@ -278,12 +271,8 @@ impl ErrorSolution {
     ///
     /// Creates a new ErrorSolution.
     ///
-    pub fn new(msg: String, loc: Loc, asset: SourceAssetDescriptor) -> Self {
-        Self {
-            msg: msg,
-            loc: loc,
-            asset: asset,
-        }
+    pub fn new(msg: String, loc: Loc) -> Self {
+        Self { msg, loc }
     }
 }
 
@@ -296,13 +285,9 @@ pub struct Error {
     pub code: ErrorCode,
     /// An instance-specific error message.
     pub msg: String,
-    /// The souce code lines the error occurred in.
-    pub source: String,
     /// A possible solution for the error.
     pub solution: Option<ErrorSolution>,
 
-    /// The descirptor of the asset the error occured in.
-    pub asset: SourceAssetDescriptor,
     /// The exact location of the error.
     pub loc: Loc,
 
@@ -314,54 +299,27 @@ impl Error {
     ///
     /// Creates a new instance.
     ///
-    pub fn new(
-        code: ErrorCode,
-        msg: String,
-        loc: Loc,
-        transient: bool,
-        asset: &SourceAsset,
-    ) -> Self {
-        let source = loc.padded_referenced_slice_in(&asset).to_string();
-        let asset = asset.descriptor.clone();
-
+    pub fn new(code: ErrorCode, msg: String, loc: Loc, transient: bool) -> Self {
         Self {
             code,
             msg,
-            source,
             solution: None,
-
-            asset,
             loc,
-
             transient,
         }
     }
 
-    pub fn new_lex(code: ErrorCode, loc: Loc, asset: &SourceAsset) -> Self {
-        let source = loc.padded_referenced_slice_in(&asset).to_string();
-        let asset_d = asset.descriptor.clone();
-
+    pub fn new_lex(code: ErrorCode, loc: Loc, asset: Asset<'_>) -> Self {
         let solution = Some(ErrorSolution::new(
-            format!(
-                "Try removing token '{}'",
-                loc.referenced_slice_in(&asset.data)
-            ),
+            format!("Try removing token '{}'", asset.referenced_slice_for(loc)),
             loc,
-            asset_d.clone(),
         ));
 
         Self {
             code,
-            msg: format!(
-                "Unexpected token '{}'",
-                loc.referenced_slice_in(&asset.data)
-            ),
-            source,
+            msg: format!("Unexpected token '{}'", asset.referenced_slice_for(loc)),
             solution,
-
-            asset: asset_d,
             loc,
-
             transient: false,
         }
     }
@@ -369,34 +327,28 @@ impl Error {
     ///
     /// Creates a new error for missing a type, provinding a fix if a gty exists.
     ///
-    pub fn new_ty_missing<T: LocAssetEntity>(
+    pub fn new_ty_missing(
         code: ErrorCode,
         msg: String,
         loc: Loc,
-        asset: &SourceAsset,
-        gty: Option<&&T>,
+        asset: Asset<'_>,
+        gty_loc: Option<Loc>,
     ) -> Self {
-        let solution = match gty {
-            Some(gty) => Some(ErrorSolution::new(
-                format!("Try including '{}'", gty.asset_descriptor().alias),
+        let solution = gty_loc.map(|gty_loc| {
+            ErrorSolution::new(
+                format!(
+                    "Try including '{}'",
+                    asset.source_map().get_asset_for_loc(gty_loc).alias
+                ),
                 Loc::new(0, 1, 1),
-                asset.descriptor.clone(),
-            )),
-            None => None,
-        };
-
-        let source = loc.padded_referenced_slice_in(&asset).to_string();
-        let asset = asset.descriptor.clone();
+            )
+        });
 
         Self {
             code,
             msg,
-            source,
             solution,
-
-            asset,
             loc,
-
             transient: false,
         }
     }
@@ -404,8 +356,9 @@ impl Error {
     ///
     /// Prints the error to stderr (colored) using termcolor.
     ///
-    pub fn print(&self) -> std::io::Result<()> {
+    pub fn print(&self, smap: &SourceMap) -> std::io::Result<()> {
         let mut stream = StandardStream::stderr(ColorChoice::Always);
+        let asset = smap.get_asset_for_loc(self.loc);
 
         stream.set_color(ColorSpec::new().set_fg(Some(Color::Red)).set_bold(true))?;
         if self.transient {
@@ -425,7 +378,7 @@ impl Error {
         writeln!(
             &mut stream,
             "{}:{}",
-            self.asset.path.to_str().unwrap(),
+            asset.path.to_str().unwrap(),
             self.loc.line
         )?;
 
@@ -435,7 +388,7 @@ impl Error {
 
         let mut line_drawn = false;
 
-        for c in self.source.chars() {
+        for c in smap.padded_referenced_slice_for(self.loc).chars() {
             write!(&mut stream, "{}", c)?;
             if c == '\n' {
                 stream.set_color(ColorSpec::new().set_fg(Some(Color::Blue)).set_bold(true))?;
@@ -453,12 +406,14 @@ impl Error {
         writeln!(&mut stream)?;
 
         if let Some(solution) = &self.solution {
+            let solution_asset = smap.get_asset_for_loc(solution.loc);
+
             stream.set_color(ColorSpec::new().set_fg(Some(Color::Blue)).set_bold(true))?;
             writeln!(&mut stream, "    = {}", solution.msg)?;
             writeln!(
                 &mut stream,
                 "       in {}:{}",
-                solution.asset.path.to_str().unwrap(),
+                solution_asset.path.to_str().unwrap(),
                 solution.loc.line
             )?;
         }

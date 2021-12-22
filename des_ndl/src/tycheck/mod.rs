@@ -1,10 +1,10 @@
-use crate::SourceAsset;
+use crate::source::Asset;
 
 use super::{
     error::{Error, ErrorCode::*},
     loc::Loc,
     parser::{LinkDef, ModuleDef, NetworkDef, ParsingResult},
-    source::SourceAssetDescriptor,
+    source::AssetDescriptor,
     NdlResolver,
 };
 
@@ -28,11 +28,9 @@ pub fn validate(
 ) -> Vec<Error> {
     let mut tyctx = TyContext::new();
     let mut errors = Vec::new();
-    let asset = resolver
-        .assets
-        .iter()
-        .find(|a| a.descriptor == unit.asset)
-        .unwrap();
+
+
+    let asset = resolver.source_map.get_asset(&unit.asset.alias).unwrap();
 
     resolve_includes(resolver, unit, &mut tyctx, &mut errors, asset);
 
@@ -53,7 +51,7 @@ pub fn validate(
                         format!("Module '{}' was allready defined.", self_ty),
                         module.loc,
                         false,
-                        asset,
+                    
                     ))
                 } else {
                     module_names.push(self_ty)
@@ -69,7 +67,7 @@ pub fn validate(
                             format!("Field '{}' was already declared.", submodule.descriptor),
                             submodule.loc,
                             false,
-                            asset,
+                        
                         ));
                     }
                     descriptors.push(&submodule.descriptor);
@@ -82,7 +80,7 @@ pub fn validate(
                             format!("Module '{0}' has a required submodule of type '{0}'. Cannot create cyclic definitions.", submodule.ty),
                             submodule.loc,
                             false,
-                            asset
+                      
                         ))
                     } else if !ty_valid {
                         let gty = global_tyctx
@@ -98,7 +96,7 @@ pub fn validate(
                             ),
                             submodule.loc,
                             asset,
-                            gty,
+                            gty.map(|ty| ty.loc),
                         ));
                     }
                 }
@@ -115,7 +113,7 @@ pub fn validate(
                             String::from("Cannot create gate of size 0."),
                             gate.loc,
                             false,
-                            asset,
+                        
                         ))
                         // Still hold the descriptor to prevent transient errors
                     }
@@ -126,7 +124,7 @@ pub fn validate(
                             format!("Gate '{}' was allready defined.", gate.name),
                             gate.loc,
                             false,
-                            asset,
+                     
                         ))
                     } else {
                         self_gates.push(&gate.name);
@@ -150,7 +148,11 @@ pub fn validate(
                                 ),
                                 connection.loc,
                                 asset,
-                                global_tyctx.links.iter().find(|l| l.name == *channel),
+                                global_tyctx
+                                    .links
+                                    .iter()
+                                    .find(|l| l.name == *channel)
+                                    .map(|ty| ty.loc),
                             ));
                         }
                     }
@@ -169,7 +171,6 @@ pub fn validate(
                                     ),
                                     peer.loc,
                                     false,
-                                    asset,
                                 ));
 
                                 return None;
@@ -183,11 +184,9 @@ pub fn validate(
 
                             let mod_def = tyctx.modules.iter().find(|m| m.name == submod.ty);
 
-                            if mod_def.is_none() {
-                                // referenced submodule has invalid ty
-                                // this error was already handled
-                                return None;
-                            }
+                            // if referenced submodule has invalid ty
+                            // this error was already handled
+                            mod_def?;
 
                             let mod_def = mod_def.unwrap();
 
@@ -203,7 +202,7 @@ pub fn validate(
                                     ),
                                     peer.loc,
                                     false,
-                                    asset,
+                                
                                 ));
 
                                 return None;
@@ -222,7 +221,7 @@ pub fn validate(
                                     ),
                                     peer.loc,
                                     false,
-                                    asset,
+                                
                                 ));
 
                                 return None;
@@ -244,7 +243,7 @@ pub fn validate(
                                     format!("Gates '{}' and '{}' cannot be connected since they have different sizes.", from, to),
                                     connection.loc,
                                     false,
-                                    asset
+                         
                                 ))
                             }
                         }
@@ -265,7 +264,7 @@ pub fn validate(
                             format!("Parameter type '{}' does not exist.", par.ty),
                             par.loc,
                             false,
-                            asset,
+                   
                         ));
                         continue;
                     }
@@ -276,7 +275,7 @@ pub fn validate(
                             format!("Parameter '{}' was already defined.", par.ident),
                             par.loc,
                             false,
-                            asset,
+                       
                         ));
                         continue;
                     } else {
@@ -295,7 +294,7 @@ pub fn validate(
                         format!("Channel '{}' was already defined.", self_ty),
                         channel.loc,
                         false,
-                        asset,
+                   
                     ))
                 } else {
                     channel_names.push(self_ty)
@@ -307,7 +306,7 @@ pub fn validate(
             format!("Name collision in '{}'", unit.asset.alias),
             Loc::new(0, 1, 1),
             false,
-            asset,
+     
         )),
     }
 
@@ -319,7 +318,7 @@ fn resolve_includes<'a>(
     unit: &'a ParsingResult,
     tyctx: &mut TyContext<'a>,
     errors: &mut Vec<Error>,
-    asset: &SourceAsset,
+    asset: Asset<'_>,
 ) {
     let new_unit = tyctx.include(unit);
     if new_unit {
@@ -336,7 +335,6 @@ fn resolve_includes<'a>(
                     ),
                     include.loc,
                     false,
-                    asset,
                 ))
             }
         }
@@ -350,7 +348,7 @@ fn resolve_includes<'a>(
 #[derive(Debug)]
 pub struct TyContext<'a> {
     /// A reference of all included assets.
-    pub included: Vec<SourceAssetDescriptor>,
+    pub included: Vec<AssetDescriptor>,
 
     /// A collection of all included channel definitions.
     pub links: Vec<&'a LinkDef>,

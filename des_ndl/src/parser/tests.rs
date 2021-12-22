@@ -1,24 +1,25 @@
 #[test]
 fn test_parser() {
-    use crate::source::SourceAsset;
+    use crate::SourceMap;
     use crate::TokenStream;
-    use crate::{lexer::tokenize, parser::parse, SourceAssetDescriptor};
+    use crate::{lexer::tokenize, parser::parse, AssetDescriptor};
+
     use des_core::ChannelMetrics;
 
-    let asset = SourceAsset::load(SourceAssetDescriptor::new(
-        "./tests/ParTest.ndl".into(),
-        "ParTest".into(),
-    ))
-    .expect("Failed to load test asset 'ParTest.ndl'");
+    let mut smap = SourceMap::new();
+    let asset = smap
+        .load(AssetDescriptor::new(
+            "./tests/ParTest.ndl".into(),
+            "ParTest".into(),
+        ))
+        .expect("Failed to load test asset 'ParTest.ndl'");
 
-    println!("{}", asset.lines);
-
-    let tokens = tokenize(&asset.data);
+    let tokens = tokenize(asset.source(), 0);
     let tokens = tokens.filter(|t| t.kind.valid());
     let tokens = tokens.filter(|t| !t.kind.reducable());
     let tokens = tokens.collect::<TokenStream>();
 
-    let result = parse(&asset, tokens);
+    let result = parse(asset, tokens);
 
     assert!(result.errors.is_empty());
 

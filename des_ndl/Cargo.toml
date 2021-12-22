@@ -17,9 +17,6 @@ name = "par_stage"
 harness = false
 name = "tyc_stage"
 
-[dev-dependencies]
-criterion = "0.3.5"
-
 [dependencies]
 des_core = {path = "../des_core"}
 log = "0.4.14"

@@ -4,6 +4,8 @@ include std/Link
 module NetworkNode {
     submodules:
         stack: NetworkStack
+    
+    // This is a comment 😃😃😃😃😃😃😃😃😃😃😃😃
 
     gates:
         toStack[5]
@@ -17,7 +19,7 @@ module NetworkNode {
 
     connections:
 
-        toStack --> FastLink --> stack/netIn
+        toStack --> Fastink --> stack/netIn
         fromStack <-- stack/netOut
         
         fromAppl --> stack/fromAppl

@@ -5,8 +5,8 @@ use std::{
 };
 
 use crate::{
-    parse, tokenize_and_validate, validate, Error, ErrorCode, GlobalErrorContext, Loc,
-    ParsingResult, SourceAsset, SourceAssetDescriptor, TyContext,
+    parse, tokenize_and_validate, validate, AssetDescriptor, Error, ErrorCode, GlobalErrorContext,
+    ParsingResult, SourceMap, TyContext,
 };
 
 ///
@@ -22,7 +22,7 @@ pub struct NdlResolver {
     /// The root directory of the NDL workspace.
     pub root_dir: PathBuf,
     /// A list of all loaded assets in the current workspace.
-    pub assets: Vec<SourceAsset>,
+    pub source_map: SourceMap,
     /// A list of all lexed/parsed assets in the current workspace.
     pub units: HashMap<String, ParsingResult>,
     /// An error handler to record errors on the way.
@@ -50,7 +50,7 @@ impl NdlResolver {
             state: NdlResolverState::Idle,
             options,
 
-            assets: Vec::new(),
+            source_map: SourceMap::new(),
             root_dir,
             units: HashMap::new(),
 
@@ -69,10 +69,10 @@ impl NdlResolver {
 
         for scope in scopes {
             // === Namespacing ===
-            let descriptor = SourceAssetDescriptor::from_path(scope, &self.root_dir);
+            let descriptor = AssetDescriptor::from_path(scope, &self.root_dir);
 
             // === Asset Loading ===
-            let asset = match SourceAsset::load(descriptor) {
+            let asset = match self.source_map.load(descriptor) {
                 Ok(asset) => asset,
                 Err(_e) => {
                     // Log error
@@ -82,15 +82,14 @@ impl NdlResolver {
 
             // === Lexing ===
 
-            let validated_token_stream = match tokenize_and_validate(&asset, &mut self.ectx) {
+            let validated_token_stream = match tokenize_and_validate(asset, &mut self.ectx) {
                 Ok(v) => v,
                 Err(_e) => {
                     self.ectx.lexing_errors.push(Error::new(
                         ErrorCode::TooManyErrors,
-                        format!("Too many errors in '{}'", asset.descriptor.alias),
-                        Loc::new(0, 1, 1),
+                        format!("Too many errors in '{}'", asset.descriptor().alias),
+                        asset.start_loc(),
                         false,
-                        &asset,
                     ));
                     continue;
                 }
@@ -98,10 +97,9 @@ impl NdlResolver {
 
             // === Compile Unit parsing
 
-            let unit = parse(&asset, validated_token_stream);
+            let unit = parse(asset, validated_token_stream);
             self.ectx.parsing_errors.append(&mut unit.errors.clone());
 
-            self.assets.push(asset);
             self.units.insert(unit.asset.alias.clone(), unit);
         }
 
@@ -135,10 +133,11 @@ impl NdlResolver {
                 errs.push(te)
             }
 
-            errs.sort_by(|&lhs, &rhs| lhs.asset.alias.cmp(&rhs.asset.alias));
+            errs.sort_by(|&lhs, &rhs| lhs.loc.pos.cmp(&rhs.loc.pos));
 
             for e in errs {
-                e.print().expect("Failed to write error to stderr")
+                e.print(&self.source_map)
+                    .expect("Failed to write error to stderr")
             }
         }
     }
@@ -184,7 +183,7 @@ impl Display for NdlResolver {
         writeln!(
             f,
             "assets: {} units: {}",
-            self.assets.len(),
+            self.source_map.len_assets(),
             self.units.len()
         )?;
 
@@ -212,7 +211,7 @@ pub enum NdlResolverState {
     Done,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct NdlResolverOptions {
     pub silent: bool,
 }
@@ -220,12 +219,6 @@ pub struct NdlResolverOptions {
 impl NdlResolverOptions {
     pub fn bench() -> Self {
         Self { silent: true }
-    }
-}
-
-impl Default for NdlResolverOptions {
-    fn default() -> Self {
-        Self { silent: false }
     }
 }
 

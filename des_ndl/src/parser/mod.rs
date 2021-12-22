@@ -4,14 +4,14 @@ use des_core::ChannelMetrics;
 
 use crate::TokenStream;
 use crate::error::ErrorSolution;
-use crate::loc::LocAssetEntity;
+use crate::source::Asset;
 
 use super::loc::Loc;
 use super::error::Error;
 use super::error::ErrorCode::*;
 use super::error::ParsingErrorContext;
 use super::lexer::{LiteralKind, Token, TokenKind};
-use super::source::{SourceAsset, SourceAssetDescriptor};
+use super::source::{AssetDescriptor};
 
 mod tests;
 
@@ -27,9 +27,12 @@ pub type ParResult<T> = Result<T, &'static str>;
 /// returning a parsing result that may or may not contain errors.
 /// 
 #[allow(unused)]
-pub fn parse(asset: &SourceAsset, tokens: TokenStream) -> ParsingResult {
+pub fn parse(asset: Asset<'_>, tokens: TokenStream) -> ParsingResult {
+
+    let last_loc = asset.end_loc();
+
     let result = ParsingResult {
-        asset: asset.descriptor.clone(),
+        asset: asset.descriptor(),
         
         includes: Vec::new(),
         links: Vec::new(),
@@ -39,9 +42,9 @@ pub fn parse(asset: &SourceAsset, tokens: TokenStream) -> ParsingResult {
         errors: Vec::new(),
     };
 
+    let mut ectx = ParsingErrorContext::new(&asset);
 
     let mut parser = Parser { result, tokens, asset };
-    let mut ectx = ParsingErrorContext::new(asset);
 
     let p_state: ParResult<()> = (||{
         while !parser.is_done() {
@@ -69,7 +72,7 @@ pub fn parse(asset: &SourceAsset, tokens: TokenStream) -> ParsingResult {
         ectx.record(
             ParUnexpectedEOF, 
             e.into(), 
-            Loc::new(parser.asset.chars - 1,1, parser.asset.lines)
+            last_loc
         );
     }
 
@@ -82,7 +85,7 @@ pub fn parse(asset: &SourceAsset, tokens: TokenStream) -> ParsingResult {
 #[derive(Debug, Clone)]
 pub struct ParsingResult {
     /// The descriptor of the asset that was parsed.
-    pub asset: SourceAssetDescriptor,
+    pub asset: AssetDescriptor,
 
     /// A collection of all unchecked includes.
     pub includes: Vec<IncludeDef>,
@@ -100,7 +103,7 @@ pub struct ParsingResult {
 struct Parser<'a> {
     result: ParsingResult,
 
-    asset: &'a SourceAsset,
+    asset: Asset<'a>,
     tokens: TokenStream,
     //ectx: ParsingErrorContext<'a>,
 }
@@ -113,22 +116,20 @@ impl<'a> Parser<'a> {
 
     fn finish(mut self, mut ectx: ParsingErrorContext<'_>) -> ParsingResult {
         // Add +5 to prevent errors at low files sizes
-        if ectx.errors.len() > self.asset.lines + 5 {
-            // Assume to many errors --> non-NDL file
-            self.result.errors.push(Error::new(
-                TooManyErrors,
-                format!("Too many errors. Found {} errors in '{}'", ectx.errors.len(), self.asset.descriptor.alias),
-                Loc::new(0, 1, 1),
-                false,
-                self.asset
-            ));
-            self.result
-        } else {
+        // if ectx.errors.len() > self.smap.lines + 5 {
+        //     // Assume to many errors --> non-NDL file
+        //     self.result.errors.push(Error::new(
+        //         TooManyErrors,
+        //         format!("Too many errors. Found {} errors in '{}'", ectx.errors.len(), self.smap.descriptor.alias),
+        //         Loc::new(0, 1, 1),
+        //         false,
+        //         self.smap
+        //     ));
+        //     self.result
+        // } else {
             self.result.errors.append(&mut ectx.errors);
             self.result
-        }
-
-       
+        // }
     }
 
     fn eat_while(&self, mut predicate: impl FnMut(&Token) -> bool) {
@@ -143,7 +144,7 @@ impl<'a> Parser<'a> {
     
     fn next_token(&self) -> ParResult<(&Token, &str)> {
         let token = self.tokens.bump()?;
-        let raw_parts = &self.asset.data[token.loc.pos..(token.loc.pos + token.loc.len)];
+        let raw_parts = self.asset.referenced_slice_for(token.loc);
 
         Ok((token, raw_parts))
     }
@@ -171,7 +172,7 @@ impl<'a> Parser<'a> {
                     _ => return token.loc.pos,
                 }
             } else {
-                return self.asset.data.len();
+                return self.asset.end_pos();
             }
         })();
 
@@ -218,8 +219,7 @@ impl<'a> Parser<'a> {
 
         let mut module_def = ModuleDef {
             loc: Loc::new(0, 1, 1),
-            asset: self.asset.descriptor.clone(),
-
+       
             name: id,
             gates: Vec::new(),
             submodule: Vec::new(),
@@ -285,7 +285,7 @@ impl<'a> Parser<'a> {
 
         let len = self.tokens.peek()
             .map(|t| t.loc.pos)
-            .unwrap_or_else(|_| self.asset.data.len()) - id_token_loc.pos;
+            .unwrap_or_else(|_| self.asset.end_pos()) - id_token_loc.pos;
         module_def.loc = Loc::new(id_token_loc.pos, len, id_token_loc.line);
 
         self.result.modules.push(module_def);
@@ -901,7 +901,6 @@ impl<'a> Parser<'a> {
                 ErrorSolution::new(
                     format!("Add parameters {}", missing_par),
                     id_token.loc,
-                    self.asset.descriptor.clone(),
                 ),
             )?;
         }
@@ -910,8 +909,7 @@ impl<'a> Parser<'a> {
 
         self.result.links.push(LinkDef {
             loc: Loc::fromto(id_token_loc, token_loc),
-            asset: self.asset.descriptor.clone(),
-
+            
             name: identifier,
             metrics: ChannelMetrics::new(
                 bitrate.unwrap_or(1_000),
@@ -1005,8 +1003,6 @@ impl Display for IncludeDef {
 pub struct LinkDef {
     /// The tokens location in the source asset.
     pub loc: Loc,
-    /// The asset the channel was defined (used for import suggestions).
-    pub asset: SourceAssetDescriptor,
 
     /// The identifier of the channel.
     pub name: String,
@@ -1014,15 +1010,7 @@ pub struct LinkDef {
     pub metrics: ChannelMetrics,
 }
 
-impl LocAssetEntity for LinkDef {
-    fn loc(&self) -> Loc {
-        self.loc
-    }
 
-    fn asset_descriptor(&self) -> &SourceAssetDescriptor {
-        &self.asset
-    }
-}
 
 impl Display for LinkDef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -1044,8 +1032,6 @@ impl Display for LinkDef {
 pub struct ModuleDef {
     /// The tokens location in the source asset.
     pub loc: Loc,
-    /// The asset the module was defined in (used for import suggestions).
-    pub asset: SourceAssetDescriptor,
 
     /// The identifier of the module.
     pub name: String,
@@ -1059,15 +1045,7 @@ pub struct ModuleDef {
     pub parameters: Vec<ParamDef>,
 }
 
-impl LocAssetEntity for ModuleDef {
-    fn loc(&self) -> Loc {
-        self.loc
-    }
 
-    fn asset_descriptor(&self) -> &SourceAssetDescriptor {
-        &self.asset
-    }
-}
 
 ///
 /// A definition of a local submodule, in a modules definition.

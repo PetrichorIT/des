@@ -6,7 +6,7 @@ fn test_token_lexer() {
     let contents = std::fs::read_to_string("./tests/LexTest.ndl")
         .expect("Failed to read static test file 'LexTest.ndl'");
 
-    let token_stream = tokenize(&contents).collect::<Vec<Token>>();
+    let token_stream = tokenize(&contents, 0).collect::<Vec<Token>>();
 
     assert_eq!(
         token_stream,

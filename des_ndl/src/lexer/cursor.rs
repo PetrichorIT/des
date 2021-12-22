@@ -20,12 +20,12 @@ pub struct Cursor<'a> {
 pub const EOF_CHAR: char = '\0';
 
 impl<'a> Cursor<'a> {
-    pub fn new(input: &'a str) -> Cursor<'a> {
+    pub fn new(input: &'a str, start_idx: usize) -> Cursor<'a> {
         Cursor {
             initial_len: input.len(),
             chars: input.chars(),
 
-            idx: 0,
+            idx: start_idx,
             line: 1,
 
             #[cfg(debug_assertions)]

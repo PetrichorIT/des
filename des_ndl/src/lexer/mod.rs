@@ -1,7 +1,7 @@
 use crate::error::LexingErrorContext;
 use crate::parser::ParResult;
+use crate::source::*;
 use crate::GlobalErrorContext;
-use crate::SourceAsset;
 
 use super::loc::Loc;
 use cursor::Cursor;
@@ -15,8 +15,8 @@ mod tests;
 mod token_stream;
 
 /// Creates an iterator that produces tokens from the input string.
-pub fn tokenize(input: &str) -> impl Iterator<Item = Token> + '_ {
-    let mut cursor = Cursor::new(input);
+pub fn tokenize(input: &str, start_idx: usize) -> impl Iterator<Item = Token> + '_ {
+    let mut cursor = Cursor::new(input, start_idx);
     std::iter::from_fn(move || {
         if cursor.is_eof() {
             None
@@ -31,7 +31,7 @@ pub fn tokenize(input: &str) -> impl Iterator<Item = Token> + '_ {
 /// Performs the entire lexing process for a given asset.
 ///
 pub fn tokenize_and_validate(
-    asset: &SourceAsset,
+    asset: Asset<'_>,
     global_ectx: &mut GlobalErrorContext,
 ) -> ParResult<TokenStream> {
     let mut ectx = LexingErrorContext::new(asset);
@@ -44,8 +44,8 @@ pub fn tokenize_and_validate(
 
 ///
 /// A raw syntactical element in of the given source asset.
-/// Note that the [Loc] allways references a [Asset](crate::SourceAsset) without
-/// defining which asset is referenced (for memory efficency).
+/// Note that the [Loc] always references the [SourceMap] buffer
+/// not the relative position in the current asset.
 ///
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Token {

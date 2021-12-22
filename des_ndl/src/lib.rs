@@ -4,7 +4,7 @@ mod source;
 
 pub use error::{Error, ErrorCode, GlobalErrorContext, ParsingErrorContext};
 pub use loc::Loc;
-pub use source::{SourceAsset, SourceAssetDescriptor};
+pub use source::{AssetDescriptor, SourceMap};
 
 mod lexer;
 mod parser;
