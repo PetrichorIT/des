@@ -55,6 +55,7 @@ name = "des_tests"
 version = "0.1.0"
 dependencies = [
  "des_core",
+ "des_macros",
  "des_ndl",
  "log",
  "rand",

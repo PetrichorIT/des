@@ -1,6 +1,10 @@
+use des_core::StaticModuleCore;
 use des_core::{Module, ModuleCore};
 use log::warn;
 
+use des_macros::Module;
+
+#[derive(Module)]
 pub struct NetworkNode {
     core: ModuleCore,
 }
@@ -21,14 +25,6 @@ impl NetworkNode {
 }
 
 impl Module for NetworkNode {
-    fn module_core(&self) -> &ModuleCore {
-        &self.core
-    }
-
-    fn module_core_mut(&mut self) -> &mut ModuleCore {
-        &mut self.core
-    }
-
     fn handle_message(&mut self, msg: des_core::Message) {
         let incoming = self.gate_by_id(msg.arrival_gate()).unwrap();
 

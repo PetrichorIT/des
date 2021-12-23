@@ -1,8 +1,12 @@
 use std::collections::HashMap;
 
-use des_core::{GateId, Module, ModuleCore, ModuleExt, NodeAddress, Packet};
+use des_core::DynamicModuleCore;
+use des_core::StaticModuleCore;
+use des_core::{GateId, Module, ModuleCore, NodeAddress, Packet};
+use des_macros::Module;
 use log::info;
 
+#[derive(Module)]
 pub struct RandomRoutingDeamon {
     core: ModuleCore,
 
@@ -40,15 +44,7 @@ impl RandomRoutingDeamon {
 }
 
 impl Module for RandomRoutingDeamon {
-    fn module_core(&self) -> &ModuleCore {
-        &self.core
-    }
-
-    fn module_core_mut(&mut self) -> &mut ModuleCore {
-        &mut self.core
-    }
-
     fn handle_message(&mut self, _msg: des_core::Message) {}
 }
 
-impl ModuleExt for RandomRoutingDeamon {}
+impl DynamicModuleCore for RandomRoutingDeamon {}

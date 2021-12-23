@@ -1,19 +1,15 @@
 use des_core::{
-    sim_time_fmt, Message, Module, ModuleCore, ModuleExt, SimTime, GATE_NULL, MODULE_NULL,
+    sim_time_fmt, DynamicModuleCore, Message, Module, ModuleCore, SimTime, StaticModuleCore,
+    GATE_NULL, MODULE_NULL,
 };
+use des_macros::Module;
+
 use log::info;
 
+#[derive(Module)]
 pub struct Alice(pub ModuleCore);
 
 impl Module for Alice {
-    fn module_core(&self) -> &ModuleCore {
-        &self.0
-    }
-
-    fn module_core_mut(&mut self) -> &mut ModuleCore {
-        &mut self.0
-    }
-
     fn handle_message(&mut self, msg: Message) {
         info!(target: "Alice", "Received at {}: message #{:?} content: {}", sim_time_fmt(),msg.id(), msg.extract_content::<String>());
 
@@ -42,4 +38,4 @@ impl Module for Alice {
     }
 }
 
-impl ModuleExt for Alice {}
+impl DynamicModuleCore for Alice {}

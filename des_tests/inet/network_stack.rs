@@ -1,10 +1,14 @@
 use std::collections::HashMap;
 
-use des_core::{rng, GateId, Message, Module, ModuleCore, ModuleExt, NodeAddress, Packet, SimTime};
+use des_core::DynamicModuleCore;
+use des_core::StaticModuleCore;
+use des_core::{rng, GateId, Message, Module, ModuleCore, NodeAddress, Packet, SimTime};
+use des_macros::Module;
 use log::info;
 
 use crate::routing_deamon::RandomRoutingDeamon;
 
+#[derive(Module)]
 pub struct NetworkStack {
     core: ModuleCore,
 
@@ -38,18 +42,6 @@ impl NetworkStack {
 }
 
 impl Module for NetworkStack {
-    fn module_core(&self) -> &ModuleCore {
-        &self.core
-    }
-
-    fn module_core_mut(&mut self) -> &mut ModuleCore {
-        &mut self.core
-    }
-
-    fn identifier(&self) -> String {
-        format!("{} \"{:x}\"", self.core.identifier(), self.address)
-    }
-
     fn handle_message(&mut self, msg: des_core::Message) {
         let incoming = msg.arrival_gate();
         let mut pkt = msg.extract_content::<Packet>();
@@ -86,4 +78,4 @@ impl Module for NetworkStack {
     }
 }
 
-impl ModuleExt for NetworkStack {}
+impl DynamicModuleCore for NetworkStack {}

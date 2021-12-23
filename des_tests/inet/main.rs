@@ -1,8 +1,10 @@
 use std::mem::ManuallyDrop;
 
+use des_core::DynamicModuleCore;
+use des_core::StaticModuleCore;
 use des_core::{
-    Channel, ChannelMetrics, Message, MessageAtGateEvent, Module, ModuleExt, NetworkRuntime,
-    Packet, Runtime, SimTime, GATE_NULL, MODULE_NULL,
+    ChannelMetrics, Message, MessageAtGateEvent, NetworkRuntime, Packet, Runtime, SimTime,
+    CHANNEL_NULL, GATE_NULL, MODULE_NULL,
 };
 use network_node::NetworkNode;
 use network_stack::NetworkStack;
@@ -30,31 +32,13 @@ fn main() {
     let mut stack_alice = NetworkStack::new(0x00_00_00_ff, RandomRoutingDeamon::new());
     stack_alice.set_parent(&mut node_alice);
 
-    let internal_out = node_alice.create_gate(
-        String::from("fromStack"),
-        des_core::GateType::Input,
-        &Channel::INSTANTANEOUS,
-    );
+    let internal_out = node_alice.create_gate("fromStack");
 
-    stack_alice.create_gate_into(
-        String::from("netOut"),
-        des_core::GateType::Output,
-        &Channel::INSTANTANEOUS,
-        internal_out,
-    );
+    stack_alice.create_gate_into("netOut", CHANNEL_NULL, internal_out);
 
-    let internal_in = stack_alice.create_gate(
-        String::from("netIn"),
-        des_core::GateType::Input,
-        &Channel::INSTANTANEOUS,
-    );
+    let internal_in = stack_alice.create_gate("netIn");
 
-    node_alice.create_gate_into(
-        String::from("toStack"),
-        des_core::GateType::Output,
-        &Channel::INSTANTANEOUS,
-        internal_in,
-    );
+    node_alice.create_gate_into("toStack", CHANNEL_NULL, internal_in);
 
     //
     // BOB
@@ -64,31 +48,13 @@ fn main() {
 
     stack_bob.set_parent(&mut node_bob);
 
-    let internal_out = node_bob.create_gate(
-        String::from("fromStack"),
-        des_core::GateType::Input,
-        &Channel::INSTANTANEOUS,
-    );
+    let internal_out = node_bob.create_gate("fromStack");
 
-    stack_bob.create_gate_into(
-        String::from("netOut"),
-        des_core::GateType::Output,
-        &Channel::INSTANTANEOUS,
-        internal_out,
-    );
+    stack_bob.create_gate_into("netOut", CHANNEL_NULL, internal_out);
 
-    let internal_in = stack_bob.create_gate(
-        String::from("netIn"),
-        des_core::GateType::Input,
-        &Channel::INSTANTANEOUS,
-    );
+    let internal_in = stack_bob.create_gate("netIn");
 
-    node_bob.create_gate_into(
-        String::from("toStack"),
-        des_core::GateType::Output,
-        &Channel::INSTANTANEOUS,
-        internal_in,
-    );
+    node_bob.create_gate_into("toStack", CHANNEL_NULL, internal_in);
 
     //
     // EVE
@@ -99,35 +65,13 @@ fn main() {
 
     stack_eve.set_parent(&mut node_eve);
 
-    let internal_out = node_eve.create_gate_cluster(
-        String::from("fromStack"),
-        2,
-        des_core::GateType::Input,
-        &Channel::INSTANTANEOUS,
-    );
+    let internal_out = node_eve.create_gate_cluster("fromStack", 2);
 
-    stack_eve.create_gate_cluster_into(
-        String::from("netOut"),
-        2,
-        des_core::GateType::Output,
-        &Channel::INSTANTANEOUS,
-        internal_out,
-    );
+    stack_eve.create_gate_cluster_into("netOut", 2, CHANNEL_NULL, internal_out);
 
-    let internal_in = stack_eve.create_gate_cluster(
-        String::from("netIn"),
-        2,
-        des_core::GateType::Input,
-        &Channel::INSTANTANEOUS,
-    );
+    let internal_in = stack_eve.create_gate_cluster("netIn", 2);
 
-    node_eve.create_gate_cluster_into(
-        String::from("toStack"),
-        2,
-        des_core::GateType::Output,
-        &Channel::INSTANTANEOUS,
-        internal_in,
-    );
+    node_eve.create_gate_cluster_into("toStack", 2, CHANNEL_NULL, internal_in);
 
     //
     // Application config
@@ -141,45 +85,16 @@ fn main() {
         jitter: 0.0.into(),
     });
 
-    let alice_in = node_alice.create_gate(
-        String::from("channelIncoming"),
-        des_core::GateType::Input,
-        channel,
-    );
+    let alice_in = node_alice.create_gate("channelIncoming");
 
-    let bob_in = node_bob.create_gate(
-        String::from("channelIncoming"),
-        des_core::GateType::Input,
-        channel,
-    );
+    let bob_in = node_bob.create_gate("channelIncoming");
 
-    node_eve.create_gate_cluster_into(
-        String::from("channelOutgoing"),
-        2,
-        des_core::GateType::Output,
-        channel,
-        vec![alice_in, bob_in],
-    );
+    node_eve.create_gate_cluster_into("channelOutgoing", 2, channel, vec![alice_in, bob_in]);
 
-    let eve_in = node_eve.create_gate_cluster(
-        String::from("channelIncoming"),
-        2,
-        des_core::GateType::Input,
-        channel,
-    );
+    let eve_in = node_eve.create_gate_cluster("channelIncoming", 2);
 
-    node_alice.create_gate_into(
-        String::from("channelOutgoing"),
-        des_core::GateType::Output,
-        channel,
-        eve_in[0],
-    );
-    node_bob.create_gate_into(
-        String::from("channelOutgoing"),
-        des_core::GateType::Output,
-        channel,
-        eve_in[1],
-    );
+    node_alice.create_gate_into("channelOutgoing", channel, eve_in[0]);
+    node_bob.create_gate_into("channelOutgoing", channel, eve_in[1]);
 
     app.create_module(node_alice);
     app.create_module(stack_alice);

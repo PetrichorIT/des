@@ -22,15 +22,15 @@ fn main() {
         jitter: 0.0.into(),
     });
 
-    let g1 = alice.create_gate(String::from("netIn"), GateType::Input, channel);
-    let g2 = alice.create_gate_into(String::from("netIn"), GateType::Input, channel, g1);
-    let g3 = bob.create_gate_into(String::from("netOut"), GateType::Output, channel, g2);
-    let g4 = bob.create_gate_into(String::from("netOut"), GateType::Output, channel, g3);
+    let g1 = alice.create_gate("netIn");
+    let g2 = alice.create_gate_into("netIn", channel, g1);
+    let g3 = bob.create_gate_into("netOut", channel, g2);
+    let g4 = bob.create_gate_into("netOut", channel, g3);
 
-    let r1 = bob.create_gate(String::from("netIn"), GateType::Input, channel);
-    let r2 = bob.create_gate_into(String::from("netIn"), GateType::Input, channel, r1);
-    let r3 = alice.create_gate_into(String::from("netOut"), GateType::Output, channel, r2);
-    let _r4 = alice.create_gate_into(String::from("netOut"), GateType::Output, channel, r3);
+    let r1 = bob.create_gate("netIn");
+    let r2 = bob.create_gate_into("netIn", channel, r1);
+    let r3 = alice.create_gate_into("netOut", channel, r2);
+    let _r4 = alice.create_gate_into("netOut", channel, r3);
 
     app.create_module(alice);
     app.create_module(bob);

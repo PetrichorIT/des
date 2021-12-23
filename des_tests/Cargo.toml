@@ -23,6 +23,7 @@ path = "ndl/main.rs"
 
 [dependencies]
 des_core = {path = "../des_core"}
+des_macros = {path = "../des_macros"}
 des_ndl = {path = "../des_ndl"}
 log = "*"
 rand = "*"
