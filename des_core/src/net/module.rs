@@ -2,8 +2,8 @@ use des_macros::GlobalUID;
 use log::error;
 
 use crate::{
-    ChannelId, Gate, GateDescription, GateId, IntoModuleGate, Message, SimTime, CHANNEL_NULL,
-    GATE_NULL,
+    ChannelId, Gate, GateDescription, GateId, IntoModuleGate, Message, NetworkRuntime, SimTime,
+    CHANNEL_NULL, GATE_NULL,
 };
 
 /// A runtime-unqiue identifier for a module / submodule inheritence tree.
@@ -62,6 +62,13 @@ pub trait StaticModuleCore {
     }
 
     ///
+    /// Returns the name of the module instance.
+    ///
+    fn name(&self) -> Option<&String> {
+        self.module_core().name.as_ref()
+    }
+
+    ///
     /// Returns a ref unstructured list of all gates from the current module.
     ///
     fn gates(&self) -> &Vec<Gate> {
@@ -73,6 +80,28 @@ pub trait StaticModuleCore {
     ///
     fn gates_mut(&mut self) -> &mut Vec<Gate> {
         &mut self.module_core_mut().gates
+    }
+
+    ///
+    /// Returns a ref to a gate of the current module dependent on its name and cluster position
+    /// if possible.
+    ///
+    fn gate_cluster(&self, name: &str) -> Vec<&Gate> {
+        self.gates()
+            .iter()
+            .filter(|&gate| gate.name() == name)
+            .collect()
+    }
+
+    ///
+    /// Returns a ref to a gate of the current module dependent on its name and cluster position
+    /// if possible.
+    ///
+    fn gate_cluster_mut(&mut self, name: &str) -> Vec<&mut Gate> {
+        self.gates_mut()
+            .iter_mut()
+            .filter(|gate| gate.name() == name)
+            .collect()
     }
 
     ///
@@ -214,8 +243,30 @@ pub trait DynamicModuleCore: StaticModuleCore {
     /// Builds the given module according to the NDL specification
     /// if any is provided, else doesn't change a thing.
     ///
-    fn build(self: Box<Self>) -> Box<Self> {
+    fn build<A>(self: Box<Self>, _rt: &mut NetworkRuntime<A>) -> Box<Self> {
         self
+    }
+
+    fn build_named<A>(name: &str, rt: &mut NetworkRuntime<A>) -> Box<Self>
+    where
+        Self: NdlCompatableModule + Sized,
+    {
+        let obj = Box::new(Self::named(name.to_string()));
+        Self::build(obj, rt)
+    }
+
+    fn build_named_with_parent<A, T>(
+        name: &str,
+        parent: &mut Box<T>,
+        rt: &mut NetworkRuntime<A>,
+    ) -> Box<Self>
+    where
+        T: NdlCompatableModule,
+        Self: NdlCompatableModule + Sized,
+    {
+        let mut obj = Box::new(Self::named_with_parent(name, parent));
+        obj.set_parent(parent);
+        Self::build(obj, rt)
     }
 
     ///
@@ -247,6 +298,31 @@ pub trait DynamicModuleCore: StaticModuleCore {
         let ptr: *mut T = &mut (**module);
         let ptr = ptr as usize;
         self.module_core_mut().parent_ptr = Some(ptr);
+    }
+}
+
+///
+/// A trait that prepares a module to be created from a NDL
+/// file.
+///
+pub trait NdlCompatableModule: StaticModuleCore {
+    ///
+    /// Creates a named instance of self without needing any additional parameters.
+    ///
+    fn named(name: String) -> Self;
+
+    ///
+    /// Creates a named instance of self based on the parent hierachical structure.
+    ///
+    fn named_with_parent<T: NdlCompatableModule>(name: &str, parent: &Box<T>) -> Self
+    where
+        Self: Sized,
+    {
+        Self::named(format!(
+            "{}.{}",
+            parent.name().expect("Named entities should have names"),
+            name
+        ))
     }
 }
 
@@ -304,6 +380,10 @@ impl ModuleCore {
             parent_ptr: None,
             name,
         }
+    }
+
+    pub fn named(name: String) -> Self {
+        Self::new_with(Some(name))
     }
 
     pub fn new() -> Self {

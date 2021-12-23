@@ -186,10 +186,10 @@ impl Drop for MessageAtGateEvent {
     }
 }
 
-pub(crate) struct HandleMessageEvent {
-    module_id: ModuleId,
-    message: ManuallyDrop<Message>,
-    handled: bool,
+pub struct HandleMessageEvent {
+    pub module_id: ModuleId,
+    pub message: ManuallyDrop<Message>,
+    pub handled: bool,
 }
 
 impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
@@ -271,7 +271,7 @@ impl Drop for HandleMessageEvent {
     }
 }
 
-pub(crate) struct CoroutineMessageEvent {
+pub struct CoroutineMessageEvent {
     module_id: ModuleId,
 }
 
@@ -298,7 +298,7 @@ impl<A> Event<NetworkRuntime<A>> for CoroutineMessageEvent {
     }
 }
 
-pub(crate) struct ChannelUnbusyNotif {
+pub struct ChannelUnbusyNotif {
     channel_id: ChannelId,
 }
 

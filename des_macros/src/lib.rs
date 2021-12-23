@@ -1,6 +1,7 @@
 use des_ndl::*;
 use proc_macro::{self, TokenStream};
 use proc_macro2::Ident;
+use proc_macro2::Span;
 use quote::quote;
 use quote::ToTokens;
 use syn::{
@@ -109,23 +110,90 @@ fn gen_dynamic_module_core(ident: Ident, attrs: Vec<Attribute>) -> TokenStream {
                 let mut token_stream = proc_macro2::TokenStream::new();
 
                 // Submodule configuration
-                // TODO
+
+                for module in &module.submodules {
+                    let SubmoduleDef { descriptor, ty, .. } = module;
+                    let ident = Ident::new(&format!("{}_smod", descriptor), Span::call_site());
+                    let ty = Ident::new(ty, Span::call_site());
+                    token_stream.extend::<proc_macro2::TokenStream>(quote! {
+                        let mut #ident: Box<#ty> = #ty::build_named_with_parent(#descriptor, &mut self, rt);
+                    })
+                }
 
                 // Gate configuration
+
                 for gate in &module.gates {
                     let GateDef { name, size, .. } = gate;
+                    let ident = Ident::new(&format!("{}_gate", name), Span::call_site());
                     token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                        self.create_gate_cluster(#name, #size);
+                        let #ident: Vec<GateId> = self.create_gate_cluster(#name, #size);
                     })
                 }
 
                 // Connection configuration.
 
+                for connection in &module.connections {
+                    let ConDef {
+                        from, channel, to, ..
+                    } = connection;
+
+                    let from_ident = ident_from_conident(&mut token_stream, from);
+                    let to_ident = ident_from_conident(&mut token_stream, to);
+
+                    if let Some(channel) = channel {
+                        let LinkDef {
+                            bitrate,
+                            latency,
+                            jitter,
+                            ..
+                        } = res
+                            .links
+                            .iter()
+                            .find(|l| l.name == *channel)
+                            .expect("unreachable");
+
+                        token_stream.extend(quote! {
+                            // assert_eq!(#from_ident.len(), #to_ident.len());
+                            for i in 0..#from_ident.len() {
+                                let channel = rt.create_channel(des_core::ChannelMetrics {
+                                    bitrate: #bitrate,
+                                    latency: des_core::SimTime::new(#latency),
+                                    jitter: des_core::SimTime::new(#jitter),
+                                });
+                                #from_ident[i].set_next_gate(#to_ident[i].id());
+                                #from_ident[i].set_channel(channel);
+                            }
+                        });
+                    } else {
+                        token_stream.extend(quote! {
+                            // assert_eq!(#from_ident.len(), #to_ident.len());
+                            for i in 0..#from_ident.len() {
+                                #from_ident[i].set_next_gate(#to_ident[i].id());
+                            }
+                        });
+                    }
+                }
+
+                // Add submodule to rt
+
+                // Submodule configuration
+
+                for module in &module.submodules {
+                    let SubmoduleDef { descriptor, .. } = module;
+                    let ident = Ident::new(&format!("{}_smod", descriptor), Span::call_site());
+
+                    token_stream.extend::<proc_macro2::TokenStream>(quote! {
+                        rt.create_module(#ident);
+                    })
+                }
+
+                // Compile token stream
+
                 let wrapped = WrappedTokenStream(token_stream);
 
                 quote! {
                     impl ::des_core::DynamicModuleCore for #ident {
-                        fn build(mut self: Box<Self>) -> Box<Self> {
+                        fn build<A>(mut self: Box<Self>, rt: &mut des_core::NetworkRuntime<A>) -> Box<Self> {
                             #wrapped
                             self
                         }
@@ -140,6 +208,31 @@ fn gen_dynamic_module_core(ident: Ident, attrs: Vec<Attribute>) -> TokenStream {
             impl ::des_core::DynamicModuleCore for #ident {}
         }
         .into()
+    }
+}
+
+fn ident_from_conident(token_stream: &mut proc_macro2::TokenStream, ident: &ConNodeIdent) -> Ident {
+    if let Some(subident) = &ident.subident {
+        let submodule_ident = Ident::new(&format!("{}_smod", ident.ident), Span::call_site());
+        let ident = Ident::new(
+            &format!("{}_smod_{}_gate", ident.ident, subident),
+            Span::call_site(),
+        );
+
+        token_stream.extend::<proc_macro2::TokenStream>(quote! {
+            let mut #ident: Vec<&mut des_core::Gate> = #submodule_ident.gate_cluster_mut(#subident);
+        });
+
+        ident
+    } else {
+        let gate_name = &ident.ident;
+        let ident = Ident::new(&format!("{}_gate_ref", ident.ident), Span::call_site());
+
+        token_stream.extend::<proc_macro2::TokenStream>(quote! {
+            let mut #ident: Vec<&mut des_core::Gate> = self.gate_cluster_mut(#gate_name);
+        });
+
+        ident
     }
 }
 

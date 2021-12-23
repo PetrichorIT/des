@@ -60,7 +60,7 @@ pub fn validate(
                 // Check submodule namespaces and types
                 let mut descriptors = Vec::new();
 
-                for submodule in &module.submodule {
+                for submodule in &module.submodules {
                     if descriptors.contains(&&submodule.descriptor) {
                         errors.push(Error::new(
                             TycModuleSubmoduleFieldAlreadyDeclared,
@@ -177,7 +177,7 @@ pub fn validate(
                             }
 
                             let submod = module
-                                .submodule
+                                .submodules
                                 .iter()
                                 .find(|&m| m.descriptor == peer.ident)
                                 .unwrap();

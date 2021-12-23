@@ -68,7 +68,8 @@ impl ChannelMetrics {
         if self.jitter == SimTime::ZERO {
             self.latency + transmission_time
         } else {
-            todo!()
+            // TODO: handle jitter this is just a yiuck fix to use NDL defaults
+            self.latency + transmission_time
         }
     }
 

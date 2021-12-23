@@ -1,0 +1,24 @@
+link Link {
+    bitrate: 100
+    latency: 0.1
+    jitter: 0.1
+}
+
+module Bob {
+    submodules:
+        child: Alice
+
+    gates:
+        netIn[3]
+        netOut[3]
+
+    connections:
+        netOut --> Link --> child/netIn
+        netIn <-- Link <-- child/netOut
+}
+
+module Alice {
+    gates:
+        netIn[3]
+        netOut[3]
+}

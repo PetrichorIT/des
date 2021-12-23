@@ -207,7 +207,7 @@ impl<'a> Parser<'a> {
        
             name: id,
             gates: Vec::new(),
-            submodule: Vec::new(),
+            submodules: Vec::new(),
             connections: Vec::new(),
             parameters: Vec::new(),
         };
@@ -490,7 +490,7 @@ impl<'a> Parser<'a> {
                             return Ok(false);
                         }
 
-                        module_def.submodule.push(SubmoduleDef { loc: Loc::fromto(first_token.loc, second_token.loc), ty, descriptor: ident });
+                        module_def.submodules.push(SubmoduleDef { loc: Loc::fromto(first_token.loc, second_token.loc), ty, descriptor: ident });
                     }
                 },
                 _ => {
@@ -932,7 +932,7 @@ impl Display for ParsingResult {
             writeln!(f, "    - {} {{", module.name)?;
 
             writeln!(f, "      submodules:")?;
-            for submodule in &module.submodule {
+            for submodule in &module.submodules {
                 writeln!(f, "        {} {}", submodule.ty, submodule.descriptor)?;
             }
 
@@ -1026,7 +1026,7 @@ pub struct ModuleDef {
     /// The identifier of the module.
     pub name: String,
     /// The local submodules defined for this module.
-    pub submodule: Vec<SubmoduleDef>,
+    pub submodules: Vec<SubmoduleDef>,
     /// The gates exposed on this module.
     pub gates: Vec<GateDef>,
     /// The connections defined by this module.

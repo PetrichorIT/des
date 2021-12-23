@@ -56,9 +56,9 @@ fn test_parser() {
     assert_eq!(result.modules[1].gates[2].name, "sike");
     assert_eq!(result.modules[1].gates[2].size, 1);
 
-    assert_eq!(result.modules[1].submodule.len(), 1);
-    assert_eq!(result.modules[1].submodule[0].ty, "SubM");
-    assert_eq!(result.modules[1].submodule[0].descriptor, "m");
+    assert_eq!(result.modules[1].submodules.len(), 1);
+    assert_eq!(result.modules[1].submodules[0].ty, "SubM");
+    assert_eq!(result.modules[1].submodules[0].descriptor, "m");
 
     assert_eq!(result.modules[1].connections.len(), 2);
     assert_eq!(result.modules[1].connections[0].channel, None);

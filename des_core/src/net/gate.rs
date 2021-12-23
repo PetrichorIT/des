@@ -109,6 +109,10 @@ impl Gate {
         self.channel_id
     }
 
+    pub fn set_channel(&mut self, channel: ChannelId) {
+        self.channel_id = channel
+    }
+
     /// The module idefnifier of the owner module.
     #[inline(always)]
     pub fn module(&self) -> ModuleId {

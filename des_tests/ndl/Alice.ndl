@@ -1,5 +1,0 @@
-module Alice {
-    gates:
-        netIn[3]
-        netOut[3]
-}
