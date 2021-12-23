@@ -64,7 +64,7 @@ impl NdlResolver {
     ///
     /// TOOD codegen
     ///
-    pub fn run(&mut self) {
+    pub fn run(&mut self) -> Result<TyContext, &'static str> {
         let scopes = self.get_ndl_scopes();
 
         for scope in scopes {
@@ -140,6 +140,8 @@ impl NdlResolver {
                     .expect("Failed to write error to stderr")
             }
         }
+
+        Ok(global_tyctx)
     }
 
     ///
@@ -231,7 +233,7 @@ mod tests {
 
         println!("{}", resolver);
 
-        resolver.run();
+        let _ = resolver.run();
 
         println!("{}", resolver);
     }

@@ -5,7 +5,7 @@ fn it_works() {
     let mut resolver =
         NdlResolver::new("./tests/TycTest").expect("Failed to create resovler with valid root.");
 
-    resolver.run();
+    let _ = resolver.run();
 
     println!("{}", resolver);
 

@@ -1,4 +1,4 @@
-use des_core::{sim_time_fmt, Message, Module, ModuleCore, StaticModuleCore};
+use des_core::{sim_time_fmt, Message, Module, ModuleCore};
 use des_macros::Module;
 use log::info;
 

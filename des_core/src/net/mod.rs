@@ -68,10 +68,10 @@ impl<A> NetworkRuntime<A> {
         Some(gate)
     }
 
-    pub fn create_channel(&mut self, metrics: ChannelMetrics) -> &Channel {
+    pub fn create_channel(&mut self, metrics: ChannelMetrics) -> ChannelId {
         let channel = Channel::new(metrics);
         self.channels.push(channel);
-        self.channels.last().unwrap()
+        self.channels.last().unwrap().id()
     }
 
     pub fn channel(&self, id: ChannelId) -> Option<&Channel> {
@@ -107,27 +107,14 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
                     gate.module()
                 );
 
-                // handle message
-                // calulate busy time at last hop
-                let id = gate.channel();
                 let module = gate.module();
-
-                let channel = rt.app.channel_mut(id).unwrap();
-                assert!(!channel.is_busy());
-
-                let dur = channel.calculate_duration(&message);
-                let busy = channel.calculate_busy(&message);
-
-                channel.set_busy(true);
-
-                rt.add_event_in(ChannelUnbusyNotif { channel_id: id }, busy);
-                rt.add_event_in(
+                rt.add_event(
                     HandleMessageEvent {
                         module_id: module,
                         message: ManuallyDrop::new(message),
                         handled: false,
                     },
-                    dur,
+                    SimTime::now(),
                 );
             } else {
                 // redirect to next channel
@@ -140,17 +127,34 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
                     next_gate
                 );
 
-                let channel = rt.app.channel(gate.channel()).unwrap();
-                if channel.is_busy() {
-                    warn!(
-                        target: &format!("Gate #{}", self.gate_id),
-                        "Dropping message {} pushed onto busy channel #{:?}",
-                        message.str(),
-                        channel
-                    );
-                    drop(message);
-                    return;
-                }
+                let next_event_time = if gate.channel() == CHANNEL_NULL {
+                    // Direct connection
+                    SimTime::now()
+                } else {
+                    // Channel delayed connection
+                    let channel_id = gate.channel();
+                    let channel = rt.app.channel_mut(channel_id).unwrap();
+
+                    if channel.is_busy() {
+                        warn!(
+                            target: &format!("Gate #{}", self.gate_id),
+                            "Dropping message {} pushed onto busy channel #{:?}",
+                            message.str(),
+                            channel
+                        );
+                        drop(message);
+                        return;
+                    }
+
+                    let dur = channel.calculate_duration(&message);
+                    let busy = channel.calculate_busy(&message);
+
+                    channel.set_busy(true);
+
+                    rt.add_event_in(ChannelUnbusyNotif { channel_id }, busy);
+
+                    SimTime::now() + dur
+                };
 
                 rt.add_event(
                     MessageAtGateEvent {
@@ -158,7 +162,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
                         message: ManuallyDrop::new(message),
                         handled: false,
                     },
-                    SimTime::now(),
+                    next_event_time,
                 )
             }
         } else {

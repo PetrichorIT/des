@@ -14,28 +14,6 @@ pub const GATE_NULL: GateId = GateId(0);
 pub const GATE_SELF: GateId = GateId(1);
 
 ///
-/// The type of a gate, defining the message flow
-/// and the derived methods.
-///
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum GateType {
-    /// A null type to identifie a undefined gate.
-    None,
-    /// A type that allows the receiving of messages.
-    Input,
-    /// A type that allows the sending of messages.
-    Output,
-    /// A gate in duplex mode.
-    InOut,
-}
-
-impl Display for GateType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Debug::fmt(&self, f)
-    }
-}
-
-///
 /// A description of a gate / gate cluster on a module.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct GateDescription {
@@ -45,8 +23,6 @@ pub struct GateDescription {
     pub name: String,
     /// The number of elements in the gate cluster.
     pub size: usize,
-    /// The type of traffic allowed on the gate cluster.
-    pub typ: GateType,
 }
 
 impl GateDescription {
@@ -61,14 +37,9 @@ impl GateDescription {
     ///
     /// Creates a new descriptor using explicit values.
     ///
-    pub fn new(typ: GateType, name: String, size: usize, owner: ModuleId) -> Self {
+    pub fn new(name: String, size: usize, owner: ModuleId) -> Self {
         assert!(size >= 1);
-        Self {
-            typ,
-            name,
-            size,
-            owner,
-        }
+        Self { name, size, owner }
     }
 }
 
@@ -150,14 +121,14 @@ impl Gate {
     pub fn new(
         description: GateDescription,
         pos: usize,
-        channel: &Channel,
+        channel: ChannelId,
         next_gate: GateId,
     ) -> Self {
         Self {
             id: GateId::gen(),
             description,
             pos,
-            channel_id: channel.id(),
+            channel_id: channel,
             next_gate,
         }
     }
@@ -166,7 +137,7 @@ impl Gate {
 ///
 /// A trait for a type to refrence a module specific gate.
 ///
-pub trait IntoModuleGate<T: Module>: Sized {
+pub trait IntoModuleGate<T: StaticModuleCore>: Sized {
     ///
     /// Extracts a gate identifier from a module using the given
     /// value as implicit reference.
@@ -176,28 +147,28 @@ pub trait IntoModuleGate<T: Module>: Sized {
     }
 }
 
-impl<T: Module> IntoModuleGate<T> for Gate {
+impl<T: StaticModuleCore> IntoModuleGate<T> for Gate {
     fn into_gate(self, module: &T) -> Option<GateId> {
         let element = module.gates().iter().find(|&g| g == &self)?;
         Some(element.id())
     }
 }
 
-impl<T: Module> IntoModuleGate<T> for &Gate {
+impl<T: StaticModuleCore> IntoModuleGate<T> for &Gate {
     fn into_gate(self, module: &T) -> Option<GateId> {
         let element = module.gates().iter().find(|&g| g == self)?;
         Some(element.id())
     }
 }
 
-impl<T: Module> IntoModuleGate<T> for GateId {
+impl<T: StaticModuleCore> IntoModuleGate<T> for GateId {
     fn into_gate(self, module: &T) -> Option<GateId> {
         let element = module.gates().iter().find(|&g| g.id() == self)?;
         Some(element.id())
     }
 }
 
-impl<T: Module> IntoModuleGate<T> for (&str, usize) {
+impl<T: StaticModuleCore> IntoModuleGate<T> for (&str, usize) {
     fn into_gate(self, module: &T) -> Option<GateId> {
         let element = module
             .gates()

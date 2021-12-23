@@ -37,5 +37,3 @@ impl Module for Alice {
             ));
     }
 }
-
-impl DynamicModuleCore for Alice {}

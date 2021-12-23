@@ -5,27 +5,27 @@ fn main() {
     let mut ctx = BenchmarkCtx::new("tyc_stage (including lex + par)", 1_000);
 
     bench(&mut ctx, "small error free", || {
-        NdlResolver::new_with("benches/tyc_stage/example_1", NdlResolverOptions::bench())
+        let _ = NdlResolver::new_with("benches/tyc_stage/example_1", NdlResolverOptions::bench())
             .expect("Failed to load resolver")
-            .run()
+            .run();
     });
 
     bench(&mut ctx, "big error free", || {
-        NdlResolver::new_with("benches/tyc_stage/example_2", NdlResolverOptions::bench())
+        let _ = NdlResolver::new_with("benches/tyc_stage/example_2", NdlResolverOptions::bench())
             .expect("Failed to load resolver")
-            .run()
+            .run();
     });
 
     bench(&mut ctx, "small error prone", || {
-        NdlResolver::new_with("benches/tyc_stage/example_3", NdlResolverOptions::bench())
+        let _ = NdlResolver::new_with("benches/tyc_stage/example_3", NdlResolverOptions::bench())
             .expect("Failed to load resolver")
-            .run()
+            .run();
     });
 
     bench(&mut ctx, "big error prone", || {
-        NdlResolver::new_with("benches/tyc_stage/example_4", NdlResolverOptions::bench())
+        let _ = NdlResolver::new_with("benches/tyc_stage/example_4", NdlResolverOptions::bench())
             .expect("Failed to load resolver")
-            .run()
+            .run();
     });
 
     ctx.finish(true)

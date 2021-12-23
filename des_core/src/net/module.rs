@@ -2,7 +2,8 @@ use des_macros::GlobalUID;
 use log::error;
 
 use crate::{
-    Channel, Gate, GateDescription, GateId, GateType, IntoModuleGate, Message, SimTime, GATE_NULL,
+    ChannelId, Gate, GateDescription, GateId, IntoModuleGate, Message, SimTime, CHANNEL_NULL,
+    GATE_NULL,
 };
 
 /// A runtime-unqiue identifier for a module / submodule inheritence tree.
@@ -14,8 +15,26 @@ pub struct ModuleId(u16);
 pub const MODULE_NULL: ModuleId = ModuleId(0);
 
 ///
-/// A trait that defines a module
-pub trait Module {
+/// A set of user defined functions for customizing the
+/// behaviour of a module.
+///
+pub trait Module: StaticModuleCore {
+    ///
+    /// A message handler for receiving events, user defined.
+    ///
+    fn handle_message(&mut self, msg: Message);
+
+    ///
+    /// A periodic activity handler.
+    ///
+    fn activity(&mut self) {}
+}
+
+///
+/// A marco-implemented trait that defines the static core components
+/// of a module.
+///
+pub trait StaticModuleCore {
     ///
     /// Returns a pointer to the modules core, used for handling event and
     /// buffers that are use case unspecific.
@@ -87,35 +106,23 @@ pub trait Module {
     ///
     /// Creates a gate on the current module, returning its ID.
     ///
-    fn create_gate(&mut self, name: String, typ: GateType, channel: &Channel) -> GateId {
-        self.create_gate_cluster(name, 1, typ, channel)[0]
+    fn create_gate(&mut self, name: &str) -> GateId {
+        self.create_gate_cluster(name, 1)[0]
     }
 
     ///
     /// Creates a gate on the current module that points to another gate as its
     /// next hop, returning the ID of the created gate.
     ///
-    fn create_gate_into(
-        &mut self,
-        name: String,
-        typ: GateType,
-        channel: &Channel,
-        next_hop: GateId,
-    ) -> GateId {
-        self.create_gate_cluster_into(name, 1, typ, channel, vec![next_hop])[0]
+    fn create_gate_into(&mut self, name: &str, channel: ChannelId, next_hop: GateId) -> GateId {
+        self.create_gate_cluster_into(name, 1, channel, vec![next_hop])[0]
     }
 
     ///
     /// Createas a cluster of gates on the current module returning their IDs.
     ///
-    fn create_gate_cluster(
-        &mut self,
-        name: String,
-        size: usize,
-        typ: GateType,
-        channel: &Channel,
-    ) -> Vec<GateId> {
-        self.create_gate_cluster_into(name, size, typ, channel, vec![GATE_NULL; size])
+    fn create_gate_cluster(&mut self, name: &str, size: usize) -> Vec<GateId> {
+        self.create_gate_cluster_into(name, size, CHANNEL_NULL, vec![GATE_NULL; size])
     }
 
     ///
@@ -128,15 +135,14 @@ pub trait Module {
     ///
     fn create_gate_cluster_into(
         &mut self,
-        name: String,
+        name: &str,
         size: usize,
-        typ: GateType,
-        channel: &Channel,
+        channel: ChannelId,
         next_hops: Vec<GateId>,
     ) -> Vec<GateId> {
         assert!(size == next_hops.len());
 
-        let descriptor = GateDescription::new(typ, name, size, self.id());
+        let descriptor = GateDescription::new(name.to_owned(), size, self.id());
         let mut ids = Vec::new();
 
         for (i, item) in next_hops.iter().enumerate() {
@@ -149,11 +155,6 @@ pub trait Module {
     }
 
     /// User message handling
-
-    ///
-    /// A message handler for receiving events, user defined.
-    ///
-    fn handle_message(&mut self, msg: Message);
 
     ///
     /// Sends a message onto a given gate. This operation will be performed after
@@ -181,11 +182,6 @@ pub trait Module {
     }
 
     ///
-    /// A periodic activity handler.
-    ///
-    fn activity(&mut self) {}
-
-    ///
     /// Enables the activity corountine using the given period.
     /// This function should only be called from [Self::handle_message].
     ///
@@ -209,11 +205,23 @@ pub trait Module {
     }
 }
 
-pub trait ModuleExt: Module {
+///
+/// A marco-implemented trait that defines the dynamic core
+/// components of a module.
+///
+pub trait DynamicModuleCore: StaticModuleCore {
+    ///
+    /// Builds the given module according to the NDL specification
+    /// if any is provided, else doesn't change a thing.
+    ///
+    fn build(self: Box<Self>) -> Box<Self> {
+        self
+    }
+
     ///
     /// Returns the parent element.
     ///
-    fn parent<T: Module>(&self) -> Option<&T> {
+    fn parent<T: StaticModuleCore>(&self) -> Option<&T> {
         unsafe {
             let ptr = self.module_core().parent_ptr?;
             let ptr: *const T = ptr as *const T;
@@ -224,7 +232,7 @@ pub trait ModuleExt: Module {
     ///
     /// Returns the parent element mutablly.
     ///
-    fn parent_mut<T: Module>(&mut self) -> Option<&mut T> {
+    fn parent_mut<T: StaticModuleCore>(&mut self) -> Option<&mut T> {
         unsafe {
             let ptr = self.module_core_mut().parent_ptr?;
             let ptr: *mut T = ptr as *mut T;
@@ -235,7 +243,7 @@ pub trait ModuleExt: Module {
     ///
     /// Sets the parent element.
     ///
-    fn set_parent<T: Module>(&mut self, module: &mut Box<T>) {
+    fn set_parent<T: StaticModuleCore>(&mut self, module: &mut Box<T>) {
         let ptr: *mut T = &mut (**module);
         let ptr = ptr as usize;
         self.module_core_mut().parent_ptr = Some(ptr);

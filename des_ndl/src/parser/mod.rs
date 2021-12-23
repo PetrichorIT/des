@@ -1,7 +1,5 @@
 use std::fmt::{Display};
 
-use des_core::ChannelMetrics;
-
 use crate::TokenStream;
 use crate::error::ErrorSolution;
 use crate::source::Asset;
@@ -898,11 +896,9 @@ impl<'a> Parser<'a> {
             loc: Loc::fromto(id_token_loc, token_loc),
             
             name: identifier,
-            metrics: ChannelMetrics::new(
-                bitrate.unwrap_or(1_000),
-                latency.unwrap_or(0.1).into(),
-                jitter.unwrap_or(0.1).into(),
-            ),
+            bitrate: bitrate.unwrap_or(1_000),
+            latency: latency.unwrap_or(0.1),
+            jitter: jitter.unwrap_or(0.1)
         });
 
         ectx.reset_transient();
@@ -986,15 +982,22 @@ impl Display for IncludeDef {
 ///
 /// A definition of a channel.
 /// 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct LinkDef {
     /// The tokens location in the source asset.
     pub loc: Loc,
 
     /// The identifier of the channel.
     pub name: String,
+
     /// The defining metric for the channel.
-    pub metrics: ChannelMetrics,
+    pub bitrate: usize,
+
+    /// The defining metric for the channel.
+    pub latency: f64,
+
+    /// The defining metric for the channel.
+    pub jitter: f64,
 }
 
 
@@ -1005,9 +1008,9 @@ impl Display for LinkDef {
             f, 
             "{}(bitrate: {}, latency: {}, jitter: {})", 
             self.name, 
-            self.metrics.bitrate, 
-            self.metrics.latency, 
-            self.metrics.jitter
+            self.bitrate, 
+            self.latency, 
+            self.jitter
         )
     }
 }

@@ -23,14 +23,10 @@ fn main() {
     });
 
     let g1 = alice.create_gate("netIn");
-    let g2 = alice.create_gate_into("netIn", channel, g1);
-    let g3 = bob.create_gate_into("netOut", channel, g2);
-    let g4 = bob.create_gate_into("netOut", channel, g3);
+    let g4 = bob.create_gate_into("netOut", channel, g1);
 
     let r1 = bob.create_gate("netIn");
-    let r2 = bob.create_gate_into("netIn", channel, r1);
-    let r3 = alice.create_gate_into("netOut", channel, r2);
-    let _r4 = alice.create_gate_into("netOut", channel, r3);
+    let _r4 = alice.create_gate_into("netOut", channel, r1);
 
     app.create_module(alice);
     app.create_module(bob);

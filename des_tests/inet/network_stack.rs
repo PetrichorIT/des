@@ -77,5 +77,3 @@ impl Module for NetworkStack {
         }
     }
 }
-
-impl DynamicModuleCore for NetworkStack {}

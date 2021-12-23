@@ -26,7 +26,7 @@ mod tests {
         let mut resolver = NdlResolver::new("./examples")
             .expect("Failed to create test resolver from examples directory");
 
-        resolver.run();
+        let _ = resolver.run();
         // println!("{}", resolver);
         panic!("WOLOLO");
     }

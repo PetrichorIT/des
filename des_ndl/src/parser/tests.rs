@@ -4,8 +4,6 @@ fn test_parser() {
     use crate::TokenStream;
     use crate::{lexer::tokenize, parser::parse, AssetDescriptor};
 
-    use des_core::ChannelMetrics;
-
     let mut smap = SourceMap::new();
     let asset = smap
         .load(AssetDescriptor::new(
@@ -30,8 +28,12 @@ fn test_parser() {
     assert_eq!(result.links.len(), 1);
     assert_eq!(result.links[0].name, "NewLink");
     assert_eq!(
-        result.links[0].metrics,
-        ChannelMetrics::new(300, 0.1.into(), 0.1.into())
+        (
+            result.links[0].bitrate,
+            result.links[0].latency,
+            result.links[0].jitter
+        ),
+        (300, 0.1, 0.1)
     );
 
     assert_eq!(result.modules.len(), 2);

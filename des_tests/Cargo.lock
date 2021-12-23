@@ -32,6 +32,7 @@ dependencies = [
 name = "des_macros"
 version = "0.1.0"
 dependencies = [
+ "des_ndl",
  "proc-macro2",
  "quote",
  "syn",
@@ -41,7 +42,6 @@ dependencies = [
 name = "des_ndl"
 version = "0.1.0"
 dependencies = [
- "des_core",
  "log",
  "serde_yaml",
  "termcolor",
