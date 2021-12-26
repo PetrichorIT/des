@@ -374,8 +374,12 @@ impl SimTimeUnit {
                     sim_time = (fract * unit.shrink_factor()).into();
                     unit = new_unit;
                 } else {
-                    str.write_fmt(format_args!("{}{} ", sim_time, unit))
-                        .expect("Failed core fmt");
+                    // This bound prevents floating point errors from
+                    // poisioing output.
+                    if sim_time > 0.01.into() {
+                        str.write_fmt(format_args!("?{}{} ", sim_time, unit))
+                            .expect("Failed core fmt");
+                    }
                     break;
                 }
 
