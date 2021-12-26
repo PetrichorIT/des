@@ -17,7 +17,7 @@ pub use parser::{
     ParsingResult,
 };
 pub use resolver::{NdlResolver, NdlResolverOptions};
-pub use tycheck::{validate, TyContext};
+pub use tycheck::{validate, OwnedTyContext, TyContext};
 
 mod tests {
     #[test]

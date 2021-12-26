@@ -203,7 +203,7 @@ pub trait StaticModuleCore {
     }
 
     ///
-    /// Enqueues a event that will trigger the [Self::handle_message] function
+    /// Enqueues a event that will trigger the [Module::handle_message] function
     /// at the given SimTime
     fn schedule_at(&mut self, msg: Message, time: SimTime) {
         assert!(time >= SimTime::now());
@@ -212,7 +212,7 @@ pub trait StaticModuleCore {
 
     ///
     /// Enables the activity corountine using the given period.
-    /// This function should only be called from [Self::handle_message].
+    /// This function should only be called from [Module::handle_message].
     ///
     fn enable_activity(&mut self, period: SimTime) {
         self.module_core_mut().activity_period = period;

@@ -67,8 +67,7 @@ impl Log for StandardLogger {
                 )
                 .expect("Failed to set termcolor");
 
-            write!(&mut stream, "{} -- {}", record.level(), record.target())
-                .expect("Failed to write to stdout");
+            write!(&mut stream, "{:>25}", record.target()).expect("Failed to write to stdout");
 
             stream
                 .set_color(ColorSpec::new().set_fg(Some(Color::Rgb(0x7f, 0x8c, 0x8d))))

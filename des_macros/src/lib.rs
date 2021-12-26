@@ -1,13 +1,36 @@
 use des_ndl::*;
+use lazy_static::lazy_static;
 use proc_macro::{self, TokenStream};
 use proc_macro2::Ident;
 use proc_macro2::Span;
 use quote::quote;
 use quote::ToTokens;
+use std::collections::HashMap;
+use std::sync::Mutex;
 use syn::{
     parse_macro_input, Attribute, Data, DeriveInput, FieldsNamed, FieldsUnnamed, Lit, Meta,
     MetaNameValue, Type,
 };
+
+lazy_static! {
+    static ref RESOLVERS: Mutex<HashMap<String, NdlResolver>> = Mutex::new(HashMap::new());
+}
+
+fn get_resolver(workspace: String) -> Result<(OwnedTyContext, bool), &'static str> {
+    let mut resolvers = RESOLVERS.lock().unwrap();
+
+    if !resolvers.contains_key(&workspace) {
+        resolvers.insert(
+            workspace.clone(),
+            NdlResolver::new(&workspace).expect("#[derive(Module)] Invalid NDL workspace."),
+        );
+    }
+    resolvers
+        .get_mut(&workspace)
+        .unwrap()
+        .run()
+        .map(|(tyctx, has_err)| (tyctx.to_owned(), has_err))
+}
 
 ///
 /// #[derive(Module)]
@@ -100,10 +123,7 @@ fn gen_static_module_core(ident: Ident, data: Data) -> TokenStream {
 
 fn gen_dynamic_module_core(ident: Ident, attrs: Vec<Attribute>) -> TokenStream {
     if let Some(workspace) = parse_attr(attrs) {
-        let mut resolver = NdlResolver::new(&workspace)
-            .expect("#[derive(Module)] -- Failed because ndl_workspace is invalid");
-
-        match resolver.run() {
+        match get_resolver(workspace) {
             Ok((res, has_errors)) => {
                 if has_errors {
                     panic!("#[derive(Module)] NDL resolver found erros while parsing")
@@ -278,10 +298,7 @@ pub fn derive_network(input: TokenStream) -> TokenStream {
 }
 
 fn gen_network_main(ident: Ident, workspace: String) -> TokenStream {
-    let mut resolver = NdlResolver::new(&workspace)
-        .expect("#[derive(Network)] -- Failed because ndl_workspace is invalid");
-
-    match resolver.run() {
+    match get_resolver(workspace) {
         Ok((res, has_errors)) => {
             if has_errors {
                 panic!("#[derive(Network)] NDL resolver found erros while parsing")

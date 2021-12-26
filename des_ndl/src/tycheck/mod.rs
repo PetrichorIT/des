@@ -645,3 +645,30 @@ impl Default for TyContext<'_> {
         Self::new()
     }
 }
+
+impl  TyContext<'_> {
+    pub fn to_owned(self) -> OwnedTyContext {
+        let TyContext { included, modules, networks, links } = self;
+
+        OwnedTyContext {
+            included,
+
+            links: links.into_iter().map(|r| r.clone()).collect(),
+            modules: modules.into_iter().map(|r| r.clone()).collect(),
+            networks: networks.into_iter().map(|r| r.clone()).collect(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct OwnedTyContext {
+    /// A reference of all included assets.
+    pub included: Vec<AssetDescriptor>,
+
+    /// A collection of all included channel definitions.
+    pub links: Vec<LinkDef>,
+    /// A collection of all included module definitions.
+    pub modules: Vec<ModuleDef>,
+    /// A collection of all included network definitions.
+    pub networks: Vec<NetworkDef>,
+}

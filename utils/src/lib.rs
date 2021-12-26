@@ -51,7 +51,7 @@ pub mod bench {
 
         pub fn load(name: &str) -> std::io::Result<Self> {
             let raw = std::fs::read_to_string(format!("benches/results/{}.yaml", name))?;
-            let val: Self = serde_yaml::from_str(&raw)
+            let val: Self = serde_json::from_str(&raw)
                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
             Ok(val)
         }
@@ -150,7 +150,7 @@ pub mod bench {
             writeln!(stream)?;
 
             if write_to_file {
-                let str = serde_yaml::to_string(&self).unwrap();
+                let str = serde_json::to_string(&self).unwrap();
                 let path = PathBuf::from(format!("benches/results/{}.yaml", self.name));
                 let prefix = path.parent().unwrap();
                 std::fs::create_dir_all(prefix)?;
