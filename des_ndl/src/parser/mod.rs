@@ -14,6 +14,7 @@ use super::source::{AssetDescriptor};
 mod tests;
 
 const MODULE_SUBSECTION_IDENT: [&str; 4] = ["gates", "submodules", "connections", "parameters"];
+const NETWORK_SUBSECTION_IDENT: [&str; 3] = ["nodes", "connections", "parameters"];
 
 ///
 /// A semi-public type to handle unexpected ends of token streams.
@@ -56,7 +57,14 @@ pub fn parse(asset: Asset<'_>, tokens: TokenStream) -> ParsingResult {
                             "module" => parser.parse_module(&mut ectx)?,
                             "link" => parser.parse_link(&mut ectx)?,
                             "network" => parser.parse_network(&mut ectx)?,
-                            _ => {}
+                            _ => { 
+                                ectx.record(
+                                    ParUnexpectedKeyword, 
+                                    format!("Unexpected keyword '{}'. Expected include / module / link or network", ident), 
+                                    token.loc
+                                );
+                                ectx.reset_transient()
+                            }
                         }
                     }
                     _ => {}
@@ -229,7 +237,7 @@ impl<'a> Parser<'a> {
 
                 ectx.record(
                     ParModuleMissingSectionIdentifier, 
-                    String::from("Invalid token. Expected identifier for subsection (gates / submodules / connections)."), 
+                    format!("Invalid token. Expected identifier for subsection are {}.", MODULE_SUBSECTION_IDENT.join(" / ")), 
                     subsec_token.loc,
                 )?;
                 return Ok(());
@@ -238,7 +246,7 @@ impl<'a> Parser<'a> {
             if !MODULE_SUBSECTION_IDENT.contains(&&subsection_id[..]) {
                 ectx.record(
                     ParModuleInvalidSectionIdentifer,
-                    format!("Invalid subsection identifier '{}'. Possibilities are gates / submodules / connections.", subsection_id),
+                    format!("Invalid subsection identifier '{}'. Possibilities are {}.", subsection_id, MODULE_SUBSECTION_IDENT.join(" / ")),
                     subsec_token.loc,
                 )?;
                 return Ok(());
@@ -256,10 +264,10 @@ impl<'a> Parser<'a> {
             ectx.reset_transient();
 
             let done = match &subsection_id[..] {
-                "gates" => self.parse_module_gates(&mut module_def, ectx)?,
-                "submodules" => self.parse_module_submodules(&mut module_def, ectx)?,
-                "connections" => self.parse_module_connections(&mut module_def, ectx)?,
-                "parameters" => self.parse_module_par(&mut module_def, ectx)?,
+                "gates" => self.parse_module_gates(&mut module_def.gates, ectx)?,
+                "submodules" => self.parse_childmodule_def(&mut module_def.submodules, ectx, &MODULE_SUBSECTION_IDENT)?,
+                "connections" => self.parse_node_connections(&mut module_def.connections, ectx, &MODULE_SUBSECTION_IDENT)?,
+                "parameters" => self.parse_par(&mut module_def.parameters, ectx, &MODULE_SUBSECTION_IDENT)?,
                 _ => unreachable!()
             };
 
@@ -278,7 +286,7 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    fn parse_module_par(&mut self, module_def: &mut ModuleDef, ectx: &mut ParsingErrorContext<'_>) -> ParResult<bool> {
+    fn parse_par(&mut self, parameters: &mut Vec<ParamDef>, ectx: &mut ParsingErrorContext<'_>, escape_keywords: &[&str]) -> ParResult<bool> {
 
         loop {
             self.eat_whitespace();
@@ -303,7 +311,7 @@ impl<'a> Parser<'a> {
                         return Ok(false);
                     }
 
-                    if MODULE_SUBSECTION_IDENT.contains(&&ident[..]) {
+                    if escape_keywords.contains(&&ident[..]) {
                         // new subsection ident
                         self.tokens.bump_back(2);
                         ectx.reset_transient();
@@ -323,7 +331,7 @@ impl<'a> Parser<'a> {
                             return Ok(false);
                         }
 
-                        module_def.parameters.push(ParamDef { loc: Loc::fromto(first_token.loc, second_token.loc), ty, ident });
+                        parameters.push(ParamDef { loc: Loc::fromto(first_token.loc, second_token.loc), ty, ident });
                     }
                 },
                 _ => {
@@ -339,7 +347,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_module_gates(&mut self, module_def: &mut ModuleDef, ectx: &mut ParsingErrorContext<'_>) -> ParResult<bool> {
+    fn parse_module_gates(&mut self, gates: &mut Vec<GateDef>, ectx: &mut ParsingErrorContext<'_>) -> ParResult<bool> {
         'mloop: loop {
             self.eat_whitespace();
 
@@ -365,7 +373,7 @@ impl<'a> Parser<'a> {
             if token.kind != TokenKind::OpenBracket {
                 // Single size gate
                 if token.kind == TokenKind::Whitespace {
-                    module_def.gates.push(GateDef { loc: Loc::fromto(name_token.loc, token.loc), name, size: 1 })
+                    gates.push(GateDef { loc: Loc::fromto(name_token.loc, token.loc), name, size: 1 })
                 } else if token.kind == TokenKind::Colon {
                     // New identifer
                     self.tokens.bump_back(2);
@@ -403,7 +411,7 @@ impl<'a> Parser<'a> {
                                         continue 'mloop;
                                     }
 
-                                    module_def.gates.push(GateDef { loc: Loc::fromto(name_token.loc, token.loc), name, size: value }); 
+                                    gates.push(GateDef { loc: Loc::fromto(name_token.loc, token.loc), name, size: value }); 
                                 },
                                 Err(e) => {
                                     ectx.record(
@@ -445,7 +453,7 @@ impl<'a> Parser<'a> {
 
     }
 
-    fn parse_module_submodules(&mut self, module_def: &mut ModuleDef, ectx: &mut ParsingErrorContext<'_>) -> ParResult<bool> {
+    fn parse_childmodule_def(&mut self, child_modules: &mut Vec<ChildeModuleDef>, ectx: &mut ParsingErrorContext<'_>, escape_keywords: &[&str]) -> ParResult<bool> {
 
         loop {
             self.eat_whitespace();
@@ -470,7 +478,7 @@ impl<'a> Parser<'a> {
                         return Ok(false);
                     }
 
-                    if MODULE_SUBSECTION_IDENT.contains(&&ident[..]) {
+                    if escape_keywords.contains(&&ident[..]) {
                         // new subsection ident
                         self.tokens.bump_back(2);
                         ectx.reset_transient();
@@ -490,7 +498,7 @@ impl<'a> Parser<'a> {
                             return Ok(false);
                         }
 
-                        module_def.submodules.push(SubmoduleDef { loc: Loc::fromto(first_token.loc, second_token.loc), ty, descriptor: ident });
+                        child_modules.push(ChildeModuleDef { loc: Loc::fromto(first_token.loc, second_token.loc), ty, descriptor: ident });
                     }
                 },
                 _ => {
@@ -507,7 +515,11 @@ impl<'a> Parser<'a> {
 
     }
 
-    fn parse_module_connections(&mut self, module_def: &mut ModuleDef, ectx: &mut ParsingErrorContext<'_>) -> ParResult<bool> {
+    fn parse_node_connections(&mut self, connections: &mut Vec<ConDef>, ectx: &mut ParsingErrorContext<'_>, _escape_keywords: &[&str]) -> ParResult<bool> {
+        
+        // Note that escape keywords are not needed here but will be provided anyway
+        // since their usage is likley in the future.
+
         loop {
             let front_ident = match self.parse_connetion_identifer_token(ectx)? {
                 ConIdentiferResult::Result(ident) => ident,
@@ -546,89 +558,96 @@ impl<'a> Parser<'a> {
                 ConIdentiferResult::Done => return Ok(true),
             };
 
-            if mid_ident.subident.is_some() {
-                // Direct connection to stack frame
-                if to_right {
-                    module_def.connections.push(ConDef {
-                        loc: Loc::fromto(front_ident.loc, t3_loc),
+            match  mid_ident {
+                ConNodeIdent::Child { .. } => {
+                    // Since potential channel ident contains slash 
+                    // this MUST be the right node identifer.
 
-                        from: front_ident,
-                        to: mid_ident,
-                        channel: None,
-                    })
-                } else {
-                    module_def.connections.push(ConDef {
-                        loc: Loc::fromto(front_ident.loc, t3_loc),
+                    if to_right {
+                        connections.push(ConDef {
+                            loc: Loc::fromto(front_ident.loc(), t3_loc),
+    
+                            from: front_ident,
+                            to: mid_ident,
+                            channel: None,
+                        })
+                    } else {
+                        connections.push(ConDef {
+                            loc: Loc::fromto(front_ident.loc(), t3_loc),
+    
+                            from: mid_ident,
+                            to: front_ident,
+                            channel: None,
+                        })
+                    }
+                },
+                ConNodeIdent::Local { ident, .. } => {
+                    // This tokem could be either a channel identifer or
+                    // node ident.
 
-                        from: mid_ident,
-                        to: front_ident,
-                        channel: None,
-                    })
-                }
-            } else {
+                    self.eat_whitespace();
 
-                self.eat_whitespace();
-
-                // check for second arrow
-                let (t1, _raw) = self.next_token()?;
-
-                if t1.kind == TokenKind::Ident {
-                    self.tokens.bump_back(1);
-                    continue;
-                }
-                
-                let (t2, _raw) = self.next_token()?;
-                let (t3, _raw) = self.next_token()?;
-
-                let t3_loc = t3.loc;
-
-                let to_right2 = match (t1.kind, t2.kind, t3.kind) {
-                    (Minus, Minus, Gt) => true,
-                    (Lt, Minus, Minus) => false,
-                    _ => {
+                    // check for second arrow
+                    let (t1, _raw) = self.next_token()?;
+    
+                    if t1.kind == TokenKind::Ident {
+                        self.tokens.bump_back(1);
+                        continue;
+                    }
+                    
+                    let (t2, _raw) = self.next_token()?;
+                    let (t3, _raw) = self.next_token()?;
+    
+                    let t3_loc = t3.loc;
+    
+                    let to_right2 = match (t1.kind, t2.kind, t3.kind) {
+                        (Minus, Minus, Gt) => true,
+                        (Lt, Minus, Minus) => false,
+                        _ => {
+                            ectx.record(
+                                ParModuleConInvaldiChannelSyntax,
+                                String::from("Unexpected token. Expected arrow syntax"),
+                                Loc::fromto(t1.loc, t3.loc),
+                            )?;
+                            return Ok(false);
+                        }
+                    };
+    
+                    if (to_right && to_right2) || (!to_right && !to_right2) {
+    
+                        let last_ident = match self.parse_connetion_identifer_token(ectx)? {
+                            ConIdentiferResult::Result(ident) => ident,
+                            ConIdentiferResult::Error => return Ok(false),
+                            ConIdentiferResult::NewSubsection => return Ok(false),
+                            ConIdentiferResult::Done => return Ok(true),
+                        };
+    
+                        if to_right {
+                            connections.push(ConDef {
+                                loc: Loc::fromto(front_ident.loc(), t3_loc),
+    
+                                from: front_ident,
+                                to: last_ident,
+                                channel: Some(ident),
+                            })
+                        } else {
+                            connections.push(ConDef {
+                                loc: Loc::fromto(front_ident.loc(), t3_loc),
+    
+                                from: last_ident,
+                                to: front_ident,
+                                channel: Some(ident),
+                            })
+                        }
+    
+                    } else {
                         ectx.record(
                             ParModuleConInvaldiChannelSyntax,
-                            String::from("Unexpected token. Expected arrow syntax"),
+                            String::from("Invalid arrow syntax. Both arrows must match."),
                             Loc::fromto(t1.loc, t3.loc),
                         )?;
                         return Ok(false);
                     }
-                };
-
-                if (to_right && to_right2) || (!to_right && !to_right2) {
-
-                    let last_ident = match self.parse_connetion_identifer_token(ectx)? {
-                        ConIdentiferResult::Result(ident) => ident,
-                        ConIdentiferResult::Error => return Ok(false),
-                        ConIdentiferResult::NewSubsection => return Ok(false),
-                        ConIdentiferResult::Done => return Ok(true),
-                    };
-
-                    if to_right {
-                        module_def.connections.push(ConDef {
-                            loc: Loc::fromto(front_ident.loc, t3_loc),
-
-                            from: front_ident,
-                            to: last_ident,
-                            channel: Some(mid_ident.ident),
-                        })
-                    } else {
-                        module_def.connections.push(ConDef {
-                            loc: Loc::fromto(front_ident.loc, t3_loc),
-
-                            from: last_ident,
-                            to: front_ident,
-                            channel: Some(mid_ident.ident),
-                        })
-                    }
-
-                } else {
-                    ectx.record(
-                        ParModuleConInvaldiChannelSyntax,
-                        String::from("Invalid arrow syntax. Both arrows must match."),
-                        Loc::fromto(t1.loc, t3.loc),
-                    )?;
-                    return Ok(false);
                 }
             }
         }
@@ -672,11 +691,11 @@ impl<'a> Parser<'a> {
                 }
 
                 ectx.reset_transient();
-                Ok(Result(ConNodeIdent { loc: Loc::fromto(first_token.loc, token.loc), ident: id, subident: Some(id_second) }))
+                Ok(Result(ConNodeIdent::Child { loc: Loc::fromto(first_token.loc, token.loc), child: id, ident: id_second }))
             },
             TokenKind::Whitespace => {
                 ectx.reset_transient();
-                Ok(Result(ConNodeIdent { loc: Loc::fromto(first_token.loc, token.loc), ident: id, subident: None }))
+                Ok(Result(ConNodeIdent::Local { loc: Loc::fromto(first_token.loc, token.loc), ident: id }))
             },
             TokenKind::Colon => {
                 self.tokens.bump_back(2);
@@ -693,6 +712,110 @@ impl<'a> Parser<'a> {
                 Ok(Error)
             },
         }
+    }
+
+    fn parse_network(&mut self, ectx: &mut ParsingErrorContext<'_>) -> ParResult<()> {
+        ectx.reset_transient();
+        self.eat_whitespace();
+
+        let (id_token, id) = self.next_token()?;
+        let id_token_loc = id_token.loc;
+        let id = String::from(id);
+        if id_token.kind != TokenKind::Ident {
+            ectx.record(
+                ParNetworkMissingIdentifer, 
+                String::from("Invalid token. Expected network identfier."), 
+                id_token.loc
+            )?;
+            return Ok(());
+        }
+
+
+        self.eat_whitespace();
+        let (token, _raw) = self.next_token()?;
+        if token.kind != TokenKind::OpenBrace {
+            ectx.record(
+                ParNetworkMissingDefBlockOpen, 
+                String::from("Invalid token. Expected network definition block (OpenBrace)"), 
+                token.loc,
+            )?;
+            return Ok(());
+        }
+
+        // Contents reading
+
+        let mut network_def = NetworkDef {
+            loc: Loc::new(0, 1, 1),
+       
+            name: id,
+            nodes: Vec::new(),
+            connections: Vec::new(),
+            parameters: Vec::new(),
+        };
+
+        loop {
+            self.eat_whitespace();
+
+            let (subsec_token, subsection_id) = self.next_token()?;
+            let subsection_id = String::from(subsection_id);
+            if subsec_token.kind != TokenKind::Ident {
+
+                if subsec_token.kind == TokenKind::CloseBrace {
+                    ectx.reset_transient();
+
+                    network_def.loc = Loc::fromto(id_token_loc, subsec_token.loc);
+                    self.result.networks.push(network_def);
+                    return Ok(());
+                }
+
+                ectx.record(
+                    ParNetworkMissingSectionIdentifier, 
+                    format!("Invalid token. Expected identifier for subsection are {}.", NETWORK_SUBSECTION_IDENT.join(" / ")), 
+                    subsec_token.loc,
+                )?;
+                return Ok(());
+            }
+
+            if !NETWORK_SUBSECTION_IDENT.contains(&&subsection_id[..]) {
+                ectx.record(
+                    ParNetworkInvalidSectionIdentifer,
+                    format!("Invalid subsection identifier '{}'. Possibilities are {}.", subsection_id, NETWORK_SUBSECTION_IDENT.join(" / ")),
+                    subsec_token.loc,
+                )?;
+                return Ok(());
+            }
+
+            let (token, _raw) = self.next_token()?;
+            if token.kind != TokenKind::Colon {
+                ectx.record(
+                    ParNetworkInvalidSeperator,
+                    String::from("Unexpected token. Expected colon ':'."),
+                    token.loc,
+                )?;
+            };
+
+            ectx.reset_transient();
+
+            let done = match &subsection_id[..] {
+                "nodes" => self.parse_childmodule_def(&mut network_def.nodes, ectx, &NETWORK_SUBSECTION_IDENT)?,
+                "connections" => self.parse_node_connections(&mut network_def.connections, ectx, &NETWORK_SUBSECTION_IDENT)?,
+                "parameters" => self.parse_par(&mut network_def.parameters, ectx, &NETWORK_SUBSECTION_IDENT)?,
+                _ => unreachable!()
+            };
+
+            if done {
+                break;
+            }
+        }
+
+        let len = self.tokens.peek()
+            .map(|t| t.loc.pos)
+            .unwrap_or_else(|_| self.asset.end_pos()) - id_token_loc.pos;
+        network_def.loc = Loc::new(id_token_loc.pos, len, id_token_loc.line);
+
+        self.result.networks.push(network_def);
+
+        Ok(())
     }
 
     fn parse_link(&mut self, ectx: &mut ParsingErrorContext<'_>) -> ParResult<()> {
@@ -905,10 +1028,6 @@ impl<'a> Parser<'a> {
 
         Ok(())
     }
-
-    fn parse_network(&mut self, _ectx: &mut ParsingErrorContext<'_>) -> ParResult<()> {
-        unimplemented!()
-    }
 }
 
 impl Display for ParsingResult {
@@ -940,6 +1059,25 @@ impl Display for ParsingResult {
             writeln!(f, "      gates:")?;
             for gate in &module.gates {
                 writeln!(f, "        {}", gate)?;
+            }
+
+            writeln!(f)?;
+            writeln!(f, "      connections:")?;
+            for con in &module.connections {
+                writeln!(f, "        {}", con)?;
+            }
+
+            writeln!(f, "    }}")?;
+        }
+
+        writeln!(f)?;
+        writeln!(f, "    networks:")?;
+        for module in &self.networks {
+            writeln!(f, "    - {} {{", module.name)?;
+
+            writeln!(f, "      nodes:")?;
+            for submodule in &module.nodes {
+                writeln!(f, "        {} {}", submodule.ty, submodule.descriptor)?;
             }
 
             writeln!(f)?;
@@ -1026,7 +1164,7 @@ pub struct ModuleDef {
     /// The identifier of the module.
     pub name: String,
     /// The local submodules defined for this module.
-    pub submodules: Vec<SubmoduleDef>,
+    pub submodules: Vec<ChildeModuleDef>,
     /// The gates exposed on this module.
     pub gates: Vec<GateDef>,
     /// The connections defined by this module.
@@ -1041,7 +1179,7 @@ pub struct ModuleDef {
 /// A definition of a local submodule, in a modules definition.
 /// 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SubmoduleDef {
+pub struct ChildeModuleDef {
     /// The location of the source tokens.
     pub loc: Loc,
 
@@ -1103,25 +1241,29 @@ impl Display for ConDef {
 /// inside a modules connection definition.
 /// 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ConNodeIdent {
-    /// The tokens location in the source asset.
-    pub loc: Loc,
+pub enum ConNodeIdent {
+    Local { loc: Loc, ident: String },
+    Child { loc: Loc, child: String, ident: String }
+}
 
-    /// The primary identifier either being the a local gate or a submodule name.
-    pub ident: String,
-    /// The secondary identifier either being the submodules gate or None.
-    pub subident: Option<String>
+impl ConNodeIdent {
+    pub fn loc(&self) -> Loc {
+        match self {
+            Self::Local { loc, .. } => *loc,
+            Self::Child { loc, ..} => *loc,
+        }
+    }
 }
 
 impl Display for ConNodeIdent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(subident) = &self.subident {
-            write!(f, "{}/{}", self.ident, subident)
-        } else {
-            write!(f, "{}", self.ident)
+        match self {
+            Self::Local { ident, ..} => write!(f, "{}", ident),
+            Self::Child { child, ident, ..} => write!(f, "{}/{}", child, ident)
         }
     }
 }
+
 
 ///
 /// A parameter for a module.
@@ -1141,4 +1283,16 @@ pub struct ParamDef {
 /// A definition of a Network.
 /// 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NetworkDef {}
+pub struct NetworkDef {
+        /// The tokens location in the source asset.
+        pub loc: Loc,
+
+        /// The identifier of the network.
+        pub name: String,
+        /// The local submodules defined for this module.
+        pub nodes: Vec<ChildeModuleDef>,
+        /// The connections defined by this module.
+        pub connections: Vec<ConDef>,
+        /// The parameters expected by this module.
+        pub parameters: Vec<ParamDef>,
+}

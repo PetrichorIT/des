@@ -117,12 +117,12 @@ impl SourceMap {
         // println!("{} \t{}", start_line, end_line);
 
         let padded_start_line = start_line.saturating_sub(1);
-        let padded_end_line = (end_line + 1).min(asset.len_lines - 1);
+        let padded_end_line = (end_line + 1).min(asset.len_lines);
 
         // println!("{} \t{}", padded_start_line, padded_end_line);
 
         let padded_start_pos = asset.line_pos_mapping[padded_start_line] + asset.pos;
-        let padded_end_pos = asset.line_pos_mapping[padded_end_line + 1] - 1 + asset.pos;
+        let padded_end_pos = asset.line_pos_mapping[padded_end_line] + 1 + asset.pos;
 
         // println!("{} \t{}", padded_start_pos, padded_end_pos);
 
@@ -166,14 +166,14 @@ impl MappedAssetDescriptor {
     ///
     pub fn new(descriptor: AssetDescriptor, pos: usize, data: &str) -> Self {
         let mut idx = 0;
-        let mut len_lines = 0;
+        let mut len_lines = 1;
         let mut len_chars = 0;
         let mut line_pos_mapping = vec![0; 2];
 
         for c in data.chars() {
             if c == '\n' {
+                len_lines += 1;
                 line_pos_mapping.push(idx + 1);
-                len_lines += 1
             }
 
             idx += c.len_utf8();
@@ -198,7 +198,7 @@ impl MappedAssetDescriptor {
     /// Maps a absolute position to an internal line in the asset.
     ///
     pub fn line_of_pos(&self, pos: usize) -> usize {
-        assert!(self.pos <= pos && pos < self.pos + self.len);
+        assert!(self.pos <= pos && pos <= self.pos + self.len);
         let rel_pos = pos.saturating_sub(self.pos);
         for (line, line_start) in self.line_pos_mapping.iter().enumerate() {
             if *line_start > rel_pos {
@@ -207,6 +207,7 @@ impl MappedAssetDescriptor {
             }
         }
 
+        println!("A {} {:?}", self.len_lines, self.line_pos_mapping);
         self.len_lines
     }
 }
@@ -374,29 +375,5 @@ impl<'a> Asset<'a> {
     pub fn padded_referenced_slice_for(&self, loc: Loc) -> &str {
         self.source_map
             .padded_referenced_slice_for_with_asset(loc, self.asset)
-    }
-}
-
-mod tests {
-    #[test]
-    fn smap() {
-        use super::*;
-
-        let mut smap = SourceMap::new();
-        let _d = smap
-            .load(AssetDescriptor::new("examples/A.txt".into(), "A".into()))
-            .expect("Failed A");
-
-        smap.load(AssetDescriptor::new("examples/B.txt".into(), "B".into()))
-            .expect("Failed B");
-
-        println!("{:?}", smap.buffer_descriptors);
-        println!("{}", (&smap.buffer[..22]));
-        println!("{}", (&smap.buffer[22..]));
-
-        let loc = Loc::new(32, 5, 2);
-
-        println!("{:?}", smap.get_asset_for_loc(loc));
-        println!("{:?}", smap.referenced_slice_for(loc));
     }
 }

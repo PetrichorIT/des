@@ -22,3 +22,8 @@ module Alice {
         netIn[3]
         netOut[3]
 }
+
+network A {
+    nodes:
+        bob: Bob
+}

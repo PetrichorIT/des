@@ -1,0 +1,15 @@
+include NetworkNode
+
+network Main {
+
+    nodes:
+        node1: NetworkNode
+        node2: NetworkNode
+        node3: NetworkNode
+
+    connections:
+        node1/channelOutgoing --> FastLink --> node2/channelIncoming
+        node2/channelOutgoing --> FastLink --> node3/channelIncoming
+        node3/channelOutgoing --> FastLink --> node1/channelIncoming
+
+}

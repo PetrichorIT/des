@@ -430,6 +430,8 @@ pub enum ErrorCode {
     ParUnexpectedEOF = 0,
     TooManyErrors = 1,
 
+    ParUnexpectedKeyword = 10,
+
     ParLinkMissingIdentifier = 11,
     ParLinkMissingDefBlockOpen = 12,
     ParLinkMissingDefBlockClose = 13,
@@ -454,6 +456,12 @@ pub enum ErrorCode {
     ParModuleConInvalidIdentiferToken = 32,
     ParModuleConInvaldiChannelSyntax = 33,
 
+    ParNetworkMissingIdentifer = 50,
+    ParNetworkMissingDefBlockOpen = 51,
+    ParNetworkMissingSectionIdentifier = 52,
+    ParNetworkInvalidSectionIdentifer = 53,
+    ParNetworkInvalidSeperator = 54,
+
     LiteralIntParseError = 100,
     LiteralFloatParseError = 101,
 
@@ -473,5 +481,14 @@ pub enum ErrorCode {
     TycParInvalidType = 360,
     TycParAllreadyDefined = 361,
     TycModuleAllreadyDefined = 362,
-    TycChannelAllreadyDefined = 363,
+    TycLinkAllreadyDefined = 363,
+
+    TycNetworkAllreadyDefined = 370,
+    TycnetworkSubmoduleFieldAlreadyDeclared = 371,
+    TycNetworkSubmoduleInvalidTy = 373,
+    TycNetworkConInvalidChannelTy = 374,
+    TycNetworkConUnknownIdentSymbol = 375,
+    TycNetworkConIllegalLocalNodeIdent = 376,
+    TycNetworkConNonMatchingGateSizes = 377,
+    TycNetworkEmptyNetwork = 378,
 }

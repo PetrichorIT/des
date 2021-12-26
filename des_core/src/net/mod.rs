@@ -37,15 +37,26 @@ impl<A> NetworkRuntime<A> {
         self.modules.last_mut().unwrap()
     }
 
-    pub fn module(&self, module_id: ModuleId) -> Option<&dyn Module> {
-        self.modules
-            .iter()
-            .find(|m| m.id() == module_id)
-            .map(|c| c.as_ref())
+    pub fn module<P>(&self, predicate: P) -> Option<&Box<dyn Module>>
+    where
+        P: FnMut(&&Box<dyn Module>) -> bool,
+    {
+        self.modules.iter().find(predicate)
     }
 
-    pub fn module_mut(&mut self, module_id: ModuleId) -> Option<&mut Box<dyn Module>> {
-        self.modules.iter_mut().find(|m| m.id() == module_id)
+    pub fn module_by_id(&self, module_id: ModuleId) -> Option<&Box<dyn Module>> {
+        self.module(|m| m.id() == module_id)
+    }
+
+    pub fn module_mut<P>(&mut self, predicate: P) -> Option<&mut Box<dyn Module>>
+    where
+        P: FnMut(&&mut Box<dyn Module>) -> bool,
+    {
+        self.modules.iter_mut().find(predicate)
+    }
+
+    pub fn module_mut_by_id(&mut self, module_id: ModuleId) -> Option<&mut Box<dyn Module>> {
+        self.module_mut(|m| m.id() == module_id)
     }
 
     pub fn gate(&self, id: GateId) -> Option<&Gate> {
@@ -80,6 +91,10 @@ impl<A> NetworkRuntime<A> {
 
     pub fn channel_mut(&mut self, id: ChannelId) -> Option<&mut Channel> {
         self.channels.iter_mut().find(|c| c.id() == id)
+    }
+
+    pub fn finish(self) -> A {
+        self.inner
     }
 }
 
@@ -194,7 +209,7 @@ pub struct HandleMessageEvent {
 
 impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
     fn handle(&mut self, rt: &mut crate::Runtime<NetworkRuntime<A>>) {
-        if let Some(module) = rt.app.module_mut(self.module_id) {
+        if let Some(module) = rt.app.module_mut_by_id(self.module_id) {
             let ptr: *const Message = unsafe { &ManuallyDrop::take(&mut self.message) };
             let mut message = unsafe { std::ptr::read(ptr) };
             message.set_target_module(module.id());
@@ -277,7 +292,7 @@ pub struct CoroutineMessageEvent {
 
 impl<A> Event<NetworkRuntime<A>> for CoroutineMessageEvent {
     fn handle(&mut self, rt: &mut crate::Runtime<NetworkRuntime<A>>) {
-        if let Some(module) = rt.app.module_mut(self.module_id) {
+        if let Some(module) = rt.app.module_mut_by_id(self.module_id) {
             let dur = module.module_core().activity_period;
             if dur != SimTime::ZERO {
                 module.activity();

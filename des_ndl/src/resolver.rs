@@ -64,7 +64,7 @@ impl NdlResolver {
     ///
     /// TOOD codegen
     ///
-    pub fn run(&mut self) -> Result<TyContext, &'static str> {
+    pub fn run(&mut self) -> Result<(TyContext, bool), &'static str> {
         let scopes = self.get_ndl_scopes();
 
         for scope in scopes {
@@ -141,7 +141,7 @@ impl NdlResolver {
             }
         }
 
-        Ok(global_tyctx)
+        Ok((global_tyctx, self.ectx.has_errors()))
     }
 
     ///

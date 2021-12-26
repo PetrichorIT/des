@@ -1,21 +1,20 @@
 use std::mem::ManuallyDrop;
 
 use des_core::*;
+use des_macros::Network;
 
 mod members;
 use members::*;
 use rand::{prelude::StdRng, SeedableRng};
 
+#[derive(Network)]
+#[ndl_workspace = "ndl"]
 struct A();
 
 fn main() {
-    let mut app = NetworkRuntime::new(A());
+    let app: NetworkRuntime<A> = A().build_rt();
 
-    let bob = Bob::build_named("bob", &mut app);
-
-    // let bob = Bob::build(Box::new(Bob::named("bob".to_owned())), &mut app);
-    let bob = app.create_module(bob);
-    let bob_id = bob.id();
+    let bob_id = app.module(|m| m.name().unwrap() == "bob").unwrap().id();
 
     let mut rt = Runtime::new_with(
         app,

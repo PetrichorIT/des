@@ -13,8 +13,8 @@ mod tycheck;
 
 pub use lexer::{tokenize, tokenize_and_validate, Token, TokenKind, TokenStream};
 pub use parser::{
-    parse, ConDef, ConNodeIdent, GateDef, LinkDef, ModuleDef, NetworkDef, ParsingResult,
-    SubmoduleDef,
+    parse, ChildeModuleDef, ConDef, ConNodeIdent, GateDef, LinkDef, ModuleDef, NetworkDef,
+    ParsingResult,
 };
 pub use resolver::{NdlResolver, NdlResolverOptions};
 pub use tycheck::{validate, TyContext};
@@ -28,7 +28,7 @@ mod tests {
             .expect("Failed to create test resolver from examples directory");
 
         let _ = resolver.run();
-        // println!("{}", resolver);
+        println!("{}", resolver.units.get("Main").unwrap());
         panic!("WOLOLO");
     }
 }

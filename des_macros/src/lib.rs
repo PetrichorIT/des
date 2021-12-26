@@ -9,6 +9,10 @@ use syn::{
     MetaNameValue, Type,
 };
 
+///
+/// #[derive(Module)]
+///
+
 #[proc_macro_derive(Module, attributes(ndl_workspace))]
 pub fn derive_module(input: TokenStream) -> TokenStream {
     let DeriveInput {
@@ -100,7 +104,11 @@ fn gen_dynamic_module_core(ident: Ident, attrs: Vec<Attribute>) -> TokenStream {
             .expect("#[derive(Module)] -- Failed because ndl_workspace is invalid");
 
         match resolver.run() {
-            Ok(res) => {
+            Ok((res, has_errors)) => {
+                if has_errors {
+                    panic!("#[derive(Module)] NDL resolver found erros while parsing")
+                }
+
                 let module = res
                     .modules
                     .into_iter()
@@ -112,7 +120,7 @@ fn gen_dynamic_module_core(ident: Ident, attrs: Vec<Attribute>) -> TokenStream {
                 // Submodule configuration
 
                 for module in &module.submodules {
-                    let SubmoduleDef { descriptor, ty, .. } = module;
+                    let ChildeModuleDef { descriptor, ty, .. } = module;
                     let ident = Ident::new(&format!("{}_smod", descriptor), Span::call_site());
                     let ty = Ident::new(ty, Span::call_site());
                     token_stream.extend::<proc_macro2::TokenStream>(quote! {
@@ -176,10 +184,8 @@ fn gen_dynamic_module_core(ident: Ident, attrs: Vec<Attribute>) -> TokenStream {
 
                 // Add submodule to rt
 
-                // Submodule configuration
-
                 for module in &module.submodules {
-                    let SubmoduleDef { descriptor, .. } = module;
+                    let ChildeModuleDef { descriptor, .. } = module;
                     let ident = Ident::new(&format!("{}_smod", descriptor), Span::call_site());
 
                     token_stream.extend::<proc_macro2::TokenStream>(quote! {
@@ -212,27 +218,29 @@ fn gen_dynamic_module_core(ident: Ident, attrs: Vec<Attribute>) -> TokenStream {
 }
 
 fn ident_from_conident(token_stream: &mut proc_macro2::TokenStream, ident: &ConNodeIdent) -> Ident {
-    if let Some(subident) = &ident.subident {
-        let submodule_ident = Ident::new(&format!("{}_smod", ident.ident), Span::call_site());
-        let ident = Ident::new(
-            &format!("{}_smod_{}_gate", ident.ident, subident),
-            Span::call_site(),
-        );
+    match ident {
+        ConNodeIdent::Child { child, ident, .. } => {
+            let submodule_ident = Ident::new(&format!("{}_smod", child), Span::call_site());
+            let ident_token =
+                Ident::new(&format!("{}_smod_{}_gate", child, ident), Span::call_site());
 
-        token_stream.extend::<proc_macro2::TokenStream>(quote! {
-            let mut #ident: Vec<&mut des_core::Gate> = #submodule_ident.gate_cluster_mut(#subident);
-        });
+            token_stream.extend::<proc_macro2::TokenStream>(quote! {
+                let mut #ident_token: Vec<&mut des_core::Gate> = #submodule_ident.gate_cluster_mut(#ident);
+            });
 
-        ident
-    } else {
-        let gate_name = &ident.ident;
-        let ident = Ident::new(&format!("{}_gate_ref", ident.ident), Span::call_site());
+            ident_token
+        }
+        ConNodeIdent::Local {
+            ident: gate_name, ..
+        } => {
+            let ident = Ident::new(&format!("{}_gate_ref", ident), Span::call_site());
 
-        token_stream.extend::<proc_macro2::TokenStream>(quote! {
-            let mut #ident: Vec<&mut des_core::Gate> = self.gate_cluster_mut(#gate_name);
-        });
+            token_stream.extend::<proc_macro2::TokenStream>(quote! {
+                let mut #ident: Vec<&mut des_core::Gate> = self.gate_cluster_mut(#gate_name);
+            });
 
-        ident
+            ident
+        }
     }
 }
 
@@ -255,6 +263,139 @@ fn parse_attr(attrs: Vec<Attribute>) -> Option<String> {
 
     None
 }
+
+///
+/// #[derive(Network)]
+///
+
+#[proc_macro_derive(Network, attributes(ndl_workspace))]
+pub fn derive_network(input: TokenStream) -> TokenStream {
+    let DeriveInput { ident, attrs, .. } = parse_macro_input!(input);
+
+    let attr = parse_attr(attrs).expect("#[derive(Network)] Missing NDL worspace");
+
+    gen_network_main(ident, attr)
+}
+
+fn gen_network_main(ident: Ident, workspace: String) -> TokenStream {
+    let mut resolver = NdlResolver::new(&workspace)
+        .expect("#[derive(Network)] -- Failed because ndl_workspace is invalid");
+
+    match resolver.run() {
+        Ok((res, has_errors)) => {
+            if has_errors {
+                panic!("#[derive(Network)] NDL resolver found erros while parsing")
+            }
+            if let Some(network) = res.networks.iter().find(|n| ident == n.name) {
+                let mut token_stream = proc_macro2::TokenStream::new();
+
+                // Config nodes.
+
+                for node in &network.nodes {
+                    let ChildeModuleDef { descriptor, ty, .. } = node;
+                    let ident = Ident::new(&format!("{}_node", descriptor), Span::call_site());
+                    let ty = Ident::new(ty, Span::call_site());
+                    token_stream.extend::<proc_macro2::TokenStream>(quote! {
+                        let mut #ident: Box<#ty> = #ty::build_named(#descriptor, rt);
+                    })
+                }
+
+                // Create connections.
+
+                for connection in &network.connections {
+                    let ConDef {
+                        from, channel, to, ..
+                    } = connection;
+
+                    let from_ident = ident_from_conident(&mut token_stream, from);
+                    let to_ident = ident_from_conident(&mut token_stream, to);
+
+                    if let Some(channel) = channel {
+                        let LinkDef {
+                            bitrate,
+                            latency,
+                            jitter,
+                            ..
+                        } = res
+                            .links
+                            .iter()
+                            .find(|l| l.name == *channel)
+                            .expect("unreachable");
+
+                        token_stream.extend(quote! {
+                            // assert_eq!(#from_ident.len(), #to_ident.len());
+                            for i in 0..#from_ident.len() {
+                                let channel = rt.create_channel(des_core::ChannelMetrics {
+                                    bitrate: #bitrate,
+                                    latency: des_core::SimTime::new(#latency),
+                                    jitter: des_core::SimTime::new(#jitter),
+                                });
+                                #from_ident[i].set_next_gate(#to_ident[i].id());
+                                #from_ident[i].set_channel(channel);
+                            }
+                        });
+                    } else {
+                        token_stream.extend(quote! {
+                            // assert_eq!(#from_ident.len(), #to_ident.len());
+                            for i in 0..#from_ident.len() {
+                                #from_ident[i].set_next_gate(#to_ident[i].id());
+                            }
+                        });
+                    }
+                }
+
+                // Add nodes to rt.
+
+                for node in &network.nodes {
+                    let ChildeModuleDef { descriptor, .. } = node;
+                    let ident = Ident::new(&format!("{}_node", descriptor), Span::call_site());
+
+                    token_stream.extend::<proc_macro2::TokenStream>(quote! {
+                        rt.create_module(#ident);
+                    })
+                }
+
+                let token_stream = WrappedTokenStream(token_stream);
+
+                quote! {
+                    impl #ident {
+                        pub fn run(self) -> (Self, des_core::SimTime) {
+                            self.run_with_options(des_core::RuntimeOptions::default())
+                        }
+
+                        pub fn run_with_options(self, options: des_core::RuntimeOptions) -> (Self, des_core::SimTime) {
+                            let net_rt = self.build_rt();
+                            let rt = des_core::Runtime::new_with(net_rt, options);
+                            let (net_rt, end_time) = rt.run().expect("RT exceeded itr limit.");
+                            (net_rt.finish(), end_time)
+                        }
+
+                        pub fn build_rt(self) -> NetworkRuntime<Self> {
+                            let mut runtime = des_core::NetworkRuntime::new(self);
+                            let rt: &mut des_core::NetworkRuntime<Self> = &mut runtime;
+
+                            #token_stream
+
+                            runtime
+                        }
+                    }
+                }.into()
+            } else {
+                panic!(
+                    "#[derive(Network)] NDL resolver failed to find network called '{}'",
+                    ident,
+                );
+            }
+        }
+        Err(e) => panic!("#[derive(Network)] NDL resolver failed: {}", e),
+    }
+}
+
+///
+/// #[derive(GlobalUID)]
+/// will be moved to utils & refactored
+/// #deprecated
+///
 
 #[proc_macro_derive(GlobalUID)]
 pub fn derive_global_uid(input: TokenStream) -> TokenStream {

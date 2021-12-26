@@ -18,7 +18,7 @@ module NetworkNode {
         fromAppl[5]
 
     connections:
-        toStack --> Fastink --> stack/netIn
+        toStack --> FastLink --> stack/netIn
         fromStack <-- stack/netOut
         
         fromAppl --> stack/fromAppl
