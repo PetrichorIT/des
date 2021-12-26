@@ -1,6 +1,5 @@
 use des_core::{
-    sim_time_fmt, DynamicModuleCore, Message, Module, ModuleCore, SimTime, StaticModuleCore,
-    GATE_NULL, MODULE_NULL,
+    sim_time_fmt, Message, Module, ModuleCore, SimTime, StaticModuleCore, GATE_NULL, MODULE_NULL,
 };
 use des_macros::Module;
 

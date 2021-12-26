@@ -57,7 +57,7 @@ pub trait StaticModuleCore {
     ///
     /// Returns a human readable representation of the modules identity.
     ///
-    fn identifier(&self) -> String {
+    fn str(&self) -> String {
         self.module_core().identifier()
     }
 
@@ -198,7 +198,7 @@ pub trait StaticModuleCore {
         if let Some(gate_idx) = gate_idx {
             self.module_core_mut().out_buffer.push((msg, gate_idx))
         } else {
-            error!(target: &self.identifier(),"Error: Could not find gate in current module");
+            error!(target: &self.str(),"Error: Could not find gate in current module");
         }
     }
 
@@ -232,47 +232,14 @@ pub trait StaticModuleCore {
     fn has_parent(&self) -> bool {
         self.module_core().parent_ptr.is_some()
     }
-}
-
-///
-/// A marco-implemented trait that defines the dynamic core
-/// components of a module.
-///
-pub trait DynamicModuleCore: StaticModuleCore {
-    ///
-    /// Builds the given module according to the NDL specification
-    /// if any is provided, else doesn't change a thing.
-    ///
-    fn build<A>(self: Box<Self>, _rt: &mut NetworkRuntime<A>) -> Box<Self> {
-        self
-    }
-
-    fn build_named<A>(name: &str, rt: &mut NetworkRuntime<A>) -> Box<Self>
-    where
-        Self: NdlCompatableModule + Sized,
-    {
-        let obj = Box::new(Self::named(name.to_string()));
-        Self::build(obj, rt)
-    }
-
-    fn build_named_with_parent<A, T>(
-        name: &str,
-        parent: &mut Box<T>,
-        rt: &mut NetworkRuntime<A>,
-    ) -> Box<Self>
-    where
-        T: NdlCompatableModule,
-        Self: NdlCompatableModule + Sized,
-    {
-        let mut obj = Box::new(Self::named_with_parent(name, parent));
-        obj.set_parent(parent);
-        Self::build(obj, rt)
-    }
 
     ///
     /// Returns the parent element.
     ///
-    fn parent<T: StaticModuleCore>(&self) -> Option<&T> {
+    fn parent<T: StaticModuleCore>(&self) -> Option<&T>
+    where
+        Self: Sized,
+    {
         unsafe {
             let ptr = self.module_core().parent_ptr?;
             let ptr: *const T = ptr as *const T;
@@ -283,7 +250,10 @@ pub trait DynamicModuleCore: StaticModuleCore {
     ///
     /// Returns the parent element mutablly.
     ///
-    fn parent_mut<T: StaticModuleCore>(&mut self) -> Option<&mut T> {
+    fn parent_mut<T: StaticModuleCore>(&mut self) -> Option<&mut T>
+    where
+        Self: Sized,
+    {
         unsafe {
             let ptr = self.module_core_mut().parent_ptr?;
             let ptr: *mut T = ptr as *mut T;
@@ -294,7 +264,10 @@ pub trait DynamicModuleCore: StaticModuleCore {
     ///
     /// Sets the parent element.
     ///
-    fn set_parent<T: StaticModuleCore>(&mut self, module: &mut Box<T>) {
+    fn set_parent<T: StaticModuleCore>(&mut self, module: &mut Box<T>)
+    where
+        Self: Sized,
+    {
         let ptr: *mut T = &mut (**module);
         let ptr = ptr as usize;
         self.module_core_mut().parent_ptr = Some(ptr);
@@ -323,6 +296,41 @@ pub trait NdlCompatableModule: StaticModuleCore {
             parent.name().expect("Named entities should have names"),
             name
         ))
+    }
+}
+
+pub trait NdlBuildableModule {
+    ///
+    /// Builds the given module according to the NDL specification
+    /// if any is provided, else doesn't change a thing.
+    ///
+    fn build<A>(self: Box<Self>, _rt: &mut NetworkRuntime<A>) -> Box<Self>
+    where
+        Self: Sized,
+    {
+        self
+    }
+
+    fn build_named<A>(name: &str, rt: &mut NetworkRuntime<A>) -> Box<Self>
+    where
+        Self: NdlCompatableModule + Sized,
+    {
+        let obj = Box::new(Self::named(name.to_string()));
+        Self::build(obj, rt)
+    }
+
+    fn build_named_with_parent<A, T>(
+        name: &str,
+        parent: &mut Box<T>,
+        rt: &mut NetworkRuntime<A>,
+    ) -> Box<Self>
+    where
+        T: NdlCompatableModule,
+        Self: NdlCompatableModule + Sized,
+    {
+        let mut obj = Box::new(Self::named_with_parent(name, parent));
+        obj.set_parent(parent);
+        Self::build(obj, rt)
     }
 }
 

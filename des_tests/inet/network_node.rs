@@ -29,7 +29,7 @@ impl Module for NetworkNode {
         let incoming = self.gate_by_id(msg.arrival_gate()).unwrap();
 
         let pos = incoming.pos();
-        warn!(target: &self.identifier(), "Node incoming at gate {:?}", incoming);
+        warn!(target: &self.str(), "Node incoming at gate {:?}", incoming);
         if incoming.name().eq("channelIncoming") {
             // From channel
             self.send(msg, ("toStack", pos))

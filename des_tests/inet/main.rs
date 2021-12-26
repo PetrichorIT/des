@@ -1,6 +1,5 @@
 use std::mem::ManuallyDrop;
 
-use des_core::DynamicModuleCore;
 use des_core::StaticModuleCore;
 use des_core::{
     ChannelMetrics, Message, MessageAtGateEvent, NetworkRuntime, Packet, Runtime, SimTime,

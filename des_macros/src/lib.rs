@@ -192,7 +192,7 @@ fn gen_dynamic_module_core(ident: Ident, attrs: Vec<Attribute>) -> TokenStream {
                 let wrapped = WrappedTokenStream(token_stream);
 
                 quote! {
-                    impl ::des_core::DynamicModuleCore for #ident {
+                    impl ::des_core::NdlBuildableModule for #ident {
                         fn build<A>(mut self: Box<Self>, rt: &mut des_core::NetworkRuntime<A>) -> Box<Self> {
                             #wrapped
                             self
@@ -205,7 +205,7 @@ fn gen_dynamic_module_core(ident: Ident, attrs: Vec<Attribute>) -> TokenStream {
         }
     } else {
         quote! {
-            impl ::des_core::DynamicModuleCore for #ident {}
+            impl ::des_core::NdlBuildableModule for #ident {}
         }
         .into()
     }

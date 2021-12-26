@@ -202,7 +202,7 @@ impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
             self.handled = true;
 
             info!(
-                target: &format!("Module {}", module.identifier()),
+                target: &format!("Module {}", module.str()),
                 "Handling message {:?}",
                 message.str()
             );

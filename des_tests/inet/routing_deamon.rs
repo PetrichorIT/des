@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use des_core::DynamicModuleCore;
+use des_core::StaticModuleCore;
 use des_core::{GateId, Module, ModuleCore, NodeAddress, Packet};
 use des_macros::Module;
 use log::info;
