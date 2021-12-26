@@ -25,11 +25,7 @@ fn get_resolver(workspace: String) -> Result<(OwnedTyContext, bool), &'static st
             NdlResolver::new(&workspace).expect("#[derive(Module)] Invalid NDL workspace."),
         );
     }
-    resolvers
-        .get_mut(&workspace)
-        .unwrap()
-        .run()
-        .map(|(tyctx, has_err)| (tyctx.to_owned(), has_err))
+    resolvers.get_mut(&workspace).unwrap().run_cached()
 }
 
 ///

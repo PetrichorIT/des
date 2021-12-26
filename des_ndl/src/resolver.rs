@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
     parse, tokenize_and_validate, validate, AssetDescriptor, Error, ErrorCode, GlobalErrorContext,
-    ParsingResult, SourceMap, TyContext,
+    OwnedTyContext, ParsingResult, SourceMap, TyContext,
 };
 
 ///
@@ -27,6 +27,8 @@ pub struct NdlResolver {
     pub units: HashMap<String, ParsingResult>,
     /// An error handler to record errors on the way.
     pub ectx: GlobalErrorContext,
+
+    result: Option<Result<OwnedTyContext, &'static str>>,
 }
 
 impl NdlResolver {
@@ -55,6 +57,8 @@ impl NdlResolver {
             units: HashMap::new(),
 
             ectx: GlobalErrorContext::new(),
+
+            result: None,
         })
     }
 
@@ -142,6 +146,15 @@ impl NdlResolver {
         }
 
         Ok((global_tyctx, self.ectx.has_errors()))
+    }
+
+    pub fn run_cached(&mut self) -> Result<(OwnedTyContext, bool), &'static str> {
+        if let Some(result) = self.result.clone() {
+            result.map(|tyctx| (tyctx, self.ectx.has_errors()))
+        } else {
+            self.run()
+                .map(|(tyctx, has_err)| (tyctx.to_owned(), has_err))
+        }
     }
 
     ///

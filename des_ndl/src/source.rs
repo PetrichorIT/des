@@ -68,17 +68,30 @@ impl SourceMap {
     /// Returns an Asset mapping to the loaded asset.
     ///
     pub fn load(&mut self, descriptor: AssetDescriptor) -> std::io::Result<Asset<'_>> {
-        let mut file = File::open(&descriptor.path)?;
-        let byte_len = file.metadata()?.len() as usize;
+        // Note:
+        // Usage of indices instead of direct ref is nessecary
+        // because of E0502 (rustc isnt smart enough yet)
+        if let Some(dsc_idx) = self
+            .buffer_descriptors
+            .iter()
+            .enumerate()
+            .find(|(_, d)| d.alias == descriptor.alias && d.path == descriptor.path)
+            .map(|(i, _)| i)
+        {
+            Ok(Asset::new(self, &self.buffer_descriptors[dsc_idx]))
+        } else {
+            let mut file = File::open(&descriptor.path)?;
+            let byte_len = file.metadata()?.len() as usize;
 
-        let pos = self.buffer.len();
-        file.read_to_string(&mut self.buffer)?;
+            let pos = self.buffer.len();
+            file.read_to_string(&mut self.buffer)?;
 
-        let descriptor =
-            MappedAssetDescriptor::new(descriptor, pos, &self.buffer[pos..(pos + byte_len)]);
+            let descriptor =
+                MappedAssetDescriptor::new(descriptor, pos, &self.buffer[pos..(pos + byte_len)]);
 
-        self.buffer_descriptors.push(descriptor);
-        Ok(Asset::new(self, self.buffer_descriptors.last().unwrap()))
+            self.buffer_descriptors.push(descriptor);
+            Ok(Asset::new(self, self.buffer_descriptors.last().unwrap()))
+        }
     }
 
     // === Accessors ===

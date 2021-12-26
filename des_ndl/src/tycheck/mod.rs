@@ -660,7 +660,7 @@ impl  TyContext<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct OwnedTyContext {
     /// A reference of all included assets.
     pub included: Vec<AssetDescriptor>,
