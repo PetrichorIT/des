@@ -73,3 +73,17 @@ impl NdlCompatableModule for Bob {
         Self(ModuleCore::named(name))
     }
 }
+
+#[derive(Module)]
+#[ndl_workspace = "ndl"]
+pub struct Eve(pub ModuleCore);
+
+impl Module for Eve {
+    fn handle_message(&mut self, _msg: Message) {}
+}
+
+impl NdlCompatableModule for Eve {
+    fn named(name: String) -> Self {
+        Self(ModuleCore::named(name))
+    }
+}

@@ -58,7 +58,7 @@ fn test_parser() {
 
     assert_eq!(result.modules[1].submodules.len(), 1);
     assert_eq!(result.modules[1].submodules[0].ty, "SubM");
-    assert_eq!(result.modules[1].submodules[0].descriptor, "m");
+    assert_eq!(result.modules[1].submodules[0].desc.descriptor, "m");
 
     assert_eq!(result.modules[1].connections.len(), 2);
     assert_eq!(result.modules[1].connections[0].channel, None);
@@ -76,28 +76,11 @@ fn test_parser() {
     // );
     // assert_eq!(result.modules[1].connections[1].from.ident, "sike");
     // assert_eq!(result.modules[1].connections[1].to.ident, "same");
-}
 
-#[test]
-fn test_parser_2() {
-    use crate::SourceMap;
-    use crate::TokenStream;
-    use crate::{lexer::tokenize, parser::parse, AssetDescriptor};
+    assert_eq!(result.networks.len(), 1);
+    assert_eq!(result.networks[0].name, "SimMain");
 
-    let mut smap = SourceMap::new();
-    let asset = smap
-        .load(AssetDescriptor::new(
-            "./examples/Main.ndl".into(),
-            "ParTest".into(),
-        ))
-        .expect("Failed to load test asset 'ParTest.ndl'");
-
-    let tokens = tokenize(asset.source(), 0);
-    let tokens = tokens.filter(|t| t.kind.valid());
-    let tokens = tokens.filter(|t| !t.kind.reducable());
-    let tokens = tokens.collect::<TokenStream>();
-
-    let result = parse(asset, tokens);
-
-    println!("{}", result)
+    assert_eq!(result.networks[0].nodes.len(), 1);
+    assert_eq!(result.networks[0].nodes[0].desc.descriptor, "router");
+    assert_eq!(result.networks[0].nodes[0].ty, "Main");
 }

@@ -11,6 +11,7 @@ module Bob {
     gates:
         netIn[3]
         netOut[3]
+        uplink
 
     connections:
         netOut --> Link --> child/netIn
@@ -23,7 +24,16 @@ module Alice {
         netOut[3]
 }
 
+module Eve {
+    gates:
+        link
+}
+
 network A {
     nodes:
-        bob: Bob
+        router: Eve
+        bob[1...5]: Bob
+
+    connections:
+        bob/uplink --> Link --> router/link
 }

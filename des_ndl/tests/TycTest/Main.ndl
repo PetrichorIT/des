@@ -1,9 +1,17 @@
 include Sub
 include std/Link
 
+module TestNode {
+    gates:
+        out[1]
+        in[5]
+}
+
 module NetworkNode {
     submodules:
         stack: NetworkStack 
+        nodes[1...5]: TestNode
+        router: TestNode
 
     gates:
         toStack[5]
@@ -17,10 +25,22 @@ module NetworkNode {
 
     connections:
 
-        toStack --> FastLink --> stack/netIn
-        fromStack <-- stack/netOut
+        nodes/out --> router/in
+
+        // fromStack <-- stack/netOut
+        // toStack --> FastLink --> stack/netIn
         
-        fromAppl --> stack/fromAppl
-        toAppl <-- stack/toAppl
+        // fromAppl --> stack/fromAppl
+        // toAppl <-- stack/toAppl
 
 }
+
+
+
+link A {
+    bitrate: 10
+    latency: 0.1
+    jitter: 0.1
+}
+
+

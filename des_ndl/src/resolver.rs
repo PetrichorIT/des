@@ -4,9 +4,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::tycheck::GlobalTySpecContext;
 use crate::{
-    parse, tokenize_and_validate, validate, AssetDescriptor, Error, ErrorCode, GlobalErrorContext,
-    OwnedTyContext, ParsingResult, SourceMap, TyContext,
+    desugar, parse, tokenize_and_validate, validate, AssetDescriptor, DesugaredParsingResult,
+    Error, ErrorCode, GlobalErrorContext, GlobalTyDefContext, ParsingResult, SourceMap,
 };
 
 ///
@@ -25,10 +26,10 @@ pub struct NdlResolver {
     pub source_map: SourceMap,
     /// A list of all lexed/parsed assets in the current workspace.
     pub units: HashMap<String, ParsingResult>,
+    /// A list of all lexed/parsed assets in the current workspace.
+    pub desugared_units: HashMap<String, DesugaredParsingResult>,
     /// An error handler to record errors on the way.
     pub ectx: GlobalErrorContext,
-
-    result: Option<Result<OwnedTyContext, &'static str>>,
 }
 
 impl NdlResolver {
@@ -37,6 +38,14 @@ impl NdlResolver {
     ///
     pub fn new(raw_path: &str) -> Result<Self, &'static str> {
         Self::new_with(raw_path, NdlResolverOptions::default())
+    }
+
+    pub fn gtyctx_def(&self) -> GlobalTyDefContext<'_> {
+        GlobalTyDefContext::new(self)
+    }
+
+    pub fn gtyctx_spec(&self) -> GlobalTySpecContext<'_> {
+        GlobalTySpecContext::new(self)
     }
 
     ///
@@ -55,10 +64,9 @@ impl NdlResolver {
             source_map: SourceMap::new(),
             root_dir,
             units: HashMap::new(),
+            desugared_units: HashMap::new(),
 
             ectx: GlobalErrorContext::new(),
-
-            result: None,
         })
     }
 
@@ -68,7 +76,7 @@ impl NdlResolver {
     ///
     /// TOOD codegen
     ///
-    pub fn run(&mut self) -> Result<(TyContext, bool), &'static str> {
+    pub fn run(&mut self) -> Result<(), &'static str> {
         let scopes = self.get_ndl_scopes();
 
         for scope in scopes {
@@ -109,17 +117,22 @@ impl NdlResolver {
 
         self.state = NdlResolverState::Parsed;
 
+        // === TY DESUGAR ==
+
+        for (alias, unit) in &self.units {
+            let desugared = desugar(unit, self);
+            self.ectx
+                .desugaring_errors
+                .append(&mut desugared.errors.clone());
+            self.desugared_units.insert(alias.clone(), desugared);
+        }
+
         // === TY CHECK ===
 
-        let mut global_tyctx = TyContext::new();
-        self.units.values().for_each(|unit| {
-            let _ = global_tyctx.include(unit);
-        });
-
-        for unit in self.units.values() {
+        for unit in self.desugared_units.values() {
             self.ectx
                 .tychecking_errors
-                .append(&mut validate(self, unit, &global_tyctx))
+                .append(&mut validate(unit, self))
         }
 
         // === FIN ===
@@ -145,16 +158,17 @@ impl NdlResolver {
             }
         }
 
-        Ok((global_tyctx, self.ectx.has_errors()))
+        self.state = NdlResolverState::Done;
+
+        Ok(())
     }
 
-    pub fn run_cached(&mut self) -> Result<(OwnedTyContext, bool), &'static str> {
-        if let Some(result) = self.result.clone() {
-            result.map(|tyctx| (tyctx, self.ectx.has_errors()))
-        } else {
-            self.run()
-                .map(|(tyctx, has_err)| (tyctx.to_owned(), has_err))
+    pub fn run_cached(&mut self) -> Result<(GlobalTySpecContext<'_>, bool), &'static str> {
+        if self.state != NdlResolverState::Done {
+            self.run()?;
         }
+
+        Ok((self.gtyctx_spec(), self.ectx.has_errors()))
     }
 
     ///

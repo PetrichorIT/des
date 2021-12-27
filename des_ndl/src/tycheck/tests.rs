@@ -9,9 +9,7 @@ fn it_works() {
 
     println!("{}", resolver);
 
-    let unit = resolver.units.get("Main").unwrap();
+    let unit = resolver.desugared_units.get("Main").unwrap();
 
-    let tyctx = TyContext::new();
-
-    let _res = tycheck::validate(&resolver, unit, &tyctx);
+    let _res = tycheck::validate(unit, &resolver);
 }

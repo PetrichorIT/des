@@ -14,7 +14,7 @@ struct A();
 fn main() {
     let app: NetworkRuntime<A> = A().build_rt();
 
-    let bob_id = app.module(|m| m.name().unwrap() == "bob").unwrap().id();
+    let bob_id = app.module(|m| m.name().unwrap() == "bob1").unwrap().id();
 
     let mut rt = Runtime::new_with(
         app,

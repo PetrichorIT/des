@@ -1,9 +1,9 @@
+use super::loc::Loc;
+use crate::{parser::ParResult, source::Asset, SourceMap, Token, TokenKind};
 use std::{io::Write, mem::MaybeUninit};
 use termcolor::*;
 
-use crate::{parser::ParResult, source::Asset, SourceMap, Token, TokenKind};
-
-use super::loc::Loc;
+pub use ErrorCode::*;
 
 ///
 /// A global context for storing errors, and if nessecary stopping
@@ -15,6 +15,8 @@ pub struct GlobalErrorContext {
     pub lexing_errors: Vec<Error>,
     /// The syntatic errors found while parsing an asset.
     pub parsing_errors: Vec<Error>,
+    /// The semantic errors found while desugaring.
+    pub desugaring_errors: Vec<Error>,
     /// The semantic errors found while evaluating the workspace.
     pub tychecking_errors: Vec<Error>,
 }
@@ -27,6 +29,7 @@ impl GlobalErrorContext {
         Self {
             lexing_errors: Vec::new(),
             parsing_errors: Vec::new(),
+            desugaring_errors: Vec::new(),
             tychecking_errors: Vec::new(),
         }
     }
@@ -331,14 +334,14 @@ impl Error {
         code: ErrorCode,
         msg: String,
         loc: Loc,
-        asset: Asset<'_>,
+        source_map: &SourceMap,
         gty_loc: Option<Loc>,
     ) -> Self {
         let solution = gty_loc.map(|gty_loc| {
             ErrorSolution::new(
                 format!(
                     "Try including '{}'",
-                    asset.source_map().get_asset_for_loc(gty_loc).alias
+                    source_map.get_asset_for_loc(gty_loc).alias
                 ),
                 Loc::new(0, 1, 1),
             )
@@ -427,68 +430,84 @@ impl Error {
 ///
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorCode {
-    ParUnexpectedEOF = 0,
-    TooManyErrors = 1,
+    ParUnexpectedEOF,
+    TooManyErrors,
 
-    ParUnexpectedKeyword = 10,
+    ParUnexpectedKeyword,
 
-    ParLinkMissingIdentifier = 11,
-    ParLinkMissingDefBlockOpen = 12,
-    ParLinkMissingDefBlockClose = 13,
-    ParLinkInvalidKeyToken = 14,
-    ParLinkInvalidKey = 15,
-    ParLinkInvalidKvSeperator = 16,
-    ParLinkInvalidValueToken = 17,
-    ParLinkInvalidValueType = 18,
-    ParLinkIncompleteDefinition = 19,
+    ParLinkMissingIdentifier,
+    ParLinkMissingDefBlockOpen,
+    ParLinkMissingDefBlockClose,
+    ParLinkInvalidKeyToken,
+    ParLinkInvalidKey,
+    ParLinkInvalidKvSeperator,
+    ParLinkInvalidValueToken,
+    ParLinkInvalidValueType,
+    ParLinkIncompleteDefinition,
 
-    ParModuleMissingIdentifer = 20,
-    ParModuleMissingDefBlockOpen = 21,
-    ParModuleMissingSectionIdentifier = 23,
-    ParModuleInvalidSectionIdentifer = 24,
-    ParModuleInvalidSeperator = 25,
-    ParModuleInvalidKeyToken = 26,
-    ParModuleGateMissingClosingBracket = 27,
-    ParModuleGateInvalidIdentifierToken = 28,
-    ParModuleGateInvalidGateSize = 29,
-    ParModuleSubInvalidIdentiferToken = 30,
-    ParModuleSubInvalidSeperator = 31,
-    ParModuleConInvalidIdentiferToken = 32,
-    ParModuleConInvaldiChannelSyntax = 33,
+    ParModuleMissingIdentifer,
+    ParModuleMissingDefBlockOpen,
+    ParModuleMissingSectionIdentifier,
+    ParModuleInvalidSectionIdentifer,
+    ParModuleInvalidSeperator,
+    ParModuleInvalidKeyToken,
 
-    ParNetworkMissingIdentifer = 50,
-    ParNetworkMissingDefBlockOpen = 51,
-    ParNetworkMissingSectionIdentifier = 52,
-    ParNetworkInvalidSectionIdentifer = 53,
-    ParNetworkInvalidSeperator = 54,
+    ParModuleGateMissingClosingBracket,
+    ParModuleGateInvalidIdentifierToken,
+    ParModuleGateInvalidGateSize,
 
-    LiteralIntParseError = 100,
-    LiteralFloatParseError = 101,
+    ParModuleSubInvalidIdentiferToken,
+    ParModuleSubInvalidSeperator,
+    ParModuleSubInvalidClusterLiteral,
+    ParModuleSubInvalidClusterDotChain,
+    ParModuleSubMissingClosingBracket,
 
-    LexInvalidSouceToken = 201,
-    LexInvalidSouceIdentifier = 202,
+    ParModuleConInvalidIdentiferToken,
+    ParModuleConInvaldiChannelSyntax,
 
-    TycDefNameCollission = 300,
-    TycModuleSubmoduleFieldAlreadyDeclared = 301,
-    TycModuleSubmoduleRecrusiveTyDefinition = 302,
-    TycModuleSubmoduleInvalidTy = 303,
-    TycModuleConInvalidChannelTy = 304,
-    TycModuleConUnknownIdentSymbol = 305,
-    TycModuleConNonMatchingGateSizes = 306,
-    TycIncludeInvalidAlias = 330,
-    TycGateInvalidNullGate = 340,
-    TycGateFieldDuplication = 341,
-    TycParInvalidType = 360,
-    TycParAllreadyDefined = 361,
-    TycModuleAllreadyDefined = 362,
-    TycLinkAllreadyDefined = 363,
+    ParNetworkMissingIdentifer,
+    ParNetworkMissingDefBlockOpen,
+    ParNetworkMissingSectionIdentifier,
+    ParNetworkInvalidSectionIdentifer,
+    ParNetworkInvalidSeperator,
 
-    TycNetworkAllreadyDefined = 370,
-    TycnetworkSubmoduleFieldAlreadyDeclared = 371,
-    TycNetworkSubmoduleInvalidTy = 373,
-    TycNetworkConInvalidChannelTy = 374,
-    TycNetworkConUnknownIdentSymbol = 375,
-    TycNetworkConIllegalLocalNodeIdent = 376,
-    TycNetworkConNonMatchingGateSizes = 377,
-    TycNetworkEmptyNetwork = 378,
+    ParExpectedIntLiteral,
+    ParLiteralIntParseError,
+    ParExpectedFloatLiteral,
+    ParLiteralFloatParseError,
+
+    LexInvalidSouceToken,
+    LexInvalidSouceIdentifier,
+
+    DsgIncludeInvalidAlias,
+    DsgDefNameCollision,
+    DsgConGateSizedToNotMatch,
+    DsgConInvalidChannel,
+    DsgConInvalidLocalGateIdent,
+    DsgConInvalidGateSize,
+    DsgConInvalidField,
+
+    TycDefNameCollission,
+    TycModuleSubmoduleFieldAlreadyDeclared,
+    TycModuleSubmoduleRecrusiveTyDefinition,
+    TycModuleSubmoduleInvalidTy,
+    TycModuleConInvalidChannelTy,
+    TycModuleConUnknownIdentSymbol,
+    TycModuleConNonMatchingGateSizes,
+    TycIncludeInvalidAlias,
+    TycGateInvalidNullGate,
+    TycGateFieldDuplication,
+    TycParInvalidType,
+    TycParAllreadyDefined,
+    TycModuleAllreadyDefined,
+    TycLinkAllreadyDefined,
+
+    TycNetworkAllreadyDefined,
+    TycnetworkSubmoduleFieldAlreadyDeclared,
+    TycNetworkSubmoduleInvalidTy,
+    TycNetworkConInvalidChannelTy,
+    TycNetworkConUnknownIdentSymbol,
+    TycNetworkConIllegalLocalNodeIdent,
+    TycNetworkConNonMatchingGateSizes,
+    TycNetworkEmptyNetwork,
 }

@@ -6,18 +6,20 @@ pub use error::{Error, ErrorCode, GlobalErrorContext, ParsingErrorContext};
 pub use loc::Loc;
 pub use source::{AssetDescriptor, SourceMap};
 
+mod desugar;
 mod lexer;
 mod parser;
 mod resolver;
 mod tycheck;
 
+pub use desugar::*;
 pub use lexer::{tokenize, tokenize_and_validate, Token, TokenKind, TokenStream};
 pub use parser::{
-    parse, ChildeModuleDef, ConDef, ConNodeIdent, GateDef, LinkDef, ModuleDef, NetworkDef,
-    ParsingResult,
+    parse, ChildeModuleDef, ConDef, ConNodeIdent, GateDef, LinkDef, LocalDescriptorDef, ModuleDef,
+    NetworkDef, ParamDef, ParsingResult,
 };
 pub use resolver::{NdlResolver, NdlResolverOptions};
-pub use tycheck::{validate, OwnedTyContext, TyContext};
+pub use tycheck::{validate, GlobalTySpecContext, OwnedTySpecContext, TySpecContext};
 
 mod tests {
     #[test]

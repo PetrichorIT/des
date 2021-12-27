@@ -32,7 +32,8 @@ pub fn parse(asset: Asset<'_>, tokens: TokenStream) -> ParsingResult {
 
     let result = ParsingResult {
         asset: asset.descriptor(),
-        
+        loc: asset.start_loc(),
+
         includes: Vec::new(),
         links: Vec::new(),
         modules: Vec::new(),
@@ -92,6 +93,9 @@ pub fn parse(asset: Asset<'_>, tokens: TokenStream) -> ParsingResult {
 pub struct ParsingResult {
     /// The descriptor of the asset that was parsed.
     pub asset: AssetDescriptor,
+
+    /// The location of the referenced asset.
+    pub loc: Loc,
 
     /// A collection of all unchecked includes.
     pub includes: Vec<IncludeDef>,
@@ -415,7 +419,7 @@ impl<'a> Parser<'a> {
                                 },
                                 Err(e) => {
                                     ectx.record(
-                                        LiteralIntParseError, 
+                                        ParLiteralIntParseError, 
                                         format!("Failed to parse integer: {}", e), 
                                         token.loc,
                                     )?;
@@ -458,6 +462,7 @@ impl<'a> Parser<'a> {
         loop {
             self.eat_whitespace();
             let (first_token, ident) = self.next_token()?;
+            let first_token_loc = first_token.loc;
             let ident = String::from(ident);
             match first_token.kind {
                 TokenKind::CloseBrace => {
@@ -468,17 +473,75 @@ impl<'a> Parser<'a> {
 
                     self.eat_whitespace();
 
+                    let mut desc = LocalDescriptorDef { 
+                        descriptor: ident, 
+                        cluster_bounds: None
+                    };
+
                     let (token, _raw) = self.next_token()?;
                     if token.kind != TokenKind::Colon {
-                        ectx.record(
-                            ParModuleSubInvalidSeperator,
-                            String::from("Unexpected token. Expected colon ':'."),
-                            token.loc,
-                        )?;
-                        return Ok(false);
+
+                        // cluster def.
+                        if token.kind == TokenKind::OpenBracket {
+                            let from_int = match self.parse_literal_usize(ectx)? {
+                                Some(value) => value,
+                                None => {
+                                    return Ok(false)
+                                }
+                            };
+
+                            for _ in 0..3 {
+                                let (token, raw) = self.next_token()?;
+                                if token.kind != TokenKind::Dot {
+                                    ectx.record(
+                                        ParModuleSubInvalidClusterDotChain,
+                                        format!("Unexpected token '{}'. Expected three dots.", raw),
+                                        token.loc
+                                    )?;
+                                    return Ok(false)
+                                }
+                            }
+
+                            let to_int = match self.parse_literal_usize(ectx)? {
+                                Some(value) => value,
+                                None => {
+                                    return Ok(false)
+                                }
+                            };
+
+                            desc.cluster_bounds = Some((from_int, to_int));
+
+
+                            let (token, raw) = self.next_token()?;
+                            if token.kind != TokenKind::CloseBracket {
+                                ectx.record(
+                                    ParModuleSubMissingClosingBracket,
+                                    format!("Unexpected token '{}'. Expected closing bracket.", raw),
+                                    token.loc,
+                                )?;
+                                return Ok(false);
+                            }
+
+                            let (token, raw) = self.next_token()?;
+                            if token.kind != TokenKind::Colon {
+                                ectx.record(
+                                    ParModuleSubInvalidSeperator,
+                                    format!("Unexpected token '{}'. Expected colon.", raw),
+                                    token.loc,
+                                )?;
+                                return Ok(false);
+                            }
+                        } else {
+                            ectx.record(
+                                ParModuleSubInvalidSeperator,
+                                String::from("Unexpected token. Expected colon ':'."),
+                                token.loc,
+                            )?;
+                            return Ok(false);
+                        }
                     }
 
-                    if escape_keywords.contains(&&ident[..]) {
+                    if escape_keywords.contains(&&desc.descriptor[..]) {
                         // new subsection ident
                         self.tokens.bump_back(2);
                         ectx.reset_transient();
@@ -498,7 +561,7 @@ impl<'a> Parser<'a> {
                             return Ok(false);
                         }
 
-                        child_modules.push(ChildeModuleDef { loc: Loc::fromto(first_token.loc, second_token.loc), ty, descriptor: ident });
+                        child_modules.push(ChildeModuleDef { loc: Loc::fromto(first_token_loc, second_token.loc), ty, desc });
                     }
                 },
                 _ => {
@@ -896,7 +959,7 @@ impl<'a> Parser<'a> {
                                 Ok(value) => bitrate = Some(value),
                                 Err(e) => {
                                     ectx.record(
-                                        LiteralIntParseError,
+                                        ParLiteralIntParseError,
                                         format!("Int parsing error: {}", e), 
                                         token.loc,
                                     )?;
@@ -921,7 +984,7 @@ impl<'a> Parser<'a> {
                                 Ok(value) => latency = Some(value),
                                 Err(e) => {
                                     ectx.record(
-                                        LiteralFloatParseError,
+                                        ParLiteralFloatParseError,
                                         format!("Float parsing error: {}", e), 
                                         token.loc
                                     )?;
@@ -945,7 +1008,7 @@ impl<'a> Parser<'a> {
                                 Ok(value) => jitter = Some(value),
                                 Err(e) => {
                                     ectx.record(
-                                        LiteralFloatParseError,
+                                        ParLiteralFloatParseError,
                                         format!("Float parsing error: {}", e), 
                                         token.loc,
                                     )?;
@@ -1028,6 +1091,41 @@ impl<'a> Parser<'a> {
 
         Ok(())
     }
+
+    #[allow(clippy::collapsible_match)]
+    fn parse_literal_usize(&mut self, ectx: &mut ParsingErrorContext<'_>) -> ParResult<Option<usize>> {
+        let (token, raw) = self.next_token()?;
+        if let TokenKind::Literal { kind, .. } = token.kind {
+            if let LiteralKind::Int { base, .. } = kind  {
+                match usize::from_str_radix(raw, base.radix()) {
+                    Ok(value) => Ok(Some(value)),
+                    Err(e) => {
+                        ectx.record(
+                            ParLiteralIntParseError,
+                            format!("Error parsing integer: {}", e),
+                            token.loc
+                        )?;
+                        Ok(None)
+                    }
+                }
+            } else {
+                ectx.record(
+                    ParExpectedIntLiteral,
+                format!("Unexpected token '{}'. Expected integer literal", raw),
+                    token.loc
+                )?;
+                Ok(None)
+            }
+        } else {
+            ectx.record(
+                ParExpectedIntLiteral,
+                format!("Unexpected token '{}'. Expected integer literal", raw),
+                token.loc
+            )?;
+
+            Ok(None)
+        }
+    }
 }
 
 impl Display for ParsingResult {
@@ -1052,7 +1150,7 @@ impl Display for ParsingResult {
 
             writeln!(f, "      submodules:")?;
             for submodule in &module.submodules {
-                writeln!(f, "        {} {}", submodule.ty, submodule.descriptor)?;
+                writeln!(f, "        {} {}", submodule.ty, submodule.desc)?;
             }
 
             writeln!(f)?;
@@ -1077,7 +1175,7 @@ impl Display for ParsingResult {
 
             writeln!(f, "      nodes:")?;
             for submodule in &module.nodes {
-                writeln!(f, "        {} {}", submodule.ty, submodule.descriptor)?;
+                writeln!(f, "        {} {}", submodule.ty, submodule.desc)?;
             }
 
             writeln!(f)?;
@@ -1186,7 +1284,27 @@ pub struct ChildeModuleDef {
     /// The type of the submodule.
     pub ty: String,
     /// A module internal descriptor for the created submodule.
+    pub desc: LocalDescriptorDef,
+}
+
+///
+/// A definition of a local descriptor
+/// 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LocalDescriptorDef {
     pub descriptor: String,
+    pub cluster_bounds: Option<(usize, usize)>
+}
+
+impl Display for LocalDescriptorDef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some((from, to)) = &self.cluster_bounds {
+            write!(f, "{}[{}...{}]", self.descriptor, from, to)
+        } else {
+            write!(f, "{}", self.descriptor)
+        }
+       
+    }
 }
 
 ///

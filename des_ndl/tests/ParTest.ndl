@@ -28,3 +28,8 @@ module Main {
         some --> m/another
         same <-- NewLink <-- sike 
 }
+
+network SimMain {
+    nodes:
+        router: Main
+}

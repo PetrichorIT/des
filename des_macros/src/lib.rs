@@ -16,7 +16,7 @@ lazy_static! {
     static ref RESOLVERS: Mutex<HashMap<String, NdlResolver>> = Mutex::new(HashMap::new());
 }
 
-fn get_resolver(workspace: String) -> Result<(OwnedTyContext, bool), &'static str> {
+fn get_resolver<'a>(workspace: String) -> Result<(OwnedTySpecContext, bool), &'static str> {
     let mut resolvers = RESOLVERS.lock().unwrap();
 
     if !resolvers.contains_key(&workspace) {
@@ -25,7 +25,11 @@ fn get_resolver(workspace: String) -> Result<(OwnedTyContext, bool), &'static st
             NdlResolver::new(&workspace).expect("#[derive(Module)] Invalid NDL workspace."),
         );
     }
-    resolvers.get_mut(&workspace).unwrap().run_cached()
+    resolvers
+        .get_mut(&workspace)
+        .unwrap()
+        .run_cached()
+        .map(|(gtyctx, has_err)| (gtyctx.to_owned(), has_err))
 }
 
 ///
@@ -126,9 +130,7 @@ fn gen_dynamic_module_core(ident: Ident, attrs: Vec<Attribute>) -> TokenStream {
                 }
 
                 let module = res
-                    .modules
-                    .into_iter()
-                    .find(|m| ident == m.name)
+                    .module(ident.clone())
                     .expect("#[derive(Module)] -- Failed to find NDL module with same name.");
 
                 let mut token_stream = proc_macro2::TokenStream::new();
@@ -136,8 +138,8 @@ fn gen_dynamic_module_core(ident: Ident, attrs: Vec<Attribute>) -> TokenStream {
                 // Submodule configuration
 
                 for module in &module.submodules {
-                    let ChildeModuleDef { descriptor, ty, .. } = module;
-                    let ident = Ident::new(&format!("{}_smod", descriptor), Span::call_site());
+                    let ChildModuleSpec { descriptor, ty, .. } = module;
+                    let ident = Ident::new(&format!("{}_child", descriptor), Span::call_site());
                     let ty = Ident::new(ty, Span::call_site());
                     token_stream.extend::<proc_macro2::TokenStream>(quote! {
                         let mut #ident: Box<#ty> = #ty::build_named_with_parent(#descriptor, &mut self, rt);
@@ -147,46 +149,43 @@ fn gen_dynamic_module_core(ident: Ident, attrs: Vec<Attribute>) -> TokenStream {
                 // Gate configuration
 
                 for gate in &module.gates {
-                    let GateDef { name, size, .. } = gate;
-                    let ident = Ident::new(&format!("{}_gate", name), Span::call_site());
+                    let GateSpec { ident, size, .. } = gate;
                     token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                        let #ident: Vec<GateId> = self.create_gate_cluster(#name, #size);
+                        let _ = self.create_gate_cluster(#ident, #size);
                     })
                 }
 
                 // Connection configuration.
 
                 for connection in &module.connections {
-                    let ConDef {
-                        from, channel, to, ..
+                    let ConSpec {
+                        source,
+                        channel,
+                        target,
+                        ..
                     } = connection;
 
-                    let from_ident = ident_from_conident(&mut token_stream, from);
-                    let to_ident = ident_from_conident(&mut token_stream, to);
+                    // get gate cluster for specific nodes
+                    let from_ident = ident_from_conident(&mut token_stream, source);
+                    let to_ident = ident_from_conident(&mut token_stream, target);
 
+                    // Define n channels (n == gate_cluster.size())
                     if let Some(channel) = channel {
-                        let LinkDef {
+                        let ChannelSpec {
                             bitrate,
                             latency,
                             jitter,
                             ..
-                        } = res
-                            .links
-                            .iter()
-                            .find(|l| l.name == *channel)
-                            .expect("unreachable");
+                        } = channel;
 
                         token_stream.extend(quote! {
-                            // assert_eq!(#from_ident.len(), #to_ident.len());
-                            for i in 0..#from_ident.len() {
-                                let channel = rt.create_channel(des_core::ChannelMetrics {
-                                    bitrate: #bitrate,
-                                    latency: des_core::SimTime::new(#latency),
-                                    jitter: des_core::SimTime::new(#jitter),
-                                });
-                                #from_ident[i].set_next_gate(#to_ident[i].id());
-                                #from_ident[i].set_channel(channel);
-                            }
+                            let channel = rt.create_channel(des_core::ChannelMetrics {
+                                bitrate: #bitrate,
+                                latency: des_core::SimTime::new(#latency),
+                                jitter: des_core::SimTime::new(#jitter),
+                            });
+                            #from_ident.set_next_gate(#to_ident.id());
+                            #from_ident.set_channel(channel);
                         });
                     } else {
                         token_stream.extend(quote! {
@@ -201,8 +200,8 @@ fn gen_dynamic_module_core(ident: Ident, attrs: Vec<Attribute>) -> TokenStream {
                 // Add submodule to rt
 
                 for module in &module.submodules {
-                    let ChildeModuleDef { descriptor, .. } = module;
-                    let ident = Ident::new(&format!("{}_smod", descriptor), Span::call_site());
+                    let ChildModuleSpec { descriptor, .. } = module;
+                    let ident = Ident::new(&format!("{}_child", descriptor), Span::call_site());
 
                     token_stream.extend::<proc_macro2::TokenStream>(quote! {
                         rt.create_module(#ident);
@@ -233,26 +232,42 @@ fn gen_dynamic_module_core(ident: Ident, attrs: Vec<Attribute>) -> TokenStream {
     }
 }
 
-fn ident_from_conident(token_stream: &mut proc_macro2::TokenStream, ident: &ConNodeIdent) -> Ident {
+/// Resolve a concreate conident to the associated gate clusters
+fn ident_from_conident(
+    token_stream: &mut proc_macro2::TokenStream,
+    ident: &ConSpecNodeIdent,
+) -> Ident {
     match ident {
-        ConNodeIdent::Child { child, ident, .. } => {
-            let submodule_ident = Ident::new(&format!("{}_smod", child), Span::call_site());
-            let ident_token =
-                Ident::new(&format!("{}_smod_{}_gate", child, ident), Span::call_site());
+        ConSpecNodeIdent::Child {
+            child_ident,
+            gate_ident,
+            pos,
+            ..
+        } => {
+            let submodule_ident = Ident::new(&format!("{}_child", child_ident), Span::call_site());
+            let ident_token = Ident::new(
+                &format!("{}_child_{}_gate{}", child_ident, gate_ident, pos),
+                Span::call_site(),
+            );
 
             token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                let mut #ident_token: Vec<&mut des_core::Gate> = #submodule_ident.gate_cluster_mut(#ident);
+                let mut #ident_token: &mut des_core::Gate = #submodule_ident.gate_mut(#gate_ident, #pos)
+                    .expect("Internal macro err.");
             });
 
             ident_token
         }
-        ConNodeIdent::Local {
-            ident: gate_name, ..
+        ConSpecNodeIdent::Local {
+            gate_ident, pos, ..
         } => {
-            let ident = Ident::new(&format!("{}_gate_ref", ident), Span::call_site());
+            let ident = Ident::new(
+                &format!("{}_gate{}_ref", gate_ident, pos),
+                Span::call_site(),
+            );
 
             token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                let mut #ident: Vec<&mut des_core::Gate> = self.gate_cluster_mut(#gate_name);
+                let mut #ident: &mut des_core::Gate = self.gate_mut(#gate_ident, #pos)
+                    .expect("Internal macro err.");
             });
 
             ident
@@ -280,6 +295,40 @@ fn parse_attr(attrs: Vec<Attribute>) -> Option<String> {
     None
 }
 
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+
 ///
 /// #[derive(Network)]
 ///
@@ -299,14 +348,14 @@ fn gen_network_main(ident: Ident, workspace: String) -> TokenStream {
             if has_errors {
                 panic!("#[derive(Network)] NDL resolver found erros while parsing")
             }
-            if let Some(network) = res.networks.iter().find(|n| ident == n.name) {
+            if let Some(network) = res.network(ident.clone()) {
                 let mut token_stream = proc_macro2::TokenStream::new();
 
                 // Config nodes.
 
                 for node in &network.nodes {
-                    let ChildeModuleDef { descriptor, ty, .. } = node;
-                    let ident = Ident::new(&format!("{}_node", descriptor), Span::call_site());
+                    let ChildModuleSpec { descriptor, ty, .. } = node;
+                    let ident = Ident::new(&format!("{}_child", descriptor), Span::call_site());
                     let ty = Ident::new(ty, Span::call_site());
                     token_stream.extend::<proc_macro2::TokenStream>(quote! {
                         let mut #ident: Box<#ty> = #ty::build_named(#descriptor, rt);
@@ -316,36 +365,34 @@ fn gen_network_main(ident: Ident, workspace: String) -> TokenStream {
                 // Create connections.
 
                 for connection in &network.connections {
-                    let ConDef {
-                        from, channel, to, ..
+                    let ConSpec {
+                        source,
+                        channel,
+                        target,
+                        ..
                     } = connection;
 
-                    let from_ident = ident_from_conident(&mut token_stream, from);
-                    let to_ident = ident_from_conident(&mut token_stream, to);
+                    // get gate cluster for specific nodes
+                    let from_ident = ident_from_conident(&mut token_stream, source);
+                    let to_ident = ident_from_conident(&mut token_stream, target);
 
+                    // Define n channels (n == gate_cluster.size())
                     if let Some(channel) = channel {
-                        let LinkDef {
+                        let ChannelSpec {
                             bitrate,
                             latency,
                             jitter,
                             ..
-                        } = res
-                            .links
-                            .iter()
-                            .find(|l| l.name == *channel)
-                            .expect("unreachable");
+                        } = channel;
 
                         token_stream.extend(quote! {
-                            // assert_eq!(#from_ident.len(), #to_ident.len());
-                            for i in 0..#from_ident.len() {
-                                let channel = rt.create_channel(des_core::ChannelMetrics {
-                                    bitrate: #bitrate,
-                                    latency: des_core::SimTime::new(#latency),
-                                    jitter: des_core::SimTime::new(#jitter),
-                                });
-                                #from_ident[i].set_next_gate(#to_ident[i].id());
-                                #from_ident[i].set_channel(channel);
-                            }
+                            let channel = rt.create_channel(des_core::ChannelMetrics {
+                                bitrate: #bitrate,
+                                latency: des_core::SimTime::new(#latency),
+                                jitter: des_core::SimTime::new(#jitter),
+                            });
+                            #from_ident.set_next_gate(#to_ident.id());
+                            #from_ident.set_channel(channel);
                         });
                     } else {
                         token_stream.extend(quote! {
@@ -356,17 +403,18 @@ fn gen_network_main(ident: Ident, workspace: String) -> TokenStream {
                         });
                     }
                 }
-
                 // Add nodes to rt.
 
                 for node in &network.nodes {
-                    let ChildeModuleDef { descriptor, .. } = node;
-                    let ident = Ident::new(&format!("{}_node", descriptor), Span::call_site());
+                    let ChildModuleSpec { descriptor, .. } = node;
+                    let ident = Ident::new(&format!("{}_child", descriptor), Span::call_site());
 
                     token_stream.extend::<proc_macro2::TokenStream>(quote! {
                         rt.create_module(#ident);
                     })
                 }
+
+                // Compile token stream
 
                 let token_stream = WrappedTokenStream(token_stream);
 

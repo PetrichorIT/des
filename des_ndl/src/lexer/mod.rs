@@ -177,6 +177,7 @@ impl TokenKind {
                 | Gt
                 | Minus
                 | Slash
+                | Dot
         )
     }
 }
