@@ -1,25 +1,16 @@
-use std::fmt::{Display};
+use crate::*;
 
-use crate::TokenStream;
-use crate::error::ErrorSolution;
-use crate::source::Asset;
+use crate::error::*;
+use crate::lexer::LiteralKind;
 
-use super::loc::Loc;
-use super::error::Error;
-use super::error::ErrorCode::*;
-use super::error::ParsingErrorContext;
-use super::lexer::{LiteralKind, Token, TokenKind};
-use super::source::{AssetDescriptor};
+use std::fmt::Display;
+
 
 mod tests;
 
 const MODULE_SUBSECTION_IDENT: [&str; 4] = ["gates", "submodules", "connections", "parameters"];
 const NETWORK_SUBSECTION_IDENT: [&str; 3] = ["nodes", "connections", "parameters"];
 
-///
-/// A semi-public type to handle unexpected ends of token streams.
-/// 
-pub type ParResult<T> = Result<T, &'static str>;
 
 ///
 /// Parses the given asset and its associated tokenstream

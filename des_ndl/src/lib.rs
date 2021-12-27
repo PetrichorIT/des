@@ -2,24 +2,53 @@ mod error;
 mod loc;
 mod source;
 
-pub use error::{Error, ErrorCode, GlobalErrorContext, ParsingErrorContext};
-pub use loc::Loc;
-pub use source::{AssetDescriptor, SourceMap};
-
 mod desugar;
 mod lexer;
 mod parser;
 mod resolver;
 mod tycheck;
 
-pub use desugar::*;
-pub use lexer::{tokenize, tokenize_and_validate, Token, TokenKind, TokenStream};
-pub use parser::{
-    parse, ChildeModuleDef, ConDef, ConNodeIdent, GateDef, LinkDef, LocalDescriptorDef, ModuleDef,
-    NetworkDef, ParamDef, ParsingResult,
+// ### Exports ###
+
+// > Function exports
+pub use desugar::desugar;
+pub use lexer::tokenize;
+pub use lexer::tokenize_and_validate;
+pub use parser::parse;
+pub use tycheck::validate;
+
+// > Global primitivs
+pub use error::Error;
+pub use error::ErrorCode;
+pub use error::GlobalErrorContext;
+pub use lexer::Token;
+pub use lexer::TokenKind;
+pub use lexer::TokenStream;
+pub use loc::Loc;
+pub use source::Asset;
+pub use source::AssetDescriptor;
+pub use source::SourceMap;
+
+// > Spec Exports.
+pub use desugar::{
+    ChannelSpec, ChildModuleSpec, ConSpec, ConSpecNodeIdent, GateSpec, IncludeSpec, ModuleSpec,
+    NetworkSpec, ParamSpec,
 };
-pub use resolver::{NdlResolver, NdlResolverOptions};
-pub use tycheck::{validate, GlobalTySpecContext, OwnedTySpecContext, TySpecContext};
+
+// > TyCtx
+pub use desugar::GlobalTyDefContext;
+pub use desugar::TyDefContext;
+pub use tycheck::GlobalTySpecContext;
+pub use tycheck::OwnedTySpecContext;
+pub use tycheck::TySpecContext;
+
+// > Resolver
+pub use resolver::NdlResolver;
+pub use resolver::NdlResolverOptions;
+pub use resolver::NdlResolverState;
+
+// > Static Result
+pub type ParResult<T> = Result<T, &'static str>;
 
 mod tests {
     #[test]

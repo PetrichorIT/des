@@ -1,5 +1,5 @@
 use crate::loc::Loc;
-use crate::{GateDef, LinkDef, ModuleDef, NetworkDef, ParamDef};
+use crate::parser::{GateDef, LinkDef, ModuleDef, NetworkDef, ParamDef};
 use std::fmt::Display;
 
 ///
@@ -46,7 +46,7 @@ impl ModuleSpec {
     /// This means 'loc', 'ident' and 'gates' will be initalized
     /// while 'submodules' and 'connections' must be desugard manually.
     ///
-    pub fn new(module_def: &ModuleDef) -> Self {
+    pub(crate) fn new(module_def: &ModuleDef) -> Self {
         // Do not use Vec::with_capacity()
         // since desugaring will increase the number of entries
         // significantly.
@@ -226,7 +226,7 @@ impl ChannelSpec {
     /// Creates a fully initialized instance of Self
     /// using a [LinkDef] as reference point.
     ///
-    pub fn new(link_def: &LinkDef) -> Self {
+    pub(crate) fn new(link_def: &LinkDef) -> Self {
         Self {
             loc: link_def.loc,
 
@@ -267,7 +267,7 @@ impl GateSpec {
     /// Creates a new instance of Self
     /// using only a given [GateDef].
     ///
-    pub fn new(gate_def: &GateDef) -> Self {
+    pub(crate) fn new(gate_def: &GateDef) -> Self {
         Self {
             loc: gate_def.loc,
 

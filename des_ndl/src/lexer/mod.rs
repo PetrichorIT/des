@@ -1,18 +1,16 @@
-use crate::error::LexingErrorContext;
-use crate::parser::ParResult;
-use crate::source::*;
-use crate::GlobalErrorContext;
+use crate::*;
 
-use super::loc::Loc;
-use cursor::Cursor;
+use crate::error::{GlobalErrorContext, LexingErrorContext};
 
-pub use self::token_stream::TokenStream;
 use self::LiteralKind::*;
 use self::TokenKind::*;
+use cursor::Cursor;
 
 mod cursor;
 mod tests;
 mod token_stream;
+
+pub use self::token_stream::TokenStream;
 
 /// Creates an iterator that produces tokens from the input string.
 pub fn tokenize(input: &str, start_idx: usize) -> impl Iterator<Item = Token> + '_ {

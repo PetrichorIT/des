@@ -1,6 +1,6 @@
-use super::loc::Loc;
-use crate::{parser::ParResult, source::Asset, SourceMap, Token, TokenKind};
-use std::{io::Write, mem::MaybeUninit};
+use crate::*;
+
+use std::io::Write;
 use termcolor::*;
 
 pub use ErrorCode::*;
@@ -161,19 +161,6 @@ impl IntoIterator for ParsingErrorContext<'_> {
 
 impl<'a> ParsingErrorContext<'a> {
     ///
-    /// Creates an error context without asset binding.
-    /// This cannot be usied without binding to an asset.
-    ///
-    pub fn null() -> Self {
-        Self {
-            errors: Vec::new(),
-
-            asset: unsafe { &*MaybeUninit::<Asset>::uninit().as_ptr() },
-            transient: false,
-        }
-    }
-
-    ///
     /// Creates a new context bound to the given asset.
     ///
     pub fn new(asset: &'a Asset) -> Self {
@@ -183,20 +170,6 @@ impl<'a> ParsingErrorContext<'a> {
             asset,
             transient: false,
         }
-    }
-
-    ///
-    /// The number of errors record.
-    ///
-    pub fn len(&self) -> usize {
-        self.errors.len()
-    }
-
-    ///
-    /// Imdicates whether any errors have occured.
-    ///
-    pub fn is_empty(&self) -> bool {
-        self.errors.is_empty()
     }
 
     ///

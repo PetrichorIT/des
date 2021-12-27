@@ -1,5 +1,7 @@
 use crate::*;
 
+use crate::desugar::DesugaredParsingResult;
+
 pub struct GlobalTySpecContext<'a> {
     resolver: &'a NdlResolver,
 }

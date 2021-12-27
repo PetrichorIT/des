@@ -1,16 +1,18 @@
-use std::fmt::Display;
+use crate::*;
 
 use crate::error::*;
-use crate::*;
-pub use specs::*;
-pub use tyctx::*;
+use crate::parser::*;
+use std::fmt::Display;
 
 mod specs;
 mod tests;
 mod tyctx;
 
+pub use specs::*;
+pub use tyctx::*;
+
 ///
-/// Transforms a given [ParsingResult] into a [DesugaredParsingResult]
+/// Transforms a given a internal ParsingResult into a internal DesugaredParsingResult
 /// by removing syntactic sugar, and turning Defs into Specs.
 ///
 pub fn desugar(unit: &ParsingResult, resolver: &NdlResolver) -> DesugaredParsingResult {

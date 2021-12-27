@@ -361,7 +361,7 @@ impl<'a> Asset<'a> {
     ///
     /// Returns the used reference to the [MappedAssetDescriptor].
     ///
-    pub fn mapped_asset(&self) -> &'a MappedAssetDescriptor {
+    pub(crate) fn mapped_asset(&self) -> &'a MappedAssetDescriptor {
         self.asset
     }
 

@@ -1,8 +1,7 @@
-use crate::{
-    error::*,
-    loc::Loc,
-    NdlResolver, DesugaredParsingResult,
-};
+use crate::*;
+
+use crate::desugar::DesugaredParsingResult;
+use crate::error::*;
 
 mod tests;
 mod tyctx;
@@ -15,7 +14,7 @@ const PAR_TYPES: [&str; 15] = [
 ];
 
 ///
-/// Validates the given [DesugaredParsingResult] 'unit' using the resovler
+/// Validates the given an internal DesugaredParsingResult 'unit' using the resovler
 /// as parameters.
 /// Returns all sematic errors that were encountered.
 ///
