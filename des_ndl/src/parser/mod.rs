@@ -37,7 +37,7 @@ pub fn parse(asset: Asset<'_>, tokens: TokenStream) -> ParsingResult {
 
     let mut parser = Parser { result, tokens, asset };
 
-    let p_state: ParResult<()> = (||{
+    let p_state: NdlResult<()> = (||{
         while !parser.is_done() {
             if let Ok((token, raw_parts)) = parser.next_token() {
                 match token.kind {
@@ -130,7 +130,7 @@ impl<'a> Parser<'a> {
         self.eat_while(|t| t.kind == TokenKind::Whitespace)
     }
     
-    fn next_token(&self) -> ParResult<(&Token, &str)> {
+    fn next_token(&self) -> NdlResult<(&Token, &str)> {
         let token = self.tokens.bump()?;
         let raw_parts = self.asset.referenced_slice_for(token.loc);
 
@@ -139,7 +139,7 @@ impl<'a> Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
-    fn parse_include(&mut self, ectx: &mut ParsingErrorContext<'_>) -> ParResult<()> {
+    fn parse_include(&mut self, ectx: &mut ParsingErrorContext<'_>) -> NdlResult<()> {
         ectx.reset_transient();
         self.eat_whitespace();
 
@@ -175,7 +175,7 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    fn parse_module(&mut self, ectx: &mut ParsingErrorContext<'_>) -> ParResult<()> {
+    fn parse_module(&mut self, ectx: &mut ParsingErrorContext<'_>) -> NdlResult<()> {
         ectx.reset_transient();
         self.eat_whitespace();
 
@@ -281,7 +281,7 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    fn parse_par(&mut self, parameters: &mut Vec<ParamDef>, ectx: &mut ParsingErrorContext<'_>, escape_keywords: &[&str]) -> ParResult<bool> {
+    fn parse_par(&mut self, parameters: &mut Vec<ParamDef>, ectx: &mut ParsingErrorContext<'_>, escape_keywords: &[&str]) -> NdlResult<bool> {
 
         loop {
             self.eat_whitespace();
@@ -342,7 +342,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_module_gates(&mut self, gates: &mut Vec<GateDef>, ectx: &mut ParsingErrorContext<'_>) -> ParResult<bool> {
+    fn parse_module_gates(&mut self, gates: &mut Vec<GateDef>, ectx: &mut ParsingErrorContext<'_>) -> NdlResult<bool> {
         'mloop: loop {
             self.eat_whitespace();
 
@@ -448,7 +448,7 @@ impl<'a> Parser<'a> {
 
     }
 
-    fn parse_childmodule_def(&mut self, child_modules: &mut Vec<ChildeModuleDef>, ectx: &mut ParsingErrorContext<'_>, escape_keywords: &[&str]) -> ParResult<bool> {
+    fn parse_childmodule_def(&mut self, child_modules: &mut Vec<ChildeModuleDef>, ectx: &mut ParsingErrorContext<'_>, escape_keywords: &[&str]) -> NdlResult<bool> {
 
         loop {
             self.eat_whitespace();
@@ -569,7 +569,7 @@ impl<'a> Parser<'a> {
 
     }
 
-    fn parse_node_connections(&mut self, connections: &mut Vec<ConDef>, ectx: &mut ParsingErrorContext<'_>, _escape_keywords: &[&str]) -> ParResult<bool> {
+    fn parse_node_connections(&mut self, connections: &mut Vec<ConDef>, ectx: &mut ParsingErrorContext<'_>, _escape_keywords: &[&str]) -> NdlResult<bool> {
         
         // Note that escape keywords are not needed here but will be provided anyway
         // since their usage is likley in the future.
@@ -707,7 +707,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_connetion_identifer_token(&mut self, ectx: &mut ParsingErrorContext<'_>) -> ParResult<ConIdentiferResult> {
+    fn parse_connetion_identifer_token(&mut self, ectx: &mut ParsingErrorContext<'_>) -> NdlResult<ConIdentiferResult> {
         use ConIdentiferResult::*;
 
         self.eat_whitespace();
@@ -768,7 +768,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_network(&mut self, ectx: &mut ParsingErrorContext<'_>) -> ParResult<()> {
+    fn parse_network(&mut self, ectx: &mut ParsingErrorContext<'_>) -> NdlResult<()> {
         ectx.reset_transient();
         self.eat_whitespace();
 
@@ -872,7 +872,7 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    fn parse_link(&mut self, ectx: &mut ParsingErrorContext<'_>) -> ParResult<()> {
+    fn parse_link(&mut self, ectx: &mut ParsingErrorContext<'_>) -> NdlResult<()> {
         ectx.reset_transient();
 
         self.eat_whitespace();
@@ -1084,7 +1084,7 @@ impl<'a> Parser<'a> {
     }
 
     #[allow(clippy::collapsible_match)]
-    fn parse_literal_usize(&mut self, ectx: &mut ParsingErrorContext<'_>) -> ParResult<Option<usize>> {
+    fn parse_literal_usize(&mut self, ectx: &mut ParsingErrorContext<'_>) -> NdlResult<Option<usize>> {
         let (token, raw) = self.next_token()?;
         if let TokenKind::Literal { kind, .. } = token.kind {
             if let LiteralKind::Int { base, .. } = kind  {

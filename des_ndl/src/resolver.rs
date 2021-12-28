@@ -241,6 +241,9 @@ pub enum NdlResolverState {
     Done,
 }
 
+///
+/// Options for specificing the behaviour of a resolver.
+///
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct NdlResolverOptions {
     pub silent: bool,

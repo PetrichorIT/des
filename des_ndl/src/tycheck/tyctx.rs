@@ -2,19 +2,30 @@ use crate::*;
 
 use crate::desugar::DesugaredParsingResult;
 
+///
+/// A global type context over the specifications stored in
+/// a resolver.
+///
 pub struct GlobalTySpecContext<'a> {
     resolver: &'a NdlResolver,
 }
 
 impl<'a> GlobalTySpecContext<'a> {
+    /// The [SourceMap] of the referenced resolver.
     pub fn source_map(&self) -> &SourceMap {
         &self.resolver.source_map
     }
 
+    ///
+    /// Creates a new instance of self given a resolver ref.
+    ///
     pub fn new(resolver: &'a NdlResolver) -> Self {
         Self { resolver }
     }
 
+    ///
+    /// Returns a module spec with the given ident from the type context.
+    ///
     pub fn module<T: PartialEq<String>>(&self, ident: T) -> Option<&ModuleSpec> {
         for unit in self.resolver.desugared_units.values() {
             match unit.modules.iter().find(|l| ident == l.ident) {
@@ -25,6 +36,9 @@ impl<'a> GlobalTySpecContext<'a> {
         None
     }
 
+    ///
+    /// Returns a network sepc with the given ident from the type context.
+    ///
     pub fn network<T: PartialEq<String>>(&self, ident: T) -> Option<&NetworkSpec> {
         for unit in self.resolver.desugared_units.values() {
             match unit.networks.iter().find(|l| ident == l.ident) {
@@ -35,11 +49,17 @@ impl<'a> GlobalTySpecContext<'a> {
         None
     }
 
+    ///
+    /// Extracts all specs from the current context and stores it in a [OwnedTySpecContext].
+    ///
     pub fn to_owned(&self) -> OwnedTySpecContext {
         OwnedTySpecContext::new(self)
     }
 }
 
+///
+/// A owned type spec context.
+///
 pub struct OwnedTySpecContext {
     /// A collection of all included module definitions.
     pub modules: Vec<ModuleSpec>,
@@ -48,6 +68,9 @@ pub struct OwnedTySpecContext {
 }
 
 impl OwnedTySpecContext {
+    ///
+    /// Createa a new OwnedTySpecContext from a GlobalTySpecContext.
+    ///
     pub fn new(gtyctx: &GlobalTySpecContext) -> Self {
         let mut modules = Vec::new();
         let mut networks = Vec::new();
@@ -64,10 +87,16 @@ impl OwnedTySpecContext {
         Self { modules, networks }
     }
 
+    ///
+    /// Returns a module sepc with the given ident from the type context.
+    ///
     pub fn module<T: PartialEq<String>>(&self, ident: T) -> Option<&ModuleSpec> {
         self.modules.iter().find(|l| ident == l.ident)
     }
 
+    ///
+    /// Returns a network sepc with the given ident from the type context.
+    ///
     pub fn network<T: PartialEq<String>>(&self, ident: T) -> Option<&NetworkSpec> {
         self.networks.iter().find(|l| ident == l.ident)
     }

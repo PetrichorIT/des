@@ -4,6 +4,9 @@ use crate::error::*;
 
 use std::cell::UnsafeCell;
 
+///
+/// A stream of NDL tokens referncing an [Asset].
+///
 #[derive(Debug)]
 pub struct TokenStream {
     inner: Vec<Token>,
@@ -11,7 +14,7 @@ pub struct TokenStream {
 }
 
 impl TokenStream {
-    pub fn new(asset: Asset<'_>, ectx: &mut LexingErrorContext) -> ParResult<Self> {
+    pub fn new(asset: Asset<'_>, ectx: &mut LexingErrorContext) -> NdlResult<Self> {
         let mut inner = Vec::new();
         for token in tokenize(asset.source(), asset.start_pos()) {
             if token.kind.valid() && !token.kind.reducable() {
@@ -39,7 +42,7 @@ impl TokenStream {
         self.len() == 0
     }
 
-    pub fn peek(&self) -> ParResult<&Token> {
+    pub fn peek(&self) -> NdlResult<&Token> {
         unsafe {
             if *self.head.get() < self.inner.len() {
                 Ok(&self.inner[*self.head.get()])
@@ -49,7 +52,7 @@ impl TokenStream {
         }
     }
 
-    pub fn bump(&self) -> ParResult<&Token> {
+    pub fn bump(&self) -> NdlResult<&Token> {
         unsafe {
             if *self.head.get() < self.inner.len() {
                 *self.head.get() += 1;

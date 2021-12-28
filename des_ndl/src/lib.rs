@@ -1,3 +1,54 @@
+//! A crate for parsing NDL files and workspace.
+//!
+//! # Use Case
+//!
+//! NDL (NodeDescriptionLanguage) is a language for representing module and network structures
+//! of a DES simulation. This crate shall be used together with des_macros the codegen
+//! unit of the "NDL compiler". The provided macros will generate code based on the given
+//! module / network description in the NDL files and attach that functionality to Structs
+//! that implement the Module trait (for networks thats not nessecary).
+//!
+//! # Usage
+//!
+//! In general this package should only be used in either the codegen macros of des_macros
+//! or in a build script, not as standalone packet.
+//!
+//! Nonetheless if you want to interact with NDL directly here is a quick rundown:
+//!
+//! ## Steps in the compile process
+//!
+//! | process step |                  input                  |         output         | parallisable |
+//! |:------------:|:---------------------------------------:|:----------------------:|:------------:|
+//! |    lexing    |                  Asset                  |       TokenStream      |     true     |
+//! |    parsing   |               TokenStream               |      ParsingResult     |     true     |
+//! |  desugaring  |              ParsingResult              | DesugaredParsingResult |     false    |
+//! | typechecking | DesugaredParsingResult & Global Context |    validation result   |     false    |
+//! |   resolving  |                Workspace                |   Global type context  |       -      |
+//!
+//! ## Asset management
+//!
+//! Assets will be managed by loading them into the [SourceMap].
+//! This can be done by passing an [AssetDescriptor] to the [SourceMap::load] function.
+//! The asset will be mapped internally and loaded (if not allready done) into memory.
+//! If the process succeeds an [Asset] will be returned.
+//! This is a object referncing the raw buffer stored in the [SourceMap].
+//!
+//! ## Error management
+//!
+//! Depending on the process steps errors will be reported differently, but in the end
+//! all errors will be stored in the [GlobalErrorContext].
+//! It is possible that the process may exit prematurly if a serios error was found that
+//! prevents a later process step from being executed.
+//! If the resolver is run in non-silent mode errors will be printed to stderr
+//! after typechecking has finished.
+//!
+//! ## The result of a run.
+//!
+//! What is returned is a [OwnedTySpecContext]. This type context contains all
+//! module / network specifications without checking for name collisions.
+//! From there you are free to do whatever you want with this definitions.
+//!
+
 mod error;
 mod loc;
 mod source;
@@ -48,7 +99,7 @@ pub use resolver::NdlResolverOptions;
 pub use resolver::NdlResolverState;
 
 // > Static Result
-pub type ParResult<T> = Result<T, &'static str>;
+pub type NdlResult<T> = Result<T, &'static str>;
 
 mod tests {
     #[test]

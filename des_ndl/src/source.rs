@@ -150,7 +150,7 @@ impl Default for SourceMap {
 }
 
 ///
-/// A managment block for an asset loaded into a SourceMap.
+/// A managment block for an asset loaded into a [SourceMap].
 ///
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MappedAssetDescriptor {
@@ -281,7 +281,7 @@ impl AssetDescriptor {
 }
 
 ///
-/// A temporary asset mapping to a mapped asset in a source map.
+/// A temporary asset mapping to a loaded asset in a [SourceMap].
 ///
 #[derive(Debug, Clone, Copy)]
 pub struct Asset<'a> {

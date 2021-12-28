@@ -106,7 +106,7 @@ impl<'a> LexingErrorContext<'a> {
     ///
     /// A function to add another error to the context.
     ///
-    pub fn record(&mut self, token: &Token) -> ParResult<()> {
+    pub fn record(&mut self, token: &Token) -> NdlResult<()> {
         self.errors.push(Error::new_lex(
             if matches!(token.kind, TokenKind::InvalidIdent) {
                 ErrorCode::LexInvalidSouceIdentifier
@@ -175,7 +175,7 @@ impl<'a> ParsingErrorContext<'a> {
     ///
     /// Records an error, determining transients automaticly.
     ///
-    pub fn record(&mut self, code: ErrorCode, msg: String, loc: Loc) -> ParResult<()> {
+    pub fn record(&mut self, code: ErrorCode, msg: String, loc: Loc) -> NdlResult<()> {
         self.errors.push(Error {
             code,
             msg,
@@ -204,7 +204,7 @@ impl<'a> ParsingErrorContext<'a> {
         msg: String,
         loc: Loc,
         solution: ErrorSolution,
-    ) -> ParResult<()> {
+    ) -> NdlResult<()> {
         self.errors.push(Error {
             code,
             msg,

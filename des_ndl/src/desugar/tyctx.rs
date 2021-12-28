@@ -3,19 +3,29 @@ use crate::parser::*;
 use crate::resolver::*;
 use crate::source::*;
 
+///
+/// A global type context over the definitions stored in a resolver.
+///
 pub struct GlobalTyDefContext<'a> {
     resolver: &'a NdlResolver,
 }
 
 impl<'a> GlobalTyDefContext<'a> {
+    /// The used [SourceMap] of the resolver.
     pub fn source_map(&self) -> &SourceMap {
         &self.resolver.source_map
     }
 
+    ///
+    /// Creates a new instance of self using the given resolver as data source.
+    ///
     pub fn new(resolver: &'a NdlResolver) -> Self {
         Self { resolver }
     }
 
+    ///
+    /// Returns a link def with the given ident from the type context.
+    ///
     pub fn link(&self, ident: &str) -> Option<&LinkDef> {
         for unit in self.resolver.units.values() {
             match unit.links.iter().find(|l| l.name == ident) {
@@ -26,6 +36,9 @@ impl<'a> GlobalTyDefContext<'a> {
         None
     }
 
+    ///
+    /// REturns a module def with the given ident from the type context.
+    ///
     pub fn module(&self, ident: &str) -> Option<&ModuleDef> {
         for unit in self.resolver.units.values() {
             match unit.modules.iter().find(|l| l.name == ident) {
@@ -66,6 +79,10 @@ impl<'a> TyDefContext<'a> {
         }
     }
 
+    ///
+    /// Createa a new instance of Self by using a resolver and a unit
+    /// to include all nessecaryy units.
+    ///
     pub fn new_for(
         unit: &'a ParsingResult,
         resolver: &'a NdlResolver,

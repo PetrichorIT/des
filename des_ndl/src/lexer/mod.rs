@@ -31,7 +31,7 @@ pub fn tokenize(input: &str, start_idx: usize) -> impl Iterator<Item = Token> + 
 pub fn tokenize_and_validate(
     asset: Asset<'_>,
     global_ectx: &mut GlobalErrorContext,
-) -> ParResult<TokenStream> {
+) -> NdlResult<TokenStream> {
     let mut ectx = LexingErrorContext::new(asset);
 
     let token_stream = TokenStream::new(asset, &mut ectx)?;
