@@ -5,39 +5,63 @@ use rand::{
     rngs::OsRng,
     Rng, SeedableRng,
 };
+use utils::SyncCell;
 
 use crate::*;
 use std::{
     any::type_name,
     collections::BinaryHeap,
     fmt::{Debug, Display},
-    sync::RwLock,
 };
 
 use super::logger::StandardLogger;
 
 lazy_static! {
-    static ref RTCORE: RwLock<Option<RuntimeCore>> = RwLock::new(None);
+    static ref RTC: SyncCell<Option<RuntimeCore>> = SyncCell::new(None);
 }
 
+///
+/// Returns the current simulation time of the currentlly active
+/// runtime session.
+///
 #[inline(always)]
 pub fn sim_time() -> SimTime {
-    RTCORE.read().unwrap().as_ref().unwrap().sim_time
+    unsafe { (*RTC.get()).as_ref().unwrap().sim_time }
 }
 
+///
+/// Returns the current simulation time formatted with the
+/// simulations base unit.
+///
 #[inline(always)]
 pub fn sim_time_fmt() -> String {
-    SimTimeUnit::fmt_compact(
-        RTCORE.read().unwrap().as_ref().unwrap().sim_time,
-        RTCORE.read().unwrap().as_ref().unwrap().sim_base_unit,
-    )
+    unsafe {
+        SimTimeUnit::fmt_compact(
+            (*RTC.get()).as_ref().unwrap().sim_time,
+            (*RTC.get()).as_ref().unwrap().sim_base_unit,
+        )
+    }
 }
 
+///
+/// Generates a random instance of type T with a Standard distribution.
+///
 pub fn rng<T>() -> T
 where
     Standard: Distribution<T>,
 {
-    RTCORE.write().unwrap().as_mut().unwrap().rng.gen()
+    unsafe { (*RTC.get()).as_mut().unwrap().rng.gen() }
+}
+
+///
+/// Generates a random instance of type T with a distribution
+/// of type D.
+///
+pub fn sample<T, D>(distr: D) -> T
+where
+    D: Distribution<T>,
+{
+    unsafe { (*RTC.get()).as_mut().unwrap().rng.sample(distr) }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -62,7 +86,7 @@ impl RuntimeCore {
         itr: usize,
         max_itr: usize,
         rng: StdRng,
-    ) -> &'static RwLock<Option<RuntimeCore>> {
+    ) -> &'static SyncCell<Option<RuntimeCore>> {
         let rtc = Self {
             sim_time,
             sim_base_unit,
@@ -76,9 +100,9 @@ impl RuntimeCore {
             eprintln!("{}", e)
         }
 
-        *RTCORE.write().unwrap() = Some(rtc);
+        unsafe { *RTC.get() = Some(rtc) };
 
-        &RTCORE
+        &RTC
     }
 }
 
@@ -90,17 +114,25 @@ impl RuntimeCore {
 pub struct Runtime<A> {
     pub app: A,
 
-    core: &'static RwLock<Option<RuntimeCore>>,
+    core: &'static SyncCell<Option<RuntimeCore>>,
     future_event_heap: BinaryHeap<EventNode<A>>,
 }
 
 impl<A> Runtime<A> {
+    fn core(&self) -> &RuntimeCore {
+        unsafe { (*self.core.get()).as_ref().unwrap() }
+    }
+
+    fn core_mut(&mut self) -> &mut RuntimeCore {
+        unsafe { (*self.core.get()).as_mut().unwrap() }
+    }
+
     ///
     /// Returns the number of events that were dispatched on this [Runtime] instance.
     ///
     #[inline(always)]
     pub fn num_events_dispatched(&self) -> usize {
-        self.core.read().unwrap().as_ref().unwrap().event_id
+        self.core().event_id
     }
 
     ///
@@ -108,7 +140,7 @@ impl<A> Runtime<A> {
     ///
     #[inline(always)]
     pub fn num_events_received(&self) -> usize {
-        self.core.read().unwrap().as_ref().unwrap().itr
+        self.core().itr
     }
 
     ///
@@ -117,7 +149,7 @@ impl<A> Runtime<A> {
     ///
     #[inline(always)]
     pub fn max_itr(&self) -> usize {
-        self.core.read().unwrap().as_ref().unwrap().max_itr
+        self.core().max_itr
     }
 
     ///
@@ -125,40 +157,34 @@ impl<A> Runtime<A> {
     ///
     #[inline(always)]
     pub fn set_max_itr(&mut self, value: usize) {
-        self.core.write().unwrap().as_mut().unwrap().max_itr = value;
+        self.core_mut().max_itr = value;
     }
 
     ///
     /// Returns the current simulation time.
     ///
     pub fn sim_time(&self) -> SimTime {
-        self.core.read().unwrap().as_ref().unwrap().sim_time
+        self.core().sim_time
     }
 
     ///
     /// Returns the rng.
     ///
-    pub fn rng<T>(&self) -> T
+    pub fn rng<T>(&mut self) -> T
     where
         Standard: Distribution<T>,
     {
-        self.core.write().unwrap().as_mut().unwrap().rng.gen()
+        self.core_mut().rng.gen()
     }
 
     ///
     /// Returns the rng.
     ///
-    pub fn rng_sample<T, D>(&self, distribution: D) -> T
+    pub fn rng_sample<T, D>(&mut self, distribution: D) -> T
     where
         D: Distribution<T>,
     {
-        self.core
-            .write()
-            .unwrap()
-            .as_mut()
-            .unwrap()
-            .rng
-            .sample(distribution)
+        self.core_mut().rng.sample(distribution)
     }
 
     ///
@@ -206,10 +232,10 @@ impl<A> Runtime<A> {
             return false;
         }
 
-        self.core.write().unwrap().as_mut().unwrap().itr += 1;
+        self.core_mut().itr += 1;
 
         let mut node = self.future_event_heap.pop().unwrap();
-        self.core.write().unwrap().as_mut().unwrap().sim_time = node.time();
+        self.core_mut().sim_time = node.time();
 
         node.handle(self);
         !self.future_event_heap.is_empty()
@@ -253,7 +279,7 @@ impl<A> Runtime<A> {
         assert!(time >= self.sim_time());
 
         let node = EventNode::create_into(self, event, time);
-        self.core.write().unwrap().as_mut().unwrap().event_id += 1;
+        self.core_mut().event_id += 1;
         self.future_event_heap.push(node);
     }
 }

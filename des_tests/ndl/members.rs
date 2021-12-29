@@ -9,19 +9,18 @@ pub struct Alice(ModuleCore);
 
 impl Module for Alice {
     fn handle_message(&mut self, msg: Message) {
-        info!(target: "Alice", "Received at {}: message #{:?} content: {}", sim_time_fmt(),msg.id(), msg.extract_content::<String>());
+        let mut pkt = msg.extract_content::<Packet>();
+        info!(target: &self.name().unwrap(), "Received at {}: Message #{} content: {}", sim_time_fmt(), pkt.id(), unsafe { pkt.extract_content_ref::<String>() });
 
-        self.send(
-            Message::new(
-                1,
-                GATE_NULL,
-                self.id(),
-                MODULE_NULL,
-                SimTime::ZERO,
-                String::from("Pong"),
-            ),
-            ("netOut", 0),
-        );
+        if pkt.hop_count() > 10 {
+            // TERMINATE
+        } else {
+            pkt.set_hop_count(pkt.hop_count() + 1);
+            self.send(
+                Message::new_boxed(1, self.id(), SimTime::ZERO, pkt),
+                ("netOut", 0),
+            )
+        }
 
         self.parent_mut::<super::Bob>()
             .unwrap()
@@ -48,11 +47,8 @@ pub struct Bob(ModuleCore);
 
 impl Module for Bob {
     fn handle_message(&mut self, msg: Message) {
-        let id = msg.id();
-        let content = msg.extract_content::<String>();
-        info!(target: "Bob", "Received at {}: message #{:?} content: {}", sim_time_fmt(), id, content);
-
-        if *content == "Init" {
+        if msg.id() == MessageId(0xff) {
+            info!(target: "Bob", "Initalizing");
             self.send(
                 Message::new(
                     1,
@@ -60,8 +56,20 @@ impl Module for Bob {
                     self.id(),
                     MODULE_NULL,
                     SimTime::ZERO,
-                    String::from("Ping"),
+                    Packet::new(
+                        (0x7f_00_00_01, 80),
+                        (0x7f_00_00_02, 80),
+                        String::from("Ping"),
+                    ),
                 ),
+                ("netOut", 2),
+            );
+        } else {
+            let mut pkt = msg.extract_content::<Packet>();
+            pkt.set_hop_count(pkt.hop_count() + 1);
+            info!(target: &self.name().unwrap(), "Received at {}: Message #{} content: {}", sim_time_fmt(), pkt.id(), unsafe { pkt.extract_content_ref::<String>() });
+            self.send(
+                Message::new_boxed(1, self.id(), SimTime::ZERO, pkt),
                 ("netOut", 2),
             );
         }

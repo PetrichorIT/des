@@ -26,7 +26,7 @@ fn main() {
     );
 
     let msg = Message::new(
-        0,
+        0xff,
         GATE_NULL,
         MODULE_NULL,
         MODULE_NULL,

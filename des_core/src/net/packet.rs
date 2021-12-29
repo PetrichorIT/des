@@ -1,4 +1,4 @@
-use std::mem::size_of;
+use std::{any::TypeId, mem::size_of};
 
 use des_macros::GlobalUID;
 
@@ -51,7 +51,8 @@ pub struct Packet {
     ttl: usize,
     hop_count: usize,
 
-    content: usize,
+    content: *mut (),
+    content_ty_id: TypeId,
     content_bit_len: usize,
     content_byte_len: usize,
 }
@@ -87,35 +88,49 @@ impl Packet {
         self.target_port
     }
 
+    /// The number of hops the message had before.
     pub fn hop_count(&self) -> usize {
         self.hop_count
     }
 
+    /// Sets the hop counter.
     pub fn set_hop_count(&mut self, hop_count: usize) {
         self.hop_count = hop_count
     }
 
+    /// The time to live of a message.
     pub fn ttl(&self) -> usize {
         self.ttl
     }
 
+    /// Sets the TTL.
     pub fn set_ttl(&mut self, ttl: usize) {
         self.ttl = ttl
     }
 
+    ///
+    /// Creates a new message with the given metadata and
+    /// a content of type T.
+    ///
+    /// # Guarntees
+    ///
+    /// The value of type T will be moved into a box which is then
+    /// transmuted into a raw ptr. The allocated memory of T will only
+    /// be dropped if the message is extracted.
+    ///
     pub fn new<T>(
         src: (NodeAddress, PortAddress),
         target: (NodeAddress, PortAddress),
         content: T,
     ) -> Self
     where
-        T: MessageBody,
+        T: 'static + MessageBody,
     {
         let bit_len = content.bit_len();
         let byte_len = content.byte_len();
 
         let boxed = Box::new(content);
-        let ptr = Box::into_raw(boxed) as usize;
+        let ptr = Box::into_raw(boxed) as *mut ();
 
         Self {
             id: PacketId::gen(),
@@ -130,17 +145,48 @@ impl Packet {
             hop_count: 0,
 
             content: ptr,
+            content_ty_id: TypeId::of::<T>(),
             content_bit_len: bit_len,
             content_byte_len: byte_len,
         }
     }
 
-    pub fn extract_content<T: MessageBody>(self) -> Box<T> {
+    ///
+    /// Consumes the message casting the stored ptr
+    /// into a Box of type T.
+    ///
+    /// # Safty
+    ///
+    /// The caller must ensure that the stored data is a valid instance
+    /// of type T. If this cannot be guarnteed this is UB.
+    /// Note that DES guarntees that the data refernced by ptr will not
+    /// be freed until this function is called, and ownership is thereby moved..
+    ///
+    pub fn extract_content<T: 'static + MessageBody>(self) -> Box<T> {
+        assert_eq!(
+            self.content_ty_id,
+            TypeId::of::<T>(),
+            "Extracted content must have the same type T the packet was build with."
+        );
+
         let ptr = self.content as *mut T;
         // SAFTY:
         // Note that this function is incredbilly unsafe but nessecary
         // due to the constrains of the user-defined content.
+
         unsafe { Box::from_raw(ptr) }
+    }
+
+    pub unsafe fn extract_content_ref<T: 'static + MessageBody>(&self) -> &T {
+        assert_eq!(
+            self.content_ty_id,
+            TypeId::of::<T>(),
+            "Extracted content must have the same type T the packet was build with."
+        );
+
+        let ptr = self.content as *const T;
+        let reference: &T = &*ptr;
+        reference
     }
 }
 

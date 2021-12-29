@@ -26,6 +26,7 @@ dependencies = [
  "termcolor",
  "unic-emoji-char",
  "unicode-xid",
+ "utils",
 ]
 
 [[package]]

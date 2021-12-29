@@ -548,6 +548,7 @@ pub fn derive_global_uid(input: TokenStream) -> TokenStream {
             }
         }
 
+
         impl std::cmp::Eq for #ident {}
 
         impl std::hash::Hash for #ident {

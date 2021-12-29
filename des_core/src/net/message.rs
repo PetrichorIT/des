@@ -10,7 +10,7 @@ use crate::SimTime;
 
 #[derive(GlobalUID)]
 #[repr(transparent)]
-pub struct MessageId(u32);
+pub struct MessageId(pub u32);
 
 /// The type of messages, similar to the TOS field in IP packets.
 pub type MessageKind = u16;
@@ -22,8 +22,9 @@ pub struct Message {
     pub kind: MessageKind,
     pub timestamp: SimTime,
 
-    content: usize,
+    content: *mut (),
     bit_len: usize,
+    byte_len: usize,
 
     // === Sender ===
     sender_module_id: ModuleId,
@@ -126,8 +127,9 @@ impl Message {
         timestamp: SimTime,
         message_id: MessageId,
         message_tree_id: MessageId,
-        content: usize,
+        content: *mut (),
         bit_len: usize,
+        byte_len: usize,
     ) -> Self {
         Self {
             kind,
@@ -141,9 +143,20 @@ impl Message {
             message_tree_id,
             content,
             bit_len,
+            byte_len,
         }
     }
 
+    ///
+    /// Creates a new message with the given metadata and
+    /// a content of type Box<T>.
+    ///
+    /// # Guarntees
+    ///
+    /// The value of type T will be moved into a box which is then
+    /// transmuted into a raw ptr. The allocated memory of T will only
+    /// be dropped if the message is extracted.
+    ///
     pub fn new_boxed<T: MessageBody>(
         kind: MessageKind,
         sender_module_id: ModuleId,
@@ -151,9 +164,10 @@ impl Message {
         content: Box<T>,
     ) -> Self {
         let bit_len = content.bit_len();
+        let byte_len = content.byte_len();
 
         let ptr: *const T = Box::into_raw(content);
-        let ptr = ptr as usize;
+        let ptr = ptr as *mut ();
 
         let id = MessageId::gen();
 
@@ -169,9 +183,20 @@ impl Message {
             id,
             ptr,
             bit_len,
+            byte_len,
         )
     }
 
+    ///
+    /// Creates a new message with the given metadata and
+    /// a content of type T.
+    ///
+    /// # Guarntees
+    ///
+    /// The value of type T will be moved into a box which is then
+    /// transmuted into a raw ptr. The allocated memory of T will only
+    /// be dropped if the message is extracted.
+    ///
     pub fn new<T: MessageBody>(
         kind: MessageKind,
         last_gate: GateId,
@@ -183,10 +208,10 @@ impl Message {
         let id = MessageId::gen();
 
         let bit_len = content.bit_len();
+        let byte_len = content.byte_len();
 
         let boxed = Box::new(content);
-        let ptr: *const T = Box::into_raw(boxed);
-        let ptr = ptr as usize;
+        let ptr = Box::into_raw(boxed) as *mut ();
 
         Self::new_raw(
             kind,
@@ -200,13 +225,21 @@ impl Message {
             id,
             ptr,
             bit_len,
+            byte_len,
         )
     }
 
     ///
-    /// # Static methods
+    /// Consumes the message casting the stored ptr
+    /// into a Box of type T.
     ///
-
+    /// # Safty
+    ///
+    /// The caller must ensure that the stored data is a valid instance
+    /// of type T. If this cannot be guarnteed this is UB.
+    /// Note that DES guarntees that the data refernced by ptr will not
+    /// be freed until this function is called, and ownership is thereby moved..
+    ///
     pub fn extract_content<T: MessageBody>(self) -> Box<T> {
         let ptr = self.content as *mut T;
         // SAFTY:
@@ -230,6 +263,7 @@ impl Clone for Message {
             self.message_tree_id,
             self.content,
             self.bit_len,
+            self.byte_len,
         )
     }
 }
