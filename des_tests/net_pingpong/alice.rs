@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use des_core::{
     sim_time_fmt, Message, Module, ModuleCore, SimTime, StaticModuleCore, GATE_NULL, MODULE_NULL,
 };
@@ -10,7 +12,7 @@ pub struct Alice(pub ModuleCore);
 
 impl Module for Alice {
     fn handle_message(&mut self, msg: Message) {
-        info!(target: "Alice", "Received at {}: message #{:?} content: {}", sim_time_fmt(),msg.id(), msg.extract_content::<String>());
+        info!(target: "Alice", "Received at {}: message #{:?} content: {}", sim_time_fmt(),msg.id(), msg.extract_content::<String>().deref());
 
         self.send(
             Message::new(

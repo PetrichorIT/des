@@ -1,3 +1,5 @@
+use crate::*;
+
 use lazy_static::lazy_static;
 use rand::{
     distributions::Standard,
@@ -5,19 +7,17 @@ use rand::{
     rngs::OsRng,
     Rng, SeedableRng,
 };
-use utils::SyncCell;
-
-use crate::*;
 use std::{
     any::type_name,
     collections::BinaryHeap,
     fmt::{Debug, Display},
 };
+use utils::SyncCell;
 
 use super::logger::StandardLogger;
 
 lazy_static! {
-    static ref RTC: SyncCell<Option<RuntimeCore>> = SyncCell::new(None);
+    pub(crate) static ref RTC: SyncCell<Option<RuntimeCore>> = SyncCell::new(None);
 }
 
 ///
@@ -64,7 +64,7 @@ where
     unsafe { (*RTC.get()).as_mut().unwrap().rng.sample(distr) }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug)]
 pub(crate) struct RuntimeCore {
     pub sim_time: SimTime,
     pub sim_base_unit: SimTimeUnit,
@@ -73,6 +73,9 @@ pub(crate) struct RuntimeCore {
     pub event_id: usize,
     pub itr: usize,
     pub max_itr: usize,
+
+    // interning
+    pub interner: Interner,
 
     // Misc
     pub rng: StdRng,
@@ -90,9 +93,13 @@ impl RuntimeCore {
         let rtc = Self {
             sim_time,
             sim_base_unit,
+
             event_id,
             itr,
             max_itr,
+
+            interner: Interner::new(),
+
             rng,
         };
 
@@ -234,7 +241,7 @@ impl<A> Runtime<A> {
 
         self.core_mut().itr += 1;
 
-        let mut node = self.future_event_heap.pop().unwrap();
+        let node = self.future_event_heap.pop().unwrap();
         self.core_mut().sim_time = node.time();
 
         node.handle(self);
@@ -259,6 +266,8 @@ impl<A> Runtime<A> {
     ///
     pub fn finish(self) -> (A, SimTime) {
         let t1 = self.sim_time();
+        self.core().interner.fincheck();
+
         (self.app, t1)
     }
 

@@ -8,6 +8,7 @@ use std::mem::ManuallyDrop;
 
 pub use channel::*;
 pub use gate::*;
+use lazy_static::__Deref;
 pub use message::*;
 pub use module::*;
 pub use packet::*;
@@ -105,10 +106,10 @@ pub struct MessageAtGateEvent {
 }
 
 impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
-    fn handle(&mut self, rt: &mut crate::Runtime<NetworkRuntime<A>>) {
+    fn handle(mut self: Box<Self>, rt: &mut crate::Runtime<NetworkRuntime<A>>) {
         let gate = rt.app.gate(self.gate_id);
         if let Some(gate) = gate {
-            let ptr: *const Message = unsafe { &ManuallyDrop::take(&mut self.message) };
+            let ptr: *const Message = self.message.deref();
             let mut message = unsafe { std::ptr::read(ptr) };
             message.set_last_gate(self.gate_id);
 
@@ -208,13 +209,11 @@ pub struct HandleMessageEvent {
 }
 
 impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
-    fn handle(&mut self, rt: &mut crate::Runtime<NetworkRuntime<A>>) {
+    fn handle(mut self: Box<Self>, rt: &mut crate::Runtime<NetworkRuntime<A>>) {
         if let Some(module) = rt.app.module_mut_by_id(self.module_id) {
-            let ptr: *const Message = unsafe { &ManuallyDrop::take(&mut self.message) };
+            let ptr: *const Message = self.message.deref();
             let mut message = unsafe { std::ptr::read(ptr) };
             message.set_target_module(module.id());
-
-            self.handled = true;
 
             info!(
                 target: &format!("Module {}", module.str()),
@@ -268,6 +267,8 @@ impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
                     SimTime::now(),
                 )
             }
+
+            self.handled = true;
         } else {
             error!(
                 target: &format!("Unknown module #{}", self.module_id),
@@ -291,7 +292,7 @@ pub struct CoroutineMessageEvent {
 }
 
 impl<A> Event<NetworkRuntime<A>> for CoroutineMessageEvent {
-    fn handle(&mut self, rt: &mut crate::Runtime<NetworkRuntime<A>>) {
+    fn handle(self: Box<Self>, rt: &mut crate::Runtime<NetworkRuntime<A>>) {
         if let Some(module) = rt.app.module_mut_by_id(self.module_id) {
             let dur = module.module_core().activity_period;
             if dur != SimTime::ZERO {
@@ -318,7 +319,7 @@ pub struct ChannelUnbusyNotif {
 }
 
 impl<A> Event<NetworkRuntime<A>> for ChannelUnbusyNotif {
-    fn handle(&mut self, rt: &mut crate::Runtime<NetworkRuntime<A>>) {
+    fn handle(self: Box<Self>, rt: &mut crate::Runtime<NetworkRuntime<A>>) {
         if let Some(channel) = rt
             .app
             .channels

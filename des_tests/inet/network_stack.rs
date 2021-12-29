@@ -45,7 +45,7 @@ impl Module for NetworkStack {
         let incoming = msg.arrival_gate();
         let mut pkt = msg.extract_content::<Packet>();
 
-        pkt.set_hop_count(pkt.hop_count() + 1);
+        pkt.inc_hop_count();
         self.routing_deamon.as_mut().unwrap().handle(&pkt, incoming);
 
         // Route packet
@@ -54,7 +54,7 @@ impl Module for NetworkStack {
         } else if let Some(&route) = self.lookup_route(pkt.target_addr()) {
             // PATH ROUTE
             info!(target: "NetworkStack", "Routing over backproc path");
-            let msg = Message::new_boxed(2, self.id(), SimTime::now(), pkt);
+            let msg = Message::new_interned(2, self.id(), SimTime::now(), pkt);
             self.send(msg, route);
         } else {
             // RANDOM ROUTE
@@ -71,7 +71,7 @@ impl Module for NetworkStack {
                     .id()
             }
 
-            let msg = Message::new_boxed(2, self.id(), SimTime::now(), pkt);
+            let msg = Message::new_interned(2, self.id(), SimTime::now(), pkt);
             self.send(msg, gate_id);
         }
     }

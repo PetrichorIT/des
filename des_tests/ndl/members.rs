@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use des_core::*;
 use des_macros::Module;
 
@@ -10,28 +12,28 @@ pub struct Alice(ModuleCore);
 impl Module for Alice {
     fn handle_message(&mut self, msg: Message) {
         let mut pkt = msg.extract_content::<Packet>();
-        info!(target: &self.name().unwrap(), "Received at {}: Message #{} content: {}", sim_time_fmt(), pkt.id(), unsafe { pkt.extract_content_ref::<String>() });
+        info!(target: &self.name().unwrap(), "Received at {}: Message #{} content: {}", sim_time_fmt(), pkt.id(), pkt.extract_content_ref::<String>().deref());
 
         if pkt.hop_count() > 10 {
             // TERMINATE
         } else {
-            pkt.set_hop_count(pkt.hop_count() + 1);
+            pkt.inc_hop_count();
             self.send(
-                Message::new_boxed(1, self.id(), SimTime::ZERO, pkt),
+                Message::new_interned(1, self.id(), SimTime::ZERO, pkt),
                 ("netOut", 0),
             )
         }
 
-        self.parent_mut::<super::Bob>()
-            .unwrap()
-            .handle_message(Message::new(
-                31,
-                GATE_NULL,
-                MODULE_NULL,
-                MODULE_NULL,
-                SimTime::ZERO,
-                String::from("Pang"),
-            ));
+        // self.parent_mut::<super::Bob>()
+        //     .unwrap()
+        //     .handle_message(Message::new(
+        //         31,
+        //         GATE_NULL,
+        //         MODULE_NULL,
+        //         MODULE_NULL,
+        //         SimTime::ZERO,
+        //         String::from("Pang"),
+        //     ));
     }
 }
 
@@ -47,15 +49,17 @@ pub struct Bob(ModuleCore);
 
 impl Module for Bob {
     fn handle_message(&mut self, msg: Message) {
-        if msg.id() == MessageId(0xff) {
+        if msg.root_id() == MessageId(0xff) {
             info!(target: "Bob", "Initalizing");
+            drop(msg);
+            info!(target: "Bob", "Dropped init msg");
             self.send(
                 Message::new(
                     1,
-                    GATE_NULL,
+                    GATE_SELF,
                     self.id(),
                     MODULE_NULL,
-                    SimTime::ZERO,
+                    SimTime::now(),
                     Packet::new(
                         (0x7f_00_00_01, 80),
                         (0x7f_00_00_02, 80),
@@ -66,10 +70,14 @@ impl Module for Bob {
             );
         } else {
             let mut pkt = msg.extract_content::<Packet>();
-            pkt.set_hop_count(pkt.hop_count() + 1);
-            info!(target: &self.name().unwrap(), "Received at {}: Message #{} content: {}", sim_time_fmt(), pkt.id(), unsafe { pkt.extract_content_ref::<String>() });
+            pkt.inc_hop_count();
+
+            info!(target: &self.name().unwrap(), "Received at {}: Message #{} content: {}", sim_time_fmt(), pkt.id(), pkt.extract_content_ref::<String>().deref());
+
+            pkt.extract_content_ref::<String>().push('#');
+
             self.send(
-                Message::new_boxed(1, self.id(), SimTime::ZERO, pkt),
+                Message::new_interned(1, self.id(), SimTime::ZERO, pkt),
                 ("netOut", 2),
             );
         }

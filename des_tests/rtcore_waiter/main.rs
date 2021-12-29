@@ -48,7 +48,7 @@ struct ServerDone {
 }
 
 impl Event<Application> for ServerDone {
-    fn handle(&mut self, rt: &mut Runtime<Application>) {
+    fn handle(self: Box<Self>, rt: &mut Runtime<Application>) {
         let busy_interval = rt.sim_time() - self.started;
         rt.app.busy_time += busy_interval;
 
@@ -78,7 +78,7 @@ struct CustomerArrival {
 }
 
 impl Event<Application> for CustomerArrival {
-    fn handle(&mut self, rt: &mut Runtime<Application>) {
+    fn handle(self: Box<Self>, rt: &mut Runtime<Application>) {
         if self.idx > rt.app.n {
             return;
         }

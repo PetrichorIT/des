@@ -9,16 +9,16 @@ use std::{
 /// of generic type A
 ///
 pub trait Event<A> {
-    fn handle(&mut self, rt: &mut Runtime<A>);
+    fn handle(self: Box<Self>, rt: &mut Runtime<A>);
 }
 
-pub(crate) struct EventNode<A> {
+pub(crate) struct EventNode<A: Sized> {
     time: SimTime,
     id: usize,
     event: Box<dyn Event<A>>,
 }
 
-impl<A> EventNode<A> {
+impl<A: Sized> EventNode<A> {
     ///
     /// Returns the id of the given event.
     ///
@@ -39,7 +39,7 @@ impl<A> EventNode<A> {
     /// Calls the embedded event handler.
     ///
     #[inline(always)]
-    pub fn handle(&mut self, rt: &mut Runtime<A>) {
+    pub fn handle(self, rt: &mut Runtime<A>) {
         self.event.handle(rt)
     }
 

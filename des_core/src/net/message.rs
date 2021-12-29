@@ -5,8 +5,7 @@ use std::{
 
 use des_macros::GlobalUID;
 
-use super::*;
-use crate::SimTime;
+use crate::*;
 
 #[derive(GlobalUID)]
 #[repr(transparent)]
@@ -22,7 +21,7 @@ pub struct Message {
     pub kind: MessageKind,
     pub timestamp: SimTime,
 
-    content: *mut (),
+    content: InternedValue<'static>,
     bit_len: usize,
     byte_len: usize,
 
@@ -127,11 +126,11 @@ impl Message {
         timestamp: SimTime,
         message_id: MessageId,
         message_tree_id: MessageId,
-        content: *mut (),
+        content: InternedValue<'static>,
         bit_len: usize,
         byte_len: usize,
     ) -> Self {
-        Self {
+        let obj = Self {
             kind,
             last_gate,
             sender_module_id,
@@ -144,7 +143,9 @@ impl Message {
             content,
             bit_len,
             byte_len,
-        }
+        };
+
+        obj
     }
 
     ///
@@ -157,17 +158,14 @@ impl Message {
     /// transmuted into a raw ptr. The allocated memory of T will only
     /// be dropped if the message is extracted.
     ///
-    pub fn new_boxed<T: MessageBody>(
+    pub fn new_interned<T: MessageBody>(
         kind: MessageKind,
         sender_module_id: ModuleId,
         timestamp: SimTime,
-        content: Box<T>,
+        content: TypedInternedValue<'static, T>,
     ) -> Self {
         let bit_len = content.bit_len();
         let byte_len = content.byte_len();
-
-        let ptr: *const T = Box::into_raw(content);
-        let ptr = ptr as *mut ();
 
         let id = MessageId::gen();
 
@@ -181,7 +179,7 @@ impl Message {
             timestamp,
             id,
             id,
-            ptr,
+            content.uncast(),
             bit_len,
             byte_len,
         )
@@ -197,7 +195,7 @@ impl Message {
     /// transmuted into a raw ptr. The allocated memory of T will only
     /// be dropped if the message is extracted.
     ///
-    pub fn new<T: MessageBody>(
+    pub fn new<T: 'static + MessageBody>(
         kind: MessageKind,
         last_gate: GateId,
         sender_module_id: ModuleId,
@@ -210,8 +208,7 @@ impl Message {
         let bit_len = content.bit_len();
         let byte_len = content.byte_len();
 
-        let boxed = Box::new(content);
-        let ptr = Box::into_raw(boxed) as *mut ();
+        let interned = unsafe { (*RTC.get()).as_ref().unwrap().interner.intern(content) };
 
         Self::new_raw(
             kind,
@@ -223,7 +220,7 @@ impl Message {
             timestamp,
             id,
             id,
-            ptr,
+            interned,
             bit_len,
             byte_len,
         )
@@ -240,12 +237,8 @@ impl Message {
     /// Note that DES guarntees that the data refernced by ptr will not
     /// be freed until this function is called, and ownership is thereby moved..
     ///
-    pub fn extract_content<T: MessageBody>(self) -> Box<T> {
-        let ptr = self.content as *mut T;
-        // SAFTY:
-        // Note that this function is incredbilly unsafe but nessecary
-        // due to the constrains of the user-defined content.
-        unsafe { Box::from_raw(ptr) }
+    pub fn extract_content<T: MessageBody>(self) -> TypedInternedValue<'static, T> {
+        self.content.cast()
     }
 }
 
@@ -261,7 +254,7 @@ impl Clone for Message {
             self.timestamp,
             MessageId::gen(),
             self.message_tree_id,
-            self.content,
+            self.content.clone(),
             self.bit_len,
             self.byte_len,
         )

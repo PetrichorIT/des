@@ -1,6 +1,8 @@
-use std::{any::TypeId, mem::size_of};
+use std::mem::size_of;
 
 use des_macros::GlobalUID;
+
+use crate::*;
 
 use super::MessageBody;
 
@@ -51,8 +53,8 @@ pub struct Packet {
     ttl: usize,
     hop_count: usize,
 
-    content: *mut (),
-    content_ty_id: TypeId,
+    content: InternedValue<'static>,
+
     content_bit_len: usize,
     content_byte_len: usize,
 }
@@ -98,6 +100,10 @@ impl Packet {
         self.hop_count = hop_count
     }
 
+    pub fn inc_hop_count(&mut self) {
+        self.hop_count += 1;
+    }
+
     /// The time to live of a message.
     pub fn ttl(&self) -> usize {
         self.ttl
@@ -129,8 +135,7 @@ impl Packet {
         let bit_len = content.bit_len();
         let byte_len = content.byte_len();
 
-        let boxed = Box::new(content);
-        let ptr = Box::into_raw(boxed) as *mut ();
+        let interned = unsafe { (*RTC.get()).as_ref().unwrap().interner.intern(content) };
 
         Self {
             id: PacketId::gen(),
@@ -144,8 +149,8 @@ impl Packet {
             ttl: 0,
             hop_count: 0,
 
-            content: ptr,
-            content_ty_id: TypeId::of::<T>(),
+            content: interned,
+
             content_bit_len: bit_len,
             content_byte_len: byte_len,
         }
@@ -162,31 +167,12 @@ impl Packet {
     /// Note that DES guarntees that the data refernced by ptr will not
     /// be freed until this function is called, and ownership is thereby moved..
     ///
-    pub fn extract_content<T: 'static + MessageBody>(self) -> Box<T> {
-        assert_eq!(
-            self.content_ty_id,
-            TypeId::of::<T>(),
-            "Extracted content must have the same type T the packet was build with."
-        );
-
-        let ptr = self.content as *mut T;
-        // SAFTY:
-        // Note that this function is incredbilly unsafe but nessecary
-        // due to the constrains of the user-defined content.
-
-        unsafe { Box::from_raw(ptr) }
+    pub fn extract_content<T: 'static + MessageBody>(self) -> TypedInternedValue<'static, T> {
+        self.content.cast()
     }
 
-    pub unsafe fn extract_content_ref<T: 'static + MessageBody>(&self) -> &T {
-        assert_eq!(
-            self.content_ty_id,
-            TypeId::of::<T>(),
-            "Extracted content must have the same type T the packet was build with."
-        );
-
-        let ptr = self.content as *const T;
-        let reference: &T = &*ptr;
-        reference
+    pub fn extract_content_ref<T: 'static + MessageBody>(&self) -> TypedInternedValue<'static, T> {
+        self.content.clone().cast()
     }
 }
 

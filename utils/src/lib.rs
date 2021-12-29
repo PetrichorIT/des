@@ -5,6 +5,7 @@ pub mod bench;
 /// since a corrolated DES simulation is inherintly single threaded.
 ///
 #[repr(transparent)]
+#[derive(Debug)]
 pub struct SyncCell<T: ?Sized> {
     cell: std::cell::UnsafeCell<T>,
 }
