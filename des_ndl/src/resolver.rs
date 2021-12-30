@@ -23,6 +23,8 @@ pub struct NdlResolver {
     pub options: NdlResolverOptions,
     /// The root directory of the NDL workspace.
     pub root_dir: PathBuf,
+    /// The raw scopes of the included files.
+    pub scopes: Vec<PathBuf>,
     /// A list of all loaded assets in the current workspace.
     pub source_map: SourceMap,
     /// A list of all lexed/parsed assets in the current workspace.
@@ -64,6 +66,7 @@ impl NdlResolver {
 
             source_map: SourceMap::new(),
             root_dir,
+            scopes: Vec::new(),
             units: HashMap::new(),
             desugared_units: HashMap::new(),
 
@@ -78,11 +81,11 @@ impl NdlResolver {
     /// TOOD codegen
     ///
     pub fn run(&mut self) -> Result<(), &'static str> {
-        let scopes = self.get_ndl_scopes();
+        self.scopes = self.get_ndl_scopes();
 
-        for scope in scopes {
+        for scope in &self.scopes {
             // === Namespacing ===
-            let descriptor = AssetDescriptor::from_path(scope, &self.root_dir);
+            let descriptor = AssetDescriptor::from_path(scope.clone(), &self.root_dir);
 
             // === Asset Loading ===
             let asset = match self.source_map.load(descriptor) {

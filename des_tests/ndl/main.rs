@@ -29,8 +29,7 @@ fn main() {
         },
     );
 
-    for id in vec![ bob1_id, bob2_id, bob3_id, bob4_id, bob5_id ] {
-    
+    for id in vec![bob1_id, bob2_id, bob3_id, bob4_id, bob5_id] {
         let msg = Message::new(
             0xff,
             GATE_NULL,
@@ -39,7 +38,7 @@ fn main() {
             SimTime::now(),
             String::from("Init"),
         );
-   
+
         let arr_time = id.0 as f64 / 1000.0;
 
         rt.add_event_in(
@@ -52,5 +51,10 @@ fn main() {
         );
     }
 
-    rt.run();
+    let (_, end_time) = rt.run().unwrap();
+
+    println!(
+        "Sim finished {}",
+        SimTimeUnit::fmt_compact(end_time, SimTimeUnit::Seconds)
+    );
 }

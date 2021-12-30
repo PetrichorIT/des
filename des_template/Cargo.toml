@@ -1,0 +1,14 @@
+[package]
+build = "build.rs"
+edition = "2021"
+name = "des_template"
+version = "0.1.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+des_core = {path = "../des_core"}
+des_macros = {path = "../des_macros"}
+
+[build-dependencies]
+des_ndl = {path = "../des_ndl"}

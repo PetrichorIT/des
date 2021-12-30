@@ -220,7 +220,6 @@ impl MappedAssetDescriptor {
             }
         }
 
-        println!("A {} {:?}", self.len_lines, self.line_pos_mapping);
         self.len_lines
     }
 }

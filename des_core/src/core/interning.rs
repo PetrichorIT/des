@@ -1,3 +1,4 @@
+use std::alloc::{dealloc, Layout};
 use std::any::{type_name, TypeId};
 use std::ops::{Deref, DerefMut};
 use utils::SyncCell;
@@ -28,11 +29,12 @@ impl Interner {
     }
 
     pub fn intern_boxed<T: 'static>(&self, boxed: Box<T>) -> InternedValue<'_> {
-        let ptr = Box::into_raw(boxed) as *mut ();
+        let ptr = Box::into_raw(boxed) as *mut u8;
 
         let descriptor = InteredValueDescriptor {
             ref_count: 1,
             ty_id: TypeId::of::<T>(),
+            layout: Layout::new::<T>(),
             ptr,
         };
 
@@ -129,8 +131,15 @@ impl Interner {
 
     fn drop_untyped_interned(&self, index: usize) {
         // println!("[Interner] >> Drop (untyped) #{}", index);
-
         let contents = unsafe { &mut *self.contents.get() };
+
+        unsafe {
+            dealloc(
+                contents[index].as_ref().unwrap().ptr,
+                contents[index].as_ref().unwrap().layout,
+            )
+        }
+
         contents[index] = None;
     }
 
@@ -180,7 +189,8 @@ impl Drop for Interner {
 struct InteredValueDescriptor {
     ref_count: usize,
     ty_id: TypeId,
-    ptr: *mut (),
+    layout: Layout,
+    ptr: *mut u8,
 }
 
 pub struct InternedValue<'a> {

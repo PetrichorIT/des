@@ -5,6 +5,9 @@
 //! rust structs to automate the module setup process.
 //!
 
+mod attributes;
+
+use attributes::*;
 use des_ndl::*;
 use lazy_static::lazy_static;
 use proc_macro::{self, TokenStream};
@@ -14,26 +17,23 @@ use quote::quote;
 use quote::ToTokens;
 use std::collections::HashMap;
 use std::sync::Mutex;
-use syn::{
-    parse_macro_input, Attribute, Data, DeriveInput, FieldsNamed, FieldsUnnamed, Lit, Meta,
-    MetaNameValue, Type,
-};
+use syn::{parse_macro_input, Data, DeriveInput, FieldsNamed, FieldsUnnamed, Type};
 
 lazy_static! {
     static ref RESOLVERS: Mutex<HashMap<String, NdlResolver>> = Mutex::new(HashMap::new());
 }
 
-fn get_resolver<'a>(workspace: String) -> Result<(OwnedTySpecContext, bool), &'static str> {
+fn get_resolver<'a>(workspace: &String) -> Result<(OwnedTySpecContext, bool), &'static str> {
     let mut resolvers = RESOLVERS.lock().unwrap();
 
-    if !resolvers.contains_key(&workspace) {
+    if !resolvers.contains_key(workspace) {
         resolvers.insert(
             workspace.clone(),
             NdlResolver::new(&workspace).expect("#[derive(Module)] Invalid NDL workspace."),
         );
     }
     resolvers
-        .get_mut(&workspace)
+        .get_mut(workspace)
         .unwrap()
         .run_cached()
         .map(|(gtyctx, has_err)| (gtyctx.to_owned(), has_err))
@@ -68,6 +68,8 @@ pub fn derive_module(input: TokenStream) -> TokenStream {
     let DeriveInput {
         ident, data, attrs, ..
     } = parse_macro_input!(input);
+
+    let attrs = Attributes::from_attr(attrs);
 
     let mut static_gen = gen_static_module_core(ident.clone(), data);
     let dynamic_gen = gen_dynamic_module_core(ident.clone(), attrs);
@@ -148,17 +150,24 @@ fn gen_static_module_core(ident: Ident, data: Data) -> TokenStream {
     }
 }
 
-fn gen_dynamic_module_core(ident: Ident, attrs: Vec<Attribute>) -> TokenStream {
-    if let Some(workspace) = parse_attr(attrs) {
+fn gen_dynamic_module_core(ident: Ident, attrs: Attributes) -> TokenStream {
+    if let Some(workspace) = &attrs.workspace {
         match get_resolver(workspace) {
             Ok((res, has_errors)) => {
                 if has_errors {
                     panic!("#[derive(Module)] NDL resolver found erros while parsing")
                 }
 
-                let module = res
-                    .module(ident.clone())
-                    .expect("#[derive(Module)] -- Failed to find NDL module with same name.");
+                let module = if let Some(ident) = attrs.ident {
+                    // TODO
+                    // Not yet possible since ndl_ident was not yet added to attributes
+                    // First implement mapping inside resolver.
+                    res.module(ident)
+                        .expect("#[derive(Module)] -- Failed to find NDL module with same name.")
+                } else {
+                    res.module(ident.clone())
+                        .expect("#[derive(Module)] -- Failed to find NDL module with same name.")
+                };
 
                 let mut token_stream = proc_macro2::TokenStream::new();
 
@@ -302,26 +311,6 @@ fn ident_from_conident(
     }
 }
 
-fn parse_attr(attrs: Vec<Attribute>) -> Option<String> {
-    for attr in attrs {
-        match attr.parse_meta().unwrap() {
-            Meta::NameValue(MetaNameValue {
-                ref path, ref lit, ..
-            }) => {
-                if path.segments.last().unwrap().ident == "ndl_workspace" {
-                    match lit {
-                        Lit::Str(str) => return Some(str.value()),
-                        _ => return None,
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-
-    None
-}
-
 //
 //
 //
@@ -381,18 +370,32 @@ fn parse_attr(attrs: Vec<Attribute>) -> Option<String> {
 pub fn derive_network(input: TokenStream) -> TokenStream {
     let DeriveInput { ident, attrs, .. } = parse_macro_input!(input);
 
-    let attr = parse_attr(attrs).expect("#[derive(Network)] Missing NDL worspace");
+    let attrs = Attributes::from_attr(attrs);
 
-    gen_network_main(ident, attr)
+    gen_network_main(ident, attrs)
 }
 
-fn gen_network_main(ident: Ident, workspace: String) -> TokenStream {
-    match get_resolver(workspace) {
+fn gen_network_main(ident: Ident, attrs: Attributes) -> TokenStream {
+    match get_resolver(
+        &attrs
+            .workspace
+            .expect("#[derive(Network)] Missing NDL worspace"),
+    ) {
         Ok((res, has_errors)) => {
             if has_errors {
                 panic!("#[derive(Network)] NDL resolver found erros while parsing")
             }
-            if let Some(network) = res.network(ident.clone()) {
+
+            let network = if let Some(ident) = attrs.ident {
+                // TODO
+                // Not yet possible since ndl_ident was not yet added to attributes
+                // First implement mapping inside resolver.
+                res.network(ident)
+            } else {
+                res.network(ident.clone())
+            };
+
+            if let Some(network) = network {
                 let mut token_stream = proc_macro2::TokenStream::new();
 
                 // Config nodes.

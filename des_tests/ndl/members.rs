@@ -14,7 +14,7 @@ impl Module for Alice {
         let mut pkt = msg.extract_content::<Packet>();
         info!(target: &self.name().unwrap(), "Received at {}: Message #{} content: {}", sim_time_fmt(), pkt.id(), pkt.extract_content_ref::<String>().deref());
 
-        if pkt.hop_count() > 100_000  {
+        if pkt.hop_count() > 100_000 {
             // TERMINATE
         } else {
             pkt.inc_hop_count();

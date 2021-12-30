@@ -377,7 +377,7 @@ impl SimTimeUnit {
                     // This bound prevents floating point errors from
                     // poisioing output.
                     if sim_time > 0.01.into() {
-                        str.write_fmt(format_args!("?{}{} ", sim_time, unit))
+                        str.write_fmt(format_args!("{}{} ", sim_time, unit))
                             .expect("Failed core fmt");
                     }
                     break;
