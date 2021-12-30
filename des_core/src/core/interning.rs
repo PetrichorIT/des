@@ -1,4 +1,4 @@
-use std::any::TypeId;
+use std::any::{type_name, TypeId};
 use std::ops::{Deref, DerefMut};
 use utils::SyncCell;
 
@@ -197,7 +197,8 @@ impl<'a> InternedValue<'a> {
         assert_eq!(
             entry.ty_id,
             TypeId::of::<T>(),
-            "Cannot cast value to invalid type T"
+            "Cannot cast value to invalid type '{}'",
+            type_name::<T>()
         );
 
         // # Safty

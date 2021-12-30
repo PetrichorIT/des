@@ -9,7 +9,7 @@ use crate::{
 /// A runtime-unqiue identifier for a module / submodule inheritence tree.
 #[derive(GlobalUID)]
 #[repr(transparent)]
-pub struct ModuleId(u16);
+pub struct ModuleId(pub u16);
 
 /// A indication that the referenced module does not exist.
 pub const MODULE_NULL: ModuleId = ModuleId(0);

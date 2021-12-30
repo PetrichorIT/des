@@ -14,7 +14,7 @@ impl Module for Alice {
         let mut pkt = msg.extract_content::<Packet>();
         info!(target: &self.name().unwrap(), "Received at {}: Message #{} content: {}", sim_time_fmt(), pkt.id(), pkt.extract_content_ref::<String>().deref());
 
-        if pkt.hop_count() > 10 {
+        if pkt.hop_count() > 100_000  {
             // TERMINATE
         } else {
             pkt.inc_hop_count();
@@ -49,7 +49,7 @@ pub struct Bob(ModuleCore);
 
 impl Module for Bob {
     fn handle_message(&mut self, msg: Message) {
-        if msg.root_id() == MessageId(0xff) {
+        if msg.kind == 0xff {
             info!(target: "Bob", "Initalizing");
             drop(msg);
             info!(target: "Bob", "Dropped init msg");

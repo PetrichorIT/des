@@ -14,7 +14,11 @@ struct A();
 fn main() {
     let app: NetworkRuntime<A> = A().build_rt();
 
-    let bob_id = app.module(|m| m.name().unwrap() == "bob1").unwrap().id();
+    let bob1_id = app.module(|m| m.name().unwrap() == "bob1").unwrap().id();
+    let bob2_id = app.module(|m| m.name().unwrap() == "bob2").unwrap().id();
+    let bob3_id = app.module(|m| m.name().unwrap() == "bob3").unwrap().id();
+    let bob4_id = app.module(|m| m.name().unwrap() == "bob4").unwrap().id();
+    let bob5_id = app.module(|m| m.name().unwrap() == "bob5").unwrap().id();
 
     let mut rt = Runtime::new_with(
         app,
@@ -25,23 +29,28 @@ fn main() {
         },
     );
 
-    let msg = Message::new(
-        0xff,
-        GATE_NULL,
-        MODULE_NULL,
-        MODULE_NULL,
-        SimTime::now(),
-        String::from("Init"),
-    );
+    for id in vec![ bob1_id, bob2_id, bob3_id, bob4_id, bob5_id ] {
+    
+        let msg = Message::new(
+            0xff,
+            GATE_NULL,
+            MODULE_NULL,
+            MODULE_NULL,
+            SimTime::now(),
+            String::from("Init"),
+        );
+   
+        let arr_time = id.0 as f64 / 1000.0;
 
-    rt.add_event_in(
-        HandleMessageEvent {
-            module_id: bob_id,
-            handled: false,
-            message: ManuallyDrop::new(msg),
-        },
-        0.0.into(),
-    );
+        rt.add_event_in(
+            HandleMessageEvent {
+                module_id: id,
+                handled: false,
+                message: ManuallyDrop::new(msg),
+            },
+            arr_time.into(),
+        );
+    }
 
     rt.run();
 }
