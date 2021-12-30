@@ -56,13 +56,19 @@ pub fn desugar(unit: &ParsingResult, resolver: &NdlResolver) -> DesugaredParsing
 
         // Resolve ChildModuleDef to ChildModuleSpec
         for child in &module.submodules {
+            // Issue (001)
+            // Added type checking in desugar to prevent redundand checks
+            // on expanded macro types.
+            validate_module_ty(child, &tyctx, &gtyctx, &resolver.source_map, &mut errors);
+
             let ChildeModuleDef { loc, ty, desc } = child;
+
             if let Some((from_id, to_id)) = desc.cluster_bounds {
                 // Desugar macro
                 for id in from_id..=to_id {
                     module_spec.submodules.push(ChildModuleSpec {
                         loc: *loc,
-                        descriptor: format!("{}{}", desc.descriptor.clone(), id),
+                        descriptor: format!("{}{}", desc.descriptor, id),
                         ty: ty.clone(),
                     })
                 }
@@ -174,15 +180,43 @@ pub fn desugar(unit: &ParsingResult, resolver: &NdlResolver) -> DesugaredParsing
     for network in &unit.networks {
         let mut network_spec = NetworkSpec::new(network);
 
+        // Issue (001)
+        // Defines that tycheck should be done on unexpanded macros
+
+        let occupied_namespaces = Vec::<&LocalDescriptorDef>::new();
+        for ChildeModuleDef { desc, .. } in &network.nodes {
+            // check collisions.
+            if let Some(col) = occupied_namespaces
+                .iter()
+                .find(|n| n.descriptor == desc.descriptor && n.cluster_bounds_overlap(desc))
+            {
+                // naming collision.
+                errors.push(Error::new(
+                    TycModuleSubmoduleFieldAlreadyDeclared,
+                    format!(
+                        "Naming collision. Namespaces of '{}' and '{}' collide.",
+                        col, desc
+                    ),
+                    desc.loc,
+                    false,
+                ));
+            }
+        }
+
         // Resolve ChildModuleDef to ChildModuleSpec
         for child in &network.nodes {
+            // Issue (001)
+            // Added type checking in desugar to prevent redundand checks
+            // on expanded macro types.
+            validate_module_ty(child, &tyctx, &gtyctx, &resolver.source_map, &mut errors);
+
             let ChildeModuleDef { loc, ty, desc } = child;
             if let Some((from_id, to_id)) = desc.cluster_bounds {
                 // Desugar macro
                 for id in from_id..=to_id {
                     network_spec.nodes.push(ChildModuleSpec {
                         loc: *loc,
-                        descriptor: format!("{}{}", desc.descriptor.clone(), id),
+                        descriptor: format!("{}{}", desc.descriptor, id),
                         ty: ty.clone(),
                     })
                 }

@@ -17,6 +17,10 @@ name = "par_stage"
 harness = false
 name = "tyc_stage"
 
+[[bench]]
+harness = false
+name = "flamegraph"
+
 [dependencies]
 log = "0.4.14"
 termcolor = "1.1.2"

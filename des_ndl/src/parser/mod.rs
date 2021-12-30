@@ -488,16 +488,15 @@ impl<'a> Parser<'a> {
 
                     self.eat_whitespace();
 
-                    let mut desc = LocalDescriptorDef { 
-                        descriptor: ident, 
-                        cluster_bounds: None
-                    };
+                    let mut desc = LocalDescriptorDef::new_non_cluster(ident, first_token_loc);
 
                     let (token, _raw) = self.next_token()?;
                     if token.kind != TokenKind::Colon {
-
                         // cluster def.
                         if token.kind == TokenKind::OpenBracket {
+
+                            assert!(desc.cluster_bounds.is_none(),"Doesn not support nested implicite macros");
+
                             let from_int = match self.parse_literal_usize(ectx)? {
                                 Some(value) => value,
                                 None => {
@@ -546,6 +545,8 @@ impl<'a> Parser<'a> {
                                 )?;
                                 return Ok(false);
                             }
+
+                            desc.loc = Loc::fromto(first_token_loc, token.loc);
                         } else {
                             ectx.record(
                                 ParModuleSubInvalidSeperator,
@@ -554,7 +555,10 @@ impl<'a> Parser<'a> {
                             )?;
                             return Ok(false);
                         }
+                    } else {
+                        desc.loc = Loc::fromto(first_token_loc, token.loc);
                     }
+                    
 
                     if escape_keywords.contains(&&desc.descriptor[..]) {
                         // new subsection ident
@@ -1370,8 +1374,59 @@ pub struct ChildeModuleDef {
 /// 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LocalDescriptorDef {
+    pub loc: Loc,
+
+    // ensure that descriptor is NOT terminated with any numeric.
     pub descriptor: String,
     pub cluster_bounds: Option<(usize, usize)>
+}
+
+impl LocalDescriptorDef {
+
+    pub fn new_non_cluster(descriptor: String, loc: Loc,) -> Self {
+        // note that idents are ascii so byte indexing should work.
+        let mut idx = descriptor.len();
+        for c in descriptor.chars().rev() {
+            if !c.is_ascii_digit() {
+                break;
+            }
+            idx -= 1;
+        }
+
+        if idx == descriptor.len() {
+            Self {
+                loc,
+                descriptor,
+                cluster_bounds: None
+            }
+        } else {
+            let implicite_bounds: usize = descriptor[idx..].parse().unwrap();
+            Self {
+                loc,
+                descriptor: String::from(&descriptor[..idx]),
+                cluster_bounds: Some((implicite_bounds, implicite_bounds)),
+            }
+        }
+    }
+
+    pub fn cluster_bounds_overlap(&self, other: &Self) -> bool {
+        if let Some(self_bounds) = &self.cluster_bounds {
+            if let Some(other_bounds) = &other.cluster_bounds {
+                // Three cases:
+                // - overlap
+                // - no overlap
+                //  -> self << other
+                //  -> other << self
+
+                let self_lt_other = self_bounds.1 < other_bounds.0;
+                let other_lt_self = other_bounds.1 < self_bounds.0;
+
+                return !self_lt_other && !other_lt_self;
+            }
+        }
+
+        false
+    }
 }
 
 impl Display for LocalDescriptorDef {

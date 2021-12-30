@@ -33,8 +33,13 @@ impl Loc {
             len,
         }
     }
-
-    pub fn after(self) -> Loc {
-        Loc::new(self.pos + self.len, 0, self.line)
+    
+    ///
+    /// Returns a Loc that point directly after the current loc at a zero-width
+    /// token.
+    ///
+    #[must_use]
+    pub fn after(self) -> Self {
+        Self::new(self.pos + self.len, 0, self.line)
     }
 }

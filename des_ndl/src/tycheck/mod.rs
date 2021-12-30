@@ -2,6 +2,7 @@ use crate::*;
 
 use crate::desugar::DesugaredParsingResult;
 use crate::error::*;
+use crate::parser::ChildeModuleDef;
 
 mod tests;
 mod tyctx;
@@ -13,32 +14,49 @@ const PAR_TYPES: [&str; 15] = [
     "char", "String",
 ];
 
+pub fn validate_module_ty(def: &ChildeModuleDef, tyctx: &TyDefContext<'_>, gtyctx: &GlobalTyDefContext, smap: &SourceMap, errors: &mut Vec<Error>) {
+    if !tyctx.modules.iter().any(|m| m.name == def.ty) {
+        // Ty missing 
+        let global_ty = gtyctx.module(&def.ty).map(|m| m.loc);
+        errors.push(Error::new_ty_missing(
+            TycNetworkSubmoduleInvalidTy,
+            format!(
+                "No module with name '{}' exists in the scope.",
+                def.ty, 
+            ),
+            def.loc,
+            smap,
+            global_ty,
+        ));
+    }
+}
+
 ///
 /// Validates the given an internal DesugaredParsingResult 'unit' using the resovler
 /// as parameters.
 /// Returns all sematic errors that were encountered.
 ///
-#[allow(unused)]
 pub fn validate(
     unit: &DesugaredParsingResult,
     resolver: &NdlResolver,
 ) -> Vec<Error> {
+
     let mut tyctx = TySpecContext::new();
     let mut errors = Vec::new();
 
-    let global_tyctx = resolver.gtyctx_spec();
-
-    let asset = resolver.source_map.get_asset(&unit.asset.alias).unwrap();
-
     resolve_includes(resolver, unit, &mut tyctx, &mut errors);
 
-    match tyctx.check_name_collision() {
+    let name_collision = tyctx.check_name_collision();
+
+
+    match name_collision {
         Ok(()) => {
             //
             // === Module check ===
             //
+            //            
 
-            let mut module_names = Vec::new();
+            let mut module_names = Vec::with_capacity(unit.modules.len());
 
             for module in &unit.modules {
                 let self_ty = &module.ident;
@@ -55,23 +73,11 @@ pub fn validate(
                     module_names.push(self_ty)
                 }
 
-                // Check submodule namespaces and types
-                let mut descriptors = Vec::new();
+                //
+                // === Submodule check
+                // 
 
                 for submodule in &module.submodules {
-                    if descriptors.contains(&&submodule.descriptor) {
-                        errors.push(Error::new(
-                            TycModuleSubmoduleFieldAlreadyDeclared,
-                            format!("Field '{}' was already declared.", submodule),
-                            submodule.loc,
-                            false,
-                        
-                        ));
-                    }
-                    descriptors.push(&submodule.descriptor);
-
-                    let ty_valid = tyctx.modules.iter().any(|&m| m.ident == *submodule.ty);
-
                     if submodule.ty == *self_ty {
                         errors.push(Error::new(
                             TycModuleSubmoduleRecrusiveTyDefinition,
@@ -80,27 +86,14 @@ pub fn validate(
                             false,
                       
                         ))
-                    } else if !ty_valid {
-                        let gty = global_tyctx.module(&submodule.ty[..]);
-
-                        errors.push(Error::new_ty_missing(
-                            TycModuleSubmoduleInvalidTy,
-                            format!(
-                                "No module with name '{}' exists in the scope of module '{}'.",
-                                submodule.ty, module.ident
-                            ),
-                            submodule.loc,
-                            asset.source_map(),
-                            gty.map(|ty| ty.loc),
-                        ));
-                    }
+                    } 
                 }
 
                 //
                 // === Gate check ===
                 //
 
-                let mut self_gates = Vec::new();
+                let mut self_gates = Vec::with_capacity(module.gates.len());
                 for gate in &module.gates {
                     if gate.size == 0 {
                         errors.push(Error::new(
@@ -126,111 +119,10 @@ pub fn validate(
                 }
 
                 //
-                // === Connection check ===
-                //
-
-                // for connection in &module.connections {
-                //     // check peers
-                //     let peers = [&connection.from, &connection.to].map(|peer| {
-                //         match peer {
-                //             ConNodeIdent::Child { loc, child, ident} => {
-                //                 // Referencing subvalue
-                //                 let peer_ident_valid = descriptors.contains(&&child);
-                //                 if !peer_ident_valid {
-                //                     errors.push(Error::new(
-                //                         TycModuleConUnknownIdentSymbol,
-                //                         format!(
-                //                             "No submodule '{}' exists on module '{}'",
-                //                             child, module.name
-                //                         ),
-                //                         *loc,
-                //                         false,
-                //                     ));
-
-                //                     return None;
-                //                 }
-
-                //                 let submod = module
-                //                     .submodules
-                //                     .iter()
-                //                     .find(|&m| m.desc.descriptor == *child)
-                //                     .unwrap();
-
-                //                 let mod_def = tyctx.modules.iter().find(|m| m.name == submod.ty);
-
-                //                 // if referenced submodule has invalid ty
-                //                 // this error was already handled
-                //                 mod_def?;
-
-                //                 let mod_def = mod_def.unwrap();
-
-                //                 let peer_subident_valid =
-                //                     mod_def.gates.iter().find(|g| g.name == *ident);
-
-                //                 if peer_subident_valid.is_none() {
-                //                     errors.push(Error::new(
-                //                         TycModuleConUnknownIdentSymbol,
-                //                         format!(
-                //                             "No gate '{}' exists on submodule '{}' of type '{}'",
-                //                             ident, child, mod_def.name
-                //                         ),
-                //                         *loc,
-                //                         false,
-                                    
-                //                     ));
-
-                //                     return None;
-                //                 }
-
-                //                 peer_subident_valid
-                //             },
-                //             ConNodeIdent::Local { loc, ident} => {
-                //                 // referencing direct value
-                //                 let peer_valid = module.gates.iter().find(|g| g.name == *ident);
-                //                 if peer_valid.is_none() {
-                //                     errors.push(Error::new(
-                //                         TycModuleConUnknownIdentSymbol,
-                //                         format!(
-                //                             "No gate '{}' exists on module '{}'",
-                //                             ident, module.name
-                //                         ),
-                //                         *loc,
-                //                         false,
-                                    
-                //                     ));
-
-                //                     return None;
-                //                 }
-
-                //                 peer_valid
-                //             }
-                //         }
-                //     });
-
-                //     if let Some(from) = peers[0] {
-                //         if let Some(to) = peers[1] {
-                //             if from.size != to.size {
-                //                 // This could only be a warning once handeling procedures
-                //                 // are implemented
-
-                //                 errors.push(
-                //                     Error::new(
-                //                     TycModuleConNonMatchingGateSizes,
-                //                     format!("Gates '{}' and '{}' cannot be connected since they have different sizes.", from, to),
-                //                     connection.loc,
-                //                     false,
-                         
-                //                 ))
-                //             }
-                //         }
-                //     }
-                // }
-
-                //
                 // === Par check ===
                 //
 
-                let mut par_names = Vec::new();
+                let mut par_names = Vec::with_capacity(module.params.len());
 
                 for par in &module.params {
                     // Check ty
@@ -264,7 +156,8 @@ pub fn validate(
             // === Network check ===
             //
 
-            let mut network_names = Vec::new();
+
+            let mut network_names = Vec::with_capacity(unit.networks.len());
 
             for network in &unit.networks {
                 let self_ty = &network.ident;
@@ -290,141 +183,11 @@ pub fn validate(
                     ))
                 }
 
-                // Check submodule namespaces and types
-                let mut descriptors = Vec::new();
+                // //
+                // // === Par check ===
+                // //
 
-                for node in &network.nodes {
-                    if descriptors.contains(&&node.descriptor) {
-                        errors.push(Error::new(
-                            TycnetworkSubmoduleFieldAlreadyDeclared,
-                            format!("Field '{}' was already declared.", node.descriptor),
-                            node.loc,
-                            false,
-                        
-                        ));
-                    }
-                    descriptors.push(&node.descriptor);
-
-                    let ty_valid = tyctx.modules.iter().any(|&m| m.ident == *node.ty);
-
-                    // Cyclic definition is not possible since submoudles are modules while
-                    // networks are top-level only definitions.
-
-                    if !ty_valid {
-                        let gty = global_tyctx.module(&node.ty[..]);
-
-                        errors.push(Error::new_ty_missing(
-                            TycNetworkSubmoduleInvalidTy,
-                            format!(
-                                "No module with name '{}' exists in the scope of network '{}'.",
-                                node.ty, network.ident
-                            ),
-                            node.loc,
-                            asset.source_map(),
-                            gty.map(|ty| ty.loc),
-                        ));
-                    }
-                }
-
-                //
-                // === Connection check ===
-                //
-
-                // for connection in &network.connections {
-
-                //     // check peers
-                //     let peers = [&connection.from, &connection.to].map(|peer| {
-                //         match peer {
-                //             ConNodeIdent::Child { loc, child, ident} => {
-                //                 // Referencing subvalue
-                //                 let peer_ident_valid = descriptors.contains(&&child);
-                //                 if !peer_ident_valid {
-                //                     errors.push(Error::new(
-                //                         TycModuleConUnknownIdentSymbol,
-                //                         format!(
-                //                             "No submodule '{}' exists on module '{}'",
-                //                             child, network.name
-                //                         ),
-                //                         *loc,
-                //                         false,
-                //                     ));
-
-                //                     return None;
-                //                 }
-
-                //                 let submod = network
-                //                     .nodes
-                //                     .iter()
-                //                     .find(|&m| m.desc.descriptor == *child)
-                //                     .unwrap();
-
-                //                 let mod_def = tyctx.modules.iter().find(|m| m.name == submod.ty);
-
-                //                 // if referenced submodule has invalid ty
-                //                 // this error was already handled
-                //                 mod_def?;
-
-                //                 let mod_def = mod_def.unwrap();
-
-                //                 let peer_subident_valid =
-                //                     mod_def.gates.iter().find(|g| g.name == *ident);
-
-                //                 if peer_subident_valid.is_none() {
-                //                     errors.push(Error::new(
-                //                         TycNetworkConUnknownIdentSymbol,
-                //                         format!(
-                //                             "No gate '{}' exists on submodule '{}' of type '{}'",
-                //                             ident, child, mod_def.name
-                //                         ),
-                //                         *loc,
-                //                         false,
-                                    
-                //                     ));
-
-                //                     return None;
-                //                 }
-
-                //                 peer_subident_valid
-                //             },
-                //             ConNodeIdent::Local { loc, ident} => {
-                //                // Cannot reference local gates since no local gates
-                //                // exist for network.
-                //                 errors.push(Error::new(
-                //                     TycNetworkConIllegalLocalNodeIdent,
-                //                     format!("Cannot refernce local gate '{}' if no local gates exist on network.", ident),
-                //                     *loc,
-                //                     false
-                //                 ));
-
-                //                None
-                //             }
-                //         }
-                //     });
-
-                //     if let Some(from) = peers[0] {
-                //         if let Some(to) = peers[1] {
-                //             if from.size != to.size {
-                //                 // This could only be a warning once handeling procedures
-                //                 // are implemented
-
-                //                 errors.push(
-                //                     Error::new(
-                //                         TycNetworkConNonMatchingGateSizes,
-                //                     format!("Gates '{}' and '{}' cannot be connected since they have different sizes.", from, to),
-                //                     connection.loc,
-                //                     false,
-                         
-                //                 ))
-                //             }
-                //         }
-                //     }
-                // }
-
-                //
-                // === Par check ===
-                //
-
-                let mut par_names = Vec::new();
+                let mut par_names = Vec::with_capacity(network.params.len());
 
                 for par in &network.params {
                     // Check ty
@@ -466,7 +229,7 @@ pub fn validate(
     errors
 }
 
-fn resolve_includes<'a>(
+pub fn resolve_includes<'a>(
     resolver: &'a NdlResolver,
     unit: &'a DesugaredParsingResult,
     tyctx: &mut TySpecContext<'a>,
