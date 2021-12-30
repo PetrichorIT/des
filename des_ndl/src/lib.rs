@@ -110,7 +110,8 @@ mod tests {
             .expect("Failed to create test resolver from examples directory");
 
         let _ = resolver.run();
-        println!("{}", resolver.units.get("Main").unwrap());
+        println!("{}", resolver.units.get("NetworkNode").unwrap());
+
         panic!("WOLOLO");
     }
 }

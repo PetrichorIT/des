@@ -635,19 +635,62 @@ impl<'a> Parser<'a> {
                         })
                     }
                 },
-                ConNodeIdent::Local { ident, .. } => {
+                ConNodeIdent::Local { ident, loc } => {
                     // This tokem could be either a channel identifer or
                     // node ident.
 
                     self.eat_whitespace();
 
+                    // # Issue
+                    // requesting 3 tokens from the token stream
+                    // may not be possible since the token stream may end in < 3 tokens.
+                    // The issue is that this may can occur on valid token stream
+                    // 
+                    // # Exampele
+                    // <ident> --> <iden>}
+                    // 
+                    // t1 will be the first token after the last ident 
+                    // -> so allways safe to call
+                    // t2 and t3 could be None
+
                     // check for second arrow
                     let (t1, _raw) = self.next_token()?;
     
-                    if t1.kind == TokenKind::Ident {
-                        self.tokens.bump_back(1);
-                        continue;
+                    // Next line, expecting next conident or subident or closing delim
+                    if matches!(t1.kind, TokenKind::Ident | TokenKind::CloseBrace) {
+                        // Record valid result
+                        if to_right {
+                            connections.push(ConDef {
+                                loc: Loc::fromto(front_ident.loc(), t3_loc),
+        
+                                from: front_ident,
+                                to: ConNodeIdent::Local { ident, loc },
+                                channel: None,
+                            })
+                        } else {
+                            connections.push(ConDef {
+                                loc: Loc::fromto(front_ident.loc(), t3_loc),
+        
+                                from: ConNodeIdent::Local { ident, loc },
+                                to: front_ident,
+                                channel: None,
+                            })
+                        }
+                        ectx.reset_transient();
+
+
+                        
+                        if t1.kind == TokenKind::Ident {
+                            // Prepare for subident or new con
+                            self.tokens.bump_back(1);
+                            continue;
+                        } else {
+                            // terminate module / network parsing
+                            return Ok(true)
+                        }
                     }
+
+
                     
                     let (t2, _raw) = self.next_token()?;
                     let (t3, _raw) = self.next_token()?;
