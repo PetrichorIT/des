@@ -120,9 +120,15 @@ impl<'a> Parser<'a> {
         self.result
     }
 
+    fn eat_optionally(&self, predicate: impl FnOnce(&Token) -> bool) {
+        if self.tokens.peek().is_ok() && predicate(self.tokens.peek().unwrap()) {
+            let _ = self.tokens.bump();
+        }
+    }
+    
     fn eat_while(&self, mut predicate: impl FnMut(&Token) -> bool) {
         while self.tokens.peek().is_ok() && predicate(self.tokens.peek().unwrap()) {
-           self.tokens.bump().expect("unreachable");
+           let _ = self.tokens.bump();
         }
     }
 
@@ -326,6 +332,8 @@ impl<'a> Parser<'a> {
                             return Ok(false);
                         }
 
+                        self.eat_whitespace();
+                        self.eat_optionally(|t| t.kind == TokenKind::Comma);
                         parameters.push(ParamDef { loc: Loc::fromto(first_token.loc, second_token.loc), ty, ident });
                     }
                 },
@@ -368,6 +376,14 @@ impl<'a> Parser<'a> {
             if token.kind != TokenKind::OpenBracket {
                 // Single size gate
                 if token.kind == TokenKind::Whitespace {
+                    // Consume whitespace and comma optionally
+                    self.eat_whitespace();
+                    self.eat_optionally(|t| t.kind == TokenKind::Comma);
+
+                    // Push gate
+                    gates.push(GateDef { loc: Loc::fromto(name_token.loc, token.loc), name, size: 1 })
+                } else if token.kind == TokenKind::Comma {
+                    // Push gate
                     gates.push(GateDef { loc: Loc::fromto(name_token.loc, token.loc), name, size: 1 })
                 } else if token.kind == TokenKind::Colon {
                     // New identifer
@@ -397,14 +413,22 @@ impl<'a> Parser<'a> {
                                     self.eat_whitespace();
                                     let (token, _raw) = self.next_token()?;
                                     if token.kind != TokenKind::CloseBracket {
-                                        ectx.record(
+                                        // The found token wasn't expected
+                                        // could be relevant for next pass.
+                                        self.tokens.bump_back(1);
+                                        ectx.record_missing_token(
                                             ParModuleGateMissingClosingBracket,
                                             String::from("Unexpected token. Expected closing bracket."),
-                                            token.loc,
+                                            self.tokens.prev_non_whitespace(0).unwrap(),
+                                            "]"
                                         )?;
+
                                         
                                         continue 'mloop;
                                     }
+
+                                    self.eat_whitespace();
+                                    self.eat_optionally(|t| t.kind == TokenKind::Comma);
 
                                     gates.push(GateDef { loc: Loc::fromto(name_token.loc, token.loc), name, size: value }); 
                                 },
@@ -552,6 +576,9 @@ impl<'a> Parser<'a> {
                             return Ok(false);
                         }
 
+                        self.eat_whitespace();
+                        self.eat_optionally(|t| t.kind == TokenKind::Comma);
+
                         child_modules.push(ChildeModuleDef { loc: Loc::fromto(first_token_loc, second_token.loc), ty, desc });
                     }
                 },
@@ -617,6 +644,9 @@ impl<'a> Parser<'a> {
                     // Since potential channel ident contains slash 
                     // this MUST be the right node identifer.
 
+                    self.eat_whitespace();
+                    self.eat_optionally(|t| t.kind == TokenKind::Comma);
+
                     if to_right {
                         connections.push(ConDef {
                             loc: Loc::fromto(front_ident.loc(), t3_loc),
@@ -657,7 +687,7 @@ impl<'a> Parser<'a> {
                     let (t1, _raw) = self.next_token()?;
     
                     // Next line, expecting next conident or subident or closing delim
-                    if matches!(t1.kind, TokenKind::Ident | TokenKind::CloseBrace) {
+                    if matches!(t1.kind, TokenKind::Ident | TokenKind::CloseBrace | TokenKind::Comma) {
                         // Record valid result
                         if to_right {
                             connections.push(ConDef {
@@ -677,21 +707,25 @@ impl<'a> Parser<'a> {
                             })
                         }
                         ectx.reset_transient();
-
-
                         
-                        if t1.kind == TokenKind::Ident {
-                            // Prepare for subident or new con
-                            self.tokens.bump_back(1);
-                            continue;
-                        } else {
-                            // terminate module / network parsing
-                            return Ok(true)
+                        match t1.kind {
+                            TokenKind::Ident => {
+                                // Prepare for subident or new con
+                                self.tokens.bump_back(1);
+                                continue;
+                            },
+                            TokenKind::Comma => {
+                                // Prepare for subident or new con
+                                continue;
+                            },
+                            TokenKind::CloseBrace => {
+                                // terminate module / network parsing
+                                return Ok(true);
+                            },
+                            _ => unsafe { std::hint::unreachable_unchecked() }
                         }
                     }
 
-
-                    
                     let (t2, _raw) = self.next_token()?;
                     let (t3, _raw) = self.next_token()?;
     
@@ -718,6 +752,9 @@ impl<'a> Parser<'a> {
                             ConIdentiferResult::NewSubsection => return Ok(false),
                             ConIdentiferResult::Done => return Ok(true),
                         };
+
+                        self.eat_whitespace();
+                        self.eat_optionally(|t| t.kind == TokenKind::Comma);
     
                         if to_right {
                             connections.push(ConDef {
@@ -988,6 +1025,9 @@ impl<'a> Parser<'a> {
             match token.kind {
                 TokenKind::Literal { kind, .. } => match &identifier[..] {
                     "bitrate" => {
+                        self.eat_whitespace();
+                        self.eat_optionally(|t| t.kind == TokenKind::Comma);
+
                         if let LiteralKind::Int { base, .. } = kind {
                             match usize::from_str_radix(raw, base.radix()) {
                                 Ok(value) => bitrate = Some(value),
@@ -1012,6 +1052,8 @@ impl<'a> Parser<'a> {
 
                     "latency" => {
                         use std::str::FromStr;
+                        self.eat_whitespace();
+                        self.eat_optionally(|t| t.kind == TokenKind::Comma);
 
                         if let LiteralKind::Float { .. } = kind {
                             match f64::from_str(raw) {
@@ -1036,6 +1078,8 @@ impl<'a> Parser<'a> {
                     }
                     "jitter" => {
                         use std::str::FromStr;
+                        self.eat_whitespace();
+                        self.eat_optionally(|t| t.kind == TokenKind::Comma);
 
                         if let LiteralKind::Float { .. } = kind {
                             match f64::from_str(raw) {
@@ -1061,7 +1105,7 @@ impl<'a> Parser<'a> {
                     _ => {
                         ectx.record(
                             ParLinkInvalidKey, 
-                            format!("Invlaid key '{}' in kv-pair. Valid keys are latency, bitrate or jitter.", identifier), 
+                            format!("Invalid key '{}' in kv-pair. Valid keys are latency, bitrate or jitter.", identifier), 
                             key_token.loc,
                         )?;
                         return Ok(());

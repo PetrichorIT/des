@@ -52,6 +52,19 @@ impl TokenStream {
         }
     }
 
+    pub fn prev_non_whitespace(&self, skip: usize) -> NdlResult<&Token> {
+        let head = unsafe { *self.head.get() };
+        let mut i = head - skip;
+        while i > 0 {
+            i -= 1;
+            if self.inner[i].kind != TokenKind::Whitespace {
+                return Ok(&self.inner[i]);
+            }
+        }
+
+        Err("Could not find valid prev token")
+    }
+
     pub fn bump(&self) -> NdlResult<&Token> {
         unsafe {
             if *self.head.get() < self.inner.len() {

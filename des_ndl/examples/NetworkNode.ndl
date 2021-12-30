@@ -2,26 +2,30 @@ include NetworkStack
 include std/Link
 
 module NetworkNode {
+
+    parameters:
+        name: String,
+
     submodules:
-        stack: NetworkStack
+        stack: NetworkStack,
     
     // This is a comment 😃😃😃😃😃😃😃😃😃😃😃😃
 
     gates:
-        toStack[5]
-        fromStack[5]
+        toStack[5],
+        fromStack[5],
 
-        channelIncoming[5]
-        channelOutgoing[5]
+        channelIncoming,
+        channelOutgoing[5],
 
-        toAppl[5]
-        fromAppl[5]
+        toAppl[5],
+        fromAppl[5],
 
     connections:
-        toStack --> FastLink --> stack/netIn
-        fromStack <-- stack/netOut
+        toStack --> FastLink --> stack/netIn,
+        fromStack <-- stack/netOut,
         
-        fromAppl --> stack/fromAppl
-        toAppl <-- stack/toAppl
+        fromAppl --> stack/fromAppl,
+        toAppl <-- stack/toAppl,
 
 }

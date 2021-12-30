@@ -17,10 +17,6 @@ impl Loc {
     /// Creates a new unchecked instance using the given values.
     ///
     pub fn new(pos: usize, len: usize, line: usize) -> Self {
-        assert_ne!(
-            len, 0,
-            "Any described object must have at least one associated source character"
-        );
         Self { pos, len, line }
     }
 
@@ -36,5 +32,9 @@ impl Loc {
             line: from.line,
             len,
         }
+    }
+
+    pub fn after(self) -> Loc {
+        Loc::new(self.pos + self.len, 0, self.line)
     }
 }

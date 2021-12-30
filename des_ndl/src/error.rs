@@ -195,6 +195,35 @@ impl<'a> ParsingErrorContext<'a> {
         }
     }
 
+    pub fn record_missing_token(
+        &mut self,
+        code: ErrorCode,
+        msg: String,
+        token: &Token,
+        expected_token: &str,
+    ) -> NdlResult<()> {
+        let solution = ErrorSolution {
+            msg: format!("Try adding '{}'", expected_token),
+            loc: token.loc.after(),
+        };
+        self.errors.push(Error {
+            code,
+            msg,
+            solution: Some(solution),
+
+            loc: token.loc,
+
+            transient: self.transient,
+        });
+        self.transient = true;
+
+        if self.errors.len() > self.asset.mapped_asset().len_lines + 5 {
+            Err("Too many errors")
+        } else {
+            Ok(())
+        }
+    }
+
     ///
     /// Records an error with solution, determining transients automaticly.
     ///
