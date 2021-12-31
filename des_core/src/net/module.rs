@@ -269,7 +269,7 @@ pub trait StaticModuleCore {
         Self: Sized,
     {
         let ptr: *mut T = &mut (**module);
-        let ptr = ptr as usize;
+        let ptr = ptr as *mut u8;
         self.module_core_mut().parent_ptr = Some(ptr);
     }
 }
@@ -361,7 +361,7 @@ pub struct ModuleCore {
     pub activity_active: bool,
 
     /// The module identificator for the parent module.
-    pub parent_ptr: Option<usize>,
+    pub parent_ptr: Option<*mut u8>,
 }
 
 impl ModuleCore {
