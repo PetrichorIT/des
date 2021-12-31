@@ -1,5 +1,5 @@
 use des_ndl::*;
-use utils::bench::*;
+use util::bench::*;
 
 fn main() {
     let mut ctx = BenchmarkCtx::new("lex_stage", 10000);
