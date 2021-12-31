@@ -1,5 +1,5 @@
 use des_ndl::*;
-use utils::bench::*;
+use util::bench::*;
 
 pub fn main() {
     let mut ctx = BenchmarkCtx::new("par_bench", 10_000);
