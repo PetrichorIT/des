@@ -31,7 +31,7 @@ fn main() {
     app.create_module(alice);
     app.create_module(bob);
 
-    let mut rt = Runtime::new_with(
+    let mut rt = Runtime::<_, NetEvents>::new_with(
         app,
         RuntimeOptions {
             sim_base_unit: SimTimeUnit::Seconds,

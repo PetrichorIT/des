@@ -273,7 +273,7 @@ impl<A, E: EventSuperstructure<A>> Runtime<A, E> {
     /// Adds and event to the future event heap, that will be handled in 'duration'
     /// time units.
     ///
-    pub fn add_event_in(&mut self, event: E, duration: SimTime) {
+    pub fn add_event_in(&mut self, event: impl Into<E>, duration: SimTime) {
         self.add_event(event, self.sim_time() + duration)
     }
 
@@ -282,10 +282,10 @@ impl<A, E: EventSuperstructure<A>> Runtime<A, E> {
     /// Note that this time must be in the future i.e. greated that sim_time, or this
     /// function will panic.
     ///
-    pub fn add_event(&mut self, event: E, time: SimTime) {
+    pub fn add_event(&mut self, event: impl Into<E>, time: SimTime) {
         assert!(time >= self.sim_time());
 
-        let node = EventNode::create_into(self, event, time);
+        let node = EventNode::create_into(self, event.into(), time);
         self.core_mut().event_id += 1;
         self.future_event_heap.push(node);
     }

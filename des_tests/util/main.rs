@@ -28,6 +28,7 @@ impl Event<App> for EventB {
 }
 
 fn main() {
+    let _ev: Events = EventB().into();
 
     // let a: <EventA as Event<App>>::EventSuperstructure = Events::EventA(todo!());
 }

@@ -104,7 +104,7 @@ fn main() {
     app.create_module(node_eve);
     app.create_module(stack_eve);
 
-    let mut rt = Runtime::new_with(
+    let mut rt = Runtime::<_, NetEvents>::new_with(
         app,
         des_core::RuntimeOptions {
             sim_base_unit: des_core::SimTimeUnit::Seconds,

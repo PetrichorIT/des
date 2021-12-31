@@ -20,7 +20,7 @@ fn main() {
     let bob4_id = app.module(|m| m.name().unwrap() == "bob4").unwrap().id();
     let bob5_id = app.module(|m| m.name().unwrap() == "bob5").unwrap().id();
 
-    let mut rt = Runtime::new_with(
+    let mut rt = Runtime::<_, NetEvents>::new_with(
         app,
         des_core::RuntimeOptions {
             sim_base_unit: des_core::SimTimeUnit::Seconds,

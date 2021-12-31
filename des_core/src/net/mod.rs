@@ -6,12 +6,14 @@ mod packet;
 
 use std::mem::ManuallyDrop;
 
+use crate::Runtime;
 pub use channel::*;
 pub use gate::*;
 use lazy_static::__Deref;
 pub use message::*;
 pub use module::*;
 pub use packet::*;
+use util_macros::EventSuperstructure;
 
 use crate::{Event, EventSuperstructure, SimTime};
 use log::{error, info, warn};
@@ -99,22 +101,12 @@ impl<A> NetworkRuntime<A> {
     }
 }
 
+#[derive(EventSuperstructure)]
 pub enum NetEvents {
     MessageAtGateEvent(MessageAtGateEvent),
     HandleMessageEvent(HandleMessageEvent),
     CoroutineMessageEvent(CoroutineMessageEvent),
     ChannelUnbusyNotif(ChannelUnbusyNotif),
-}
-
-impl<A> EventSuperstructure<NetworkRuntime<A>> for NetEvents {
-    fn handle(self, rt: &mut crate::Runtime<NetworkRuntime<A>, Self>) {
-        match self {
-            Self::MessageAtGateEvent(event) => event.handle(rt),
-            Self::HandleMessageEvent(event) => event.handle(rt),
-            Self::CoroutineMessageEvent(event) => event.handle(rt),
-            Self::ChannelUnbusyNotif(event) => event.handle(rt),
-        }
-    }
 }
 
 pub struct MessageAtGateEvent {

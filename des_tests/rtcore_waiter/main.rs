@@ -154,7 +154,7 @@ fn main() {
         max_itr: !0,
     };
 
-    let mut rt = Runtime::new_with(app, opts);
+    let mut rt = Runtime::<_, Events>::new_with(app, opts);
 
     // Create first event
     let l = rt.app.l;

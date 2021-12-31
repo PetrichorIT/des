@@ -12,6 +12,8 @@ pub fn derive_event_superstucture(input: TokenStream) -> TokenStream {
             let mut token_stream = proc_macro2::TokenStream::new();
             let mut where_stream = proc_macro2::TokenStream::new();
 
+            let mut from_stream = proc_macro2::TokenStream::new();
+
             for v in data_enum.variants {
                 let Variant { ident, fields, .. } = v;
                 match fields {
@@ -39,27 +41,37 @@ pub fn derive_event_superstucture(input: TokenStream) -> TokenStream {
                         });
 
                         where_stream.extend(quote! {
-                            #ty: des_core::Event<A, EventSuperstructure = #gident>,
+                            #ty: Event<A, EventSuperstructure = #gident>,
                         });
+
+                        from_stream.extend(quote! {
+                            impl std::convert::From<#ty> for #gident {
+                                fn from(variant: #ty) -> Self {
+                                    Self::#ty(variant)
+                                }
+                            }
+                        })
                     }
                     _ => unimplemented!(),
                 }
             }
 
-            let wrapped = WrappedTokenStream(token_stream);
-            let wrapped_where = WrappedTokenStream(where_stream);
+            let token_stream = WrappedTokenStream(token_stream);
+            let where_stream = WrappedTokenStream(where_stream);
 
-            quote! {
-                impl<A> des_core::EventSuperstructure<A> for #gident
-                    where #wrapped_where {
-                    fn handle(self, rt: &mut des_core::Runtime<A, Self>) {
+            let mut final_stream = quote! {
+                impl<A> EventSuperstructure<A> for #gident
+                    where #where_stream {
+                    fn handle(self, rt: &mut Runtime<A, Self>) {
                         match self {
-                            #wrapped
+                            #token_stream
                         }
                     }
                 }
-            }
-            .into()
+            };
+
+            final_stream.extend(from_stream);
+            final_stream.into()
         }
         _ => panic!("#[derive(EventSuperstructure)] is only supported for enums."),
     }
