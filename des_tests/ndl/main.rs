@@ -42,11 +42,11 @@ fn main() {
         let arr_time = id.0 as f64 / 1000.0;
 
         rt.add_event_in(
-            HandleMessageEvent {
+            NetEvents::HandleMessageEvent(HandleMessageEvent {
                 module_id: id,
                 handled: false,
                 message: ManuallyDrop::new(msg),
-            },
+            }),
             arr_time.into(),
         );
     }

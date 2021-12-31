@@ -113,19 +113,17 @@ impl RuntimeCore {
     }
 }
 
-///
-/// The core component of a simulation handeling
-/// global utils, event scheduling and
-/// application management.
-///
-pub struct Runtime<A> {
+pub struct Runtime<A, E>
+where
+    E: EventSuperstructure<A>,
+{
     pub app: A,
 
     core: &'static SyncCell<Option<RuntimeCore>>,
-    future_event_heap: BinaryHeap<EventNode<A>>,
+    future_event_heap: BinaryHeap<EventNode<A, E>>,
 }
 
-impl<A> Runtime<A> {
+impl<A, E: EventSuperstructure<A>> Runtime<A, E> {
     fn core(&self) -> &RuntimeCore {
         unsafe { (*self.core.get()).as_ref().unwrap() }
     }
@@ -242,7 +240,7 @@ impl<A> Runtime<A> {
         self.core_mut().itr += 1;
 
         let node = self.future_event_heap.pop().unwrap();
-        self.core_mut().sim_time = node.time();
+        self.core_mut().sim_time = node.time;
 
         node.handle(self);
         !self.future_event_heap.is_empty()
@@ -275,7 +273,7 @@ impl<A> Runtime<A> {
     /// Adds and event to the future event heap, that will be handled in 'duration'
     /// time units.
     ///
-    pub fn add_event_in<T: 'static + Event<A>>(&mut self, event: T, duration: SimTime) {
+    pub fn add_event_in(&mut self, event: E, duration: SimTime) {
         self.add_event(event, self.sim_time() + duration)
     }
 
@@ -284,7 +282,7 @@ impl<A> Runtime<A> {
     /// Note that this time must be in the future i.e. greated that sim_time, or this
     /// function will panic.
     ///
-    pub fn add_event<T: 'static + Event<A>>(&mut self, event: T, time: SimTime) {
+    pub fn add_event(&mut self, event: E, time: SimTime) {
         assert!(time >= self.sim_time());
 
         let node = EventNode::create_into(self, event, time);
@@ -293,7 +291,7 @@ impl<A> Runtime<A> {
     }
 }
 
-impl<A> Debug for Runtime<A> {
+impl<A, E: EventSuperstructure<A>> Debug for Runtime<A, E> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -312,7 +310,7 @@ impl<A> Debug for Runtime<A> {
     }
 }
 
-impl<A> Display for Runtime<A> {
+impl<A, E: EventSuperstructure<A>> Display for Runtime<A, E> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,

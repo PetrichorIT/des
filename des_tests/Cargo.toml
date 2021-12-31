@@ -21,10 +21,16 @@ path = "rtcore_waiter/main.rs"
 name = "ndl"
 path = "ndl/main.rs"
 
+[[bin]]
+name = "util"
+path = "util/main.rs"
+
 [dependencies]
 des_core = {path = "../des_core"}
 des_macros = {path = "../des_macros"}
 des_ndl = {path = "../des_ndl"}
-log = { version = "*", features = [ "max_level_error"  ]}
+log = {version = "*", features = ["max_level_error"]}
 # log = "*"
 rand = "*"
+util = {path = "../util"}
+util_macros = {path = "../util_macros"}

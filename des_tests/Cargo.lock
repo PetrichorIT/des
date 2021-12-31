@@ -60,6 +60,8 @@ dependencies = [
  "des_ndl",
  "log",
  "rand",
+ "util",
+ "util_macros",
 ]
 
 [[package]]

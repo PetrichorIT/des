@@ -13,7 +13,7 @@ pub use message::*;
 pub use module::*;
 pub use packet::*;
 
-use crate::{Event, SimTime};
+use crate::{Event, EventSuperstructure, SimTime};
 use log::{error, info, warn};
 
 pub struct NetworkRuntime<A> {
@@ -99,6 +99,24 @@ impl<A> NetworkRuntime<A> {
     }
 }
 
+pub enum NetEvents {
+    MessageAtGateEvent(MessageAtGateEvent),
+    HandleMessageEvent(HandleMessageEvent),
+    CoroutineMessageEvent(CoroutineMessageEvent),
+    ChannelUnbusyNotif(ChannelUnbusyNotif),
+}
+
+impl<A> EventSuperstructure<NetworkRuntime<A>> for NetEvents {
+    fn handle(self, rt: &mut crate::Runtime<NetworkRuntime<A>, Self>) {
+        match self {
+            Self::MessageAtGateEvent(event) => event.handle(rt),
+            Self::HandleMessageEvent(event) => event.handle(rt),
+            Self::CoroutineMessageEvent(event) => event.handle(rt),
+            Self::ChannelUnbusyNotif(event) => event.handle(rt),
+        }
+    }
+}
+
 pub struct MessageAtGateEvent {
     pub gate_id: GateId,
     pub message: ManuallyDrop<Message>,
@@ -106,7 +124,9 @@ pub struct MessageAtGateEvent {
 }
 
 impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
-    fn handle(mut self: Box<Self>, rt: &mut crate::Runtime<NetworkRuntime<A>>) {
+    type EventSuperstructure = NetEvents;
+
+    fn handle(mut self, rt: &mut crate::Runtime<NetworkRuntime<A>, Self::EventSuperstructure>) {
         let gate = rt.app.gate(self.gate_id);
         if let Some(gate) = gate {
             let ptr: *const Message = self.message.deref();
@@ -125,11 +145,11 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
 
                 let module = gate.module();
                 rt.add_event(
-                    HandleMessageEvent {
+                    NetEvents::HandleMessageEvent(HandleMessageEvent {
                         module_id: module,
                         message: ManuallyDrop::new(message),
                         handled: false,
-                    },
+                    }),
                     SimTime::now(),
                 );
             } else {
@@ -167,17 +187,20 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
 
                     channel.set_busy(true);
 
-                    rt.add_event_in(ChannelUnbusyNotif { channel_id }, busy);
+                    rt.add_event_in(
+                        NetEvents::ChannelUnbusyNotif(ChannelUnbusyNotif { channel_id }),
+                        busy,
+                    );
 
                     SimTime::now() + dur
                 };
 
                 rt.add_event(
-                    MessageAtGateEvent {
+                    NetEvents::MessageAtGateEvent(MessageAtGateEvent {
                         gate_id: next_gate,
                         message: ManuallyDrop::new(message),
                         handled: false,
-                    },
+                    }),
                     next_event_time,
                 )
             }
@@ -209,7 +232,9 @@ pub struct HandleMessageEvent {
 }
 
 impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
-    fn handle(mut self: Box<Self>, rt: &mut crate::Runtime<NetworkRuntime<A>>) {
+    type EventSuperstructure = NetEvents;
+
+    fn handle(mut self, rt: &mut crate::Runtime<NetworkRuntime<A>, Self::EventSuperstructure>) {
         if let Some(module) = rt.app.module_mut_by_id(self.module_id) {
             let ptr: *const Message = self.message.deref();
             let mut message = unsafe { std::ptr::read(ptr) };
@@ -239,31 +264,31 @@ impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
 
             for (msg, gate_id) in out_buffer {
                 rt.add_event(
-                    MessageAtGateEvent {
+                    NetEvents::MessageAtGateEvent(MessageAtGateEvent {
                         gate_id,
                         message: ManuallyDrop::new(msg),
                         handled: false,
-                    },
+                    }),
                     SimTime::now(),
                 )
             }
 
             for (msg, time) in loopback_buffer {
                 rt.add_event(
-                    HandleMessageEvent {
+                    NetEvents::HandleMessageEvent(HandleMessageEvent {
                         module_id: self.module_id,
                         message: ManuallyDrop::new(msg),
                         handled: false,
-                    },
+                    }),
                     time,
                 )
             }
 
             if enqueue_activity_msg {
                 rt.add_event(
-                    CoroutineMessageEvent {
+                    NetEvents::CoroutineMessageEvent(CoroutineMessageEvent {
                         module_id: self.module_id,
-                    },
+                    }),
                     SimTime::now(),
                 )
             }
@@ -292,16 +317,18 @@ pub struct CoroutineMessageEvent {
 }
 
 impl<A> Event<NetworkRuntime<A>> for CoroutineMessageEvent {
-    fn handle(self: Box<Self>, rt: &mut crate::Runtime<NetworkRuntime<A>>) {
+    type EventSuperstructure = NetEvents;
+
+    fn handle(self, rt: &mut crate::Runtime<NetworkRuntime<A>, Self::EventSuperstructure>) {
         if let Some(module) = rt.app.module_mut_by_id(self.module_id) {
             let dur = module.module_core().activity_period;
             if dur != SimTime::ZERO {
                 module.activity();
 
                 rt.add_event_in(
-                    CoroutineMessageEvent {
+                    NetEvents::CoroutineMessageEvent(CoroutineMessageEvent {
                         module_id: self.module_id,
-                    },
+                    }),
                     dur,
                 )
             }
@@ -319,7 +346,9 @@ pub struct ChannelUnbusyNotif {
 }
 
 impl<A> Event<NetworkRuntime<A>> for ChannelUnbusyNotif {
-    fn handle(self: Box<Self>, rt: &mut crate::Runtime<NetworkRuntime<A>>) {
+    type EventSuperstructure = NetEvents;
+
+    fn handle(self, rt: &mut crate::Runtime<NetworkRuntime<A>, Self::EventSuperstructure>) {
         if let Some(channel) = rt
             .app
             .channels

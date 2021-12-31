@@ -50,11 +50,11 @@ fn main() {
     );
 
     rt.add_event_in(
-        MessageAtGateEvent {
+        NetEvents::MessageAtGateEvent(MessageAtGateEvent {
             gate_id: g4,
             handled: false,
             message: ManuallyDrop::new(msg),
-        },
+        }),
         1.0.into(),
     );
 

@@ -472,8 +472,12 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> TokenStream {
                         }
 
                         pub fn run_with_options(self, options: des_core::RuntimeOptions) -> (Self, des_core::SimTime) {
+                            use des_core::Runtime;
+                            use des_core::NetworkRuntime;
+                            use des_core::NetEvents;
+
                             let net_rt = self.build_rt();
-                            let rt = des_core::Runtime::new_with(net_rt, options);
+                            let rt = Runtime::<NetworkRuntime<Self>, NetEvents>::new_with(net_rt, options);
                             let (net_rt, end_time) = rt.run().expect("RT exceeded itr limit.");
                             (net_rt.finish(), end_time)
                         }

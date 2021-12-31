@@ -42,13 +42,29 @@ impl Application {
     }
 }
 
+enum Events {
+    ServerDone(ServerDone),
+    CustomerArrival(CustomerArrival),
+}
+
+impl EventSuperstructure<Application> for Events {
+    fn handle(self, rt: &mut Runtime<Application, Self>) {
+        match self {
+            Self::ServerDone(event) => event.handle(rt),
+            Self::CustomerArrival(event) => event.handle(rt),
+        }
+    }
+}
+
 #[derive(Debug)]
 struct ServerDone {
     started: SimTime,
 }
 
 impl Event<Application> for ServerDone {
-    fn handle(self: Box<Self>, rt: &mut Runtime<Application>) {
+    type EventSuperstructure = Events;
+
+    fn handle(self, rt: &mut Runtime<Application, Self::EventSuperstructure>) {
         let busy_interval = rt.sim_time() - self.started;
         rt.app.busy_time += busy_interval;
 
@@ -59,9 +75,9 @@ impl Event<Application> for ServerDone {
                 rt.app.busy = true;
                 rt.app.wait_times.push(rt.sim_time() - customer.arrived);
                 rt.add_event_in(
-                    ServerDone {
+                    Events::ServerDone(ServerDone {
                         started: rt.sim_time(),
-                    },
+                    }),
                     customer.duration,
                 )
             }
@@ -78,7 +94,9 @@ struct CustomerArrival {
 }
 
 impl Event<Application> for CustomerArrival {
-    fn handle(self: Box<Self>, rt: &mut Runtime<Application>) {
+    type EventSuperstructure = Events;
+
+    fn handle(self, rt: &mut Runtime<Application, Self::EventSuperstructure>) {
         if self.idx > rt.app.n {
             return;
         }
@@ -98,18 +116,21 @@ impl Event<Application> for CustomerArrival {
             rt.app.busy = true;
             rt.app.wait_times.push(SimTime::ZERO);
             rt.add_event_in(
-                ServerDone {
+                Events::ServerDone(ServerDone {
                     started: rt.sim_time(),
-                },
+                }),
                 customer.duration,
             );
         }
 
-        rt.add_event_in(CustomerArrival { idx: self.idx + 1 }, next.into());
+        rt.add_event_in(
+            Events::CustomerArrival(CustomerArrival { idx: self.idx + 1 }),
+            next.into(),
+        );
     }
 }
 
-fn expdist<A>(rt: &mut Runtime<A>, p: f64) -> f64 {
+fn expdist<A, E: EventSuperstructure<A>>(rt: &mut Runtime<A, E>, p: f64) -> f64 {
     let x: f64 = rt.rng_sample(Standard);
     x.ln() / -p
 }
@@ -138,7 +159,7 @@ fn main() {
     // Create first event
     let l = rt.app.l;
     let dur = expdist(&mut rt, l).into();
-    rt.add_event_in(CustomerArrival { idx: 0 }, dur);
+    rt.add_event_in(Events::CustomerArrival(CustomerArrival { idx: 0 }), dur);
 
     let (app, t_max) = rt.run().unwrap();
     app.eval(t_max);

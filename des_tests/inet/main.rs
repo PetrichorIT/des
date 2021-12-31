@@ -2,8 +2,8 @@ use std::mem::ManuallyDrop;
 
 use des_core::StaticModuleCore;
 use des_core::{
-    ChannelMetrics, Message, MessageAtGateEvent, NetworkRuntime, Packet, Runtime, SimTime,
-    CHANNEL_NULL, GATE_NULL, MODULE_NULL,
+    ChannelMetrics, Message, MessageAtGateEvent, NetEvents, NetworkRuntime, Packet, Runtime,
+    SimTime, CHANNEL_NULL, GATE_NULL, MODULE_NULL,
 };
 use network_node::NetworkNode;
 use network_stack::NetworkStack;
@@ -121,11 +121,11 @@ fn main() {
     let msg = Message::new(2, GATE_NULL, MODULE_NULL, MODULE_NULL, SimTime::ZERO, pkt);
 
     rt.add_event_in(
-        MessageAtGateEvent {
+        NetEvents::MessageAtGateEvent(MessageAtGateEvent {
             gate_id: alice_in,
             handled: false,
             message: ManuallyDrop::new(msg),
-        },
+        }),
         0.0.into(),
     );
 
