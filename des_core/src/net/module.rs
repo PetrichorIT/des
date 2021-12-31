@@ -1,5 +1,5 @@
-use des_macros::GlobalUID;
 use log::error;
+use util_macros::GlobalUID;
 
 use crate::{
     ChannelId, Gate, GateDescription, GateId, IntoModuleGate, Message, NetworkRuntime, SimTime,

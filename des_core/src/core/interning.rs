@@ -1,7 +1,7 @@
 use std::alloc::{dealloc, Layout};
 use std::any::{type_name, TypeId};
 use std::ops::{Deref, DerefMut};
-use utils::SyncCell;
+use util::SyncCell;
 
 ///
 /// A manager for interned objects.

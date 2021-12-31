@@ -1,6 +1,6 @@
 use std::mem::size_of;
 
-use des_macros::GlobalUID;
+use util_macros::GlobalUID;
 
 use crate::*;
 

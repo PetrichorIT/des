@@ -1,5 +1,5 @@
-use des_macros::GlobalUID;
 use std::fmt::{Debug, Display};
+use util_macros::GlobalUID;
 
 use super::*;
 

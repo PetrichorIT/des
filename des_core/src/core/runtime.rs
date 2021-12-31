@@ -12,7 +12,7 @@ use std::{
     collections::BinaryHeap,
     fmt::{Debug, Display},
 };
-use utils::SyncCell;
+use util::SyncCell;
 
 use super::logger::StandardLogger;
 

@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use des_macros::GlobalUID;
+use util_macros::GlobalUID;
 
 use crate::{Message, SimTime};
 
