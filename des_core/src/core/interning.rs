@@ -174,8 +174,15 @@ impl Interner {
     /// Drops a value from a [InternedValue].
     fn drop_untyped_interned(&self, index: usize) {
         // println!("[Interner] >> Drop (untyped) #{}", index);
+
+        // # Safty
+        // This is safe since all uses of get_mut() at internally and no
+        // references leak.
         let contents = unsafe { &mut *self.contents.get() };
 
+        // # Safty
+        // This is sound since the safty contract guarntees that 'ptr' points to
+        // valid memory and 'layout' was derived at interning for Sized types.
         unsafe {
             dealloc(
                 contents[index].as_ref().unwrap().ptr,
@@ -188,7 +195,11 @@ impl Interner {
 
     /// Drops a value from a [TypedInternedValue].
     fn drop_typed_interned<T: 'static>(&self, index: usize) {
+        // # Safty
+        // This is safe since all uses of get_mut() at internally and no
+        // references leak.
         let contents = unsafe { &mut *self.contents.get() };
+
         assert_eq!(
             contents[index].as_ref().unwrap().ref_count,
             0,
@@ -209,6 +220,9 @@ impl Interner {
 
     /// Sanity check at the end of the simulation.
     pub fn fincheck(&self) {
+        // # Safty
+        // This is safe since all uses of get_mut() at internally and no
+        // references leak.
         let contents = unsafe { &*self.contents.get() };
         for entry in contents {
             if let Some(entry) = entry {
