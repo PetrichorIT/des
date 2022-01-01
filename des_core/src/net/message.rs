@@ -5,8 +5,10 @@ use std::{
 
 use util_macros::GlobalUID;
 
-use crate::*;
+use crate::core::*;
+use crate::net::*;
 
+/// A globaly unqiue identifer for a message.
 #[derive(GlobalUID)]
 #[repr(transparent)]
 pub struct MessageId(pub u32);

@@ -2,7 +2,7 @@ use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
 use syn::*;
 
-#[proc_macro_derive(EventSuperstructure)]
+#[proc_macro_derive(EventSet)]
 pub fn derive_event_superstucture(input: TokenStream) -> TokenStream {
     let DeriveInput { ident, data, .. } = parse_macro_input!(input);
     let gident = ident;
@@ -59,7 +59,7 @@ pub fn derive_event_superstucture(input: TokenStream) -> TokenStream {
             let where_stream = WrappedTokenStream(where_stream);
 
             let mut final_stream = quote! {
-                impl<A: Application<EventSuperstructure = Self>> EventSuperstructure<A> for #gident
+                impl<A: Application<EventSet = Self>> EventSet<A> for #gident
                     where #where_stream {
                     fn handle(self, rt: &mut Runtime<A>) {
                         match self {

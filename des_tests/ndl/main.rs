@@ -1,5 +1,3 @@
-use std::mem::ManuallyDrop;
-
 use des_core::*;
 use des_macros::Network;
 
@@ -41,14 +39,7 @@ fn main() {
 
         let arr_time = id.0 as f64 / 1000.0;
 
-        rt.add_event_in(
-            NetEvents::HandleMessageEvent(HandleMessageEvent {
-                module_id: id,
-                handled: false,
-                message: ManuallyDrop::new(msg),
-            }),
-            arr_time.into(),
-        );
+        rt.handle_message_on(id, msg, arr_time.into());
     }
 
     let (_, end_time) = rt.run().unwrap();

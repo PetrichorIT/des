@@ -2,7 +2,7 @@ use std::cmp::{Eq, Ord, Ordering};
 use std::fmt::{Display, Formatter, Write};
 use std::ops::*;
 
-use crate::sim_time;
+use super::sim_time;
 
 ///
 /// A type that represents a non-scaled discrete point of time

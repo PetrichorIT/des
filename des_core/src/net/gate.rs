@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Display};
 use util_macros::GlobalUID;
 
-use super::*;
+use crate::net::*;
 
 /// A runtime-unquie identifier for a gate.
 #[derive(GlobalUID)]

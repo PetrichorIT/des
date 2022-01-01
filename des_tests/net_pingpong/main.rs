@@ -1,5 +1,3 @@
-use std::mem::ManuallyDrop;
-
 use des_core::*;
 use rand::{prelude::StdRng, SeedableRng};
 
@@ -49,14 +47,7 @@ fn main() {
         String::from("Ping"),
     );
 
-    rt.add_event_in(
-        NetEvents::MessageAtGateEvent(MessageAtGateEvent {
-            gate_id: g4,
-            handled: false,
-            message: ManuallyDrop::new(msg),
-        }),
-        1.0.into(),
-    );
+    rt.add_message_onto(g4, msg, 1.0.into());
 
     rt.run();
 }

@@ -41,6 +41,7 @@ impl Interner {
     ///
     /// Interns a value T and retursn a [TypedInternedValue] referencing the interned value.
     ///
+    #[allow(unused)]
     pub fn intern_typed<T: 'static>(&self, value: T) -> TypedInternedValue<'_, T> {
         self.intern(value).cast()
     }
@@ -56,6 +57,7 @@ impl Interner {
     ///
     /// Interns an allready boxed value T and retursn a typed reference.
     ///
+    #[allow(unused)]
     pub fn intern_boxed_typed<T: 'static>(&self, boxed: Box<T>) -> TypedInternedValue<'_, T> {
         self.intern_boxed(boxed).cast()
     }
@@ -300,6 +302,7 @@ impl<'a> InternedValue<'a> {
     ///
     /// Tries to cast self into a [TypedInternedValue], returns None if T does not match.
     ///
+    #[allow(unused)]
     pub fn try_cast<T: 'static>(self) -> Option<TypedInternedValue<'a, T>> {
         // # Safty
         // By the safty contract of Interner any Interned value must indirectly point to a valid

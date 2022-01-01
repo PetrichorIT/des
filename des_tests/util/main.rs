@@ -1,13 +1,13 @@
 #[allow(unused)]
 use des_core::*;
-use util_macros::EventSuperstructure;
+use util_macros::EventSet;
 
 struct App;
 impl Application for App {
-    type EventSuperstructure = Events;
+    type EventSet = Events;
 }
 
-#[derive(EventSuperstructure)]
+#[derive(EventSet)]
 enum Events {
     EventA(EventA),
     EventB(EventB),

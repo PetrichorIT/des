@@ -43,7 +43,7 @@ impl Application {
 }
 
 impl des_core::Application for Application {
-    type EventSuperstructure = Events;
+    type EventSet = Events;
 }
 
 enum Events {
@@ -51,7 +51,7 @@ enum Events {
     CustomerArrival(CustomerArrival),
 }
 
-impl EventSuperstructure<Application> for Events {
+impl EventSet<Application> for Events {
     fn handle(self, rt: &mut Runtime<Application>) {
         match self {
             Self::ServerDone(event) => event.handle(rt),

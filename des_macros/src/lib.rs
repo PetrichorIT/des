@@ -474,7 +474,6 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> TokenStream {
                         pub fn run_with_options(self, options: des_core::RuntimeOptions) -> (Self, des_core::SimTime) {
                             use des_core::Runtime;
                             use des_core::NetworkRuntime;
-                            use des_core::NetEvents;
 
                             let net_rt = self.build_rt();
                             let rt = Runtime::<NetworkRuntime<Self>>::new_with(net_rt, options);

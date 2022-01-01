@@ -2,10 +2,8 @@ use std::fmt::Display;
 
 use util_macros::GlobalUID;
 
-use crate::{Message, SimTime};
-
-/// A runtime-unqiue identifier for a end-to-end connection.
-pub type ConnectionId = usize;
+use crate::core::*;
+use crate::net::*;
 
 /// A runtime-unique identifier for a one directional channel.
 #[derive(GlobalUID)]

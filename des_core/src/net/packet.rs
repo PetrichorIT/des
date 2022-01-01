@@ -1,10 +1,8 @@
 use std::mem::size_of;
-
 use util_macros::GlobalUID;
 
-use crate::*;
-
-use super::MessageBody;
+use crate::core::*;
+use crate::net::*;
 
 /// A address of a node in a IPv6 network.
 #[cfg(feature = "netipv6")]
@@ -24,15 +22,18 @@ pub type NodeAddress = u32;
 
 /// The broadcast address in a IPv4 network.
 #[cfg(not(feature = "netipv6"))]
+#[allow(unused)]
 pub const NODE_ADDR_BROADCAST: NodeAddress = u32::MAX;
 
 /// The loopback address in a IPv4 network.
 #[cfg(not(feature = "netipv6"))]
+#[allow(unused)]
 pub const NODE_ADDR_LOOPBACK: NodeAddress = 0x7f_00_00_01;
 
 /// A node-local address of an application.
 pub type PortAddress = u16;
 
+/// A globalsy unqiue identifer for a packet.
 #[derive(GlobalUID)]
 #[repr(transparent)]
 pub struct PacketId(u32);
