@@ -1,5 +1,3 @@
-#![feature(box_into_inner)]
-
 pub(crate) mod core;
 pub(crate) mod metrics;
 pub(crate) mod misc;

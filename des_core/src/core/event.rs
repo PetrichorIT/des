@@ -5,31 +5,36 @@ use std::{
     marker::PhantomData,
 };
 
-pub trait EventSuperstructure<A>: Sized {
-    fn handle(self, rt: &mut Runtime<A, Self>);
+pub trait Application: Sized {
+    type EventSuperstructure: EventSuperstructure<Self>;
 }
 
-pub trait Event<A>: Sized {
-    type EventSuperstructure: EventSuperstructure<A>;
-
-    fn handle(self, rt: &mut Runtime<A, Self::EventSuperstructure>);
+pub trait EventSuperstructure<A>
+where
+    A: Application,
+{
+    fn handle(self, rt: &mut Runtime<A>);
 }
 
-pub(crate) struct EventNode<A, E: EventSuperstructure<A>> {
+pub trait Event<A: Application> {
+    fn handle(self, rt: &mut Runtime<A>);
+}
+
+pub(crate) struct EventNode<A: Application> {
     pub(crate) time: SimTime,
     pub(crate) id: usize,
-    pub(crate) event: E,
+    pub(crate) event: A::EventSuperstructure,
 
     _phantom: PhantomData<A>,
 }
 
-impl<A, E: EventSuperstructure<A>> EventNode<A, E> {
+impl<A: Application> EventNode<A> {
     #[inline(always)]
-    pub fn handle(self, rt: &mut Runtime<A, E>) {
+    pub fn handle(self, rt: &mut Runtime<A>) {
         self.event.handle(rt)
     }
 
-    pub fn create_into(rt: &mut Runtime<A, E>, event: E, time: SimTime) -> Self {
+    pub fn create_into(rt: &mut Runtime<A>, event: A::EventSuperstructure, time: SimTime) -> Self {
         Self {
             id: rt.num_events_dispatched(),
             event,
@@ -40,21 +45,21 @@ impl<A, E: EventSuperstructure<A>> EventNode<A, E> {
     }
 }
 
-impl<A, E: EventSuperstructure<A>> PartialEq for EventNode<A, E> {
+impl<A: Application> PartialEq for EventNode<A> {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
 }
 
-impl<A, E: EventSuperstructure<A>> Eq for EventNode<A, E> {}
+impl<A: Application> Eq for EventNode<A> {}
 
-impl<A, E: EventSuperstructure<A>> PartialOrd for EventNode<A, E> {
+impl<A: Application> PartialOrd for EventNode<A> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<A, E: EventSuperstructure<A>> Ord for EventNode<A, E> {
+impl<A: Application> Ord for EventNode<A> {
     fn cmp(&self, other: &Self) -> Ordering {
         if self == other {
             Ordering::Equal
@@ -66,9 +71,9 @@ impl<A, E: EventSuperstructure<A>> Ord for EventNode<A, E> {
     }
 }
 
-impl<A, E: EventSuperstructure<A>> Debug for EventNode<A, E>
+impl<A: Application> Debug for EventNode<A>
 where
-    E: Debug,
+    A::EventSuperstructure: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -79,9 +84,9 @@ where
     }
 }
 
-impl<A, E: EventSuperstructure<A>> Display for EventNode<A, E>
+impl<A: Application> Display for EventNode<A>
 where
-    E: Display,
+    A::EventSuperstructure: Display,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(

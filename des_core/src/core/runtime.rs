@@ -113,17 +113,14 @@ impl RuntimeCore {
     }
 }
 
-pub struct Runtime<A, E>
-where
-    E: EventSuperstructure<A>,
-{
+pub struct Runtime<A: Application> {
     pub app: A,
 
     core: &'static SyncCell<Option<RuntimeCore>>,
-    future_event_heap: BinaryHeap<EventNode<A, E>>,
+    future_event_heap: BinaryHeap<EventNode<A>>,
 }
 
-impl<A, E: EventSuperstructure<A>> Runtime<A, E> {
+impl<A: Application> Runtime<A> {
     fn core(&self) -> &RuntimeCore {
         unsafe { (*self.core.get()).as_ref().unwrap() }
     }
@@ -273,7 +270,7 @@ impl<A, E: EventSuperstructure<A>> Runtime<A, E> {
     /// Adds and event to the future event heap, that will be handled in 'duration'
     /// time units.
     ///
-    pub fn add_event_in(&mut self, event: impl Into<E>, duration: SimTime) {
+    pub fn add_event_in(&mut self, event: impl Into<A::EventSuperstructure>, duration: SimTime) {
         self.add_event(event, self.sim_time() + duration)
     }
 
@@ -282,7 +279,7 @@ impl<A, E: EventSuperstructure<A>> Runtime<A, E> {
     /// Note that this time must be in the future i.e. greated that sim_time, or this
     /// function will panic.
     ///
-    pub fn add_event(&mut self, event: impl Into<E>, time: SimTime) {
+    pub fn add_event(&mut self, event: impl Into<A::EventSuperstructure>, time: SimTime) {
         assert!(time >= self.sim_time());
 
         let node = EventNode::create_into(self, event.into(), time);
@@ -291,7 +288,7 @@ impl<A, E: EventSuperstructure<A>> Runtime<A, E> {
     }
 }
 
-impl<A, E: EventSuperstructure<A>> Debug for Runtime<A, E> {
+impl<A: Application> Debug for Runtime<A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -310,7 +307,7 @@ impl<A, E: EventSuperstructure<A>> Debug for Runtime<A, E> {
     }
 }
 
-impl<A, E: EventSuperstructure<A>> Display for Runtime<A, E> {
+impl<A: Application> Display for Runtime<A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,

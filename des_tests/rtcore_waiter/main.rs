@@ -42,13 +42,17 @@ impl Application {
     }
 }
 
+impl des_core::Application for Application {
+    type EventSuperstructure = Events;
+}
+
 enum Events {
     ServerDone(ServerDone),
     CustomerArrival(CustomerArrival),
 }
 
 impl EventSuperstructure<Application> for Events {
-    fn handle(self, rt: &mut Runtime<Application, Self>) {
+    fn handle(self, rt: &mut Runtime<Application>) {
         match self {
             Self::ServerDone(event) => event.handle(rt),
             Self::CustomerArrival(event) => event.handle(rt),
@@ -62,9 +66,7 @@ struct ServerDone {
 }
 
 impl Event<Application> for ServerDone {
-    type EventSuperstructure = Events;
-
-    fn handle(self, rt: &mut Runtime<Application, Self::EventSuperstructure>) {
+    fn handle(self, rt: &mut Runtime<Application>) {
         let busy_interval = rt.sim_time() - self.started;
         rt.app.busy_time += busy_interval;
 
@@ -94,9 +96,7 @@ struct CustomerArrival {
 }
 
 impl Event<Application> for CustomerArrival {
-    type EventSuperstructure = Events;
-
-    fn handle(self, rt: &mut Runtime<Application, Self::EventSuperstructure>) {
+    fn handle(self, rt: &mut Runtime<Application>) {
         if self.idx > rt.app.n {
             return;
         }
@@ -130,7 +130,7 @@ impl Event<Application> for CustomerArrival {
     }
 }
 
-fn expdist<A, E: EventSuperstructure<A>>(rt: &mut Runtime<A, E>, p: f64) -> f64 {
+fn expdist<A: des_core::Application>(rt: &mut Runtime<A>, p: f64) -> f64 {
     let x: f64 = rt.rng_sample(Standard);
     x.ln() / -p
 }
@@ -154,7 +154,7 @@ fn main() {
         max_itr: !0,
     };
 
-    let mut rt = Runtime::<_, Events>::new_with(app, opts);
+    let mut rt = Runtime::new_with(app, opts);
 
     // Create first event
     let l = rt.app.l;

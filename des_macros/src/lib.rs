@@ -477,7 +477,7 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> TokenStream {
                             use des_core::NetEvents;
 
                             let net_rt = self.build_rt();
-                            let rt = Runtime::<NetworkRuntime<Self>, NetEvents>::new_with(net_rt, options);
+                            let rt = Runtime::<NetworkRuntime<Self>>::new_with(net_rt, options);
                             let (net_rt, end_time) = rt.run().expect("RT exceeded itr limit.");
                             (net_rt.finish(), end_time)
                         }

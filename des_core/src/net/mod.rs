@@ -6,14 +6,13 @@ mod packet;
 
 use std::mem::ManuallyDrop;
 
-use crate::Runtime;
+use crate::{Application, Runtime};
 pub use channel::*;
 pub use gate::*;
 use lazy_static::__Deref;
 pub use message::*;
 pub use module::*;
 pub use packet::*;
-use util_macros::EventSuperstructure;
 
 use crate::{Event, EventSuperstructure, SimTime};
 use log::{error, info, warn};
@@ -101,12 +100,27 @@ impl<A> NetworkRuntime<A> {
     }
 }
 
-#[derive(EventSuperstructure)]
+impl<A> Application for NetworkRuntime<A> {
+    type EventSuperstructure = NetEvents;
+}
+
+// #[derive(EventSuperstructure)]
 pub enum NetEvents {
     MessageAtGateEvent(MessageAtGateEvent),
     HandleMessageEvent(HandleMessageEvent),
     CoroutineMessageEvent(CoroutineMessageEvent),
     ChannelUnbusyNotif(ChannelUnbusyNotif),
+}
+
+impl<A> EventSuperstructure<NetworkRuntime<A>> for NetEvents {
+    fn handle(self, rt: &mut Runtime<NetworkRuntime<A>>) {
+        match self {
+            Self::MessageAtGateEvent(event) => event.handle(rt),
+            Self::HandleMessageEvent(event) => event.handle(rt),
+            Self::CoroutineMessageEvent(event) => event.handle(rt),
+            Self::ChannelUnbusyNotif(event) => event.handle(rt),
+        }
+    }
 }
 
 pub struct MessageAtGateEvent {
@@ -116,9 +130,7 @@ pub struct MessageAtGateEvent {
 }
 
 impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
-    type EventSuperstructure = NetEvents;
-
-    fn handle(mut self, rt: &mut crate::Runtime<NetworkRuntime<A>, Self::EventSuperstructure>) {
+    fn handle(mut self, rt: &mut crate::Runtime<NetworkRuntime<A>>) {
         let gate = rt.app.gate(self.gate_id);
         if let Some(gate) = gate {
             let ptr: *const Message = self.message.deref();
@@ -224,9 +236,7 @@ pub struct HandleMessageEvent {
 }
 
 impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
-    type EventSuperstructure = NetEvents;
-
-    fn handle(mut self, rt: &mut crate::Runtime<NetworkRuntime<A>, Self::EventSuperstructure>) {
+    fn handle(mut self, rt: &mut crate::Runtime<NetworkRuntime<A>>) {
         if let Some(module) = rt.app.module_mut_by_id(self.module_id) {
             let ptr: *const Message = self.message.deref();
             let mut message = unsafe { std::ptr::read(ptr) };
@@ -309,9 +319,7 @@ pub struct CoroutineMessageEvent {
 }
 
 impl<A> Event<NetworkRuntime<A>> for CoroutineMessageEvent {
-    type EventSuperstructure = NetEvents;
-
-    fn handle(self, rt: &mut crate::Runtime<NetworkRuntime<A>, Self::EventSuperstructure>) {
+    fn handle(self, rt: &mut crate::Runtime<NetworkRuntime<A>>) {
         if let Some(module) = rt.app.module_mut_by_id(self.module_id) {
             let dur = module.module_core().activity_period;
             if dur != SimTime::ZERO {
@@ -338,9 +346,7 @@ pub struct ChannelUnbusyNotif {
 }
 
 impl<A> Event<NetworkRuntime<A>> for ChannelUnbusyNotif {
-    type EventSuperstructure = NetEvents;
-
-    fn handle(self, rt: &mut crate::Runtime<NetworkRuntime<A>, Self::EventSuperstructure>) {
+    fn handle(self, rt: &mut crate::Runtime<NetworkRuntime<A>>) {
         if let Some(channel) = rt
             .app
             .channels

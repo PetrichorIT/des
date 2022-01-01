@@ -1,30 +1,28 @@
+#[allow(unused)]
 use des_core::*;
 use util_macros::EventSuperstructure;
 
 struct App;
+impl Application for App {
+    type EventSuperstructure = Events;
+}
 
 #[derive(EventSuperstructure)]
 enum Events {
-    #[allow(unused)]
     EventA(EventA),
-    #[allow(unused)]
     EventB(EventB),
 }
 
 struct EventA();
 
 impl Event<App> for EventA {
-    type EventSuperstructure = Events;
-
-    fn handle(self, _rt: &mut Runtime<App, Self::EventSuperstructure>) {}
+    fn handle(self, _rt: &mut Runtime<App>) {}
 }
 
 struct EventB();
 
 impl Event<App> for EventB {
-    type EventSuperstructure = Events;
-
-    fn handle(self, _rt: &mut Runtime<App, Self::EventSuperstructure>) {}
+    fn handle(self, _rt: &mut Runtime<App>) {}
 }
 
 fn main() {

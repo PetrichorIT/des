@@ -10,9 +10,8 @@ pub fn derive_event_superstucture(input: TokenStream) -> TokenStream {
     match data {
         Data::Enum(data_enum) => {
             let mut token_stream = proc_macro2::TokenStream::new();
-            let mut where_stream = proc_macro2::TokenStream::new();
-
             let mut from_stream = proc_macro2::TokenStream::new();
+            let mut where_stream = proc_macro2::TokenStream::new();
 
             for v in data_enum.variants {
                 let Variant { ident, fields, .. } = v;
@@ -41,7 +40,7 @@ pub fn derive_event_superstucture(input: TokenStream) -> TokenStream {
                         });
 
                         where_stream.extend(quote! {
-                            #ty: Event<A, EventSuperstructure = #gident>,
+                            #ty: Event<A>,
                         });
 
                         from_stream.extend(quote! {
@@ -60,9 +59,9 @@ pub fn derive_event_superstucture(input: TokenStream) -> TokenStream {
             let where_stream = WrappedTokenStream(where_stream);
 
             let mut final_stream = quote! {
-                impl<A> EventSuperstructure<A> for #gident
+                impl<A: Application<EventSuperstructure = Self>> EventSuperstructure<A> for #gident
                     where #where_stream {
-                    fn handle(self, rt: &mut Runtime<A, Self>) {
+                    fn handle(self, rt: &mut Runtime<A>) {
                         match self {
                             #token_stream
                         }

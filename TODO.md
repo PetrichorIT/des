@@ -51,3 +51,7 @@ Macros can do the heavy lifting.
 
 -   SimTime rework?
 -   bettern interning integration
+
+# Idea bind events to RT as trait param
+
+--> Reduces complexity.
