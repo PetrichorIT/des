@@ -23,13 +23,13 @@ lazy_static! {
     static ref RESOLVERS: Mutex<HashMap<String, NdlResolver>> = Mutex::new(HashMap::new());
 }
 
-fn get_resolver<'a>(workspace: &String) -> Result<(OwnedTySpecContext, bool), &'static str> {
+fn get_resolver(workspace: &str) -> Result<(OwnedTySpecContext, bool), &'static str> {
     let mut resolvers = RESOLVERS.lock().unwrap();
 
     if !resolvers.contains_key(workspace) {
         resolvers.insert(
-            workspace.clone(),
-            NdlResolver::new(&workspace).expect("#[derive(Module)] Invalid NDL workspace."),
+            workspace.to_owned(),
+            NdlResolver::new(workspace).expect("#[derive(Module)] Invalid NDL workspace."),
         );
     }
     resolvers
@@ -72,7 +72,7 @@ pub fn derive_module(input: TokenStream) -> TokenStream {
     let attrs = Attributes::from_attr(attrs);
 
     let mut static_gen = gen_static_module_core(ident.clone(), data);
-    let dynamic_gen = gen_dynamic_module_core(ident.clone(), attrs);
+    let dynamic_gen = gen_dynamic_module_core(ident, attrs);
 
     static_gen.extend(dynamic_gen.into_iter());
 

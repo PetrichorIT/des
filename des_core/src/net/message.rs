@@ -130,7 +130,7 @@ impl Message {
         bit_len: usize,
         byte_len: usize,
     ) -> Self {
-        let obj = Self {
+        Self {
             kind,
             last_gate,
             sender_module_id,
@@ -143,9 +143,7 @@ impl Message {
             content,
             bit_len,
             byte_len,
-        };
-
-        obj
+        }
     }
 
     ///

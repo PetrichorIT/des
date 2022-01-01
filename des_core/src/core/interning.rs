@@ -86,14 +86,14 @@ impl Interner {
         // any & references.
         let contents = unsafe { &mut *self.contents.get() };
 
-        for index in 0..contents.len() {
-            if contents[index].is_none() {
+        for (index, item) in contents.iter_mut().enumerate() {
+            if item.is_none() {
                 // Use previous freed item.
                 // println!(
                 //     "[Interner] >> New #{} (filler) ty: {:?}",
                 //     index, descriptor.ty_id
                 // );
-                contents[index] = Some(descriptor);
+                *item = Some(descriptor);
 
                 return InternedValue {
                     interner: self,
@@ -119,6 +119,7 @@ impl Interner {
 
     /// Retrieves a entry at cell the given index.
     #[allow(unused_unsafe)]
+    #[allow(clippy::mut_from_ref)]
     unsafe fn get_mut(&self, index: usize) -> &mut InteredValueDescriptor {
         // # Safty
         // This is an internal fn that under the safty contract of
@@ -224,11 +225,15 @@ impl Interner {
         // This is safe since all uses of get_mut() at internally and no
         // references leak.
         let contents = unsafe { &*self.contents.get() };
-        for entry in contents {
-            if let Some(entry) = entry {
-                eprintln!("[ERROR] Undisposed obj after runtime end: {:?}", entry);
-            }
+        for entry in contents.iter().flatten() {
+            eprintln!("[ERROR] Undisposed obj after runtime end: {:?}", entry);
         }
+    }
+}
+
+impl Default for Interner {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

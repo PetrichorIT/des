@@ -58,6 +58,7 @@ impl ChannelMetrics {
     ///
     /// Calcualtes the duration a message travels on a link.
     ///
+    #[allow(clippy::if_same_then_else)]
     pub fn calculate_duration(&self, msg: &Message) -> SimTime {
         if self.bitrate == 0 {
             return SimTime::ZERO;

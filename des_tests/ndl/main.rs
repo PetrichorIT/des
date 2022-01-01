@@ -29,7 +29,7 @@ fn main() {
         },
     );
 
-    for id in vec![bob1_id, bob2_id, bob3_id, bob4_id, bob5_id] {
+    for id in [bob1_id, bob2_id, bob3_id, bob4_id, bob5_id] {
         let msg = Message::new(
             0xff,
             GATE_NULL,

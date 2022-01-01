@@ -287,10 +287,13 @@ pub trait NdlCompatableModule: StaticModuleCore {
     ///
     /// Creates a named instance of self based on the parent hierachical structure.
     ///
+    #[allow(clippy::borrowed_box)]
     fn named_with_parent<T: NdlCompatableModule>(name: &str, parent: &Box<T>) -> Self
     where
         Self: Sized,
     {
+        // Clippy is just confused .. non box-borrow would throw E0277
+
         Self::named(format!(
             "{}.{}",
             parent.name().expect("Named entities should have names"),

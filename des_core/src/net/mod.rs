@@ -39,14 +39,17 @@ impl<A> NetworkRuntime<A> {
         self.modules.last_mut().unwrap()
     }
 
-    pub fn module<P>(&self, predicate: P) -> Option<&Box<dyn Module>>
+    pub fn module<P>(&self, predicate: P) -> Option<&dyn Module>
     where
         P: FnMut(&&Box<dyn Module>) -> bool,
     {
-        self.modules.iter().find(predicate)
+        self.modules
+            .iter()
+            .find(predicate)
+            .map(|boxed| boxed.deref())
     }
 
-    pub fn module_by_id(&self, module_id: ModuleId) -> Option<&Box<dyn Module>> {
+    pub fn module_by_id(&self, module_id: ModuleId) -> Option<&dyn Module> {
         self.module(|m| m.id() == module_id)
     }
 
