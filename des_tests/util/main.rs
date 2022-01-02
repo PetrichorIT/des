@@ -1,32 +1,30 @@
-#[allow(unused)]
 use des_core::*;
-use util_macros::EventSet;
+use des_macros::Network;
 
-struct App;
-impl Application for App {
-    type EventSet = Events;
-}
+mod members;
+use members::*;
+use rand::{prelude::StdRng, SeedableRng};
 
-#[derive(EventSet)]
-enum Events {
-    EventA(EventA),
-    EventB(EventB),
-}
-
-struct EventA();
-
-impl Event<App> for EventA {
-    fn handle(self, _rt: &mut Runtime<App>) {}
-}
-
-struct EventB();
-
-impl Event<App> for EventB {
-    fn handle(self, _rt: &mut Runtime<App>) {}
-}
+#[derive(Network)]
+#[ndl_workspace = "util"]
+struct A();
 
 fn main() {
-    let _ev: Events = EventB().into();
+    let app: NetworkRuntime<A> = A().build_rt();
 
-    // let a: <EventA as Event<App>>::EventSuperstructure = Events::EventA(todo!());
+    let rt = Runtime::new_with(
+        app,
+        des_core::RuntimeOptions {
+            sim_base_unit: des_core::SimTimeUnit::Seconds,
+            rng: StdRng::seed_from_u64(0x123),
+            max_itr: !0,
+        },
+    );
+
+    let (_, end_time) = rt.run().unwrap();
+
+    println!(
+        "Sim finished {}",
+        SimTimeUnit::fmt_compact(end_time, SimTimeUnit::Seconds)
+    );
 }

@@ -28,6 +28,12 @@ pub trait Module: StaticModuleCore {
     /// A periodic activity handler.
     ///
     fn activity(&mut self) {}
+
+    ///
+    /// A function that is run at the start of each simulation,
+    /// for each module.
+    ///
+    fn at_simulation_start(&mut self) {}
 }
 
 ///
@@ -224,6 +230,7 @@ pub trait StaticModuleCore {
     ///
     fn disable_activity(&mut self) {
         self.module_core_mut().activity_period = SimTime::ZERO;
+        self.module_core_mut().activity_active = false;
     }
 
     ///
@@ -343,7 +350,7 @@ pub trait NdlBuildableModule {
 #[derive(Debug, Clone)]
 pub struct ModuleCore {
     /// A runtime specific but unqiue identifier for a given module.
-    pub id: ModuleId,
+    id: ModuleId,
 
     /// A human readable identifier for the module.
     pub name: Option<String>,
@@ -368,6 +375,10 @@ pub struct ModuleCore {
 }
 
 impl ModuleCore {
+    pub fn id(&self) -> ModuleId {
+        self.id
+    }
+
     pub fn identifier(&self) -> String {
         format!(
             "#{} {}",

@@ -17,13 +17,13 @@ pub struct NetworkRuntime<A> {
     /// The set of module used in the network simulation.
     /// All module must be boxed, since they must conform to the [Module] trait.
     ///
-    pub modules: Vec<Box<dyn Module>>,
+    modules: Vec<Box<dyn Module>>,
 
     ///
     /// The set of channels used to connect module. This will NOT include direct connections
     /// which do not contain any delay, thus are bound to no channel.
     ///
-    pub channels: Vec<Channel>,
+    channels: Vec<Channel>,
 
     ///
     /// A inner container for holding user defined global state.
@@ -50,8 +50,15 @@ impl<A> NetworkRuntime<A> {
     /// This reference should be short lived since it blocks any other reference to self.
     ///
     pub fn create_module(&mut self, module: Box<dyn Module>) -> &mut Box<dyn Module> {
-        self.modules.push(module);
-        self.modules.last_mut().unwrap()
+        let insert_at = match self
+            .modules
+            .binary_search_by_key(&module.id().0, |m| m.id().0)
+        {
+            Ok(insert_at) | Err(insert_at) => insert_at,
+        };
+
+        self.modules.insert(insert_at, module);
+        &mut self.modules[insert_at]
     }
 
     ///
@@ -69,10 +76,19 @@ impl<A> NetworkRuntime<A> {
     }
 
     ///
-    /// Leacy support. Deprecation planned.
+    /// Retrieves module by id. This is more efficient that the usual
+    /// 'module_mut' because ids a sorted so binary seach can be used.
     ///
     pub fn module_by_id(&self, module_id: ModuleId) -> Option<&dyn Module> {
-        self.module(|m| m.id() == module_id)
+        let pos = match self
+            .modules
+            .binary_search_by_key(&module_id.0, |m| m.id().0)
+        {
+            Ok(pos) => pos,
+            Err(_) => return None,
+        };
+
+        Some(self.modules[pos].deref())
     }
 
     ///
@@ -87,10 +103,19 @@ impl<A> NetworkRuntime<A> {
     }
 
     ///
-    /// Leacy support. Deprecation planned.
+    /// Retrieves module mutably by id. This is more efficient that the usual
+    /// 'module_mut' because ids a sorted so binary seach can be used.
     ///
     pub fn module_mut_by_id(&mut self, module_id: ModuleId) -> Option<&mut Box<dyn Module>> {
-        self.module_mut(|m| m.id() == module_id)
+        let pos = match self
+            .modules
+            .binary_search_by_key(&module_id.0, |m| m.id().0)
+        {
+            Ok(pos) => pos,
+            Err(_) => return None,
+        };
+
+        Some(&mut self.modules[pos])
     }
 
     ///
@@ -98,22 +123,39 @@ impl<A> NetworkRuntime<A> {
     ///
     pub fn create_channel(&mut self, metrics: ChannelMetrics) -> ChannelId {
         let channel = Channel::new(metrics);
-        self.channels.push(channel);
-        self.channels.last().unwrap().id()
+        let insert_at = match self
+            .channels
+            .binary_search_by_key(&channel.id().0, |c| c.id().0)
+        {
+            Ok(insert_at) | Err(insert_at) => insert_at,
+        };
+
+        self.channels.insert(insert_at, channel);
+        self.channels[insert_at].id()
     }
 
     ///
     /// Retrieves a channel by id.
     ///
     pub fn channel(&self, id: ChannelId) -> Option<&Channel> {
-        self.channels.iter().find(|c| c.id() == id)
+        let pos = match self.channels.binary_search_by_key(&id.0, |c| c.id().0) {
+            Ok(pos) => pos,
+            Err(_) => return None,
+        };
+
+        Some(&self.channels[pos])
     }
 
     ///
     /// Retrieves a channel by id mutabliy.
     ///
     pub fn channel_mut(&mut self, id: ChannelId) -> Option<&mut Channel> {
-        self.channels.iter_mut().find(|c| c.id() == id)
+        let pos = match self.channels.binary_search_by_key(&id.0, |c| c.id().0) {
+            Ok(pos) => pos,
+            Err(_) => return None,
+        };
+
+        Some(&mut self.channels[pos])
     }
 
     ///
@@ -155,6 +197,10 @@ impl<A> NetworkRuntime<A> {
 
 impl<A> Application for NetworkRuntime<A> {
     type EventSet = NetEvents;
+
+    fn at_simulation_start(rt: &mut Runtime<Self>) {
+        rt.add_event(NetEvents::SimStartNotif(SimStartNotif()), SimTime::now())
+    }
 }
 
 ///
@@ -165,6 +211,7 @@ pub enum NetEvents {
     HandleMessageEvent(HandleMessageEvent),
     CoroutineMessageEvent(CoroutineMessageEvent),
     ChannelUnbusyNotif(ChannelUnbusyNotif),
+    SimStartNotif(SimStartNotif),
 }
 
 impl<A> EventSet<NetworkRuntime<A>> for NetEvents {
@@ -174,6 +221,7 @@ impl<A> EventSet<NetworkRuntime<A>> for NetEvents {
             Self::HandleMessageEvent(event) => event.handle(rt),
             Self::CoroutineMessageEvent(event) => event.handle(rt),
             Self::ChannelUnbusyNotif(event) => event.handle(rt),
+            Self::SimStartNotif(event) => event.handle(rt),
         }
     }
 }
@@ -305,50 +353,8 @@ impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
 
             module.handle_message(message);
 
-            // Send out events
-            let out_buffer: Vec<(Message, GateId)> =
-                module.module_core_mut().out_buffer.drain(0..).collect();
-
-            // Schedule own wakeups
-            let loopback_buffer: Vec<(Message, SimTime)> = module
-                .module_core_mut()
-                .loopback_buffer
-                .drain(0..)
-                .collect();
-
-            let enqueue_activity_msg = module.module_core_mut().activity_period != SimTime::ZERO
-                && !module.module_core_mut().activity_active;
-
-            for (msg, gate_id) in out_buffer {
-                rt.add_event(
-                    NetEvents::MessageAtGateEvent(MessageAtGateEvent {
-                        gate_id,
-                        message: ManuallyDrop::new(msg),
-                        handled: false,
-                    }),
-                    SimTime::now(),
-                )
-            }
-
-            for (msg, time) in loopback_buffer {
-                rt.add_event(
-                    NetEvents::HandleMessageEvent(HandleMessageEvent {
-                        module_id: self.module_id,
-                        message: ManuallyDrop::new(msg),
-                        handled: false,
-                    }),
-                    time,
-                )
-            }
-
-            if enqueue_activity_msg {
-                rt.add_event(
-                    NetEvents::CoroutineMessageEvent(CoroutineMessageEvent {
-                        module_id: self.module_id,
-                    }),
-                    SimTime::now(),
-                )
-            }
+            let job = module_drain_buffers(module.module_core_mut());
+            module_handle_jobs(rt, job);
 
             self.handled = true;
         } else {
@@ -377,15 +383,30 @@ impl<A> Event<NetworkRuntime<A>> for CoroutineMessageEvent {
     fn handle(self, rt: &mut crate::Runtime<NetworkRuntime<A>>) {
         if let Some(module) = rt.app.module_mut_by_id(self.module_id) {
             let dur = module.module_core().activity_period;
-            if dur != SimTime::ZERO {
+            // This message can only occure *after* the activity is
+            // fully initalized.
+            // It can be the case that this is wrong .. if handle_message at invalidated activity
+            // but a event still remains in queue.
+            if dur != SimTime::ZERO && module.module_core().activity_active {
                 module.activity();
 
-                rt.add_event_in(
-                    NetEvents::CoroutineMessageEvent(CoroutineMessageEvent {
-                        module_id: self.module_id,
-                    }),
-                    dur,
-                )
+                let still_active = module.module_core().activity_active;
+
+                // This call will only use up out buffers and loopback buffers
+                // not schedule a new Coroutine since either:
+                // - state remains stable since allready init
+                // - activity deactivated.
+                let jobs = module_drain_buffers(module.module_core_mut());
+                module_handle_jobs(rt, jobs);
+
+                if still_active {
+                    rt.add_event_in(
+                        NetEvents::CoroutineMessageEvent(CoroutineMessageEvent {
+                            module_id: self.module_id,
+                        }),
+                        dur,
+                    )
+                }
             }
         } else {
             error!(
@@ -410,5 +431,103 @@ impl<A> Event<NetworkRuntime<A>> for ChannelUnbusyNotif {
         {
             channel.set_busy(false);
         }
+    }
+}
+
+pub struct SimStartNotif();
+
+impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
+    fn handle(self, rt: &mut Runtime<NetworkRuntime<A>>) {
+        // This is a explicit for loop to prevent borrow rt only in the inner block
+        // allowing preemtive dropping of 'module' so that rt can be used in
+        // 'module_handle_jobs'.
+        for i in 0..rt.app.modules.len() {
+            let module = &mut rt.app.modules[i];
+            info!(
+                target: &format!("Module {}", module.str()),
+                "Calling at_simulation_start."
+            );
+            module.at_simulation_start();
+
+            let jobs = module_drain_buffers(module.module_core_mut());
+            module_handle_jobs(rt, jobs);
+        }
+    }
+}
+
+//
+// # Helper functions
+//
+
+struct ModuleBufferJob {
+    module_id: ModuleId,
+
+    out: Vec<(Message, GateId)>,
+    loopback: Vec<(Message, SimTime)>,
+
+    ac_event: Option<SimTime>,
+}
+
+fn module_drain_buffers(module_core: &mut ModuleCore) -> ModuleBufferJob {
+    let enqueue_activity_msg =
+        module_core.activity_period != SimTime::ZERO && !module_core.activity_active;
+
+    if enqueue_activity_msg {
+        module_core.activity_active = enqueue_activity_msg;
+    }
+
+    ModuleBufferJob {
+        module_id: module_core.id(),
+
+        out: module_core.out_buffer.drain(..).collect(),
+        loopback: module_core.loopback_buffer.drain(..).collect(),
+
+        ac_event: if enqueue_activity_msg {
+            Some(module_core.activity_period)
+        } else {
+            None
+        },
+    }
+}
+
+fn module_handle_jobs<A>(rt: &mut Runtime<NetworkRuntime<A>>, job: ModuleBufferJob) {
+    let ModuleBufferJob {
+        module_id,
+        out,
+        loopback,
+        ac_event,
+    } = job;
+
+    // Send gate events from the 'send' method calls
+    for (msg, gate_id) in out {
+        rt.add_event(
+            NetEvents::MessageAtGateEvent(MessageAtGateEvent {
+                gate_id,
+                message: ManuallyDrop::new(msg),
+                handled: false,
+            }),
+            SimTime::now(),
+        )
+    }
+
+    // Send loopback events from 'scheduleAt'
+    for (msg, time) in loopback {
+        rt.add_event(
+            NetEvents::HandleMessageEvent(HandleMessageEvent {
+                module_id: module_id,
+                message: ManuallyDrop::new(msg),
+                handled: false,
+            }),
+            time,
+        )
+    }
+
+    // initalily
+    // call activity
+    if let Some(ac_event) = ac_event {
+        rt.add_event_in(
+            NetEvents::CoroutineMessageEvent(CoroutineMessageEvent { module_id }),
+            ac_event,
+        )
     }
 }

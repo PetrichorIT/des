@@ -8,7 +8,7 @@ use crate::net::*;
 /// A runtime-unique identifier for a one directional channel.
 #[derive(GlobalUID)]
 #[repr(transparent)]
-pub struct ChannelId(usize);
+pub struct ChannelId(pub usize);
 
 /// A not defined channel aka a missing link.
 pub const CHANNEL_NULL: ChannelId = ChannelId(0);

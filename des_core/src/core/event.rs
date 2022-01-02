@@ -11,8 +11,11 @@ use std::{
 /// runtime.
 ///
 pub trait Application: Sized {
-    ///
+    /// The set of events used in the simulation.
     type EventSet: EventSet<Self>;
+
+    /// A function that is called only once at the start of the simulation.
+    fn at_simulation_start(_rt: &mut Runtime<Self>) {}
 }
 
 ///

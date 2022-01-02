@@ -29,7 +29,7 @@ path = "util/main.rs"
 des_core = {path = "../des_core"}
 des_macros = {path = "../des_macros"}
 des_ndl = {path = "../des_ndl"}
-log = {version = "*", features = ["max_level_error"]}
+log = {version = "*"}
 # log = "*"
 rand = "*"
 util = {path = "../util"}

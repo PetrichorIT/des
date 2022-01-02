@@ -1,6 +1,7 @@
 use crate::core::*;
 
 use lazy_static::lazy_static;
+use log::warn;
 use rand::{
     distributions::Standard,
     prelude::{Distribution, StdRng},
@@ -233,7 +234,7 @@ impl<A: Application> Runtime<A> {
     }
 
     pub fn new_with(app: A, options: RuntimeOptions) -> Self {
-        Self {
+        let mut this = Self {
             core: RuntimeCore::new(
                 SimTime::ZERO,
                 options.sim_base_unit,
@@ -243,8 +244,11 @@ impl<A: Application> Runtime<A> {
                 options.rng,
             ),
             app,
-            future_event_heap: BinaryHeap::new(),
-        }
+            future_event_heap: BinaryHeap::with_capacity(64),
+        };
+
+        A::at_simulation_start(&mut this);
+        this
     }
 
     ///
@@ -270,6 +274,11 @@ impl<A: Application> Runtime<A> {
     /// Runs the application until it terminates or exceeds it max_itr.
     ///
     pub fn run(mut self) -> Option<(A, SimTime)> {
+        if self.future_event_heap.is_empty() {
+            warn!(target: "des::core", "Running simulation without any events. Think about adding some inital events.");
+            return None;
+        }
+
         while self.next() {}
 
         if self.future_event_heap.is_empty() {
