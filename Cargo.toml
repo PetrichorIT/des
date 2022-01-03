@@ -1,0 +1,10 @@
+[workspace]
+
+members = [
+  "des_core",
+  "des_tests",
+  "des_template",
+  "util",
+  "des_macros",
+  "util_macros",
+]

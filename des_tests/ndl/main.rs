@@ -6,7 +6,7 @@ use members::*;
 use rand::{prelude::StdRng, SeedableRng};
 
 #[derive(Network)]
-#[ndl_workspace = "ndl"]
+#[ndl_workspace = "des_tests/ndl"]
 struct A();
 
 fn main() {
@@ -37,7 +37,7 @@ fn main() {
             String::from("Init"),
         );
 
-        let arr_time = id.0 as f64 / 1000.0;
+        let arr_time = id.raw() as f64 / 1000.0;
 
         rt.handle_message_on(id, msg, arr_time.into());
     }

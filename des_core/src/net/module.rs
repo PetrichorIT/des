@@ -1,15 +1,15 @@
 use log::error;
-use util_macros::GlobalUID;
+use util::create_global_uid;
 
 use crate::{
     ChannelId, Gate, GateDescription, GateId, IntoModuleGate, Message, NetworkRuntime, SimTime,
     CHANNEL_NULL, GATE_NULL,
 };
 
-/// A runtime-unqiue identifier for a module / submodule inheritence tree.
-#[derive(GlobalUID)]
-#[repr(transparent)]
-pub struct ModuleId(pub u16);
+create_global_uid!(
+    /// A runtime-unqiue identifier for a module / submodule inheritence tree.
+    pub ModuleId(u16) = MODULE_ID,
+);
 
 /// A indication that the referenced module does not exist.
 pub const MODULE_NULL: ModuleId = ModuleId(0);

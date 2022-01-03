@@ -1,12 +1,12 @@
 use std::fmt::{Debug, Display};
-use util_macros::GlobalUID;
+use util::create_global_uid;
 
 use crate::net::*;
 
-/// A runtime-unquie identifier for a gate.
-#[derive(GlobalUID)]
-#[repr(transparent)]
-pub struct GateId(u32);
+create_global_uid!(
+    /// A runtime-unquie identifier for a gate.
+    pub GateId(u32) = GATE_ID,
+);
 
 /// A non-initalized gate.
 pub const GATE_NULL: GateId = GateId(0);

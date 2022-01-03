@@ -1,14 +1,14 @@
 use std::fmt::Display;
 
-use util_macros::GlobalUID;
+use util::create_global_uid;
 
 use crate::core::*;
 use crate::net::*;
 
-/// A runtime-unique identifier for a one directional channel.
-#[derive(GlobalUID)]
-#[repr(transparent)]
-pub struct ChannelId(pub usize);
+create_global_uid!(
+    /// A runtime-unique identifier for a one directional channel.
+    pub ChannelId(usize) = CHANNEL_ID,
+);
 
 /// A not defined channel aka a missing link.
 pub const CHANNEL_NULL: ChannelId = ChannelId(0);

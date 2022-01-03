@@ -50,10 +50,7 @@ impl<A> NetworkRuntime<A> {
     /// This reference should be short lived since it blocks any other reference to self.
     ///
     pub fn create_module(&mut self, module: Box<dyn Module>) -> &mut Box<dyn Module> {
-        let insert_at = match self
-            .modules
-            .binary_search_by_key(&module.id().0, |m| m.id().0)
-        {
+        let insert_at = match self.modules.binary_search_by_key(&module.id(), |m| m.id()) {
             Ok(insert_at) | Err(insert_at) => insert_at,
         };
 
@@ -80,10 +77,7 @@ impl<A> NetworkRuntime<A> {
     /// 'module_mut' because ids a sorted so binary seach can be used.
     ///
     pub fn module_by_id(&self, module_id: ModuleId) -> Option<&dyn Module> {
-        let pos = match self
-            .modules
-            .binary_search_by_key(&module_id.0, |m| m.id().0)
-        {
+        let pos = match self.modules.binary_search_by_key(&module_id, |m| m.id()) {
             Ok(pos) => pos,
             Err(_) => return None,
         };
@@ -107,10 +101,7 @@ impl<A> NetworkRuntime<A> {
     /// 'module_mut' because ids a sorted so binary seach can be used.
     ///
     pub fn module_mut_by_id(&mut self, module_id: ModuleId) -> Option<&mut Box<dyn Module>> {
-        let pos = match self
-            .modules
-            .binary_search_by_key(&module_id.0, |m| m.id().0)
-        {
+        let pos = match self.modules.binary_search_by_key(&module_id, |m| m.id()) {
             Ok(pos) => pos,
             Err(_) => return None,
         };
@@ -125,7 +116,7 @@ impl<A> NetworkRuntime<A> {
         let channel = Channel::new(metrics);
         let insert_at = match self
             .channels
-            .binary_search_by_key(&channel.id().0, |c| c.id().0)
+            .binary_search_by_key(&channel.id(), |c| c.id())
         {
             Ok(insert_at) | Err(insert_at) => insert_at,
         };
@@ -138,7 +129,7 @@ impl<A> NetworkRuntime<A> {
     /// Retrieves a channel by id.
     ///
     pub fn channel(&self, id: ChannelId) -> Option<&Channel> {
-        let pos = match self.channels.binary_search_by_key(&id.0, |c| c.id().0) {
+        let pos = match self.channels.binary_search_by_key(&id, |c| c.id()) {
             Ok(pos) => pos,
             Err(_) => return None,
         };
@@ -150,7 +141,7 @@ impl<A> NetworkRuntime<A> {
     /// Retrieves a channel by id mutabliy.
     ///
     pub fn channel_mut(&mut self, id: ChannelId) -> Option<&mut Channel> {
-        let pos = match self.channels.binary_search_by_key(&id.0, |c| c.id().0) {
+        let pos = match self.channels.binary_search_by_key(&id, |c| c.id()) {
             Ok(pos) => pos,
             Err(_) => return None,
         };
@@ -514,7 +505,7 @@ fn module_handle_jobs<A>(rt: &mut Runtime<NetworkRuntime<A>>, job: ModuleBufferJ
     for (msg, time) in loopback {
         rt.add_event(
             NetEvents::HandleMessageEvent(HandleMessageEvent {
-                module_id: module_id,
+                module_id,
                 message: ManuallyDrop::new(msg),
                 handled: false,
             }),

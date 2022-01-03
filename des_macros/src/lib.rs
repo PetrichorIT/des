@@ -354,7 +354,7 @@ fn ident_from_conident(
 /// - build_rt
 ///
 /// The build_rt function allows the struct the macro is applied to to generate a
-/// NetworkRuntime<A> where A is the struct itself.
+/// NetworkRuntime where A is the struct itself.
 /// This network runtime has preconfigured modules and connections according to the
 /// networks NDL specification and intern the used modules NDL specification.
 ///

@@ -3,15 +3,15 @@ use std::{
     fmt::Debug,
 };
 
-use util_macros::GlobalUID;
+use util::create_global_uid;
 
 use crate::core::*;
 use crate::net::*;
 
-/// A globaly unqiue identifer for a message.
-#[derive(GlobalUID)]
-#[repr(transparent)]
-pub struct MessageId(pub u32);
+create_global_uid!(
+    /// A globaly unqiue identifer for a message.
+    pub MessageId(u32) = MESSAGE_ID,
+);
 
 /// The type of messages, similar to the TOS field in IP packets.
 pub type MessageKind = u16;

@@ -6,7 +6,7 @@ use des_macros::Module;
 use log::info;
 
 #[derive(Module)]
-#[ndl_workspace = "ndl"]
+#[ndl_workspace = "des_tests/ndl"]
 pub struct Alice(ModuleCore);
 
 impl Module for Alice {
@@ -44,7 +44,7 @@ impl NdlCompatableModule for Alice {
 }
 
 #[derive(Module, Debug)]
-#[ndl_workspace = "ndl"]
+#[ndl_workspace = "des_tests/ndl"]
 pub struct Bob(ModuleCore);
 
 impl Module for Bob {
@@ -91,7 +91,7 @@ impl NdlCompatableModule for Bob {
 }
 
 #[derive(Module)]
-#[ndl_workspace = "ndl"]
+#[ndl_workspace = "des_tests/ndl"]
 pub struct Eve(pub ModuleCore);
 
 impl Module for Eve {

@@ -6,7 +6,7 @@ use members::*;
 use rand::{prelude::StdRng, SeedableRng};
 
 #[derive(Network)]
-#[ndl_workspace = "util"]
+#[ndl_workspace = "des_tests/utils"]
 struct A();
 
 fn main() {

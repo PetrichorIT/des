@@ -22,8 +22,8 @@ name = "ndl"
 path = "ndl/main.rs"
 
 [[bin]]
-name = "util"
-path = "util/main.rs"
+name = "utils"
+path = "utils/main.rs"
 
 [dependencies]
 des_core = {path = "../des_core"}

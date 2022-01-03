@@ -1,5 +1,5 @@
 use std::mem::size_of;
-use util_macros::GlobalUID;
+use util::create_global_uid;
 
 use crate::core::*;
 use crate::net::*;
@@ -33,10 +33,10 @@ pub const NODE_ADDR_LOOPBACK: NodeAddress = 0x7f_00_00_01;
 /// A node-local address of an application.
 pub type PortAddress = u16;
 
-/// A globalsy unqiue identifer for a packet.
-#[derive(GlobalUID)]
-#[repr(transparent)]
-pub struct PacketId(u32);
+create_global_uid!(
+    /// A globalsy unqiue identifer for a packet.
+    pub PacketId(u32) = PACKET_ID,
+);
 
 ///
 /// A application-addressed message in a network, similar to TCP/UDP.
