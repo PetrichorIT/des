@@ -52,6 +52,38 @@ macro_rules! create_global_uid {
     };
 }
 
+/// In dev
+#[macro_export]
+macro_rules! create_event_set {
+    (
+        $(#[$outer:meta])*
+        $vis: vis enum $ident: ident {
+            type App = $appty: ty where $(generics: ident),*;
+
+            $(
+                $variant: ident($variant_ty: ty),
+            )+
+        };
+    ) => {
+        $(#[$outer])*
+        $vis enum $ident {
+            $(
+                $variant($variant_ty),
+            )+
+        }
+
+        impl EventSet<$appty> for $ident {
+            fn handle(self, rt: &mut Runtime<$appty>) {
+                match self {
+                    $(
+                        Self::$variant(event) => event.handle(rt),
+                    )+
+                }
+            }
+        }
+    };
+}
+
 ///
 /// A implementation of UnsafeCell that implements Sync
 /// since a corrolated DES simulation is inherintly single threaded.
