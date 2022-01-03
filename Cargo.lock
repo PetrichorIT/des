@@ -26,7 +26,6 @@ dependencies = [
  "unic-emoji-char",
  "unicode-xid",
  "util",
- "util_macros",
 ]
 
 [[package]]
@@ -70,7 +69,6 @@ dependencies = [
  "log",
  "rand",
  "util",
- "util_macros",
 ]
 
 [[package]]
@@ -293,15 +291,6 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "termcolor",
-]
-
-[[package]]
-name = "util_macros"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]

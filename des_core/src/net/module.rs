@@ -8,16 +8,22 @@ use crate::{
 
 create_global_uid!(
     /// A runtime-unqiue identifier for a module / submodule inheritence tree.
-    pub ModuleId(u16) = MODULE_ID,
+/// * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
+    pub ModuleId(u16) = MODULE_ID;
 );
 
 /// A indication that the referenced module does not exist.
+/// * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub const MODULE_NULL: ModuleId = ModuleId(0);
 
 ///
 /// A set of user defined functions for customizing the
 /// behaviour of a module.
 ///
+/// * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub trait Module: StaticModuleCore {
     ///
     /// A message handler for receiving events, user defined.
@@ -40,6 +46,8 @@ pub trait Module: StaticModuleCore {
 /// A marco-implemented trait that defines the static core components
 /// of a module.
 ///
+/// * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub trait StaticModuleCore {
     ///
     /// Returns a pointer to the modules core, used for handling event and
@@ -285,6 +293,8 @@ pub trait StaticModuleCore {
 /// A trait that prepares a module to be created from a NDL
 /// file.
 ///
+/// * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub trait NdlCompatableModule: StaticModuleCore {
     ///
     /// Creates a named instance of self without needing any additional parameters.
@@ -309,6 +319,12 @@ pub trait NdlCompatableModule: StaticModuleCore {
     }
 }
 
+///
+/// A macro-implemented trait that constructs a instance of Self using a NDl
+/// description.
+///
+/// * This type is only available of DES is build with the `"net"` feature.
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub trait NdlBuildableModule {
     ///
     /// Builds the given module according to the NDL specification
@@ -347,6 +363,8 @@ pub trait NdlBuildableModule {
 ///
 /// The usecase independent core of a module.
 ///
+/// * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 #[derive(Debug, Clone)]
 pub struct ModuleCore {
     /// A runtime specific but unqiue identifier for a given module.

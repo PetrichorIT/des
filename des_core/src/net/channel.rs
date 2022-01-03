@@ -7,21 +7,31 @@ use crate::net::*;
 
 create_global_uid!(
     /// A runtime-unique identifier for a one directional channel.
-    pub ChannelId(usize) = CHANNEL_ID,
+/// * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
+    pub ChannelId(usize) = CHANNEL_ID;
 );
 
 /// A not defined channel aka a missing link.
+/// * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub const CHANNEL_NULL: ChannelId = ChannelId(0);
 
 /// A reference to other channel in a two directional configuration.
+/// * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub const CHANNEL_SELF: ChannelId = ChannelId(1);
 
 /// The id of a general purpose non-delay channel
+/// * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub const CHANNEL_INSTANTANEOUS: ChannelId = ChannelId(2);
 
 ///
 /// Metrics that define a channels capabilitites.
 ///
+/// * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChannelMetrics {
     /// The maximum throughput of the channel in bit/s
@@ -99,6 +109,8 @@ impl Display for ChannelMetrics {
 ///
 /// A representation of a one directional link.
 ///
+/// * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 #[derive(Debug)]
 pub struct Channel {
     /// A unique identifier for a channel.

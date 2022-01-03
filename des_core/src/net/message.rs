@@ -10,15 +10,21 @@ use crate::net::*;
 
 create_global_uid!(
     /// A globaly unqiue identifer for a message.
-    pub MessageId(u32) = MESSAGE_ID,
+/// * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
+    pub MessageId(u32) = MESSAGE_ID;
 );
 
 /// The type of messages, similar to the TOS field in IP packets.
+/// * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub type MessageKind = u16;
 
 ///
 /// A generic network message holding a payload.
 ///
+/// * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub struct Message {
     pub kind: MessageKind,
     pub timestamp: SimTime,
@@ -284,6 +290,8 @@ impl Debug for Message {
 ///
 /// A trait that allows a type to be mesured in bits / bytes.
 ///
+/// * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub trait MessageBody {
     fn byte_len(&self) -> usize;
     fn bit_len(&self) -> usize {

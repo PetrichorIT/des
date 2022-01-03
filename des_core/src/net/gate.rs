@@ -5,16 +5,26 @@ use crate::net::*;
 
 create_global_uid!(
     /// A runtime-unquie identifier for a gate.
-    pub GateId(u32) = GATE_ID,
+/// * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
+    pub GateId(u32) = GATE_ID;
 );
 
 /// A non-initalized gate.
+/// * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub const GATE_NULL: GateId = GateId(0);
+
 /// A referecne to the current working gate.
+/// * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub const GATE_SELF: GateId = GateId(1);
 
 ///
 /// A description of a gate / gate cluster on a module.
+///
+/// * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct GateDescription {
     /// The identifier of the module the gate was created on.
@@ -52,6 +62,8 @@ impl Display for GateDescription {
 ///
 /// A gate, a message insertion or extraction point used for handeling channels.
 ///
+/// * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Gate {
     /// A globally unique identifier for the gate.

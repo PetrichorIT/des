@@ -21,26 +21,36 @@ pub const NODE_ADDR_LOOPBACK: NodeAddress = 0xfe80;
 pub type NodeAddress = u32;
 
 /// The broadcast address in a IPv4 network.
+/// * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 #[cfg(not(feature = "netipv6"))]
 #[allow(unused)]
 pub const NODE_ADDR_BROADCAST: NodeAddress = u32::MAX;
 
 /// The loopback address in a IPv4 network.
+/// * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 #[cfg(not(feature = "netipv6"))]
 #[allow(unused)]
 pub const NODE_ADDR_LOOPBACK: NodeAddress = 0x7f_00_00_01;
 
 /// A node-local address of an application.
+/// * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub type PortAddress = u16;
 
 create_global_uid!(
     /// A globalsy unqiue identifer for a packet.
-    pub PacketId(u32) = PACKET_ID,
+/// * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
+    pub PacketId(u32) = PACKET_ID;
 );
 
 ///
 /// A application-addressed message in a network, similar to TCP/UDP.
 ///
+/// * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 #[allow(unused)]
 pub struct Packet {
     id: PacketId,

@@ -3,6 +3,7 @@ use crate::net::*;
 
 use lazy_static::__Deref;
 use std::mem::ManuallyDrop;
+use util::create_event_set;
 
 use crate::{Event, EventSet, SimTime};
 use log::{error, info, warn};
@@ -194,28 +195,22 @@ impl<A> Application for NetworkRuntime<A> {
     }
 }
 
-///
-/// The event set for a [NetworkRuntime].
-///
-pub enum NetEvents {
-    MessageAtGateEvent(MessageAtGateEvent),
-    HandleMessageEvent(HandleMessageEvent),
-    CoroutineMessageEvent(CoroutineMessageEvent),
-    ChannelUnbusyNotif(ChannelUnbusyNotif),
-    SimStartNotif(SimStartNotif),
-}
+create_event_set!(
+    ///
+    /// The event set for a [NetworkRuntime].
+    ///
+    /// * This type is only available of DES is build with the `"net"` feature.
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
+    pub enum NetEvents {
+        type App = NetworkRuntime<A>;
 
-impl<A> EventSet<NetworkRuntime<A>> for NetEvents {
-    fn handle(self, rt: &mut Runtime<NetworkRuntime<A>>) {
-        match self {
-            Self::MessageAtGateEvent(event) => event.handle(rt),
-            Self::HandleMessageEvent(event) => event.handle(rt),
-            Self::CoroutineMessageEvent(event) => event.handle(rt),
-            Self::ChannelUnbusyNotif(event) => event.handle(rt),
-            Self::SimStartNotif(event) => event.handle(rt),
-        }
-    }
-}
+        MessageAtGateEvent(MessageAtGateEvent),
+        HandleMessageEvent(HandleMessageEvent),
+        CoroutineMessageEvent(CoroutineMessageEvent),
+        ChannelUnbusyNotif(ChannelUnbusyNotif),
+        SimStartNotif(SimStartNotif),
+    };
+);
 
 pub struct MessageAtGateEvent {
     pub gate_id: GateId,

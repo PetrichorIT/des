@@ -6,5 +6,4 @@ members = [
   "des_template",
   "util",
   "des_macros",
-  "util_macros",
 ]

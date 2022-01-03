@@ -33,4 +33,3 @@ log = {version = "*"}
 # log = "*"
 rand = "*"
 util = {path = "../util"}
-util_macros = {path = "../util_macros"}

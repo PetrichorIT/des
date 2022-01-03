@@ -1,11 +1,27 @@
 pub mod bench;
 
+///
+/// A decl. macro for creating numeric global UIDs.
+///
+/// # Syntax
+///
+/// ```
+/// create_global_uid!(
+///     pub MessageId(u32) = MESSAGE_ID_STATIC;
+///     pub(crate) packetId(u16) = PKT_ID_STATIC;
+/// );
+/// ```
+///
+/// # Note
+///
+/// The inner type must be numeric and initalizable from a numeric interger literal.
+/// Supported types are u* and i*.
+///
 #[macro_export]
 macro_rules! create_global_uid {
     ($(
         $(#[$outer:meta])*
-        $vis: vis $ident: ident($ty: ty) =
-        $sident: ident,
+        $vis: vis $ident: ident($ty: ty) = $sident: ident;
     )+) => {
 
         $(
@@ -52,13 +68,29 @@ macro_rules! create_global_uid {
     };
 }
 
-/// In dev
+///
+/// A decl. macro for generating a event set.
+///
+/// # Syntax
+///
+/// ```
+/// create_event_set!(
+///     pub enum EventSet {
+///         type App = NetworkRuntime<A>;
+///
+///         EventA(A),
+///         EventB(B),
+///     };
+/// );
+/// ```
+///
 #[macro_export]
 macro_rules! create_event_set {
+
     (
         $(#[$outer:meta])*
         $vis: vis enum $ident: ident {
-            type App = $appty: ty where $(generics: ident),*;
+            type App = $ty:ident < $( $N:ident $(: $b0:ident $(+$b:ident)* )? ),* >;
 
             $(
                 $variant: ident($variant_ty: ty),
@@ -72,8 +104,8 @@ macro_rules! create_event_set {
             )+
         }
 
-        impl EventSet<$appty> for $ident {
-            fn handle(self, rt: &mut Runtime<$appty>) {
+        impl< $( $N $(: $b0 $(+$b)* )? ),* > EventSet<$ty< $( $N ),* >> for $ident {
+            fn handle(self, rt: &mut Runtime<$ty< $( $N ),* >>) {
                 match self {
                     $(
                         Self::$variant(event) => event.handle(rt),
@@ -81,6 +113,34 @@ macro_rules! create_event_set {
                 }
             }
         }
+
+        $(
+            impl From<$variant_ty> for $ident {
+                fn from(variant: $variant_ty) -> Self {
+                    Self::$variant(variant)
+                }
+            }
+        )+
+    };
+    (
+        $(#[$outer:meta])*
+        $vis: vis enum $ident: ident {
+            type App = $ty:ident;
+
+            $(
+                $variant: ident($variant_ty: ty),
+            )+
+        };
+    ) => {
+        create_event_set!(
+            $vis enum $ident {
+                type App = $ty<>;
+
+                $(
+                    $variant($variant_ty),
+                )+
+            };
+        );
     };
 }
 
