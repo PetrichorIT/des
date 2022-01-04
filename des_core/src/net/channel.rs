@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use util::create_global_uid;
+use crate::create_global_uid;
 
 use crate::core::*;
 use crate::net::*;

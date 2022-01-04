@@ -9,6 +9,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 
 [[package]]
+name = "bench_utils"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "termcolor",
+]
+
+[[package]]
 name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -25,7 +35,6 @@ dependencies = [
  "termcolor",
  "unic-emoji-char",
  "unicode-xid",
- "util",
 ]
 
 [[package]]
@@ -43,11 +52,11 @@ dependencies = [
 name = "des_ndl"
 version = "0.1.0"
 dependencies = [
+ "bench_utils",
  "log",
  "termcolor",
  "unic-emoji-char",
  "unicode-xid",
- "util",
 ]
 
 [[package]]
@@ -68,7 +77,6 @@ dependencies = [
  "des_ndl",
  "log",
  "rand",
- "util",
 ]
 
 [[package]]
@@ -282,16 +290,6 @@ name = "unicode-xid"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ccb82d61f80a663efe1f787a51b16b5a51e3314d6ac365b08639f52387b33f3"
-
-[[package]]
-name = "util"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_derive",
- "serde_json",
- "termcolor",
-]
 
 [[package]]
 name = "wasi"

@@ -1,12 +1,10 @@
 use crate::core::*;
+use crate::create_event_set;
 use crate::net::*;
 
 use lazy_static::__Deref;
-use std::mem::ManuallyDrop;
-use util::create_event_set;
-
-use crate::{Event, EventSet, SimTime};
 use log::{error, info, warn};
+use std::mem::ManuallyDrop;
 
 ///
 /// A runtime application for a module/network oriantated simulation.

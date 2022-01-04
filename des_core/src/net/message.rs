@@ -3,10 +3,9 @@ use std::{
     fmt::Debug,
 };
 
-use util::create_global_uid;
-
 use crate::core::interning::*;
 use crate::core::*;
+use crate::create_global_uid;
 use crate::net::*;
 
 create_global_uid!(

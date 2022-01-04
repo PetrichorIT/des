@@ -4,6 +4,6 @@ members = [
   "des_core",
   "des_tests",
   "des_template",
-  "util",
+  "bench_utils",
   "des_macros",
 ]

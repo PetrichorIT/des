@@ -1,5 +1,5 @@
+use bench_utils::*;
 use des_ndl::*;
-use util::bench::*;
 
 fn main() {
     let mut ctx = BenchmarkCtx::new("tyc_stage (including lex + par)", 1_000);

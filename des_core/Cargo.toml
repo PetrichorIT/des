@@ -18,4 +18,3 @@ rand = {version = "*", features = ["std_rng"]}
 termcolor = "1.1.2"
 unic-emoji-char = "0.9.0"
 unicode-xid = "0.2.0"
-util = {path = "../util"}

@@ -1,5 +1,6 @@
 use crate::core::interning::*;
 use crate::core::*;
+use crate::util::*;
 
 use lazy_static::lazy_static;
 use log::warn;
@@ -14,7 +15,6 @@ use std::{
     collections::BinaryHeap,
     fmt::{Debug, Display},
 };
-use util::SyncCell;
 
 lazy_static! {
     pub(crate) static ref RTC: SyncCell<Option<RuntimeCore>> = SyncCell::new(None);
@@ -221,10 +221,18 @@ impl<A: Application> Runtime<A> {
     /// # Examples
     ///
     /// ```
-    /// use dse::*;
+    /// use des_core::*;
     ///
+    /// // Assumme Application is implemented for App.
     /// #[derive(Debug)]
     /// struct App(usize,  String);
+    /// # impl Application for App {
+    /// #   type EventSet = Events;
+    /// # }
+    /// # enum Events {}
+    /// # impl EventSet<App> for Events {
+    /// #   fn handle(self, rt: &mut Runtime<App>) {}
+    /// # }
     ///
     /// let app = App(42, String::from("Hello there!"));
     /// let rt = Runtime::new(app);

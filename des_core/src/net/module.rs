@@ -1,5 +1,4 @@
 use log::error;
-use util::create_global_uid;
 
 use crate::net::*;
 use crate::*;

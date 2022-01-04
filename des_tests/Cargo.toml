@@ -32,4 +32,3 @@ des_ndl = {path = "../des_ndl"}
 log = {version = "*"}
 # log = "*"
 rand = "*"
-util = {path = "../util"}
