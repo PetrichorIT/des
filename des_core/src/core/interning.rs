@@ -1,3 +1,9 @@
+//!
+//! A module for handeling efficent, dupliction free data storage.
+//!
+//! * This will only be visible when DES is build with the feature "pubinterning"
+//!
+
 use std::alloc::{dealloc, Layout};
 use std::any::{type_name, TypeId};
 use std::ops::{Deref, DerefMut};
@@ -374,7 +380,8 @@ impl<'a, T> TypedInternedValue<'a, T> {
     /// If that would be the case, the interned value would be dropped without type information
     /// leading to a potentially incomplete drop.
     ///
-    pub(crate) fn uncast(self) -> InternedValue<'a> {
+    #[allow(unused)]
+    pub fn uncast(self) -> InternedValue<'a> {
         // Since self is still droped register downcasted value as clone
         self.interner.clone_interned(self.index);
 

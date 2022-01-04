@@ -1,6 +1,8 @@
 pub(crate) mod core;
 pub(crate) mod metrics;
 pub(crate) mod misc;
+
+#[cfg(feature = "net")]
 pub(crate) mod net;
 
 //

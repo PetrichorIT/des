@@ -1,3 +1,4 @@
+use crate::core::interning::*;
 use crate::core::*;
 
 use lazy_static::lazy_static;
@@ -131,7 +132,7 @@ impl RuntimeCore {
 /// # Usage with module system
 ///
 /// If you want to use the module system for network-like simulations
-/// than you must create a [NetworkRuntime<A>](crate::net::NetworkRuntime<A>) as app parameter for the core [Runtime].
+/// than you must create a NetworkRuntime<A> as app parameter for the core [Runtime].
 /// This network runtime comes preconfigured with an event set and all managment
 /// event nessecary for the simulation. All you have to do is to pass the app into [Runtime::new]
 /// to create a runnable instance and the run it.

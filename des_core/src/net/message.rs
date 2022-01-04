@@ -5,6 +5,7 @@ use std::{
 
 use util::create_global_uid;
 
+use crate::core::interning::*;
 use crate::core::*;
 use crate::net::*;
 

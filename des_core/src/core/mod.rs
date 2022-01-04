@@ -1,8 +1,16 @@
 mod event;
-mod interning;
+
 mod logger;
 mod runtime;
 mod sim_time;
+
+// # Feature "pubintering"
+
+#[cfg(not(feature = "pubinterning"))]
+pub(crate) mod interning;
+
+#[cfg(feature = "pubinterning")]
+pub mod interning;
 
 //
 // # Exposed publics
@@ -27,6 +35,6 @@ pub use self::runtime::RuntimeOptions;
 //
 
 pub(crate) use self::event::EventNode;
-pub(crate) use self::interning::*;
 pub(crate) use self::logger::StandardLogger;
+#[allow(unused)]
 pub(crate) use self::runtime::RTC;

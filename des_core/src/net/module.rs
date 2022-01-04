@@ -1,10 +1,8 @@
 use log::error;
 use util::create_global_uid;
 
-use crate::{
-    ChannelId, Gate, GateDescription, GateId, IntoModuleGate, Message, NetworkRuntime, SimTime,
-    CHANNEL_NULL, GATE_NULL,
-};
+use crate::net::*;
+use crate::*;
 
 create_global_uid!(
     /// A runtime-unqiue identifier for a module / submodule inheritence tree.

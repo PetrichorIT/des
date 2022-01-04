@@ -33,6 +33,9 @@ macro_rules! create_global_uid {
             static mut $sident: $ty = 0xff;
 
             impl $ident {
+                ///
+                /// Generates a new unqiue instance of Self.
+                ///
                 $vis fn gen() -> Self {
                     unsafe {
                         let a = $sident;
@@ -41,6 +44,9 @@ macro_rules! create_global_uid {
                     }
                 }
 
+                ///
+                /// Returns the raw primitiv the UID is contructed over.
+                ///
                 #[allow(unused)]
                 $vis fn raw(&self) -> $ty {
                     self.0

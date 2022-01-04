@@ -1,6 +1,7 @@
 use std::mem::size_of;
 use util::create_global_uid;
 
+use crate::core::interning::*;
 use crate::core::*;
 use crate::net::*;
 

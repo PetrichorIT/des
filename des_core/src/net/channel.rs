@@ -124,18 +124,34 @@ pub struct Channel {
 }
 
 impl Channel {
+    ///
+    /// A unique identifier for a channel.
+    ///
     pub fn id(&self) -> ChannelId {
         self.id
     }
 
+    ///
+    /// The capabilities of the channel.
+    ///
     pub fn metrics(&self) -> &ChannelMetrics {
         &self.metrics
     }
 
+    ///
+    /// A indicator whether a channel is currently busy transmissting a
+    /// packet onto the medium.
+    ///
+    /// Note that being non-busy does not mean that no packet is currently on the medium
+    /// it just means that all bits have been put onto the medium.
+    ///
     pub fn is_busy(&self) -> bool {
         self.busy
     }
 
+    ///
+    /// Sets the busy state of an medium.
+    ///
     pub fn set_busy(&mut self, busy_state: bool) {
         self.busy = busy_state
     }
