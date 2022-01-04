@@ -17,10 +17,11 @@ impl Attributes {
         };
 
         for attr in attrs {
-            match attr.parse_meta().unwrap() {
-                Meta::NameValue(MetaNameValue {
-                    ref path, ref lit, ..
-                }) => match &path.segments.last().unwrap().ident.to_string()[..] {
+            if let Meta::NameValue(MetaNameValue {
+                ref path, ref lit, ..
+            }) = attr.parse_meta().unwrap()
+            {
+                match &path.segments.last().unwrap().ident.to_string()[..] {
                     "ndl_workspace" => {
                         obj.workspace = match lit {
                             Lit::Str(str) => Some(str.value()),
@@ -34,9 +35,29 @@ impl Attributes {
                         }
                     }
                     _ => {}
-                },
-                _ => {}
+                }
             }
+
+            // match attr.parse_meta().unwrap() {
+            //     Meta::NameValue(MetaNameValue {
+            //         ref path, ref lit, ..
+            //     }) => match &path.segments.last().unwrap().ident.to_string()[..] {
+            //         "ndl_workspace" => {
+            //             obj.workspace = match lit {
+            //                 Lit::Str(str) => Some(str.value()),
+            //                 _ => None,
+            //             }
+            //         }
+            //         "ndl_ident" => {
+            //             obj.ident = match lit {
+            //                 Lit::Str(str) => Some(str.value()),
+            //                 _ => None,
+            //             }
+            //         }
+            //         _ => {}
+            //     },
+            //     _ => {}
+            // }
         }
 
         obj

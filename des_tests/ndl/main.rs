@@ -1,5 +1,3 @@
-use std::mem::ManuallyDrop;
-
 use des_core::*;
 use des_macros::Network;
 
@@ -8,7 +6,7 @@ use members::*;
 use rand::{prelude::StdRng, SeedableRng};
 
 #[derive(Network)]
-#[ndl_workspace = "ndl"]
+#[ndl_workspace = "des_tests/ndl"]
 struct A();
 
 fn main() {
@@ -29,7 +27,7 @@ fn main() {
         },
     );
 
-    for id in vec![bob1_id, bob2_id, bob3_id, bob4_id, bob5_id] {
+    for id in [bob1_id, bob2_id, bob3_id, bob4_id, bob5_id] {
         let msg = Message::new(
             0xff,
             GATE_NULL,
@@ -39,16 +37,9 @@ fn main() {
             String::from("Init"),
         );
 
-        let arr_time = id.0 as f64 / 1000.0;
+        let arr_time = id.raw() as f64 / 1000.0;
 
-        rt.add_event_in(
-            HandleMessageEvent {
-                module_id: id,
-                handled: false,
-                message: ManuallyDrop::new(msg),
-            },
-            arr_time.into(),
-        );
+        rt.handle_message_on(id, msg, arr_time.into());
     }
 
     let (_, end_time) = rt.run().unwrap();

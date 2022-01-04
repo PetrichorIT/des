@@ -1,6 +1,9 @@
-use crate::*;
+use crate::core::interning::*;
+use crate::core::*;
+use crate::util::*;
 
 use lazy_static::lazy_static;
+use log::warn;
 use rand::{
     distributions::Standard,
     prelude::{Distribution, StdRng},
@@ -12,9 +15,6 @@ use std::{
     collections::BinaryHeap,
     fmt::{Debug, Display},
 };
-use utils::SyncCell;
-
-use super::logger::StandardLogger;
 
 lazy_static! {
     pub(crate) static ref RTC: SyncCell<Option<RuntimeCore>> = SyncCell::new(None);
@@ -114,18 +114,38 @@ impl RuntimeCore {
 }
 
 ///
-/// The core component of a simulation handeling
-/// global utils, event scheduling and
-/// application management.
+/// The central managment point for a generic
+/// instance of a discrete event based simulation.
 ///
-pub struct Runtime<A> {
+/// # Generic usage
+///
+/// If you want to create a generic simulation you are requied to provide a 'app'
+/// parameter with an associated event set yourself. To do this follow this steps:
+///
+/// - Create an 'App' struct that implements the trait [Application].
+/// This struct will hold the systems state and define the event set used in the simulation.
+/// - Create your events that handle the logic of you simulation. They must implement [Event] with the generic
+/// parameter A, where A is your 'App' struct.
+/// - To bind those two together create a enum that implements [EventSet] that holds all your events.
+/// This can be done via a macro. The use this event set as the associated event set in 'App'.
+///
+/// # Usage with module system
+///
+/// If you want to use the module system for network-like simulations
+/// than you must create a NetworkRuntime<A> as app parameter for the core [Runtime].
+/// This network runtime comes preconfigured with an event set and all managment
+/// event nessecary for the simulation. All you have to do is to pass the app into [Runtime::new]
+/// to create a runnable instance and the run it.
+///
+pub struct Runtime<A: Application> {
+    /// The contained runtime application, defining globals and the used event set.
     pub app: A,
 
     core: &'static SyncCell<Option<RuntimeCore>>,
     future_event_heap: BinaryHeap<EventNode<A>>,
 }
 
-impl<A> Runtime<A> {
+impl<A: Application> Runtime<A> {
     fn core(&self) -> &RuntimeCore {
         unsafe { (*self.core.get()).as_ref().unwrap() }
     }
@@ -201,10 +221,18 @@ impl<A> Runtime<A> {
     /// # Examples
     ///
     /// ```
-    /// use dse::*;
+    /// use des_core::*;
     ///
+    /// // Assumme Application is implemented for App.
     /// #[derive(Debug)]
     /// struct App(usize,  String);
+    /// # impl Application for App {
+    /// #   type EventSet = Events;
+    /// # }
+    /// # enum Events {}
+    /// # impl EventSet<App> for Events {
+    /// #   fn handle(self, rt: &mut Runtime<App>) {}
+    /// # }
     ///
     /// let app = App(42, String::from("Hello there!"));
     /// let rt = Runtime::new(app);
@@ -215,7 +243,7 @@ impl<A> Runtime<A> {
     }
 
     pub fn new_with(app: A, options: RuntimeOptions) -> Self {
-        Self {
+        let mut this = Self {
             core: RuntimeCore::new(
                 SimTime::ZERO,
                 options.sim_base_unit,
@@ -225,8 +253,11 @@ impl<A> Runtime<A> {
                 options.rng,
             ),
             app,
-            future_event_heap: BinaryHeap::new(),
-        }
+            future_event_heap: BinaryHeap::with_capacity(64),
+        };
+
+        A::at_simulation_start(&mut this);
+        this
     }
 
     ///
@@ -242,7 +273,7 @@ impl<A> Runtime<A> {
         self.core_mut().itr += 1;
 
         let node = self.future_event_heap.pop().unwrap();
-        self.core_mut().sim_time = node.time();
+        self.core_mut().sim_time = node.time;
 
         node.handle(self);
         !self.future_event_heap.is_empty()
@@ -252,6 +283,11 @@ impl<A> Runtime<A> {
     /// Runs the application until it terminates or exceeds it max_itr.
     ///
     pub fn run(mut self) -> Option<(A, SimTime)> {
+        if self.future_event_heap.is_empty() {
+            warn!(target: "des::core", "Running simulation without any events. Think about adding some inital events.");
+            return None;
+        }
+
         while self.next() {}
 
         if self.future_event_heap.is_empty() {
@@ -275,7 +311,7 @@ impl<A> Runtime<A> {
     /// Adds and event to the future event heap, that will be handled in 'duration'
     /// time units.
     ///
-    pub fn add_event_in<T: 'static + Event<A>>(&mut self, event: T, duration: SimTime) {
+    pub fn add_event_in(&mut self, event: impl Into<A::EventSet>, duration: SimTime) {
         self.add_event(event, self.sim_time() + duration)
     }
 
@@ -284,16 +320,42 @@ impl<A> Runtime<A> {
     /// Note that this time must be in the future i.e. greated that sim_time, or this
     /// function will panic.
     ///
-    pub fn add_event<T: 'static + Event<A>>(&mut self, event: T, time: SimTime) {
+    pub fn add_event(&mut self, event: impl Into<A::EventSet>, time: SimTime) {
         assert!(time >= self.sim_time());
 
-        let node = EventNode::create_into(self, event, time);
+        let node = EventNode::create_into(self, event.into(), time);
         self.core_mut().event_id += 1;
         self.future_event_heap.push(node);
     }
 }
 
-impl<A> Debug for Runtime<A> {
+#[cfg(feature = "net")]
+use crate::net::*;
+
+#[cfg(feature = "net")]
+impl<A> Runtime<NetworkRuntime<A>> {
+    pub fn add_message_onto(&mut self, gate_id: GateId, message: Message, time: SimTime) {
+        let event = MessageAtGateEvent {
+            gate_id,
+            handled: false,
+            message: std::mem::ManuallyDrop::new(message),
+        };
+
+        self.add_event(NetEvents::MessageAtGateEvent(event), time)
+    }
+
+    pub fn handle_message_on(&mut self, module_id: ModuleId, message: Message, time: SimTime) {
+        let event = HandleMessageEvent {
+            module_id,
+            handled: false,
+            message: std::mem::ManuallyDrop::new(message),
+        };
+
+        self.add_event(NetEvents::HandleMessageEvent(event), time)
+    }
+}
+
+impl<A: Application> Debug for Runtime<A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -312,7 +374,7 @@ impl<A> Debug for Runtime<A> {
     }
 }
 
-impl<A> Display for Runtime<A> {
+impl<A: Application> Display for Runtime<A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -334,12 +396,19 @@ impl<A> Display for Runtime<A> {
 // OPTS
 
 ///
-/// Options for configuring a runtime independent of datacollection.
+/// Options for sepcificing the behaviour of the core runtime
+/// independent of the app logic.
 ///
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuntimeOptions {
+    /// The base unit for representing time stamps.
+    /// Defaults to [SimTimeUnit::Undefined].
     pub sim_base_unit: SimTimeUnit,
+    /// The random number generator used internally.
+    /// This can be seeded to ensure reproducability.
+    /// Defaults to a [OsRng] which does NOT provide reproducability.
     pub rng: StdRng,
+    /// The maximum number of events processed by the simulation. Defaults to [usize::MAX].
     pub max_itr: usize,
 }
 

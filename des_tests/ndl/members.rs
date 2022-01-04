@@ -6,13 +6,13 @@ use des_macros::Module;
 use log::info;
 
 #[derive(Module)]
-#[ndl_workspace = "ndl"]
+#[ndl_workspace = "des_tests/ndl"]
 pub struct Alice(ModuleCore);
 
 impl Module for Alice {
     fn handle_message(&mut self, msg: Message) {
         let mut pkt = msg.extract_content::<Packet>();
-        info!(target: &self.name().unwrap(), "Received at {}: Message #{} content: {}", sim_time_fmt(), pkt.id(), pkt.extract_content_ref::<String>().deref());
+        info!(target: self.name().unwrap(), "Received at {}: Message #{} content: {}", sim_time_fmt(), pkt.id(), pkt.extract_content_ref::<String>().deref());
 
         if pkt.hop_count() > 100_000 {
             // TERMINATE
@@ -44,7 +44,7 @@ impl NdlCompatableModule for Alice {
 }
 
 #[derive(Module, Debug)]
-#[ndl_workspace = "ndl"]
+#[ndl_workspace = "des_tests/ndl"]
 pub struct Bob(ModuleCore);
 
 impl Module for Bob {
@@ -72,7 +72,7 @@ impl Module for Bob {
             let mut pkt = msg.extract_content::<Packet>();
             pkt.inc_hop_count();
 
-            info!(target: &self.name().unwrap(), "Received at {}: Message #{} content: {}", sim_time_fmt(), pkt.id(), pkt.extract_content_ref::<String>().deref());
+            info!(target: self.name().unwrap(), "Received at {}: Message #{} content: {}", sim_time_fmt(), pkt.id(), pkt.extract_content_ref::<String>().deref());
 
             pkt.extract_content_ref::<String>().push('#');
 
@@ -91,7 +91,7 @@ impl NdlCompatableModule for Bob {
 }
 
 #[derive(Module)]
-#[ndl_workspace = "ndl"]
+#[ndl_workspace = "des_tests/ndl"]
 pub struct Eve(pub ModuleCore);
 
 impl Module for Eve {

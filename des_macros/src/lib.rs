@@ -23,13 +23,13 @@ lazy_static! {
     static ref RESOLVERS: Mutex<HashMap<String, NdlResolver>> = Mutex::new(HashMap::new());
 }
 
-fn get_resolver<'a>(workspace: &String) -> Result<(OwnedTySpecContext, bool), &'static str> {
+fn get_resolver(workspace: &str) -> Result<(OwnedTySpecContext, bool), &'static str> {
     let mut resolvers = RESOLVERS.lock().unwrap();
 
     if !resolvers.contains_key(workspace) {
         resolvers.insert(
-            workspace.clone(),
-            NdlResolver::new(&workspace).expect("#[derive(Module)] Invalid NDL workspace."),
+            workspace.to_owned(),
+            NdlResolver::new(workspace).expect("#[derive(Module)] Invalid NDL workspace."),
         );
     }
     resolvers
@@ -72,7 +72,7 @@ pub fn derive_module(input: TokenStream) -> TokenStream {
     let attrs = Attributes::from_attr(attrs);
 
     let mut static_gen = gen_static_module_core(ident.clone(), data);
-    let dynamic_gen = gen_dynamic_module_core(ident.clone(), attrs);
+    let dynamic_gen = gen_dynamic_module_core(ident, attrs);
 
     static_gen.extend(dynamic_gen.into_iter());
 
@@ -354,7 +354,7 @@ fn ident_from_conident(
 /// - build_rt
 ///
 /// The build_rt function allows the struct the macro is applied to to generate a
-/// NetworkRuntime<A> where A is the struct itself.
+/// NetworkRuntime where A is the struct itself.
 /// This network runtime has preconfigured modules and connections according to the
 /// networks NDL specification and intern the used modules NDL specification.
 ///
@@ -472,8 +472,11 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> TokenStream {
                         }
 
                         pub fn run_with_options(self, options: des_core::RuntimeOptions) -> (Self, des_core::SimTime) {
+                            use des_core::Runtime;
+                            use des_core::NetworkRuntime;
+
                             let net_rt = self.build_rt();
-                            let rt = des_core::Runtime::new_with(net_rt, options);
+                            let rt = Runtime::<NetworkRuntime<Self>>::new_with(net_rt, options);
                             let (net_rt, end_time) = rt.run().expect("RT exceeded itr limit.");
                             (net_rt.finish(), end_time)
                         }
@@ -497,71 +500,6 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> TokenStream {
         }
         Err(e) => panic!("#[derive(Network)] NDL resolver failed: {}", e),
     }
-}
-
-///
-/// DEPRECATED
-///
-
-#[proc_macro_derive(GlobalUID)]
-pub fn derive_global_uid(input: TokenStream) -> TokenStream {
-    let DeriveInput { ident, .. } = parse_macro_input!(input);
-
-    let mut name = ident.to_string().to_uppercase();
-    name.push_str("_STATIC");
-    let sident = Ident::new(&name, ident.span());
-
-    let output = quote! {
-
-        static mut #sident: #ident = #ident(0xff);
-
-        impl #ident {
-            fn gen() -> Self {
-                unsafe {
-                    let a = #sident;
-                    #sident.0 += 1;
-                    a
-                }
-            }
-        }
-
-        impl Clone for #ident {
-            fn clone(&self) -> Self {
-                Self(self.0)
-            }
-        }
-
-        impl Copy for #ident  {}
-
-        impl std::fmt::Debug for #ident {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                std::fmt::Debug::fmt(&self.0, f)
-            }
-        }
-
-        impl std::fmt::Display for #ident {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                std::fmt::Display::fmt(&self.0, f)
-            }
-        }
-
-        impl std::cmp::PartialEq for #ident {
-            fn eq(&self, other: &Self) -> bool {
-                self.0 == other.0
-            }
-        }
-
-
-        impl std::cmp::Eq for #ident {}
-
-        impl std::hash::Hash for #ident {
-            fn hash<H>(&self, state: &mut H)
-                where H: std::hash::Hasher {
-                    self.0.hash(state)
-                }
-        }
-    };
-    output.into()
 }
 
 struct WrappedTokenStream(proc_macro2::TokenStream);

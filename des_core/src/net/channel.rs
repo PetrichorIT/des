@@ -1,29 +1,37 @@
 use std::fmt::Display;
 
-use des_macros::GlobalUID;
+use crate::create_global_uid;
 
-use crate::{Message, SimTime};
+use crate::core::*;
+use crate::net::*;
 
-/// A runtime-unqiue identifier for a end-to-end connection.
-pub type ConnectionId = usize;
-
-/// A runtime-unique identifier for a one directional channel.
-#[derive(GlobalUID)]
-#[repr(transparent)]
-pub struct ChannelId(usize);
+create_global_uid!(
+    /// A runtime-unique identifier for a one directional channel.
+/// * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
+    pub ChannelId(usize) = CHANNEL_ID;
+);
 
 /// A not defined channel aka a missing link.
+/// * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub const CHANNEL_NULL: ChannelId = ChannelId(0);
 
 /// A reference to other channel in a two directional configuration.
+/// * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub const CHANNEL_SELF: ChannelId = ChannelId(1);
 
 /// The id of a general purpose non-delay channel
+/// * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub const CHANNEL_INSTANTANEOUS: ChannelId = ChannelId(2);
 
 ///
 /// Metrics that define a channels capabilitites.
 ///
+/// * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChannelMetrics {
     /// The maximum throughput of the channel in bit/s
@@ -58,6 +66,7 @@ impl ChannelMetrics {
     ///
     /// Calcualtes the duration a message travels on a link.
     ///
+    #[allow(clippy::if_same_then_else)]
     pub fn calculate_duration(&self, msg: &Message) -> SimTime {
         if self.bitrate == 0 {
             return SimTime::ZERO;
@@ -100,6 +109,8 @@ impl Display for ChannelMetrics {
 ///
 /// A representation of a one directional link.
 ///
+/// * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 #[derive(Debug)]
 pub struct Channel {
     /// A unique identifier for a channel.
@@ -113,18 +124,34 @@ pub struct Channel {
 }
 
 impl Channel {
+    ///
+    /// A unique identifier for a channel.
+    ///
     pub fn id(&self) -> ChannelId {
         self.id
     }
 
+    ///
+    /// The capabilities of the channel.
+    ///
     pub fn metrics(&self) -> &ChannelMetrics {
         &self.metrics
     }
 
+    ///
+    /// A indicator whether a channel is currently busy transmissting a
+    /// packet onto the medium.
+    ///
+    /// Note that being non-busy does not mean that no packet is currently on the medium
+    /// it just means that all bits have been put onto the medium.
+    ///
     pub fn is_busy(&self) -> bool {
         self.busy
     }
 
+    ///
+    /// Sets the busy state of an medium.
+    ///
     pub fn set_busy(&mut self, busy_state: bool) {
         self.busy = busy_state
     }

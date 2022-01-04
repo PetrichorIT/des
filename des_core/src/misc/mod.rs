@@ -17,13 +17,13 @@ impl<T: Ord> OrdVec<T> {
         }
     }
 
-    pub fn push(&mut self, item: T) {
-        self.inner.push(item);
-        self.inner.sort();
-    }
+    pub fn insert(&mut self, item: T) -> usize {
+        let insert_at = match self.inner.binary_search(&item) {
+            Ok(insert_at) | Err(insert_at) => insert_at,
+        };
 
-    pub fn pop(&mut self) -> Option<T> {
-        self.inner.pop()
+        self.inner.insert(insert_at, item);
+        insert_at
     }
 }
 

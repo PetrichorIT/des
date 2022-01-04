@@ -22,8 +22,8 @@ harness = false
 name = "flamegraph"
 
 [dependencies]
+bench_utils = {path = "../bench_utils"}
 log = "0.4.14"
 termcolor = "1.1.2"
 unic-emoji-char = "0.9.0"
 unicode-xid = "0.2.0"
-utils = {path = "../utils"}

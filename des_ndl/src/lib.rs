@@ -112,7 +112,5 @@ mod tests {
 
         let _ = resolver.run();
         println!("{}", resolver.units.get("NetworkNode").unwrap());
-
-        panic!("WOLOLO");
     }
 }

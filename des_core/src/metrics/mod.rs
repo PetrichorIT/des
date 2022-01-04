@@ -176,6 +176,7 @@ impl Histogramm {
     ///
     /// Creates a new historgramm with equidistant bins.
     ///
+    #[allow(unused)]
     pub fn new(range: RangeInclusive<f64>, bins: usize) -> Self {
         Self {
             lower_bound: *range.start(),

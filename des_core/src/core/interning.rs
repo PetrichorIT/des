@@ -1,7 +1,13 @@
+//!
+//! A module for handeling efficent, dupliction free data storage.
+//!
+//! * This will only be visible when DES is build with the feature "pubinterning"
+//!
+
+use crate::util::SyncCell;
 use std::alloc::{dealloc, Layout};
 use std::any::{type_name, TypeId};
 use std::ops::{Deref, DerefMut};
-use utils::SyncCell;
 
 ///
 /// A manager for interned objects.
@@ -41,6 +47,7 @@ impl Interner {
     ///
     /// Interns a value T and retursn a [TypedInternedValue] referencing the interned value.
     ///
+    #[allow(unused)]
     pub fn intern_typed<T: 'static>(&self, value: T) -> TypedInternedValue<'_, T> {
         self.intern(value).cast()
     }
@@ -56,6 +63,7 @@ impl Interner {
     ///
     /// Interns an allready boxed value T and retursn a typed reference.
     ///
+    #[allow(unused)]
     pub fn intern_boxed_typed<T: 'static>(&self, boxed: Box<T>) -> TypedInternedValue<'_, T> {
         self.intern_boxed(boxed).cast()
     }
@@ -86,14 +94,14 @@ impl Interner {
         // any & references.
         let contents = unsafe { &mut *self.contents.get() };
 
-        for index in 0..contents.len() {
-            if contents[index].is_none() {
+        for (index, item) in contents.iter_mut().enumerate() {
+            if item.is_none() {
                 // Use previous freed item.
                 // println!(
                 //     "[Interner] >> New #{} (filler) ty: {:?}",
                 //     index, descriptor.ty_id
                 // );
-                contents[index] = Some(descriptor);
+                *item = Some(descriptor);
 
                 return InternedValue {
                     interner: self,
@@ -119,6 +127,7 @@ impl Interner {
 
     /// Retrieves a entry at cell the given index.
     #[allow(unused_unsafe)]
+    #[allow(clippy::mut_from_ref)]
     unsafe fn get_mut(&self, index: usize) -> &mut InteredValueDescriptor {
         // # Safty
         // This is an internal fn that under the safty contract of
@@ -224,11 +233,15 @@ impl Interner {
         // This is safe since all uses of get_mut() at internally and no
         // references leak.
         let contents = unsafe { &*self.contents.get() };
-        for entry in contents {
-            if let Some(entry) = entry {
-                eprintln!("[ERROR] Undisposed obj after runtime end: {:?}", entry);
-            }
+        for entry in contents.iter().flatten() {
+            eprintln!("[ERROR] Undisposed obj after runtime end: {:?}", entry);
         }
+    }
+}
+
+impl Default for Interner {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -295,6 +308,7 @@ impl<'a> InternedValue<'a> {
     ///
     /// Tries to cast self into a [TypedInternedValue], returns None if T does not match.
     ///
+    #[allow(unused)]
     pub fn try_cast<T: 'static>(self) -> Option<TypedInternedValue<'a, T>> {
         // # Safty
         // By the safty contract of Interner any Interned value must indirectly point to a valid
@@ -366,7 +380,8 @@ impl<'a, T> TypedInternedValue<'a, T> {
     /// If that would be the case, the interned value would be dropped without type information
     /// leading to a potentially incomplete drop.
     ///
-    pub(crate) fn uncast(self) -> InternedValue<'a> {
+    #[allow(unused)]
+    pub fn uncast(self) -> InternedValue<'a> {
         // Since self is still droped register downcasted value as clone
         self.interner.clone_interned(self.index);
 

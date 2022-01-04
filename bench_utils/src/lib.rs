@@ -1,4 +1,3 @@
-
 use std::{
     io::Write,
     path::PathBuf,
@@ -18,7 +17,7 @@ pub fn black_box<T>(dummy: T) -> T {
 
 pub fn bench<T>(ctx: &mut BenchmarkCtx, name: &'static str, mut routine: T)
 where
-    T: FnMut() -> (),
+    T: FnMut(),
 {
     let mut benchmark = Benchmark::new(name);
     for _ in 0..ctx.itr {
@@ -63,13 +62,7 @@ impl BenchmarkCtx {
 
         stream.set_color(ColorSpec::new().set_fg(Some(Color::Green)).set_bold(true))?;
         writeln!(stream, "Benchmark suit '{}' finished", self.name)?;
-        writeln!(
-            stream,
-            "{}",
-            std::iter::repeat("=")
-                .take(26 + self.name.len())
-                .collect::<String>()
-        )?;
+        writeln!(stream, "{}", "=".repeat(26 + self.name.len()))?;
         writeln!(stream)?;
 
         match Self::load(&self.name) {
