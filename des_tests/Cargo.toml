@@ -29,6 +29,6 @@ path = "utils/main.rs"
 des_core = {path = "../des_core", features = ["net"]}
 des_macros = {path = "../des_macros"}
 des_ndl = {path = "../des_ndl"}
-log = {version = "*", features=["max_level_warn"]}
+log = {version = "*", features = ["max_level_warn"]}
 # log = "*"
 rand = "*"

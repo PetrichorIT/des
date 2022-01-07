@@ -217,8 +217,8 @@ fn gen_dynamic_module_core(ident: Ident, attrs: Attributes) -> TokenStream {
                         token_stream.extend(quote! {
                             let channel = rt.create_channel(des_core::ChannelMetrics {
                                 bitrate: #bitrate,
-                                latency: des_core::SimTime::new(#latency),
-                                jitter: des_core::SimTime::new(#jitter),
+                                latency: des_core::SimTime::from(#latency),
+                                jitter: des_core::SimTime::from(#jitter),
                             });
                             #from_ident.set_next_gate(#to_ident.id());
                             #from_ident.set_channel(channel);
@@ -435,8 +435,8 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> TokenStream {
                         token_stream.extend(quote! {
                             let channel = rt.create_channel(des_core::ChannelMetrics {
                                 bitrate: #bitrate,
-                                latency: des_core::SimTime::new(#latency),
-                                jitter: des_core::SimTime::new(#jitter),
+                                latency: des_core::SimTime::from(#latency),
+                                jitter: des_core::SimTime::from(#jitter),
                             });
                             #from_ident.set_next_gate(#to_ident.id());
                             #from_ident.set_channel(channel);

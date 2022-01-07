@@ -39,9 +39,9 @@ fn main() {
             String::from("Init"),
         );
 
-        let arr_time = id.raw() as f64 / 1000.0;
+        let arr_time = SimTime::ZERO;
 
-        rt.handle_message_on(id, msg, arr_time.into());
+        rt.handle_message_on(id, msg, arr_time);
     }
 
     rt.run().unwrap();

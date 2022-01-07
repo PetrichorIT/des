@@ -9,6 +9,7 @@ version = "0.1.0"
 net = []
 netipv6 = ["net"]
 pubinterning = []
+simtime_u128 = []
 staticgates = []
 
 [dependencies]
