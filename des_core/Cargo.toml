@@ -9,6 +9,7 @@ version = "0.1.0"
 net = []
 netipv6 = ["net"]
 pubinterning = []
+staticgates = []
 
 [dependencies]
 lazy_static = "1.4.0"

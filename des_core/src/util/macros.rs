@@ -33,6 +33,9 @@ macro_rules! create_global_uid {
             static mut $sident: $ty = 0xff;
 
             impl $ident {
+
+                $vis const MIN: Self = Self(0xff);
+
                 ///
                 /// Generates a new unqiue instance of Self.
                 ///

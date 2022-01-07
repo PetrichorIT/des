@@ -487,6 +487,7 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> TokenStream {
 
                             #token_stream
 
+                            rt.finish_building();
                             runtime
                         }
                     }
