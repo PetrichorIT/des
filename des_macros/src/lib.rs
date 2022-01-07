@@ -187,7 +187,7 @@ fn gen_dynamic_module_core(ident: Ident, attrs: Attributes) -> TokenStream {
                 for gate in &module.gates {
                     let GateSpec { ident, size, .. } = gate;
                     token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                        let _ = self.create_gate_cluster(#ident, #size);
+                        let _ = self.create_gate_cluster(#ident, #size, rt);
                     })
                 }
 

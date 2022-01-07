@@ -23,17 +23,6 @@ impl Module for Alice {
                 ("netOut", 0),
             )
         }
-
-        // self.parent_mut::<super::Bob>()
-        //     .unwrap()
-        //     .handle_message(Message::new(
-        //         31,
-        //         GATE_NULL,
-        //         MODULE_NULL,
-        //         MODULE_NULL,
-        //         SimTime::ZERO,
-        //         String::from("Pang"),
-        //     ));
     }
 }
 
@@ -85,20 +74,6 @@ impl Module for Bob {
 }
 
 impl NdlCompatableModule for Bob {
-    fn named(name: String) -> Self {
-        Self(ModuleCore::named(name))
-    }
-}
-
-#[derive(Module)]
-#[ndl_workspace = "des_tests/ndl"]
-pub struct Eve(pub ModuleCore);
-
-impl Module for Eve {
-    fn handle_message(&mut self, _msg: Message) {}
-}
-
-impl NdlCompatableModule for Eve {
     fn named(name: String) -> Self {
         Self(ModuleCore::named(name))
     }

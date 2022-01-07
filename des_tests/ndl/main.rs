@@ -12,11 +12,13 @@ struct A();
 fn main() {
     let app: NetworkRuntime<A> = A().build_rt();
 
-    let bob1_id = app.module(|m| m.name().unwrap() == "bob1").unwrap().id();
-    let bob2_id = app.module(|m| m.name().unwrap() == "bob2").unwrap().id();
-    let bob3_id = app.module(|m| m.name().unwrap() == "bob3").unwrap().id();
-    let bob4_id = app.module(|m| m.name().unwrap() == "bob4").unwrap().id();
-    let bob5_id = app.module(|m| m.name().unwrap() == "bob5").unwrap().id();
+    let ids: Vec<ModuleId> = (1..=100)
+        .map(|n| {
+            app.module(|m| m.name().unwrap() == &format!("bob{}", n))
+                .unwrap()
+                .id()
+        })
+        .collect();
 
     let mut rt = Runtime::new_with(
         app,
@@ -27,7 +29,7 @@ fn main() {
         },
     );
 
-    for id in [bob1_id, bob2_id, bob3_id, bob4_id, bob5_id] {
+    for id in ids {
         let msg = Message::new(
             0xff,
             GATE_NULL,
@@ -42,10 +44,5 @@ fn main() {
         rt.handle_message_on(id, msg, arr_time.into());
     }
 
-    let (_, end_time) = rt.run().unwrap();
-
-    println!(
-        "Sim finished {}",
-        SimTimeUnit::fmt_compact(end_time, SimTimeUnit::Seconds)
-    );
+    rt.run().unwrap();
 }

@@ -1,5 +1,6 @@
 mod channel;
 mod gate;
+mod gate_buffer;
 mod message;
 mod module;
 mod packet;
@@ -36,6 +37,9 @@ pub use self::gate::IntoModuleGate;
 pub use self::gate::GateId;
 pub use self::gate::GATE_NULL;
 pub use self::gate::GATE_SELF;
+
+pub(crate) use self::gate_buffer::GateBuffer;
+pub(crate) use self::gate_buffer::GateRef;
 
 //
 // # Messages & Packets

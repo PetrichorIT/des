@@ -82,15 +82,19 @@ pub trait StaticModuleCore {
     ///
     /// Returns a ref unstructured list of all gates from the current module.
     ///
-    fn gates(&self) -> &Vec<Gate> {
-        &self.module_core().gates
+    fn gates(&self) -> Vec<&Gate> {
+        self.module_core().gates.iter().map(|r| r.get()).collect()
     }
 
     ///
     /// Returns a mutable ref to the all gates list.
     ///
-    fn gates_mut(&mut self) -> &mut Vec<Gate> {
-        &mut self.module_core_mut().gates
+    fn gates_mut(&mut self) -> Vec<&mut Gate> {
+        self.module_core_mut()
+            .gates
+            .iter_mut()
+            .map(|r| r.get_mut())
+            .collect()
     }
 
     ///
@@ -99,7 +103,7 @@ pub trait StaticModuleCore {
     ///
     fn gate_cluster(&self, name: &str) -> Vec<&Gate> {
         self.gates()
-            .iter()
+            .into_iter()
             .filter(|&gate| gate.name() == name)
             .collect()
     }
@@ -110,7 +114,7 @@ pub trait StaticModuleCore {
     ///
     fn gate_cluster_mut(&mut self, name: &str) -> Vec<&mut Gate> {
         self.gates_mut()
-            .iter_mut()
+            .into_iter()
             .filter(|gate| gate.name() == name)
             .collect()
     }
@@ -121,12 +125,12 @@ pub trait StaticModuleCore {
     ///
     fn gate(&self, name: &str, pos: usize) -> Option<&Gate> {
         self.gates()
-            .iter()
+            .into_iter()
             .find(|&gate| gate.name() == name && gate.pos() == pos)
     }
 
     fn gate_by_id(&self, id: GateId) -> Option<&Gate> {
-        self.gates().iter().find(|&gate| gate.id() == id)
+        self.gates().into_iter().find(|&gate| gate.id() == id)
     }
 
     ///
@@ -135,34 +139,54 @@ pub trait StaticModuleCore {
     ///
     fn gate_mut(&mut self, name: &str, pos: usize) -> Option<&mut Gate> {
         self.gates_mut()
-            .iter_mut()
+            .into_iter()
             .find(|gate| gate.name() == name && gate.pos() == pos)
     }
 
     fn gate_by_id_mut(&mut self, id: GateId) -> Option<&mut Gate> {
-        self.gates_mut().iter_mut().find(|gate| gate.id() == id)
+        self.gates_mut().into_iter().find(|gate| gate.id() == id)
     }
 
     ///
     /// Creates a gate on the current module, returning its ID.
     ///
-    fn create_gate(&mut self, name: &str) -> GateId {
-        self.create_gate_cluster(name, 1)[0]
+    fn create_gate<A>(&mut self, name: &str, rt: &mut NetworkRuntime<A>) -> GateId
+    where
+        Self: Sized,
+    {
+        self.create_gate_cluster(name, 1, rt)[0]
     }
 
     ///
     /// Creates a gate on the current module that points to another gate as its
     /// next hop, returning the ID of the created gate.
     ///
-    fn create_gate_into(&mut self, name: &str, channel: ChannelId, next_hop: GateId) -> GateId {
-        self.create_gate_cluster_into(name, 1, channel, vec![next_hop])[0]
+    fn create_gate_into<A>(
+        &mut self,
+        name: &str,
+        channel: ChannelId,
+        next_hop: GateId,
+        rt: &mut NetworkRuntime<A>,
+    ) -> GateId
+    where
+        Self: Sized,
+    {
+        self.create_gate_cluster_into(name, 1, channel, vec![next_hop], rt)[0]
     }
 
     ///
     /// Createas a cluster of gates on the current module returning their IDs.
     ///
-    fn create_gate_cluster(&mut self, name: &str, size: usize) -> Vec<GateId> {
-        self.create_gate_cluster_into(name, size, CHANNEL_NULL, vec![GATE_NULL; size])
+    fn create_gate_cluster<A>(
+        &mut self,
+        name: &str,
+        size: usize,
+        rt: &mut NetworkRuntime<A>,
+    ) -> Vec<GateId>
+    where
+        Self: Sized,
+    {
+        self.create_gate_cluster_into(name, size, CHANNEL_NULL, vec![GATE_NULL; size], rt)
     }
 
     ///
@@ -173,13 +197,17 @@ pub trait StaticModuleCore {
     ///
     /// This function will panic should size != next_hops.len()
     ///
-    fn create_gate_cluster_into(
+    fn create_gate_cluster_into<A>(
         &mut self,
         name: &str,
         size: usize,
         channel: ChannelId,
         next_hops: Vec<GateId>,
-    ) -> Vec<GateId> {
+        rt: &mut NetworkRuntime<A>,
+    ) -> Vec<GateId>
+    where
+        Self: Sized,
+    {
         assert!(size == next_hops.len());
 
         let descriptor = GateDescription::new(name.to_owned(), size, self.id());
@@ -188,7 +216,9 @@ pub trait StaticModuleCore {
         for (i, item) in next_hops.iter().enumerate() {
             let gate = Gate::new(descriptor.clone(), i, channel, *item);
             ids.push(gate.id());
-            self.gates_mut().push(gate);
+
+            let reference = rt.create_gate(gate);
+            self.module_core_mut().gates.push(reference);
         }
 
         ids
@@ -371,7 +401,7 @@ pub struct ModuleCore {
     pub name: Option<String>,
 
     /// A collection of all gates register to the current module
-    pub gates: Vec<Gate>,
+    pub gates: Vec<GateRef>,
 
     /// A buffer of messages to be send out, after the current handle messsage terminates.
     pub out_buffer: Vec<(Message, GateId)>,

@@ -10,6 +10,7 @@ use rand::{
     rngs::OsRng,
     Rng, SeedableRng,
 };
+use std::collections::VecDeque;
 use std::{
     any::type_name,
     collections::BinaryHeap,
@@ -142,7 +143,9 @@ pub struct Runtime<A: Application> {
     pub app: A,
 
     core: &'static SyncCell<Option<RuntimeCore>>,
+
     future_event_heap: BinaryHeap<EventNode<A>>,
+    now_event_queue: VecDeque<EventNode<A>>,
 }
 
 impl<A: Application> Runtime<A> {
@@ -254,6 +257,7 @@ impl<A: Application> Runtime<A> {
             ),
             app,
             future_event_heap: BinaryHeap::with_capacity(64),
+            now_event_queue: VecDeque::with_capacity(32),
         };
 
         A::at_simulation_start(&mut this);
@@ -272,25 +276,35 @@ impl<A: Application> Runtime<A> {
 
         self.core_mut().itr += 1;
 
-        let node = self.future_event_heap.pop().unwrap();
+        let node = self.fetch_next_event();
+
+        // Let this be the only position where SimTime is changed
         self.core_mut().sim_time = node.time;
 
         node.handle(self);
-        !self.future_event_heap.is_empty()
+        !(self.future_event_heap.is_empty() && self.now_event_queue.is_empty())
+    }
+
+    fn fetch_next_event(&mut self) -> EventNode<A> {
+        if let Some(event) = self.now_event_queue.pop_front() {
+            event
+        } else {
+            self.future_event_heap.pop().unwrap()
+        }
     }
 
     ///
     /// Runs the application until it terminates or exceeds it max_itr.
     ///
     pub fn run(mut self) -> Option<(A, SimTime)> {
-        if self.future_event_heap.is_empty() {
+        if self.future_event_heap.is_empty() && self.now_event_queue.is_empty() {
             warn!(target: "des::core", "Running simulation without any events. Think about adding some inital events.");
             return None;
         }
 
         while self.next() {}
 
-        if self.future_event_heap.is_empty() {
+        if self.future_event_heap.is_empty() && self.now_event_queue.is_empty() {
             Some(self.finish())
         } else {
             None
@@ -303,6 +317,12 @@ impl<A: Application> Runtime<A> {
     pub fn finish(self) -> (A, SimTime) {
         let t1 = self.sim_time();
         self.core().interner.fincheck();
+
+        println!(
+            "Simulation finished after {} at event #{}.",
+            SimTimeUnit::fmt_compact(t1, SimTimeUnit::Seconds),
+            self.core().itr
+        );
 
         (self.app, t1)
     }
@@ -325,7 +345,12 @@ impl<A: Application> Runtime<A> {
 
         let node = EventNode::create_into(self, event.into(), time);
         self.core_mut().event_id += 1;
-        self.future_event_heap.push(node);
+
+        if time == self.sim_time() {
+            self.now_event_queue.push_back(node);
+        } else {
+            self.future_event_heap.push(node);
+        }
     }
 }
 

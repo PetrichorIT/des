@@ -24,6 +24,9 @@ pub struct NetworkRuntime<A> {
     ///
     channels: Vec<Channel>,
 
+    /// A buffer to store all gates
+    gate_buffer: GateBuffer,
+
     ///
     /// A inner container for holding user defined global state.
     ///
@@ -38,6 +41,8 @@ impl<A> NetworkRuntime<A> {
         Self {
             modules: Vec::new(),
             channels: vec![],
+
+            gate_buffer: GateBuffer::new(),
 
             inner,
         }
@@ -148,33 +153,24 @@ impl<A> NetworkRuntime<A> {
         Some(&mut self.channels[pos])
     }
 
+    pub fn create_gate(&mut self, gate: Gate) -> GateRef {
+        self.gate_buffer.insert(gate)
+    }
+
     ///
     /// Retrieves a gate by id from.
     /// This operations should only be done if absuloutly nessecary since it is
     /// expensive, bc gates are stored in their respecitve owner modules.
     ///
     pub fn gate(&self, id: GateId) -> Option<&Gate> {
-        for module in &self.modules {
-            for gate in module.gates() {
-                if gate.id() == id {
-                    return Some(gate);
-                }
-            }
-        }
-
-        None
+        self.gate_buffer.gate(id)
     }
 
     ///
     /// Retrieves a target gate of a gate chain.
     ///
     pub fn gate_dest(&self, source_id: GateId) -> Option<&Gate> {
-        // TODO: make more efficient variant.
-        let mut gate = self.gate(source_id)?;
-        while gate.id() != GATE_SELF {
-            gate = self.gate(gate.next_gate())?
-        }
-        Some(gate)
+        self.gate_buffer.gate_dest(source_id)
     }
 
     ///
@@ -407,12 +403,7 @@ pub struct ChannelUnbusyNotif {
 
 impl<A> Event<NetworkRuntime<A>> for ChannelUnbusyNotif {
     fn handle(self, rt: &mut crate::Runtime<NetworkRuntime<A>>) {
-        if let Some(channel) = rt
-            .app
-            .channels
-            .iter_mut()
-            .find(|c| c.id() == self.channel_id)
-        {
+        if let Some(channel) = rt.app.channel_mut(self.channel_id) {
             channel.set_busy(false);
         }
     }

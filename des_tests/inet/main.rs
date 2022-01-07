@@ -22,6 +22,8 @@ fn main() {
     // node::toStack --> stack::netIn
     // node::fromStack  <-- stack::netOut
 
+    let mut app = NetworkRuntime::new(A());
+
     //
     // ALICE
     //
@@ -29,13 +31,13 @@ fn main() {
     let mut stack_alice = NetworkStack::new(0x00_00_00_ff, RandomRoutingDeamon::new());
     stack_alice.set_parent(&mut node_alice);
 
-    let internal_out = node_alice.create_gate("fromStack");
+    let internal_out = node_alice.create_gate("fromStack", &mut app);
 
-    stack_alice.create_gate_into("netOut", CHANNEL_NULL, internal_out);
+    stack_alice.create_gate_into("netOut", CHANNEL_NULL, internal_out, &mut app);
 
-    let internal_in = stack_alice.create_gate("netIn");
+    let internal_in = stack_alice.create_gate("netIn", &mut app);
 
-    node_alice.create_gate_into("toStack", CHANNEL_NULL, internal_in);
+    node_alice.create_gate_into("toStack", CHANNEL_NULL, internal_in, &mut app);
 
     //
     // BOB
@@ -45,13 +47,13 @@ fn main() {
 
     stack_bob.set_parent(&mut node_bob);
 
-    let internal_out = node_bob.create_gate("fromStack");
+    let internal_out = node_bob.create_gate("fromStack", &mut app);
 
-    stack_bob.create_gate_into("netOut", CHANNEL_NULL, internal_out);
+    stack_bob.create_gate_into("netOut", CHANNEL_NULL, internal_out, &mut app);
 
-    let internal_in = stack_bob.create_gate("netIn");
+    let internal_in = stack_bob.create_gate("netIn", &mut app);
 
-    node_bob.create_gate_into("toStack", CHANNEL_NULL, internal_in);
+    node_bob.create_gate_into("toStack", CHANNEL_NULL, internal_in, &mut app);
 
     //
     // EVE
@@ -62,19 +64,17 @@ fn main() {
 
     stack_eve.set_parent(&mut node_eve);
 
-    let internal_out = node_eve.create_gate_cluster("fromStack", 2);
+    let internal_out = node_eve.create_gate_cluster("fromStack", 2, &mut app);
 
-    stack_eve.create_gate_cluster_into("netOut", 2, CHANNEL_NULL, internal_out);
+    stack_eve.create_gate_cluster_into("netOut", 2, CHANNEL_NULL, internal_out, &mut app);
 
-    let internal_in = stack_eve.create_gate_cluster("netIn", 2);
+    let internal_in = stack_eve.create_gate_cluster("netIn", 2, &mut app);
 
-    node_eve.create_gate_cluster_into("toStack", 2, CHANNEL_NULL, internal_in);
+    node_eve.create_gate_cluster_into("toStack", 2, CHANNEL_NULL, internal_in, &mut app);
 
     //
     // Application config
     //
-
-    let mut app = NetworkRuntime::new(A());
 
     let channel = app.create_channel(ChannelMetrics {
         bitrate: 5_000_000,
@@ -82,16 +82,22 @@ fn main() {
         jitter: 0.0.into(),
     });
 
-    let alice_in = node_alice.create_gate("channelIncoming");
+    let alice_in = node_alice.create_gate("channelIncoming", &mut app);
 
-    let bob_in = node_bob.create_gate("channelIncoming");
+    let bob_in = node_bob.create_gate("channelIncoming", &mut app);
 
-    node_eve.create_gate_cluster_into("channelOutgoing", 2, channel, vec![alice_in, bob_in]);
+    node_eve.create_gate_cluster_into(
+        "channelOutgoing",
+        2,
+        channel,
+        vec![alice_in, bob_in],
+        &mut app,
+    );
 
-    let eve_in = node_eve.create_gate_cluster("channelIncoming", 2);
+    let eve_in = node_eve.create_gate_cluster("channelIncoming", 2, &mut app);
 
-    node_alice.create_gate_into("channelOutgoing", channel, eve_in[0]);
-    node_bob.create_gate_into("channelOutgoing", channel, eve_in[1]);
+    node_alice.create_gate_into("channelOutgoing", channel, eve_in[0], &mut app);
+    node_bob.create_gate_into("channelOutgoing", channel, eve_in[1], &mut app);
 
     app.create_module(node_alice);
     app.create_module(stack_alice);

@@ -1,3 +1,5 @@
+use std::cell::UnsafeCell;
+
 ///
 /// A implementation of UnsafeCell that implements Sync
 /// since a corrolated DES simulation is inherintly single threaded.
@@ -33,3 +35,12 @@ impl<T: ?Sized> SyncCell<T> {
 }
 
 unsafe impl<T: ?Sized> Sync for SyncCell<T> {}
+
+impl<T: Clone> Clone for SyncCell<T> {
+    fn clone(&self) -> Self {
+        let r = unsafe { &*self.cell.get() };
+        Self {
+            cell: UnsafeCell::new(r.clone()),
+        }
+    }
+}

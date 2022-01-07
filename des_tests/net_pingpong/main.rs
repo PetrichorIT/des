@@ -20,11 +20,11 @@ fn main() {
         jitter: 0.0.into(),
     });
 
-    let g1 = alice.create_gate("netIn");
-    let g4 = bob.create_gate_into("netOut", channel, g1);
+    let g1 = alice.create_gate("netIn", &mut app);
+    let g4 = bob.create_gate_into("netOut", channel, g1, &mut app);
 
-    let r1 = bob.create_gate("netIn");
-    let _r4 = alice.create_gate_into("netOut", channel, r1);
+    let r1 = bob.create_gate("netIn", &mut app);
+    let _r4 = alice.create_gate_into("netOut", channel, r1, &mut app);
 
     app.create_module(alice);
     app.create_module(bob);

@@ -165,22 +165,34 @@ pub trait IntoModuleGate<T: StaticModuleCore>: Sized {
 
 impl<T: StaticModuleCore> IntoModuleGate<T> for Gate {
     fn into_gate(self, module: &T) -> Option<GateId> {
-        let element = module.gates().iter().find(|&g| g == &self)?;
-        Some(element.id())
+        let element = module
+            .gates()
+            .iter()
+            .find(|&g| **g == self)
+            .map(|v| v.id())?;
+        Some(element)
     }
 }
 
 impl<T: StaticModuleCore> IntoModuleGate<T> for &Gate {
     fn into_gate(self, module: &T) -> Option<GateId> {
-        let element = module.gates().iter().find(|&g| g == self)?;
-        Some(element.id())
+        let element = module
+            .gates()
+            .iter()
+            .find(|&g| *g == self)
+            .map(|v| v.id())?;
+        Some(element)
     }
 }
 
 impl<T: StaticModuleCore> IntoModuleGate<T> for GateId {
     fn into_gate(self, module: &T) -> Option<GateId> {
-        let element = module.gates().iter().find(|&g| g.id() == self)?;
-        Some(element.id())
+        let element = module
+            .gates()
+            .iter()
+            .find(|&g| g.id() == self)
+            .map(|v| v.id())?;
+        Some(element)
     }
 }
 
@@ -189,8 +201,9 @@ impl<T: StaticModuleCore> IntoModuleGate<T> for (&str, usize) {
         let element = module
             .gates()
             .iter()
-            .find(|&g| g.name() == self.0 && g.pos() == self.1)?;
+            .find(|&g| g.name() == self.0 && g.pos() == self.1)
+            .map(|v| v.id())?;
 
-        Some(element.id())
+        Some(element)
     }
 }

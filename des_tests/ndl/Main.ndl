@@ -24,16 +24,8 @@ module Alice {
         netOut[3]
 }
 
-module Eve {
-    gates:
-        link
-}
 
 network A {
     nodes:
-        router: Eve
-        bob[1...5]: Bob
-
-    connections:
-        bob/uplink --> Link --> router/link
+        bob[1...100]: Bob
 }
