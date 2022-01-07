@@ -1,4 +1,5 @@
 target
 /queue
 
-flamegraph.svg
+flamegraph*.svg
+./perf.*
