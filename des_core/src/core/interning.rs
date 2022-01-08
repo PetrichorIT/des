@@ -1,7 +1,7 @@
 //!
 //! A module for handeling efficent, dupliction free data storage.
 //!
-//! * This will only be visible when DES is build with the feature "pubinterning"
+//! * This will only be visible when DES is build with the feature "pub_interning"
 //!
 
 use crate::util::SyncCell;

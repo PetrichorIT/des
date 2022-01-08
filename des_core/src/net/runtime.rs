@@ -177,7 +177,7 @@ impl<A> NetworkRuntime<A> {
     /// Locks the buffer to that no new gates can be created-
     ///
     pub fn finish_building(&mut self) {
-        #[cfg(feature = "staticgates")]
+        #[cfg(feature = "static_gates")]
         self.gate_buffer.lock()
     }
 

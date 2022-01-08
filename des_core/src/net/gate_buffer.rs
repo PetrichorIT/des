@@ -1,9 +1,9 @@
-#[cfg(not(feature = "staticgates"))]
+#[cfg(not(feature = "static_gates"))]
 pub type GateBuffer = dynamic_gate_buffer::GateBuffer;
-#[cfg(not(feature = "staticgates"))]
+#[cfg(not(feature = "static_gates"))]
 pub type GateRef = dynamic_gate_buffer::GateRef;
 
-#[cfg(not(feature = "staticgates"))]
+#[cfg(not(feature = "static_gates"))]
 mod dynamic_gate_buffer {
     use crate::net::*;
     use crate::util::*;
@@ -214,12 +214,12 @@ mod dynamic_gate_buffer {
     }
 }
 
-#[cfg(feature = "staticgates")]
+#[cfg(feature = "static_gates")]
 pub type GateBuffer = static_gate_buffer::GateBuffer;
-#[cfg(feature = "staticgates")]
+#[cfg(feature = "static_gates")]
 pub type GateRef = static_gate_buffer::GateRef;
 
-#[cfg(feature = "staticgates")]
+#[cfg(feature = "static_gates")]
 mod static_gate_buffer {
     use crate::net::*;
 

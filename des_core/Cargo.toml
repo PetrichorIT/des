@@ -8,9 +8,9 @@ version = "0.1.0"
 [features]
 net = []
 netipv6 = ["net"]
-pubinterning = []
+pub_interning = []
 simtime_u128 = []
-staticgates = []
+static_gates = []
 
 [dependencies]
 lazy_static = "1.4.0"
