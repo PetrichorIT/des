@@ -111,7 +111,6 @@ fn main() {
     let mut rt = Runtime::new_with(
         app,
         des_core::RuntimeOptions {
-            sim_base_unit: des_core::SimTimeUnit::Seconds,
             rng: StdRng::seed_from_u64(0x123),
             max_itr: !0,
         },

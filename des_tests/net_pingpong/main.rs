@@ -32,7 +32,6 @@ fn main() {
     let mut rt = Runtime::new_with(
         app,
         RuntimeOptions {
-            sim_base_unit: SimTimeUnit::Seconds,
             max_itr: 200,
             rng: StdRng::seed_from_u64(0x56123),
         },

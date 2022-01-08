@@ -126,17 +126,28 @@ impl<A: Application> PartialOrd for EventNode<A> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
+
+    fn lt(&self, other: &Self) -> bool {
+        other.time < self.time
+    }
+
+    fn le(&self, other: &Self) -> bool {
+        other.time <= self.time
+    }
+
+    fn gt(&self, other: &Self) -> bool {
+        other.time > self.time
+    }
+
+    fn ge(&self, other: &Self) -> bool {
+        other.time >= self.time
+    }
 }
 
 impl<A: Application> Ord for EventNode<A> {
     fn cmp(&self, other: &Self) -> Ordering {
-        if self == other {
-            Ordering::Equal
-        } else if self.time < other.time {
-            Ordering::Greater
-        } else {
-            Ordering::Less
-        }
+        // Inverted call should act as reverse
+        other.time.cmp(&self.time)
     }
 }
 

@@ -149,7 +149,6 @@ fn main() {
     };
 
     let opts = RuntimeOptions {
-        sim_base_unit: SimTimeUnit::Nanoseconds,
         rng: StdRng::seed_from_u64(0x42069),
         max_itr: !0,
     };

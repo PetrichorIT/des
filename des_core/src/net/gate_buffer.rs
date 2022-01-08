@@ -88,6 +88,12 @@ mod dynamic_gate_buffer {
         }
     }
 
+    impl Default for GateBuffer {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
     ///
     /// A reference to a [Gate] stored in a [GateBuffer].
     ///
@@ -119,6 +125,8 @@ mod dynamic_gate_buffer {
             }
         }
 
+        // Internal fn to hide caching calls.
+        #[allow(clippy::mut_from_ref)]
         fn direct(&self) -> &mut Option<(usize, *mut Gate)> {
             //
             // # Safty

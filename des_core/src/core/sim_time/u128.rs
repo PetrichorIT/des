@@ -1,6 +1,6 @@
 use crate::core::sim_time;
 use std::cmp::{Eq, Ord, Ordering};
-use std::fmt::{Display, Formatter, Write};
+use std::fmt::{Display, Formatter};
 use std::ops::*;
 
 ///
@@ -9,36 +9,40 @@ use std::ops::*;
 ///
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SimTime {
-    picos: u64,
+    femtos: u64,
     secs: u64,
 }
 
-const PICO_ONE_SEC: u64 = 1_000_000_000_000;
-const PICO_MAX: u64 = PICO_ONE_SEC - 1;
+const FEMTO_ONE_SEC: u64 = 1_000_000_000_000_000;
+const FEMTO_MAX: u64 = FEMTO_ONE_SEC - 1;
 
 impl SimTime {
-    pub const ZERO: Self = Self { picos: 0, secs: 0 };
+    pub const ZERO: Self = Self { femtos: 0, secs: 0 };
 
-    pub const MIN: Self = Self { picos: 0, secs: 0 };
+    pub const MIN: Self = Self { femtos: 0, secs: 0 };
     pub const MAX: Self = Self {
-        picos: PICO_MAX,
+        femtos: FEMTO_MAX,
         secs: u64::MAX,
     };
 
+    pub fn femto(&self) -> u64 {
+        self.femtos % 1000
+    }
+
     pub fn picos(&self) -> u64 {
-        self.picos % 1000
+        (self.femtos / 1_000) % 1000
     }
 
     pub fn nanos(&self) -> u64 {
-        (self.picos / 1_000) % 1000
+        (self.femtos / 1_000_000) % 1000
     }
 
     pub fn micros(&self) -> u64 {
-        (self.picos / 1_000_000) % 1000
+        (self.femtos / 1_000_000_000) % 1000
     }
 
     pub fn millis(&self) -> u64 {
-        (self.picos / 1_000_000_000) % 1000
+        (self.femtos / 1_000_000_000_000) % 1000
     }
 
     pub fn secs(&self) -> u64 {
@@ -57,9 +61,9 @@ impl SimTime {
         self.secs / (60 * 60 * 24)
     }
 
-    pub fn new(picos: u64, secs: u64) -> Self {
-        assert!(picos <= PICO_MAX);
-        Self { picos, secs }
+    pub fn new(femtos: u64, secs: u64) -> Self {
+        assert!(femtos <= FEMTO_MAX);
+        Self { femtos, secs }
     }
 
     pub fn now() -> Self {
@@ -71,6 +75,58 @@ impl PartialOrd for SimTime {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
+
+    // To prevent the usage of cmp, which is lesse effiecent event
+    // in release mode.
+    #[allow(clippy::comparison_chain)]
+    fn lt(&self, other: &Self) -> bool {
+        if self.secs < other.secs {
+            true
+        } else if self.secs == other.secs {
+            self.femtos < other.femtos
+        } else {
+            false
+        }
+    }
+
+    // To prevent the usage of cmp, which is lesse effiecent event
+    // in release mode.
+    #[allow(clippy::comparison_chain)]
+    fn le(&self, other: &Self) -> bool {
+        if self.secs < other.secs {
+            true
+        } else if self.secs == other.secs {
+            self.femtos <= other.femtos
+        } else {
+            false
+        }
+    }
+
+    // To prevent the usage of cmp, which is lesse effiecent event
+    // in release mode.
+    #[allow(clippy::comparison_chain)]
+    fn gt(&self, other: &Self) -> bool {
+        if self.secs > other.secs {
+            true
+        } else if self.secs == other.secs {
+            self.femtos > other.femtos
+        } else {
+            false
+        }
+    }
+
+    // To prevent the usage of cmp, which is lesse effiecent event
+    // in release mode.
+    #[allow(clippy::comparison_chain)]
+    fn ge(&self, other: &Self) -> bool {
+        if self.secs > other.secs {
+            true
+        } else if self.secs == other.secs {
+            self.femtos >= other.femtos
+        } else {
+            false
+        }
+    }
 }
 
 impl Ord for SimTime {
@@ -78,48 +134,70 @@ impl Ord for SimTime {
         match self.secs.cmp(&other.secs) {
             Ordering::Less => Ordering::Less,
             Ordering::Greater => Ordering::Greater,
-            Ordering::Equal => self.picos.cmp(&other.picos),
+            Ordering::Equal => self.femtos.cmp(&other.femtos),
         }
     }
 }
 
 impl Display for SimTime {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}s ({}ps)", self.secs, self.picos)
+        // ignore femtos they are just for rounding
+        for (value, unit) in [
+            (self.days(), "days"),
+            (self.hours(), "h"),
+            (self.mins(), "min"),
+            (self.secs(), "s"),
+            (self.millis(), "ms"),
+            (self.micros(), "µs"),
+            (self.nanos(), "ns"),
+            (self.picos(), "ps"),
+        ] {
+            if value != 0 {
+                write!(f, "{}{} ", value, unit)?
+            }
+        }
+
+        Ok(())
     }
 }
 
 impl From<f64> for SimTime {
     fn from(val: f64) -> Self {
         let secs = val.trunc() as u64;
-        let picos = val.fract() * PICO_ONE_SEC as f64;
-        let picos = picos as u64;
+        let femtos = val.fract() * FEMTO_ONE_SEC as f64;
+        let femtos = femtos as u64;
 
-        Self { picos, secs }
+        Self { femtos, secs }
     }
 }
 
 impl From<SimTime> for f64 {
     fn from(simtime: SimTime) -> Self {
-        let mut result = simtime.picos as f64;
-        result /= PICO_ONE_SEC as f64;
-        result + simtime.secs as f64
+        let mut result = simtime.femtos as f64;
+        result /= FEMTO_ONE_SEC as f64;
+        result += simtime.secs as f64;
+
+        result
     }
 }
 
 impl From<&'_ SimTime> for f64 {
     fn from(simtime: &'_ SimTime) -> Self {
-        let mut result = simtime.picos as f64;
-        result /= PICO_ONE_SEC as f64;
-        result + simtime.secs as f64
+        let mut result = simtime.femtos as f64;
+        result /= FEMTO_ONE_SEC as f64;
+        result += simtime.secs as f64;
+
+        result
     }
 }
 
 impl From<&'_ mut SimTime> for f64 {
     fn from(simtime: &'_ mut SimTime) -> Self {
-        let mut result = simtime.picos as f64;
-        result /= PICO_ONE_SEC as f64;
-        result + simtime.secs as f64
+        let mut result = simtime.femtos as f64;
+        result /= FEMTO_ONE_SEC as f64;
+        result += simtime.secs as f64;
+
+        result
     }
 }
 
@@ -136,12 +214,12 @@ impl Add for SimTime {
 
 impl AddAssign for SimTime {
     fn add_assign(&mut self, rhs: Self) {
-        self.picos += rhs.picos;
+        self.femtos += rhs.femtos;
         self.secs += rhs.secs;
 
-        if self.picos > PICO_MAX {
+        if self.femtos > FEMTO_MAX {
             self.secs += 1;
-            self.picos -= PICO_MAX;
+            self.femtos -= FEMTO_MAX;
         }
     }
 }
@@ -157,12 +235,12 @@ impl Sub for SimTime {
 
 impl SubAssign for SimTime {
     fn sub_assign(&mut self, rhs: Self) {
-        if self.picos < rhs.picos {
+        if self.femtos < rhs.femtos {
             self.secs -= 1;
-            self.picos += PICO_MAX;
+            self.femtos += FEMTO_MAX;
         }
 
-        self.picos -= rhs.picos;
+        self.femtos -= rhs.femtos;
         self.secs -= rhs.secs;
     }
 }
@@ -195,8 +273,11 @@ impl MulAssign<f64> for SimTime {
     fn mul_assign(&mut self, rhs: f64) {
         let rawref = &*self;
         let f = f64::from(rawref) * rhs;
-        let Self { picos, secs } = Self::from(f);
-        self.picos = picos;
+        let Self {
+            femtos: picos,
+            secs,
+        } = Self::from(f);
+        self.femtos = picos;
         self.secs = secs;
     }
 }
@@ -212,77 +293,5 @@ impl Div<f64> for SimTime {
 impl DivAssign<f64> for SimTime {
     fn div_assign(&mut self, rhs: f64) {
         self.mul_assign(1.0_f64 / rhs);
-    }
-}
-
-///
-/// A type to represent the minimum time-step of the simulation time,
-/// thus the raw value of simtime.
-///
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SimTimeUnit {
-    Picoseconds,
-    Microseconds,
-    Nanoseconds,
-    Milliseconds,
-    Seconds,
-    Minutes,
-    Hours,
-    Days,
-    Years,
-
-    Undefined,
-}
-
-impl SimTimeUnit {
-    ///
-    /// Formats the given timestamp using the unit (unsimplified).
-    ///
-    pub fn fmt_full(sim_time: SimTime, unit: SimTimeUnit) -> String {
-        Self::fmt_compact(sim_time, unit)
-    }
-
-    ///
-    /// Formats the given timestamp using the unit type (simplified).
-    ///
-    pub fn fmt_compact(sim_time: SimTime, unit: SimTimeUnit) -> String {
-        assert!(unit == Self::Seconds);
-
-        let mut str = String::new();
-        for (value, unit) in [
-            (sim_time.days(), Self::Days),
-            (sim_time.hours(), Self::Hours),
-            (sim_time.mins(), Self::Minutes),
-            (sim_time.secs(), Self::Seconds),
-            (sim_time.millis(), Self::Milliseconds),
-            (sim_time.micros(), Self::Microseconds),
-            (sim_time.nanos(), Self::Nanoseconds),
-            (sim_time.picos(), Self::Picoseconds),
-        ] {
-            if value != 0 {
-                str.write_fmt(format_args!("{}{}", value, unit))
-                    .expect("Failed write")
-            }
-        }
-
-        str
-    }
-}
-
-impl Display for SimTimeUnit {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Picoseconds => write!(f, "ps"),
-            Self::Microseconds => write!(f, "µs"),
-            Self::Nanoseconds => write!(f, "ns"),
-            Self::Milliseconds => write!(f, "ms"),
-            Self::Seconds => write!(f, "s"),
-            Self::Minutes => write!(f, "min"),
-            Self::Hours => write!(f, "h"),
-            Self::Days => write!(f, "days"),
-            Self::Years => write!(f, "years"),
-
-            Self::Undefined => Ok(()),
-        }
     }
 }

@@ -7,8 +7,8 @@ use crate::net::*;
 
 create_global_uid!(
     /// A runtime-unique identifier for a one directional channel.
-/// * This type is only available of DES is build with the `"net"` feature.*
-#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
+    /// * This type is only available of DES is build with the `"net"` feature.*
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
     pub ChannelId(usize) = CHANNEL_ID;
 );
 

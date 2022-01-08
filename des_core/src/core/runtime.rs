@@ -31,20 +31,6 @@ pub fn sim_time() -> SimTime {
 }
 
 ///
-/// Returns the current simulation time formatted with the
-/// simulations base unit.
-///
-#[inline(always)]
-pub fn sim_time_fmt() -> String {
-    unsafe {
-        SimTimeUnit::fmt_compact(
-            (*RTC.get()).as_ref().unwrap().sim_time,
-            (*RTC.get()).as_ref().unwrap().sim_base_unit,
-        )
-    }
-}
-
-///
 /// Generates a random instance of type T with a Standard distribution.
 ///
 pub fn rng<T>() -> T
@@ -68,7 +54,6 @@ where
 #[derive(Debug)]
 pub(crate) struct RuntimeCore {
     pub sim_time: SimTime,
-    pub sim_base_unit: SimTimeUnit,
 
     // Rt limits
     pub event_id: usize,
@@ -85,7 +70,6 @@ pub(crate) struct RuntimeCore {
 impl RuntimeCore {
     pub fn new(
         sim_time: SimTime,
-        sim_base_unit: SimTimeUnit,
         event_id: usize,
         itr: usize,
         max_itr: usize,
@@ -93,7 +77,6 @@ impl RuntimeCore {
     ) -> &'static SyncCell<Option<RuntimeCore>> {
         let rtc = Self {
             sim_time,
-            sim_base_unit,
 
             event_id,
             itr,
@@ -247,14 +230,7 @@ impl<A: Application> Runtime<A> {
 
     pub fn new_with(app: A, options: RuntimeOptions) -> Self {
         let mut this = Self {
-            core: RuntimeCore::new(
-                SimTime::ZERO,
-                options.sim_base_unit,
-                0,
-                0,
-                options.max_itr,
-                options.rng,
-            ),
+            core: RuntimeCore::new(SimTime::ZERO, 0, 0, options.max_itr, options.rng),
             app,
             future_event_heap: BinaryHeap::with_capacity(64),
             now_event_queue: VecDeque::with_capacity(32),
@@ -320,7 +296,7 @@ impl<A: Application> Runtime<A> {
 
         println!(
             "Simulation finished after {} at event #{}.",
-            SimTimeUnit::fmt_compact(t1, SimTimeUnit::Seconds),
+            t1,
             self.core().itr
         );
 
@@ -426,9 +402,6 @@ impl<A: Application> Display for Runtime<A> {
 ///
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuntimeOptions {
-    /// The base unit for representing time stamps.
-    /// Defaults to [SimTimeUnit::Undefined].
-    pub sim_base_unit: SimTimeUnit,
     /// The random number generator used internally.
     /// This can be seeded to ensure reproducability.
     /// Defaults to a [OsRng] which does NOT provide reproducability.
@@ -440,7 +413,6 @@ pub struct RuntimeOptions {
 impl Default for RuntimeOptions {
     fn default() -> Self {
         Self {
-            sim_base_unit: SimTimeUnit::Undefined,
             rng: StdRng::from_rng(OsRng::default()).unwrap(),
             max_itr: !0,
         }

@@ -9,14 +9,17 @@ use crate::core::sim_time;
 /// in the simulation.
 ///
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct SimTime(pub(crate) f64);
+pub struct SimTime(f64);
 
 impl SimTime {
     /// The start time of the simulation.
     pub const ZERO: SimTime = SimTime(0.0);
 
     /// The end time of the simulation.
-    pub const INFINITY: SimTime = SimTime(f64::INFINITY);
+    pub const MIN: SimTime = SimTime(0.0);
+
+    /// The end time of the simulation.
+    pub const MAX: SimTime = SimTime(f64::INFINITY);
 
     ///
     /// Creates a new instance from a raw f64.
@@ -51,27 +54,6 @@ impl SimTime {
     }
 
     ///
-    /// Returns the absolute part of the simtime.
-    ///
-    pub fn abs(self) -> f64 {
-        self.0.abs()
-    }
-
-    ///
-    /// Returns the value closer to the simulation start.
-    ///
-    pub fn min(&self, other: Self) -> Self {
-        Self(self.0.min(other.0))
-    }
-
-    ///
-    /// Returns the value closer to the simulation end.
-    ///
-    pub fn max(&self, other: Self) -> Self {
-        Self(self.0.max(other.0))
-    }
-
-    ///
     /// Returns the integer (super-unit) part of the timestamp.
     ///
     /// # Examples
@@ -85,8 +67,9 @@ impl SimTime {
     /// assert_eq!(st_1.trunc(), 3.0);
     /// assert_eq!(st_2.trunc(), 3.0);
     /// ```
+    #[must_use]
     pub fn trunc(self) -> SimTime {
-        Self(self.0.trunc())
+        Self(self.0.trunc().abs())
     }
 
     ///
@@ -100,12 +83,17 @@ impl SimTime {
     /// let st_1 = SimTime::new(3.4);
     /// let st_2 = SimTime::new(1.4);
     ///
-    /// assert!((st_1.fract().abs() - 0.4).abs() < 1e-10);
-    /// assert!((st_2.fract().abs() - 0.4).abs() < 1e-10);
+    /// assert!((st_1.fract() - 0.4).raw() < 1e-10);
+    /// assert!((st_2.fract() - 0.4).raw() < 1e-10);
     /// ```
     ///
+    #[must_use]
     pub fn fract(self) -> SimTime {
-        Self(self.0.fract())
+        Self(self.0.fract().abs())
+    }
+
+    pub fn raw(self) -> f64 {
+        self.0.abs()
     }
 }
 
@@ -145,7 +133,11 @@ impl Ord for SimTime {
 
 impl Display for SimTime {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+        write!(
+            f,
+            "{}",
+            SimTimeUnit::fmt_compact(*self, SimTimeUnit::Seconds)
+        )
     }
 }
 
@@ -281,64 +273,45 @@ impl DivAssign<f64> for SimTime {
 /// A type to represent the minimum time-step of the simulation time,
 /// thus the raw value of simtime.
 ///
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SimTimeUnit {
-    Microseconds,
+#[derive(PartialEq, Clone, Copy)]
+enum SimTimeUnit {
     Nanoseconds,
+    Microseconds,
     Milliseconds,
     Seconds,
     Minutes,
     Hours,
     Days,
-    Years,
-
-    Undefined,
 }
 
 impl SimTimeUnit {
     ///
-    /// Formats the given timestamp using the unit (unsimplified).
-    ///
-    pub fn fmt_full(sim_time: SimTime, unit: SimTimeUnit) -> String {
-        let mut str = String::new();
-        let (sim_time, unit) = SimTimeUnit::simplifiy(sim_time, unit);
-        str.write_fmt(format_args!("{}{}", sim_time, unit))
-            .expect("Failed core fmt");
-        str
-    }
-
-    ///
     /// Scales the given type (interpreted as unit) to the most matching unit type.
     ///
     pub fn simplifiy(mut sim_time: SimTime, mut unit: SimTimeUnit) -> (SimTime, SimTimeUnit) {
-        match unit {
-            Self::Undefined => (sim_time, unit),
-            _ => {
-                // Shrink num, grow unit
-                while sim_time >= unit.grow_factor().into() {
-                    match unit.growed() {
-                        Some(new_unit) => {
-                            sim_time /= unit.grow_factor();
-                            unit = new_unit;
-                        }
-                        None => break,
-                    }
+        // Shrink num, grow unit
+        while sim_time >= unit.grow_factor().into() {
+            match unit.growed() {
+                Some(new_unit) => {
+                    sim_time /= unit.grow_factor();
+                    unit = new_unit;
                 }
-
-                // Grow num, shrink unit
-                while sim_time < 1.0.into() {
-                    match unit.shrinked() {
-                        Some(new_unit) => {
-                            sim_time *= unit.shrink_factor();
-                            unit = new_unit;
-                        }
-                        None => break,
-                    }
-                }
-
-                (sim_time, unit)
+                None => break,
             }
         }
+
+        // Grow num, shrink unit
+        while sim_time < 1.0.into() {
+            match unit.shrinked() {
+                Some(new_unit) => {
+                    sim_time *= unit.shrink_factor();
+                    unit = new_unit;
+                }
+                None => break,
+            }
+        }
+
+        (sim_time, unit)
     }
 
     ///
@@ -352,7 +325,7 @@ impl SimTimeUnit {
         // a.b where a 1..1000 b unknown
 
         // Ignore easy case
-        if unit == Self::Microseconds || unit == Self::Undefined {
+        if unit == Self::Nanoseconds {
             str.write_fmt(format_args!("{}{}", sim_time, unit))
                 .expect("Failed core fmt");
             str
@@ -377,7 +350,7 @@ impl SimTimeUnit {
                     // This bound prevents floating point errors from
                     // poisioing output.
                     if sim_time > 0.01.into() {
-                        str.write_fmt(format_args!("{}{} ", sim_time, unit))
+                        str.write_fmt(format_args!("{}{} ", sim_time.0, unit))
                             .expect("Failed core fmt");
                     }
                     break;
@@ -403,8 +376,6 @@ impl SimTimeUnit {
             Self::Minutes => Some(Self::Seconds),
             Self::Hours => Some(Self::Minutes),
             Self::Days => Some(Self::Hours),
-            Self::Years => Some(Self::Days),
-            _ => None,
         }
     }
 
@@ -418,8 +389,6 @@ impl SimTimeUnit {
             Self::Microseconds | Self::Nanoseconds | Self::Milliseconds | Self::Seconds => 1000.0,
             Self::Minutes | Self::Hours => 60.0,
             Self::Days => 24.0,
-            Self::Years => 356.0,
-            Self::Undefined => 0.0,
         }
     }
 
@@ -428,15 +397,13 @@ impl SimTimeUnit {
     ///
     pub fn growed(self) -> Option<Self> {
         match self {
-            Self::Microseconds => Some(Self::Nanoseconds),
-            Self::Nanoseconds => Some(Self::Milliseconds),
+            Self::Nanoseconds => Some(Self::Microseconds),
+            Self::Microseconds => Some(Self::Milliseconds),
             Self::Milliseconds => Some(Self::Seconds),
             Self::Seconds => Some(Self::Minutes),
             Self::Minutes => Some(Self::Hours),
             Self::Hours => Some(Self::Days),
-            Self::Days => Some(Self::Years),
-            Self::Years => None,
-            _ => None,
+            Self::Days => None,
         }
     }
 
@@ -456,16 +423,13 @@ impl SimTimeUnit {
 impl Display for SimTimeUnit {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Microseconds => write!(f, "µs"),
             Self::Nanoseconds => write!(f, "ns"),
+            Self::Microseconds => write!(f, "µs"),
             Self::Milliseconds => write!(f, "ms"),
             Self::Seconds => write!(f, "s"),
             Self::Minutes => write!(f, "min"),
             Self::Hours => write!(f, "h"),
             Self::Days => write!(f, "days"),
-            Self::Years => write!(f, "years"),
-
-            Self::Undefined => Ok(()),
         }
     }
 }
