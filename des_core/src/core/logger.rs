@@ -29,7 +29,7 @@ pub struct StandardLogger();
 
 impl StandardLogger {
     pub fn setup() -> Result<(), SetLoggerError> {
-        set_logger(&LOGGER).map(|()| set_max_level(LevelFilter::Info))
+        set_logger(&LOGGER).map(|()| set_max_level(LevelFilter::Trace))
     }
 
     fn get_level_color(level: Level) -> Color {
@@ -45,7 +45,7 @@ impl StandardLogger {
 
 impl Log for StandardLogger {
     fn enabled(&self, metadata: &log::Metadata) -> bool {
-        metadata.level() <= Level::Info
+        metadata.level() <= Level::Trace
     }
 
     fn log(&self, record: &log::Record) {

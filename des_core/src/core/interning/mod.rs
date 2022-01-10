@@ -5,6 +5,8 @@
 //!
 
 use crate::util::SyncCell;
+use crate::Packet;
+use log::{error, trace, warn};
 use std::alloc::{dealloc, Layout};
 use std::any::{type_name, TypeId};
 use std::ops::{Deref, DerefMut};
@@ -104,6 +106,7 @@ impl Interner {
                 //     index, descriptor.ty_id
                 // );
                 *item = Some(descriptor);
+                trace!(target: "interner", "Interning new {} value at ID: {}.", type_name::<T>(), index);
 
                 return InternedValue {
                     interner: self,
@@ -114,10 +117,7 @@ impl Interner {
 
         // Push new item
         let index = contents.len();
-        // println!(
-        //     "[Interner] >> New #{} (pusher) ty: {:?}",
-        //     index, descriptor.ty_id
-        // );
+        trace!(target: "interner", "Interning new {} value at ID: {}.", type_name::<T>(), index);
 
         contents.push(Some(descriptor));
 
@@ -125,6 +125,122 @@ impl Interner {
             interner: self,
             index,
         }
+    }
+
+    pub fn cast<T: 'static>(value: InternedValue) -> TypedInternedValue<T> {
+        trace!(target: "interner", "Casting to typed({}) ref for ID: {}", type_name::<T>(), value.index);
+        let InternedValue { interner, index } = value;
+
+        // # Safty
+        // By the safty contract of Interner any Interned value must indirectly point to a valid
+        // interned value, thereby the index points to a valid descriptor.
+        let entry = unsafe { interner.get_mut(index) };
+
+        assert_eq!(
+            entry.ty_id,
+            TypeId::of::<T>(),
+            "Cannot cast value to invalid type '{}'",
+            type_name::<T>()
+        );
+
+        // # Safty
+        // By the safty contract the memory will be valid, and by checking the type id
+        // the constructed reference will point to a valid instance of T,
+        // so this is no UB.
+        let reference = unsafe { &mut *(entry.ptr as *mut T) };
+
+        // Since the ref is converted the ref count should not be
+        // decreased by droppping 'value' nor increased by creating
+        // the return type manually
+        std::mem::forget(value);
+
+        TypedInternedValue {
+            interner,
+            index,
+            reference,
+        }
+    }
+
+    pub fn uncast<T: 'static>(value: TypedInternedValue<T>) -> InternedValue {
+        trace!(target: "interner", "Uncasting typed({}) ref for ID: {}", type_name::<T>(), value.index);
+        let TypedInternedValue {
+            interner, index, ..
+        } = value;
+
+        std::mem::forget(value);
+
+        InternedValue { interner, index }
+    }
+
+    pub fn drop_untyped(value: &mut InternedValue) {
+        let InternedValue { interner, index } = *value;
+
+        let remaining_ref = Self::dec_ref_count(interner, index);
+
+        if remaining_ref == 0 {
+            // Unsound drop, check usual suspects
+
+            if value.type_id() == TypeId::of::<Packet>() {
+                Self::drop_typed_raw::<Packet>(interner, index);
+            } else if value.type_id() == TypeId::of::<String>() {
+                Self::drop_typed_raw::<String>(interner, index);
+            } else if value.type_id() == TypeId::of::<Vec<u8>>() {
+                Self::drop_typed_raw::<Vec<u8>>(interner, index);
+            } else {
+                warn!(target: "interner", "Dropping untyped value ID: {}", index);
+
+                // # Safty
+                // This is safe since all uses of get_mut() at internally and no
+                // references leak.
+                let contents = unsafe { &mut *interner.contents.get() };
+                // # Safty
+                // This is sound since the safty contract guarntees that 'ptr' points to
+                // valid memory and 'layout' was derived at interning for Sized types.
+                unsafe {
+                    dealloc(
+                        contents[index].as_ref().unwrap().ptr,
+                        contents[index].as_ref().unwrap().layout,
+                    )
+                }
+
+                contents[index] = None;
+            }
+        }
+    }
+
+    pub fn drop_typed<T: 'static>(value: &mut TypedInternedValue<T>) {
+        let TypedInternedValue {
+            interner, index, ..
+        } = *value;
+
+        let remaining_ref = Self::dec_ref_count(interner, index);
+        if remaining_ref == 0 {
+            Self::drop_typed_raw::<T>(interner, index);
+        }
+    }
+
+    pub fn drop_typed_raw<T: 'static>(interner: &Interner, index: usize) {
+        trace!(target: "interner", "Dropping typed ({}) value ID: {}", type_name::<T>(), index);
+
+        // # Safty
+        // This is safe since all uses of get_mut() at internally and no
+        // references leak.
+        let contents = unsafe { &mut *interner.contents.get() };
+
+        assert_eq!(
+            contents[index].as_ref().unwrap().ref_count,
+            0,
+            "Cannot drop interned value with still valid references."
+        );
+
+        // # Safty
+        // This is a safe operation since the refernced index is of type
+        // T since this function is only called from a validated instance of
+        // TypedInternedValue<T>.
+        let boxed = unsafe { Box::from_raw(contents[index].as_ref().unwrap().ptr as *mut T) };
+        drop(boxed);
+
+        contents[index] = None;
     }
 
     /// Retrieves a entry at cell the given index.
@@ -145,88 +261,35 @@ impl Interner {
     }
 
     /// Registers a clone on the given value.
-    fn clone_interned(&self, index: usize) {
+    fn inc_ref_count(&self, index: usize) {
         // # Safty
         // This operation is safe since [Self] is single threaded
         // and mutable referenced to ref_cell are only
         // temporary and not leaked outside Self.
         let entry = unsafe { self.get_mut(index) };
-
-        // println!(
-        //     "[Interner] >> Clone #{} {} --> {}",
-        //     index,
-        //     entry.ref_count,
-        //     entry.ref_count + 1
-        // );
-
+        trace!(target: "interner", "New ref for ID: {} up from {} to {}", index, entry.ref_count, entry.ref_count + 1);
         entry.ref_count += 1;
     }
 
-    /// Checks reference counts and returns whether the value should be dropped.
-    fn predrop_interned(&self, index: usize) -> bool {
+    fn dec_ref_count(&self, index: usize) -> usize {
         // # Safty
         // This operation is safe since [Self] is single threaded
         // and mutable referenced to ref_cell are only
         // temporary and not leaked outside Self.
         let entry = unsafe { self.get_mut(index) };
-
-        // println!(
-        //     "[Interner] >> Predrop #{} {} --> {}",
-        //     index,
-        //     entry.ref_count,
-        //     entry.ref_count.saturating_sub(1)
-        // );
+        trace!(target: "interner", "Lost ref for ID: {} down from {} to {}", index, entry.ref_count, entry.ref_count - 1);
 
         entry.ref_count -= 1;
-
-        entry.ref_count == 0
+        entry.ref_count
     }
 
-    /// Drops a value from a [InternedValue].
-    fn drop_untyped_interned(&self, index: usize) {
-        // println!("[Interner] >> Drop (untyped) #{}", index);
-
+    fn type_id_of(&self, index: usize) -> TypeId {
         // # Safty
-        // This is safe since all uses of get_mut() at internally and no
-        // references leak.
-        let contents = unsafe { &mut *self.contents.get() };
-
-        // # Safty
-        // This is sound since the safty contract guarntees that 'ptr' points to
-        // valid memory and 'layout' was derived at interning for Sized types.
-        unsafe {
-            dealloc(
-                contents[index].as_ref().unwrap().ptr,
-                contents[index].as_ref().unwrap().layout,
-            )
-        }
-
-        contents[index] = None;
-    }
-
-    /// Drops a value from a [TypedInternedValue].
-    fn drop_typed_interned<T: 'static>(&self, index: usize) {
-        // # Safty
-        // This is safe since all uses of get_mut() at internally and no
-        // references leak.
-        let contents = unsafe { &mut *self.contents.get() };
-
-        assert_eq!(
-            contents[index].as_ref().unwrap().ref_count,
-            0,
-            "Cannot drop interned value with still valid references."
-        );
-
-        // println!("[Interner] >> Drop (typed) #{}", index);
-
-        // # Safty
-        // This is a safe operation since the refernced index is of type
-        // T since this function is only called from a validated instance of
-        // TypedInternedValue<T>.
-        let boxed = unsafe { Box::from_raw(contents[index].as_ref().unwrap().ptr as *mut T) };
-        drop(boxed);
-
-        contents[index] = None;
+        // This operation is safe since [Self] is single threaded
+        // and mutable referenced to ref_cell are only
+        // temporary and not leaked outside Self.
+        let entry = unsafe { self.get_mut(index) };
+        entry.ty_id
     }
 
     /// Sanity check at the end of the simulation.
@@ -236,7 +299,7 @@ impl Interner {
         // references leak.
         let contents = unsafe { &*self.contents.get() };
         for entry in contents.iter().flatten() {
-            eprintln!("[ERROR] Undisposed obj after runtime end: {:?}", entry);
+            error!(target: "interner", "Undisposed object after runtime end: {:?}", entry);
         }
     }
 }
@@ -269,8 +332,8 @@ struct InteredValueDescriptor {
 /// A reference to a interned value of a given interner.
 ///
 pub struct InternedValue<'a> {
-    interner: &'a Interner,
-    index: usize,
+    pub(crate) interner: &'a Interner,
+    pub(crate) index: usize,
 }
 
 impl<'a> InternedValue<'a> {
@@ -279,69 +342,18 @@ impl<'a> InternedValue<'a> {
     /// of the interned value.
     ///
     pub fn cast<T: 'static>(self) -> TypedInternedValue<'a, T> {
-        // # Safty
-        // By the safty contract of Interner any Interned value must indirectly point to a valid
-        // interned value, thereby the index points to a valid descriptor.
-        let entry = unsafe { self.interner.get_mut(self.index) };
-        assert_eq!(
-            entry.ty_id,
-            TypeId::of::<T>(),
-            "Cannot cast value to invalid type '{}'",
-            type_name::<T>()
-        );
-
-        // # Safty
-        // By the safty contract the memory will be valid, and by checking the type id
-        // the constructed reference will point to a valid instance of T,
-        // so this is no UB.
-        let reference = unsafe { &mut *(entry.ptr as *mut T) };
-
-        // Since self gets dropped either way TypedInternedValue is a new
-        // reference to the interned value.
-        self.interner.clone_interned(self.index);
-
-        TypedInternedValue {
-            interner: self.interner,
-            index: self.index,
-            reference,
-        }
+        Interner::cast(self)
     }
 
-    ///
-    /// Tries to cast self into a [TypedInternedValue], returns None if T does not match.
-    ///
-    #[allow(unused)]
-    pub fn try_cast<T: 'static>(self) -> Option<TypedInternedValue<'a, T>> {
-        // # Safty
-        // By the safty contract of Interner any Interned value must indirectly point to a valid
-        // interned value, thereby the index points to a valid descriptor.
-        let entry = unsafe { self.interner.get_mut(self.index) };
-        if entry.ty_id == TypeId::of::<T>() {
-            return None;
-        }
-
-        // # Safty
-        // By the safty contract the memory will be valid, and by checking the type id
-        // the constructed reference will point to a valid instance of T,
-        // so this is no UB.
-        let reference = unsafe { &mut *(entry.ptr as *mut T) };
-
-        // Since self gets dropped either way TypedInternedValue is a new
-        // reference to the interned value.
-        self.interner.clone_interned(self.index);
-
-        Some(TypedInternedValue {
-            interner: self.interner,
-            index: self.index,
-            reference,
-        })
+    pub fn type_id(&self) -> TypeId {
+        self.interner.type_id_of(self.index)
     }
 }
 
 impl Clone for InternedValue<'_> {
     fn clone(&self) -> Self {
         // Upon clone add 1 to the ref counter
-        self.interner.clone_interned(self.index);
+        self.interner.inc_ref_count(self.index);
 
         Self {
             interner: self.interner,
@@ -352,13 +364,7 @@ impl Clone for InternedValue<'_> {
 
 impl Drop for InternedValue<'_> {
     fn drop(&mut self) {
-        // If a ref is dropped sub 1 from the ref counter
-        let final_drop = self.interner.predrop_interned(self.index);
-
-        // If final drop, use provided typeinfo for sound drop
-        if final_drop {
-            self.interner.drop_untyped_interned(self.index)
-        }
+        Interner::drop_untyped(self)
     }
 }
 
@@ -384,13 +390,11 @@ impl<'a, T> TypedInternedValue<'a, T> {
     ///
     #[allow(unused)]
     pub fn uncast(self) -> InternedValue<'a> {
-        // Since self is still droped register downcasted value as clone
-        self.interner.clone_interned(self.index);
+        Interner::uncast(self)
+    }
 
-        InternedValue {
-            interner: self.interner,
-            index: self.index,
-        }
+    pub fn type_id(&self) -> TypeId {
+        self.interner.type_id_of(self.index)
     }
 }
 
@@ -411,25 +415,21 @@ impl<T: 'static> DerefMut for TypedInternedValue<'_, T> {
 impl<'a, T: 'static> Clone for TypedInternedValue<'a, T> {
     fn clone(&self) -> Self {
         // Upon clone add 1 to the ref counter
-        self.interner.clone_interned(self.index);
+        self.interner.inc_ref_count(self.index);
 
         let raw_interned = InternedValue {
             interner: self.interner,
             index: self.index,
         };
 
+        // This vodo is nessecary to fight of the
+        // lifetimes system
         raw_interned.cast()
     }
 }
 
 impl<T: 'static> Drop for TypedInternedValue<'_, T> {
     fn drop(&mut self) {
-        // If a ref is dropped sub 1 from the ref counter
-        let final_drop = self.interner.predrop_interned(self.index);
-
-        // If final drop, use provided typeinfo for sound drop
-        if final_drop {
-            self.interner.drop_typed_interned::<T>(self.index)
-        }
+        Interner::drop_typed(self)
     }
 }

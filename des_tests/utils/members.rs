@@ -14,7 +14,7 @@ impl Module for Alice {
         let mut pkt = msg.extract_content::<Packet>();
         info!(target: self.name().unwrap(), "Received at {}: Message #{} content: {}", sim_time(), pkt.id(), pkt.extract_content_ref::<String>().deref());
 
-        if pkt.hop_count() > 4 {
+        if pkt.hop_count() > 2 {
             // TERMINATE
             self.disable_activity()
         } else {
