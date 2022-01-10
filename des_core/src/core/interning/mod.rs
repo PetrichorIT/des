@@ -9,6 +9,8 @@ use std::alloc::{dealloc, Layout};
 use std::any::{type_name, TypeId};
 use std::ops::{Deref, DerefMut};
 
+mod tests;
+
 ///
 /// A manager for interned objects.
 ///
