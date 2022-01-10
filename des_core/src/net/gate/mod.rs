@@ -1,7 +1,22 @@
-use std::fmt::{Debug, Display};
-
 use crate::create_global_uid;
 use crate::net::*;
+use std::fmt::{Debug, Display};
+
+#[cfg(not(feature = "static_gates"))]
+pub type GateBuffer = dynamic_buffer::GateBuffer;
+#[cfg(not(feature = "static_gates"))]
+pub type GateRef = dynamic_buffer::GateRef;
+
+#[cfg(not(feature = "static_gates"))]
+mod dynamic_buffer;
+
+#[cfg(feature = "static_gates")]
+pub type GateBuffer = static_buffer::GateBuffer;
+#[cfg(feature = "static_gates")]
+pub type GateRef = static_buffer::GateRef;
+
+#[cfg(feature = "static_gates")]
+mod static_buffer;
 
 create_global_uid!(
     /// A runtime-unquie identifier for a gate.

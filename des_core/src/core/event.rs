@@ -69,6 +69,11 @@ where
 }
 
 ///
+/// A runtime unqiue identifier for a event.
+///
+pub type EventId = u64;
+
+///
 /// A bin-heap node of a event from the applicaitons event set.
 ///
 /// # Allocation
@@ -82,7 +87,7 @@ pub(crate) struct EventNode<A: Application> {
     /// The deadline timestamp for the event.
     pub(crate) time: SimTime,
     /// A runtime-specific unique identifier.
-    pub(crate) id: usize,
+    pub(crate) id: EventId,
     /// The actual event.
     pub(crate) event: A::EventSet,
 

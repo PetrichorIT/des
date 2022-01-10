@@ -56,7 +56,7 @@ pub(crate) struct RuntimeCore {
     pub sim_time: SimTime,
 
     // Rt limits
-    pub event_id: usize,
+    pub event_id: EventId,
     pub itr: usize,
     pub max_itr: usize,
 
@@ -70,7 +70,7 @@ pub(crate) struct RuntimeCore {
 impl RuntimeCore {
     pub fn new(
         sim_time: SimTime,
-        event_id: usize,
+        event_id: EventId,
         itr: usize,
         max_itr: usize,
         rng: StdRng,
@@ -144,7 +144,7 @@ impl<A: Application> Runtime<A> {
     /// Returns the number of events that were dispatched on this [Runtime] instance.
     ///
     #[inline(always)]
-    pub fn num_events_dispatched(&self) -> usize {
+    pub fn num_events_dispatched(&self) -> u64 {
         self.core().event_id
     }
 
