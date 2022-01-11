@@ -233,8 +233,8 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
         // This is a explicit for loop to prevent borrow rt only in the inner block
         // allowing preemtive dropping of 'module' so that rt can be used in
         // 'module_handle_jobs'.
-        for i in 0..rt.app.modules.len() {
-            let module = &mut rt.app.modules[i];
+        for i in 0..rt.app.modules().len() {
+            let module = &mut rt.app.modules_mut()[i];
             info!(
                 target: &format!("Module {}", module.str()),
                 "Calling at_simulation_start."

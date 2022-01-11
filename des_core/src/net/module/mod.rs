@@ -1,7 +1,9 @@
-use log::error;
+mod buffer;
+pub use buffer::*;
 
 use crate::net::*;
 use crate::*;
+use log::error;
 
 create_global_uid!(
     /// A runtime-unqiue identifier for a module / submodule inheritence tree.

@@ -1,3 +1,6 @@
+mod buffer;
+pub use buffer::*;
+
 use std::fmt::Display;
 
 use crate::create_global_uid;

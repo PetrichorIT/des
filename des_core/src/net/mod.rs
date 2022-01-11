@@ -25,6 +25,8 @@ pub use self::channel::CHANNEL_INSTANTANEOUS;
 pub use self::channel::CHANNEL_NULL;
 pub use self::channel::CHANNEL_SELF;
 
+pub(crate) use self::channel::ChannelBuffer;
+
 //
 // # Gate definitions
 //
@@ -70,3 +72,5 @@ pub use self::module::ModuleCore;
 pub use self::module::NdlBuildableModule;
 pub use self::module::NdlCompatableModule;
 pub use self::module::StaticModuleCore;
+
+pub(crate) use self::module::ModuleBuffer;
