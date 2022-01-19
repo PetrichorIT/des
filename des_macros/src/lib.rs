@@ -128,6 +128,15 @@ fn gen_static_module_core(ident: Ident, data: Data) -> TokenStream {
                         &mut self.#eident
                     }
                 }
+
+                impl ::des_core::Indexable for #ident {
+                    type Id = ::des_core::ModuleId;
+
+                    fn id(&self) -> ::des_core::ModuleId {
+                        use ::des_core::StaticModuleCore;
+                        self.module_core().id()
+                    }
+                }
             }
             .into()
         } else {
@@ -140,6 +149,15 @@ fn gen_static_module_core(ident: Ident, data: Data) -> TokenStream {
 
                     fn module_core_mut(&mut self) -> &mut ::des_core::ModuleCore {
                         &mut self.#idx
+                    }
+                }
+
+                impl ::des_core::Indexable for #ident {
+                    type Id = ::des_core::ModuleId;
+
+                    fn id(&self) -> ::des_core::ModuleId {
+                        use ::des_core::StaticModuleCore;
+                        self.module_core().id()
                     }
                 }
             }

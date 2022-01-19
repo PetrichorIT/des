@@ -1,5 +1,8 @@
 use crate::core::*;
 use crate::net::*;
+use crate::util::IdBuffer;
+use crate::util::IdBufferRef;
+use crate::util::Indexable;
 
 mod events;
 pub use events::*;
@@ -15,18 +18,18 @@ pub struct NetworkRuntime<A> {
     /// The set of module used in the network simulation.
     /// All module must be boxed, since they must conform to the [Module] trait.
     ///
-    module_buffer: ModuleBuffer,
+    module_buffer: IdBuffer<Box<dyn Module>>,
 
     ///
     /// The set of channels used to connect module. This will NOT include direct connections
     /// which do not contain any delay, thus are bound to no channel.
     ///
-    channel_buffer: ChannelBuffer,
+    channel_buffer: IdBuffer<Channel>,
 
     ///
     ///  A buffer to store all gates.
     ///
-    gate_buffer: GateBuffer,
+    gate_buffer: IdBuffer<Gate>,
 
     ///
     /// A inner container for holding user defined global state.
@@ -40,9 +43,9 @@ impl<A> NetworkRuntime<A> {
     ///
     pub fn new(inner: A) -> Self {
         Self {
-            module_buffer: ModuleBuffer::new(),
-            channel_buffer: ChannelBuffer::new(),
-            gate_buffer: GateBuffer::new(),
+            module_buffer: IdBuffer::new(),
+            channel_buffer: IdBuffer::new(),
+            gate_buffer: IdBuffer::new(),
 
             inner,
         }
@@ -61,7 +64,7 @@ impl<A> NetworkRuntime<A> {
     /// Returns a reference to the list of all modules.
     ///
     pub fn modules(&self) -> &Vec<Box<dyn Module>> {
-        self.module_buffer.modules()
+        self.module_buffer.contents()
     }
 
     ///
@@ -81,7 +84,7 @@ impl<A> NetworkRuntime<A> {
     /// Returns a mutable reference to the list of all modules.
     ///
     pub fn modules_mut(&mut self) -> &mut Vec<Box<dyn Module>> {
-        self.module_buffer.modules_mut()
+        self.module_buffer.contents_mut()
     }
 
     ///
@@ -100,7 +103,7 @@ impl<A> NetworkRuntime<A> {
     /// 'module_mut' because ids a sorted so binary seach can be used.
     ///
     pub fn module_by_id(&self, id: ModuleId) -> Option<&dyn Module> {
-        self.module_buffer.module(id)
+        self.module_buffer.get(id).map(|boxed| boxed.deref())
     }
 
     ///
@@ -108,7 +111,7 @@ impl<A> NetworkRuntime<A> {
     /// 'module_mut' because ids a sorted so binary seach can be used.
     ///
     pub fn module_mut_by_id(&mut self, id: ModuleId) -> Option<&mut Box<dyn Module>> {
-        self.module_buffer.module_mut(id)
+        self.module_buffer.get_mut(id)
     }
 
     ///
@@ -116,29 +119,31 @@ impl<A> NetworkRuntime<A> {
     ///
     pub fn create_channel(&mut self, metrics: ChannelMetrics) -> ChannelId {
         let channel = Channel::new(metrics);
-        self.channel_buffer.insert(channel)
+        self.channel_buffer.insert(channel).id()
     }
 
     ///
     /// Retrieves a channel by id.
     ///
     pub fn channel(&self, id: ChannelId) -> Option<&Channel> {
-        self.channel_buffer.channel(id)
+        self.channel_buffer.get(id)
     }
 
     ///
     /// Retrieves a channel by id mutabliy.
     ///
     pub fn channel_mut(&mut self, id: ChannelId) -> Option<&mut Channel> {
-        self.channel_buffer.channel_mut(id)
+        self.channel_buffer.get_mut(id)
     }
 
     ///
     /// Registers a new gate into the global buffer returning
     /// a reference to the gate.
     ///
-    pub fn create_gate(&mut self, gate: Gate) -> GateRef {
-        self.gate_buffer.insert(gate)
+    pub fn create_gate(&mut self, gate: Gate) -> IdBufferRef<Gate> {
+        let item = self.gate_buffer.insert(gate);
+
+        IdBufferRef::new(item.id(), &mut self.gate_buffer)
     }
 
     ///
@@ -147,14 +152,18 @@ impl<A> NetworkRuntime<A> {
     /// expensive, bc gates are stored in their respecitve owner modules.
     ///
     pub fn gate(&self, id: GateId) -> Option<&Gate> {
-        self.gate_buffer.gate(id)
+        self.gate_buffer.get(id)
     }
 
     ///
     /// Retrieves a target gate of a gate chain.
     ///
     pub fn gate_dest(&self, source_id: GateId) -> Option<&Gate> {
-        self.gate_buffer.gate_dest(source_id)
+        let mut gate = self.gate(source_id)?;
+        while gate.id() != GATE_SELF {
+            gate = self.gate(gate.next_gate())?
+        }
+        Some(gate)
     }
 
     ///
@@ -163,13 +172,12 @@ impl<A> NetworkRuntime<A> {
     pub fn finish_building(&mut self) {
         // If feature 'static' is active,
         // lock the buffer to activate preformance improvments
-
-        #[cfg(feature = "static_modules")]
-        self.module_buffer.lock();
-        #[cfg(feature = "static_channels")]
-        self.channel_buffer.lock();
-        #[cfg(feature = "static_gates")]
-        self.gate_buffer.lock();
+        #[cfg(feature = "static")]
+        {
+            self.module_buffer.lock();
+            self.channel_buffer.lock();
+            self.gate_buffer.lock();
+        }
     }
 
     ///

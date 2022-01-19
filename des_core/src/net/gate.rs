@@ -1,22 +1,25 @@
 use crate::create_global_uid;
 use crate::net::*;
+use crate::Indexable;
 use std::fmt::{Debug, Display};
 
-#[cfg(not(feature = "static_gates"))]
+/*
+#[cfg(not(feature = "static"))]
 pub type GateBuffer = dynamic_buffer::GateBuffer;
-#[cfg(not(feature = "static_gates"))]
+#[cfg(not(feature = "static"))]
 pub type GateRef = dynamic_buffer::GateRef;
 
-#[cfg(not(feature = "static_gates"))]
+#[cfg(not(feature = "static"))]
 mod dynamic_buffer;
 
-#[cfg(feature = "static_gates")]
+#[cfg(feature = "static")]
 pub type GateBuffer = static_buffer::GateBuffer;
-#[cfg(feature = "static_gates")]
+#[cfg(feature = "static")]
 pub type GateRef = static_buffer::GateRef;
 
-#[cfg(feature = "static_gates")]
+#[cfg(feature = "static")]
 mod static_buffer;
+*/
 
 create_global_uid!(
     /// A runtime-unquie identifier for a gate.
@@ -93,13 +96,15 @@ pub struct Gate {
     next_gate: GateId,
 }
 
-impl Gate {
-    /// A globally unique identifier for the gate.
-    #[inline(always)]
-    pub fn id(&self) -> GateId {
+impl Indexable for Gate {
+    type Id = GateId;
+
+    fn id(&self) -> GateId {
         self.id
     }
+}
 
+impl Gate {
     /// The position index of the gate in the descriptor cluster.
     #[inline(always)]
     pub fn pos(&self) -> usize {

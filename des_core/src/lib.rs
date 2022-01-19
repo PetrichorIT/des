@@ -15,7 +15,6 @@
 
 pub(crate) mod core;
 pub(crate) mod metrics;
-pub(crate) mod misc;
 pub(crate) mod util;
 
 #[cfg(feature = "net")]
@@ -40,3 +39,5 @@ pub use crate::metrics::StdDev;
 
 #[cfg(feature = "net")]
 pub use crate::net::*;
+
+pub use util::Indexable;

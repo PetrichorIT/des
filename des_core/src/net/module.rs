@@ -1,7 +1,8 @@
-mod buffer;
-pub use buffer::*;
+//mod buffer;
+//pub use buffer::*;
 
 use crate::net::*;
+use crate::util::{IdBufferRef, Indexable};
 use crate::*;
 use log::error;
 
@@ -47,7 +48,7 @@ pub trait Module: StaticModuleCore {
 ///
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-pub trait StaticModuleCore {
+pub trait StaticModuleCore: Indexable<Id = ModuleId> {
     ///
     /// Returns a pointer to the modules core, used for handling event and
     /// buffers that are use case unspecific.
@@ -59,13 +60,6 @@ pub trait StaticModuleCore {
     /// buffers that are use case unspecific.
     ///
     fn module_core_mut(&mut self) -> &mut ModuleCore;
-
-    ///
-    /// Returns the internal unquie identifier for the given module.
-    ///
-    fn id(&self) -> ModuleId {
-        self.module_core().id
-    }
 
     ///
     /// Returns a human readable representation of the modules identity.
@@ -403,7 +397,7 @@ pub struct ModuleCore {
     pub name: Option<String>,
 
     /// A collection of all gates register to the current module
-    pub gates: Vec<GateRef>,
+    pub gates: Vec<IdBufferRef<Gate>>,
 
     /// A buffer of messages to be send out, after the current handle messsage terminates.
     pub out_buffer: Vec<(Message, GateId)>,

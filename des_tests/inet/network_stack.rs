@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use des_core::StaticModuleCore;
-use des_core::{rng, GateId, Message, Module, ModuleCore, NodeAddress, Packet, SimTime};
+use des_core::{rng, GateId, Indexable, Message, Module, ModuleCore, NodeAddress, Packet, SimTime};
 use des_macros::Module;
 use log::info;
 

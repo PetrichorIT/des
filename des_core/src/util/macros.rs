@@ -1,17 +1,6 @@
 ///
 /// A decl. macro for creating numeric global UIDs.
 ///
-/// # Syntax
-///
-/// ```
-/// use des_core::create_global_uid;
-///
-/// create_global_uid!(
-///     pub MessageId(u32) = MESSAGE_ID_STATIC;
-///     pub(crate) packetId(u16) = PKT_ID_STATIC;
-/// );
-/// ```
-///
 /// # Note
 ///
 /// The inner type must be numeric and initalizable from a numeric interger literal.
@@ -32,14 +21,11 @@ macro_rules! create_global_uid {
 
             static mut $sident: $ty = 0xff;
 
-            impl $ident {
+            use crate::util::IdAsIndex;
+            impl IdAsIndex for $ident {
+                const MIN: Self = Self(0xff);
 
-                $vis const MIN: Self = Self(0xff);
-
-                ///
-                /// Generates a new unqiue instance of Self.
-                ///
-                $vis fn gen() -> Self {
+                fn gen() -> Self {
                     unsafe {
                         let a = $sident;
                         $sident += 1;
@@ -47,12 +33,8 @@ macro_rules! create_global_uid {
                     }
                 }
 
-                ///
-                /// Returns the raw primitiv the UID is contructed over.
-                ///
-                #[allow(unused)]
-                $vis fn raw(&self) -> $ty {
-                    self.0
+                fn as_usize(&self) -> usize {
+                    self.0 as usize
                 }
             }
 

@@ -10,10 +10,8 @@ net = []
 netipv6 = ["net"]
 pub_interning = []
 simtime_u128 = []
-static = [ "static_gates", "static_channels", "static_modules"]
+static = ["static_gates"]
 static_gates = ["net"]
-static_channels = ["net"]
-static_modules = ["net"]
 
 [dependencies]
 lazy_static = "1.4.0"

@@ -1,12 +1,10 @@
-mod buffer;
-pub use buffer::*;
-
 use std::fmt::Display;
 
 use crate::create_global_uid;
 
 use crate::core::*;
 use crate::net::*;
+use crate::util::Indexable;
 
 create_global_uid!(
     /// A runtime-unique identifier for a one directional channel.
@@ -126,14 +124,15 @@ pub struct Channel {
     busy: bool,
 }
 
-impl Channel {
-    ///
-    /// A unique identifier for a channel.
-    ///
-    pub fn id(&self) -> ChannelId {
+impl Indexable for Channel {
+    type Id = ChannelId;
+
+    fn id(&self) -> Self::Id {
         self.id
     }
+}
 
+impl Channel {
     ///
     /// The capabilities of the channel.
     ///

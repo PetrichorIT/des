@@ -1,7 +1,8 @@
 use std::ops::Deref;
 
 use des_core::{
-    sim_time, Message, Module, ModuleCore, SimTime, StaticModuleCore, GATE_NULL, MODULE_NULL,
+    sim_time, Indexable, Message, Module, ModuleCore, SimTime, StaticModuleCore, GATE_NULL,
+    MODULE_NULL,
 };
 use des_macros::Module;
 
