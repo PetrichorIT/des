@@ -9,6 +9,20 @@ use std::ops::Deref;
 /// A buffer for self-indexable objects, enabling static
 /// optimization.
 ///
+/// # Feature "static"
+///
+/// If this feature is active this buffer wil be optimized to allow O(1)
+/// accesses at runtime after the buffer is locked. Note that locking of the buffer
+/// prevents the removal or insertion of new elements into the buffer.
+/// Insertion can also be optimized to O(1) (ignoring grows) if and only
+/// if elements are inserted in the correct order.
+///
+/// # Default behaviour
+///
+/// If no static optimization is performed, both insert and access are O(log n)
+/// with caching optimizations for [IdBufferRef]. Insertions and removals are
+/// allowed at any point in the process.
+///
 pub struct IdBuffer<T>
 where
     T: Indexable,
@@ -26,10 +40,17 @@ impl<T> IdBuffer<T>
 where
     T: Indexable,
 {
+    ///
+    /// Creates a new empty buffer.
+    ///
     pub fn new() -> Self {
         Self::with_capacity(0)
     }
 
+    ///
+    /// Creates a new buffer that does not need reallocation until
+    /// greater than 'cap' elements are inserted.
+    ///
     pub fn with_capacity(cap: usize) -> Self {
         Self {
             inner: Vec::with_capacity(cap),
@@ -42,12 +63,39 @@ where
         }
     }
 
+    ///
+    /// Inserts an element into the buffer, sorting it at the best allocated
+    /// stop. Returns a reference to the element that should only be used very temporary.
+    ///
+    /// # Complexity
+    ///
+    /// O(1) with feature "static" and in-order insertions.
+    /// O(log n) elsewhere.
+    ///
     pub fn insert(&mut self, item: T) -> &mut T {
         #[cfg(feature = "static")]
         assert!(
             self.locked == false,
             "Cannot insert element into locked buffer"
         );
+
+        // Shortcut to speed up static in-line inserts.
+        // Usually in static cases insertions are allready in order but this leads
+        // to worst case prefomace of 'binary_serach_by_key'.
+        // so check this shortcut.
+        #[cfg(feature = "static")]
+        match self.inner.last() {
+            Some(element) => {
+                if element.id() < item.id() {
+                    self.inner.push(item);
+                    return self.inner.last_mut().unwrap();
+                }
+            }
+            None => {
+                self.inner.push(item);
+                return self.inner.last_mut().unwrap();
+            }
+        }
 
         let id = item.id();
         let insert_at = match self.inner.binary_search_by_key(&id, |c| c.id()) {
@@ -64,6 +112,10 @@ where
         &mut self.inner[insert_at]
     }
 
+    ///
+    /// Removes an element from the buffer, returning whether the element
+    /// was found and removed.
+    ///
     #[cfg(not(feature = "static"))]
     pub fn remove(&mut self, id: T::Id) -> bool {
         let idx = match self.inner.binary_search_by_key(&id, |c| c.id()) {
@@ -75,6 +127,12 @@ where
         true
     }
 
+    ///
+    /// Locks the buffer checking the validity of the indices,
+    /// forbidding the insertion of any future elements.
+    /// This ensures that the memory will not be unmapped allowing
+    /// direct ptr optiominzation.
+    ///
     #[cfg(feature = "static")]
     pub fn lock(&mut self) {
         info!(
@@ -171,6 +229,11 @@ where
 #[cfg(not(feature = "static"))]
 use crate::util::SyncCell;
 
+///
+/// A semi-owned reference to a object stored in the buffer.
+/// There should only exist one [IdBufferRef] per buffered object,
+/// but it is possible to create multipled ones.
+///
 #[derive(Debug, Clone)]
 pub struct IdBufferRef<T>
 where
@@ -187,6 +250,10 @@ impl<T> IdBufferRef<T>
 where
     T: Indexable,
 {
+    ///
+    /// Creates a new strong ref to a object referenced by and id
+    /// in the given buffer.
+    ///
     pub fn new(id: T::Id, buffer: &mut IdBuffer<T>) -> Self {
         Self {
             id,
@@ -203,6 +270,9 @@ where
         unsafe { &mut *self.direct_ptr.get() }
     }
 
+    ///
+    /// Resolves the ref to a read-only intrincis reference.
+    ///
     pub fn get(&self) -> &T {
         //
         // # Safty
@@ -257,6 +327,9 @@ where
         obj
     }
 
+    ///
+    /// Resolves the ref to a mutable intrincis reference.
+    ///
     pub fn get_mut(&mut self) -> &mut T {
         //
         // # Safty
@@ -323,7 +396,12 @@ struct DirectPtr<T> {
 /// A type that has a id that can be used as a index.
 ///
 pub trait Indexable {
+    /// The type of IDs used to index the type.
     type Id: IdAsIndex;
+
+    ///
+    /// Returns the identifer of this instance.
+    ///
     fn id(&self) -> Self::Id;
 }
 
@@ -343,6 +421,11 @@ where
 /// A id that can be used as a index.
 ///
 pub trait IdAsIndex: Copy + Ord {
+    ///
+    /// The first custom ID used by this index type.
+    /// All instances of Self smaller than MIN are special constants
+    /// and cannot be created by the [gen] method.
+    ///
     const MIN: Self;
 
     ///
@@ -355,6 +438,10 @@ pub trait IdAsIndex: Copy + Ord {
     ///
     fn as_usize(&self) -> usize;
 
+    ///
+    /// Returns the ID normalized as a index based on the usize
+    /// value and the MIN.
+    ///
     fn as_index(&self) -> usize
     where
         Self: Sized,
