@@ -15,7 +15,7 @@ pub trait Application: Sized {
     type EventSet: EventSet<Self>;
 
     /// A function that is called only once at the start of the simulation.
-    fn at_simulation_start(_rt: &mut Runtime<Self>) {}
+    fn at_sim_start(_rt: &mut Runtime<Self>) {}
 }
 
 ///

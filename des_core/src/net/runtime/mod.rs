@@ -191,7 +191,7 @@ impl<A> NetworkRuntime<A> {
 impl<A> Application for NetworkRuntime<A> {
     type EventSet = NetEvents;
 
-    fn at_simulation_start(rt: &mut Runtime<Self>) {
+    fn at_sim_start(rt: &mut Runtime<Self>) {
         // Add inital event
         rt.add_event(NetEvents::SimStartNotif(SimStartNotif()), SimTime::now());
     }

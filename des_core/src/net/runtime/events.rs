@@ -237,9 +237,9 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
             let module = &mut rt.app.modules_mut()[i];
             info!(
                 target: &format!("Module {}", module.str()),
-                "Calling at_simulation_start."
+                "Calling at_sim_start."
             );
-            module.at_simulation_start();
+            module.at_sim_start();
 
             let jobs = module_drain_buffers(module.module_core_mut());
             module_handle_jobs(rt, jobs);

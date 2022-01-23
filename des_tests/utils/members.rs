@@ -26,7 +26,7 @@ impl Module for Alice {
         }
     }
 
-    fn at_simulation_start(&mut self) {
+    fn at_sim_start(&mut self) {
         self.enable_activity(SimTime::from(3.0));
     }
 
@@ -46,7 +46,7 @@ impl NdlCompatableModule for Alice {
 pub struct Bob(ModuleCore);
 
 impl Module for Bob {
-    fn at_simulation_start(&mut self) {
+    fn at_sim_start(&mut self) {
         info!(target: "Bob", "Initalizing");
         self.send(
             Message::new(

@@ -6,32 +6,32 @@ use crate::create_global_uid;
 use crate::net::*;
 
 /// A address of a node in a IPv6 network.
-#[cfg(feature = "netipv6")]
+#[cfg(feature = "net-ipv6")]
 pub type NodeAddress = u128;
 
 /// The broadcast address in a IPv6 network.
-#[cfg(feature = "netipv6")]
+#[cfg(feature = "net-ipv6")]
 pub const NODE_ADDR_BROADCAST: NodeAddress = u128::MAX;
 
 /// The loopback address in a IPv6 network.
-#[cfg(feature = "netipv6")]
+#[cfg(feature = "net-ipv6")]
 pub const NODE_ADDR_LOOPBACK: NodeAddress = 0xfe80;
 
 /// A address of a node in a IPv4 network.
-#[cfg(not(feature = "netipv6"))]
+#[cfg(not(feature = "net-ipv6"))]
 pub type NodeAddress = u32;
 
 /// The broadcast address in a IPv4 network.
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-#[cfg(not(feature = "netipv6"))]
+#[cfg(not(feature = "net-ipv6"))]
 #[allow(unused)]
 pub const NODE_ADDR_BROADCAST: NodeAddress = u32::MAX;
 
 /// The loopback address in a IPv4 network.
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-#[cfg(not(feature = "netipv6"))]
+#[cfg(not(feature = "net-ipv6"))]
 #[allow(unused)]
 pub const NODE_ADDR_LOOPBACK: NodeAddress = 0x7f_00_00_01;
 
@@ -42,8 +42,8 @@ pub type PortAddress = u16;
 
 create_global_uid!(
     /// A globalsy unqiue identifer for a packet.
-/// * This type is only available of DES is build with the `"net"` feature.*
-#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
+    /// * This type is only available of DES is build with the `"net"` feature.*
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
     pub PacketId(u32) = PACKET_ID;
 );
 
@@ -53,6 +53,7 @@ create_global_uid!(
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 #[allow(unused)]
+#[derive(Debug)]
 pub struct Packet {
     id: PacketId,
 

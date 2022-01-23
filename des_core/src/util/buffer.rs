@@ -29,7 +29,7 @@ where
 {
     inner: Vec<T>,
 
-    #[cfg(not(feature = "static"))]
+    #[cfg(not(feature = "net-static"))]
     gen: usize,
 
     #[cfg(feature = "static")]
@@ -55,7 +55,7 @@ where
         Self {
             inner: Vec::with_capacity(cap),
 
-            #[cfg(not(feature = "static"))]
+            #[cfg(not(feature = "net-static"))]
             gen: 0,
 
             #[cfg(feature = "static")]
@@ -74,10 +74,7 @@ where
     ///
     pub fn insert(&mut self, item: T) -> &mut T {
         #[cfg(feature = "static")]
-        assert!(
-            self.locked == false,
-            "Cannot insert element into locked buffer"
-        );
+        assert!(!self.locked, "Cannot insert element into locked buffer");
 
         // Shortcut to speed up static in-line inserts.
         // Usually in static cases insertions are allready in order but this leads
@@ -104,7 +101,7 @@ where
 
         self.inner.insert(insert_at, item);
 
-        #[cfg(not(feature = "static"))]
+        #[cfg(not(feature = "net-static"))]
         {
             self.gen += 1;
         }
@@ -116,7 +113,7 @@ where
     /// Removes an element from the buffer, returning whether the element
     /// was found and removed.
     ///
-    #[cfg(not(feature = "static"))]
+    #[cfg(not(feature = "net-static"))]
     pub fn remove(&mut self, id: T::Id) -> bool {
         let idx = match self.inner.binary_search_by_key(&id, |c| c.id()) {
             Ok(idx) => idx,
@@ -226,7 +223,7 @@ where
     }
 }
 
-#[cfg(not(feature = "static"))]
+#[cfg(not(feature = "net-static"))]
 use crate::util::SyncCell;
 
 ///
@@ -242,7 +239,7 @@ where
     buffer: *mut IdBuffer<T>,
     id: T::Id,
 
-    #[cfg(not(feature = "static"))]
+    #[cfg(not(feature = "net-static"))]
     direct_ptr: SyncCell<Option<DirectPtr<T>>>,
 }
 
@@ -259,12 +256,12 @@ where
             id,
             buffer,
 
-            #[cfg(not(feature = "static"))]
+            #[cfg(not(feature = "net-static"))]
             direct_ptr: SyncCell::new(None),
         }
     }
 
-    #[cfg(not(feature = "static"))]
+    #[cfg(not(feature = "net-static"))]
     #[allow(clippy::mut_from_ref)]
     fn direct(&self) -> &mut Option<DirectPtr<T>> {
         unsafe { &mut *self.direct_ptr.get() }
@@ -287,7 +284,7 @@ where
         //
         // Direct links will only be used when no implicite O(1) indexing is possible.
         //
-        #[cfg(not(feature = "static"))]
+        #[cfg(not(feature = "net-static"))]
         let buffer_gen = buffer.gen;
 
         //
@@ -299,7 +296,7 @@ where
         //
         // Direct links will only be used when no implicite O(1) indexing is possible.
         //
-        #[cfg(not(feature = "static"))]
+        #[cfg(not(feature = "net-static"))]
         if let Some(DirectPtr { gen, ptr }) = self.direct() {
             if *gen == buffer_gen {
                 return unsafe { &**ptr };
@@ -315,7 +312,7 @@ where
         //
         // Direct links will only be used when no implicite O(1) indexing is possible.
         //
-        #[cfg(not(feature = "static"))]
+        #[cfg(not(feature = "net-static"))]
         {
             let r = self.direct();
             *r = Some(DirectPtr {
@@ -344,7 +341,7 @@ where
         //
         // Direct links will only be used when no implicite O(1) indexing is possible.
         //
-        #[cfg(not(feature = "static"))]
+        #[cfg(not(feature = "net-static"))]
         let buffer_gen = buffer.gen;
 
         //
@@ -356,7 +353,7 @@ where
         //
         // Direct links will only be used when no implicite O(1) indexing is possible.
         //
-        #[cfg(not(feature = "static"))]
+        #[cfg(not(feature = "net-static"))]
         if let Some(DirectPtr { gen, ptr }) = self.direct() {
             if *gen == buffer_gen {
                 return unsafe { &mut **ptr };
@@ -372,7 +369,7 @@ where
         //
         // Direct links will only be used when no implicite O(1) indexing is possible.
         //
-        #[cfg(not(feature = "static"))]
+        #[cfg(not(feature = "net-static"))]
         {
             let r = self.direct();
             *r = Some(DirectPtr {
@@ -385,7 +382,7 @@ where
     }
 }
 
-#[cfg(not(feature = "static"))]
+#[cfg(not(feature = "net-static"))]
 #[derive(Debug, Clone)]
 struct DirectPtr<T> {
     gen: usize,

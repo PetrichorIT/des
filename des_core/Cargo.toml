@@ -6,12 +6,12 @@ version = "0.1.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
+internal-metrics = []
 net = []
-netipv6 = ["net"]
-pub_interning = []
-simtime_u128 = []
-static = ["static_gates"]
-static_gates = ["net"]
+net-ipv6 = ["net"]
+net-static = ["net"]
+pub-interning = []
+simtime-u128 = []
 
 [dependencies]
 lazy_static = "1.4.0"
@@ -21,3 +21,6 @@ rand = {version = "*", features = ["std_rng"]}
 termcolor = "1.1.2"
 unic-emoji-char = "0.9.0"
 unicode-xid = "0.2.0"
+
+[dev-dependencies]
+des_macros = {path = "../des_macros"}

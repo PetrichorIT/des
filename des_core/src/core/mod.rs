@@ -6,10 +6,10 @@ mod sim_time;
 
 // # Feature "pubintering"
 
-#[cfg(not(feature = "pub_interning"))]
+#[cfg(not(feature = "pub-interning"))]
 pub(crate) mod interning;
 
-#[cfg(feature = "pub_interning")]
+#[cfg(feature = "pub-interning")]
 pub mod interning;
 
 //

@@ -4,12 +4,12 @@ use crate::Indexable;
 use std::fmt::{Debug, Display};
 
 /*
-#[cfg(not(feature = "static"))]
+#[cfg(not(feature = "net-static"))]
 pub type GateBuffer = dynamic_buffer::GateBuffer;
-#[cfg(not(feature = "static"))]
+#[cfg(not(feature = "net-static"))]
 pub type GateRef = dynamic_buffer::GateRef;
 
-#[cfg(not(feature = "static"))]
+#[cfg(not(feature = "net-static"))]
 mod dynamic_buffer;
 
 #[cfg(feature = "static")]

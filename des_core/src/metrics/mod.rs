@@ -1,6 +1,10 @@
-use std::ops::RangeInclusive;
-
 use crate::SimTime;
+use std::{fmt::Display, ops::RangeInclusive};
+
+#[cfg(feature = "internal-metrics")]
+mod internal;
+#[cfg(feature = "internal-metrics")]
+pub use internal::*;
 
 ///
 /// A type that allows for statistical datacollection
@@ -154,6 +158,19 @@ impl Statistic for StdDev {
                 var
             }
         }
+    }
+}
+
+impl Display for StdDev {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Mean: {} (min: {} max: {}) Derv: {}",
+            self.datapoints_mean(),
+            self.datapoints_min(),
+            self.datapoints_max(),
+            self.datapoints_std_derivation()
+        )
     }
 }
 

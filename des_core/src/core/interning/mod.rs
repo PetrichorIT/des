@@ -1,15 +1,18 @@
 //!
 //! A module for handeling efficent, dupliction free data storage.
 //!
-//! * This will only be visible when DES is build with the feature "pub_interning"
+//! * This will only be visible when DES is build with the feature "pub-interning"
 //!
 
 use crate::util::SyncCell;
-use crate::Packet;
 use log::{error, trace, warn};
 use std::alloc::{dealloc, Layout};
 use std::any::{type_name, TypeId};
+use std::fmt::Debug;
 use std::ops::{Deref, DerefMut};
+
+#[cfg(feature = "net")]
+use crate::net::Packet;
 
 mod tests;
 
@@ -180,31 +183,36 @@ impl Interner {
         if remaining_ref == 0 {
             // Unsound drop, check usual suspects
 
+            #[cfg(feature = "net")]
             if value.type_id() == TypeId::of::<Packet>() {
-                Self::drop_typed_raw::<Packet>(interner, index);
-            } else if value.type_id() == TypeId::of::<String>() {
-                Self::drop_typed_raw::<String>(interner, index);
-            } else if value.type_id() == TypeId::of::<Vec<u8>>() {
-                Self::drop_typed_raw::<Vec<u8>>(interner, index);
-            } else {
-                warn!(target: "interner", "Dropping untyped value ID: {}", index);
-
-                // # Safty
-                // This is safe since all uses of get_mut() at internally and no
-                // references leak.
-                let contents = unsafe { &mut *interner.contents.get() };
-                // # Safty
-                // This is sound since the safty contract guarntees that 'ptr' points to
-                // valid memory and 'layout' was derived at interning for Sized types.
-                unsafe {
-                    dealloc(
-                        contents[index].as_ref().unwrap().ptr,
-                        contents[index].as_ref().unwrap().layout,
-                    )
-                }
-
-                contents[index] = None;
+                return Self::drop_typed_raw::<Packet>(interner, index);
             }
+
+            if value.type_id() == TypeId::of::<String>() {
+                return Self::drop_typed_raw::<String>(interner, index);
+            }
+            if value.type_id() == TypeId::of::<Vec<u8>>() {
+                return Self::drop_typed_raw::<Vec<u8>>(interner, index);
+            }
+
+            // Go no success
+            warn!(target: "interner", "Dropping untyped value ID: {}", index);
+
+            // # Safty
+            // This is safe since all uses of get_mut() at internally and no
+            // references leak.
+            let contents = unsafe { &mut *interner.contents.get() };
+            // # Safty
+            // This is sound since the safty contract guarntees that 'ptr' points to
+            // valid memory and 'layout' was derived at interning for Sized types.
+            unsafe {
+                dealloc(
+                    contents[index].as_ref().unwrap().ptr,
+                    contents[index].as_ref().unwrap().layout,
+                )
+            }
+
+            contents[index] = None;
         }
     }
 
@@ -368,6 +376,12 @@ impl Drop for InternedValue<'_> {
     }
 }
 
+impl Debug for InternedValue<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "InternedValue {{ idx: {}, ... }}", self.index)
+    }
+}
+
 ///
 /// A typed reference to a interned value.
 ///
@@ -393,6 +407,7 @@ impl<'a, T> TypedInternedValue<'a, T> {
         Interner::uncast(self)
     }
 
+    #[allow(unused)]
     pub fn type_id(&self) -> TypeId {
         self.interner.type_id_of(self.index)
     }
@@ -412,6 +427,12 @@ impl<T: 'static> DerefMut for TypedInternedValue<'_, T> {
     }
 }
 
+// TODO:
+// Remove this trait impl since users expect this to clone the
+// inner value, resulting in uncontrolled mutation from multiple
+// non depdendent sources.
+//
+// Maybe impl 'Clone' as true clone and make ref-clones internal.
 impl<'a, T: 'static> Clone for TypedInternedValue<'a, T> {
     fn clone(&self) -> Self {
         // Upon clone add 1 to the ref counter

@@ -8,8 +8,8 @@ use log::error;
 
 create_global_uid!(
     /// A runtime-unqiue identifier for a module / submodule inheritence tree.
-/// * This type is only available of DES is build with the `"net"` feature.*
-#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
+    /// * This type is only available of DES is build with the `"net"` feature.*
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
     pub ModuleId(u16) = MODULE_ID;
 );
 
@@ -28,18 +28,102 @@ pub trait Module: StaticModuleCore {
     ///
     /// A message handler for receiving events, user defined.
     ///
+    /// # Example
+    ///
+    /// ```
+    /// use des_core::*;
+    /// use des_macros::Module;
+    ///
+    /// #[derive(Module)]
+    /// struct MyModule {
+    ///     core: ModuleCore,
+    ///
+    ///     my_prop_1: f64,
+    ///     my_prop_2: String,
+    /// };
+    ///
+    /// impl Module for MyModule {
+    ///     fn handle_message(&mut self, msg: Message) {
+    ///         let pkt = msg.extract_content::<Packet>();
+    ///         println!("Received {:?}", *pkt);
+    ///     }
+    /// }
+    /// ```
+    ///
     fn handle_message(&mut self, msg: Message);
 
     ///
     /// A periodic activity handler.
     ///
+    /// # Example
+    ///
+    /// ```
+    /// use des_core::*;
+    /// use des_macros::Module;
+    /// # fn is_good_packet<T>(_t: T) -> bool { true }
+    ///
+    /// #[derive(Module)]
+    /// struct OurModule {
+    ///     core: ModuleCore,
+    ///
+    ///     good_packets: f64,
+    ///     bad_packets: f64,
+    ///
+    ///     records: Vec<f64>,
+    /// };
+    ///
+    /// impl Module for OurModule {
+    ///     fn handle_message(&mut self, msg: Message) {
+    ///         let pkt = msg.extract_content::<Packet>();
+    ///         if is_good_packet(pkt) {
+    ///             self.good_packets += 1.0;
+    ///         } else {
+    ///             self.bad_packets += 1.0;
+    ///         }
+    ///     }
+    ///
+    ///     fn activity(&mut self) {
+    ///         // Record accummulated percentage over time
+    ///         self.records.push(self.good_packets / self.bad_packets);
+    ///     }
+    /// }
+    /// ```
     fn activity(&mut self) {}
 
     ///
     /// A function that is run at the start of each simulation,
     /// for each module.
     ///
-    fn at_simulation_start(&mut self) {}
+    /// # Example
+    ///
+    /// ```
+    /// use des_core::*;
+    /// use des_macros::Module;
+    /// # type Config = ();
+    /// # type Record = u8;
+    /// # fn fetch_config(s: &str, id: ModuleId) -> Config {}
+    ///
+    /// #[derive(Module)]
+    /// struct SomeModule {
+    ///     core: ModuleCore,
+    ///
+    ///     config: Config,
+    ///     records: Vec<Record>,
+    /// };
+    ///
+    /// impl Module for SomeModule {
+    ///     fn at_sim_start(&mut self) {
+    ///         self.config = fetch_config("https://mysimconfig.com/simrun1", self.id());
+    ///         self.records.clear();
+    ///     }
+    ///
+    ///     fn handle_message(&mut self, msg: Message) {
+    ///         todo!()
+    ///     }
+    /// }
+    /// ```
+    ///
+    fn at_sim_start(&mut self) {}
 }
 
 ///

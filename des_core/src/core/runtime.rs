@@ -129,6 +129,9 @@ pub struct Runtime<A: Application> {
 
     future_event_heap: BinaryHeap<EventNode<A>>,
     now_event_queue: VecDeque<EventNode<A>>,
+
+    #[cfg(feature = "internal-metrics")]
+    metrics: crate::metrics::RuntimeMetrics,
 }
 
 impl<A: Application> Runtime<A> {
@@ -138,6 +141,24 @@ impl<A: Application> Runtime<A> {
 
     fn core_mut(&mut self) -> &mut RuntimeCore {
         unsafe { (*self.core.get()).as_mut().unwrap() }
+    }
+
+    ///
+    /// Returns the current number of events on enqueud.
+    ///
+    #[inline(always)]
+    #[allow(unused)]
+    pub(crate) fn num_non_zero_events_queued(&self) -> usize {
+        self.future_event_heap.len()
+    }
+
+    ///
+    /// Returns the current number of events on enqueud.
+    ///
+    #[inline(always)]
+    #[allow(unused)]
+    pub(crate) fn num_zero_events_queued(&self) -> usize {
+        self.now_event_queue.len()
     }
 
     ///
@@ -234,9 +255,12 @@ impl<A: Application> Runtime<A> {
             app,
             future_event_heap: BinaryHeap::with_capacity(64),
             now_event_queue: VecDeque::with_capacity(32),
+
+            #[cfg(feature = "internal-metrics")]
+            metrics: crate::metrics::RuntimeMetrics::new(),
         };
 
-        A::at_simulation_start(&mut this);
+        A::at_sim_start(&mut this);
         this
     }
 
@@ -254,6 +278,12 @@ impl<A: Application> Runtime<A> {
 
         let node = self.fetch_next_event();
 
+        // Internal runtime metrics
+        #[cfg(feature = "internal-metrics")]
+        {
+            self.metrics.record_handled(self);
+        }
+
         // Let this be the only position where SimTime is changed
         self.core_mut().sim_time = node.time;
 
@@ -263,8 +293,18 @@ impl<A: Application> Runtime<A> {
 
     fn fetch_next_event(&mut self) -> EventNode<A> {
         if let Some(event) = self.now_event_queue.pop_front() {
+            #[cfg(feature = "internal-metrics")]
+            {
+                self.metrics.zero_event_count += 1;
+            }
+
             event
         } else {
+            #[cfg(feature = "internal-metrics")]
+            {
+                self.metrics.non_zero_event_count += 1;
+            }
+
             self.future_event_heap.pop().unwrap()
         }
     }
@@ -300,6 +340,24 @@ impl<A: Application> Runtime<A> {
             self.core().itr
         );
 
+        #[cfg(feature = "internal-metrics")]
+        {
+            println!();
+            println!("Metrics");
+            println!("=======");
+
+            println!("Heap size:          {}", self.metrics.heap_size);
+            println!(
+                "Event timespan:     {}",
+                self.metrics.non_zero_event_wait_time
+            );
+
+            let total = self.metrics.zero_event_count + self.metrics.non_zero_event_count;
+            let perc = self.metrics.non_zero_event_count as f64 / total as f64;
+            println!("Instant event prec: {}", perc);
+            // println!("Instant event prec: {}", self.metrics.zero_wait_event_prec);
+        }
+
         (self.app, t1)
     }
 
@@ -325,6 +383,9 @@ impl<A: Application> Runtime<A> {
         if time == self.sim_time() {
             self.now_event_queue.push_back(node);
         } else {
+            #[cfg(feature = "internal-metrics")]
+            self.metrics.record_non_zero_queud(self, time);
+
             self.future_event_heap.push(node);
         }
     }

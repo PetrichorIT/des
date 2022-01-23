@@ -62,7 +62,7 @@ sys 0m0,004s
 ### Precise simtime
 
 release + debuginfo + no_log
-features = [ "simtime_u128" ]
+features = [ "simtime-u128" ]
 
 real 0m7,383s
 user 0m7,382s
@@ -71,7 +71,7 @@ sys 0m0,000s
 ### Precise simtime & static all
 
 release + debuginfo + no_log
-features = [ "simtime_u128", "static" ]
+features = [ "simtime-u128", "static" ]
 
 real 0m6,234s
 user 0m6,229s

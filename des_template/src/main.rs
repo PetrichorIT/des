@@ -1,11 +1,4 @@
-use des_core::*;
-use des_macros::Module;
-
-#[derive(Module)]
-#[ndl_workspace = "des_template/src"]
-struct SimpleModule {
-    core: ModuleCore,
-}
+// use des_core::*;
 
 fn main() {
     println!("Hello, world!");
