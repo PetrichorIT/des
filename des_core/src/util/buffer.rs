@@ -1,6 +1,6 @@
-#[cfg(feature = "static")]
+#[cfg(feature = "net-static")]
 use log::info;
-#[cfg(feature = "static")]
+#[cfg(feature = "net-static")]
 use std::any::type_name;
 
 use std::ops::Deref;
@@ -32,7 +32,7 @@ where
     #[cfg(not(feature = "net-static"))]
     gen: usize,
 
-    #[cfg(feature = "static")]
+    #[cfg(feature = "net-static")]
     locked: bool,
 }
 
@@ -58,7 +58,7 @@ where
             #[cfg(not(feature = "net-static"))]
             gen: 0,
 
-            #[cfg(feature = "static")]
+            #[cfg(feature = "net-static")]
             locked: false,
         }
     }
@@ -73,14 +73,14 @@ where
     /// O(log n) elsewhere.
     ///
     pub fn insert(&mut self, item: T) -> &mut T {
-        #[cfg(feature = "static")]
+        #[cfg(feature = "net-static")]
         assert!(!self.locked, "Cannot insert element into locked buffer");
 
         // Shortcut to speed up static in-line inserts.
         // Usually in static cases insertions are allready in order but this leads
         // to worst case prefomace of 'binary_serach_by_key'.
         // so check this shortcut.
-        #[cfg(feature = "static")]
+        #[cfg(feature = "net-static")]
         match self.inner.last() {
             Some(element) => {
                 if element.id() < item.id() {
@@ -130,7 +130,7 @@ where
     /// This ensures that the memory will not be unmapped allowing
     /// direct ptr optiominzation.
     ///
-    #[cfg(feature = "static")]
+    #[cfg(feature = "net-static")]
     pub fn lock(&mut self) {
         info!(
             target: &format!("Buffer<{}>", type_name::<T>()),
@@ -176,7 +176,7 @@ where
     /// O(1) or O(log n)
     ///
     pub fn get(&self, id: T::Id) -> Option<&T> {
-        #[cfg(feature = "static")]
+        #[cfg(feature = "net-static")]
         if self.locked {
             return Some(&self.inner[id.as_index()]);
         }
@@ -192,7 +192,7 @@ where
     ///
     /// Retrieves a element mutably by using its id.
     ///
-    /// Uses static indexing if buffer is locked and feature = "static"
+    /// Uses static indexing if buffer is locked and feature = "net-static"
     /// is activated. Else uses binary search.
     ///
     /// # Complexity
@@ -200,7 +200,7 @@ where
     /// O(1) or O(log n)
     ///
     pub fn get_mut(&mut self, id: T::Id) -> Option<&mut T> {
-        #[cfg(feature = "static")]
+        #[cfg(feature = "net-static")]
         if self.locked {
             return Some(&mut self.inner[id.as_index()]);
         }

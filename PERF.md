@@ -53,7 +53,7 @@ sys 0m0,008s
 ### All statics
 
 release + debuginfo + no_log
-features = [ "static" ]
+features = [ "net-static" ]
 
 real 0m4,429s
 user 0m4,418s

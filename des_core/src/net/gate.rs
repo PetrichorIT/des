@@ -3,24 +3,6 @@ use crate::net::*;
 use crate::Indexable;
 use std::fmt::{Debug, Display};
 
-/*
-#[cfg(not(feature = "net-static"))]
-pub type GateBuffer = dynamic_buffer::GateBuffer;
-#[cfg(not(feature = "net-static"))]
-pub type GateRef = dynamic_buffer::GateRef;
-
-#[cfg(not(feature = "net-static"))]
-mod dynamic_buffer;
-
-#[cfg(feature = "static")]
-pub type GateBuffer = static_buffer::GateBuffer;
-#[cfg(feature = "static")]
-pub type GateRef = static_buffer::GateRef;
-
-#[cfg(feature = "static")]
-mod static_buffer;
-*/
-
 create_global_uid!(
     /// A runtime-unquie identifier for a gate.
 /// * This type is only available of DES is build with the `"net"` feature.*

@@ -172,7 +172,7 @@ impl<A> NetworkRuntime<A> {
     pub fn finish_building(&mut self) {
         // If feature 'static' is active,
         // lock the buffer to activate preformance improvments
-        #[cfg(feature = "static")]
+        #[cfg(feature = "net-static")]
         {
             self.module_buffer.lock();
             self.channel_buffer.lock();
