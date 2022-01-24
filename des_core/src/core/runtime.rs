@@ -278,12 +278,6 @@ impl<A: Application> Runtime<A> {
 
         let node = self.fetch_next_event();
 
-        // Internal runtime metrics
-        #[cfg(feature = "internal-metrics")]
-        {
-            self.metrics.record_handled(self);
-        }
-
         // Let this be the only position where SimTime is changed
         self.core_mut().sim_time = node.time;
 
@@ -292,6 +286,12 @@ impl<A: Application> Runtime<A> {
     }
 
     fn fetch_next_event(&mut self) -> EventNode<A> {
+        // Internal runtime metrics
+        #[cfg(feature = "internal-metrics")]
+        {
+            self.metrics.record_handled(self);
+        }
+
         if let Some(event) = self.now_event_queue.pop_front() {
             #[cfg(feature = "internal-metrics")]
             {
@@ -330,7 +330,8 @@ impl<A: Application> Runtime<A> {
     ///
     /// Decontructs the runtime and returns the application and the final sim_time.
     ///
-    pub fn finish(self) -> (A, SimTime) {
+    #[allow(unused_mut)]
+    pub fn finish(mut self) -> (A, SimTime) {
         let t1 = self.sim_time();
         self.core().interner.fincheck();
 
@@ -343,19 +344,7 @@ impl<A: Application> Runtime<A> {
         #[cfg(feature = "internal-metrics")]
         {
             println!();
-            println!("Metrics");
-            println!("=======");
-
-            println!("Heap size:          {}", self.metrics.heap_size);
-            println!(
-                "Event timespan:     {}",
-                self.metrics.non_zero_event_wait_time
-            );
-
-            let total = self.metrics.zero_event_count + self.metrics.non_zero_event_count;
-            let perc = self.metrics.non_zero_event_count as f64 / total as f64;
-            println!("Instant event prec: {}", perc);
-            // println!("Instant event prec: {}", self.metrics.zero_wait_event_prec);
+            self.metrics.finish()
         }
 
         (self.app, t1)

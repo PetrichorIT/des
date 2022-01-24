@@ -1,10 +1,13 @@
 use crate::SimTime;
-use std::{fmt::Display, ops::RangeInclusive};
+use std::ops::RangeInclusive;
 
 #[cfg(feature = "internal-metrics")]
 mod internal;
 #[cfg(feature = "internal-metrics")]
 pub use internal::*;
+
+mod stddev;
+pub use stddev::*;
 
 ///
 /// A type that allows for statistical datacollection
@@ -48,130 +51,18 @@ pub trait Statistic {
 
     /// # Collections statisitcs
 
-    fn datapoints_len(&self) -> usize;
-    fn datapoints_sum(&self) -> Self::Value;
-    fn datapoints_sqrtsum(&self) -> Self::Value;
-    fn datapoints_min(&self) -> Self::Value;
-    fn datapoints_max(&self) -> Self::Value;
-    fn datapoints_mean(&self) -> Self::Value;
-    fn datapoints_std_derivation(&self) -> Self::Value;
-    fn datapoints_variance(&self) -> Self::Value;
-}
-
-///
-/// The type to collect a accumulated value, provinding
-/// standartised metrics like e.g. standart derivation.
-///
-#[derive(Debug, Clone, PartialEq)]
-pub struct StdDev {
-    min: f64,
-    max: f64,
-
-    num_values: usize,
-    sum: f64,
-    sum_weights: f64,
-    sqrtsum: f64,
-    sqrtsum_weights: f64,
-}
-
-impl StdDev {
-    ///
-    /// Creates  a new instance of StdDev.
-    ///
-    pub fn new() -> Self {
-        Self {
-            min: f64::INFINITY,
-            max: f64::NEG_INFINITY,
-
-            num_values: 0,
-            sum: 0.0,
-            sum_weights: 0.0,
-            sqrtsum: 0.0,
-            sqrtsum_weights: 0.0,
-        }
-    }
-}
-
-impl Default for StdDev {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Statistic for StdDev {
-    type Value = f64;
-
-    fn collect_weighted_at(&mut self, value: Self::Value, weight: f64, _sim_time: SimTime) {
-        self.num_values += 1;
-
-        if self.min > value {
-            self.min = value;
-        }
-        if self.max < value {
-            self.max = value;
-        }
-
-        self.sum += weight * value;
-        self.sum_weights += weight;
-
-        self.sqrtsum += weight * value * value;
-        self.sqrtsum_weights += weight * weight;
+    fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
-    fn datapoints_len(&self) -> usize {
-        self.num_values
-    }
-
-    fn datapoints_sum(&self) -> Self::Value {
-        self.sum
-    }
-
-    fn datapoints_sqrtsum(&self) -> Self::Value {
-        self.sqrtsum
-    }
-
-    fn datapoints_min(&self) -> Self::Value {
-        self.min
-    }
-
-    fn datapoints_max(&self) -> Self::Value {
-        self.max
-    }
-
-    fn datapoints_mean(&self) -> Self::Value {
-        self.sum / (self.num_values as f64)
-    }
-
-    fn datapoints_std_derivation(&self) -> Self::Value {
-        self.datapoints_variance().sqrt()
-    }
-
-    fn datapoints_variance(&self) -> Self::Value {
-        if self.num_values == 0 {
-            f64::NAN
-        } else {
-            let var = (self.sum_weights * self.sqrtsum - self.sum * self.sum)
-                / (self.sum_weights * self.sum_weights - self.sqrtsum_weights);
-            if var < 0.0 {
-                0.0
-            } else {
-                var
-            }
-        }
-    }
-}
-
-impl Display for StdDev {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Mean: {} (min: {} max: {}) Derv: {}",
-            self.datapoints_mean(),
-            self.datapoints_min(),
-            self.datapoints_max(),
-            self.datapoints_std_derivation()
-        )
-    }
+    fn len(&self) -> usize;
+    fn sum(&self) -> Self::Value;
+    fn sqrtsum(&self) -> Self::Value;
+    fn min(&self) -> Self::Value;
+    fn max(&self) -> Self::Value;
+    fn mean(&self) -> Self::Value;
+    fn std_derivation(&self) -> Self::Value;
+    fn variance(&self) -> Self::Value;
 }
 
 ///
@@ -220,11 +111,11 @@ impl Statistic for Histogramm {
         self.bins[idx] += weight;
     }
 
-    fn datapoints_len(&self) -> usize {
+    fn len(&self) -> usize {
         self.bins.iter().fold(0.0, |acc, &e| acc + e) as usize
     }
 
-    fn datapoints_sum(&self) -> Self::Value {
+    fn sum(&self) -> Self::Value {
         let mut sum_value = 0.0;
 
         for b in &self.bins {
@@ -238,7 +129,7 @@ impl Statistic for Histogramm {
         sum_value
     }
 
-    fn datapoints_sqrtsum(&self) -> Self::Value {
+    fn sqrtsum(&self) -> Self::Value {
         let mut sum_value = 0.0;
 
         for b in &self.bins {
@@ -252,23 +143,23 @@ impl Statistic for Histogramm {
         sum_value
     }
 
-    fn datapoints_min(&self) -> Self::Value {
+    fn min(&self) -> Self::Value {
         self.min
     }
 
-    fn datapoints_max(&self) -> Self::Value {
+    fn max(&self) -> Self::Value {
         self.max
     }
 
-    fn datapoints_mean(&self) -> Self::Value {
-        self.datapoints_sum() / self.datapoints_len() as f64
+    fn mean(&self) -> Self::Value {
+        self.sum() / self.len() as f64
     }
 
-    fn datapoints_std_derivation(&self) -> Self::Value {
+    fn std_derivation(&self) -> Self::Value {
         todo!()
     }
 
-    fn datapoints_variance(&self) -> Self::Value {
+    fn variance(&self) -> Self::Value {
         todo!()
     }
 }
