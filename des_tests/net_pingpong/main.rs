@@ -39,9 +39,9 @@ fn main() {
 
     let msg = Message::new(
         1,
-        GATE_NULL,
-        MODULE_NULL,
-        MODULE_NULL,
+        GateId::NULL,
+        ModuleId::NULL,
+        ModuleId::NULL,
         SimTime::now(),
         String::from("Ping"),
     );

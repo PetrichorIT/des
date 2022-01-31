@@ -21,17 +21,28 @@ macro_rules! create_global_uid {
 
             static mut $sident: $ty = 0xff;
 
-            use crate::util::IdAsIndex;
-            impl IdAsIndex for $ident {
-                const MIN: Self = Self(0xff);
+            impl $ident {
+                ///
+                /// A general prupose identifier for a empty
+                /// instance.
+                ///
+                pub const NULL: Self = Self(0);
 
-                fn gen() -> Self {
+                ///
+                /// Generates a new unique id.
+                ///
+                pub fn gen() -> Self {
                     unsafe {
                         let a = $sident;
                         $sident += 1;
                         Self(a)
                     }
                 }
+            }
+
+            use crate::util::IdAsIndex;
+            impl IdAsIndex for $ident {
+                const MIN: Self = Self(0xff);
 
                 fn as_usize(&self) -> usize {
                     self.0 as usize

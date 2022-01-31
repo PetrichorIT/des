@@ -419,16 +419,9 @@ where
 ///
 pub trait IdAsIndex: Copy + Ord {
     ///
-    /// The first custom ID used by this index type.
-    /// All instances of Self smaller than MIN are special constants
-    /// and cannot be created by the [gen] method.
+    /// The first valid id in the runtime.
     ///
     const MIN: Self;
-
-    ///
-    /// Generates a new unqiue instance of Self.
-    ///
-    fn gen() -> Self;
 
     ///
     /// Returns the raw primitiv the UID is contructed over.

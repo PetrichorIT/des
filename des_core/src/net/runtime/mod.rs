@@ -160,7 +160,7 @@ impl<A> NetworkRuntime<A> {
     ///
     pub fn gate_dest(&self, source_id: GateId) -> Option<&Gate> {
         let mut gate = self.gate(source_id)?;
-        while gate.id() != GATE_SELF {
+        while gate.id() != GateId::NULL {
             gate = self.gate(gate.next_gate())?
         }
         Some(gate)

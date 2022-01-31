@@ -31,9 +31,9 @@ fn main() {
     for id in ids {
         let msg = Message::new(
             0xff,
-            GATE_NULL,
-            MODULE_NULL,
-            MODULE_NULL,
+            GateId::NULL,
+            ModuleId::NULL,
+            ModuleId::NULL,
             SimTime::now(),
             String::from("Init"),
         );

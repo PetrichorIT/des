@@ -45,9 +45,9 @@ impl Module for Bob {
             self.send(
                 Message::new(
                     1,
-                    GATE_SELF,
+                    GateId::NULL,
                     self.id(),
-                    MODULE_NULL,
+                    ModuleId::NULL,
                     SimTime::now(),
                     Packet::new(
                         (0x7f_00_00_01, 80),

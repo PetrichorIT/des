@@ -1,7 +1,4 @@
-use des_core::{
-    sim_time, Indexable, Message, Module, ModuleCore, SimTime, StaticModuleCore, GATE_NULL,
-    MODULE_NULL,
-};
+use des_core::*;
 use des_macros::Module;
 
 use log::info;
@@ -17,9 +14,9 @@ impl Module for Alice {
         self.send(
             Message::new(
                 1,
-                GATE_NULL,
+                GateId::NULL,
                 self.id(),
-                MODULE_NULL,
+                ModuleId::NULL,
                 SimTime::ZERO,
                 String::from("Pong"),
             ),
@@ -30,9 +27,9 @@ impl Module for Alice {
             .unwrap()
             .handle_message(Message::new(
                 31,
-                GATE_NULL,
-                MODULE_NULL,
-                MODULE_NULL,
+                GateId::NULL,
+                ModuleId::NULL,
+                ModuleId::NULL,
                 SimTime::ZERO,
                 String::from("Pang"),
             ));

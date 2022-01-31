@@ -13,11 +13,6 @@ create_global_uid!(
     pub ModuleId(u16) = MODULE_ID;
 );
 
-/// A indication that the referenced module does not exist.
-/// * This type is only available of DES is build with the `"net"` feature.*
-#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-pub const MODULE_NULL: ModuleId = ModuleId(0);
-
 ///
 /// A set of user defined functions for customizing the
 /// behaviour of a module.
@@ -266,7 +261,7 @@ pub trait StaticModuleCore: Indexable<Id = ModuleId> {
     where
         Self: Sized,
     {
-        self.create_gate_cluster_into(name, size, CHANNEL_NULL, vec![GATE_NULL; size], rt)
+        self.create_gate_cluster_into(name, size, ChannelId::NULL, vec![GateId::NULL; size], rt)
     }
 
     ///

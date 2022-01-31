@@ -13,21 +13,6 @@ create_global_uid!(
     pub ChannelId(usize) = CHANNEL_ID;
 );
 
-/// A not defined channel aka a missing link.
-/// * This type is only available of DES is build with the `"net"` feature.*
-#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-pub const CHANNEL_NULL: ChannelId = ChannelId(0);
-
-/// A reference to other channel in a two directional configuration.
-/// * This type is only available of DES is build with the `"net"` feature.*
-#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-pub const CHANNEL_SELF: ChannelId = ChannelId(1);
-
-/// The id of a general purpose non-delay channel
-/// * This type is only available of DES is build with the `"net"` feature.*
-#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-pub const CHANNEL_INSTANTANEOUS: ChannelId = ChannelId(2);
-
 ///
 /// Metrics that define a channels capabilitites.
 ///
@@ -162,7 +147,7 @@ impl Channel {
     /// A channel metric that does not take up time.
     ///
     pub const INSTANTANEOUS: Channel = Channel {
-        id: CHANNEL_INSTANTANEOUS,
+        id: ChannelId::NULL,
         metrics: ChannelMetrics::INSTANTANEOUS,
         busy: false,
     };

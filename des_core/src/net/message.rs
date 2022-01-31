@@ -159,9 +159,9 @@ impl Message {
             timestamp,
 
             sender_module_id,
-            receiver_module_id: MODULE_NULL,
+            receiver_module_id: ModuleId::NULL,
 
-            last_gate: GATE_NULL,
+            last_gate: GateId::NULL,
 
             creation_time: SimTime::now(),
             send_time: SimTime::MAX,

@@ -18,12 +18,8 @@ pub use self::runtime::NetworkRuntime;
 //
 
 pub use self::channel::Channel;
-pub use self::channel::ChannelMetrics;
-
 pub use self::channel::ChannelId;
-pub use self::channel::CHANNEL_INSTANTANEOUS;
-pub use self::channel::CHANNEL_NULL;
-pub use self::channel::CHANNEL_SELF;
+pub use self::channel::ChannelMetrics;
 
 //
 // # Gate definitions
@@ -34,8 +30,6 @@ pub use self::gate::GateDescription;
 pub use self::gate::IntoModuleGate;
 
 pub use self::gate::GateId;
-pub use self::gate::GATE_NULL;
-pub use self::gate::GATE_SELF;
 
 //
 // # Messages & Packets
@@ -61,7 +55,6 @@ pub use self::packet::NODE_ADDR_LOOPBACK;
 //
 
 pub use self::module::ModuleId;
-pub use self::module::MODULE_NULL;
 
 pub use self::module::Module;
 pub use self::module::ModuleCore;

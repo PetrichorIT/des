@@ -5,6 +5,7 @@ use std::ops::Deref;
 use crate::core::*;
 use crate::create_event_set;
 use crate::net::*;
+use crate::util::*;
 
 create_event_set!(
     ///
@@ -39,7 +40,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
 
             self.handled = true;
 
-            if gate.next_gate() == GATE_SELF || gate.next_gate() == GATE_NULL {
+            if gate.next_gate() == GateId::NULL {
                 info!(
                     target: &format!("Gate #{} ({})", self.gate_id, gate.name()),
                     "Forwarding message [{}] to module #{}",
@@ -67,7 +68,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
                     next_gate
                 );
 
-                let next_event_time = if gate.channel() == CHANNEL_NULL {
+                let next_event_time = if gate.channel() == ChannelId::NULL {
                     // Direct connection
                     SimTime::now()
                 } else {

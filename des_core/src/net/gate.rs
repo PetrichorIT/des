@@ -10,16 +10,6 @@ create_global_uid!(
     pub GateId(u32) = GATE_ID;
 );
 
-/// A non-initalized gate.
-/// * This type is only available of DES is build with the `"net"` feature.*
-#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-pub const GATE_NULL: GateId = GateId(0);
-
-/// A referecne to the current working gate.
-/// * This type is only available of DES is build with the `"net"` feature.*
-#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-pub const GATE_SELF: GateId = GateId(1);
-
 ///
 /// A description of a gate / gate cluster on a module.
 ///

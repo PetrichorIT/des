@@ -1,8 +1,7 @@
-use des_core::StaticModuleCore;
 use des_core::{
-    ChannelMetrics, Message, NetworkRuntime, Packet, Runtime, SimTime, CHANNEL_NULL, GATE_NULL,
-    MODULE_NULL,
+    ChannelId, ChannelMetrics, Message, ModuleId, NetworkRuntime, Packet, Runtime, SimTime,
 };
+use des_core::{GateId, StaticModuleCore};
 use network_node::NetworkNode;
 use network_stack::NetworkStack;
 use rand::{prelude::StdRng, SeedableRng};
@@ -33,11 +32,11 @@ fn main() {
 
     let internal_out = node_alice.create_gate("fromStack", &mut app);
 
-    stack_alice.create_gate_into("netOut", CHANNEL_NULL, internal_out, &mut app);
+    stack_alice.create_gate_into("netOut", ChannelId::NULL, internal_out, &mut app);
 
     let internal_in = stack_alice.create_gate("netIn", &mut app);
 
-    node_alice.create_gate_into("toStack", CHANNEL_NULL, internal_in, &mut app);
+    node_alice.create_gate_into("toStack", ChannelId::NULL, internal_in, &mut app);
 
     //
     // BOB
@@ -49,11 +48,11 @@ fn main() {
 
     let internal_out = node_bob.create_gate("fromStack", &mut app);
 
-    stack_bob.create_gate_into("netOut", CHANNEL_NULL, internal_out, &mut app);
+    stack_bob.create_gate_into("netOut", ChannelId::NULL, internal_out, &mut app);
 
     let internal_in = stack_bob.create_gate("netIn", &mut app);
 
-    node_bob.create_gate_into("toStack", CHANNEL_NULL, internal_in, &mut app);
+    node_bob.create_gate_into("toStack", ChannelId::NULL, internal_in, &mut app);
 
     //
     // EVE
@@ -66,11 +65,11 @@ fn main() {
 
     let internal_out = node_eve.create_gate_cluster("fromStack", 2, &mut app);
 
-    stack_eve.create_gate_cluster_into("netOut", 2, CHANNEL_NULL, internal_out, &mut app);
+    stack_eve.create_gate_cluster_into("netOut", 2, ChannelId::NULL, internal_out, &mut app);
 
     let internal_in = stack_eve.create_gate_cluster("netIn", 2, &mut app);
 
-    node_eve.create_gate_cluster_into("toStack", 2, CHANNEL_NULL, internal_in, &mut app);
+    node_eve.create_gate_cluster_into("toStack", 2, ChannelId::NULL, internal_in, &mut app);
 
     //
     // Application config
@@ -121,7 +120,14 @@ fn main() {
         (0x00_00_00_ee, 0x00_fe),
         String::from("PING"),
     );
-    let msg = Message::new(2, GATE_NULL, MODULE_NULL, MODULE_NULL, SimTime::ZERO, pkt);
+    let msg = Message::new(
+        2,
+        GateId::NULL,
+        ModuleId::NULL,
+        ModuleId::NULL,
+        SimTime::ZERO,
+        pkt,
+    );
 
     rt.add_message_onto(alice_in, msg, 0.0.into());
 
