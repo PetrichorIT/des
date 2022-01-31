@@ -469,7 +469,6 @@ pub trait NdlBuildableModule {
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 #[derive(Debug, Clone)]
 pub struct ModuleCore {
-    /// A runtime specific but unqiue identifier for a given module.
     id: ModuleId,
 
     /// A human readable identifier for the module.
@@ -495,10 +494,13 @@ pub struct ModuleCore {
 }
 
 impl ModuleCore {
+    /// A runtime specific but unqiue identifier for a given module.
+    #[inline(always)]
     pub fn id(&self) -> ModuleId {
         self.id
     }
 
+    /// A human readable identifer for a given module.
     pub fn identifier(&self) -> String {
         format!(
             "#{} {}",
@@ -511,6 +513,10 @@ impl ModuleCore {
         )
     }
 
+    ///
+    /// Creates a new optionally named instance
+    /// of 'Self'.
+    ///
     pub fn new_with(name: Option<String>) -> Self {
         Self {
             id: ModuleId::gen(),
@@ -524,10 +530,18 @@ impl ModuleCore {
         }
     }
 
+    ///
+    /// Creates a named instance of 'Self'.
+    ///
+    #[inline(always)]
     pub fn named(name: String) -> Self {
         Self::new_with(Some(name))
     }
 
+    ///
+    /// Creates  a not-named instance of 'Self'.
+    ///
+    #[inline(always)]
     pub fn new() -> Self {
         Self::new_with(None)
     }
@@ -535,6 +549,6 @@ impl ModuleCore {
 
 impl Default for ModuleCore {
     fn default() -> Self {
-        Self::new_with(None)
+        Self::new()
     }
 }

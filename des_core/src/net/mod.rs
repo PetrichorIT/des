@@ -27,9 +27,8 @@ pub use self::channel::ChannelMetrics;
 
 pub use self::gate::Gate;
 pub use self::gate::GateDescription;
-pub use self::gate::IntoModuleGate;
-
 pub use self::gate::GateId;
+pub use self::gate::IntoModuleGate;
 
 //
 // # Messages & Packets
@@ -41,12 +40,10 @@ pub use self::message::MessageId;
 pub use self::message::MessageKind;
 pub use self::message::MessageMetadata;
 
+pub use self::packet::NodeAddress;
 pub use self::packet::Packet;
 pub use self::packet::PacketId;
-
 pub use self::packet::PortAddress;
-
-pub use self::packet::NodeAddress;
 pub use self::packet::NODE_ADDR_BROADCAST;
 pub use self::packet::NODE_ADDR_LOOPBACK;
 
@@ -54,10 +51,9 @@ pub use self::packet::NODE_ADDR_LOOPBACK;
 // # Modules
 //
 
-pub use self::module::ModuleId;
-
 pub use self::module::Module;
 pub use self::module::ModuleCore;
+pub use self::module::ModuleId;
 pub use self::module::NdlBuildableModule;
 pub use self::module::NdlCompatableModule;
 pub use self::module::StaticModuleCore;

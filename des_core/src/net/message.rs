@@ -93,27 +93,22 @@ pub struct Message {
 
 impl Message {
     ///
-    /// # Primitiv Getters
+    /// The metadata attached to the message.
     ///
-
+    #[inline(always)]
     pub fn meta(&self) -> &MessageMetadata {
         &self.meta
     }
 
     ///
-    /// # Additional fn
+    /// A strinification function that reduces it to its identifering pars.
     ///
-
     pub fn str(&self) -> String {
         format!(
             "#{}({}) {} bits",
             self.meta.id, self.meta.tree_id, self.bit_len
         )
     }
-
-    ///
-    /// # Constructors
-    ///
 
     #[allow(clippy::too_many_arguments)]
     fn new_raw(
@@ -242,6 +237,7 @@ impl Message {
     /// which does not gurantee that this is a internally valid instance
     /// of 'T'.
     ///
+    #[inline(always)]
     pub fn can_cast<T: 'static + MessageBody>(&self) -> bool {
         self.content.can_cast::<T>()
     }
@@ -284,7 +280,16 @@ impl Debug for Message {
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub trait MessageBody {
+    ///
+    /// The length of the message body in bytes.
+    ///
     fn byte_len(&self) -> usize;
+
+    ///
+    /// The length of the message body in bits.
+    /// This should be the byte length time 8 generally
+    /// but should be implemented otherwise for small datatypes.
+    ///
     fn bit_len(&self) -> usize {
         self.byte_len() * 8
     }

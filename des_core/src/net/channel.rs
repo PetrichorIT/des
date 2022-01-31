@@ -121,6 +121,7 @@ impl Channel {
     ///
     /// The capabilities of the channel.
     ///
+    #[inline(always)]
     pub fn metrics(&self) -> &ChannelMetrics {
         &self.metrics
     }
@@ -132,6 +133,7 @@ impl Channel {
     /// Note that being non-busy does not mean that no packet is currently on the medium
     /// it just means that all bits have been put onto the medium.
     ///
+    #[inline(always)]
     pub fn is_busy(&self) -> bool {
         self.busy
     }
@@ -139,6 +141,7 @@ impl Channel {
     ///
     /// Sets the busy state of an medium.
     ///
+    #[inline(always)]
     pub fn set_busy(&mut self, busy_state: bool) {
         self.busy = busy_state
     }
@@ -167,6 +170,7 @@ impl Channel {
     /// Calcualtes the packet travel duration using the
     /// underlying metric.
     ///
+    #[inline(always)]
     pub fn calculate_duration(&self, msg: &Message) -> SimTime {
         self.metrics.calculate_duration(msg)
     }
@@ -175,6 +179,7 @@ impl Channel {
     /// Calcualtes the busy time of the channel using
     /// the underlying metric.
     ///
+    #[inline(always)]
     pub fn calculate_busy(&self, msg: &Message) -> SimTime {
         self.metrics.calculate_busy(msg)
     }

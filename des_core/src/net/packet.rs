@@ -104,25 +104,31 @@ impl Packet {
     }
 
     /// The number of hops the message had before.
+    #[inline(always)]
     pub fn hop_count(&self) -> usize {
         self.hop_count
     }
 
     /// Sets the hop counter.
+    #[inline(always)]
     pub fn set_hop_count(&mut self, hop_count: usize) {
         self.hop_count = hop_count
     }
 
+    /// Increments the hop counter.
+    #[inline(always)]
     pub fn inc_hop_count(&mut self) {
         self.hop_count += 1;
     }
 
     /// The time to live of a message.
+    #[inline(always)]
     pub fn ttl(&self) -> usize {
         self.ttl
     }
 
     /// Sets the TTL.
+    #[inline(always)]
     pub fn set_ttl(&mut self, ttl: usize) {
         self.ttl = ttl
     }

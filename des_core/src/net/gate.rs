@@ -30,6 +30,7 @@ impl GateDescription {
     /// Indicator whether a descriptor describes a cluster
     /// or a single gate
     ///
+    #[inline(always)]
     pub fn is_cluster(&self) -> bool {
         self.size != 1
     }
@@ -83,6 +84,7 @@ impl Gate {
         self.pos
     }
 
+    #[inline(always)]
     pub fn size(&self) -> usize {
         self.description.size
     }
@@ -103,6 +105,7 @@ impl Gate {
     /// A function to link the next gate in the gate chain, by referencing
     /// its identifier.
     ///
+    #[inline(always)]
     pub fn set_next_gate(&mut self, next_gate: GateId) {
         self.next_gate = next_gate;
     }
@@ -113,6 +116,7 @@ impl Gate {
         self.channel_id
     }
 
+    #[inline(always)]
     pub fn set_channel(&mut self, channel: ChannelId) {
         self.channel_id = channel
     }
