@@ -353,6 +353,10 @@ impl<'a> InternedValue<'a> {
         Interner::cast(self)
     }
 
+    pub fn can_cast<T: 'static>(&self) -> bool {
+        self.interner.type_id_of(self.index) == TypeId::of::<T>()
+    }
+
     pub fn type_id(&self) -> TypeId {
         self.interner.type_id_of(self.index)
     }

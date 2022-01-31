@@ -11,7 +11,7 @@ pub struct Alice(ModuleCore);
 
 impl Module for Alice {
     fn handle_message(&mut self, msg: Message) {
-        let mut pkt = msg.extract_content::<Packet>();
+        let (mut pkt, _) = msg.cast::<Packet>();
         info!(target: self.name().unwrap(), "Received at {}: Message #{} content: {}", sim_time(), pkt.id(), pkt.extract_content_ref::<String>().deref());
 
         if pkt.hop_count() > 2 {
@@ -66,7 +66,7 @@ impl Module for Bob {
     }
 
     fn handle_message(&mut self, msg: Message) {
-        let mut pkt = msg.extract_content::<Packet>();
+        let (mut pkt, _) = msg.cast::<Packet>();
         pkt.inc_hop_count();
 
         info!(target: self.name().unwrap(), "Received at {}: Message #{} content: {}", sim_time(), pkt.id(), pkt.extract_content_ref::<String>().deref());

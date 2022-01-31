@@ -11,7 +11,7 @@ pub struct Alice(ModuleCore);
 
 impl Module for Alice {
     fn handle_message(&mut self, msg: Message) {
-        let mut pkt = msg.extract_content::<Packet>();
+        let (mut pkt, _) = msg.cast::<Packet>();
         info!(target: self.name().unwrap(), "Received at {}: Message #{} content: {}", sim_time(), pkt.id(), pkt.extract_content_ref::<String>().deref());
 
         if pkt.hop_count() > 100_000 {
@@ -38,7 +38,7 @@ pub struct Bob(ModuleCore);
 
 impl Module for Bob {
     fn handle_message(&mut self, msg: Message) {
-        if msg.kind == 0xff {
+        if msg.kind() == 0xff {
             info!(target: "Bob", "Initalizing");
             drop(msg);
             info!(target: "Bob", "Dropped init msg");
@@ -58,7 +58,7 @@ impl Module for Bob {
                 ("netOut", 2),
             );
         } else {
-            let mut pkt = msg.extract_content::<Packet>();
+            let (mut pkt, _) = msg.cast::<Packet>();
             pkt.inc_hop_count();
 
             info!(target: self.name().unwrap(), "Received at {}: Message #{} content: {}", sim_time(), pkt.id(), pkt.extract_content_ref::<String>().deref());

@@ -8,6 +8,6 @@ pub struct Bob(pub ModuleCore);
 
 impl Module for Bob {
     fn handle_message(&mut self, msg: Message) {
-        info!(target: "Bob", "Received at {}: message #{:?} content: {}", sim_time(),msg.id(), msg.extract_content::<String>().deref());
+        info!(target: "Bob", "Received at {}: message #{:?} content: {}", sim_time(),msg.id(), msg.cast::<String>().0.deref());
     }
 }

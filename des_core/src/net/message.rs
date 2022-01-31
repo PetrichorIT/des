@@ -21,34 +21,74 @@ create_global_uid!(
 pub type MessageKind = u16;
 
 ///
+/// The metadata attachted to a message, independent of its contents.
+///
+/// * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MessageMetadata {
+    /// A unqiue identifier for this instance of a message.
+    pub id: MessageId,
+    /// A unique identifier for the message this instance was cloned from.
+    /// If this instance was not cloned 'tree_id == id'.
+    pub tree_id: MessageId,
+
+    /// The type of message to be handled.
+    pub kind: MessageKind,
+    /// A custom user-defined timestamp.
+    pub timestamp: SimTime,
+
+    /// The id of the module that send this message.
+    pub sender_module_id: ModuleId,
+    /// The id of the module that received this message.
+    /// This is 'MODULE_NULL' until the message is received at a module.
+    pub receiver_module_id: ModuleId,
+
+    /// The last gate the message was passed through.
+    /// This can be used to identifier the inbound port
+    /// of a module.
+    pub last_gate: GateId,
+
+    /// A timestamp when the message was created.
+    pub creation_time: SimTime,
+    /// A timestamp when the message was send onto a link.
+    /// This may differ from the creation time if either messages are relayed
+    /// with processing delay, or some kind of buffered queue delays the transmission
+    /// onto the link.
+    pub send_time: SimTime,
+}
+
+impl MessageMetadata {
+    fn clone_message(&self) -> Self {
+        Self {
+            id: MessageId::gen(),
+            tree_id: self.id,
+
+            kind: self.kind,
+            timestamp: self.timestamp,
+
+            sender_module_id: self.sender_module_id,
+            receiver_module_id: self.receiver_module_id,
+
+            last_gate: self.last_gate,
+
+            creation_time: SimTime::now(),
+            send_time: SimTime::MAX,
+        }
+    }
+}
+
+///
 /// A generic network message holding a payload.
 ///
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub struct Message {
-    pub kind: MessageKind,
-    pub timestamp: SimTime,
+    meta: MessageMetadata,
 
     content: InternedValue<'static>,
     bit_len: usize,
     byte_len: usize,
-
-    // === Sender ===
-    sender_module_id: ModuleId,
-
-    // === Receiver ===
-    target_module_id: ModuleId,
-
-    // === Last Gate ===
-    last_gate: GateId,
-
-    // === Timings ===
-    creation_time: SimTime,
-    send_time: SimTime,
-
-    // === IDs ===
-    message_id: MessageId,
-    message_tree_id: MessageId,
 }
 
 impl Message {
@@ -56,39 +96,43 @@ impl Message {
     /// # Primitiv Getters
     ///
 
+    pub fn kind(&self) -> MessageKind {
+        self.meta.kind
+    }
+
     #[inline(always)]
     pub fn sender_module_id(&self) -> ModuleId {
-        self.sender_module_id
+        self.meta.sender_module_id
     }
 
     #[inline(always)]
     pub fn arrival_gate(&self) -> GateId {
-        self.last_gate
+        self.meta.last_gate
     }
 
     #[inline(always)]
-    pub fn target_module_id(&self) -> ModuleId {
-        self.target_module_id
+    pub fn receiver_module_id(&self) -> ModuleId {
+        self.meta.receiver_module_id
     }
 
     #[inline(always)]
     pub fn creation_time(&self) -> SimTime {
-        self.creation_time
+        self.meta.creation_time
     }
 
     #[inline(always)]
     pub fn send_time(&self) -> SimTime {
-        self.send_time
+        self.meta.send_time
     }
 
     #[inline(always)]
     pub fn id(&self) -> MessageId {
-        self.message_id
+        self.meta.id
     }
 
     #[inline(always)]
     pub fn root_id(&self) -> MessageId {
-        self.message_tree_id
+        self.meta.tree_id
     }
 
     pub fn bit_len(&self) -> usize {
@@ -96,7 +140,7 @@ impl Message {
     }
 
     pub fn set_last_gate(&mut self, gate: GateId) {
-        self.last_gate = gate;
+        self.meta.last_gate = gate;
     }
 
     ///
@@ -105,17 +149,17 @@ impl Message {
 
     #[inline(always)]
     pub fn is_self_msg(&self) -> bool {
-        self.sender_module_id == self.target_module_id
+        self.meta.sender_module_id == self.meta.receiver_module_id
     }
 
     pub fn set_target_module(&mut self, module_id: ModuleId) {
-        self.target_module_id = module_id;
+        self.meta.receiver_module_id = module_id;
     }
 
     pub fn str(&self) -> String {
         format!(
             "#{}({}) {} bits",
-            self.message_id, self.message_tree_id, self.bit_len
+            self.meta.id, self.meta.tree_id, self.bit_len
         )
     }
 
@@ -125,29 +169,13 @@ impl Message {
 
     #[allow(clippy::too_many_arguments)]
     fn new_raw(
-        kind: MessageKind,
-        last_gate: GateId,
-        sender_module_id: ModuleId,
-        target_module_id: ModuleId,
-        creation_time: SimTime,
-        send_time: SimTime,
-        timestamp: SimTime,
-        message_id: MessageId,
-        message_tree_id: MessageId,
+        meta: MessageMetadata,
         content: InternedValue<'static>,
         bit_len: usize,
         byte_len: usize,
     ) -> Self {
         Self {
-            kind,
-            last_gate,
-            sender_module_id,
-            target_module_id,
-            creation_time,
-            send_time,
-            timestamp,
-            message_id,
-            message_tree_id,
+            meta,
             content,
             bit_len,
             byte_len,
@@ -175,20 +203,23 @@ impl Message {
 
         let id = MessageId::gen();
 
-        Self::new_raw(
+        let meta = MessageMetadata {
+            id,
+            tree_id: id,
+
             kind,
-            GATE_NULL,
-            sender_module_id,
-            MODULE_NULL,
-            SimTime::now(),
-            SimTime::now(),
             timestamp,
-            id,
-            id,
-            content.uncast(),
-            bit_len,
-            byte_len,
-        )
+
+            sender_module_id,
+            receiver_module_id: MODULE_NULL,
+
+            last_gate: GATE_NULL,
+
+            creation_time: SimTime::now(),
+            send_time: SimTime::MAX,
+        };
+
+        Self::new_raw(meta, content.uncast(), bit_len, byte_len)
     }
 
     ///
@@ -205,7 +236,7 @@ impl Message {
         kind: MessageKind,
         last_gate: GateId,
         sender_module_id: ModuleId,
-        target_module_id: ModuleId,
+        receiver_module_id: ModuleId,
         timestamp: SimTime,
         content: T,
     ) -> Self {
@@ -216,20 +247,23 @@ impl Message {
 
         let interned = unsafe { (*RTC.get()).as_ref().unwrap().interner.intern(content) };
 
-        Self::new_raw(
+        let meta = MessageMetadata {
+            id,
+            tree_id: id,
+
             kind,
-            last_gate,
-            sender_module_id,
-            target_module_id,
-            SimTime::now(),
-            SimTime::ZERO,
             timestamp,
-            id,
-            id,
-            interned,
-            bit_len,
-            byte_len,
-        )
+
+            sender_module_id,
+            receiver_module_id,
+
+            last_gate,
+
+            creation_time: SimTime::now(),
+            send_time: SimTime::MAX,
+        };
+
+        Self::new_raw(meta, interned, bit_len, byte_len)
     }
 
     ///
@@ -243,23 +277,32 @@ impl Message {
     /// Note that DES guarntees that the data refernced by ptr will not
     /// be freed until this function is called, and ownership is thereby moved..
     ///
-    pub fn extract_content<T: MessageBody>(self) -> TypedInternedValue<'static, T> {
-        self.content.cast()
+    pub fn cast<T: MessageBody>(self) -> (TypedInternedValue<'static, T>, MessageMetadata) {
+        let Message { meta, content, .. } = self;
+        (content.cast(), meta)
+    }
+
+    ///
+    /// Indicates wheter a cast to a instance of type T ca
+    /// succeed.
+    ///
+    /// # Safty
+    ///
+    /// Note that this only gurantees that a cast will result in UB
+    /// if it returns 'false'. Should this function return 'true' it indicates
+    /// that the underlying value was created as a instance of type 'T',
+    /// which does not gurantee that this is a internally valid instance
+    /// of 'T'.
+    ///
+    pub fn can_cast<T: 'static + MessageBody>(&self) -> bool {
+        self.content.can_cast::<T>()
     }
 }
 
 impl Clone for Message {
     fn clone(&self) -> Self {
         Self::new_raw(
-            self.kind,
-            self.last_gate,
-            self.sender_module_id,
-            self.target_module_id,
-            self.creation_time,
-            self.send_time,
-            self.timestamp,
-            MessageId::gen(),
-            self.message_tree_id,
+            self.meta.clone_message(),
             self.content.clone(),
             self.bit_len,
             self.byte_len,
@@ -270,17 +313,17 @@ impl Clone for Message {
 impl Debug for Message {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Message")
-            .field("id", &self.message_id)
-            .field("tree_id", &self.message_tree_id)
-            .field("kind", &self.kind)
-            .field("last_gate", &self.last_gate)
-            .field("sender_module_id", &self.sender_module_id)
-            .field("target_module_id", &self.target_module_id)
+            .field("id", &self.meta.id)
+            .field("tree_id", &self.meta.tree_id)
+            .field("kind", &self.meta.kind)
+            .field("last_gate", &self.meta.last_gate)
+            .field("sender_module_id", &self.meta.sender_module_id)
+            .field("target_module_id", &self.meta.receiver_module_id)
             .field(
                 "timestamp",
                 &format!(
                     "{} (created: {}, send: {})",
-                    self.timestamp, self.creation_time, self.send_time
+                    self.meta.timestamp, self.meta.creation_time, self.meta.send_time
                 ),
             )
             .finish()

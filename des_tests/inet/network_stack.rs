@@ -42,11 +42,13 @@ impl NetworkStack {
 
 impl Module for NetworkStack {
     fn handle_message(&mut self, msg: des_core::Message) {
-        let incoming = msg.arrival_gate();
-        let mut pkt = msg.extract_content::<Packet>();
+        let (mut pkt, meta) = msg.cast::<Packet>();
 
         pkt.inc_hop_count();
-        self.routing_deamon.as_mut().unwrap().handle(&pkt, incoming);
+        self.routing_deamon
+            .as_mut()
+            .unwrap()
+            .handle(&pkt, meta.last_gate);
 
         // Route packet
         if pkt.target_addr() == self.address {
@@ -64,7 +66,7 @@ impl Module for NetworkStack {
             let idx = rng::<usize>() % out_size;
 
             let mut gate_id = self.gate("netOut", idx).unwrap().id();
-            if gate_id == incoming {
+            if gate_id == meta.last_gate {
                 gate_id = self
                     .gate("netOut", (idx + 1) % self.gates().len())
                     .unwrap()

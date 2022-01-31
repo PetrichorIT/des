@@ -45,6 +45,7 @@ pub use self::message::Message;
 pub use self::message::MessageBody;
 pub use self::message::MessageId;
 pub use self::message::MessageKind;
+pub use self::message::MessageMetadata;
 
 pub use self::packet::Packet;
 pub use self::packet::PacketId;

@@ -13,7 +13,7 @@ pub struct Alice(pub ModuleCore);
 
 impl Module for Alice {
     fn handle_message(&mut self, msg: Message) {
-        info!(target: "Alice", "Received at {}: message #{:?} content: {}", sim_time(),msg.id(), msg.extract_content::<String>().deref());
+        info!(target: "Alice", "Received at {}: message #{:?} content: {}", sim_time(),msg.id(), msg.cast::<String>().0.deref());
 
         self.send(
             Message::new(
