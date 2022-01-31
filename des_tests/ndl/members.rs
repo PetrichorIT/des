@@ -38,7 +38,7 @@ pub struct Bob(ModuleCore);
 
 impl Module for Bob {
     fn handle_message(&mut self, msg: Message) {
-        if msg.kind() == 0xff {
+        if msg.meta().kind == 0xff {
             info!(target: "Bob", "Initalizing");
             drop(msg);
             info!(target: "Bob", "Dropped init msg");

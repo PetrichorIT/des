@@ -26,7 +26,7 @@ impl NetworkNode {
 
 impl Module for NetworkNode {
     fn handle_message(&mut self, msg: des_core::Message) {
-        let incoming = self.gate_by_id(msg.arrival_gate()).unwrap();
+        let incoming = self.gate_by_id(msg.meta().last_gate).unwrap();
 
         let pos = incoming.pos();
         warn!(target: &self.str(), "Node incoming at gate {:?}", incoming);

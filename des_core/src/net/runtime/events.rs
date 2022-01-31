@@ -35,7 +35,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
         if let Some(gate) = gate {
             let ptr: *const Message = self.message.deref();
             let mut message = unsafe { std::ptr::read(ptr) };
-            message.set_last_gate(self.gate_id);
+            message.meta.last_gate = self.gate_id;
 
             self.handled = true;
 
@@ -140,7 +140,7 @@ impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
         if let Some(module) = rt.app.module_mut_by_id(self.module_id) {
             let ptr: *const Message = self.message.deref();
             let mut message = unsafe { std::ptr::read(ptr) };
-            message.set_target_module(module.id());
+            message.meta.receiver_module_id = module.id();
 
             info!(
                 target: &format!("Module {}", module.str()),

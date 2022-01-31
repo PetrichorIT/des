@@ -84,11 +84,11 @@ impl MessageMetadata {
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub struct Message {
-    meta: MessageMetadata,
+    pub(crate) meta: MessageMetadata,
 
-    content: InternedValue<'static>,
-    bit_len: usize,
-    byte_len: usize,
+    pub(crate) content: InternedValue<'static>,
+    pub(crate) bit_len: usize,
+    pub(crate) byte_len: usize,
 }
 
 impl Message {
@@ -96,65 +96,13 @@ impl Message {
     /// # Primitiv Getters
     ///
 
-    pub fn kind(&self) -> MessageKind {
-        self.meta.kind
-    }
-
-    #[inline(always)]
-    pub fn sender_module_id(&self) -> ModuleId {
-        self.meta.sender_module_id
-    }
-
-    #[inline(always)]
-    pub fn arrival_gate(&self) -> GateId {
-        self.meta.last_gate
-    }
-
-    #[inline(always)]
-    pub fn receiver_module_id(&self) -> ModuleId {
-        self.meta.receiver_module_id
-    }
-
-    #[inline(always)]
-    pub fn creation_time(&self) -> SimTime {
-        self.meta.creation_time
-    }
-
-    #[inline(always)]
-    pub fn send_time(&self) -> SimTime {
-        self.meta.send_time
-    }
-
-    #[inline(always)]
-    pub fn id(&self) -> MessageId {
-        self.meta.id
-    }
-
-    #[inline(always)]
-    pub fn root_id(&self) -> MessageId {
-        self.meta.tree_id
-    }
-
-    pub fn bit_len(&self) -> usize {
-        self.bit_len
-    }
-
-    pub fn set_last_gate(&mut self, gate: GateId) {
-        self.meta.last_gate = gate;
+    pub fn meta(&self) -> &MessageMetadata {
+        &self.meta
     }
 
     ///
     /// # Additional fn
     ///
-
-    #[inline(always)]
-    pub fn is_self_msg(&self) -> bool {
-        self.meta.sender_module_id == self.meta.receiver_module_id
-    }
-
-    pub fn set_target_module(&mut self, module_id: ModuleId) {
-        self.meta.receiver_module_id = module_id;
-    }
 
     pub fn str(&self) -> String {
         format!(

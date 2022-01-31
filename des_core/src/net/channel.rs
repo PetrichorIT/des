@@ -73,7 +73,7 @@ impl ChannelMetrics {
             return SimTime::ZERO;
         }
 
-        let len = msg.bit_len();
+        let len = msg.bit_len;
         let transmission_time = SimTime::from(len as f64 / self.bitrate as f64);
         if self.jitter == SimTime::ZERO {
             self.latency + transmission_time
@@ -91,7 +91,7 @@ impl ChannelMetrics {
         if self.bitrate == 0 {
             SimTime::ZERO
         } else {
-            let len = msg.bit_len();
+            let len = msg.bit_len;
             SimTime::from(len as f64 / self.bitrate as f64)
         }
     }

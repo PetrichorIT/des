@@ -198,16 +198,10 @@ impl SubAssign for SimTime {
 }
 
 impl Div for SimTime {
-    type Output = Self;
+    type Output = f64;
 
     fn div(self, rhs: Self) -> Self::Output {
-        Self(self.0 / rhs.0)
-    }
-}
-
-impl DivAssign for SimTime {
-    fn div_assign(&mut self, rhs: Self) {
-        self.0 /= rhs.0
+        self.0 / rhs.0
     }
 }
 
