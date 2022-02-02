@@ -12,9 +12,9 @@ pub struct Alice(ModuleCore);
 impl Module for Alice {
     fn handle_message(&mut self, msg: Message) {
         let (mut pkt, _) = msg.cast::<Packet>();
-        info!(target: self.name().unwrap(), "Received at {}: Message #{} content: {}", sim_time(), pkt.id(), pkt.extract_content_ref::<String>().deref());
+        info!(target: self.name().unwrap(), "Received at {}: Message #{} content: {}", sim_time(), pkt.id(), pkt.content::<String>().deref());
 
-        if pkt.hop_count() > 2 {
+        if pkt.header().hop_count > 2 {
             // TERMINATE
             self.disable_activity()
         } else {
@@ -69,9 +69,9 @@ impl Module for Bob {
         let (mut pkt, _) = msg.cast::<Packet>();
         pkt.inc_hop_count();
 
-        info!(target: self.name().unwrap(), "Received at {}: Message #{} content: {}", sim_time(), pkt.id(), pkt.extract_content_ref::<String>().deref());
+        info!(target: self.name().unwrap(), "Received at {}: Message #{} content: {}", sim_time(), pkt.id(), pkt.content::<String>().deref());
 
-        pkt.extract_content_ref::<String>().push('#');
+        pkt.content::<String>().push('#');
 
         self.send(
             Message::new_interned(1, self.id(), SimTime::ZERO, pkt),

@@ -51,9 +51,9 @@ impl Module for NetworkStack {
             .handle(&pkt, meta.last_gate);
 
         // Route packet
-        if pkt.target_addr() == self.address {
+        if pkt.header().target_node == self.address {
             info!(target: "Application Layer", "=== Received packet ===");
-        } else if let Some(&route) = self.lookup_route(pkt.target_addr()) {
+        } else if let Some(&route) = self.lookup_route(pkt.header().target_node) {
             // PATH ROUTE
             info!(target: "NetworkStack", "Routing over backproc path");
             let msg = Message::new_interned(2, self.id(), SimTime::now(), pkt);

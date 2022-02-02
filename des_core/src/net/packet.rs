@@ -48,6 +48,23 @@ create_global_uid!(
 );
 
 ///
+/// A application-addressed header in a network, similar to TCP/UDP.
+///
+/// * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
+#[derive(Debug)]
+pub struct PacketHeader {
+    pub source_node: NodeAddress,
+    pub source_port: PortAddress,
+
+    pub target_node: NodeAddress,
+    pub target_port: PortAddress,
+
+    pub ttl: usize,
+    pub hop_count: usize,
+}
+
+///
 /// A application-addressed message in a network, similar to TCP/UDP.
 ///
 /// * This type is only available of DES is build with the `"net"` feature.*
@@ -57,14 +74,7 @@ create_global_uid!(
 pub struct Packet {
     id: PacketId,
 
-    source_node: NodeAddress,
-    source_port: PortAddress,
-
-    target_node: NodeAddress,
-    target_port: PortAddress,
-
-    ttl: usize,
-    hop_count: usize,
+    header: PacketHeader,
 
     content: InternedValue<'static>,
 
@@ -79,58 +89,26 @@ impl Packet {
         self.id
     }
 
-    /// The source address of the packet.
-    #[inline(always)]
-    pub fn source_addr(&self) -> NodeAddress {
-        self.source_node
-    }
-
-    /// The source port of the packet.
-    #[inline(always)]
-    pub fn source_port(&self) -> PortAddress {
-        self.source_port
-    }
-
-    /// The requested targets address.
-    #[inline(always)]
-    pub fn target_addr(&self) -> NodeAddress {
-        self.target_node
-    }
-
-    /// The requested targets port.
-    #[inline(always)]
-    pub fn target_port(&self) -> PortAddress {
-        self.target_port
-    }
-
-    /// The number of hops the message had before.
-    #[inline(always)]
-    pub fn hop_count(&self) -> usize {
-        self.hop_count
+    pub fn header(&self) -> &PacketHeader {
+        &self.header
     }
 
     /// Sets the hop counter.
     #[inline(always)]
     pub fn set_hop_count(&mut self, hop_count: usize) {
-        self.hop_count = hop_count
+        self.header.hop_count = hop_count
     }
 
     /// Increments the hop counter.
     #[inline(always)]
     pub fn inc_hop_count(&mut self) {
-        self.hop_count += 1;
-    }
-
-    /// The time to live of a message.
-    #[inline(always)]
-    pub fn ttl(&self) -> usize {
-        self.ttl
+        self.header.hop_count += 1;
     }
 
     /// Sets the TTL.
     #[inline(always)]
     pub fn set_ttl(&mut self, ttl: usize) {
-        self.ttl = ttl
+        self.header.ttl = ttl
     }
 
     ///
@@ -159,14 +137,16 @@ impl Packet {
         Self {
             id: PacketId::gen(),
 
-            source_node: src.0,
-            source_port: src.1,
+            header: PacketHeader {
+                source_node: src.0,
+                source_port: src.1,
 
-            target_node: target.0,
-            target_port: target.1,
+                target_node: target.0,
+                target_port: target.1,
 
-            ttl: 0,
-            hop_count: 0,
+                ttl: 0,
+                hop_count: 0,
+            },
 
             content: interned,
 
@@ -176,7 +156,7 @@ impl Packet {
     }
 
     ///
-    /// Consumes the message casting the stored ptr
+    /// Extracts the message casting the stored ptr
     /// into a Box of type T.
     ///
     /// # Safty
@@ -186,11 +166,27 @@ impl Packet {
     /// Note that DES guarntees that the data refernced by ptr will not
     /// be freed until this function is called, and ownership is thereby moved..
     ///
-    pub fn extract_content<T: 'static + MessageBody>(self) -> TypedInternedValue<'static, T> {
-        self.content.cast()
+    pub fn decapsulate<T: 'static + MessageBody>(
+        self,
+    ) -> (TypedInternedValue<'static, T>, PacketHeader) {
+        let Self {
+            content, header, ..
+        } = self;
+        (content.cast(), header)
     }
 
-    pub fn extract_content_ref<T: 'static + MessageBody>(&self) -> TypedInternedValue<'static, T> {
+    ///
+    /// Extracts the message casting the stored ptr
+    /// into a Box of type T.
+    ///
+    /// # Safty
+    ///
+    /// The caller must ensure that the stored data is a valid instance
+    /// of type T. If this cannot be guarnteed this is UB.
+    /// Note that DES guarntees that the data refernced by ptr will not
+    /// be freed until this function is called, and ownership is thereby moved..
+    ///
+    pub fn content<T: 'static + MessageBody>(&self) -> TypedInternedValue<'static, T> {
         self.content.clone().cast()
     }
 }
