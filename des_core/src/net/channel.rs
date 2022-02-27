@@ -110,6 +110,9 @@ pub struct Channel {
 
     /// A indicator whether a channel is busy transmitting a packet.
     busy: bool,
+
+    /// The time the current packet is fully transmitted onto the channel.
+    transmission_finish_time: SimTime,
 }
 
 impl Indexable for Channel {
@@ -142,11 +145,28 @@ impl Channel {
     }
 
     ///
-    /// Sets the busy state of an medium.
+    /// Sets the channel busy, announcing that the message will be trabńsmitted
+    /// in 'sim_time' time units.
     ///
-    #[inline(always)]
-    pub fn set_busy(&mut self, busy_state: bool) {
-        self.busy = busy_state
+    pub fn set_busy_until(&mut self, sim_time: SimTime) {
+        self.busy = true;
+        self.transmission_finish_time = sim_time;
+    }
+
+    ///
+    /// Resets the busy state of a channel.
+    ///
+    pub fn unbusy(&mut self) {
+        self.busy = false;
+        self.transmission_finish_time = SimTime::ZERO;
+    }
+
+    ///
+    /// Returns the time when the packet currently being transmitted onto the medium
+    /// has been fully transmitted, or [SimTime::ZERO] if no packet is currently being transmitted.
+    ///
+    pub fn transmission_finish_time(&self) -> SimTime {
+        self.transmission_finish_time
     }
 
     ///
@@ -156,6 +176,7 @@ impl Channel {
         id: ChannelId::NULL,
         metrics: ChannelMetrics::INSTANTANEOUS,
         busy: false,
+        transmission_finish_time: SimTime::ZERO,
     };
 
     ///
@@ -166,6 +187,7 @@ impl Channel {
             id: ChannelId::gen(),
             metrics,
             busy: false,
+            transmission_finish_time: SimTime::ZERO,
         }
     }
 

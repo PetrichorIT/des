@@ -91,11 +91,13 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
                     let dur = channel.calculate_duration(&message);
                     let busy = channel.calculate_busy(&message);
 
-                    channel.set_busy(true);
+                    let transmissin_finish = SimTime::now() + busy;
 
-                    rt.add_event_in(
+                    channel.set_busy_until(transmissin_finish);
+
+                    rt.add_event(
                         NetEvents::ChannelUnbusyNotif(ChannelUnbusyNotif { channel_id }),
-                        busy,
+                        transmissin_finish,
                     );
 
                     SimTime::now() + dur
@@ -223,7 +225,7 @@ pub struct ChannelUnbusyNotif {
 impl<A> Event<NetworkRuntime<A>> for ChannelUnbusyNotif {
     fn handle(self, rt: &mut crate::Runtime<NetworkRuntime<A>>) {
         if let Some(channel) = rt.app.channel_mut(self.channel_id) {
-            channel.set_busy(false);
+            channel.unbusy();
         }
     }
 }
