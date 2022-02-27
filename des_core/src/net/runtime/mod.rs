@@ -117,9 +117,11 @@ impl<A> NetworkRuntime<A> {
     ///
     /// Registers a channel with a non-null delay.
     ///
-    pub fn create_channel(&mut self, metrics: ChannelMetrics) -> ChannelId {
+    pub fn create_channel(&mut self, metrics: ChannelMetrics) -> ChannelRef {
         let channel = Channel::new(metrics);
-        self.channel_buffer.insert(channel).id()
+        let item = self.channel_buffer.insert(channel);
+
+        IdBufferRef::new(item.id(), &mut self.channel_buffer)
     }
 
     ///

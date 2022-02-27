@@ -4,7 +4,10 @@ use crate::create_global_uid;
 
 use crate::core::*;
 use crate::net::*;
+use crate::util::IdBufferRef;
 use crate::util::Indexable;
+
+pub type ChannelRef = IdBufferRef<Channel>;
 
 create_global_uid!(
     /// A runtime-unique identifier for a one directional channel.

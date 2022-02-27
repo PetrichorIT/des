@@ -3,6 +3,7 @@ use log::info;
 #[cfg(feature = "net-static")]
 use std::any::type_name;
 
+use std::hash::Hash;
 use std::ops::Deref;
 
 ///
@@ -231,7 +232,7 @@ use crate::util::SyncCell;
 /// There should only exist one [IdBufferRef] per buffered object,
 /// but it is possible to create multipled ones.
 ///
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct IdBufferRef<T>
 where
     T: Indexable,
@@ -247,6 +248,10 @@ impl<T> IdBufferRef<T>
 where
     T: Indexable,
 {
+    pub fn id(&self) -> T::Id {
+        self.id
+    }
+
     ///
     /// Creates a new strong ref to a object referenced by and id
     /// in the given buffer.
@@ -379,6 +384,30 @@ where
         }
 
         obj
+    }
+}
+
+impl<T: Indexable> Clone for IdBufferRef<T> {
+    fn clone(&self) -> Self {
+        Self {
+            buffer: self.buffer,
+            id: self.id,
+        }
+    }
+}
+
+impl<T: Indexable> PartialEq for IdBufferRef<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl<T: Indexable> Eq for IdBufferRef<T> {}
+
+impl<T: Indexable> Hash for IdBufferRef<T> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.buffer.hash(state);
+        self.id.as_usize().hash(state)
     }
 }
 

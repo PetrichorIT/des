@@ -25,10 +25,14 @@ path = "ndl/main.rs"
 name = "utils"
 path = "utils/main.rs"
 
+[[bin]]
+name = "ptrhell"
+path = "ptrhell/main.rs"
+
 [dependencies]
 des_core = {path = "../des_core", features = ["net", "net-static"]}
 des_macros = {path = "../des_macros"}
 des_ndl = {path = "../des_ndl"}
-log = {version = "*", features = ["max_level_error"]}
+log = {version = "*", features = ["max_level_trace"]}
 # log = "*"
 rand = "*"

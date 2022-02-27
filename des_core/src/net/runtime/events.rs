@@ -63,17 +63,18 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
 
                 info!(
                     target: &format!("Gate #{} ({})", self.gate_id, gate.name()),
-                    "Forwarding message [{}] to next gate #{}",
+                    "Forwarding message [{}] to next gate #{} delyed: {}",
                     message.str(),
-                    next_gate
+                    next_gate,
+                    gate.channel_id() != ChannelId::NULL
                 );
 
-                let next_event_time = if gate.channel() == ChannelId::NULL {
+                let next_event_time = if gate.channel_id() == ChannelId::NULL {
                     // Direct connection
                     SimTime::now()
                 } else {
                     // Channel delayed connection
-                    let channel_id = gate.channel();
+                    let channel_id = gate.channel_id();
                     let channel = rt.app.channel_mut(channel_id).unwrap();
 
                     if channel.is_busy() {

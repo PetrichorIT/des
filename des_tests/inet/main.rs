@@ -1,6 +1,4 @@
-use des_core::{
-    ChannelId, ChannelMetrics, Message, ModuleId, NetworkRuntime, Packet, Runtime, SimTime,
-};
+use des_core::{ChannelMetrics, Message, ModuleId, NetworkRuntime, Packet, Runtime, SimTime};
 use des_core::{GateId, StaticModuleCore};
 use network_node::NetworkNode;
 use network_stack::NetworkStack;
@@ -32,11 +30,11 @@ fn main() {
 
     let internal_out = node_alice.create_gate("fromStack", &mut app);
 
-    stack_alice.create_gate_into("netOut", ChannelId::NULL, internal_out, &mut app);
+    stack_alice.create_gate_into("netOut", None, internal_out, &mut app);
 
     let internal_in = stack_alice.create_gate("netIn", &mut app);
 
-    node_alice.create_gate_into("toStack", ChannelId::NULL, internal_in, &mut app);
+    node_alice.create_gate_into("toStack", None, internal_in, &mut app);
 
     //
     // BOB
@@ -48,11 +46,11 @@ fn main() {
 
     let internal_out = node_bob.create_gate("fromStack", &mut app);
 
-    stack_bob.create_gate_into("netOut", ChannelId::NULL, internal_out, &mut app);
+    stack_bob.create_gate_into("netOut", None, internal_out, &mut app);
 
     let internal_in = stack_bob.create_gate("netIn", &mut app);
 
-    node_bob.create_gate_into("toStack", ChannelId::NULL, internal_in, &mut app);
+    node_bob.create_gate_into("toStack", None, internal_in, &mut app);
 
     //
     // EVE
@@ -65,21 +63,21 @@ fn main() {
 
     let internal_out = node_eve.create_gate_cluster("fromStack", 2, &mut app);
 
-    stack_eve.create_gate_cluster_into("netOut", 2, ChannelId::NULL, internal_out, &mut app);
+    stack_eve.create_gate_cluster_into("netOut", 2, None, internal_out, &mut app);
 
     let internal_in = stack_eve.create_gate_cluster("netIn", 2, &mut app);
 
-    node_eve.create_gate_cluster_into("toStack", 2, ChannelId::NULL, internal_in, &mut app);
+    node_eve.create_gate_cluster_into("toStack", 2, None, internal_in, &mut app);
 
     //
     // Application config
     //
 
-    let channel = app.create_channel(ChannelMetrics {
+    let channel = Some(app.create_channel(ChannelMetrics {
         bitrate: 5_000_000,
         latency: 0.1.into(),
         jitter: 0.0.into(),
-    });
+    }));
 
     let alice_in = node_alice.create_gate("channelIncoming", &mut app);
 
@@ -88,14 +86,14 @@ fn main() {
     node_eve.create_gate_cluster_into(
         "channelOutgoing",
         2,
-        channel,
+        channel.clone(),
         vec![alice_in, bob_in],
         &mut app,
     );
 
     let eve_in = node_eve.create_gate_cluster("channelIncoming", 2, &mut app);
 
-    node_alice.create_gate_into("channelOutgoing", channel, eve_in[0], &mut app);
+    node_alice.create_gate_into("channelOutgoing", channel.clone(), eve_in[0], &mut app);
     node_bob.create_gate_into("channelOutgoing", channel, eve_in[1], &mut app);
 
     app.create_module(node_alice);

@@ -2,7 +2,7 @@
 //pub use buffer::*;
 
 use crate::net::*;
-use crate::util::{IdBufferRef, Indexable};
+use crate::util::Indexable;
 use crate::*;
 use log::error;
 
@@ -239,7 +239,7 @@ pub trait StaticModuleCore: Indexable<Id = ModuleId> {
     fn create_gate_into<A>(
         &mut self,
         name: &str,
-        channel: ChannelId,
+        channel: Option<ChannelRef>,
         next_hop: GateId,
         rt: &mut NetworkRuntime<A>,
     ) -> GateId
@@ -261,7 +261,7 @@ pub trait StaticModuleCore: Indexable<Id = ModuleId> {
     where
         Self: Sized,
     {
-        self.create_gate_cluster_into(name, size, ChannelId::NULL, vec![GateId::NULL; size], rt)
+        self.create_gate_cluster_into(name, size, None, vec![GateId::NULL; size], rt)
     }
 
     ///
@@ -276,7 +276,7 @@ pub trait StaticModuleCore: Indexable<Id = ModuleId> {
         &mut self,
         name: &str,
         size: usize,
-        channel: ChannelId,
+        channel: Option<ChannelRef>,
         next_hops: Vec<GateId>,
         rt: &mut NetworkRuntime<A>,
     ) -> Vec<GateId>
@@ -289,7 +289,7 @@ pub trait StaticModuleCore: Indexable<Id = ModuleId> {
         let mut ids = Vec::new();
 
         for (i, item) in next_hops.iter().enumerate() {
-            let gate = Gate::new(descriptor.clone(), i, channel, *item);
+            let gate = Gate::new(descriptor.clone(), i, channel.clone(), *item);
             ids.push(gate.id());
 
             let reference = rt.create_gate(gate);
@@ -475,7 +475,7 @@ pub struct ModuleCore {
     pub name: Option<String>,
 
     /// A collection of all gates register to the current module
-    pub gates: Vec<IdBufferRef<Gate>>,
+    pub gates: Vec<GateRef>,
 
     /// A buffer of messages to be send out, after the current handle messsage terminates.
     pub out_buffer: Vec<(Message, GateId)>,

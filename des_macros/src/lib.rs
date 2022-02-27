@@ -220,9 +220,12 @@ fn gen_dynamic_module_core(ident: Ident, attrs: Attributes) -> TokenStream {
                     } = connection;
 
                     // get gate cluster for specific nodes
-                    let from_ident = ident_from_conident(&mut token_stream, source);
                     let to_ident = ident_from_conident(&mut token_stream, target);
+                    token_stream.extend(quote! {
+                        let #to_ident = #to_ident.id();
+                    });
 
+                    let from_ident = ident_from_conident(&mut token_stream, source);
                     // Define n channels (n == gate_cluster.size())
                     if let Some(channel) = channel {
                         let ChannelSpec {
@@ -238,15 +241,15 @@ fn gen_dynamic_module_core(ident: Ident, attrs: Attributes) -> TokenStream {
                                 latency: des_core::SimTime::from(#latency),
                                 jitter: des_core::SimTime::from(#jitter),
                             });
-                            #from_ident.set_next_gate(#to_ident.id());
+                            #from_ident.set_next_gate(#to_ident);
                             #from_ident.set_channel(channel);
                         });
                     } else {
                         token_stream.extend(quote! {
                             // assert_eq!(#from_ident.len(), #to_ident.len());
-                            for i in 0..#from_ident.len() {
-                                #from_ident[i].set_next_gate(#to_ident[i].id());
-                            }
+                            // for i in 0..#from_ident.len() {
+                                #from_ident.set_next_gate(#to_ident);
+                            // }
                         });
                     }
                 }

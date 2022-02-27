@@ -1,7 +1,10 @@
 use crate::create_global_uid;
 use crate::net::*;
+use crate::util::IdBufferRef;
 use crate::Indexable;
 use std::fmt::{Debug, Display};
+
+pub type GateRef = IdBufferRef<Gate>;
 
 create_global_uid!(
     /// A runtime-unquie identifier for a gate.
@@ -64,7 +67,7 @@ pub struct Gate {
     /// The position index of the gate in the descriptor cluster.
     pos: usize,
     /// A identifier of the channel linked to the gate chain.
-    channel_id: ChannelId,
+    channel: Option<ChannelRef>,
     /// The next gate in the gate chain, GATE_NULL if non is existent.
     next_gate: GateId,
 }
@@ -112,13 +115,23 @@ impl Gate {
 
     /// The channel identifier of the linked channel.
     #[inline(always)]
-    pub fn channel(&self) -> ChannelId {
-        self.channel_id
+    pub fn channel_id(&self) -> ChannelId {
+        match &self.channel {
+            Some(c) => c.id(),
+            None => ChannelId::NULL,
+        }
+    }
+
+    pub fn channel(&self) -> Option<&Channel> {
+        match &self.channel {
+            Some(c) => Some(c.get()),
+            None => None,
+        }
     }
 
     #[inline(always)]
-    pub fn set_channel(&mut self, channel: ChannelId) {
-        self.channel_id = channel
+    pub fn set_channel(&mut self, channel: ChannelRef) {
+        self.channel = Some(channel)
     }
 
     /// The module idefnifier of the owner module.
@@ -133,14 +146,14 @@ impl Gate {
     pub fn new(
         description: GateDescription,
         pos: usize,
-        channel: ChannelId,
+        channel: Option<ChannelRef>,
         next_gate: GateId,
     ) -> Self {
         Self {
             id: GateId::gen(),
             description,
             pos,
-            channel_id: channel,
+            channel,
             next_gate,
         }
     }
