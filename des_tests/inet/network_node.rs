@@ -13,13 +13,13 @@ impl NetworkNode {
     #[allow(unused)]
     pub fn new() -> Self {
         Self {
-            core: ModuleCore::new_with(Some("NetworkNode".to_string())),
+            core: ModuleCore::new_with("NetworkNode".parse().unwrap()),
         }
     }
 
     pub fn named(name: &str) -> Self {
         Self {
-            core: ModuleCore::new_with(Some(format!("NetworkNode - {}", name))),
+            core: ModuleCore::new_with(format!("NetworkNode - {}", name).parse().unwrap()),
         }
     }
 }

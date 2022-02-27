@@ -12,7 +12,7 @@ pub struct Alice(ModuleCore);
 impl Module for Alice {
     fn handle_message(&mut self, msg: Message) {
         let (mut pkt, _) = msg.cast::<Packet>();
-        info!(target: self.name().unwrap(), "Received at {}: Message #{} content: {}", sim_time(), pkt.id(), pkt.content::<String>().deref());
+        info!(target: self.name(), "Received at {}: Message #{} content: {}", sim_time(), pkt.id(), pkt.content::<String>().deref());
 
         if pkt.header().hop_count > 100_000 {
             // TERMINATE
@@ -23,12 +23,6 @@ impl Module for Alice {
                 ("netOut", 0),
             )
         }
-    }
-}
-
-impl NdlCompatableModule for Alice {
-    fn named(name: String) -> Self {
-        Self(ModuleCore::named(name))
     }
 }
 
@@ -61,7 +55,7 @@ impl Module for Bob {
             let (mut pkt, _) = msg.cast::<Packet>();
             pkt.inc_hop_count();
 
-            info!(target: self.name().unwrap(), "Received at {}: Message #{} content: {}", sim_time(), pkt.id(), pkt.content::<String>().deref());
+            info!(target: self.name(), "Received at {}: Message #{} content: {}", sim_time(), pkt.id(), pkt.content::<String>().deref());
 
             pkt.content::<String>().push('#');
 
@@ -70,11 +64,5 @@ impl Module for Bob {
                 ("netOut", 2),
             );
         }
-    }
-}
-
-impl NdlCompatableModule for Bob {
-    fn named(name: String) -> Self {
-        Self(ModuleCore::named(name))
     }
 }

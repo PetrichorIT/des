@@ -17,6 +17,7 @@ use quote::quote;
 use quote::ToTokens;
 use std::collections::HashMap;
 use std::sync::Mutex;
+use syn::DataStruct;
 use syn::{parse_macro_input, Data, DeriveInput, FieldsNamed, FieldsUnnamed, Type};
 
 lazy_static! {
@@ -80,45 +81,51 @@ pub fn derive_module(input: TokenStream) -> TokenStream {
 }
 
 fn gen_static_module_core(ident: Ident, data: Data) -> TokenStream {
-    let elem_ident = match data {
-        syn::Data::Struct(s) => match s.fields {
-            syn::Fields::Named(FieldsNamed { named, .. }) => named
-                .iter()
-                .find(|f| {
-                    if let Type::Path(ty) = &f.ty {
-                        ty.path.segments.last().unwrap().ident
-                            == Ident::new(
-                                "ModuleCore",
-                                ty.path.segments.last().unwrap().ident.span(),
-                            )
-                    } else {
-                        false
-                    }
-                })
-                .map(|field| (Some(field.ident.clone().unwrap()), 0)),
-            syn::Fields::Unnamed(FieldsUnnamed { unnamed, .. }) => unnamed
-                .iter()
-                .enumerate()
-                .find(|(_, f)| {
-                    if let Type::Path(ty) = &f.ty {
-                        ty.path.segments.last().unwrap().ident
-                            == Ident::new(
-                                "ModuleCore",
-                                ty.path.segments.last().unwrap().ident.span(),
-                            )
-                    } else {
-                        false
-                    }
-                })
-                .map(|(idx, _)| (None, idx)),
-            syn::Fields::Unit => None,
-        },
+    let token_stream: proc_macro2::TokenStream;
+
+    let elem_ident = match &data {
+        syn::Data::Struct(s) => {
+            token_stream = gen_named_object(ident.clone(), s);
+
+            match &s.fields {
+                syn::Fields::Named(FieldsNamed { named, .. }) => named
+                    .iter()
+                    .find(|f| {
+                        if let Type::Path(ty) = &f.ty {
+                            ty.path.segments.last().unwrap().ident
+                                == Ident::new(
+                                    "ModuleCore",
+                                    ty.path.segments.last().unwrap().ident.span(),
+                                )
+                        } else {
+                            false
+                        }
+                    })
+                    .map(|field| (Some(field.ident.clone().unwrap()), 0)),
+                syn::Fields::Unnamed(FieldsUnnamed { unnamed, .. }) => unnamed
+                    .iter()
+                    .enumerate()
+                    .find(|(_, f)| {
+                        if let Type::Path(ty) = &f.ty {
+                            ty.path.segments.last().unwrap().ident
+                                == Ident::new(
+                                    "ModuleCore",
+                                    ty.path.segments.last().unwrap().ident.span(),
+                                )
+                        } else {
+                            false
+                        }
+                    })
+                    .map(|(idx, _)| (None, idx)),
+                syn::Fields::Unit => None,
+            }
+        }
         _ => unimplemented!(),
     };
 
     if let Some((eident, idx)) = elem_ident {
         if let Some(eident) = eident {
-            quote! {
+            let mut ts = quote! {
                 impl ::des_core::StaticModuleCore for #ident {
                     fn module_core(&self) -> &::des_core::ModuleCore {
                         &self.#eident
@@ -137,11 +144,13 @@ fn gen_static_module_core(ident: Ident, data: Data) -> TokenStream {
                         self.module_core().id()
                     }
                 }
-            }
-            .into()
+            };
+
+            ts.extend(token_stream);
+            ts.into()
         } else {
             let idx = syn::Index::from(idx);
-            quote! {
+            let mut ts = quote! {
                 impl ::des_core::StaticModuleCore for #ident {
                     fn module_core(&self) -> &::des_core::ModuleCore {
                         &self.#idx
@@ -160,11 +169,46 @@ fn gen_static_module_core(ident: Ident, data: Data) -> TokenStream {
                         self.module_core().id()
                     }
                 }
-            }
-            .into()
+            };
+
+            ts.extend(token_stream);
+            ts.into()
         }
     } else {
         panic!("#[derive(Module)] -- No assosicated module core field found.")
+    }
+}
+
+fn gen_named_object(ident: Ident, data: &DataStruct) -> proc_macro2::TokenStream {
+    match &data.fields {
+        syn::Fields::Named(FieldsNamed { named, .. }) => {
+            if named.len() == 1 {
+                let field = named.first().unwrap().ident.clone().unwrap();
+                quote! {
+                    impl ::des_core::NameableModule for #ident {
+                        fn named(path: ::des_core::ModulePath) -> Self {
+                            Self { #field: ::des_core::ModuleCore::new_with(path) }
+                        }
+                    }
+                }
+            } else {
+                proc_macro2::TokenStream::new()
+            }
+        }
+        syn::Fields::Unnamed(FieldsUnnamed { unnamed, .. }) => {
+            if unnamed.len() == 1 {
+                quote! {
+                    impl ::des_core::NameableModule for #ident {
+                        fn named(path: ::des_core::ModulePath) -> Self {
+                            Self(::des_core::ModuleCore::new_with(path))
+                        }
+                    }
+                }
+            } else {
+                proc_macro2::TokenStream::new()
+            }
+        }
+        _ => proc_macro2::TokenStream::new(),
     }
 }
 
@@ -426,7 +470,7 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> TokenStream {
                     let ident = Ident::new(&format!("{}_child", descriptor), Span::call_site());
                     let ty = Ident::new(ty, Span::call_site());
                     token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                        let mut #ident: Box<#ty> = #ty::build_named(#descriptor, rt);
+                        let mut #ident: Box<#ty> = #ty::build_named(#descriptor.parse().unwrap(), rt);
                     })
                 }
 

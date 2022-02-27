@@ -26,12 +26,6 @@ impl Module for Alice {
     }
 }
 
-impl NdlCompatableModule for Alice {
-    fn named(name: String) -> Self {
-        Self(ModuleCore::named(name))
-    }
-}
-
 #[derive(Debug, Module)]
 #[ndl_workspace = "des_tests/ptrhell"]
 pub struct Bob(ModuleCore);
@@ -47,12 +41,6 @@ impl Module for Bob {
     }
 }
 
-impl NdlCompatableModule for Bob {
-    fn named(name: String) -> Self {
-        Self(ModuleCore::named(name))
-    }
-}
-
 #[derive(Debug, Module)]
 #[ndl_workspace = "des_tests/ptrhell"]
 pub struct Network(ModuleCore);
@@ -60,11 +48,5 @@ pub struct Network(ModuleCore);
 impl Module for Network {
     fn handle_message(&mut self, _: Message) {
         unimplemented!()
-    }
-}
-
-impl NdlCompatableModule for Network {
-    fn named(name: String) -> Self {
-        Self(ModuleCore::named(name))
     }
 }

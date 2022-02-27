@@ -8,6 +8,8 @@ mod events;
 pub use events::*;
 use lazy_static::__Deref;
 
+use super::common::Parameters;
+
 ///
 /// A runtime application for a module/network oriantated simulation.
 ///
@@ -32,12 +34,21 @@ pub struct NetworkRuntime<A> {
     gate_buffer: IdBuffer<Gate>,
 
     ///
+    /// The set of parameters for the module-driven simulation.
+    ///
+    parameters: Parameters,
+
+    ///
     /// A inner container for holding user defined global state.
     ///
     pub inner: A,
 }
 
 impl<A> NetworkRuntime<A> {
+    pub fn parameters(&self) -> &Parameters {
+        &self.parameters
+    }
+
     ///
     /// Creates a new instance by wrapping 'inner' into a empty NetworkRuntime<A>.
     ///
@@ -46,6 +57,7 @@ impl<A> NetworkRuntime<A> {
             module_buffer: IdBuffer::new(),
             channel_buffer: IdBuffer::new(),
             gate_buffer: IdBuffer::new(),
+            parameters: Parameters::empty(),
 
             inner,
         }

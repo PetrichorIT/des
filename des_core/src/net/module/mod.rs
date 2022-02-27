@@ -1,17 +1,15 @@
-//mod buffer;
-//pub use buffer::*;
+mod core;
+mod ndl;
 
 use crate::net::*;
 use crate::util::Indexable;
 use crate::*;
 use log::error;
 
-create_global_uid!(
-    /// A runtime-unqiue identifier for a module / submodule inheritence tree.
-    /// * This type is only available of DES is build with the `"net"` feature.*
-    #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-    pub ModuleId(u16) = MODULE_ID;
-);
+pub use self::core::*;
+pub use self::ndl::*;
+
+use super::common::Parameter;
 
 ///
 /// A set of user defined functions for customizing the
@@ -143,15 +141,29 @@ pub trait StaticModuleCore: Indexable<Id = ModuleId> {
     ///
     /// Returns a human readable representation of the modules identity.
     ///
-    fn str(&self) -> String {
+    fn str(&self) -> &str {
         self.module_core().identifier()
     }
 
     ///
     /// Returns the name of the module instance.
     ///
-    fn name(&self) -> Option<&String> {
-        self.module_core().name.as_ref()
+    fn path(&self) -> &ModulePath {
+        &self.module_core().path
+    }
+
+    ///
+    /// Returns the name of the module instance.
+    ///
+    fn name(&self) -> &str {
+        self.module_core().path.module_name()
+    }
+
+    fn par(&self, key: &str) -> Option<&Parameter> {
+        self.module_core()
+            .parameters
+            .iter()
+            .find(|p| p.key() == key)
     }
 
     ///
@@ -388,167 +400,5 @@ pub trait StaticModuleCore: Indexable<Id = ModuleId> {
         let ptr: *mut T = &mut (**module);
         let ptr = ptr as *mut u8;
         self.module_core_mut().parent_ptr = Some(ptr);
-    }
-}
-
-///
-/// A trait that prepares a module to be created from a NDL
-/// file.
-///
-/// * This type is only available of DES is build with the `"net"` feature.*
-#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-pub trait NdlCompatableModule: StaticModuleCore {
-    ///
-    /// Creates a named instance of self without needing any additional parameters.
-    ///
-    fn named(name: String) -> Self;
-
-    ///
-    /// Creates a named instance of self based on the parent hierachical structure.
-    ///
-    #[allow(clippy::borrowed_box)]
-    fn named_with_parent<T: NdlCompatableModule>(name: &str, parent: &Box<T>) -> Self
-    where
-        Self: Sized,
-    {
-        // Clippy is just confused .. non box-borrow would throw E0277
-
-        Self::named(format!(
-            "{}.{}",
-            parent.name().expect("Named entities should have names"),
-            name
-        ))
-    }
-}
-
-///
-/// A macro-implemented trait that constructs a instance of Self using a NDl
-/// description.
-///
-/// * This type is only available of DES is build with the `"net"` feature.
-#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-pub trait NdlBuildableModule {
-    ///
-    /// Builds the given module according to the NDL specification
-    /// if any is provided, else doesn't change a thing.
-    ///
-    fn build<A>(self: Box<Self>, _rt: &mut NetworkRuntime<A>) -> Box<Self>
-    where
-        Self: Sized,
-    {
-        self
-    }
-
-    fn build_named<A>(name: &str, rt: &mut NetworkRuntime<A>) -> Box<Self>
-    where
-        Self: NdlCompatableModule + Sized,
-    {
-        let obj = Box::new(Self::named(name.to_string()));
-        Self::build(obj, rt)
-    }
-
-    fn build_named_with_parent<A, T>(
-        name: &str,
-        parent: &mut Box<T>,
-        rt: &mut NetworkRuntime<A>,
-    ) -> Box<Self>
-    where
-        T: NdlCompatableModule,
-        Self: NdlCompatableModule + Sized,
-    {
-        let mut obj = Box::new(Self::named_with_parent(name, parent));
-        obj.set_parent(parent);
-        Self::build(obj, rt)
-    }
-}
-
-///
-/// The usecase independent core of a module.
-///
-/// * This type is only available of DES is build with the `"net"` feature.*
-#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-#[derive(Debug, Clone)]
-pub struct ModuleCore {
-    id: ModuleId,
-
-    /// A human readable identifier for the module.
-    pub name: Option<String>,
-
-    /// A collection of all gates register to the current module
-    pub gates: Vec<GateRef>,
-
-    /// A buffer of messages to be send out, after the current handle messsage terminates.
-    pub out_buffer: Vec<(Message, GateId)>,
-
-    /// A buffer of wakeup calls to be enqueued, after the current handle message terminates.
-    pub loopback_buffer: Vec<(Message, SimTime)>,
-
-    /// The period of the activity coroutine (if zero than there is no coroutine).
-    pub activity_period: SimTime,
-
-    /// An indicator whether a valid activity timeout is existent.
-    pub activity_active: bool,
-
-    /// The module identificator for the parent module.
-    pub parent_ptr: Option<*mut u8>,
-}
-
-impl ModuleCore {
-    /// A runtime specific but unqiue identifier for a given module.
-    #[inline(always)]
-    pub fn id(&self) -> ModuleId {
-        self.id
-    }
-
-    /// A human readable identifer for a given module.
-    pub fn identifier(&self) -> String {
-        format!(
-            "#{} {}",
-            self.id,
-            if self.name.is_some() {
-                format!("({})", self.name.as_ref().unwrap())
-            } else {
-                "".into()
-            }
-        )
-    }
-
-    ///
-    /// Creates a new optionally named instance
-    /// of 'Self'.
-    ///
-    pub fn new_with(name: Option<String>) -> Self {
-        Self {
-            id: ModuleId::gen(),
-            gates: Vec::new(),
-            out_buffer: Vec::new(),
-            loopback_buffer: Vec::new(),
-            activity_period: SimTime::ZERO,
-            activity_active: false,
-            parent_ptr: None,
-            name,
-        }
-    }
-
-    ///
-    /// Creates a named instance of 'Self'.
-    ///
-    #[inline(always)]
-    pub fn named(name: String) -> Self {
-        Self::new_with(Some(name))
-    }
-
-    ///
-    /// Creates  a not-named instance of 'Self'.
-    ///
-    #[inline(always)]
-    pub fn new() -> Self {
-        Self::new_with(None)
-    }
-}
-
-impl Default for ModuleCore {
-    fn default() -> Self {
-        Self::new()
     }
 }

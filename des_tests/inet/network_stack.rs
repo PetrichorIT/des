@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use des_core::StaticModuleCore;
 use des_core::{rng, GateId, Indexable, Message, Module, ModuleCore, NodeAddress, Packet, SimTime};
+use des_core::{ModulePath, StaticModuleCore};
 use des_macros::Module;
 use log::info;
 
@@ -20,7 +20,7 @@ pub struct NetworkStack {
 impl NetworkStack {
     pub fn new(address: NodeAddress, mut router: RandomRoutingDeamon) -> Box<Self> {
         let mut obj = Box::new(Self {
-            core: ModuleCore::new_with(Some(String::from("NetworkStack"))),
+            core: ModuleCore::new_with(ModulePath::isolated("NetworkStack")),
             address,
             forwarding_table: HashMap::new(),
             routing_deamon: None,

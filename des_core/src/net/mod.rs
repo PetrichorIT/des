@@ -58,8 +58,8 @@ pub use self::packet::NODE_ADDR_LOOPBACK;
 pub use self::module::Module;
 pub use self::module::ModuleCore;
 pub use self::module::ModuleId;
+pub use self::module::NameableModule;
 pub use self::module::NdlBuildableModule;
-pub use self::module::NdlCompatableModule;
 pub use self::module::StaticModuleCore;
 
-pub(crate) use self::common::*;
+pub use self::common::ModulePath;
