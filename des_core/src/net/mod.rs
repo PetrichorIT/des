@@ -1,4 +1,5 @@
 mod channel;
+mod common;
 mod gate;
 mod message;
 mod module;
@@ -60,3 +61,5 @@ pub use self::module::ModuleId;
 pub use self::module::NdlBuildableModule;
 pub use self::module::NdlCompatableModule;
 pub use self::module::StaticModuleCore;
+
+pub(crate) use self::common::*;
