@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::core::*;
 use crate::net::*;
 use crate::util::IdBuffer;
@@ -36,7 +38,7 @@ pub struct NetworkRuntime<A> {
     ///
     /// The set of parameters for the module-driven simulation.
     ///
-    parameters: Parameters,
+    parameters: Rc<Parameters>,
 
     ///
     /// A inner container for holding user defined global state.
@@ -45,8 +47,8 @@ pub struct NetworkRuntime<A> {
 }
 
 impl<A> NetworkRuntime<A> {
-    pub fn parameters(&self) -> &Parameters {
-        &self.parameters
+    pub fn parameters(&self) -> Rc<Parameters> {
+        self.parameters.clone()
     }
 
     ///
@@ -57,7 +59,7 @@ impl<A> NetworkRuntime<A> {
             module_buffer: IdBuffer::new(),
             channel_buffer: IdBuffer::new(),
             gate_buffer: IdBuffer::new(),
-            parameters: Parameters::empty(),
+            parameters: Rc::new(Parameters::new()),
 
             inner,
         }

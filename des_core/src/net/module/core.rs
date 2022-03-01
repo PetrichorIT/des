@@ -1,4 +1,6 @@
-use crate::{net::common::Parameter, *};
+use std::rc::Rc;
+
+use crate::{net::common::Parameters, *};
 
 create_global_uid!(
     /// A runtime-unqiue identifier for a module / submodule inheritence tree.
@@ -38,7 +40,7 @@ pub struct ModuleCore {
     pub parent_ptr: Option<*mut u8>,
 
     /// A set of local parameters
-    pub parameters: Vec<Parameter>,
+    pub parameters: Rc<Parameters>,
 }
 
 impl ModuleCore {
@@ -57,7 +59,7 @@ impl ModuleCore {
     /// Creates a new optionally named instance
     /// of 'Self'.
     ///
-    pub fn new_with(path: ModulePath) -> Self {
+    pub fn new_with(path: ModulePath, parameters: Rc<Parameters>) -> Self {
         Self {
             id: ModuleId::gen(),
             gates: Vec::new(),
@@ -67,7 +69,7 @@ impl ModuleCore {
             activity_active: false,
             parent_ptr: None,
             path,
-            parameters: Vec::new(),
+            parameters,
         }
     }
 
@@ -76,7 +78,10 @@ impl ModuleCore {
     ///
     #[inline(always)]
     pub fn new() -> Self {
-        Self::new_with(ModulePath::root(String::from("unknown-module")))
+        Self::new_with(
+            ModulePath::root(String::from("unknown-module")),
+            Rc::new(Parameters::new()),
+        )
     }
 }
 

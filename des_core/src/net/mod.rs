@@ -63,3 +63,4 @@ pub use self::module::NdlBuildableModule;
 pub use self::module::StaticModuleCore;
 
 pub use self::common::ModulePath;
+pub use self::common::Parameters;

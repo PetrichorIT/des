@@ -18,7 +18,7 @@ pub(crate) mod metrics;
 pub(crate) mod util;
 
 #[cfg(feature = "net")]
-pub(crate) mod net;
+mod net;
 
 //
 // # Generic core exports

@@ -1,6 +1,8 @@
 mod core;
 mod ndl;
 
+use std::collections::HashMap;
+
 use crate::net::*;
 use crate::util::Indexable;
 use crate::*;
@@ -8,8 +10,6 @@ use log::error;
 
 pub use self::core::*;
 pub use self::ndl::*;
-
-use super::common::Parameter;
 
 ///
 /// A set of user defined functions for customizing the
@@ -159,11 +159,10 @@ pub trait StaticModuleCore: Indexable<Id = ModuleId> {
         self.module_core().path.module_name()
     }
 
-    fn par(&self, key: &str) -> Option<&Parameter> {
+    fn pars(&self) -> HashMap<String, String> {
         self.module_core()
             .parameters
-            .iter()
-            .find(|p| p.key() == key)
+            .get(self.module_core().path.module_path())
     }
 
     ///

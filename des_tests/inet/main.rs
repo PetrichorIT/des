@@ -24,8 +24,9 @@ fn main() {
     //
     // ALICE
     //
-    let mut node_alice = Box::new(NetworkNode::named("Alice"));
-    let mut stack_alice = NetworkStack::new(0x00_00_00_ff, RandomRoutingDeamon::new());
+    let mut node_alice = Box::new(NetworkNode::named("Alice", app.parameters()));
+    let mut stack_alice =
+        NetworkStack::new(0x00_00_00_ff, RandomRoutingDeamon::new(app.parameters()));
     stack_alice.set_parent(&mut node_alice);
 
     let internal_out = node_alice.create_gate("fromStack", &mut app);
@@ -39,8 +40,9 @@ fn main() {
     //
     // BOB
     //
-    let mut node_bob = Box::new(NetworkNode::named("Bob"));
-    let mut stack_bob = NetworkStack::new(0x00_00_00_ee, RandomRoutingDeamon::new());
+    let mut node_bob = Box::new(NetworkNode::named("Bob", app.parameters()));
+    let mut stack_bob =
+        NetworkStack::new(0x00_00_00_ee, RandomRoutingDeamon::new(app.parameters()));
 
     stack_bob.set_parent(&mut node_bob);
 
@@ -56,8 +58,9 @@ fn main() {
     // EVE
     //
 
-    let mut node_eve = Box::new(NetworkNode::named("Eve"));
-    let mut stack_eve = NetworkStack::new(0x00_00_00_dd, RandomRoutingDeamon::new());
+    let mut node_eve = Box::new(NetworkNode::named("Eve", app.parameters()));
+    let mut stack_eve =
+        NetworkStack::new(0x00_00_00_dd, RandomRoutingDeamon::new(app.parameters()));
 
     stack_eve.set_parent(&mut node_eve);
 

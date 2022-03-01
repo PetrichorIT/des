@@ -6,7 +6,7 @@ version = "0.1.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [[bin]]
-name = "net"
+name = "inet"
 path = "inet/main.rs"
 
 [[bin]]
@@ -28,6 +28,10 @@ path = "utils/main.rs"
 [[bin]]
 name = "ptrhell"
 path = "ptrhell/main.rs"
+
+[[bin]]
+name = "par"
+path = "par/main.rs"
 
 [dependencies]
 des_core = {path = "../des_core", features = ["net", "net-static"]}

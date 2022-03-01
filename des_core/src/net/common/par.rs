@@ -1,75 +1,127 @@
-use std::str::FromStr;
+use std::collections::HashMap;
 
-use crate::ModulePath;
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Parameter {
-    path_and_name: String,
-    name_start: usize,
-    value: String,
-}
-
-impl Parameter {
-    pub fn path(&self) -> &str {
-        if self.name_start == 0 {
-            &self.path_and_name[..0]
-        } else {
-            &self.path_and_name[..self.name_start - 1]
-        }
-    }
-
-    pub fn key(&self) -> &str {
-        &self.path_and_name[self.name_start..]
-    }
-
-    pub fn new(key: &str, value: &str) -> Self {
-        match key.chars().rev().enumerate().find(|(_, c)| *c == '.') {
-            Some((idx, _)) => Self {
-                path_and_name: key.to_string(),
-                name_start: idx + 1,
-                value: value.to_string(),
-            },
-            None => Self {
-                path_and_name: key.to_string(),
-                name_start: 0,
-                value: value.to_string(),
-            },
-        }
-    }
-
-    pub fn parse<F: FromStr>(&self) -> Result<F, <F as FromStr>::Err> {
-        self.value.parse()
-    }
-}
-
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Parameters {
-    pars: Vec<Parameter>,
+    tree: ParameterTree,
 }
 
 impl Parameters {
-    pub fn empty() -> Self {
-        Self { pars: Vec::new() }
+    pub fn new() -> Self {
+        Self {
+            tree: ParameterTree::Node {
+                branches: Vec::new(),
+            },
+        }
     }
 
-    pub fn add(&mut self, string: String) {
-        for line in string.lines() {
-            let splits: Vec<&str> = line.split("=").collect();
-            if splits.len() == 2 {
-                self.pars.push(Parameter::new(splits[0], splits[1]))
+    pub fn build(&mut self, raw_text: &str) {
+        for line in raw_text.lines() {
+            if let Some((key, value)) = line.split_once("=") {
+                self.insert(key.trim(), value.trim());
             }
         }
     }
 
-    pub fn for_module(&self, module: &ModulePath) -> Vec<Parameter> {
-        self.pars
-            .iter()
-            .filter(|p| p.path() == module.module_path())
-            .cloned()
-            .collect()
+    pub fn insert(&mut self, key: &str, value: &str) {
+        self.tree.insert(key, value)
     }
 
-    pub fn get(&self, module_path: &ModulePath, name: &str) -> Option<&Parameter> {
-        let search_term = format!("{}.{}", module_path, name);
-        self.pars.iter().find(|p| p.path_and_name == search_term)
+    pub fn get(&self, key: &str) -> HashMap<String, String> {
+        let mut map = HashMap::new();
+        self.tree.get(key, &mut map);
+        map
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ParameterTreeBranch {
+    Path(String, ParameterTree),
+    Asterix(ParameterTree),
+}
+
+impl ParameterTreeBranch {
+    fn matches(&self, key: &str) -> bool {
+        match self {
+            Self::Path(path, ..) => path == key,
+            Self::Asterix(..) => key == "*",
+        }
+    }
+
+    fn tree_mut(&mut self) -> &mut ParameterTree {
+        match self {
+            Self::Path(_, tree) => tree,
+            Self::Asterix(tree) => tree,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ParameterTree {
+    Node { branches: Vec<ParameterTreeBranch> },
+    Leaf { pars: HashMap<String, String> },
+}
+
+impl ParameterTree {
+    fn insert(&mut self, key: &str, value: &str) {
+        match self {
+            Self::Node { branches } => {
+                // Search or create matching branch
+                match key.split_once(".") {
+                    Some((ele, rem)) => match branches.iter_mut().find(|b| b.matches(ele)) {
+                        Some(branch) => branch.tree_mut().insert(rem, value),
+                        None => {
+                            let mut node = ParameterTree::Node {
+                                branches: Vec::new(),
+                            };
+                            node.insert(rem, value);
+                            if ele == "*" {
+                                branches.push(ParameterTreeBranch::Asterix(node))
+                            } else {
+                                branches.push(ParameterTreeBranch::Path(ele.to_string(), node))
+                            }
+                        }
+                    },
+                    None => {
+                        // ASsumming this is a end point, and a recently created node
+                        assert!(branches.is_empty());
+
+                        let mut map = HashMap::new();
+                        map.insert(key.to_string(), value.to_string());
+
+                        *self = ParameterTree::Leaf { pars: map }
+                    }
+                }
+            }
+            Self::Leaf { pars } => {
+                // Assume that key is now only the identifier for the parameter name
+                assert!(!key.contains('.'));
+                pars.insert(key.to_string(), value.to_string());
+            }
+        }
+    }
+
+    fn get(&self, key: &str, map: &mut HashMap<String, String>) {
+        match self {
+            Self::Node { branches } => {
+                let (ele, rem) = key.split_once(".").unwrap_or((key, ""));
+                for branch in branches {
+                    match branch {
+                        ParameterTreeBranch::Asterix(subtree) => subtree.get(rem, map),
+                        ParameterTreeBranch::Path(path, subtree) => {
+                            if path == ele {
+                                subtree.get(rem, map)
+                            }
+                        }
+                    }
+                }
+            }
+            Self::Leaf { pars } => {
+                if key == "" {
+                    pars.iter().for_each(|(key, value)| {
+                        let _ = map.insert(key.to_string(), value.to_string());
+                    })
+                }
+            }
+        }
     }
 }

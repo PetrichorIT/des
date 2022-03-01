@@ -1,6 +1,7 @@
 use std::collections::HashMap;
+use std::rc::Rc;
 
-use des_core::{GateId, Module, ModuleCore, NodeAddress, Packet};
+use des_core::{GateId, Module, ModuleCore, NodeAddress, Packet, Parameters};
 use des_core::{ModulePath, StaticModuleCore};
 use des_macros::Module;
 use log::info;
@@ -13,9 +14,9 @@ pub struct RandomRoutingDeamon {
 }
 
 impl RandomRoutingDeamon {
-    pub fn new() -> Self {
+    pub fn new(parameters: Rc<Parameters>) -> Self {
         Self {
-            core: ModuleCore::new_with(ModulePath::isolated("RoutingDaemon")),
+            core: ModuleCore::new_with(ModulePath::isolated("RoutingDaemon"), parameters),
             hop_counts: HashMap::new(),
         }
     }

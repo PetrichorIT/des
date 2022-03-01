@@ -20,7 +20,10 @@ pub struct NetworkStack {
 impl NetworkStack {
     pub fn new(address: NodeAddress, mut router: RandomRoutingDeamon) -> Box<Self> {
         let mut obj = Box::new(Self {
-            core: ModuleCore::new_with(ModulePath::isolated("NetworkStack")),
+            core: ModuleCore::new_with(
+                ModulePath::isolated("NetworkStack"),
+                router.module_core().parameters.clone(),
+            ),
             address,
             forwarding_table: HashMap::new(),
             routing_deamon: None,

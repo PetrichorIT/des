@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::*;
 
 ///
@@ -10,7 +12,7 @@ pub trait NameableModule: StaticModuleCore {
     ///
     /// Creates a named instance of self without needing any additional parameters.
     ///
-    fn named(path: ModulePath) -> Self;
+    fn named(path: ModulePath, parameters: Rc<Parameters>) -> Self;
 
     ///
     /// Creates a named instance of self based on the parent hierachical structure.
@@ -22,7 +24,10 @@ pub trait NameableModule: StaticModuleCore {
     {
         // Clippy is just confused .. non box-borrow would throw E0277
 
-        Self::named(ModulePath::new_with_parent(name, parent.path()))
+        Self::named(
+            ModulePath::new_with_parent(name, parent.path()),
+            parent.module_core().parameters.clone(),
+        )
     }
 }
 
@@ -48,8 +53,8 @@ pub trait NdlBuildableModule: StaticModuleCore {
     where
         Self: NameableModule + Sized,
     {
-        let obj = Box::new(Self::named(path));
-        Self::build(obj, rt).assign_parameters(rt)
+        let obj = Box::new(Self::named(path, rt.parameters()));
+        Self::build(obj, rt)
     }
 
     fn build_named_with_parent<A, T>(
@@ -63,13 +68,6 @@ pub trait NdlBuildableModule: StaticModuleCore {
     {
         let mut obj = Box::new(Self::named_with_parent(name, parent));
         obj.set_parent(parent);
-        Self::build(obj, rt).assign_parameters(rt)
-    }
-
-    fn assign_parameters<A>(mut self: Box<Self>, rt: &mut NetworkRuntime<A>) -> Box<Self> {
-        let pars = rt.parameters().for_module(&self.module_core().path);
-        self.module_core_mut().parameters.extend(pars);
-
-        self
+        Self::build(obj, rt)
     }
 }
