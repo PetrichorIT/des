@@ -1,6 +1,4 @@
-use std::rc::Rc;
-
-use crate::*;
+use crate::{util::spmc::SpmcReader, *};
 
 ///
 /// A trait that prepares a module to be created from a NDL
@@ -12,7 +10,7 @@ pub trait NameableModule: StaticModuleCore {
     ///
     /// Creates a named instance of self without needing any additional parameters.
     ///
-    fn named(path: ModulePath, parameters: Rc<Parameters>) -> Self;
+    fn named(path: ModulePath, parameters: SpmcReader<Parameters>) -> Self;
 
     ///
     /// Creates a named instance of self based on the parent hierachical structure.

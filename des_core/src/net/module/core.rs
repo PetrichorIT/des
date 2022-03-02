@@ -1,6 +1,8 @@
-use std::rc::Rc;
-
-use crate::{net::common::Parameters, *};
+use crate::{
+    net::common::Parameters,
+    util::spmc::{SpmcReader, SpmcWriter},
+    *,
+};
 
 create_global_uid!(
     /// A runtime-unqiue identifier for a module / submodule inheritence tree.
@@ -40,7 +42,7 @@ pub struct ModuleCore {
     pub parent_ptr: Option<*mut u8>,
 
     /// A set of local parameters
-    pub parameters: Rc<Parameters>,
+    pub parameters: SpmcReader<Parameters>,
 }
 
 impl ModuleCore {
@@ -59,7 +61,7 @@ impl ModuleCore {
     /// Creates a new optionally named instance
     /// of 'Self'.
     ///
-    pub fn new_with(path: ModulePath, parameters: Rc<Parameters>) -> Self {
+    pub fn new_with(path: ModulePath, parameters: SpmcReader<Parameters>) -> Self {
         Self {
             id: ModuleId::gen(),
             gates: Vec::new(),
@@ -80,7 +82,7 @@ impl ModuleCore {
     pub fn new() -> Self {
         Self::new_with(
             ModulePath::root(String::from("unknown-module")),
-            Rc::new(Parameters::new()),
+            SpmcWriter::new(Parameters::new()).get_reader(),
         )
     }
 }

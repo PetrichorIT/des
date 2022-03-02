@@ -42,3 +42,5 @@ pub use crate::net::*;
 
 #[cfg(feature = "net")]
 pub use util::Indexable;
+
+pub use util::spmc::*;

@@ -1,6 +1,4 @@
-use std::rc::Rc;
-
-use des_core::{Module, ModuleCore};
+use des_core::{Module, ModuleCore, SpmcReader};
 use des_core::{Parameters, StaticModuleCore};
 use log::warn;
 
@@ -13,13 +11,13 @@ pub struct NetworkNode {
 
 impl NetworkNode {
     #[allow(unused)]
-    pub fn new(parameters: Rc<Parameters>) -> Self {
+    pub fn new(parameters: SpmcReader<Parameters>) -> Self {
         Self {
             core: ModuleCore::new_with("NetworkNode".parse().unwrap(), parameters),
         }
     }
 
-    pub fn named(name: &str, parameters: Rc<Parameters>) -> Self {
+    pub fn named(name: &str, parameters: SpmcReader<Parameters>) -> Self {
         Self {
             core: ModuleCore::new_with(
                 format!("NetworkNode - {}", name).parse().unwrap(),

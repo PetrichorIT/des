@@ -1,10 +1,6 @@
-use std::rc::Rc;
-
 use crate::core::*;
 use crate::net::*;
-use crate::util::IdBuffer;
-use crate::util::IdBufferRef;
-use crate::util::Indexable;
+use crate::util::*;
 
 mod events;
 pub use events::*;
@@ -38,7 +34,7 @@ pub struct NetworkRuntime<A> {
     ///
     /// The set of parameters for the module-driven simulation.
     ///
-    parameters: Rc<Parameters>,
+    parameters: spmc::SpmcWriter<Parameters>,
 
     ///
     /// A inner container for holding user defined global state.
@@ -47,8 +43,8 @@ pub struct NetworkRuntime<A> {
 }
 
 impl<A> NetworkRuntime<A> {
-    pub fn parameters(&self) -> Rc<Parameters> {
-        self.parameters.clone()
+    pub fn parameters(&self) -> spmc::SpmcReader<Parameters> {
+        self.parameters.get_reader()
     }
 
     ///
@@ -59,7 +55,7 @@ impl<A> NetworkRuntime<A> {
             module_buffer: IdBuffer::new(),
             channel_buffer: IdBuffer::new(),
             gate_buffer: IdBuffer::new(),
-            parameters: Rc::new(Parameters::new()),
+            parameters: spmc::SpmcWriter::new(Parameters::new()),
 
             inner,
         }

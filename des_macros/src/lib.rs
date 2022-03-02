@@ -186,7 +186,7 @@ fn gen_named_object(ident: Ident, data: &DataStruct) -> proc_macro2::TokenStream
                 let field = named.first().unwrap().ident.clone().unwrap();
                 quote! {
                     impl ::des_core::NameableModule for #ident {
-                        fn named(path: ::des_core::ModulePath, parameters: std::rc::Rc<::des_core::Parameters>) -> Self {
+                        fn named(path: ::des_core::ModulePath, parameters: ::des_core::SpmcReader<::des_core::Parameters>) -> Self {
                             Self { #field: ::des_core::ModuleCore::new_with(path, parameters) }
                         }
                     }
@@ -199,7 +199,7 @@ fn gen_named_object(ident: Ident, data: &DataStruct) -> proc_macro2::TokenStream
             if unnamed.len() == 1 {
                 quote! {
                     impl ::des_core::NameableModule for #ident {
-                        fn named(path: ::des_core::ModulePath, parameters: std::rc::Rc<::des_core::Parameters>) -> Self {
+                        fn named(path: ::des_core::ModulePath, parameters: ::des_core::SpmcReader<::des_core::Parameters>) -> Self {
                             Self(::des_core::ModuleCore::new_with(path, parameters))
                         }
                     }
