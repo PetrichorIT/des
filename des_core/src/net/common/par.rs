@@ -8,9 +8,7 @@ pub struct Parameters {
 impl Parameters {
     pub fn new() -> Self {
         Self {
-            tree: ParameterTree::Node {
-                branches: Vec::new(),
-            },
+            tree: ParameterTree::new(),
         }
     }
 
@@ -56,70 +54,55 @@ impl ParameterTreeBranch {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum ParameterTree {
-    Node { branches: Vec<ParameterTreeBranch> },
-    Leaf { pars: HashMap<String, String> },
+struct ParameterTree {
+    branches: Vec<ParameterTreeBranch>,
+    pars: HashMap<String, String>,
 }
 
 impl ParameterTree {
+    fn new() -> Self {
+        Self {
+            branches: Vec::new(),
+            pars: HashMap::new(),
+        }
+    }
+
     fn insert(&mut self, key: &str, value: &str) {
-        match self {
-            Self::Node { branches } => {
-                // Search or create matching branch
-                match key.split_once(".") {
-                    Some((ele, rem)) => match branches.iter_mut().find(|b| b.matches(ele)) {
-                        Some(branch) => branch.tree_mut().insert(rem, value),
-                        None => {
-                            let mut node = ParameterTree::Node {
-                                branches: Vec::new(),
-                            };
-                            node.insert(rem, value);
-                            if ele == "*" {
-                                branches.push(ParameterTreeBranch::Asterix(node))
-                            } else {
-                                branches.push(ParameterTreeBranch::Path(ele.to_string(), node))
-                            }
-                        }
-                    },
-                    None => {
-                        // ASsumming this is a end point, and a recently created node
-                        assert!(branches.is_empty());
-
-                        let mut map = HashMap::new();
-                        map.insert(key.to_string(), value.to_string());
-
-                        *self = ParameterTree::Leaf { pars: map }
+        match key.split_once(".") {
+            Some((ele, rem)) => match self.branches.iter_mut().find(|b| b.matches(ele)) {
+                Some(branch) => branch.tree_mut().insert(rem, value),
+                None => {
+                    let mut node = ParameterTree::new();
+                    node.insert(rem, value);
+                    if ele == "*" {
+                        self.branches.push(ParameterTreeBranch::Asterix(node))
+                    } else {
+                        self.branches
+                            .push(ParameterTreeBranch::Path(ele.to_string(), node))
                     }
                 }
-            }
-            Self::Leaf { pars } => {
-                // Assume that key is now only the identifier for the parameter name
-                assert!(!key.contains('.'));
-                pars.insert(key.to_string(), value.to_string());
+            },
+            None => {
+                self.pars.insert(key.to_string(), value.to_string());
             }
         }
     }
 
     fn get(&self, key: &str, map: &mut HashMap<String, String>) {
-        match self {
-            Self::Node { branches } => {
-                let (ele, rem) = key.split_once(".").unwrap_or((key, ""));
-                for branch in branches {
-                    match branch {
-                        ParameterTreeBranch::Asterix(subtree) => subtree.get(rem, map),
-                        ParameterTreeBranch::Path(path, subtree) => {
-                            if path == ele {
-                                subtree.get(rem, map)
-                            }
-                        }
+        if key == "" {
+            self.pars.iter().for_each(|(key, value)| {
+                let _ = map.insert(key.to_string(), value.to_string());
+            })
+        }
+        let (ele, rem) = key.split_once(".").unwrap_or((key, ""));
+
+        for branch in &self.branches {
+            match branch {
+                ParameterTreeBranch::Asterix(subtree) => subtree.get(rem, map),
+                ParameterTreeBranch::Path(path, subtree) => {
+                    if path == ele {
+                        subtree.get(rem, map)
                     }
-                }
-            }
-            Self::Leaf { pars } => {
-                if key == "" {
-                    pars.iter().for_each(|(key, value)| {
-                        let _ = map.insert(key.to_string(), value.to_string());
-                    })
                 }
             }
         }

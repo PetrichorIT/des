@@ -5,6 +5,7 @@ use crate::util::*;
 mod events;
 pub use events::*;
 use lazy_static::__Deref;
+use log::error;
 
 use super::common::Parameters;
 
@@ -58,6 +59,16 @@ impl<A> NetworkRuntime<A> {
             parameters: spmc::SpmcWriter::new(Parameters::new()),
 
             inner,
+        }
+    }
+
+    ///
+    /// Tries to include a parameter file.
+    ///
+    pub fn include_par_file(&mut self, file: &str) {
+        match std::fs::read_to_string(file) {
+            Ok(string) => self.parameters.build(&string),
+            Err(e) => error!(target: "ParLoader", "{}", e),
         }
     }
 

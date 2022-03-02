@@ -1,0 +1,5 @@
+bob1.char = #
+bob2.char = *
+
+bob1.child.limit = 10
+bob2.child.limit = 2

@@ -25,6 +25,8 @@ pub struct NdlResolver {
     pub root_dir: PathBuf,
     /// The raw scopes of the included files.
     pub scopes: Vec<PathBuf>,
+    /// The list of par files.
+    pub par_files: Vec<PathBuf>,
     /// A list of all loaded assets in the current workspace.
     pub source_map: SourceMap,
     /// A list of all lexed/parsed assets in the current workspace.
@@ -67,6 +69,7 @@ impl NdlResolver {
             source_map: SourceMap::new(),
             root_dir,
             scopes: Vec::new(),
+            par_files: Vec::new(),
             units: HashMap::new(),
             desugared_units: HashMap::new(),
 
@@ -81,7 +84,7 @@ impl NdlResolver {
     /// TOOD codegen
     ///
     pub fn run(&mut self) -> Result<(), &'static str> {
-        self.scopes = self.get_ndl_scopes();
+        self.get_ndl_scopes();
 
         for scope in &self.scopes {
             // === Namespacing ===
@@ -167,21 +170,28 @@ impl NdlResolver {
         Ok(())
     }
 
-    pub fn run_cached(&mut self) -> Result<(GlobalTySpecContext<'_>, bool), &'static str> {
+    pub fn run_cached(
+        &mut self,
+    ) -> Result<(GlobalTySpecContext<'_>, bool, Vec<PathBuf>), &'static str> {
         if self.state != NdlResolverState::Done {
             self.run()?;
         }
 
-        Ok((self.gtyctx_spec(), self.ectx.has_errors()))
+        Ok((
+            self.gtyctx_spec(),
+            self.ectx.has_errors(),
+            self.par_files.clone(),
+        ))
     }
 
     ///
     /// Extracts all *.ndl files from the working directory (recursivly).
+    /// and all *par files.
     ///
-    fn get_ndl_scopes(&self) -> Vec<PathBuf> {
+    fn get_ndl_scopes(&mut self) {
         const TREE_SEARCH_MAX_ITR: usize = 100;
 
-        fn recusive(path: PathBuf, itr: &mut usize, results: &mut Vec<PathBuf>) {
+        fn recursive(path: PathBuf, itr: &mut usize, resolver: &mut NdlResolver) {
             *itr += 1;
 
             if *itr >= TREE_SEARCH_MAX_ITR {
@@ -191,21 +201,24 @@ impl NdlResolver {
             if path.is_file() {
                 if let Some(ext) = path.extension() {
                     if ext == "ndl" {
-                        results.push(path)
+                        resolver.scopes.push(path)
+                    } else if ext == "par" {
+                        resolver.par_files.push(path)
                     }
                 }
             } else if path.is_dir() {
                 if let Ok(dir) = path.read_dir() {
                     for entry in dir.flatten() {
-                        recusive(entry.path(), itr, results)
+                        recursive(entry.path(), itr, resolver)
                     }
                 }
             }
         }
 
-        let mut results = Vec::new();
-        recusive(self.root_dir.clone(), &mut 0, &mut results);
-        results
+        self.scopes = Vec::new();
+        self.par_files = Vec::new();
+
+        recursive(self.root_dir.clone(), &mut 0, self);
     }
 }
 

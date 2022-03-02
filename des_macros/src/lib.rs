@@ -16,6 +16,7 @@ use proc_macro2::Span;
 use quote::quote;
 use quote::ToTokens;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Mutex;
 use syn::DataStruct;
 use syn::{parse_macro_input, Data, DeriveInput, FieldsNamed, FieldsUnnamed, Type};
@@ -24,7 +25,7 @@ lazy_static! {
     static ref RESOLVERS: Mutex<HashMap<String, NdlResolver>> = Mutex::new(HashMap::new());
 }
 
-fn get_resolver(workspace: &str) -> Result<(OwnedTySpecContext, bool), &'static str> {
+fn get_resolver(workspace: &str) -> Result<(OwnedTySpecContext, bool, Vec<PathBuf>), &'static str> {
     let mut resolvers = RESOLVERS.lock().unwrap();
 
     if !resolvers.contains_key(workspace) {
@@ -37,7 +38,7 @@ fn get_resolver(workspace: &str) -> Result<(OwnedTySpecContext, bool), &'static 
         .get_mut(workspace)
         .unwrap()
         .run_cached()
-        .map(|(gtyctx, has_err)| (gtyctx.to_owned(), has_err))
+        .map(|(gtyctx, has_err, pars)| (gtyctx.to_owned(), has_err, pars))
 }
 
 ///
@@ -215,7 +216,7 @@ fn gen_named_object(ident: Ident, data: &DataStruct) -> proc_macro2::TokenStream
 fn gen_dynamic_module_core(ident: Ident, attrs: Attributes) -> TokenStream {
     if let Some(workspace) = &attrs.workspace {
         match get_resolver(workspace) {
-            Ok((res, has_errors)) => {
+            Ok((res, has_errors, _)) => {
                 if has_errors {
                     panic!("#[derive(Module)] NDL resolver found erros while parsing")
                 }
@@ -446,7 +447,7 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> TokenStream {
             .workspace
             .expect("#[derive(Network)] Missing NDL worspace"),
     ) {
-        Ok((res, has_errors)) => {
+        Ok((res, has_errors, par_files)) => {
             if has_errors {
                 panic!("#[derive(Network)] NDL resolver found erros while parsing")
             }
@@ -462,6 +463,15 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> TokenStream {
 
             if let Some(network) = network {
                 let mut token_stream = proc_macro2::TokenStream::new();
+
+                // Import parameters
+
+                for par_file in par_files {
+                    let string_literal = par_file.to_str().unwrap();
+                    token_stream.extend::<proc_macro2::TokenStream>(quote! {
+                        rt.include_par_file(#string_literal);
+                    })
+                }
 
                 // Config nodes.
 
@@ -532,13 +542,13 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> TokenStream {
 
                 quote! {
                     impl #ident {
-                        pub fn run(self) -> (Self, des_core::SimTime) {
-                            self.run_with_options(des_core::RuntimeOptions::default())
+                        pub fn run(self) -> (Self, ::des_core::SimTime) {
+                            self.run_with_options(::des_core::RuntimeOptions::default())
                         }
 
-                        pub fn run_with_options(self, options: des_core::RuntimeOptions) -> (Self, des_core::SimTime) {
-                            use des_core::Runtime;
-                            use des_core::NetworkRuntime;
+                        pub fn run_with_options(self, options: ::des_core::RuntimeOptions) -> (Self, ::des_core::SimTime) {
+                            use ::des_core::Runtime;
+                            use ::des_core::NetworkRuntime;
 
                             let net_rt = self.build_rt();
                             let rt = Runtime::<NetworkRuntime<Self>>::new_with(net_rt, options);
@@ -546,9 +556,9 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> TokenStream {
                             (net_rt.finish(), end_time)
                         }
 
-                        pub fn build_rt(self) -> NetworkRuntime<Self> {
-                            let mut runtime = des_core::NetworkRuntime::new(self);
-                            let rt: &mut des_core::NetworkRuntime<Self> = &mut runtime;
+                        pub fn build_rt(self) -> ::des_core::NetworkRuntime<Self> {
+                            let mut runtime = ::des_core::NetworkRuntime::new(self);
+                            let rt: &mut ::des_core::NetworkRuntime<Self> = &mut runtime;
 
                             #token_stream
 

@@ -12,6 +12,8 @@ struct A();
 fn main() {
     let app: NetworkRuntime<A> = A().build_rt();
 
+    println!("{:?}", app.parameters());
+
     let rt = Runtime::new_with(
         app,
         des_core::RuntimeOptions {
