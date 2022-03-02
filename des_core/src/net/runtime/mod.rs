@@ -218,4 +218,10 @@ impl<A> Application for NetworkRuntime<A> {
         // Add inital event
         rt.add_event(NetEvents::SimStartNotif(SimStartNotif()), SimTime::now());
     }
+
+    fn at_sim_end(rt: &mut Runtime<Self>) {
+        for module in rt.app.module_buffer.iter_mut() {
+            module.at_sim_end();
+        }
+    }
 }

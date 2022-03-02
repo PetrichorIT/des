@@ -117,6 +117,12 @@ pub trait Module: StaticModuleCore {
     /// ```
     ///
     fn at_sim_start(&mut self) {}
+
+    ///
+    /// A callback function that is invoked should the simulation finish.
+    /// All events emitted by this function will NOT be processed.
+    ///
+    fn at_sim_end(&mut self) {}
 }
 
 ///

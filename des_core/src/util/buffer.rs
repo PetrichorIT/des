@@ -5,6 +5,7 @@ use std::any::type_name;
 
 use std::hash::Hash;
 use std::ops::Deref;
+use std::slice::{Iter, IterMut};
 
 ///
 /// A buffer for self-indexable objects, enabling static
@@ -212,6 +213,14 @@ where
         };
 
         Some(&mut self.inner[idx])
+    }
+
+    pub fn iter(&self) -> Iter<'_, T> {
+        self.inner.iter()
+    }
+
+    pub fn iter_mut(&mut self) -> IterMut<'_, T> {
+        self.inner.iter_mut()
     }
 }
 

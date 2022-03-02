@@ -320,6 +320,9 @@ impl<A: Application> Runtime<A> {
 
         while self.next() {}
 
+        // Call the fin-handler on the allocated application
+        A::at_sim_end(&mut self);
+
         if self.future_event_heap.is_empty() && self.now_event_queue.is_empty() {
             Some(self.finish())
         } else {
