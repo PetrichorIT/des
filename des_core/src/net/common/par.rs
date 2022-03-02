@@ -1,5 +1,9 @@
 use std::collections::HashMap;
 
+///
+/// The collection of all loaded parameters for modules,
+/// inside a network runtime.
+///
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Parameters {
     tree: ParameterTree,

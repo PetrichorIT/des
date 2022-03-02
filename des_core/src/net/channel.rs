@@ -7,6 +7,9 @@ use crate::net::*;
 use crate::util::IdBufferRef;
 use crate::util::Indexable;
 
+///
+/// A mutable reference to a channel inside a global buffer.
+///
 pub type ChannelRef = IdBufferRef<Channel>;
 
 create_global_uid!(

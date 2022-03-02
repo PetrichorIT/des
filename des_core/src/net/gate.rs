@@ -4,6 +4,9 @@ use crate::util::IdBufferRef;
 use crate::Indexable;
 use std::fmt::{Debug, Display};
 
+///
+/// A mutable reference to a gate inside a global buffer.
+///
 pub type GateRef = IdBufferRef<Gate>;
 
 create_global_uid!(
