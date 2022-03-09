@@ -202,9 +202,16 @@ impl<A: Application> Runtime<A> {
     }
 
     ///
+    /// Returns the random number generator by mutable refernce
+    ///
+    pub(crate) unsafe fn rng(&mut self) -> *mut StdRng {
+        &mut self.core_mut().rng
+    }
+
+    ///
     /// Returns the rng.
     ///
-    pub fn rng<T>(&mut self) -> T
+    pub fn random<T>(&mut self) -> T
     where
         Standard: Distribution<T>,
     {

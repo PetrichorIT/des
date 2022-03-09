@@ -75,6 +75,11 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
                 } else {
                     // Channel delayed connection
                     let channel_id = gate.channel_id();
+
+                    // SAFTY:
+                    // The rng and random number generator dont interfere so this operation can
+                    // be considered safe. Make sure this ref is only used in conjunction with the channel.
+                    let rng_ref = unsafe { &mut (*rt.rng()) };
                     let channel = rt.app.channel_mut(channel_id).unwrap();
 
                     if channel.is_busy() {
@@ -88,7 +93,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
                         return;
                     }
 
-                    let dur = channel.calculate_duration(&message);
+                    let dur = channel.calculate_duration(&message, rng_ref);
                     let busy = channel.calculate_busy(&message);
 
                     let transmissin_finish = SimTime::now() + busy;

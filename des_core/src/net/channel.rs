@@ -1,5 +1,9 @@
 use std::fmt::Display;
 
+use rand::distributions::Uniform;
+use rand::prelude::StdRng;
+use rand::Rng;
+
 use crate::create_global_uid;
 
 use crate::core::*;
@@ -59,7 +63,7 @@ impl ChannelMetrics {
     /// Calcualtes the duration a message travels on a link.
     ///
     #[allow(clippy::if_same_then_else)]
-    pub fn calculate_duration(&self, msg: &Message) -> SimTime {
+    pub fn calculate_duration(&self, msg: &Message, rng: &mut StdRng) -> SimTime {
         if self.bitrate == 0 {
             return SimTime::ZERO;
         }
@@ -69,8 +73,8 @@ impl ChannelMetrics {
         if self.jitter == SimTime::ZERO {
             self.latency + transmission_time
         } else {
-            // TODO: handle jitter this is just a yiuck fix to use NDL defaults
-            self.latency + transmission_time
+            let perc = rng.sample(Uniform::new(0.0f64, f64::from(self.jitter)));
+            self.latency + transmission_time + perc
         }
     }
 
@@ -199,8 +203,8 @@ impl Channel {
     /// underlying metric.
     ///
     #[inline(always)]
-    pub fn calculate_duration(&self, msg: &Message) -> SimTime {
-        self.metrics.calculate_duration(msg)
+    pub fn calculate_duration(&self, msg: &Message, rng: &mut StdRng) -> SimTime {
+        self.metrics.calculate_duration(msg, rng)
     }
 
     ///
