@@ -121,7 +121,10 @@ impl RuntimeCore {
 /// event nessecary for the simulation. All you have to do is to pass the app into [Runtime::new]
 /// to create a runnable instance and the run it.
 ///
-pub struct Runtime<A: Application> {
+pub struct Runtime<A>
+where
+    A: Application,
+{
     /// The contained runtime application, defining globals and the used event set.
     pub app: A,
 
@@ -134,7 +137,10 @@ pub struct Runtime<A: Application> {
     metrics: crate::metrics::RuntimeMetrics,
 }
 
-impl<A: Application> Runtime<A> {
+impl<A> Runtime<A>
+where
+    A: Application,
+{
     fn core(&self) -> &RuntimeCore {
         unsafe { (*self.core.get()).as_ref().unwrap() }
     }
@@ -416,7 +422,10 @@ impl<A> Runtime<NetworkRuntime<A>> {
     }
 }
 
-impl<A: Application> Debug for Runtime<A> {
+impl<A> Debug for Runtime<A>
+where
+    A: Application,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -435,7 +444,10 @@ impl<A: Application> Debug for Runtime<A> {
     }
 }
 
-impl<A: Application> Display for Runtime<A> {
+impl<A> Display for Runtime<A>
+where
+    A: Application,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,

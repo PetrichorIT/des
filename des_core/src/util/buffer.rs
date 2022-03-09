@@ -396,7 +396,10 @@ where
     }
 }
 
-impl<T: Indexable> Clone for IdBufferRef<T> {
+impl<T> Clone for IdBufferRef<T>
+where
+    T: Indexable,
+{
     fn clone(&self) -> Self {
         Self {
             buffer: self.buffer,
@@ -405,15 +408,21 @@ impl<T: Indexable> Clone for IdBufferRef<T> {
     }
 }
 
-impl<T: Indexable> PartialEq for IdBufferRef<T> {
+impl<T> PartialEq for IdBufferRef<T>
+where
+    T: Indexable,
+{
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
 }
 
-impl<T: Indexable> Eq for IdBufferRef<T> {}
+impl<T> Eq for IdBufferRef<T> where T: Indexable {}
 
-impl<T: Indexable> Hash for IdBufferRef<T> {
+impl<T> Hash for IdBufferRef<T>
+where
+    T: Indexable,
+{
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.buffer.hash(state);
         self.id.as_usize().hash(state)
@@ -440,10 +449,10 @@ pub trait Indexable {
     fn id(&self) -> Self::Id;
 }
 
-impl<T, S: ?Sized> Indexable for T
+impl<T, S> Indexable for T
 where
     T: Deref<Target = S>,
-    S: Indexable,
+    S: ?Sized + Indexable,
 {
     type Id = S::Id;
 

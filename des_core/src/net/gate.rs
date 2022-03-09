@@ -165,7 +165,10 @@ impl Gate {
 ///
 /// A trait for a type to refrence a module specific gate.
 ///
-pub trait IntoModuleGate<T: StaticModuleCore>: Sized {
+pub trait IntoModuleGate<T>: Sized
+where
+    T: StaticModuleCore,
+{
     ///
     /// Extracts a gate identifier from a module using the given
     /// value as implicit reference.
@@ -175,7 +178,10 @@ pub trait IntoModuleGate<T: StaticModuleCore>: Sized {
     }
 }
 
-impl<T: StaticModuleCore> IntoModuleGate<T> for Gate {
+impl<T> IntoModuleGate<T> for Gate
+where
+    T: StaticModuleCore,
+{
     fn into_gate(self, module: &T) -> Option<GateId> {
         let element = module
             .gates()
@@ -186,7 +192,10 @@ impl<T: StaticModuleCore> IntoModuleGate<T> for Gate {
     }
 }
 
-impl<T: StaticModuleCore> IntoModuleGate<T> for &Gate {
+impl<T> IntoModuleGate<T> for &Gate
+where
+    T: StaticModuleCore,
+{
     fn into_gate(self, module: &T) -> Option<GateId> {
         let element = module
             .gates()
@@ -197,7 +206,10 @@ impl<T: StaticModuleCore> IntoModuleGate<T> for &Gate {
     }
 }
 
-impl<T: StaticModuleCore> IntoModuleGate<T> for GateId {
+impl<T> IntoModuleGate<T> for GateId
+where
+    T: StaticModuleCore,
+{
     fn into_gate(self, module: &T) -> Option<GateId> {
         let element = module
             .gates()
@@ -208,7 +220,10 @@ impl<T: StaticModuleCore> IntoModuleGate<T> for GateId {
     }
 }
 
-impl<T: StaticModuleCore> IntoModuleGate<T> for (&str, usize) {
+impl<T> IntoModuleGate<T> for (&str, usize)
+where
+    T: StaticModuleCore,
+{
     fn into_gate(self, module: &T) -> Option<GateId> {
         let element = module
             .gates()

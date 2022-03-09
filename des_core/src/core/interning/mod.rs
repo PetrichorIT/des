@@ -55,14 +55,20 @@ impl Interner {
     /// Interns a value T and retursn a [TypedInternedValue] referencing the interned value.
     ///
     #[allow(unused)]
-    pub fn intern_typed<T: 'static>(&self, value: T) -> TypedInternedValue<'_, T> {
+    pub fn intern_typed<T>(&self, value: T) -> TypedInternedValue<'_, T>
+    where
+        T: 'static,
+    {
         self.intern(value).cast()
     }
 
     ///
     /// Interns a value T.
     ///
-    pub fn intern<T: 'static>(&self, value: T) -> InternedValue<'_> {
+    pub fn intern<T>(&self, value: T) -> InternedValue<'_>
+    where
+        T: 'static,
+    {
         let boxed = Box::new(value);
         self.intern_boxed(boxed)
     }
@@ -71,14 +77,20 @@ impl Interner {
     /// Interns an allready boxed value T and retursn a typed reference.
     ///
     #[allow(unused)]
-    pub fn intern_boxed_typed<T: 'static>(&self, boxed: Box<T>) -> TypedInternedValue<'_, T> {
+    pub fn intern_boxed_typed<T>(&self, boxed: Box<T>) -> TypedInternedValue<'_, T>
+    where
+        T: 'static,
+    {
         self.intern_boxed(boxed).cast()
     }
 
     ///
     /// Interns an allready boxed value T.
     ///
-    pub fn intern_boxed<T: 'static>(&self, boxed: Box<T>) -> InternedValue<'_> {
+    pub fn intern_boxed<T>(&self, boxed: Box<T>) -> InternedValue<'_>
+    where
+        T: 'static,
+    {
         assert!(
             std::mem::size_of::<T>() != 0,
             "Size of type T must not be zero."
@@ -130,7 +142,10 @@ impl Interner {
         }
     }
 
-    pub fn cast<T: 'static>(value: InternedValue) -> TypedInternedValue<T> {
+    pub fn cast<T>(value: InternedValue) -> TypedInternedValue<T>
+    where
+        T: 'static,
+    {
         trace!(target: "interner", "Casting to typed({}) ref for ID: {}", type_name::<T>(), value.index);
         let InternedValue { interner, index } = value;
 
@@ -164,7 +179,10 @@ impl Interner {
         }
     }
 
-    pub fn uncast<T: 'static>(value: TypedInternedValue<T>) -> InternedValue {
+    pub fn uncast<T>(value: TypedInternedValue<T>) -> InternedValue
+    where
+        T: 'static,
+    {
         trace!(target: "interner", "Uncasting typed({}) ref for ID: {}", type_name::<T>(), value.index);
         let TypedInternedValue {
             interner, index, ..
@@ -216,7 +234,10 @@ impl Interner {
         }
     }
 
-    pub fn drop_typed<T: 'static>(value: &mut TypedInternedValue<T>) {
+    pub fn drop_typed<T>(value: &mut TypedInternedValue<T>)
+    where
+        T: 'static,
+    {
         let TypedInternedValue {
             interner, index, ..
         } = *value;
@@ -227,7 +248,10 @@ impl Interner {
         }
     }
 
-    pub fn drop_typed_raw<T: 'static>(interner: &Interner, index: usize) {
+    pub fn drop_typed_raw<T>(interner: &Interner, index: usize)
+    where
+        T: 'static,
+    {
         trace!(target: "interner", "Dropping typed ({}) value ID: {}", type_name::<T>(), index);
 
         // # Safty
@@ -349,12 +373,18 @@ impl<'a> InternedValue<'a> {
     /// Casts self into a [TypedInternedValue] panicing of T doesn't match the T
     /// of the interned value.
     ///
-    pub fn cast<T: 'static>(self) -> TypedInternedValue<'a, T> {
+    pub fn cast<T>(self) -> TypedInternedValue<'a, T>
+    where
+        T: 'static,
+    {
         Interner::cast(self)
     }
 
     #[allow(unused)]
-    pub fn can_cast<T: 'static>(&self) -> bool {
+    pub fn can_cast<T>(&self) -> bool
+    where
+        T: 'static,
+    {
         self.interner.type_id_of(self.index) == TypeId::of::<T>()
     }
 
@@ -390,13 +420,19 @@ impl Debug for InternedValue<'_> {
 ///
 /// A typed reference to a interned value.
 ///
-pub struct TypedInternedValue<'a, T: 'static> {
+pub struct TypedInternedValue<'a, T>
+where
+    T: 'static,
+{
     interner: &'a Interner,
     index: usize,
     reference: &'a mut T,
 }
 
-impl<'a, T> TypedInternedValue<'a, T> {
+impl<'a, T> TypedInternedValue<'a, T>
+where
+    T: 'static,
+{
     ///
     /// Downgards self to a [InternedValue] losing type information in the process.
     ///
@@ -418,7 +454,10 @@ impl<'a, T> TypedInternedValue<'a, T> {
     }
 }
 
-impl<T: 'static> Deref for TypedInternedValue<'_, T> {
+impl<T> Deref for TypedInternedValue<'_, T>
+where
+    T: 'static,
+{
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -426,7 +465,10 @@ impl<T: 'static> Deref for TypedInternedValue<'_, T> {
     }
 }
 
-impl<T: 'static> DerefMut for TypedInternedValue<'_, T> {
+impl<T> DerefMut for TypedInternedValue<'_, T>
+where
+    T: 'static,
+{
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.reference
     }
@@ -438,7 +480,10 @@ impl<T: 'static> DerefMut for TypedInternedValue<'_, T> {
 // non depdendent sources.
 //
 // Maybe impl 'Clone' as true clone and make ref-clones internal.
-impl<'a, T: 'static> Clone for TypedInternedValue<'a, T> {
+impl<'a, T> Clone for TypedInternedValue<'a, T>
+where
+    T: 'static,
+{
     fn clone(&self) -> Self {
         // Upon clone add 1 to the ref counter
         self.interner.inc_ref_count(self.index);
@@ -454,7 +499,10 @@ impl<'a, T: 'static> Clone for TypedInternedValue<'a, T> {
     }
 }
 
-impl<T: 'static> Drop for TypedInternedValue<'_, T> {
+impl<T> Drop for TypedInternedValue<'_, T>
+where
+    T: 'static,
+{
     fn drop(&mut self) {
         Interner::drop_typed(self)
     }

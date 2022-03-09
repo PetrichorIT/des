@@ -23,7 +23,10 @@ impl<T> SyncCell<T> {
     }
 }
 
-impl<T: ?Sized> SyncCell<T> {
+impl<T> SyncCell<T>
+where
+    T: ?Sized,
+{
     pub fn get(&self) -> *mut T {
         self.cell.get()
     }
@@ -34,9 +37,12 @@ impl<T: ?Sized> SyncCell<T> {
     }
 }
 
-unsafe impl<T: ?Sized> Sync for SyncCell<T> {}
+unsafe impl<T> Sync for SyncCell<T> where T: ?Sized {}
 
-impl<T: Clone> Clone for SyncCell<T> {
+impl<T> Clone for SyncCell<T>
+where
+    T: Clone,
+{
     fn clone(&self) -> Self {
         let r = unsafe { &*self.cell.get() };
         Self {

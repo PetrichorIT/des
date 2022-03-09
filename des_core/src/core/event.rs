@@ -92,7 +92,10 @@ pub type EventId = u64;
 /// Nonetheless this node will be stored on the heap as it is
 /// only used inside a [std::collections::BinaryHeap].
 ///
-pub(crate) struct EventNode<A: Application> {
+pub(crate) struct EventNode<A>
+where
+    A: Application,
+{
     /// The deadline timestamp for the event.
     pub(crate) time: SimTime,
     /// A runtime-specific unique identifier.
@@ -105,7 +108,10 @@ pub(crate) struct EventNode<A: Application> {
     _phantom: PhantomData<A>,
 }
 
-impl<A: Application> EventNode<A> {
+impl<A> EventNode<A>
+where
+    A: Application,
+{
     ///
     /// Delegation call to 'handle' on the event from the [EventSet].
     ///
@@ -128,15 +134,21 @@ impl<A: Application> EventNode<A> {
     }
 }
 
-impl<A: Application> PartialEq for EventNode<A> {
+impl<A> PartialEq for EventNode<A>
+where
+    A: Application,
+{
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
 }
 
-impl<A: Application> Eq for EventNode<A> {}
+impl<A> Eq for EventNode<A> where A: Application {}
 
-impl<A: Application> PartialOrd for EventNode<A> {
+impl<A> PartialOrd for EventNode<A>
+where
+    A: Application,
+{
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
@@ -158,15 +170,19 @@ impl<A: Application> PartialOrd for EventNode<A> {
     }
 }
 
-impl<A: Application> Ord for EventNode<A> {
+impl<A> Ord for EventNode<A>
+where
+    A: Application,
+{
     fn cmp(&self, other: &Self) -> Ordering {
         // Inverted call should act as reverse
         other.time.cmp(&self.time)
     }
 }
 
-impl<A: Application> Debug for EventNode<A>
+impl<A> Debug for EventNode<A>
 where
+    A: Application,
     A::EventSet: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -178,8 +194,9 @@ where
     }
 }
 
-impl<A: Application> Display for EventNode<A>
+impl<A> Display for EventNode<A>
 where
+    A: Application,
     A::EventSet: Display,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

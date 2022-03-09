@@ -66,25 +66,34 @@ impl<T> DerefMut for SpmcWriter<T> {
     }
 }
 
-impl<T: Debug> Debug for SpmcWriter<T> {
+impl<T> Debug for SpmcWriter<T>
+where
+    T: Debug,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.deref().fmt(f)
     }
 }
 
-impl<T: Display> Display for SpmcWriter<T> {
+impl<T> Display for SpmcWriter<T>
+where
+    T: Display,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.deref().fmt(f)
     }
 }
 
-impl<T: PartialEq> PartialEq for SpmcWriter<T> {
+impl<T> PartialEq for SpmcWriter<T>
+where
+    T: PartialEq,
+{
     fn eq(&self, other: &Self) -> bool {
         self.deref().eq(other.deref())
     }
 }
 
-impl<T: Eq> Eq for SpmcWriter<T> {}
+impl<T> Eq for SpmcWriter<T> where T: Eq {}
 
 ///
 /// A reader to a single-producer multipled consumer
@@ -117,25 +126,34 @@ impl<T> Deref for SpmcReader<T> {
     }
 }
 
-impl<T: Debug> Debug for SpmcReader<T> {
+impl<T> Debug for SpmcReader<T>
+where
+    T: Debug,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.deref().fmt(f)
     }
 }
 
-impl<T: Display> Display for SpmcReader<T> {
+impl<T> Display for SpmcReader<T>
+where
+    T: Display,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.deref().fmt(f)
     }
 }
 
-impl<T: PartialEq> PartialEq for SpmcReader<T> {
+impl<T> PartialEq for SpmcReader<T>
+where
+    T: PartialEq,
+{
     fn eq(&self, other: &Self) -> bool {
         self.deref().eq(other.deref())
     }
 }
 
-impl<T: Eq> Eq for SpmcReader<T> {}
+impl<T> Eq for SpmcReader<T> where T: Eq {}
 
 impl<T> Clone for SpmcReader<T> {
     fn clone(&self) -> Self {
