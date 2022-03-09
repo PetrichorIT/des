@@ -27,7 +27,7 @@ fn main() {
     let mut node_alice = Box::new(NetworkNode::named("Alice", app.parameters()));
     let mut stack_alice =
         NetworkStack::new(0x00_00_00_ff, RandomRoutingDeamon::new(app.parameters()));
-    stack_alice.set_parent(&mut node_alice);
+    node_alice.add_child(&mut *stack_alice);
 
     let internal_out = node_alice.create_gate("fromStack", &mut app);
 
@@ -44,7 +44,7 @@ fn main() {
     let mut stack_bob =
         NetworkStack::new(0x00_00_00_ee, RandomRoutingDeamon::new(app.parameters()));
 
-    stack_bob.set_parent(&mut node_bob);
+    node_bob.add_child(&mut *stack_bob);
 
     let internal_out = node_bob.create_gate("fromStack", &mut app);
 
@@ -62,7 +62,7 @@ fn main() {
     let mut stack_eve =
         NetworkStack::new(0x00_00_00_dd, RandomRoutingDeamon::new(app.parameters()));
 
-    stack_eve.set_parent(&mut node_eve);
+    node_eve.add_child(&mut *stack_eve);
 
     let internal_out = node_eve.create_gate_cluster("fromStack", 2, &mut app);
 

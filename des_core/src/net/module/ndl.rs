@@ -6,26 +6,37 @@ use crate::{util::spmc::SpmcReader, *};
 ///
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-pub trait NameableModule: StaticModuleCore {
+pub trait NameableModule: 'static + StaticModuleCore {
     ///
     /// Creates a named instance of self without needing any additional parameters.
     ///
     fn named(path: ModulePath, parameters: SpmcReader<Parameters>) -> Self;
 
     ///
-    /// Creates a named instance of self based on the parent hierachical structure.
+    /// Creates a boxed instance of Self, based on the implementation of 'named'.
     ///
-    #[allow(clippy::borrowed_box)]
-    fn named_with_parent<T: NameableModule>(name: &str, parent: &Box<T>) -> Self
+    fn named_boxed(path: ModulePath, parameters: SpmcReader<Parameters>) -> Box<Self>
     where
         Self: Sized,
     {
-        // Clippy is just confused .. non box-borrow would throw E0277
+        Box::new(Self::named(path, parameters))
+    }
 
-        Self::named(
+    ///
+    /// Creates a named instance of self based on the parent hierachical structure.
+    ///
+    fn named_with_parent<T>(name: &str, parent: &mut T) -> Box<Self>
+    where
+        T: NameableModule,
+        Self: Sized,
+    {
+        let mut this = Self::named_boxed(
             ModulePath::new_with_parent(name, parent.path()),
             parent.module_core().parameters.clone(),
-        )
+        );
+
+        parent.add_child(&mut *this);
+        this
     }
 }
 
@@ -64,8 +75,8 @@ pub trait NdlBuildableModule: StaticModuleCore {
         T: NameableModule,
         Self: NameableModule + Sized,
     {
-        let mut obj = Box::new(Self::named_with_parent(name, parent));
-        obj.set_parent(parent);
+        let mut obj = Self::named_with_parent(name, &mut **parent);
+        parent.add_child(&mut (*obj));
         Self::build(obj, rt)
     }
 }

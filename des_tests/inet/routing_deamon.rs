@@ -15,7 +15,7 @@ pub struct RandomRoutingDeamon {
 impl RandomRoutingDeamon {
     pub fn new(parameters: SpmcReader<Parameters>) -> Self {
         Self {
-            core: ModuleCore::new_with(ModulePath::isolated("RoutingDaemon"), parameters),
+            core: ModuleCore::new_with(ModulePath::root("RoutingDaemon".to_string()), parameters),
             hop_counts: HashMap::new(),
         }
     }

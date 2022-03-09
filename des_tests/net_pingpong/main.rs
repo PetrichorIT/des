@@ -10,7 +10,7 @@ fn main() {
     let mut alice = Box::new(alice::Alice(ModuleCore::new()));
     let mut bob = Box::new(bob::Bob(ModuleCore::new()));
 
-    alice.set_parent(&mut bob);
+    bob.add_child(&mut *alice);
 
     let mut app = NetworkRuntime::new(Application());
 

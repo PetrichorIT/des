@@ -18,10 +18,10 @@ pub struct NetworkStack {
 }
 
 impl NetworkStack {
-    pub fn new(address: NodeAddress, mut router: RandomRoutingDeamon) -> Box<Self> {
+    pub fn new(address: NodeAddress, router: RandomRoutingDeamon) -> Box<Self> {
         let mut obj = Box::new(Self {
             core: ModuleCore::new_with(
-                ModulePath::isolated("NetworkStack"),
+                ModulePath::root("NetworkStack".to_string()),
                 router.module_core().parameters.clone(),
             ),
             address,
@@ -29,8 +29,10 @@ impl NetworkStack {
             routing_deamon: None,
         });
 
-        router.set_parent(&mut obj);
-        obj.routing_deamon = Some(Box::new(router));
+        let mut router = Box::new(router);
+
+        obj.add_child(&mut *router);
+        obj.routing_deamon = Some(router);
         obj
     }
 

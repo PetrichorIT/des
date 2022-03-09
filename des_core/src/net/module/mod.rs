@@ -1,6 +1,9 @@
 mod core;
 mod ndl;
 
+#[cfg(test)]
+mod tests;
+
 use std::collections::HashMap;
 
 use crate::net::*;
@@ -162,13 +165,13 @@ pub trait StaticModuleCore: Indexable<Id = ModuleId> {
     /// Returns the name of the module instance.
     ///
     fn name(&self) -> &str {
-        self.module_core().path.module_name()
+        self.module_core().path.name()
     }
 
     fn pars(&self) -> HashMap<String, String> {
         self.module_core()
             .parameters
-            .get(self.module_core().path.module_path())
+            .get(self.module_core().path.path())
     }
 
     ///
@@ -361,49 +364,60 @@ pub trait StaticModuleCore: Indexable<Id = ModuleId> {
     }
 
     ///
-    /// Indicates wether the module has a parent module.
-    ///
-    fn has_parent(&self) -> bool {
-        self.module_core().parent_ptr.is_some()
-    }
-
-    ///
     /// Returns the parent element.
     ///
-    fn parent<T: StaticModuleCore>(&self) -> Option<&T>
+    fn parent<T>(&self) -> Result<&T, ModuleReferencingError>
     where
+        T: 'static + StaticModuleCore,
         Self: Sized,
     {
-        unsafe {
-            let ptr = self.module_core().parent_ptr?;
-            let ptr: *const T = ptr as *const T;
-            Some(&*ptr)
-        }
+        self.module_core().parent()
     }
 
     ///
     /// Returns the parent element mutablly.
     ///
-    fn parent_mut<T: StaticModuleCore>(&mut self) -> Option<&mut T>
+    fn parent_mut<T>(&mut self) -> Result<&mut T, ModuleReferencingError>
     where
+        T: 'static + StaticModuleCore,
         Self: Sized,
     {
-        unsafe {
-            let ptr = self.module_core_mut().parent_ptr?;
-            let ptr: *mut T = ptr as *mut T;
-            Some(&mut *ptr)
-        }
+        self.module_core_mut().parent_mut()
     }
 
     ///
-    /// Sets the parent element.
+    /// Returns a mutable reference to a child, assuming the module exists under this name
+    /// and has the type T.
     ///
-    fn set_parent<T: StaticModuleCore>(&mut self, module: &mut Box<T>)
+    fn child<T>(&self, name: &str) -> Result<&T, ModuleReferencingError>
     where
+        T: 'static + StaticModuleCore,
         Self: Sized,
     {
-        let ptr: *mut T = &mut (**module);
-        let ptr = ptr as *mut u8;
-        self.module_core_mut().parent_ptr = Some(ptr);
+        self.module_core().child(name)
+    }
+
+    ///
+    /// Returns a mutable reference to a child, assuming the module exists under this name
+    /// and has the type T.
+    ///
+    fn child_mut<T>(&mut self, name: &str) -> Result<&mut T, ModuleReferencingError>
+    where
+        T: 'static + StaticModuleCore,
+        Self: Sized,
+    {
+        self.module_core_mut().child_mut(name)
+    }
+
+    ///
+    /// Adds the given module as a child module, automaticly writing
+    /// the childs parent.
+    ///
+    fn add_child<T>(&mut self, module: &mut T)
+    where
+        T: 'static + StaticModuleCore,
+        Self: 'static + Sized,
+    {
+        self.module_core_mut().add_child::<Self, T>(module)
     }
 }

@@ -10,26 +10,28 @@ pub struct ModulePath {
 }
 
 impl ModulePath {
-    pub fn module_name(&self) -> &str {
+    ///
+    /// The name of the refenced module.
+    ///
+    pub fn name(&self) -> &str {
         &self.full_path[self.name_start..]
     }
 
-    pub fn module_path(&self) -> &str {
+    ///
+    /// The path of the referenced module, including its name.
+    ///
+    pub fn path(&self) -> &str {
         &self.full_path
     }
 
+    ///
+    /// The path to the parent module, or an empty str.
+    ///
     pub fn parent_path(&self) -> &str {
         if self.name_start == 0 {
             &self.full_path[..0]
         } else {
             &self.full_path[..self.name_start - 1]
-        }
-    }
-
-    pub fn isolated(name: &str) -> Self {
-        Self {
-            full_path: name.to_string(),
-            name_start: 0,
         }
     }
 
@@ -61,6 +63,6 @@ impl FromStr for ModulePath {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self::isolated(s))
+        Ok(Self::root(s.to_string()))
     }
 }
