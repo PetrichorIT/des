@@ -22,7 +22,7 @@ impl NetworkStack {
         let mut obj = Box::new(Self {
             core: ModuleCore::new_with(
                 ModulePath::root("NetworkStack".to_string()),
-                router.module_core().parameters.clone(),
+                router.module_core().pars_ref(),
             ),
             address,
             forwarding_table: HashMap::new(),

@@ -55,12 +55,12 @@ pub use self::packet::NODE_ADDR_LOOPBACK;
 // # Modules
 //
 
+pub use self::module::BuildableModule;
 pub use self::module::Module;
 pub use self::module::ModuleCore;
 pub use self::module::ModuleId;
 pub use self::module::ModuleReferencingError;
 pub use self::module::NameableModule;
-pub use self::module::NdlBuildableModule;
 pub use self::module::StaticModuleCore;
 
 pub use self::common::ModulePath;

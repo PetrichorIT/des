@@ -1,4 +1,4 @@
-use crate::{util::spmc::SpmcReader, *};
+use crate::*;
 
 ///
 /// A trait that prepares a module to be created from a NDL
@@ -8,19 +8,9 @@ use crate::{util::spmc::SpmcReader, *};
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub trait NameableModule: 'static + StaticModuleCore {
     ///
-    /// Creates a named instance of self without needing any additional parameters.
+    /// Creates a named instance of the module with a provided [ModuleCore].
     ///
-    fn named(path: ModulePath, parameters: SpmcReader<Parameters>) -> Self;
-
-    ///
-    /// Creates a boxed instance of Self, based on the implementation of 'named'.
-    ///
-    fn named_boxed(path: ModulePath, parameters: SpmcReader<Parameters>) -> Box<Self>
-    where
-        Self: Sized,
-    {
-        Box::new(Self::named(path, parameters))
-    }
+    fn named(core: ModuleCore) -> Self;
 
     ///
     /// Creates a named instance of self based on the parent hierachical structure.
@@ -30,10 +20,8 @@ pub trait NameableModule: 'static + StaticModuleCore {
         T: NameableModule,
         Self: Sized,
     {
-        let mut this = Self::named_boxed(
-            ModulePath::new_with_parent(name, parent.path()),
-            parent.module_core().parameters.clone(),
-        );
+        let core = ModuleCore::child_of(name, parent.module_core());
+        let mut this = Box::new(Self::named(core));
 
         parent.add_child(&mut *this);
         this
@@ -46,7 +34,7 @@ pub trait NameableModule: 'static + StaticModuleCore {
 ///
 /// * This type is only available of DES is build with the `"net"` feature.
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-pub trait NdlBuildableModule: StaticModuleCore {
+pub trait BuildableModule: StaticModuleCore {
     ///
     /// Builds the given module according to the NDL specification
     /// if any is provided, else doesn't change a thing.
@@ -62,8 +50,9 @@ pub trait NdlBuildableModule: StaticModuleCore {
     where
         Self: NameableModule + Sized,
     {
-        let obj = Box::new(Self::named(path, rt.parameters()));
-        Self::build(obj, rt)
+        let core = ModuleCore::new_with(path, rt.parameters());
+        let this = Box::new(Self::named(core));
+        Self::build(this, rt)
     }
 
     fn build_named_with_parent<A, T>(
@@ -75,8 +64,8 @@ pub trait NdlBuildableModule: StaticModuleCore {
         T: NameableModule,
         Self: NameableModule + Sized,
     {
-        let mut obj = Self::named_with_parent(name, &mut **parent);
-        parent.add_child(&mut (*obj));
+        let obj = Self::named_with_parent(name, &mut **parent);
+        // parent.add_child(&mut (*obj));
         Self::build(obj, rt)
     }
 }

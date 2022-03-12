@@ -151,7 +151,7 @@ pub trait StaticModuleCore: Indexable<Id = ModuleId> {
     /// Returns a human readable representation of the modules identity.
     ///
     fn str(&self) -> &str {
-        self.module_core().identifier()
+        self.module_core().path.path()
     }
 
     ///
@@ -169,9 +169,7 @@ pub trait StaticModuleCore: Indexable<Id = ModuleId> {
     }
 
     fn pars(&self) -> HashMap<String, String> {
-        self.module_core()
-            .parameters
-            .get(self.module_core().path.path())
+        self.module_core().pars()
     }
 
     ///

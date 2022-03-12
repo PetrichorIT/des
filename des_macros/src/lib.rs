@@ -187,8 +187,8 @@ fn gen_named_object(ident: Ident, data: &DataStruct) -> proc_macro2::TokenStream
                 let field = named.first().unwrap().ident.clone().unwrap();
                 quote! {
                     impl ::des_core::NameableModule for #ident {
-                        fn named(path: ::des_core::ModulePath, parameters: ::des_core::SpmcReader<::des_core::Parameters>) -> Self {
-                            Self { #field: ::des_core::ModuleCore::new_with(path, parameters) }
+                        fn named(core: ::des_core::ModuleCore) -> Self {
+                            Self { #field: core }
                         }
                     }
                 }
@@ -200,8 +200,8 @@ fn gen_named_object(ident: Ident, data: &DataStruct) -> proc_macro2::TokenStream
             if unnamed.len() == 1 {
                 quote! {
                     impl ::des_core::NameableModule for #ident {
-                        fn named(path: ::des_core::ModulePath, parameters: ::des_core::SpmcReader<::des_core::Parameters>) -> Self {
-                            Self(::des_core::ModuleCore::new_with(path, parameters))
+                        fn named(core: ::des_core::ModuleCore) -> Self {
+                            Self(core)
                         }
                     }
                 }
@@ -315,7 +315,7 @@ fn gen_dynamic_module_core(ident: Ident, attrs: Attributes) -> TokenStream {
                 let wrapped = WrappedTokenStream(token_stream);
 
                 quote! {
-                    impl ::des_core::NdlBuildableModule for #ident {
+                    impl ::des_core::BuildableModule for #ident {
                         fn build<A>(mut self: Box<Self>, rt: &mut des_core::NetworkRuntime<A>) -> Box<Self> {
                             #wrapped
                             self
@@ -328,7 +328,7 @@ fn gen_dynamic_module_core(ident: Ident, attrs: Attributes) -> TokenStream {
         }
     } else {
         quote! {
-            impl ::des_core::NdlBuildableModule for #ident {}
+            impl ::des_core::BuildableModule for #ident {}
         }
         .into()
     }

@@ -30,22 +30,22 @@ pub struct ModuleCore {
     id: ModuleId,
 
     /// A human readable identifier for the module.
-    pub path: ModulePath,
+    pub(crate) path: ModulePath,
 
     /// A collection of all gates register to the current module
-    pub gates: Vec<GateRef>,
+    pub(crate) gates: Vec<GateRef>,
 
     /// A buffer of messages to be send out, after the current handle messsage terminates.
-    pub out_buffer: Vec<(Message, GateId)>,
+    pub(crate) out_buffer: Vec<(Message, GateId)>,
 
     /// A buffer of wakeup calls to be enqueued, after the current handle message terminates.
-    pub loopback_buffer: Vec<(Message, SimTime)>,
+    pub(crate) loopback_buffer: Vec<(Message, SimTime)>,
 
     /// The period of the activity coroutine (if zero than there is no coroutine).
-    pub activity_period: SimTime,
+    pub(crate) activity_period: SimTime,
 
     /// An indicator whether a valid activity timeout is existent.
-    pub activity_active: bool,
+    pub(crate) activity_active: bool,
 
     /// The module identificator for the parent module.
     parent_ptr: Option<TypedModulePtr>,
@@ -53,20 +53,18 @@ pub struct ModuleCore {
     /// The collection of child nodes for the curretn module.
     childern: HashMap<String, TypedModulePtr>,
 
-    /// A set of local parameters
-    pub parameters: SpmcReader<Parameters>,
+    /// A set of local parameters.
+    ///
+    /// TODO: Restrict to pub(crate) if possible providing constructors to created valid subinstances.
+    parameters: SpmcReader<Parameters>,
 }
 
 impl ModuleCore {
-    /// A runtime specific but unqiue identifier for a given module.
-    #[inline(always)]
+    ///
+    /// A runtime-unqiue identifier for this module-core and by extension this module.
+    ///
     pub fn id(&self) -> ModuleId {
         self.id
-    }
-
-    /// A human readable identifer for a given module.
-    pub fn identifier(&self) -> &str {
-        self.path.path()
     }
 
     ///
@@ -85,6 +83,27 @@ impl ModuleCore {
             path,
             childern: HashMap::new(),
             parameters,
+        }
+    }
+
+    ///
+    /// Creates a new module core based on the parent
+    /// using the name to extend the path.
+    ///
+    pub fn child_of(name: &str, parent: &ModuleCore) -> Self {
+        let path = ModulePath::new_with_parent(name, &parent.path);
+
+        Self {
+            id: ModuleId::gen(),
+            path,
+            gates: Vec::new(),
+            out_buffer: Vec::new(),
+            loopback_buffer: Vec::new(),
+            activity_period: SimTime::ZERO,
+            activity_active: false,
+            parent_ptr: None,
+            childern: HashMap::new(),
+            parameters: parent.parameters.clone(),
         }
     }
 
@@ -203,6 +222,27 @@ impl ModuleCore {
                 "This module does not posses a parent ptr.",
             ))),
         }
+    }
+}
+
+///
+/// # Parameter management
+///
+
+impl ModuleCore {
+    ///
+    /// Returns the parameters for the current module.
+    ///
+    pub fn pars(&self) -> HashMap<String, String> {
+        self.parameters.get(self.path.path())
+    }
+
+    ///
+    /// Returns a reference to the parameter store, used for constructing
+    /// custom instances of modules.
+    ///
+    pub fn pars_ref(&self) -> SpmcReader<Parameters> {
+        self.parameters.clone()
     }
 }
 

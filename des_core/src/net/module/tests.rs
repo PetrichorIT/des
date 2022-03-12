@@ -22,16 +22,7 @@ macro_rules! auto_impl_static {
             }
         }
 
-        impl NameableModule for $ident {
-            fn named(path: ModulePath, parameters: SpmcReader<Parameters>) -> Self {
-                let mut this = Self::new();
-                this.module_core_mut().parameters = parameters;
-                this.module_core_mut().path = path;
-                this
-            }
-        }
-
-        impl NdlBuildableModule for $ident {}
+        impl BuildableModule for $ident {}
     };
 }
 
@@ -41,10 +32,10 @@ struct Parent {
     acummulated_counter: usize,
 }
 
-impl Parent {
-    fn new() -> Self {
+impl NameableModule for Parent {
+    fn named(core: ModuleCore) -> Self {
         Self {
-            core: ModuleCore::new(),
+            core,
             acummulated_counter: 0,
         }
     }
@@ -58,14 +49,13 @@ struct Child {
     counter: usize,
 }
 
-impl Child {
-    fn new() -> Self {
-        Self {
-            core: ModuleCore::new(),
-            counter: 0,
-        }
+impl NameableModule for Child {
+    fn named(core: ModuleCore) -> Self {
+        Self { core, counter: 0 }
     }
+}
 
+impl Child {
     fn inc(&mut self, amount: usize) {
         self.counter += amount;
         self.parent_mut::<Parent>().unwrap().acummulated_counter += amount;
@@ -79,11 +69,9 @@ struct GrandChild {
     core: ModuleCore,
 }
 
-impl GrandChild {
-    fn new() -> Self {
-        Self {
-            core: ModuleCore::new(),
-        }
+impl NameableModule for GrandChild {
+    fn named(core: ModuleCore) -> Self {
+        Self { core }
     }
 }
 
@@ -98,10 +86,12 @@ struct TestCase {
 
 impl TestCase {
     fn build() -> Self {
-        let mut parent = Box::new(Parent::named(
+        let core = ModuleCore::new_with(
             ModulePath::root("Root".into()),
             SpmcWriter::new(Parameters::new()).get_reader(),
-        ));
+        );
+
+        let mut parent = Box::new(Parent::named(core));
 
         let mut children = vec![
             Child::named_with_parent("c1", &mut *parent),
