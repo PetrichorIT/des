@@ -28,7 +28,7 @@ impl Parameters {
         self.tree.insert(key, value)
     }
 
-    pub fn get(&self, key: &str) -> HashMap<String, String> {
+    pub(crate) fn get(&self, key: &str) -> HashMap<String, String> {
         let mut map = HashMap::new();
         self.tree.get(key, &mut map);
         map
