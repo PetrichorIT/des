@@ -404,6 +404,11 @@ where
         Self {
             buffer: self.buffer,
             id: self.id,
+
+            // TODO:
+            // implement a mode that retains the direct ptr on clone
+            #[cfg(not(feature = "net-static"))]
+            direct_ptr: SyncCell::new(None),
         }
     }
 }

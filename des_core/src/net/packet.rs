@@ -93,6 +93,10 @@ impl Packet {
         &self.header
     }
 
+    pub fn set_source_node(&mut self, node: NodeAddress) {
+        self.header.source_node = node
+    }
+
     /// Sets the hop counter.
     #[inline(always)]
     pub fn set_hop_count(&mut self, hop_count: usize) {

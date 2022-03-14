@@ -5,15 +5,9 @@ use std::{
 
 use crate::core::interning::*;
 use crate::core::*;
-use crate::create_global_uid;
 use crate::net::*;
 
-create_global_uid!(
-    /// A globaly unqiue identifer for a message.
-/// * This type is only available of DES is build with the `"net"` feature.*
-#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-    pub MessageId(u32) = MESSAGE_ID;
-);
+pub type MessageId = u16;
 
 /// The type of messages, similar to the TOS field in IP packets.
 /// * This type is only available of DES is build with the `"net"` feature.*
@@ -29,9 +23,6 @@ pub type MessageKind = u16;
 pub struct MessageMetadata {
     /// A unqiue identifier for this instance of a message.
     pub id: MessageId,
-    /// A unique identifier for the message this instance was cloned from.
-    /// If this instance was not cloned 'tree_id == id'.
-    pub tree_id: MessageId,
 
     /// The type of message to be handled.
     pub kind: MessageKind,
@@ -61,8 +52,7 @@ pub struct MessageMetadata {
 impl MessageMetadata {
     fn clone_message(&self) -> Self {
         Self {
-            id: MessageId::gen(),
-            tree_id: self.id,
+            id: self.id,
 
             kind: self.kind,
             timestamp: self.timestamp,
@@ -104,10 +94,7 @@ impl Message {
     /// A strinification function that reduces it to its identifering pars.
     ///
     pub fn str(&self) -> String {
-        format!(
-            "#{}({}) {} bits",
-            self.meta.id, self.meta.tree_id, self.bit_len
-        )
+        format!("#{} {} bits", self.meta.id, self.bit_len)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -136,6 +123,7 @@ impl Message {
     /// be dropped if the message is extracted.
     ///
     pub fn new_interned<T: MessageBody>(
+        id: MessageId,
         kind: MessageKind,
         sender_module_id: ModuleId,
         timestamp: SimTime,
@@ -144,11 +132,8 @@ impl Message {
         let bit_len = content.bit_len();
         let byte_len = content.byte_len();
 
-        let id = MessageId::gen();
-
         let meta = MessageMetadata {
             id,
-            tree_id: id,
 
             kind,
             timestamp,
@@ -176,6 +161,7 @@ impl Message {
     /// be dropped if the message is extracted.
     ///
     pub fn new<T: 'static + MessageBody>(
+        id: MessageId,
         kind: MessageKind,
         last_gate: GateId,
         sender_module_id: ModuleId,
@@ -183,8 +169,6 @@ impl Message {
         timestamp: SimTime,
         content: T,
     ) -> Self {
-        let id = MessageId::gen();
-
         let bit_len = content.bit_len();
         let byte_len = content.byte_len();
 
@@ -192,7 +176,6 @@ impl Message {
 
         let meta = MessageMetadata {
             id,
-            tree_id: id,
 
             kind,
             timestamp,
@@ -258,7 +241,6 @@ impl Debug for Message {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Message")
             .field("id", &self.meta.id)
-            .field("tree_id", &self.meta.tree_id)
             .field("kind", &self.meta.kind)
             .field("last_gate", &self.meta.last_gate)
             .field("sender_module_id", &self.meta.sender_module_id)

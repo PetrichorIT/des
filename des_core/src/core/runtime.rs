@@ -210,6 +210,7 @@ where
     ///
     /// Returns the random number generator by mutable refernce
     ///
+    #[allow(unused)]
     pub(crate) unsafe fn rng(&mut self) -> *mut StdRng {
         &mut self.core_mut().rng
     }
