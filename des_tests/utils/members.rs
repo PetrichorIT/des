@@ -20,7 +20,7 @@ impl Module for Alice {
         } else {
             pkt.inc_hop_count();
             self.send(
-                Message::new_interned(1, self.id(), SimTime::ZERO, pkt),
+                Message::new_interned(0, 1, self.id(), SimTime::ZERO, pkt),
                 ("netOut", 0),
             )
         }
@@ -44,6 +44,7 @@ impl Module for Bob {
         info!(target: "Bob", "Initalizing");
         self.send(
             Message::new(
+                0,
                 1,
                 GateId::NULL,
                 self.id(),
@@ -68,7 +69,7 @@ impl Module for Bob {
         pkt.content::<String>().push_str(&self.pars()["char"]);
 
         self.send(
-            Message::new_interned(1, self.id(), SimTime::ZERO, pkt),
+            Message::new_interned(0, 1, self.id(), SimTime::ZERO, pkt),
             ("netOut", 2),
         );
     }

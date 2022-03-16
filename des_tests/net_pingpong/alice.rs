@@ -13,6 +13,7 @@ impl Module for Alice {
 
         self.send(
             Message::new(
+                0,
                 1,
                 GateId::NULL,
                 self.id(),
@@ -26,6 +27,7 @@ impl Module for Alice {
         self.parent_mut::<super::bob::Bob>()
             .unwrap()
             .handle_message(Message::new(
+                0,
                 31,
                 GateId::NULL,
                 ModuleId::NULL,

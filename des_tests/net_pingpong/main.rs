@@ -38,6 +38,7 @@ fn main() {
     );
 
     let msg = Message::new(
+        0,
         1,
         GateId::NULL,
         ModuleId::NULL,

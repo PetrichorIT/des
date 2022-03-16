@@ -61,7 +61,7 @@ impl Module for NetworkStack {
         } else if let Some(&route) = self.lookup_route(pkt.header().target_node) {
             // PATH ROUTE
             info!(target: "NetworkStack", "Routing over backproc path");
-            let msg = Message::new_interned(2, self.id(), SimTime::now(), pkt);
+            let msg = Message::new_interned(0, 2, self.id(), SimTime::now(), pkt);
             self.send(msg, route);
         } else {
             // RANDOM ROUTE
@@ -78,7 +78,7 @@ impl Module for NetworkStack {
                     .id()
             }
 
-            let msg = Message::new_interned(2, self.id(), SimTime::now(), pkt);
+            let msg = Message::new_interned(0, 2, self.id(), SimTime::now(), pkt);
             self.send(msg, gate_id);
         }
     }

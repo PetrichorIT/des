@@ -30,6 +30,7 @@ fn main() {
 
     for id in ids {
         let msg = Message::new(
+            0,
             0xff,
             GateId::NULL,
             ModuleId::NULL,

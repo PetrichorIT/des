@@ -8,6 +8,7 @@ pub struct Alice(ModuleCore);
 impl Module for Alice {
     fn at_sim_start(&mut self) {
         let msg = Message::new(
+            0,
             1,
             GateId::NULL,
             self.id(),
@@ -36,7 +37,7 @@ impl Module for Bob {
 
         println!("Received msg: {} - {:?}", *msg, head);
 
-        let msg = Message::new_interned(2, self.id(), SimTime::now(), msg);
+        let msg = Message::new_interned(0, 2, self.id(), SimTime::now(), msg);
         self.send(msg, ("netOut", 0))
     }
 }

@@ -15,3 +15,6 @@ mod macros;
 pub use macros::*;
 
 pub mod spmc;
+
+mod mm;
+pub use mm::*;

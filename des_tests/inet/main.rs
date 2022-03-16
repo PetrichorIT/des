@@ -122,6 +122,7 @@ fn main() {
         String::from("PING"),
     );
     let msg = Message::new(
+        0,
         2,
         GateId::NULL,
         ModuleId::NULL,
