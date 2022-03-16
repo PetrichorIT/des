@@ -38,84 +38,99 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
 
         self.handled = true;
 
-        match self.gate.next_gate() {
-            Some(next_gate) => {
-                // redirect to next channel
+        //
+        // Iterate through gates until:
+        // a) a final gate with no next_gate was found, indicating a handle_module_call
+        // b) a delay gate was found, apply the delay and recall in a new event.
+        //
+        let mut current_gate = &self.gate;
+        while let Some(next_gate) = current_gate.next_gate() {
+            // A next gate exists.
+            // redirect to next channel
 
-                info!(
-                    target: &format!("Gate #{} ({})", self.gate.id(), self.gate.name()),
-                    "Forwarding message [{}] to next gate #{} delyed: {}",
-                    message.str(),
-                    next_gate.id(),
-                    self.gate.channel().is_some()
-                );
+            info!(
+                target: &format!("Gate #{} ({})", current_gate.id(), current_gate.name()),
+                "Forwarding message [{}] to next gate #{} delyed: {}",
+                message.str(),
+                next_gate.id(),
+                current_gate.channel().is_some()
+            );
 
-                let next_event_time = match self.gate.channel() {
-                    Some(channel) => {
-                        let mut channel = channel.clone();
+            match current_gate.channel() {
+                Some(channel) => {
+                    let mut channel = channel.clone();
 
-                        // Channel delayed connection
-                        // SAFTY:
-                        // The rng and random number generator dont interfere so this operation can
-                        // be considered safe. Make sure this ref is only used in conjunction with the channel.
-                        let rng_ref = unsafe { &mut (*rt.rng()) };
+                    // Channel delayed connection
+                    // SAFTY:
+                    // The rng and random number generator dont interfere so this operation can
+                    // be considered safe. Make sure this ref is only used in conjunction with the channel.
+                    let rng_ref = unsafe { &mut (*rt.rng()) };
 
-                        if channel.is_busy() {
-                            warn!(
-                                target: &format!("Gate #{}", self.gate.id()),
-                                "Dropping message {} pushed onto busy channel #{:?}",
-                                message.str(),
-                                channel
-                            );
-                            drop(message);
-                            return;
-                        }
-
-                        let dur = channel.calculate_duration(&message, rng_ref);
-                        let busy = channel.calculate_busy(&message);
-
-                        let transmissin_finish = SimTime::now() + busy;
-
-                        channel.set_busy_until(transmissin_finish);
-
-                        rt.add_event(
-                            NetEvents::ChannelUnbusyNotif(ChannelUnbusyNotif { channel }),
-                            transmissin_finish,
+                    if channel.is_busy() {
+                        warn!(
+                            target: &format!("Gate #{}", current_gate.id()),
+                            "Dropping message {} pushed onto busy channel #{:?}",
+                            message.str(),
+                            channel
                         );
-
-                        SimTime::now() + dur
+                        drop(message);
+                        return;
                     }
-                    None => SimTime::now(),
-                };
 
-                rt.add_event(
-                    NetEvents::MessageAtGateEvent(MessageAtGateEvent {
-                        gate: next_gate.clone(),
-                        message: ManuallyDrop::new(message),
-                        handled: false,
-                    }),
-                    next_event_time,
-                )
-            }
-            None => {
-                info!(
-                    target: &format!("Gate #{} ({})", self.gate.id(), self.gate.name()),
-                    "Forwarding message [{}] to module #{}",
-                    message.str(),
-                    self.gate.module()
-                );
+                    let dur = channel.calculate_duration(&message, rng_ref);
+                    let busy = channel.calculate_busy(&message);
 
-                let module = self.gate.module();
-                rt.add_event(
-                    NetEvents::HandleMessageEvent(HandleMessageEvent {
-                        module_id: module,
-                        message: ManuallyDrop::new(message),
-                        handled: false,
-                    }),
-                    SimTime::now(),
-                );
+                    let transmissin_finish = SimTime::now() + busy;
+
+                    channel.set_busy_until(transmissin_finish);
+
+                    rt.add_event(
+                        NetEvents::ChannelUnbusyNotif(ChannelUnbusyNotif { channel }),
+                        transmissin_finish,
+                    );
+
+                    let next_event_time = SimTime::now() + dur;
+
+                    rt.add_event(
+                        NetEvents::MessageAtGateEvent(MessageAtGateEvent {
+                            gate: next_gate.clone(),
+                            message: ManuallyDrop::new(message),
+                            handled: false,
+                        }),
+                        next_event_time,
+                    );
+
+                    // must break iteration,
+                    // but not perform on-module handling
+                    return;
+                }
+                None => {
+                    // no delay nessecary
+                    // goto next iteration
+                    current_gate = next_gate;
+                }
             }
         }
+
+        // No next gate exists.
+        assert!(current_gate.next_gate().is_none());
+
+        info!(
+            target: &format!("Gate #{} ({})", current_gate.id(), current_gate.name()),
+            "Forwarding message [{}] to module #{}",
+            message.str(),
+            current_gate.module()
+        );
+
+        let module = current_gate.module();
+        rt.add_event(
+            NetEvents::HandleMessageEvent(HandleMessageEvent {
+                module_id: module,
+                message: ManuallyDrop::new(message),
+                handled: false,
+            }),
+            SimTime::now(),
+        );
     }
 }
 
