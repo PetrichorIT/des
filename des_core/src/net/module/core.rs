@@ -36,7 +36,7 @@ pub struct ModuleCore {
     pub(crate) gates: Vec<GateRef>,
 
     /// A buffer of messages to be send out, after the current handle messsage terminates.
-    pub(crate) out_buffer: Vec<(Message, GateId)>,
+    pub(crate) out_buffer: Vec<(Message, GateRef)>,
 
     /// A buffer of wakeup calls to be enqueued, after the current handle message terminates.
     pub(crate) loopback_buffer: Vec<(Message, SimTime)>,
@@ -155,7 +155,7 @@ impl ModuleCore {
     where
         T: 'static + StaticModuleCore,
     {
-        let ptr = self.check_reference_intergrity(self.childern.get(name).map(|t| t.clone()))?;
+        let ptr = self.check_reference_intergrity(self.childern.get(name).copied())?;
         unsafe { Ok(&*ptr) }
     }
 
@@ -167,7 +167,7 @@ impl ModuleCore {
     where
         T: 'static + StaticModuleCore,
     {
-        let ptr = self.check_reference_intergrity(self.childern.get(name).map(|t| t.clone()))?;
+        let ptr = self.check_reference_intergrity(self.childern.get(name).copied())?;
         unsafe { Ok(&mut *ptr) }
     }
 

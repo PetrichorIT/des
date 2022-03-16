@@ -14,7 +14,7 @@ fn main() {
 
     let ids: Vec<ModuleId> = (1..=100)
         .map(|n| {
-            app.module(|m| m.name() == &format!("bob{}", n))
+            app.module(|m| m.name() == format!("bob{}", n))
                 .unwrap()
                 .id()
         })

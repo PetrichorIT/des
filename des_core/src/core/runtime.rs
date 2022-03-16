@@ -402,9 +402,9 @@ use crate::net::*;
 
 #[cfg(feature = "net")]
 impl<A> Runtime<NetworkRuntime<A>> {
-    pub fn add_message_onto(&mut self, gate_id: GateId, message: Message, time: SimTime) {
+    pub fn add_message_onto(&mut self, gate: GateRef, message: Message, time: SimTime) {
         let event = MessageAtGateEvent {
-            gate_id,
+            gate,
             handled: false,
             message: std::mem::ManuallyDrop::new(message),
         };

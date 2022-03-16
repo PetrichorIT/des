@@ -22,17 +22,6 @@ pub struct NetworkRuntime<A> {
     module_buffer: IdBuffer<Box<dyn Module>>,
 
     ///
-    /// The set of channels used to connect module. This will NOT include direct connections
-    /// which do not contain any delay, thus are bound to no channel.
-    ///
-    channel_buffer: IdBuffer<Channel>,
-
-    ///
-    ///  A buffer to store all gates.
-    ///
-    gate_buffer: IdBuffer<Gate>,
-
-    ///
     /// The set of parameters for the module-driven simulation.
     ///
     parameters: spmc::SpmcWriter<Parameters>,
@@ -54,8 +43,6 @@ impl<A> NetworkRuntime<A> {
     pub fn new(inner: A) -> Self {
         Self {
             module_buffer: IdBuffer::new(),
-            channel_buffer: IdBuffer::new(),
-            gate_buffer: IdBuffer::new(),
             parameters: spmc::SpmcWriter::new(Parameters::new()),
 
             inner,
@@ -139,54 +126,8 @@ impl<A> NetworkRuntime<A> {
     /// Registers a channel with a non-null delay.
     ///
     pub fn create_channel(&mut self, metrics: ChannelMetrics) -> ChannelRef {
-        let channel = Channel::new(metrics);
-        let item = self.channel_buffer.insert(channel);
-
-        IdBufferRef::new(item.id(), &mut self.channel_buffer)
-    }
-
-    ///
-    /// Retrieves a channel by id.
-    ///
-    pub fn channel(&self, id: ChannelId) -> Option<&Channel> {
-        self.channel_buffer.get(id)
-    }
-
-    ///
-    /// Retrieves a channel by id mutabliy.
-    ///
-    pub fn channel_mut(&mut self, id: ChannelId) -> Option<&mut Channel> {
-        self.channel_buffer.get_mut(id)
-    }
-
-    ///
-    /// Registers a new gate into the global buffer returning
-    /// a reference to the gate.
-    ///
-    pub fn create_gate(&mut self, gate: Gate) -> IdBufferRef<Gate> {
-        let item = self.gate_buffer.insert(gate);
-
-        IdBufferRef::new(item.id(), &mut self.gate_buffer)
-    }
-
-    ///
-    /// Retrieves a gate by id from.
-    /// This operations should only be done if absuloutly nessecary since it is
-    /// expensive, bc gates are stored in their respecitve owner modules.
-    ///
-    pub fn gate(&self, id: GateId) -> Option<&Gate> {
-        self.gate_buffer.get(id)
-    }
-
-    ///
-    /// Retrieves a target gate of a gate chain.
-    ///
-    pub fn gate_dest(&self, source_id: GateId) -> Option<&Gate> {
-        let mut gate = self.gate(source_id)?;
-        while gate.id() != GateId::NULL {
-            gate = self.gate(gate.next_gate())?
-        }
-        Some(gate)
+        // TODO: Depc
+        Mrc::new(Channel::new(metrics))
     }
 
     ///
@@ -198,8 +139,6 @@ impl<A> NetworkRuntime<A> {
         #[cfg(feature = "net-static")]
         {
             self.module_buffer.lock();
-            self.channel_buffer.lock();
-            self.gate_buffer.lock();
         }
     }
 

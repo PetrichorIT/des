@@ -266,9 +266,6 @@ fn gen_dynamic_module_core(ident: Ident, attrs: Attributes) -> TokenStream {
 
                     // get gate cluster for specific nodes
                     let to_ident = ident_from_conident(&mut token_stream, target);
-                    token_stream.extend(quote! {
-                        let #to_ident = #to_ident.id();
-                    });
 
                     let from_ident = ident_from_conident(&mut token_stream, source);
                     // Define n channels (n == gate_cluster.size())
@@ -353,8 +350,8 @@ fn ident_from_conident(
             );
 
             token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                let mut #ident_token: &mut des_core::Gate = #submodule_ident.gate_mut(#gate_ident, #pos)
-                    .expect("Internal macro err.");
+                let mut #ident_token: ::des_core::GateRef = #submodule_ident.gate_mut(#gate_ident, #pos)
+                    .expect("Internal macro err.").clone();
             });
 
             ident_token
@@ -368,8 +365,8 @@ fn ident_from_conident(
             );
 
             token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                let mut #ident: &mut des_core::Gate = self.gate_mut(#gate_ident, #pos)
-                    .expect("Internal macro err.");
+                let mut #ident: ::des_core::GateRef = self.gate_mut(#gate_ident, #pos)
+                    .expect("Internal macro err.").clone();
             });
 
             ident

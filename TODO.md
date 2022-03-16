@@ -17,3 +17,7 @@ substructure generics:
 
 try to redesign interning,
 also use Clone-on-write for typed instances
+
+# Deprecated Channel ID
+
+since channels are managed using Mrc not central buffers, ids became obsolete

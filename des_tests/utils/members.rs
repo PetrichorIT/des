@@ -31,7 +31,7 @@ impl Module for Alice {
     }
 
     fn activity(&mut self) {
-        warn!(target: &self.str(), "ACTIVITY");
+        warn!(target: self.str(), "ACTIVITY");
     }
 }
 

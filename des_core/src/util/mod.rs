@@ -8,9 +8,6 @@ mod buffer;
 #[cfg(feature = "net")]
 pub use buffer::*;
 
-mod cell;
-pub use cell::*;
-
 mod macros;
 pub use macros::*;
 

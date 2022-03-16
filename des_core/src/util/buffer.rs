@@ -215,6 +215,7 @@ where
         Some(&mut self.inner[idx])
     }
 
+    #[allow(unused)]
     pub fn iter(&self) -> Iter<'_, T> {
         self.inner.iter()
     }
@@ -257,6 +258,7 @@ impl<T> IdBufferRef<T>
 where
     T: Indexable,
 {
+    #[allow(unused)]
     pub fn id(&self) -> T::Id {
         self.id
     }
@@ -265,6 +267,7 @@ where
     /// Creates a new strong ref to a object referenced by and id
     /// in the given buffer.
     ///
+    #[allow(unused)]
     pub fn new(id: T::Id, buffer: &mut IdBuffer<T>) -> Self {
         Self {
             id,
@@ -284,6 +287,7 @@ where
     ///
     /// Resolves the ref to a read-only intrincis reference.
     ///
+    #[allow(unused)]
     pub fn get(&self) -> &T {
         //
         // # Safty
@@ -341,6 +345,7 @@ where
     ///
     /// Resolves the ref to a mutable intrincis reference.
     ///
+    #[allow(unused)]
     pub fn get_mut(&mut self) -> &mut T {
         //
         // # Safty

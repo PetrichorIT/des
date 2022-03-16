@@ -8,13 +8,13 @@ use crate::create_global_uid;
 
 use crate::core::*;
 use crate::net::*;
-use crate::util::IdBufferRef;
 use crate::util::Indexable;
+use crate::util::Mrc;
 
 ///
 /// A mutable reference to a channel inside a global buffer.
 ///
-pub type ChannelRef = IdBufferRef<Channel>;
+pub type ChannelRef = Mrc<Channel>;
 
 create_global_uid!(
     /// A runtime-unique identifier for a one directional channel.

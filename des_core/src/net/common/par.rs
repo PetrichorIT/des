@@ -18,7 +18,7 @@ impl Parameters {
 
     pub fn build(&mut self, raw_text: &str) {
         for line in raw_text.lines() {
-            if let Some((key, value)) = line.split_once("=") {
+            if let Some((key, value)) = line.split_once('=') {
                 self.insert(key.trim(), value.trim());
             }
         }
@@ -32,6 +32,12 @@ impl Parameters {
         let mut map = HashMap::new();
         self.tree.get(key, &mut map);
         map
+    }
+}
+
+impl Default for Parameters {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -72,7 +78,7 @@ impl ParameterTree {
     }
 
     fn insert(&mut self, key: &str, value: &str) {
-        match key.split_once(".") {
+        match key.split_once('.') {
             Some((ele, rem)) => match self.branches.iter_mut().find(|b| b.matches(ele)) {
                 Some(branch) => branch.tree_mut().insert(rem, value),
                 None => {
@@ -93,12 +99,12 @@ impl ParameterTree {
     }
 
     fn get(&self, key: &str, map: &mut HashMap<String, String>) {
-        if key == "" {
+        if key.is_empty() {
             self.pars.iter().for_each(|(key, value)| {
                 let _ = map.insert(key.to_string(), value.to_string());
             })
         }
-        let (ele, rem) = key.split_once(".").unwrap_or((key, ""));
+        let (ele, rem) = key.split_once('.').unwrap_or((key, ""));
 
         for branch in &self.branches {
             match branch {

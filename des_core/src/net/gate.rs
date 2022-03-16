@@ -1,13 +1,13 @@
 use crate::create_global_uid;
 use crate::net::*;
-use crate::util::IdBufferRef;
+use crate::util::Mrc;
 use crate::Indexable;
 use std::fmt::{Debug, Display};
 
 ///
 /// A mutable reference to a gate inside a global buffer.
 ///
-pub type GateRef = IdBufferRef<Gate>;
+pub type GateRef = Mrc<Gate>;
 
 create_global_uid!(
     /// A runtime-unquie identifier for a gate.
@@ -61,7 +61,7 @@ impl Display for GateDescription {
 ///
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone)]
 pub struct Gate {
     /// A globally unique identifier for the gate.
     id: GateId,
@@ -72,7 +72,7 @@ pub struct Gate {
     /// A identifier of the channel linked to the gate chain.
     channel: Option<ChannelRef>,
     /// The next gate in the gate chain, GATE_NULL if non is existent.
-    next_gate: GateId,
+    next_gate: Option<GateRef>,
 }
 
 impl Indexable for Gate {
@@ -103,8 +103,8 @@ impl Gate {
 
     /// The next gate in the gate chain.
     #[inline(always)]
-    pub fn next_gate(&self) -> GateId {
-        self.next_gate
+    pub fn next_gate(&self) -> Option<&GateRef> {
+        self.next_gate.as_ref()
     }
 
     ///
@@ -112,24 +112,20 @@ impl Gate {
     /// its identifier.
     ///
     #[inline(always)]
-    pub fn set_next_gate(&mut self, next_gate: GateId) {
-        self.next_gate = next_gate;
+    pub fn set_next_gate(&mut self, next_gate: GateRef) {
+        self.next_gate = Some(next_gate);
     }
 
     /// The channel identifier of the linked channel.
     #[inline(always)]
     pub fn channel_id(&self) -> ChannelId {
-        match &self.channel {
-            Some(c) => c.id(),
-            None => ChannelId::NULL,
-        }
+        self.channel()
+            .map(|c| c.as_ref().id())
+            .unwrap_or(ChannelId::NULL)
     }
 
-    pub fn channel(&self) -> Option<&Channel> {
-        match &self.channel {
-            Some(c) => Some(c.get()),
-            None => None,
-        }
+    pub fn channel(&self) -> Option<&ChannelRef> {
+        self.channel.as_ref()
     }
 
     #[inline(always)]
@@ -150,7 +146,7 @@ impl Gate {
         description: GateDescription,
         pos: usize,
         channel: Option<ChannelRef>,
-        next_gate: GateId,
+        next_gate: Option<GateRef>,
     ) -> Self {
         Self {
             id: GateId::gen(),
@@ -173,7 +169,7 @@ where
     /// Extracts a gate identifier from a module using the given
     /// value as implicit reference.
     ///
-    fn into_gate(self, _module: &T) -> Option<GateId> {
+    fn into_gate(self, _module: &T) -> Option<GateRef> {
         None
     }
 }
@@ -182,13 +178,9 @@ impl<T> IntoModuleGate<T> for Gate
 where
     T: StaticModuleCore,
 {
-    fn into_gate(self, module: &T) -> Option<GateId> {
-        let element = module
-            .gates()
-            .iter()
-            .find(|&g| **g == self)
-            .map(|v| v.id())?;
-        Some(element)
+    fn into_gate(self, module: &T) -> Option<GateRef> {
+        let element = module.gates().iter().find(|&g| g.id() == self.id())?;
+        Some(element.clone())
     }
 }
 
@@ -196,13 +188,9 @@ impl<T> IntoModuleGate<T> for &Gate
 where
     T: StaticModuleCore,
 {
-    fn into_gate(self, module: &T) -> Option<GateId> {
-        let element = module
-            .gates()
-            .iter()
-            .find(|&g| *g == self)
-            .map(|v| v.id())?;
-        Some(element)
+    fn into_gate(self, module: &T) -> Option<GateRef> {
+        let element = module.gates().iter().find(|&g| g.id() == self.id())?;
+        Some(element.clone())
     }
 }
 
@@ -210,13 +198,9 @@ impl<T> IntoModuleGate<T> for GateId
 where
     T: StaticModuleCore,
 {
-    fn into_gate(self, module: &T) -> Option<GateId> {
-        let element = module
-            .gates()
-            .iter()
-            .find(|&g| g.id() == self)
-            .map(|v| v.id())?;
-        Some(element)
+    fn into_gate(self, module: &T) -> Option<GateRef> {
+        let element = module.gates().iter().find(|&g| g.id() == self)?;
+        Some(element.clone())
     }
 }
 
@@ -224,13 +208,12 @@ impl<T> IntoModuleGate<T> for (&str, usize)
 where
     T: StaticModuleCore,
 {
-    fn into_gate(self, module: &T) -> Option<GateId> {
+    fn into_gate(self, module: &T) -> Option<GateRef> {
         let element = module
             .gates()
             .iter()
-            .find(|&g| g.name() == self.0 && g.pos() == self.1)
-            .map(|v| v.id())?;
+            .find(|&g| g.name() == self.0 && g.pos() == self.1)?;
 
-        Some(element)
+        Some(element.clone())
     }
 }
