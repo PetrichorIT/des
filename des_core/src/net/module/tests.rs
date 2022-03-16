@@ -1,17 +1,9 @@
 use std::any::TypeId;
 
-use crate::*;
+use crate::{util::Mrc, *};
 
 macro_rules! auto_impl_static {
     ($ident: ident) => {
-        impl Indexable for $ident {
-            type Id = ModuleId;
-
-            fn id(&self) -> Self::Id {
-                self.module_core().id()
-            }
-        }
-
         impl StaticModuleCore for $ident {
             fn module_core(&self) -> &ModuleCore {
                 &self.core
@@ -79,9 +71,9 @@ auto_impl_static!(GrandChild);
 
 #[derive(Debug)]
 struct TestCase {
-    parent: Box<Parent>,
-    children: Vec<Box<Child>>,
-    grand_children: Vec<Box<GrandChild>>,
+    parent: Mrc<Parent>,
+    children: Vec<Mrc<Child>>,
+    grand_children: Vec<Mrc<GrandChild>>,
 }
 
 impl TestCase {
@@ -91,7 +83,7 @@ impl TestCase {
             SpmcWriter::new(Parameters::new()).get_reader(),
         );
 
-        let mut parent = Box::new(Parent::named(core));
+        let mut parent = Mrc::new(Parent::named(core));
 
         let mut children = vec![
             Child::named_with_parent("c1", &mut *parent),

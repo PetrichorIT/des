@@ -5,7 +5,8 @@
 use std::{
     borrow::{Borrow, BorrowMut},
     cell::UnsafeCell,
-    ops::{Deref, DerefMut},
+    marker::Unsize,
+    ops::{CoerceUnsized, Deref, DerefMut, DispatchFromDyn},
     rc::Rc,
 };
 
@@ -97,6 +98,20 @@ where
         // acording to the type definition
         unsafe { &mut *self.inner.as_ref().get() }
     }
+}
+
+impl<T, U> CoerceUnsized<Mrc<U>> for Mrc<T>
+where
+    T: ?Sized + Unsize<U>,
+    U: ?Sized,
+{
+}
+
+impl<T, U> DispatchFromDyn<Mrc<U>> for Mrc<T>
+where
+    T: ?Sized + Unsize<U>,
+    U: ?Sized,
+{
 }
 
 ///

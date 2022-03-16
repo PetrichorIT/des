@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use des_core::{rng, GateId, Indexable, Message, Module, ModuleCore, NodeAddress, Packet, SimTime};
+use des_core::{rng, GateId, Message, Module, ModuleCore, Mrc, NodeAddress, Packet, SimTime};
 use des_core::{ModulePath, StaticModuleCore};
 use des_macros::Module;
 use log::info;
@@ -14,12 +14,12 @@ pub struct NetworkStack {
     address: NodeAddress,
 
     forwarding_table: HashMap<NodeAddress, GateId>,
-    routing_deamon: Option<Box<RandomRoutingDeamon>>,
+    routing_deamon: Option<Mrc<RandomRoutingDeamon>>,
 }
 
 impl NetworkStack {
-    pub fn new(address: NodeAddress, router: RandomRoutingDeamon) -> Box<Self> {
-        let mut obj = Box::new(Self {
+    pub fn new(address: NodeAddress, router: RandomRoutingDeamon) -> Mrc<Self> {
+        let mut obj = Mrc::new(Self {
             core: ModuleCore::new_with(
                 ModulePath::root("NetworkStack".to_string()),
                 router.module_core().pars_ref(),
@@ -29,7 +29,7 @@ impl NetworkStack {
             routing_deamon: None,
         });
 
-        let mut router = Box::new(router);
+        let mut router = Mrc::new(router);
 
         obj.add_child(&mut *router);
         obj.routing_deamon = Some(router);

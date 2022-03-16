@@ -40,15 +40,6 @@ macro_rules! create_global_uid {
                 }
             }
 
-            use crate::util::IdAsIndex;
-            impl IdAsIndex for $ident {
-                const MIN: Self = Self(0xff);
-
-                fn as_usize(&self) -> usize {
-                    self.0 as usize
-                }
-            }
-
             impl From<$ty> for $ident {
                 fn from(raw_id: $ty) -> Self {
                     Self(raw_id)

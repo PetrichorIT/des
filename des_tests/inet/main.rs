@@ -1,5 +1,5 @@
 use des_core::{
-    Channel, ChannelMetrics, Message, ModuleId, NetworkRuntime, Packet, Runtime, SimTime,
+    Channel, ChannelMetrics, Message, ModuleId, Mrc, NetworkRuntime, Packet, Runtime, SimTime,
 };
 use des_core::{GateId, StaticModuleCore};
 use network_node::NetworkNode;
@@ -26,7 +26,7 @@ fn main() {
     //
     // ALICE
     //
-    let mut node_alice = Box::new(NetworkNode::named("Alice", app.parameters()));
+    let mut node_alice = Mrc::new(NetworkNode::named("Alice", app.parameters()));
     let mut stack_alice =
         NetworkStack::new(0x00_00_00_ff, RandomRoutingDeamon::new(app.parameters()));
     node_alice.add_child(&mut *stack_alice);
@@ -42,7 +42,7 @@ fn main() {
     //
     // BOB
     //
-    let mut node_bob = Box::new(NetworkNode::named("Bob", app.parameters()));
+    let mut node_bob = Mrc::new(NetworkNode::named("Bob", app.parameters()));
     let mut stack_bob =
         NetworkStack::new(0x00_00_00_ee, RandomRoutingDeamon::new(app.parameters()));
 
@@ -60,7 +60,7 @@ fn main() {
     // EVE
     //
 
-    let mut node_eve = Box::new(NetworkNode::named("Eve", app.parameters()));
+    let mut node_eve = Mrc::new(NetworkNode::named("Eve", app.parameters()));
     let mut stack_eve =
         NetworkStack::new(0x00_00_00_dd, RandomRoutingDeamon::new(app.parameters()));
 

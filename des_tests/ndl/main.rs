@@ -12,12 +12,8 @@ struct A();
 fn main() {
     let app: NetworkRuntime<A> = A().build_rt();
 
-    let ids: Vec<ModuleId> = (1..=100)
-        .map(|n| {
-            app.module(|m| m.name() == format!("bob{}", n))
-                .unwrap()
-                .id()
-        })
+    let ids: Vec<ModuleRef> = (1..=100)
+        .map(|n| app.module(|m| m.name() == format!("bob{}", n)).unwrap())
         .collect();
 
     let mut rt = Runtime::new_with(

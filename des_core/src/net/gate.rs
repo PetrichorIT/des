@@ -2,6 +2,7 @@ use crate::create_global_uid;
 use crate::net::*;
 use crate::util::Mrc;
 use std::fmt::{Debug, Display};
+use std::marker::Unsize;
 
 ///
 /// A mutable reference to a gate inside a global buffer.
@@ -20,10 +21,10 @@ create_global_uid!(
 ///
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone)]
 pub struct GateDescription {
     /// The identifier of the module the gate was created on.
-    pub owner: ModuleId,
+    pub owner: ModuleRef,
     /// A human readable name for a gate cluster.
     pub name: String,
     /// The number of elements in the gate cluster.
@@ -43,7 +44,11 @@ impl GateDescription {
     ///
     /// Creates a new descriptor using explicit values.
     ///
-    pub fn new(name: String, size: usize, owner: ModuleId) -> Self {
+    pub fn new<T>(name: String, size: usize, owner: Mrc<T>) -> Self
+    where
+        T: Module + Unsize<dyn Module>,
+    {
+        let owner: Mrc<dyn Module> = owner;
         assert!(size >= 1);
         Self { name, size, owner }
     }
@@ -52,6 +57,24 @@ impl GateDescription {
 impl Display for GateDescription {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Debug::fmt(&self, f)
+    }
+}
+
+impl Debug for GateDescription {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GateDescription")
+            .field("name", &self.name)
+            .field("size", &self.size)
+            .field("owner", self.owner.path())
+            .finish()
+    }
+}
+
+impl PartialEq for GateDescription {
+    fn eq(&self, other: &Self) -> bool {
+        // self.size can be ignored since no descriptors with the same name can exist
+        // on the same owner
+        self.name == other.name && self.owner.id() == other.owner.id()
     }
 }
 
@@ -123,8 +146,8 @@ impl Gate {
 
     /// The module idefnifier of the owner module.
     #[inline(always)]
-    pub fn module(&self) -> ModuleId {
-        self.description.owner
+    pub fn module(&self) -> &ModuleRef {
+        &self.description.owner
     }
 
     ///

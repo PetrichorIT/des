@@ -59,6 +59,7 @@ pub use self::module::BuildableModule;
 pub use self::module::Module;
 pub use self::module::ModuleCore;
 pub use self::module::ModuleId;
+pub use self::module::ModuleRef;
 pub use self::module::ModuleReferencingError;
 pub use self::module::NameableModule;
 pub use self::module::StaticModuleCore;

@@ -7,12 +7,14 @@ mod tests;
 use std::collections::HashMap;
 
 use crate::net::*;
-use crate::util::Indexable;
+use crate::util::Mrc;
 use crate::*;
 use log::error;
 
 pub use self::core::*;
 pub use self::ndl::*;
+
+pub type ModuleRef = Mrc<dyn Module>;
 
 ///
 /// A set of user defined functions for customizing the
@@ -134,7 +136,11 @@ pub trait Module: StaticModuleCore {
 ///
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-pub trait StaticModuleCore: Indexable<Id = ModuleId> {
+pub trait StaticModuleCore {
+    fn id(&self) -> ModuleId {
+        self.module_core().id()
+    }
+
     ///
     /// Returns a pointer to the modules core, used for handling event and
     /// buffers that are use case unspecific.
@@ -239,9 +245,9 @@ pub trait StaticModuleCore: Indexable<Id = ModuleId> {
     ///
     /// Creates a gate on the current module, returning its ID.
     ///
-    fn create_gate<A>(&mut self, name: &str, rt: &mut NetworkRuntime<A>) -> GateRef
+    fn create_gate<A>(self: &mut Mrc<Self>, name: &str, rt: &mut NetworkRuntime<A>) -> GateRef
     where
-        Self: Sized,
+        Self: 'static + Sized + Module,
     {
         self.create_gate_cluster(name, 1, rt).remove(0)
     }
@@ -251,14 +257,14 @@ pub trait StaticModuleCore: Indexable<Id = ModuleId> {
     /// next hop, returning the ID of the created gate.
     ///
     fn create_gate_into<A>(
-        &mut self,
+        self: &mut Mrc<Self>,
         name: &str,
         channel: Option<ChannelRef>,
         next_hop: Option<GateRef>,
         rt: &mut NetworkRuntime<A>,
     ) -> GateRef
     where
-        Self: Sized,
+        Self: 'static + Sized + Module,
     {
         self.create_gate_cluster_into(name, 1, channel, vec![next_hop], rt)
             .remove(0)
@@ -268,13 +274,13 @@ pub trait StaticModuleCore: Indexable<Id = ModuleId> {
     /// Createas a cluster of gates on the current module returning their IDs.
     ///
     fn create_gate_cluster<A>(
-        &mut self,
+        self: &mut Mrc<Self>,
         name: &str,
         size: usize,
         rt: &mut NetworkRuntime<A>,
     ) -> Vec<GateRef>
     where
-        Self: Sized,
+        Self: 'static + Sized + Module,
     {
         self.create_gate_cluster_into(name, size, None, vec![None; size], rt)
     }
@@ -288,7 +294,7 @@ pub trait StaticModuleCore: Indexable<Id = ModuleId> {
     /// This function will panic should size != next_hops.len()
     ///
     fn create_gate_cluster_into<A>(
-        &mut self,
+        self: &mut Mrc<Self>,
         name: &str,
         size: usize,
         channel: Option<ChannelRef>,
@@ -296,11 +302,12 @@ pub trait StaticModuleCore: Indexable<Id = ModuleId> {
         _rt: &mut NetworkRuntime<A>,
     ) -> Vec<GateRef>
     where
-        Self: Sized,
+        Self: 'static + Sized + Module,
     {
         assert!(size == next_hops.len());
 
-        let descriptor = GateDescription::new(name.to_owned(), size, self.id());
+        let mrc = Mrc::clone(self);
+        let descriptor = GateDescription::new(name.to_owned(), size, mrc);
         let mut ids = Vec::new();
 
         for (i, item) in next_hops.into_iter().enumerate() {

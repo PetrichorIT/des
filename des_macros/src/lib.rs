@@ -136,15 +136,6 @@ fn gen_static_module_core(ident: Ident, data: Data) -> TokenStream {
                         &mut self.#eident
                     }
                 }
-
-                impl ::des_core::Indexable for #ident {
-                    type Id = ::des_core::ModuleId;
-
-                    fn id(&self) -> ::des_core::ModuleId {
-                        use ::des_core::StaticModuleCore;
-                        self.module_core().id()
-                    }
-                }
             };
 
             ts.extend(token_stream);
@@ -159,15 +150,6 @@ fn gen_static_module_core(ident: Ident, data: Data) -> TokenStream {
 
                     fn module_core_mut(&mut self) -> &mut ::des_core::ModuleCore {
                         &mut self.#idx
-                    }
-                }
-
-                impl ::des_core::Indexable for #ident {
-                    type Id = ::des_core::ModuleId;
-
-                    fn id(&self) -> ::des_core::ModuleId {
-                        use ::des_core::StaticModuleCore;
-                        self.module_core().id()
                     }
                 }
             };
@@ -241,7 +223,7 @@ fn gen_dynamic_module_core(ident: Ident, attrs: Attributes) -> TokenStream {
                     let ident = Ident::new(&format!("{}_child", descriptor), Span::call_site());
                     let ty = Ident::new(ty, Span::call_site());
                     token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                        let mut #ident: Box<#ty> = #ty::build_named_with_parent(#descriptor, &mut self, rt);
+                        let mut #ident: ::des_core::Mrc<#ty> = #ty::build_named_with_parent(#descriptor, &mut this, rt);
                     })
                 }
 
@@ -250,7 +232,7 @@ fn gen_dynamic_module_core(ident: Ident, attrs: Attributes) -> TokenStream {
                 for gate in &module.gates {
                     let GateSpec { ident, size, .. } = gate;
                     token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                        let _ = self.create_gate_cluster(#ident, #size, rt);
+                        let _ = this.create_gate_cluster(#ident, #size, rt);
                     })
                 }
 
@@ -288,10 +270,7 @@ fn gen_dynamic_module_core(ident: Ident, attrs: Attributes) -> TokenStream {
                         });
                     } else {
                         token_stream.extend(quote! {
-                            // assert_eq!(#from_ident.len(), #to_ident.len());
-                            // for i in 0..#from_ident.len() {
                                 #from_ident.set_next_gate(#to_ident);
-                            // }
                         });
                     }
                 }
@@ -313,9 +292,9 @@ fn gen_dynamic_module_core(ident: Ident, attrs: Attributes) -> TokenStream {
 
                 quote! {
                     impl ::des_core::BuildableModule for #ident {
-                        fn build<A>(mut self: Box<Self>, rt: &mut des_core::NetworkRuntime<A>) -> Box<Self> {
+                        fn build<A>(mut this: ::des_core::Mrc<Self>, rt: &mut des_core::NetworkRuntime<A>) -> ::des_core::Mrc<Self> {
                             #wrapped
-                            self
+                            this
                         }
                     }
                 }
@@ -365,7 +344,7 @@ fn ident_from_conident(
             );
 
             token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                let mut #ident: ::des_core::GateRef = self.gate_mut(#gate_ident, #pos)
+                let mut #ident: ::des_core::GateRef = this.gate_mut(#gate_ident, #pos)
                     .expect("Internal macro err.").clone();
             });
 
@@ -477,7 +456,7 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> TokenStream {
                     let ident = Ident::new(&format!("{}_child", descriptor), Span::call_site());
                     let ty = Ident::new(ty, Span::call_site());
                     token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                        let mut #ident: Box<#ty> = #ty::build_named(#descriptor.parse().unwrap(), rt);
+                        let mut #ident: ::des_core::Mrc<#ty> = #ty::build_named(#descriptor.parse().unwrap(), rt);
                     })
                 }
 
@@ -559,7 +538,7 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> TokenStream {
 
                             #token_stream
 
-                            rt.finish_building();
+                            // rt.finish_building()
                             runtime
                         }
                     }

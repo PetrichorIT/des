@@ -412,9 +412,9 @@ impl<A> Runtime<NetworkRuntime<A>> {
         self.add_event(NetEvents::MessageAtGateEvent(event), time)
     }
 
-    pub fn handle_message_on(&mut self, module_id: ModuleId, message: Message, time: SimTime) {
+    pub fn handle_message_on(&mut self, module: ModuleRef, message: Message, time: SimTime) {
         let event = HandleMessageEvent {
-            module_id,
+            module,
             handled: false,
             message: std::mem::ManuallyDrop::new(message),
         };

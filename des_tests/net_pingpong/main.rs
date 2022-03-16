@@ -7,8 +7,8 @@ mod bob;
 struct Application();
 
 fn main() {
-    let mut alice = Box::new(alice::Alice(ModuleCore::new()));
-    let mut bob = Box::new(bob::Bob(ModuleCore::new()));
+    let mut alice = Mrc::new(alice::Alice(ModuleCore::new()));
+    let mut bob = Mrc::new(bob::Bob(ModuleCore::new()));
 
     bob.add_child(&mut *alice);
 

@@ -1,11 +1,10 @@
-use log::{error, info, warn};
+use log::{info, warn};
 use std::mem::ManuallyDrop;
 use std::ops::Deref;
 
 use crate::core::*;
 use crate::create_event_set;
 use crate::net::*;
-use crate::util::*;
 
 create_event_set!(
     ///
@@ -119,13 +118,13 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
             target: &format!("Gate #{} ({})", current_gate.id(), current_gate.name()),
             "Forwarding message [{}] to module #{}",
             message.str(),
-            current_gate.module()
+            current_gate.module().id()
         );
 
-        let module = current_gate.module();
+        let module = current_gate.module().clone();
         rt.add_event(
             NetEvents::HandleMessageEvent(HandleMessageEvent {
-                module_id: module,
+                module,
                 message: ManuallyDrop::new(message),
                 handled: false,
             }),
@@ -146,37 +145,29 @@ impl Drop for MessageAtGateEvent {
 }
 
 pub struct HandleMessageEvent {
-    pub module_id: ModuleId,
+    pub module: ModuleRef,
     pub message: ManuallyDrop<Message>,
     pub handled: bool,
 }
 
 impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
     fn handle(mut self, rt: &mut crate::Runtime<NetworkRuntime<A>>) {
-        if let Some(module) = rt.app.module_mut_by_id(self.module_id) {
-            let ptr: *const Message = self.message.deref();
-            let mut message = unsafe { std::ptr::read(ptr) };
-            message.meta.receiver_module_id = module.id();
+        let ptr: *const Message = self.message.deref();
+        let mut message = unsafe { std::ptr::read(ptr) };
+        message.meta.receiver_module_id = self.module.id();
 
-            info!(
-                target: &format!("Module {}", module.str()),
-                "Handling message {:?}",
-                message.str()
-            );
+        info!(
+            target: &format!("Module {}", self.module.str()),
+            "Handling message {:?}",
+            message.str()
+        );
 
-            module.handle_message(message);
+        self.module.handle_message(message);
 
-            let job = module_drain_buffers(module.module_core_mut());
-            module_handle_jobs(rt, job);
+        let job = module_drain_buffers(self.module.clone());
+        module_handle_jobs(rt, job);
 
-            self.handled = true;
-        } else {
-            error!(
-                target: &format!("Unknown module #{}", self.module_id),
-                "Dropped message {} since module was not found",
-                self.message.str()
-            );
-        }
+        self.handled = true;
     }
 }
 
@@ -189,43 +180,36 @@ impl Drop for HandleMessageEvent {
 }
 
 pub struct CoroutineMessageEvent {
-    module_id: ModuleId,
+    module: ModuleRef,
 }
 
 impl<A> Event<NetworkRuntime<A>> for CoroutineMessageEvent {
-    fn handle(self, rt: &mut crate::Runtime<NetworkRuntime<A>>) {
-        if let Some(module) = rt.app.module_mut_by_id(self.module_id) {
-            let dur = module.module_core().activity_period;
-            // This message can only occure *after* the activity is
-            // fully initalized.
-            // It can be the case that this is wrong .. if handle_message at invalidated activity
-            // but a event still remains in queue.
-            if dur != SimTime::ZERO && module.module_core().activity_active {
-                module.activity();
+    fn handle(mut self, rt: &mut crate::Runtime<NetworkRuntime<A>>) {
+        let dur = self.module.module_core().activity_period;
+        // This message can only occure *after* the activity is
+        // fully initalized.
+        // It can be the case that this is wrong .. if handle_message at invalidated activity
+        // but a event still remains in queue.
+        if dur != SimTime::ZERO && self.module.module_core().activity_active {
+            self.module.activity();
 
-                let still_active = module.module_core().activity_active;
+            let still_active = self.module.module_core().activity_active;
 
-                // This call will only use up out buffers and loopback buffers
-                // not schedule a new Coroutine since either:
-                // - state remains stable since allready init
-                // - activity deactivated.
-                let jobs = module_drain_buffers(module.module_core_mut());
-                module_handle_jobs(rt, jobs);
+            // This call will only use up out buffers and loopback buffers
+            // not schedule a new Coroutine since either:
+            // - state remains stable since allready init
+            // - activity deactivated.
+            let jobs = module_drain_buffers(self.module.clone());
+            module_handle_jobs(rt, jobs);
 
-                if still_active {
-                    rt.add_event_in(
-                        NetEvents::CoroutineMessageEvent(CoroutineMessageEvent {
-                            module_id: self.module_id,
-                        }),
-                        dur,
-                    )
-                }
+            if still_active {
+                rt.add_event_in(
+                    NetEvents::CoroutineMessageEvent(CoroutineMessageEvent {
+                        module: self.module.clone(),
+                    }),
+                    dur,
+                )
             }
-        } else {
-            error!(
-                target: &format!("Module #{}", self.module_id),
-                " Coroutine call",
-            );
         }
     }
 }
@@ -248,14 +232,14 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
         // allowing preemtive dropping of 'module' so that rt can be used in
         // 'module_handle_jobs'.
         for i in 0..rt.app.modules().len() {
-            let module = &mut rt.app.modules_mut()[i];
+            let mut module = rt.app.modules()[i].clone();
             info!(
                 target: &format!("Module {}", module.str()),
                 "Calling at_sim_start."
             );
             module.at_sim_start();
 
-            let jobs = module_drain_buffers(module.module_core_mut());
+            let jobs = module_drain_buffers(module);
             module_handle_jobs(rt, jobs);
         }
     }
@@ -266,7 +250,7 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
 //
 
 struct ModuleBufferJob {
-    module_id: ModuleId,
+    module: ModuleRef,
 
     out: Vec<(Message, GateRef)>,
     loopback: Vec<(Message, SimTime)>,
@@ -274,7 +258,8 @@ struct ModuleBufferJob {
     ac_event: Option<SimTime>,
 }
 
-fn module_drain_buffers(module_core: &mut ModuleCore) -> ModuleBufferJob {
+fn module_drain_buffers(mut module: ModuleRef) -> ModuleBufferJob {
+    let module_core = module.module_core_mut();
     let enqueue_activity_msg =
         module_core.activity_period != SimTime::ZERO && !module_core.activity_active;
 
@@ -283,8 +268,6 @@ fn module_drain_buffers(module_core: &mut ModuleCore) -> ModuleBufferJob {
     }
 
     ModuleBufferJob {
-        module_id: module_core.id(),
-
         out: module_core.out_buffer.drain(..).collect(),
         loopback: module_core.loopback_buffer.drain(..).collect(),
 
@@ -293,12 +276,14 @@ fn module_drain_buffers(module_core: &mut ModuleCore) -> ModuleBufferJob {
         } else {
             None
         },
+
+        module,
     }
 }
 
 fn module_handle_jobs<A>(rt: &mut Runtime<NetworkRuntime<A>>, job: ModuleBufferJob) {
     let ModuleBufferJob {
-        module_id,
+        module,
         out,
         loopback,
         ac_event,
@@ -320,7 +305,7 @@ fn module_handle_jobs<A>(rt: &mut Runtime<NetworkRuntime<A>>, job: ModuleBufferJ
     for (msg, time) in loopback {
         rt.add_event(
             NetEvents::HandleMessageEvent(HandleMessageEvent {
-                module_id,
+                module: module.clone(),
                 message: ManuallyDrop::new(msg),
                 handled: false,
             }),
@@ -332,7 +317,7 @@ fn module_handle_jobs<A>(rt: &mut Runtime<NetworkRuntime<A>>, job: ModuleBufferJ
     // call activity
     if let Some(ac_event) = ac_event {
         rt.add_event_in(
-            NetEvents::CoroutineMessageEvent(CoroutineMessageEvent { module_id }),
+            NetEvents::CoroutineMessageEvent(CoroutineMessageEvent { module }),
             ac_event,
         )
     }

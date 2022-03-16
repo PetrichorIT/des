@@ -1,3 +1,8 @@
+#![feature(unsize)]
+#![feature(dispatch_from_dyn)]
+#![feature(coerce_unsized)]
+#![feature(arbitrary_self_types)]
+
 //!
 //! A discrete event simulator.
 //!
@@ -40,7 +45,5 @@ pub use crate::metrics::StdDev;
 #[cfg(feature = "net")]
 pub use crate::net::*;
 
-#[cfg(feature = "net")]
-pub use util::Indexable;
-
 pub use util::spmc::*;
+pub use util::Mrc;

@@ -1,10 +1,11 @@
+use std::marker::Unsize;
+
 use crate::core::*;
 use crate::net::*;
 use crate::util::*;
 
 mod events;
 pub use events::*;
-use lazy_static::__Deref;
 use log::error;
 
 use super::common::Parameters;
@@ -19,7 +20,7 @@ pub struct NetworkRuntime<A> {
     /// The set of module used in the network simulation.
     /// All module must be boxed, since they must conform to the [Module] trait.
     ///
-    module_buffer: IdBuffer<Box<dyn Module>>,
+    module_list: Vec<ModuleRef>,
 
     ///
     /// The set of parameters for the module-driven simulation.
@@ -42,7 +43,7 @@ impl<A> NetworkRuntime<A> {
     ///
     pub fn new(inner: A) -> Self {
         Self {
-            module_buffer: IdBuffer::new(),
+            module_list: Vec::new(),
             parameters: spmc::SpmcWriter::new(Parameters::new()),
 
             inner,
@@ -64,74 +65,30 @@ impl<A> NetworkRuntime<A> {
     /// Returns a mutable refernce to the boxed module.
     /// This reference should be short lived since it blocks any other reference to self.
     ///
-    pub fn create_module(&mut self, module: Box<dyn Module>) -> &mut Box<dyn Module> {
-        self.module_buffer.insert(module)
+    pub fn create_module<T>(&mut self, module: Mrc<T>)
+    where
+        T: Module + Unsize<dyn Module>,
+    {
+        let dyned: Mrc<dyn Module> = module;
+        self.module_list.push(dyned);
     }
 
     ///
     /// Returns a reference to the list of all modules.
     ///
-    pub fn modules(&self) -> &Vec<Box<dyn Module>> {
-        self.module_buffer.contents()
+    pub fn modules(&self) -> &Vec<ModuleRef> {
+        &self.module_list
     }
 
     ///
     /// Searches a module based on this predicate.
     /// Shortcircuits if found and returns a read-only reference.
     ///
-    pub fn module<F>(&self, predicate: F) -> Option<&dyn Module>
+    pub fn module<F>(&self, predicate: F) -> Option<ModuleRef>
     where
-        F: FnMut(&&Box<dyn Module>) -> bool,
+        F: FnMut(&&ModuleRef) -> bool,
     {
-        self.modules()
-            .iter()
-            .find(predicate)
-            .map(|boxed| boxed.deref())
-    }
-    ///
-    /// Returns a mutable reference to the list of all modules.
-    ///
-    pub fn modules_mut(&mut self) -> &mut Vec<Box<dyn Module>> {
-        self.module_buffer.contents_mut()
-    }
-
-    ///
-    /// Searches a module based on this predicate.
-    /// Shortcircuits if found and returns a mutably reference.
-    ///
-    pub fn module_mut<F>(&mut self, predicate: F) -> Option<&mut Box<dyn Module>>
-    where
-        F: FnMut(&&mut Box<dyn Module>) -> bool,
-    {
-        self.modules_mut().iter_mut().find(predicate)
-    }
-
-    ///
-    /// Retrieves module by id. This is more efficient that the usual
-    /// 'module_mut' because ids a sorted so binary seach can be used.
-    ///
-    pub fn module_by_id(&self, id: ModuleId) -> Option<&dyn Module> {
-        self.module_buffer.get(id).map(|boxed| boxed.deref())
-    }
-
-    ///
-    /// Retrieves module mutably by id. This is more efficient that the usual
-    /// 'module_mut' because ids a sorted so binary seach can be used.
-    ///
-    pub fn module_mut_by_id(&mut self, id: ModuleId) -> Option<&mut Box<dyn Module>> {
-        self.module_buffer.get_mut(id)
-    }
-
-    ///
-    /// Locks the buffer to that no new gates can be created-
-    ///
-    pub fn finish_building(&mut self) {
-        // If feature 'static' is active,
-        // lock the buffer to activate preformance improvments
-        #[cfg(feature = "net-static")]
-        {
-            self.module_buffer.lock();
-        }
+        self.modules().iter().find(predicate).cloned()
     }
 
     ///
@@ -147,11 +104,13 @@ impl<A> Application for NetworkRuntime<A> {
 
     fn at_sim_start(rt: &mut Runtime<Self>) {
         // Add inital event
+        // this is done via an event to get the usual module buffer clearing behavoir
+        // while the end ignores all send packets.
         rt.add_event(NetEvents::SimStartNotif(SimStartNotif()), SimTime::now());
     }
 
     fn at_sim_end(rt: &mut Runtime<Self>) {
-        for module in rt.app.module_buffer.iter_mut() {
+        for module in rt.app.module_list.iter_mut() {
             module.at_sim_end();
         }
     }
