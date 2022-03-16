@@ -1,7 +1,6 @@
 use crate::create_global_uid;
 use crate::net::*;
 use crate::util::Mrc;
-use crate::Indexable;
 use std::fmt::{Debug, Display};
 
 ///
@@ -75,15 +74,12 @@ pub struct Gate {
     next_gate: Option<GateRef>,
 }
 
-impl Indexable for Gate {
-    type Id = GateId;
-
-    fn id(&self) -> GateId {
+impl Gate {
+    // Returns the gate id
+    pub fn id(&self) -> GateId {
         self.id
     }
-}
 
-impl Gate {
     /// The position index of the gate in the descriptor cluster.
     #[inline(always)]
     pub fn pos(&self) -> usize {
@@ -114,14 +110,6 @@ impl Gate {
     #[inline(always)]
     pub fn set_next_gate(&mut self, next_gate: GateRef) {
         self.next_gate = Some(next_gate);
-    }
-
-    /// The channel identifier of the linked channel.
-    #[inline(always)]
-    pub fn channel_id(&self) -> ChannelId {
-        self.channel()
-            .map(|c| c.as_ref().id())
-            .unwrap_or(ChannelId::NULL)
     }
 
     pub fn channel(&self) -> Option<&ChannelRef> {

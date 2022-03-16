@@ -8,7 +8,6 @@ use crate::create_global_uid;
 
 use crate::core::*;
 use crate::net::*;
-use crate::util::Indexable;
 use crate::util::Mrc;
 
 ///
@@ -113,15 +112,11 @@ pub struct Channel {
     transmission_finish_time: SimTime,
 }
 
-impl Indexable for Channel {
-    type Id = ChannelId;
-
-    fn id(&self) -> Self::Id {
+impl Channel {
+    pub fn id(&self) -> ChannelId {
         self.id
     }
-}
 
-impl Channel {
     ///
     /// The capabilities of the channel.
     ///
