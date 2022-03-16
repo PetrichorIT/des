@@ -54,8 +54,6 @@ pub struct ModuleCore {
     childern: HashMap<String, TypedModulePtr>,
 
     /// A set of local parameters.
-    ///
-    /// TODO: Restrict to pub(crate) if possible providing constructors to created valid subinstances.
     parameters: SpmcReader<Parameters>,
 }
 

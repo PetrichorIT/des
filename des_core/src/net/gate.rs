@@ -147,14 +147,14 @@ impl Gate {
         pos: usize,
         channel: Option<ChannelRef>,
         next_gate: Option<GateRef>,
-    ) -> Self {
-        Self {
+    ) -> Mrc<Self> {
+        Mrc::new(Self {
             id: GateId::gen(),
             description,
             pos,
             channel,
             next_gate,
-        }
+        })
     }
 }
 

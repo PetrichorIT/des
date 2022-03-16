@@ -8,7 +8,6 @@ use std::collections::HashMap;
 
 use crate::net::*;
 use crate::util::Indexable;
-use crate::util::Mrc;
 use crate::*;
 use log::error;
 
@@ -305,7 +304,7 @@ pub trait StaticModuleCore: Indexable<Id = ModuleId> {
         let mut ids = Vec::new();
 
         for (i, item) in next_hops.into_iter().enumerate() {
-            let gate = Mrc::new(Gate::new(descriptor.clone(), i, channel.clone(), item));
+            let gate = Gate::new(descriptor.clone(), i, channel.clone(), item);
             ids.push(gate.clone());
 
             self.module_core_mut().gates.push(gate);

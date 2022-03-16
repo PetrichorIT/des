@@ -1,4 +1,6 @@
-use des_core::{ChannelMetrics, Message, ModuleId, NetworkRuntime, Packet, Runtime, SimTime};
+use des_core::{
+    Channel, ChannelMetrics, Message, ModuleId, NetworkRuntime, Packet, Runtime, SimTime,
+};
 use des_core::{GateId, StaticModuleCore};
 use network_node::NetworkNode;
 use network_stack::NetworkStack;
@@ -88,7 +90,7 @@ fn main() {
     // Application config
     //
 
-    let channel = Some(app.create_channel(ChannelMetrics {
+    let channel = Some(Channel::new(ChannelMetrics {
         bitrate: 5_000_000,
         latency: 0.1.into(),
         jitter: 0.0.into(),

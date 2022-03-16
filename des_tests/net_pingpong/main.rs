@@ -14,7 +14,7 @@ fn main() {
 
     let mut app = NetworkRuntime::new(Application());
 
-    let channel = app.create_channel(ChannelMetrics {
+    let channel = Channel::new(ChannelMetrics {
         bitrate: 5_000_000,
         latency: 0.1.into(),
         jitter: 0.0.into(),

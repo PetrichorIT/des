@@ -123,14 +123,6 @@ impl<A> NetworkRuntime<A> {
     }
 
     ///
-    /// Registers a channel with a non-null delay.
-    ///
-    pub fn create_channel(&mut self, metrics: ChannelMetrics) -> ChannelRef {
-        // TODO: Depc
-        Mrc::new(Channel::new(metrics))
-    }
-
-    ///
     /// Locks the buffer to that no new gates can be created-
     ///
     pub fn finish_building(&mut self) {

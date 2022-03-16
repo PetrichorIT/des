@@ -40,15 +40,6 @@ pub struct ChannelMetrics {
 
 impl ChannelMetrics {
     ///
-    /// A channel metric that does not take up time.
-    ///
-    pub const INSTANTANEOUS: ChannelMetrics = ChannelMetrics {
-        bitrate: 0,
-        latency: SimTime::ZERO,
-        jitter: SimTime::ZERO,
-    };
-
-    ///
     /// Creates a new instance of channel metrics.
     ///
     pub fn new(bitrate: usize, latency: SimTime, jitter: SimTime) -> Self {
@@ -177,25 +168,15 @@ impl Channel {
     }
 
     ///
-    /// A channel metric that does not take up time.
-    ///
-    pub const INSTANTANEOUS: Channel = Channel {
-        id: ChannelId::NULL,
-        metrics: ChannelMetrics::INSTANTANEOUS,
-        busy: false,
-        transmission_finish_time: SimTime::ZERO,
-    };
-
-    ///
     /// Creates a new channel using tthe given metrics.
     ///
-    pub fn new(metrics: ChannelMetrics) -> Self {
-        Self {
+    pub fn new(metrics: ChannelMetrics) -> Mrc<Self> {
+        Mrc::new(Self {
             id: ChannelId::gen(),
             metrics,
             busy: false,
             transmission_finish_time: SimTime::ZERO,
-        }
+        })
     }
 
     ///
