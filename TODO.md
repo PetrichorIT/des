@@ -25,3 +25,8 @@ since channels are managed using Mrc not central buffers, ids became obsolete
 # Change parent / child to Mrc dyn traits instead of unsafe calls
 
 only when the performace hit is neglecable
+
+# Try implementing calender queue
+
+CQueue:
+n buckets of arbitry size spanning time span t

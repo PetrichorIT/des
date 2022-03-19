@@ -1,0 +1,42 @@
+[package]
+edition = "2021"
+name = "tests"
+version = "0.1.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name = "t-inet"
+path = "inet/main.rs"
+
+[[bin]]
+name = "t-pingpong"
+path = "pingpong/main.rs"
+
+[[bin]]
+name = "t-waiter"
+path = "waiter/main.rs"
+
+[[bin]]
+name = "t-ndl"
+path = "ndl/main.rs"
+
+[[bin]]
+name = "t-utils"
+path = "utils/main.rs"
+
+[[bin]]
+name = "t-ptrhell"
+path = "ptrhell/main.rs"
+
+[[bin]]
+name = "t-par"
+path = "par/main.rs"
+
+[dependencies]
+des = {path = "../des", features = ["net", "net-static", "internal-metrics"]}
+des_derive = {path = "../des_derive"}
+ndl = {path = "../ndl"}
+log = {version = "*", features = ["max_level_error"]}
+# log = "*"
+rand = "*"

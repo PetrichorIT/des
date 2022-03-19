@@ -1,5 +1,0 @@
-module SimpleModule {
-    gates:
-        in[5]
-        out[5]
-}
