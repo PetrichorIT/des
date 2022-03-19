@@ -62,6 +62,35 @@ impl ModuleSpec {
     }
 }
 
+impl Display for ModuleSpec {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "module {} {{", self.ident)?;
+
+        if !self.submodules.is_empty() {
+            writeln!(f, "\tsubmodules: ")?;
+            for submodule in self.submodules.iter() {
+                writeln!(f, "\t\t{}", submodule)?
+            }
+        }
+
+        if !self.gates.is_empty() {
+            writeln!(f, "\tgates: ")?;
+            for gate in self.gates.iter() {
+                writeln!(f, "\t\t{}", gate)?
+            }
+        }
+
+        if !self.connections.is_empty() {
+            writeln!(f, "\tconnections: ")?;
+            for connection in self.connections.iter() {
+                writeln!(f, "\t\t{}", connection)?
+            }
+        }
+
+        write!(f, "}}")
+    }
+}
+
 ///
 /// A specification for the creation of a network.
 ///
@@ -98,6 +127,28 @@ impl NetworkSpec {
             connections: Vec::new(),
             params: network_def.parameters.iter().map(ParamSpec::new).collect(),
         }
+    }
+}
+
+impl Display for NetworkSpec {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "network {} {{", self.ident)?;
+
+        if !self.nodes.is_empty() {
+            writeln!(f, "\tnodes: ")?;
+            for node in self.nodes.iter() {
+                writeln!(f, "\t\t{}", node)?
+            }
+        }
+
+        if !self.connections.is_empty() {
+            writeln!(f, "\tconnections: ")?;
+            for connection in self.connections.iter() {
+                writeln!(f, "\t\t{}", connection)?
+            }
+        }
+
+        write!(f, "}}")
     }
 }
 
