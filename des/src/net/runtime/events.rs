@@ -5,6 +5,7 @@ use std::ops::Deref;
 use crate::core::*;
 use crate::create_event_set;
 use crate::net::*;
+use crate::Mrc;
 
 create_event_set!(
     ///
@@ -164,8 +165,7 @@ impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
 
         self.module.handle_message(message);
 
-        let job = module_drain_buffers(self.module.clone());
-        module_handle_jobs(rt, job);
+        Mrc::clone(&self.module).handle_buffers(rt);
 
         self.handled = true;
     }
@@ -199,13 +199,12 @@ impl<A> Event<NetworkRuntime<A>> for CoroutineMessageEvent {
             // not schedule a new Coroutine since either:
             // - state remains stable since allready init
             // - activity deactivated.
-            let jobs = module_drain_buffers(self.module.clone());
-            module_handle_jobs(rt, jobs);
+            Mrc::clone(&self.module).handle_buffers(rt);
 
             if still_active {
                 rt.add_event_in(
                     NetEvents::CoroutineMessageEvent(CoroutineMessageEvent {
-                        module: self.module.clone(),
+                        module: self.module,
                     }),
                     dur,
                 )
@@ -239,8 +238,7 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
             );
             module.at_sim_start();
 
-            let jobs = module_drain_buffers(module);
-            module_handle_jobs(rt, jobs);
+            module.handle_buffers(rt)
         }
     }
 }
@@ -249,76 +247,47 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
 // # Helper functions
 //
 
-struct ModuleBufferJob {
-    module: ModuleRef,
+impl ModuleRef {
+    fn handle_buffers<A>(mut self, rt: &mut Runtime<NetworkRuntime<A>>) {
+        // Check whether a new activity cycle must be initated
+        let enqueue_actitivy_msg = self.module_core().activity_period != SimTime::ZERO
+            && !self.module_core().activity_active;
 
-    out: Vec<(Message, GateRef)>,
-    loopback: Vec<(Message, SimTime)>,
+        self.module_core_mut().activity_active = true;
 
-    ac_event: Option<SimTime>,
-}
+        // Send gate events from the 'send' method calls
+        for (msg, gate) in self.module_core_mut().out_buffer.drain(..) {
+            rt.add_event(
+                NetEvents::MessageAtGateEvent(MessageAtGateEvent {
+                    gate,
+                    message: ManuallyDrop::new(msg),
+                    handled: false,
+                }),
+                SimTime::now(),
+            )
+        }
 
-fn module_drain_buffers(mut module: ModuleRef) -> ModuleBufferJob {
-    let module_core = module.module_core_mut();
-    let enqueue_activity_msg =
-        module_core.activity_period != SimTime::ZERO && !module_core.activity_active;
+        let mref = Mrc::clone(&self);
 
-    if enqueue_activity_msg {
-        module_core.activity_active = enqueue_activity_msg;
-    }
+        // Send loopback events from 'scheduleAt'
+        for (msg, time) in self.module_core_mut().loopback_buffer.drain(..) {
+            rt.add_event(
+                NetEvents::HandleMessageEvent(HandleMessageEvent {
+                    module: mref.clone(),
+                    message: ManuallyDrop::new(msg),
+                    handled: false,
+                }),
+                time,
+            )
+        }
 
-    ModuleBufferJob {
-        out: module_core.out_buffer.drain(..).collect(),
-        loopback: module_core.loopback_buffer.drain(..).collect(),
-
-        ac_event: if enqueue_activity_msg {
-            Some(module_core.activity_period)
-        } else {
-            None
-        },
-
-        module,
-    }
-}
-
-fn module_handle_jobs<A>(rt: &mut Runtime<NetworkRuntime<A>>, job: ModuleBufferJob) {
-    let ModuleBufferJob {
-        module,
-        out,
-        loopback,
-        ac_event,
-    } = job;
-
-    // Send gate events from the 'send' method calls
-    for (msg, gate) in out {
-        rt.add_event(
-            NetEvents::MessageAtGateEvent(MessageAtGateEvent {
-                gate,
-                message: ManuallyDrop::new(msg),
-                handled: false,
-            }),
-            SimTime::now(),
-        )
-    }
-
-    // Send loopback events from 'scheduleAt'
-    for (msg, time) in loopback {
-        rt.add_event(
-            NetEvents::HandleMessageEvent(HandleMessageEvent {
-                module: module.clone(),
-                message: ManuallyDrop::new(msg),
-                handled: false,
-            }),
-            time,
-        )
-    }
-
-    // initalily
-    // call activity
-    if let Some(ac_event) = ac_event {
-        rt.add_event_in(
-            NetEvents::CoroutineMessageEvent(CoroutineMessageEvent { module }),
-            ac_event,
-        )
+        // initalily
+        // call activity
+        if enqueue_actitivy_msg {
+            rt.add_event_in(
+                NetEvents::CoroutineMessageEvent(CoroutineMessageEvent { module: mref }),
+                self.module_core().activity_period,
+            )
+        }
     }
 }
