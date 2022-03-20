@@ -23,6 +23,11 @@ lazy_static! {
     pub(crate) static ref RTC: SyncCell<Option<RuntimeCore>> = SyncCell::new(None);
 }
 
+pub(crate) const FT_NET: bool = cfg!(feature = "net");
+pub(crate) const FT_SIMTIME_U128: bool = cfg!(feature = "simtime-u128");
+pub(crate) const FT_CQUEUE: bool = cfg!(feature = "cqueue");
+pub(crate) const FT_INTERNAL_METRICS: bool = cfg!(feature = "internal-metrics");
+
 ///
 /// Returns the current simulation time of the currentlly active
 /// runtime session.
@@ -275,6 +280,36 @@ where
             metrics: crate::Mrc::new(crate::metrics::RuntimeMetrics::new()),
         };
 
+        macro_rules! symbol {
+            ($i:ident) => {
+                if $i {
+                    '\u{1F5F8}'
+                } else {
+                    '\u{26CC}'
+                }
+            };
+        }
+
+        // Startup message
+        println!("\u{23A1}");
+        println!("\u{23A2} Simulation starting");
+        println!(
+            "\u{23A2}  net [{}] metrics [{}] precision time [{}] cqueue [{}]",
+            symbol!(FT_NET),
+            symbol!(FT_INTERNAL_METRICS),
+            symbol!(FT_SIMTIME_U128),
+            symbol!(FT_CQUEUE)
+        );
+        println!(
+            "\u{23A2}  Event limit := {}",
+            if this.max_itr() == !0 {
+                "∞".to_string()
+            } else {
+                format!("{}", this.max_itr())
+            }
+        );
+        println!("\u{23A3}");
+
         A::at_sim_start(&mut this);
         this
     }
@@ -332,17 +367,17 @@ where
         let t1 = self.sim_time();
         self.core().interner.fincheck();
 
-        println!(
-            "Simulation finished after {} at event #{}.",
-            t1,
-            self.core().itr
-        );
+        println!("\u{23A1}");
+        println!("\u{23A2} Simulation ended");
+        println!("\u{23A2}  Ended at event #{} after {}", self.core().itr, t1);
 
         #[cfg(feature = "internal-metrics")]
         {
-            println!();
+            println!("\u{23A2}");
             self.metrics.finish()
         }
+
+        println!("\u{23A3}");
 
         (self.app, t1)
     }

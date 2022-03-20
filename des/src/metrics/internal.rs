@@ -33,16 +33,18 @@ mod std {
             self.non_zero_event_wait_time.flush();
             self.zero_event_prec.flush();
 
-            println!("Metrics");
-            println!("=======");
+            println!("\u{23A2} Metrics");
 
-            println!("Heap size:          {}", self.heap_size);
-            println!("Event timespan:     {}", self.non_zero_event_wait_time);
-            println!("Instant event prec: {}", self.zero_event_prec);
+            println!("\u{23A2}  Heap size:          {}", self.heap_size);
+            println!(
+                "\u{23A2}  Event timespan:     {}",
+                self.non_zero_event_wait_time
+            );
+            println!("\u{23A2}  Instant event prec: {}", self.zero_event_prec);
 
             let total = self.zero_event_count + self.non_zero_event_count;
             let perc = self.non_zero_event_count as f64 / total as f64;
-            println!("Instant event prec: {}", perc);
+            println!("\u{23A2}  Instant event prec: {}", perc);
         }
     }
 }
@@ -84,19 +86,24 @@ mod cqueue {
         pub fn finish(&mut self) {
             self.non_zero_event_wait_time.flush();
 
-            println!("Metrics");
-            println!("=======");
+            println!("\u{23A2} Metrics");
 
-            println!("Bucket queue total: {}", self.queue_bucket_size);
-            println!("Per bucket total:   {}", self.avg_first_bucket_fill);
-            println!("Num filled buckets: {}", self.avg_filled_buckets);
+            println!("\u{23A2}  Bucket queue total: {}", self.queue_bucket_size);
+            println!(
+                "\u{23A2}  Per bucket total:   {}",
+                self.avg_first_bucket_fill
+            );
+            println!("\u{23A2}  Num filled buckets: {}", self.avg_filled_buckets);
 
-            println!("Overflow Heap size: {}", self.overflow_heap_size);
-            println!("Event timespan:     {}", self.non_zero_event_wait_time);
+            println!("\u{23A2}  Overflow Heap size: {}", self.overflow_heap_size);
+            println!(
+                "\u{23A2}  Event timespan:     {}",
+                self.non_zero_event_wait_time
+            );
 
             let total = self.zero_event_count + self.nonzero_event_count;
             let perc = self.nonzero_event_count as f64 / total as f64;
-            println!("Instant event prec: {}", perc);
+            println!("\u{23A2}  Instant event prec: {}", perc);
         }
     }
 }

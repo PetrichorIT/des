@@ -241,7 +241,7 @@ mod cqueue {
                             .enumerate()
                             .find(|(_, b)| b.len() == 0)
                             .map(|(idx, _)| idx)
-                            .unwrap_or(N) as f64,
+                            .unwrap_or(self.n) as f64,
                         event.time,
                     );
                 }
