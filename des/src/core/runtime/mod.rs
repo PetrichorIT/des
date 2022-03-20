@@ -1,108 +1,28 @@
-use crate::core::interning::*;
-use crate::core::*;
-use crate::util::*;
-
-use lazy_static::lazy_static;
+use crate::{util::SyncCell, *};
 use log::warn;
 use rand::{
     distributions::Standard,
     prelude::{Distribution, StdRng},
-    rngs::OsRng,
-    Rng, SeedableRng,
+    Rng,
 };
-
 use std::{
     any::type_name,
     fmt::{Debug, Display},
 };
 
 mod future_event_set;
-use future_event_set::*;
+use self::future_event_set::*;
 
-lazy_static! {
-    pub(crate) static ref RTC: SyncCell<Option<RuntimeCore>> = SyncCell::new(None);
-}
+mod options;
+pub use self::options::*;
+
+mod core;
+pub use self::core::*;
 
 pub(crate) const FT_NET: bool = cfg!(feature = "net");
 pub(crate) const FT_SIMTIME_U128: bool = cfg!(feature = "simtime-u128");
 pub(crate) const FT_CQUEUE: bool = cfg!(feature = "cqueue");
 pub(crate) const FT_INTERNAL_METRICS: bool = cfg!(feature = "internal-metrics");
-
-///
-/// Returns the current simulation time of the currentlly active
-/// runtime session.
-///
-#[inline(always)]
-pub fn sim_time() -> SimTime {
-    unsafe { (*RTC.get()).as_ref().unwrap().sim_time }
-}
-
-///
-/// Generates a random instance of type T with a Standard distribution.
-///
-pub fn rng<T>() -> T
-where
-    Standard: Distribution<T>,
-{
-    unsafe { (*RTC.get()).as_mut().unwrap().rng.gen() }
-}
-
-///
-/// Generates a random instance of type T with a distribution
-/// of type D.
-///
-pub fn sample<T, D>(distr: D) -> T
-where
-    D: Distribution<T>,
-{
-    unsafe { (*RTC.get()).as_mut().unwrap().rng.sample(distr) }
-}
-
-#[derive(Debug)]
-pub(crate) struct RuntimeCore {
-    pub sim_time: SimTime,
-
-    // Rt limits
-    pub event_id: EventId,
-    pub itr: usize,
-    pub max_itr: usize,
-
-    // interning
-    pub interner: Interner,
-
-    // Misc
-    pub rng: StdRng,
-}
-
-impl RuntimeCore {
-    pub fn new(
-        sim_time: SimTime,
-        event_id: EventId,
-        itr: usize,
-        max_itr: usize,
-        rng: StdRng,
-    ) -> &'static SyncCell<Option<RuntimeCore>> {
-        let rtc = Self {
-            sim_time,
-
-            event_id,
-            itr,
-            max_itr,
-
-            interner: Interner::new(),
-
-            rng,
-        };
-
-        if let Err(e) = StandardLogger::setup() {
-            eprintln!("{}", e)
-        }
-
-        unsafe { *RTC.get() = Some(rtc) };
-
-        &RTC
-    }
-}
 
 ///
 /// The central managment point for a generic
@@ -472,66 +392,5 @@ where
             self.num_events_dispatched(),
             self.future_event_set.len()
         )
-    }
-}
-
-// OPTS
-
-///
-/// Options for sepcificing the behaviour of the core runtime
-/// independent of the app logic.
-///
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RuntimeOptions {
-    ///
-    /// The random number generator used internally.
-    /// This can be seeded to ensure reproducability.
-    /// Defaults to a [OsRng] which does NOT provide reproducability.
-    ///
-    pub rng: StdRng,
-
-    ///
-    /// The maximum number of events processed by the simulation. Defaults to [usize::MAX].
-    ///
-    pub max_itr: usize,
-
-    ///
-    /// The number of buckets used in the cqueue for storing events.
-    ///
-    #[cfg(feature = "cqueue")]
-    pub cqueue_num_buckets: usize,
-
-    ///
-    /// The time interval each bucket in the cqueue manages.
-    ///
-    #[cfg(feature = "cqueue")]
-    pub cqueue_bucket_timespan: SimTime,
-}
-
-impl RuntimeOptions {
-    pub fn seeded(state: u64) -> Self {
-        let mut default = Self::default();
-        default.rng = StdRng::seed_from_u64(state);
-        default
-    }
-
-    pub fn max_itr(mut self, max_itr: usize) -> Self {
-        self.max_itr = max_itr;
-        self
-    }
-}
-
-impl Default for RuntimeOptions {
-    fn default() -> Self {
-        Self {
-            rng: StdRng::from_rng(OsRng::default()).unwrap(),
-            max_itr: !0,
-
-            #[cfg(feature = "cqueue")]
-            cqueue_num_buckets: 10,
-
-            #[cfg(feature = "cqueue")]
-            cqueue_bucket_timespan: SimTime::from(0.2),
-        }
     }
 }
