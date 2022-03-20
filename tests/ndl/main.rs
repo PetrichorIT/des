@@ -33,5 +33,11 @@ fn main() {
         rt.handle_message_on(id, msg, arr_time);
     }
 
-    rt.run().unwrap();
+    let (_, time, event_count) = rt.run().unwrap();
+
+    assert_eq!(
+        time,
+        SimTime::from(39.0 * 60.0 * 60.0 + 43.0 * 60.0 + 49.0 + 0.378633077)
+    );
+    assert_eq!(event_count, 40_001_301);
 }

@@ -28,6 +28,7 @@ pub use self::runtime::sample;
 pub use self::runtime::sim_time;
 pub use self::runtime::Runtime;
 pub use self::runtime::RuntimeOptions;
+pub use self::runtime::RuntimeResult;
 
 //
 // # Hidden publics

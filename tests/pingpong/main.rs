@@ -42,5 +42,8 @@ fn main() {
 
     rt.add_message_onto(g4, msg, 1.0.into());
 
-    rt.run();
+    let (_, time, event_count) = rt.run().unwrap();
+
+    assert_eq!(time, SimTime::from(1.2000128));
+    assert_eq!(event_count, 9);
 }

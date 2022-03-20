@@ -101,7 +101,7 @@ fn main() {
         }
     }
 
-    let (App { event_list }, _) = rt.run().unwrap();
+    let (App { event_list }, _, _) = rt.run().unwrap();
     let mut boxed_list = Vec::with_capacity(N);
 
     let mut current_box = EventBox {

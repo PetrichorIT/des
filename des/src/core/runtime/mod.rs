@@ -261,45 +261,78 @@ where
     ///
     /// Runs the application until it terminates or exceeds it max_itr.
     ///
-    pub fn run(mut self) -> Option<(A, SimTime)> {
+    pub fn run(mut self) -> RuntimeResult<A> {
         if self.future_event_set.is_empty() {
             warn!(target: "des::core", "Running simulation without any events. Think about adding some inital events.");
-            return None;
+            return RuntimeResult::EmptySimulation { app: self.app };
         }
 
         while self.next() {}
 
-        // Call the fin-handler on the allocated application
-        A::at_sim_end(&mut self);
-
-        if self.future_event_set.is_empty() {
-            Some(self.finish())
-        } else {
-            None
-        }
+        self.finish()
     }
 
     ///
     /// Decontructs the runtime and returns the application and the final sim_time.
     ///
     #[allow(unused_mut)]
-    pub fn finish(mut self) -> (A, SimTime) {
-        let t1 = self.sim_time();
-        self.core().interner.fincheck();
+    pub fn finish(mut self) -> RuntimeResult<A> {
+        // Call the fin-handler on the allocated application
+        A::at_sim_end(&mut self);
 
-        println!("\u{23A1}");
-        println!("\u{23A2} Simulation ended");
-        println!("\u{23A2}  Ended at event #{} after {}", self.core().itr, t1);
+        if self.future_event_set.is_empty() {
+            let time = self.sim_time();
+            self.core().interner.fincheck();
 
-        #[cfg(feature = "internal-metrics")]
-        {
-            println!("\u{23A2}");
-            self.metrics.finish()
+            println!("\u{23A1}");
+            println!("\u{23A2} Simulation ended");
+            println!(
+                "\u{23A2}  Ended at event #{} after {}",
+                self.core().itr,
+                time
+            );
+
+            #[cfg(feature = "internal-metrics")]
+            {
+                println!("\u{23A2}");
+                self.metrics.finish()
+            }
+
+            println!("\u{23A3}");
+
+            RuntimeResult::Finished {
+                event_count: self.core().itr,
+                app: self.app,
+                time,
+            }
+        } else {
+            let time = self.sim_time();
+            self.core().interner.fincheck();
+
+            println!("\u{23A1}");
+            println!("\u{23A2} Simulation ended prematurly");
+            println!(
+                "\u{23A2}  Ended at event #{} with {} active events after {}",
+                self.core().itr,
+                self.future_event_set.len(),
+                time
+            );
+
+            #[cfg(feature = "internal-metrics")]
+            {
+                println!("\u{23A2}");
+                self.metrics.finish()
+            }
+
+            println!("\u{23A3}");
+
+            RuntimeResult::PrematureAbort {
+                event_count: self.core().itr,
+                active_events: self.future_event_set.len(),
+                app: self.app,
+                time,
+            }
         }
-
-        println!("\u{23A3}");
-
-        (self.app, t1)
     }
 
     ///
@@ -322,6 +355,94 @@ where
             #[cfg(feature = "internal-metrics")]
             self.metrics.clone(),
         )
+    }
+}
+
+///
+/// The result of an full execution of a runtime object.
+///
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum RuntimeResult<A> {
+    EmptySimulation {
+        app: A,
+    },
+    Finished {
+        app: A,
+        time: SimTime,
+        event_count: usize,
+    },
+    PrematureAbort {
+        app: A,
+        time: SimTime,
+        event_count: usize,
+        active_events: usize,
+    },
+}
+
+impl<A> RuntimeResult<A> {
+    pub fn unwrap(self) -> (A, SimTime, usize) {
+        match self {
+            Self::Finished {
+                app,
+                time,
+                event_count,
+            } => (app, time, event_count),
+            _ => panic!("called `RuntimeResult::unwrap` on value that is not 'Finished'"),
+        }
+    }
+
+    pub fn unwrap_or(self, default: (A, SimTime, usize)) -> (A, SimTime, usize) {
+        match self {
+            Self::Finished {
+                app,
+                time,
+                event_count,
+            } => (app, time, event_count),
+            _ => default,
+        }
+    }
+
+    pub fn unwrap_or_else<F>(self, f: F) -> (A, SimTime, usize)
+    where
+        F: FnOnce() -> (A, SimTime, usize),
+    {
+        match self {
+            Self::Finished {
+                app,
+                time,
+                event_count,
+            } => (app, time, event_count),
+            _ => f(),
+        }
+    }
+
+    pub fn map_app<F, T>(self, f: F) -> RuntimeResult<T>
+    where
+        F: FnOnce(A) -> T,
+    {
+        match self {
+            Self::EmptySimulation { app } => RuntimeResult::EmptySimulation { app: f(app) },
+            Self::Finished {
+                app,
+                time,
+                event_count,
+            } => RuntimeResult::Finished {
+                app: f(app),
+                time,
+                event_count,
+            },
+            Self::PrematureAbort {
+                app,
+                time,
+                event_count,
+                active_events,
+            } => RuntimeResult::PrematureAbort {
+                app: f(app),
+                time,
+                event_count,
+                active_events,
+            },
+        }
     }
 }
 

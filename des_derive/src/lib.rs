@@ -518,18 +518,19 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> TokenStream {
 
                 quote! {
                     impl #ident {
-                        pub fn run(self) -> (Self, ::des::SimTime) {
+                        pub fn run(self) -> ::des::RuntimeResult<Self> {
                             self.run_with_options(::des::RuntimeOptions::default())
                         }
 
-                        pub fn run_with_options(self, options: ::des::RuntimeOptions) -> (Self, ::des::SimTime) {
+                        pub fn run_with_options(self, options: ::des::RuntimeOptions) -> ::des::RuntimeResult<Self> {
                             use ::des::Runtime;
                             use ::des::NetworkRuntime;
 
                             let net_rt = self.build_rt();
                             let rt = Runtime::<NetworkRuntime<Self>>::new_with(net_rt, options);
-                            let (net_rt, end_time) = rt.run().expect("RT exceeded itr limit.");
-                            (net_rt.finish(), end_time)
+
+
+                            rt.run().map_app(|network_app| network_app.finish())
                         }
 
                         pub fn build_rt(self) -> ::des::NetworkRuntime<Self> {

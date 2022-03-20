@@ -39,6 +39,9 @@ impl Application {
         println!("Finshed at t := {}", t);
         println!("Busy := {}", busy_perc);
         println!("(avg) waittime := {}", avg_wait);
+
+        assert_eq!(busy_perc, 0.4996535454771872);
+        assert_eq!(avg_wait, SimTime::from(1.0021351711438122))
     }
 }
 
@@ -157,6 +160,6 @@ fn main() {
     let dur = expdist(&mut rt, l).into();
     rt.add_event_in(Events::CustomerArrival(CustomerArrival { idx: 0 }), dur);
 
-    let (app, t_max) = rt.run().unwrap();
+    let (app, t_max, _) = rt.run().unwrap();
     app.eval(t_max);
 }
