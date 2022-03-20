@@ -47,6 +47,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
         while let Some(next_gate) = current_gate.next_gate() {
             // A next gate exists.
             // redirect to next channel
+            message.meta.last_gate = next_gate.id();
 
             info!(
                 target: &format!("Gate #{} ({})", current_gate.id(), current_gate.name()),
