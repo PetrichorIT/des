@@ -64,7 +64,7 @@ impl ChannelMetrics {
             self.latency + transmission_time
         } else {
             let perc = rng.sample(Uniform::new(0.0f64, f64::from(self.jitter)));
-            self.latency + transmission_time + perc
+            self.latency + transmission_time + SimTime::from(perc)
         }
     }
 

@@ -61,7 +61,7 @@ impl SimTime {
         self.secs / (60 * 60 * 24)
     }
 
-    pub fn new(femtos: u64, secs: u64) -> Self {
+    pub const fn new(femtos: u64, secs: u64) -> Self {
         assert!(femtos <= FEMTO_MAX);
         Self { femtos, secs }
     }

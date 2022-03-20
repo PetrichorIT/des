@@ -26,7 +26,9 @@ since channels are managed using Mrc not central buffers, ids became obsolete
 
 only when the performace hit is neglecable
 
-# Try implementing calender queue
+# NET IPV6
 
-CQueue:
-n buckets of arbitry size spanning time span t
+With features 'net' 'cqueue' and 'internal-metrics' adding 'ipv6' to t-ndl
+changes the overflow heap usage from avg 0 to avg 180
+
+investigate

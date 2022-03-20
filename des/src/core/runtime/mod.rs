@@ -272,7 +272,7 @@ where
             future_event_set: FutureEventSet::new(),
 
             #[cfg(feature = "internal-metrics")]
-            metrics: crate::metrics::RuntimeMetrics::new(),
+            metrics: crate::Mrc::new(crate::metrics::RuntimeMetrics::new()),
         };
 
         A::at_sim_start(&mut this);
@@ -291,7 +291,10 @@ where
 
         self.core_mut().itr += 1;
 
-        let node = self.future_event_set.fetch_next();
+        let node = self.future_event_set.fetch_next(
+            #[cfg(feature = "internal-metrics")]
+            self.metrics.clone(),
+        );
 
         // Let this be the only position where SimTime is changed
         self.core_mut().sim_time = node.time;
@@ -358,7 +361,12 @@ where
     /// function will panic.
     ///
     pub fn add_event(&mut self, event: impl Into<A::EventSet>, time: SimTime) {
-        self.future_event_set.add(time, event)
+        self.future_event_set.add(
+            time,
+            event,
+            #[cfg(feature = "internal-metrics")]
+            self.metrics.clone(),
+        )
     }
 }
 
