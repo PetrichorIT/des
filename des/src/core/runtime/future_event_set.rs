@@ -1,6 +1,6 @@
 #[cfg(not(feature = "cqueue"))]
 mod default {
-    use crate::{core::event::EventNode, Application, SimTime};
+    use crate::{core::event::EventNode, Application, RuntimeOptions, SimTime};
     use std::collections::{BinaryHeap, VecDeque};
 
     #[cfg(feature = "internal-metrics")]
@@ -36,7 +36,7 @@ mod default {
             self.heap.len()
         }
 
-        pub fn new() -> Self {
+        pub fn new_with(_options: &RuntimeOptions) -> Self {
             Self {
                 heap: BinaryHeap::with_capacity(64),
                 zero_queue: VecDeque::with_capacity(32),
@@ -121,7 +121,7 @@ pub(crate) use default::*;
 
 #[cfg(feature = "cqueue")]
 mod cqueue {
-    use crate::{core::event::EventNode, Application, SimTime};
+    use crate::{core::event::EventNode, Application, RuntimeOptions, SimTime};
     use std::collections::{BinaryHeap, VecDeque};
 
     #[cfg(feature = "internal-metrics")]
@@ -130,19 +130,14 @@ mod cqueue {
     #[cfg(feature = "internal-metrics")]
     use crate::Statistic;
 
-    const N: usize = 10;
-
-    #[cfg(not(feature = "simtime-u128"))]
-    const T: SimTime = SimTime::new(0.2);
-
-    #[cfg(feature = "simtime-u128")]
-    const T: SimTime = SimTime::new(200_000_000_000_000, 0);
-
     pub(crate) struct FutureEventSet<A>
     where
         A: Application,
     {
-        upper_bounds: [SimTime; N],
+        n: usize,
+        t: SimTime,
+
+        upper_bounds: Vec<SimTime>,
 
         zero_bucket: VecDeque<EventNode<A>>,
         buckets: Vec<VecDeque<EventNode<A>>>,
@@ -172,20 +167,26 @@ mod cqueue {
             self.len - self.zero_bucket.len()
         }
 
-        pub fn new() -> Self {
-            let mut upper_bounds = [SimTime::ZERO; N];
+        pub fn new_with(options: &RuntimeOptions) -> Self {
+            let n = options.cqueue_num_buckets;
+            let t = options.cqueue_bucket_timespan;
+
+            let mut upper_bounds = Vec::with_capacity(n);
             let mut time = SimTime::ZERO;
-            for i in 0..N {
-                upper_bounds[i] = time;
-                time += T;
+            for _ in 0..n {
+                upper_bounds.push(time);
+                time += t;
             }
 
             Self {
+                n,
+                t,
+
                 upper_bounds,
 
                 zero_bucket: VecDeque::with_capacity(16),
                 buckets: std::iter::repeat_with(|| VecDeque::with_capacity(16))
-                    .take(N)
+                    .take(n)
                     .collect(),
                 overflow_bucket: BinaryHeap::with_capacity(16),
 
@@ -256,18 +257,18 @@ mod cqueue {
             // Check for empty buckets
             while self.buckets[0].is_empty() {
                 // Shift up all finite buckets
-                for i in 0..(N - 1) {
+                for i in 0..(self.n - 1) {
                     self.buckets.swap(i, i + 1);
                     self.upper_bounds.swap(i, i + 1);
                 }
 
                 // Now at N-1 there is an empty bucket
                 // at N there is a inifinte bucket
-                assert!(self.buckets[N - 1].is_empty());
+                assert!(self.buckets[self.n - 1].is_empty());
 
                 // Set new bound
-                let bound = self.upper_bounds[N - 2] + T;
-                self.upper_bounds[N - 1] = bound;
+                let bound = self.upper_bounds[self.n - 2] + self.t;
+                self.upper_bounds[self.n - 1] = bound;
 
                 // Filter elements
                 while let Some(element) = self.overflow_bucket.peek() {
@@ -275,7 +276,7 @@ mod cqueue {
                         let element = self.overflow_bucket.pop().unwrap();
 
                         // This is super inefficient
-                        self.buckets[N - 1].push_back(element);
+                        self.buckets[self.n - 1].push_back(element);
                     } else {
                         break;
                     }
@@ -305,7 +306,7 @@ mod cqueue {
                 .non_zero_event_wait_time
                 .collect_at((time - SimTime::now()).into(), SimTime::now());
 
-            for i in 0..N {
+            for i in 0..self.n {
                 if time > self.upper_bounds[i] {
                     continue;
                 } else {

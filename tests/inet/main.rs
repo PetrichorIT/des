@@ -1,10 +1,10 @@
 use des::{
-    Channel, ChannelMetrics, Message, ModuleId, Mrc, NetworkRuntime, Packet, Runtime, SimTime,
+    Channel, ChannelMetrics, Message, ModuleId, Mrc, NetworkRuntime, Packet, Runtime,
+    RuntimeOptions, SimTime,
 };
 use des::{GateId, StaticModuleCore};
 use network_node::NetworkNode;
 use network_stack::NetworkStack;
-use rand::{prelude::StdRng, SeedableRng};
 use routing_deamon::RandomRoutingDeamon;
 
 mod network_node;
@@ -132,13 +132,7 @@ fn main() {
     app.create_module(node_eve);
     app.create_module(stack_eve);
 
-    let mut rt = Runtime::new_with(
-        app,
-        des::RuntimeOptions {
-            rng: StdRng::seed_from_u64(0x123),
-            max_itr: !0,
-        },
-    );
+    let mut rt = Runtime::new_with(app, RuntimeOptions::seeded(0x123));
 
     let pkt = Packet::new(
         (0x00_00_00_ff, 0x00_fe),

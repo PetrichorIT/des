@@ -3,7 +3,6 @@ use des_derive::Network;
 
 mod members;
 use members::*;
-use rand::{prelude::StdRng, SeedableRng};
 
 #[derive(Network)]
 #[ndl_workspace = "tests/utils"]
@@ -14,13 +13,7 @@ fn main() {
 
     println!("{:?}", app.parameters());
 
-    let rt = Runtime::new_with(
-        app,
-        des::RuntimeOptions {
-            rng: StdRng::seed_from_u64(0x123),
-            max_itr: !0,
-        },
-    );
+    let rt = Runtime::new_with(app, RuntimeOptions::seeded(0x123));
 
     rt.run().unwrap();
 }

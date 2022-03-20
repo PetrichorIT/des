@@ -1,4 +1,4 @@
-use rand::{distributions::Standard, prelude::StdRng, SeedableRng};
+use rand::distributions::Standard;
 use std::{collections::VecDeque, fmt::Debug};
 
 use des::*;
@@ -148,10 +148,7 @@ fn main() {
         busy_time: SimTime::ZERO,
     };
 
-    let opts = RuntimeOptions {
-        rng: StdRng::seed_from_u64(0x42069),
-        max_itr: !0,
-    };
+    let opts = RuntimeOptions::seeded(0x42069);
 
     let mut rt = Runtime::new_with(app, opts);
 

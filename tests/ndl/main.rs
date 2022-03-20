@@ -3,7 +3,6 @@ use des_derive::Network;
 
 mod members;
 use members::*;
-use rand::{prelude::StdRng, SeedableRng};
 
 #[derive(Network)]
 #[ndl_workspace = "tests/ndl"]
@@ -16,13 +15,7 @@ fn main() {
         .map(|n| app.module(|m| m.name() == format!("bob{}", n)).unwrap())
         .collect();
 
-    let mut rt = Runtime::new_with(
-        app,
-        des::RuntimeOptions {
-            rng: StdRng::seed_from_u64(0x123),
-            max_itr: !0,
-        },
-    );
+    let mut rt = Runtime::new_with(app, RuntimeOptions::seeded(0x123));
 
     for id in ids {
         let msg = Message::new(

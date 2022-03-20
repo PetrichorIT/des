@@ -1,5 +1,4 @@
 use des::*;
-use rand::{prelude::StdRng, SeedableRng};
 
 mod alice;
 mod bob;
@@ -29,13 +28,7 @@ fn main() {
     app.create_module(alice);
     app.create_module(bob);
 
-    let mut rt = Runtime::new_with(
-        app,
-        RuntimeOptions {
-            max_itr: 200,
-            rng: StdRng::seed_from_u64(0x56123),
-        },
-    );
+    let mut rt = Runtime::new_with(app, RuntimeOptions::seeded(0x56123).max_itr(200));
 
     let msg = Message::new(
         0,
