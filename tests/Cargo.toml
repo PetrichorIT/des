@@ -34,7 +34,7 @@ name = "t-par"
 path = "par/main.rs"
 
 [dependencies]
-des = {path = "../des", features = ["net", "net-static"]}
+des = {path = "../des", features = ["net"]}
 des_derive = {path = "../des_derive"}
 ndl = {path = "../ndl"}
 log = {version = "*", features = ["max_level_error"]}
