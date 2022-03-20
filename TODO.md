@@ -30,3 +30,5 @@ only when the performace hit is neglecable
 
 CQueue:
 n buckets of arbitry size spanning time span t
+
+# Cleanup NET_STATIC

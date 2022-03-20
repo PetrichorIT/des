@@ -12,6 +12,7 @@ net-ipv6 = ["net"]
 net-static = ["net"]
 pub-interning = []
 simtime-u128 = []
+cqueue = []
 
 [dependencies]
 lazy_static = "1.4.0"

@@ -25,10 +25,10 @@ impl SimTime {
     /// Creates a new instance from a raw f64.
     /// Note that this function only accepts valid timestamps (positiv).
     ///
-    pub fn new(time: f64) -> Self {
-        assert!(time >= 0.0);
+    pub const fn new(time: f64) -> Self {
         Self(time)
     }
+
     ///
     /// Creates a new instance holding the current simulation time.
     /// Note that this requires a global runtime core to be created beforhand,

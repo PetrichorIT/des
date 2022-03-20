@@ -120,12 +120,9 @@ where
         self.event.handle(rt)
     }
 
-    ///
-    /// Creates a event for the given runtime.
-    ///
-    pub fn create_into(rt: &Runtime<A>, event: A::EventSet, time: SimTime) -> Self {
+    pub fn create_no_id(event: A::EventSet, time: SimTime) -> Self {
         Self {
-            id: rt.num_events_dispatched(),
+            id: 0,
             event,
             time,
 

@@ -33,7 +33,6 @@ pub use self::runtime::RuntimeOptions;
 // # Hidden publics
 //
 
-pub(crate) use self::event::EventNode;
 pub(crate) use self::logger::StandardLogger;
 #[allow(unused)]
 pub(crate) use self::runtime::RTC;
