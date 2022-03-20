@@ -312,7 +312,7 @@ mod cqueue {
                 } else {
                     // Insert into finite bucket
 
-                    match self.buckets[i].binary_search_by(|node| time.cmp(&node.time)) {
+                    match self.buckets[i].binary_search_by(|node| node.time.cmp(&time)) {
                         Ok(mut idx) => {
                             // A event at the same time allready exits
                             // thus make sure the ord is right;
