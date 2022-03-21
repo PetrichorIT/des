@@ -14,6 +14,9 @@ use log::error;
 pub use self::core::*;
 pub use self::ndl::*;
 
+///
+/// A reference to a module.
+///
 pub type ModuleRef = Mrc<dyn Module>;
 
 ///
@@ -316,7 +319,7 @@ pub trait StaticModuleCore {
 
         for (i, item) in next_hops.into_iter().enumerate() {
             let gate = Gate::new(descriptor.clone(), i, channel.clone(), item);
-            ids.push(gate.clone());
+            ids.push(Mrc::clone(&gate));
 
             self.module_core_mut().gates.push(gate);
         }

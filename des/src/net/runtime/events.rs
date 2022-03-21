@@ -34,7 +34,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
     fn handle(mut self, rt: &mut crate::Runtime<NetworkRuntime<A>>) {
         let ptr: *const Message = self.message.deref();
         let mut message = unsafe { std::ptr::read(ptr) };
-        message.meta.last_gate = Some(self.gate.clone());
+        message.meta.last_gate = Some(Mrc::clone(&self.gate));
 
         self.handled = true;
 
@@ -57,9 +57,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
             );
 
             match current_gate.channel() {
-                Some(channel) => {
-                    let mut channel = channel.clone();
-
+                Some(mut channel) => {
                     // Channel delayed connection
                     // SAFTY:
                     // The rng and random number generator dont interfere so this operation can
@@ -93,7 +91,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
 
                     rt.add_event(
                         NetEvents::MessageAtGateEvent(MessageAtGateEvent {
-                            gate: next_gate.clone(),
+                            gate: Mrc::clone(next_gate),
                             message: ManuallyDrop::new(message),
                             handled: false,
                         }),
@@ -122,7 +120,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
             current_gate.owner().id()
         );
 
-        let module = current_gate.owner().clone();
+        let module = Mrc::clone(current_gate.owner());
         rt.add_event(
             NetEvents::HandleMessageEvent(HandleMessageEvent {
                 module,
@@ -231,7 +229,7 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
         // allowing preemtive dropping of 'module' so that rt can be used in
         // 'module_handle_jobs'.
         for i in 0..rt.app.modules().len() {
-            let mut module = rt.app.modules()[i].clone();
+            let mut module = Mrc::clone(&rt.app.modules()[i]);
             info!(
                 target: &format!("Module {}", module.str()),
                 "Calling at_sim_start."
@@ -273,7 +271,7 @@ impl ModuleRef {
         for (msg, time) in self.module_core_mut().loopback_buffer.drain(..) {
             rt.add_event(
                 NetEvents::HandleMessageEvent(HandleMessageEvent {
-                    module: mref.clone(),
+                    module: Mrc::clone(&mref),
                     message: ManuallyDrop::new(msg),
                     handled: false,
                 }),

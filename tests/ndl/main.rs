@@ -37,7 +37,7 @@ fn main() {
 
     assert_eq!(
         time,
-        SimTime::from(39.0 * 60.0 * 60.0 + 43.0 * 60.0 + 49.0 + 0.378633077)
+	SimTime::from(16779.29102765267)
     );
     assert_eq!(event_count, 40_001_301);
 }

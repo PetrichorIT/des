@@ -2,7 +2,6 @@ use std::mem::size_of;
 
 use crate::core::interning::*;
 use crate::core::*;
-use crate::create_global_uid;
 use crate::net::*;
 
 /// A address of a node in a IPv6 network.
@@ -40,13 +39,6 @@ pub const NODE_ADDR_LOOPBACK: NodeAddress = 0x7f_00_00_01;
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub type PortAddress = u16;
 
-create_global_uid!(
-    /// A globalsy unqiue identifer for a packet.
-    /// * This type is only available of DES is build with the `"net"` feature.*
-    #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-    pub PacketId(u32) = PACKET_ID;
-);
-
 ///
 /// A application-addressed header in a network, similar to TCP/UDP.
 ///
@@ -60,8 +52,26 @@ pub struct PacketHeader {
     pub target_node: NodeAddress,
     pub target_port: PortAddress,
 
+    // should be u8 but test case requies >u16
     pub ttl: usize,
+    // should be u8 but test case requies >u16
     pub hop_count: usize,
+
+    pub tos: u8,
+    pub protocol: u8,
+
+    pub(crate) pkt_bit_len: usize,
+    pub pkt_byte_len: u16,
+}
+
+impl MessageBody for PacketHeader {
+    fn bit_len(&self) -> usize {
+        size_of::<NodeAddress>() * 16 + size_of::<PortAddress>() * 16 + 48
+    }
+
+    fn byte_len(&self) -> usize {
+        size_of::<NodeAddress>() * 2 + size_of::<PortAddress>() * 2 + 6
+    }
 }
 
 ///
@@ -72,21 +82,14 @@ pub struct PacketHeader {
 #[allow(unused)]
 #[derive(Debug)]
 pub struct Packet {
-    id: PacketId,
-
     header: PacketHeader,
-
     content: InternedValue<'static>,
-
-    content_bit_len: usize,
-    content_byte_len: usize,
 }
 
 impl Packet {
-    /// The unqiue identifer of the given packet.
-    #[inline(always)]
-    pub fn id(&self) -> PacketId {
-        self.id
+    #[deprecated(since = "0.2.0", note = "PacketIDs are no longer supported")]
+    pub fn id(&self) -> ! {
+        unimplemented!("PacketIDs are no longer supported")
     }
 
     pub fn header(&self) -> &PacketHeader {
@@ -134,13 +137,11 @@ impl Packet {
         T: 'static + MessageBody,
     {
         let bit_len = content.bit_len();
-        let byte_len = content.byte_len();
+        let byte_len = content.byte_len() as u16;
 
         let interned = unsafe { (*RTC.get()).as_ref().unwrap().interner.intern(content) };
 
         Self {
-            id: PacketId::gen(),
-
             header: PacketHeader {
                 source_node: src.0,
                 source_port: src.1,
@@ -150,12 +151,15 @@ impl Packet {
 
                 ttl: 0,
                 hop_count: 0,
+
+                tos: 0,
+                protocol: 0,
+
+                pkt_bit_len: bit_len,
+                pkt_byte_len: byte_len,
             },
 
             content: interned,
-
-            content_bit_len: bit_len,
-            content_byte_len: byte_len,
         }
     }
 
@@ -197,10 +201,10 @@ impl Packet {
 
 impl MessageBody for Packet {
     fn bit_len(&self) -> usize {
-        self.content_bit_len + 16 * size_of::<NodeAddress>() + 16 * size_of::<PortAddress>()
+        self.header.pkt_bit_len as usize + self.header.bit_len()
     }
 
     fn byte_len(&self) -> usize {
-        self.content_byte_len + 2 * size_of::<NodeAddress>() + 2 * size_of::<PortAddress>()
+        self.header.pkt_byte_len as usize + self.header.byte_len()
     }
 }

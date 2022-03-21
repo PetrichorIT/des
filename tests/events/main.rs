@@ -114,13 +114,13 @@ fn main() {
         } else {
             boxed_list.push(current_box);
             current_box = EventBox {
-                time: time,
+                time,
                 events: vec![event],
             };
         }
     }
 
-    if current_box.events.len() > 0 {
+    if !current_box.events.is_empty() {
         boxed_list.push(current_box);
     }
 
@@ -132,7 +132,7 @@ fn main() {
         assert_eq!(lhs.events.len(), rhs.events.len());
 
         for l in lhs.events {
-            assert!(rhs.events.iter().find(|r| l == **r).is_some())
+            assert!(rhs.events.iter().any(|r| l == *r))
         }
     }
 }

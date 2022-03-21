@@ -34,6 +34,9 @@ pub struct NetworkRuntime<A> {
 }
 
 impl<A> NetworkRuntime<A> {
+    ///
+    /// Returns the parameter reader of the entire simulation.
+    ///
     pub fn parameters(&self) -> spmc::SpmcReader<Parameters> {
         self.parameters.get_reader()
     }

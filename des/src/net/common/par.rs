@@ -10,12 +10,19 @@ pub struct Parameters {
 }
 
 impl Parameters {
+    ///
+    /// Creates a new empty parameter tree.
+    ///
     pub fn new() -> Self {
         Self {
             tree: ParameterTree::new(),
         }
     }
 
+    ///
+    /// Populates the parameter tree using the given raw text
+    /// as parameter definitions.
+    ///
     pub fn build(&mut self, raw_text: &str) {
         for line in raw_text.lines() {
             if let Some((key, value)) = line.split_once('=') {
@@ -24,7 +31,7 @@ impl Parameters {
         }
     }
 
-    pub fn insert(&mut self, key: &str, value: &str) {
+    pub(crate) fn insert(&mut self, key: &str, value: &str) {
         self.tree.insert(key, value)
     }
 

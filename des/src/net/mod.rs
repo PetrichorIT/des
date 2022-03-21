@@ -44,7 +44,6 @@ pub use self::message::MessageMetadata;
 pub use self::packet::NodeAddress;
 pub use self::packet::Packet;
 pub use self::packet::PacketHeader;
-pub use self::packet::PacketId;
 pub use self::packet::PortAddress;
 pub use self::packet::NODE_ADDR_BROADCAST;
 pub use self::packet::NODE_ADDR_LOOPBACK;

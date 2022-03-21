@@ -32,12 +32,20 @@ pub struct RuntimeOptions {
 }
 
 impl RuntimeOptions {
+    ///
+    /// Creates a seeded runtime for reproducable runs.
+    ///
     pub fn seeded(state: u64) -> Self {
-        let mut default = Self::default();
-        default.rng = StdRng::seed_from_u64(state);
-        default
+        Self {
+            rng: StdRng::seed_from_u64(state),
+            ..Self::default()
+        }
     }
 
+    ///
+    /// Changes the maximum iteration number of a runtime.
+    ///
+    #[must_use]
     pub fn max_itr(mut self, max_itr: usize) -> Self {
         self.max_itr = max_itr;
         self

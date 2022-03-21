@@ -16,6 +16,6 @@ fn main() {
     let rt = Runtime::new_with(app, RuntimeOptions::seeded(0x123));
     let (_, time, event_count) = rt.run().unwrap();
 
-    assert_eq!(event_count, 83);
-    assert_eq!(time, SimTime::from(21.0))
+    assert_eq!(event_count, 86);
+    assert_eq!(time, SimTime::from(27.0))
 }

@@ -189,6 +189,31 @@ where
         Self::new_with(app, RuntimeOptions::default())
     }
 
+    ///
+    /// Creates a new [Runtime] Instance using an application as core,
+    /// and accepting events of type [Event<A>], using a custom set of
+    /// [RuntimeOptions].
+    ///
+    ///   /// # Examples
+    ///
+    /// ```
+    /// use des::*;
+    ///
+    /// // Assumme Application is implemented for App.
+    /// #[derive(Debug)]
+    /// struct App(usize,  String);
+    /// # impl Application for App {
+    /// #   type EventSet = Events;
+    /// # }
+    /// # enum Events {}
+    /// # impl EventSet<App> for Events {
+    /// #   fn handle(self, rt: &mut Runtime<App>) {}
+    /// # }
+    ///
+    /// let app = App(42, String::from("Hello there!"));
+    /// let rt = Runtime::new_with(app, RuntimeOptions::seeded(42).max_itr(69));
+    /// ```
+    ///
     pub fn new_with(app: A, options: RuntimeOptions) -> Self {
         let mut this = Self {
             future_event_set: FutureEventSet::new_with(&options),
@@ -248,7 +273,7 @@ where
 
         let node = self.future_event_set.fetch_next(
             #[cfg(feature = "internal-metrics")]
-            self.metrics.clone(),
+            Mrc::clone(&self.metrics),
         );
 
         // Let this be the only position where SimTime is changed
@@ -353,7 +378,7 @@ where
             time,
             event,
             #[cfg(feature = "internal-metrics")]
-            self.metrics.clone(),
+            Mrc::clone(&self.metrics),
         )
     }
 }

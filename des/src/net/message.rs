@@ -7,10 +7,17 @@ use crate::core::*;
 use crate::net::*;
 use crate::{core::interning::*, Mrc};
 
+///
+/// A ID that defines the meaning of the message in the simulation context.
+///
+///  * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub type MessageId = u16;
 
+///
 /// The type of messages, similar to the TOS field in IP packets.
-/// * This type is only available of DES is build with the `"net"` feature.*
+///
+///  * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub type MessageKind = u16;
 
@@ -60,7 +67,7 @@ impl MessageMetadata {
             sender_module_id: self.sender_module_id,
             receiver_module_id: self.receiver_module_id,
 
-            last_gate: self.last_gate.as_ref().map(|i| Mrc::clone(i)),
+            last_gate: self.last_gate.as_ref().map(Mrc::clone),
 
             creation_time: SimTime::now(),
             send_time: SimTime::MAX,

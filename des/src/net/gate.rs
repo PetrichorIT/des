@@ -182,7 +182,7 @@ impl Gate {
             current = next_gate
         }
 
-        Some(current.clone())
+        Some(Mrc::clone(current))
     }
 
     ///
@@ -255,6 +255,6 @@ where
             .iter()
             .find(|&g| g.name() == self.0 && g.pos() == self.1)?;
 
-        Some(element.clone())
+        Some(Mrc::clone(element))
     }
 }
