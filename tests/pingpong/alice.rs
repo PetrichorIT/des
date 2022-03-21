@@ -15,7 +15,7 @@ impl Module for Alice {
             Message::new(
                 0,
                 1,
-                GateId::NULL,
+                None,
                 self.id(),
                 ModuleId::NULL,
                 SimTime::ZERO,
@@ -29,7 +29,7 @@ impl Module for Alice {
             .handle_message(Message::new(
                 0,
                 31,
-                GateId::NULL,
+                None,
                 ModuleId::NULL,
                 ModuleId::NULL,
                 SimTime::ZERO,

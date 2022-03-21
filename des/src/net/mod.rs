@@ -19,7 +19,6 @@ pub use self::runtime::NetworkRuntime;
 //
 
 pub use self::channel::Channel;
-pub use self::channel::ChannelId;
 pub use self::channel::ChannelMetrics;
 pub use self::channel::ChannelRef;
 
@@ -29,7 +28,6 @@ pub use self::channel::ChannelRef;
 
 pub use self::gate::Gate;
 pub use self::gate::GateDescription;
-pub use self::gate::GateId;
 pub use self::gate::GateRef;
 pub use self::gate::IntoModuleGate;
 

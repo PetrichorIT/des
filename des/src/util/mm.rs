@@ -3,7 +3,6 @@
 //!
 
 use std::{
-    borrow::{Borrow, BorrowMut},
     cell::UnsafeCell,
     marker::Unsize,
     ops::{CoerceUnsized, Deref, DerefMut, DispatchFromDyn},
@@ -42,27 +41,6 @@ where
         // This deref in considered safe since it only extends Mrc
         // with the default Rc behaviour
         unsafe { &*self.inner.as_ref().get() }
-    }
-}
-
-impl<T> Borrow<T> for Mrc<T>
-where
-    T: ?Sized,
-{
-    fn borrow(&self) -> &T {
-        self.as_ref()
-    }
-}
-
-impl<T> BorrowMut<T> for Mrc<T>
-where
-    T: ?Sized,
-{
-    fn borrow_mut(&mut self) -> &mut T {
-        // SAFTY:
-        // This can be considered a valid extension of the safty contract
-        // acording to the type definition
-        unsafe { &mut *self.inner.as_ref().get() }
     }
 }
 
@@ -113,6 +91,17 @@ where
     U: ?Sized,
 {
 }
+
+impl<T> PartialEq for Mrc<T>
+where
+    T: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.deref().eq(other.deref())
+    }
+}
+
+impl<T> Eq for Mrc<T> where T: Eq {}
 
 ///
 /// A implementation of UnsafeCell that implements Sync

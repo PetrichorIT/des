@@ -4,8 +4,6 @@ use rand::distributions::Uniform;
 use rand::prelude::StdRng;
 use rand::Rng;
 
-use crate::create_global_uid;
-
 use crate::core::*;
 use crate::net::*;
 use crate::util::Mrc;
@@ -14,13 +12,6 @@ use crate::util::Mrc;
 /// A mutable reference to a channel inside a global buffer.
 ///
 pub type ChannelRef = Mrc<Channel>;
-
-create_global_uid!(
-    /// A runtime-unique identifier for a one directional channel.
-    /// * This type is only available of DES is build with the `"net"` feature.*
-    #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-    pub ChannelId(usize) = CHANNEL_ID;
-);
 
 ///
 /// Metrics that define a channels capabilitites.
@@ -93,15 +84,12 @@ impl Display for ChannelMetrics {
 }
 
 ///
-/// A representation of a one directional link.
+/// A representation of a one directional delayed link,.
 ///
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Channel {
-    /// A unique identifier for a channel.
-    id: ChannelId,
-
     /// The capabilities of the channel.
     metrics: ChannelMetrics,
 
@@ -113,12 +101,14 @@ pub struct Channel {
 }
 
 impl Channel {
-    pub fn id(&self) -> ChannelId {
-        self.id
+    #[deprecated(since = "0.2.0", note = "Channel IDs are no longer supported.")]
+    pub fn id(&self) -> ! {
+        unimplemented!("Channel IDs have been removed");
     }
 
     ///
-    /// The capabilities of the channel.
+    /// A description of the channels capabilities,
+    /// independent from its current state.
     ///
     #[inline(always)]
     pub fn metrics(&self) -> &ChannelMetrics {
@@ -141,7 +131,7 @@ impl Channel {
     /// Sets the channel busy, announcing that the message will be trabńsmitted
     /// in 'sim_time' time units.
     ///
-    pub fn set_busy_until(&mut self, sim_time: SimTime) {
+    pub(crate) fn set_busy_until(&mut self, sim_time: SimTime) {
         self.busy = true;
         self.transmission_finish_time = sim_time;
     }
@@ -149,7 +139,7 @@ impl Channel {
     ///
     /// Resets the busy state of a channel.
     ///
-    pub fn unbusy(&mut self) {
+    pub(crate) fn unbusy(&mut self) {
         self.busy = false;
         self.transmission_finish_time = SimTime::ZERO;
     }
@@ -163,11 +153,11 @@ impl Channel {
     }
 
     ///
-    /// Creates a new channel using tthe given metrics.
+    /// Creates a new channel using the given metrics,
+    /// with an initially unbusy state.
     ///
     pub fn new(metrics: ChannelMetrics) -> Mrc<Self> {
         Mrc::new(Self {
-            id: ChannelId::gen(),
             metrics,
             busy: false,
             transmission_finish_time: SimTime::ZERO,

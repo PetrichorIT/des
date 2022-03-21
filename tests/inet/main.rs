@@ -1,8 +1,8 @@
+use des::StaticModuleCore;
 use des::{
     Channel, ChannelMetrics, Message, ModuleId, Mrc, NetworkRuntime, Packet, Runtime,
     RuntimeOptions, SimTime,
 };
-use des::{GateId, StaticModuleCore};
 use network_node::NetworkNode;
 use network_stack::NetworkStack;
 use routing_deamon::RandomRoutingDeamon;
@@ -142,7 +142,7 @@ fn main() {
     let msg = Message::new(
         0,
         2,
-        GateId::NULL,
+        None,
         ModuleId::NULL,
         ModuleId::NULL,
         SimTime::ZERO,

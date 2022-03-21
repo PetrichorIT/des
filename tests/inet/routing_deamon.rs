@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use des::{GateId, Module, ModuleCore, NodeAddress, Packet, Parameters, SpmcReader};
+use des::{GateRef, Module, ModuleCore, NodeAddress, Packet, Parameters, SpmcReader};
 use des::{ModulePath, StaticModuleCore};
 use des_derive::Module;
 use log::info;
@@ -20,7 +20,7 @@ impl RandomRoutingDeamon {
         }
     }
 
-    pub fn handle(&mut self, pkt: &Packet, incoming: GateId) {
+    pub fn handle(&mut self, pkt: &Packet, incoming: GateRef) {
         let source = pkt.header().source_node;
         if let Some(path_cost) = self.hop_counts.get_mut(&source) {
             // Allready knows path

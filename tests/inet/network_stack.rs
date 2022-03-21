@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use des::{rng, GateId, Message, Module, ModuleCore, Mrc, NodeAddress, Packet, SimTime};
+use des::{rng, GateRef, Message, Module, ModuleCore, Mrc, NodeAddress, Packet, SimTime};
 use des::{ModulePath, StaticModuleCore};
 use des_derive::Module;
 use log::info;
@@ -13,7 +13,7 @@ pub struct NetworkStack {
 
     address: NodeAddress,
 
-    forwarding_table: HashMap<NodeAddress, GateId>,
+    forwarding_table: HashMap<NodeAddress, GateRef>,
     routing_deamon: Option<Mrc<RandomRoutingDeamon>>,
 }
 
@@ -36,11 +36,11 @@ impl NetworkStack {
         obj
     }
 
-    pub fn add_route(&mut self, target: NodeAddress, gate_id: GateId) {
+    pub fn add_route(&mut self, target: NodeAddress, gate_id: GateRef) {
         self.forwarding_table.insert(target, gate_id);
     }
 
-    pub fn lookup_route(&mut self, target: NodeAddress) -> Option<&GateId> {
+    pub fn lookup_route(&mut self, target: NodeAddress) -> Option<&GateRef> {
         self.forwarding_table.get(&target)
     }
 }
@@ -53,12 +53,14 @@ impl Module for NetworkStack {
         self.routing_deamon
             .as_mut()
             .unwrap()
-            .handle(&pkt, meta.last_gate);
+            .handle(&pkt, meta.last_gate.clone().unwrap());
 
         // Route packet
         if pkt.header().target_node == self.address {
             info!(target: "Application Layer", "=== Received packet ===");
-        } else if let Some(&route) = self.lookup_route(pkt.header().target_node) {
+        } else if let Some(route) = self.lookup_route(pkt.header().target_node) {
+            let route = route.clone();
+
             // PATH ROUTE
             info!(target: "NetworkStack", "Routing over backproc path");
             let msg = Message::new_interned(0, 2, self.id(), SimTime::now(), pkt);
@@ -70,12 +72,9 @@ impl Module for NetworkStack {
             let out_size = self.gate("netOut", 0).unwrap().size();
             let idx = rng::<usize>() % out_size;
 
-            let mut gate_id = self.gate("netOut", idx).unwrap().id();
-            if gate_id == meta.last_gate {
-                gate_id = self
-                    .gate("netOut", (idx + 1) % self.gates().len())
-                    .unwrap()
-                    .id()
+            let mut gate_id = self.gate("netOut", idx).unwrap();
+            if gate_id == meta.last_gate.unwrap() {
+                gate_id = self.gate("netOut", (idx + 1) % self.gates().len()).unwrap()
             }
 
             let msg = Message::new_interned(0, 2, self.id(), SimTime::now(), pkt);

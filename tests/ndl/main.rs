@@ -21,7 +21,7 @@ fn main() {
         let msg = Message::new(
             0,
             0xff,
-            GateId::NULL,
+            None,
             ModuleId::NULL,
             ModuleId::NULL,
             SimTime::now(),

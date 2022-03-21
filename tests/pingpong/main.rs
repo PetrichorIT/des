@@ -33,7 +33,7 @@ fn main() {
     let msg = Message::new(
         0,
         1,
-        GateId::NULL,
+        None,
         ModuleId::NULL,
         ModuleId::NULL,
         SimTime::now(),

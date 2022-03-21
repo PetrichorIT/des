@@ -1,4 +1,3 @@
-use crate::create_global_uid;
 use crate::net::*;
 use crate::util::Mrc;
 use std::fmt::{Debug, Display};
@@ -9,13 +8,6 @@ use std::marker::Unsize;
 ///
 pub type GateRef = Mrc<Gate>;
 
-create_global_uid!(
-    /// A runtime-unquie identifier for a gate.
-/// * This type is only available of DES is build with the `"net"` feature.*
-#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-    pub GateId(u32) = GATE_ID;
-);
-
 ///
 /// A description of a gate / gate cluster on a module.
 ///
@@ -23,11 +15,17 @@ create_global_uid!(
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 #[derive(Clone)]
 pub struct GateDescription {
+    ///
     /// The identifier of the module the gate was created on.
+    ///
     pub owner: ModuleRef,
+    ///
     /// A human readable name for a gate cluster.
+    ///
     pub name: String,
+    ///
     /// The number of elements in the gate cluster.
+    ///
     pub size: usize,
 }
 
@@ -78,49 +76,73 @@ impl PartialEq for GateDescription {
     }
 }
 
+impl Eq for GateDescription {}
+
 ///
 /// A gate, a message insertion or extraction point used for handeling channels.
 ///
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Gate {
-    /// A globally unique identifier for the gate.
-    id: GateId,
+    ///
     /// A descriptor of the cluster this gate belongs to.
+    ///
     description: GateDescription,
+    ///
     /// The position index of the gate in the descriptor cluster.
+    ///
     pos: usize,
+    ///
     /// A identifier of the channel linked to the gate chain.
+    ///
     channel: Option<ChannelRef>,
+    ///
     /// The next gate in the gate chain, GATE_NULL if non is existent.
+    ///
     next_gate: Option<GateRef>,
 }
 
 impl Gate {
-    // Returns the gate id
-    pub fn id(&self) -> GateId {
-        self.id
+    #[deprecated(since = "0.2.0", note = "GateIDs are no longer supported")]
+    pub fn id(&self) -> ! {
+        unimplemented!("GateIDs are no longer supported");
     }
 
-    /// The position index of the gate in the descriptor cluster.
+    ///
+    /// The position index of the gate within the descriptor cluster.
+    ///
     #[inline(always)]
     pub fn pos(&self) -> usize {
         self.pos
     }
 
+    ///
+    /// The size of the gate cluster.
+    ///
     #[inline(always)]
     pub fn size(&self) -> usize {
         self.description.size
     }
 
+    ///
     /// The human-readable name for the allocated gate cluster.
+    ///
     #[inline(always)]
-    pub fn name(&self) -> &String {
+    pub fn name(&self) -> &str {
         &self.description.name
     }
 
-    /// The next gate in the gate chain.
+    ///
+    /// The full tree path of the gate.
+    ///
+    pub fn path(&self) -> String {
+        format!("{}:{}", self.description.owner.path(), self.name())
+    }
+
+    ///
+    /// The next gate in the gate chain by reference.
+    ///
     #[inline(always)]
     pub fn next_gate(&self) -> Option<&GateRef> {
         self.next_gate.as_ref()
@@ -135,15 +157,25 @@ impl Gate {
         self.next_gate = Some(next_gate);
     }
 
+    ///
+    /// Returns the channel attached to this gate, if any exits.
+    ///
     pub fn channel(&self) -> Option<ChannelRef> {
         Some(Mrc::clone(self.channel.as_ref()?))
     }
 
+    ///
+    /// Sets the channel attached to this gate.
+    ///
     #[inline(always)]
     pub fn set_channel(&mut self, channel: ChannelRef) {
         self.channel = Some(channel)
     }
 
+    ///
+    /// Follows the next-gate references until a gate without a next-gate
+    /// was found.
+    ///
     pub fn path_end(&self) -> Option<GateRef> {
         let mut current = self.next_gate.as_ref()?;
         while let Some(next_gate) = &current.next_gate {
@@ -153,7 +185,9 @@ impl Gate {
         Some(current.clone())
     }
 
-    /// The module idefnifier of the owner module.
+    ///
+    /// Returns the owner module by reference of this gate.
+    ///
     #[inline(always)]
     pub fn owner(&self) -> &ModuleRef {
         &self.description.owner
@@ -169,7 +203,6 @@ impl Gate {
         next_gate: Option<GateRef>,
     ) -> Mrc<Self> {
         Mrc::new(Self {
-            id: GateId::gen(),
             description,
             pos,
             channel,
@@ -194,33 +227,21 @@ where
     }
 }
 
-impl<T> IntoModuleGate<T> for Gate
+impl<T> IntoModuleGate<T> for GateRef
 where
     T: StaticModuleCore,
 {
-    fn into_gate(self, module: &T) -> Option<GateRef> {
-        let element = module.gates().iter().find(|&g| g.id() == self.id())?;
-        Some(element.clone())
+    fn into_gate(self, _module: &T) -> Option<GateRef> {
+        Some(self)
     }
 }
 
-impl<T> IntoModuleGate<T> for &Gate
+impl<T> IntoModuleGate<T> for &GateRef
 where
     T: StaticModuleCore,
 {
-    fn into_gate(self, module: &T) -> Option<GateRef> {
-        let element = module.gates().iter().find(|&g| g.id() == self.id())?;
-        Some(element.clone())
-    }
-}
-
-impl<T> IntoModuleGate<T> for GateId
-where
-    T: StaticModuleCore,
-{
-    fn into_gate(self, module: &T) -> Option<GateRef> {
-        let element = module.gates().iter().find(|&g| g.id() == self)?;
-        Some(element.clone())
+    fn into_gate(self, _module: &T) -> Option<GateRef> {
+        Some(Mrc::clone(self))
     }
 }
 

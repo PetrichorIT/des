@@ -46,7 +46,7 @@ impl Module for Bob {
             Message::new(
                 0,
                 1,
-                GateId::NULL,
+                None,
                 self.id(),
                 ModuleId::NULL,
                 SimTime::now(),

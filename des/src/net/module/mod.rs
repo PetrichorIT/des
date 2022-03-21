@@ -226,8 +226,9 @@ pub trait StaticModuleCore {
         ))
     }
 
-    fn gate_by_id(&self, id: GateId) -> Option<GateRef> {
-        self.gates().iter().find(|&gate| gate.id() == id).cloned()
+    #[deprecated(since = "0.2.0", note = "GateIDs are no longer supported")]
+    fn gate_by_id(&self, _id: ()) -> ! {
+        unimplemented!("GateIDs are no longer supported")
     }
 
     ///
@@ -240,8 +241,9 @@ pub trait StaticModuleCore {
             .find(|gate| gate.name() == name && gate.pos() == pos)
     }
 
-    fn gate_by_id_mut(&mut self, id: GateId) -> Option<&mut GateRef> {
-        self.gates_mut().iter_mut().find(|gate| gate.id() == id)
+    #[deprecated(since = "0.2.0", note = "GateIDs are no longer supported")]
+    fn gate_by_id_mut(&mut self, _id: ()) -> ! {
+        unimplemented!("GateIDs are no longer supported")
     }
 
     ///

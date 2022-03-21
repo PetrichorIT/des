@@ -3,9 +3,9 @@ use std::{
     fmt::Debug,
 };
 
-use crate::core::interning::*;
 use crate::core::*;
 use crate::net::*;
+use crate::{core::interning::*, Mrc};
 
 pub type MessageId = u16;
 
@@ -38,7 +38,7 @@ pub struct MessageMetadata {
     /// The last gate the message was passed through.
     /// This can be used to identifier the inbound port
     /// of a module.
-    pub last_gate: GateId,
+    pub last_gate: Option<GateRef>,
 
     /// A timestamp when the message was created.
     pub creation_time: SimTime,
@@ -60,7 +60,7 @@ impl MessageMetadata {
             sender_module_id: self.sender_module_id,
             receiver_module_id: self.receiver_module_id,
 
-            last_gate: self.last_gate,
+            last_gate: self.last_gate.as_ref().map(|i| Mrc::clone(i)),
 
             creation_time: SimTime::now(),
             send_time: SimTime::MAX,
@@ -116,7 +116,7 @@ impl Message {
     /// Creates a new message with the given metadata and
     /// a content of type Box<T>.
     ///
-    /// # Guarntees
+    /// ## Guarantees
     ///
     /// The value of type T will be moved into a box which is then
     /// transmuted into a raw ptr. The allocated memory of T will only
@@ -141,7 +141,7 @@ impl Message {
             sender_module_id,
             receiver_module_id: ModuleId::NULL,
 
-            last_gate: GateId::NULL,
+            last_gate: None,
 
             creation_time: SimTime::now(),
             send_time: SimTime::MAX,
@@ -154,7 +154,7 @@ impl Message {
     /// Creates a new message with the given metadata and
     /// a content of type T.
     ///
-    /// # Guarntees
+    /// ## Guarantees
     ///
     /// The value of type T will be moved into a box which is then
     /// transmuted into a raw ptr. The allocated memory of T will only
@@ -163,7 +163,7 @@ impl Message {
     pub fn new<T: 'static + MessageBody>(
         id: MessageId,
         kind: MessageKind,
-        last_gate: GateId,
+        last_gate: Option<GateRef>,
         sender_module_id: ModuleId,
         receiver_module_id: ModuleId,
         timestamp: SimTime,
@@ -196,7 +196,7 @@ impl Message {
     /// Consumes the message casting the stored ptr
     /// into a Box of type T.
     ///
-    /// # Safty
+    /// ## Safty
     ///
     /// The caller must ensure that the stored data is a valid instance
     /// of type T. If this cannot be guarnteed this is UB.
@@ -212,7 +212,7 @@ impl Message {
     /// Indicates wheter a cast to a instance of type T ca
     /// succeed.
     ///
-    /// # Safty
+    /// ## Safty
     ///
     /// Note that this only gurantees that a cast will result in UB
     /// if it returns 'false'. Should this function return 'true' it indicates

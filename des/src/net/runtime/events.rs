@@ -34,7 +34,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
     fn handle(mut self, rt: &mut crate::Runtime<NetworkRuntime<A>>) {
         let ptr: *const Message = self.message.deref();
         let mut message = unsafe { std::ptr::read(ptr) };
-        message.meta.last_gate = self.gate.id();
+        message.meta.last_gate = Some(self.gate.clone());
 
         self.handled = true;
 
@@ -47,13 +47,12 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
         while let Some(next_gate) = current_gate.next_gate() {
             // A next gate exists.
             // redirect to next channel
-            message.meta.last_gate = next_gate.id();
+            message.meta.last_gate = Some(Mrc::clone(next_gate));
 
             info!(
-                target: &format!("Gate #{} ({})", current_gate.id(), current_gate.name()),
-                "Forwarding message [{}] to next gate #{} delyed: {}",
+                target: &format!("Gate ({})", current_gate.name()),
+                "Forwarding message [{}] to next gate delayed: {}",
                 message.str(),
-                next_gate.id(),
                 current_gate.channel().is_some()
             );
 
@@ -69,7 +68,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
 
                     if channel.is_busy() {
                         warn!(
-                            target: &format!("Gate #{}", current_gate.id()),
+                            target: &format!("Gate #{}", current_gate.name()),
                             "Dropping message {} pushed onto busy channel #{:?}",
                             message.str(),
                             channel
@@ -117,7 +116,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
         assert!(current_gate.next_gate().is_none());
 
         info!(
-            target: &format!("Gate #{} ({})", current_gate.id(), current_gate.name()),
+            target: &format!("Gate ({})", current_gate.name()),
             "Forwarding message [{}] to module #{}",
             message.str(),
             current_gate.owner().id()
