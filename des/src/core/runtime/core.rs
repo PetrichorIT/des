@@ -43,6 +43,7 @@ where
 #[derive(Debug)]
 pub(crate) struct RuntimeCore {
     pub sim_time: SimTime,
+    pub max_sim_time: SimTime,
 
     // Rt limits
     pub event_id: EventId,
@@ -62,10 +63,12 @@ impl RuntimeCore {
         event_id: EventId,
         itr: usize,
         max_itr: usize,
+        max_sim_time: SimTime,
         rng: StdRng,
     ) -> &'static SyncCell<Option<RuntimeCore>> {
         let rtc = Self {
             sim_time,
+            max_sim_time,
 
             event_id,
             itr,

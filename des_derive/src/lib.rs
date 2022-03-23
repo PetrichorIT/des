@@ -21,6 +21,15 @@ use std::sync::Mutex;
 use syn::DataStruct;
 use syn::{parse_macro_input, Data, DeriveInput, FieldsNamed, FieldsUnnamed, Type};
 
+macro_rules! ident {
+    ($e:expr) => {
+        Ident::new(
+            &$e.as_str().replace("[", "").replace("]", ""),
+            Span::call_site(),
+        )
+    };
+}
+
 lazy_static! {
     static ref RESOLVERS: Mutex<HashMap<String, NdlResolver>> = Mutex::new(HashMap::new());
 }
@@ -220,8 +229,9 @@ fn gen_dynamic_module_core(ident: Ident, attrs: Attributes) -> TokenStream {
 
                 for module in &module.submodules {
                     let ChildModuleSpec { descriptor, ty, .. } = module;
-                    let ident = Ident::new(&format!("{}_child", descriptor), Span::call_site());
-                    let ty = Ident::new(ty, Span::call_site());
+
+                    let ident = ident!(format!("{}_child", descriptor));
+                    let ty = ident!(ty);
                     token_stream.extend::<proc_macro2::TokenStream>(quote! {
                         let mut #ident: ::des::Mrc<#ty> = #ty::build_named_with_parent(#descriptor, &mut this, rt);
                     })
@@ -279,7 +289,7 @@ fn gen_dynamic_module_core(ident: Ident, attrs: Attributes) -> TokenStream {
 
                 for module in &module.submodules {
                     let ChildModuleSpec { descriptor, .. } = module;
-                    let ident = Ident::new(&format!("{}_child", descriptor), Span::call_site());
+                    let ident = ident!(format!("{}_child", descriptor));
 
                     token_stream.extend::<proc_macro2::TokenStream>(quote! {
                         rt.create_module(#ident);
@@ -322,11 +332,8 @@ fn ident_from_conident(
             pos,
             ..
         } => {
-            let submodule_ident = Ident::new(&format!("{}_child", child_ident), Span::call_site());
-            let ident_token = Ident::new(
-                &format!("{}_child_{}_gate{}", child_ident, gate_ident, pos),
-                Span::call_site(),
-            );
+            let submodule_ident = ident!(format!("{}_child", child_ident));
+            let ident_token = ident!(format!("{}_child_{}_gate{}", child_ident, gate_ident, pos));
 
             token_stream.extend::<proc_macro2::TokenStream>(quote! {
                 let mut #ident_token: ::des::GateRef = #submodule_ident.gate_mut(#gate_ident, #pos)
@@ -338,10 +345,7 @@ fn ident_from_conident(
         ConSpecNodeIdent::Local {
             gate_ident, pos, ..
         } => {
-            let ident = Ident::new(
-                &format!("{}_gate{}_ref", gate_ident, pos),
-                Span::call_site(),
-            );
+            let ident = ident!(format!("{}_gate{}_ref", gate_ident, pos));
 
             token_stream.extend::<proc_macro2::TokenStream>(quote! {
                 let mut #ident: ::des::GateRef = this.gate_mut(#gate_ident, #pos)
@@ -453,8 +457,8 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> TokenStream {
 
                 for node in &network.nodes {
                     let ChildModuleSpec { descriptor, ty, .. } = node;
-                    let ident = Ident::new(&format!("{}_child", descriptor), Span::call_site());
-                    let ty = Ident::new(ty, Span::call_site());
+                    let ident = ident!(format!("{}_child", descriptor));
+                    let ty = ident!(ty);
                     token_stream.extend::<proc_macro2::TokenStream>(quote! {
                         let mut #ident: ::des::Mrc<#ty> = #ty::build_named(#descriptor.parse().unwrap(), rt);
                     })
@@ -489,14 +493,14 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> TokenStream {
                                 latency: des::SimTime::from(#latency),
                                 jitter: des::SimTime::from(#jitter),
                             });
-                            #from_ident.set_next_gate(#to_ident.id());
+                            #from_ident.set_next_gate(#to_ident);
                             #from_ident.set_channel(channel);
                         });
                     } else {
                         token_stream.extend(quote! {
                             // assert_eq!(#from_ident.len(), #to_ident.len());
                             for i in 0..#from_ident.len() {
-                                #from_ident[i].set_next_gate(#to_ident[i].id());
+                                #from_ident[i].set_next_gate(#to_ident[i]);
                             }
                         });
                     }
@@ -505,7 +509,7 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> TokenStream {
 
                 for node in &network.nodes {
                     let ChildModuleSpec { descriptor, .. } = node;
-                    let ident = Ident::new(&format!("{}_child", descriptor), Span::call_site());
+                    let ident = ident!(format!("{}_child", descriptor));
 
                     token_stream.extend::<proc_macro2::TokenStream>(quote! {
                         rt.create_module(#ident);

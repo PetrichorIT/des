@@ -231,7 +231,7 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
         for i in 0..rt.app.modules().len() {
             let mut module = Mrc::clone(&rt.app.modules()[i]);
             info!(
-                target: &format!("Module {}", module.str()),
+                target: &format!("Module: {}", module.str()),
                 "Calling at_sim_start."
             );
             module.at_sim_start();

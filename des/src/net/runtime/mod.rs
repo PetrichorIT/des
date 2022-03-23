@@ -7,6 +7,7 @@ use crate::util::{mm::*, spmc::*};
 mod events;
 pub use events::*;
 use log::error;
+use log::info;
 
 use super::common::Parameters;
 
@@ -115,6 +116,10 @@ impl<A> Application for NetworkRuntime<A> {
     fn at_sim_end(rt: &mut Runtime<Self>) {
         for module in rt.app.module_list.iter_mut() {
             module.at_sim_end();
+            info!(
+                target: &format!("Module: {}", module.str()),
+                "Calling at_sim_end."
+            );
         }
     }
 }

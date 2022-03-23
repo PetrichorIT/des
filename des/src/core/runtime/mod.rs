@@ -160,7 +160,12 @@ where
     {
         self.core_mut().rng.sample(distribution)
     }
+}
 
+impl<A> Runtime<A>
+where
+    A: Application,
+{
     ///
     /// Creates a new [Runtime] Instance using an application as core,
     /// and accepting events of type [Event<A>].
@@ -218,7 +223,14 @@ where
         let mut this = Self {
             future_event_set: FutureEventSet::new_with(&options),
 
-            core: RuntimeCore::new(SimTime::ZERO, 0, 0, options.max_itr, options.rng),
+            core: RuntimeCore::new(
+                SimTime::ZERO,
+                0,
+                0,
+                options.max_itr,
+                options.max_sim_time,
+                options.rng,
+            ),
             app,
 
             #[cfg(feature = "internal-metrics")]
@@ -265,7 +277,7 @@ where
     ///
     #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> bool {
-        if self.num_events_received() > self.max_itr() {
+        if self.check_break_condition() {
             return false;
         }
 
@@ -281,6 +293,13 @@ where
 
         node.handle(self);
         !self.future_event_set.is_empty()
+    }
+
+    ///
+    /// Returns true if the one of the break conditions is met.
+    ///
+    pub fn check_break_condition(&self) -> bool {
+        self.core().itr > self.core().max_itr || self.core().sim_time > self.core().max_sim_time
     }
 
     ///
