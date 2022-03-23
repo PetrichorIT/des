@@ -1,4 +1,7 @@
-use std::marker::Unsize;
+use std::{
+    fmt::{Debug, Display},
+    marker::Unsize,
+};
 
 use crate::core::*;
 use crate::net::*;
@@ -121,5 +124,33 @@ impl<A> Application for NetworkRuntime<A> {
                 "Calling at_sim_end."
             );
         }
+    }
+}
+
+impl<A> Debug for NetworkRuntime<A>
+where
+    A: Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let modules = self
+            .module_list
+            .iter()
+            .map(|m| m.path())
+            .collect::<Vec<&ModulePath>>();
+
+        f.debug_struct("NetworkRuntime")
+            .field("modules", &modules)
+            .field("parameters", &self.parameters)
+            .field("app", &self.inner)
+            .finish()
+    }
+}
+
+impl<A> Display for NetworkRuntime<A>
+where
+    A: Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.inner.fmt(f)
     }
 }

@@ -277,16 +277,18 @@ where
     ///
     #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> bool {
-        if self.check_break_condition() {
-            return false;
-        }
-
         self.core_mut().itr += 1;
 
         let node = self.future_event_set.fetch_next(
             #[cfg(feature = "internal-metrics")]
             Mrc::clone(&self.metrics),
         );
+
+        if self.check_break_condition(&node) {
+            let EventNode { time, event, .. } = node;
+            self.future_event_set.add(time, event);
+            return false;
+        }
 
         // Let this be the only position where SimTime is changed
         self.core_mut().sim_time = node.time;
@@ -298,8 +300,8 @@ where
     ///
     /// Returns true if the one of the break conditions is met.
     ///
-    pub fn check_break_condition(&self) -> bool {
-        self.core().itr > self.core().max_itr || self.core().sim_time > self.core().max_sim_time
+    fn check_break_condition(&self, node: &EventNode<A>) -> bool {
+        self.core().itr > self.core().max_itr || node.time > self.core().max_sim_time
     }
 
     ///
@@ -424,6 +426,16 @@ pub enum RuntimeResult<A> {
 }
 
 impl<A> RuntimeResult<A> {
+    pub fn unwrap_premature_abort(self) -> (A, SimTime, usize, usize)
+    where
+        A: Debug,
+    {
+        match self {
+            Self::PrematureAbort { app, time, event_count, active_events} => (app, time, event_count, active_events),
+            _ => panic!("called `RuntimeResult::unwrap_premature_abort` on a value that is not `PrematureAbort`")
+        }
+    }
+
     pub fn unwrap(self) -> (A, SimTime, usize) {
         match self {
             Self::Finished {
@@ -492,6 +504,8 @@ impl<A> RuntimeResult<A> {
 
 #[cfg(feature = "net")]
 use crate::net::*;
+
+use super::event::EventNode;
 
 #[cfg(feature = "net")]
 impl<A> Runtime<NetworkRuntime<A>> {

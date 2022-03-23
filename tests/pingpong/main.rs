@@ -3,6 +3,7 @@ use des::*;
 mod alice;
 mod bob;
 
+#[derive(Debug)]
 struct Application();
 
 fn main() {
@@ -28,7 +29,7 @@ fn main() {
     app.create_module(alice);
     app.create_module(bob);
 
-    let mut rt = Runtime::new_with(app, RuntimeOptions::seeded(0x56123).max_itr(200));
+    let mut rt = Runtime::new_with(app, RuntimeOptions::seeded(0x56123).max_time(420.0.into()));
 
     let msg = Message::new(
         0,
@@ -42,8 +43,8 @@ fn main() {
 
     rt.add_message_onto(g4, msg, 1.0.into());
 
-    let (_, time, event_count) = rt.run().unwrap();
+    let (_, time, event_count, _) = rt.run().unwrap_premature_abort();
 
-    assert_eq!(time, SimTime::from(1.2000128));
-    assert_eq!(event_count, 9);
+    assert!(time < SimTime::from(420.0));
+    assert_eq!(event_count, 16760);
 }
