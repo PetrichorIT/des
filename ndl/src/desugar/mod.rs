@@ -178,14 +178,14 @@ pub fn desugar(unit: &ParsingResult, resolver: &NdlResolver) -> DesugaredParsing
     // === Network spec ===
     //
 
-    for network in &unit.networks {
-        let mut network_spec = NetworkSpec::new(network);
+    for network_def in &unit.networks {
+        let mut network_spec = NetworkSpec::new(network_def);
 
         // Issue (001)
         // Defines that tycheck should be done on unexpanded macros
 
         let occupied_namespaces = Vec::<&LocalDescriptorDef>::new();
-        for ChildeModuleDef { desc, .. } in &network.nodes {
+        for ChildeModuleDef { desc, .. } in &network_def.nodes {
             // check collisions.
             if let Some(col) = occupied_namespaces
                 .iter()
@@ -205,7 +205,7 @@ pub fn desugar(unit: &ParsingResult, resolver: &NdlResolver) -> DesugaredParsing
         }
 
         // Resolve ChildModuleDef to ChildModuleSpec
-        for child in &network.nodes {
+        for child in &network_def.nodes {
             // Issue (001)
             // Added type checking in desugar to prevent redundand checks
             // on expanded macro types.
@@ -234,7 +234,7 @@ pub fn desugar(unit: &ParsingResult, resolver: &NdlResolver) -> DesugaredParsing
         let vec_new = Vec::new();
 
         // Resolve connections
-        for connection in &network.connections {
+        for connection in &network_def.connections {
             let ConDef {
                 loc,
                 from,
@@ -245,7 +245,7 @@ pub fn desugar(unit: &ParsingResult, resolver: &NdlResolver) -> DesugaredParsing
             let (f_nodes_len, f_gate_size, from_idents) = match resolve_connection_ident(
                 from,
                 &vec_new,
-                &network.nodes,
+                &network_def.nodes,
                 &tyctx,
                 &gtyctx,
                 &mut errors,
@@ -256,7 +256,7 @@ pub fn desugar(unit: &ParsingResult, resolver: &NdlResolver) -> DesugaredParsing
             let (t_nodes_len, t_gate_size, to_idents) = match resolve_connection_ident(
                 to,
                 &vec_new,
-                &network.nodes,
+                &network_def.nodes,
                 &tyctx,
                 &gtyctx,
                 &mut errors,
@@ -342,7 +342,10 @@ fn resolve_connection_ident(
     match ident {
         ConNodeIdent::Local { loc, ident } => {
             // Local can only reference a modules gate
-            let gate = match local_gates.iter().find(|gate| gate.name == *ident) {
+            let gate = match local_gates
+                .iter()
+                .find(|gate| gate.name == ident.raw_ident())
+            {
                 Some(gate) => gate,
                 None => {
                     errors.push(Error::new(
@@ -366,30 +369,45 @@ fn resolve_connection_ident(
                 return None;
             }
 
-            // maybe add gate.size for debug message creation later
-            for pos in 0..gate.size {
-                result.push(ConSpecNodeIdent::Local {
-                    loc: *loc,
-                    gate_ident: ident.clone(),
-                    pos,
-                });
+            match ident {
+                Ident::Direct { .. } => {
+                    // maybe add gate.size for debug message creation later
+                    for pos in 0..gate.size {
+                        result.push(ConSpecNodeIdent::Local {
+                            loc: *loc,
+                            gate_ident: ident.raw_ident().to_string(),
+                            pos,
+                        });
+                    }
+                    Some((1, gate.size, result))
+                }
+                Ident::Clusterd { index, .. } => {
+                    result.push(ConSpecNodeIdent::Local {
+                        loc: *loc,
+                        gate_ident: ident.raw_ident().to_string(),
+                        pos: *index,
+                    });
+                    Some((1, 1, result))
+                }
             }
-
-            Some((1, gate.size, result))
         }
         ConNodeIdent::Child { loc, child, ident } => {
             // maybe referces clustered submodules.
 
-            // QUIKCFIX:
-            // strip trailing cluster bounds from child
-            //let child_mname = child.clone().trim_end_matches(char::is_numeric).to_string();
+            let submod_def = match child {
+                Ident::Direct { ident } => child_modules
+                    .iter()
+                    .find(|m| m.desc.descriptor == *ident && m.desc.cluster_bounds.is_none()),
+                Ident::Clusterd { ident, index } => child_modules.iter().find(|m| {
+                    m.desc.descriptor == *ident
+                        && m.desc.cluster_bounds.is_some()
+                        && m.desc.cluster_bounds_contain(*index)
+                }),
+            };
 
             // TODO:
             // if clustered submodule is referneced use clusterd definition
-            if let Some(submod_def) = child_modules
-                .iter()
-                .find(|m| m.desc.full_descriptor() == *child)
-            {
+            if let Some(submod_def) = submod_def {
                 // fetch module ty
                 // this can be done outside the following if-else
                 // since a cluster-definition shares the same ty
@@ -415,8 +433,14 @@ fn resolve_connection_ident(
                 };
 
                 // fetch gate
-                let gate = match sub_module.gates.iter().find(|gate| gate.name == *ident) {
-                    Some(gate) => gate,
+                let gate_def = match ident {
+                    Ident::Direct { ident } => sub_module.gates.iter().find(|g| g.name == *ident),
+                    Ident::Clusterd { .. } => todo!(),
+                };
+
+                // fetch gate
+                let gate_def = match gate_def {
+                    Some(gate_def) => gate_def,
                     None => {
                         errors.push(Error::new(
                             DsgConInvalidLocalGateIdent,
@@ -431,7 +455,7 @@ fn resolve_connection_ident(
                     }
                 };
 
-                if gate.size < 1 {
+                if gate_def.size < 1 {
                     errors.push(Error::new(
                         DsgConInvalidGateSize,
                         format!("Gate size 0 is invalid for gate cluster '{}'.", ident),
@@ -442,37 +466,39 @@ fn resolve_connection_ident(
                     return None;
                 }
 
+                let gate_ident = ident.raw_ident();
+
                 if let Some((from_id, to_id)) = submod_def.desc.cluster_bounds {
                     // Make clustersed spec
                     for id in from_id..=to_id {
                         let child_ident = format!("{}{}", child, id);
 
                         // maybe add gate.size for debug message creation later
-                        for pos in 0..gate.size {
+                        for pos in 0..gate_def.size {
                             result.push(ConSpecNodeIdent::Child {
                                 loc: *loc,
                                 child_ident: child_ident.clone(),
-                                gate_ident: ident.clone(),
+                                gate_ident: gate_ident.to_string(),
                                 pos,
                             });
                         }
                     }
 
-                    Some((to_id + 1 - from_id, gate.size, result))
+                    Some((to_id + 1 - from_id, gate_def.size, result))
                 } else {
                     // make normal spec.
 
                     // maybe add gate.size for debug message creation later
-                    for pos in 0..gate.size {
+                    for pos in 0..gate_def.size {
                         result.push(ConSpecNodeIdent::Child {
                             loc: *loc,
                             child_ident: child.to_string(),
-                            gate_ident: ident.clone(),
+                            gate_ident: gate_ident.to_string(),
                             pos,
                         });
                     }
 
-                    Some((1, gate.size, result))
+                    Some((1, gate_def.size, result))
                 }
             } else {
                 errors.push(Error::new(

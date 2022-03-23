@@ -466,6 +466,7 @@ pub enum ErrorCode {
 
     ParModuleConInvalidIdentiferToken,
     ParModuleConInvaldiChannelSyntax,
+    ParModuleConMissingClosingBracketForCLusterIdent,
 
     ParNetworkMissingIdentifer,
     ParNetworkMissingDefBlockOpen,

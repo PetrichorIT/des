@@ -766,7 +766,7 @@ impl<'a> Parser<'a> {
     
                                 from: front_ident,
                                 to: last_ident,
-                                channel: Some(ident),
+                                channel: Some(ident.unwrap_direct()),
                             })
                         } else {
                             connections.push(ConDef {
@@ -774,7 +774,7 @@ impl<'a> Parser<'a> {
     
                                 from: last_ident,
                                 to: front_ident,
-                                channel: Some(ident),
+                                channel: Some(ident.unwrap_direct()),
                             })
                         }
     
@@ -797,7 +797,8 @@ impl<'a> Parser<'a> {
         self.eat_whitespace();
 
         let (first_token, id) = self.next_token()?;
-        let id = String::from(id);
+        let first_token = first_token.clone();
+        let mut id = Ident::Direct { ident: String::from(id) };
 
         if first_token.kind != TokenKind::Ident {
             
@@ -814,11 +815,36 @@ impl<'a> Parser<'a> {
             return Ok(Error);
         }
 
-        let (token, _raw) = self.next_token()?;
+        let (token, _) = self.next_token()?;
+        let mut token = token.clone();
+
+        if token.kind == TokenKind::OpenBracket {
+            // Cluster definition
+            let num = self.parse_literal_usize(ectx)?;
+            // reade closing bracket
+            let (token_br, _) = self.next_token()?;
+
+            if token_br.kind != TokenKind::CloseBracket {
+                ectx.record_missing_token(ParModuleConMissingClosingBracketForCLusterIdent, String::from("Missing closing bracket for clustered ident."), token_br, "]")?;
+            } else if let Some(num) = num{
+                
+                // Reset id
+                if let Ident::Direct { ident } = id {
+                    id = Ident::Clusterd { ident, index: num }
+                } else {
+                    unreachable!("This is literallly impossible")
+                }
+
+                // reset given token and raw to match the next var
+                token = self.next_token()?.0.clone();
+            }
+        }
+
+
         match token.kind {
             TokenKind::Slash => {
                 let (token, id_second) = self.next_token()?;
-                let id_second = String::from(id_second);
+                let id_second = String::from(id_second) ;
                 if token.kind != TokenKind::Ident {
                     ectx.record(
                         ParModuleConInvalidIdentiferToken,
@@ -828,9 +854,28 @@ impl<'a> Parser<'a> {
                     return Ok(Error);
                 }
 
-                ectx.reset_transient();
-                Ok(Result(ConNodeIdent::Child { loc: Loc::fromto(first_token.loc, token.loc), child: id, ident: id_second }))
-            },
+                // Check for clusterd defs.
+                let token = self.tokens.peek()?;
+                if token.kind == TokenKind::OpenBracket {
+                    let _ = self.next_token()?;
+                    let num = self.parse_literal_usize(ectx)?;
+                    let (token, _raw) = self.next_token()?;
+
+                    if token.kind != TokenKind::CloseBracket {
+                        ectx.record_missing_token(ParModuleConMissingClosingBracketForCLusterIdent, String::from("Missing closing bracket for clustered ident."), token, "]")?;
+                    } 
+
+                    if let Some(num) = num {
+                        ectx.reset_transient();
+                        Ok(Result(ConNodeIdent::Child { loc: Loc::fromto(first_token.loc, token.loc), child: id, ident: Ident::Clusterd { ident: id_second, index: num}}))
+                    } else {
+                        Ok(Error)
+                    }
+                } else {
+                    ectx.reset_transient();
+                    Ok(Result(ConNodeIdent::Child { loc: Loc::fromto(first_token.loc, token.loc), child: id, ident: Ident::Direct { ident: id_second } }))
+                }
+              },
             TokenKind::Whitespace => {
                 ectx.reset_transient();
                 Ok(Result(ConNodeIdent::Local { loc: Loc::fromto(first_token.loc, token.loc), ident: id }))
@@ -1383,16 +1428,9 @@ pub struct LocalDescriptorDef {
 
 impl LocalDescriptorDef {
 
-    pub(crate) fn full_descriptor(&self) -> String {
-        if let Some((from, to)) = self.cluster_bounds {
-            if from == to {
-                format!("{}{}", self.descriptor, from)
-            } else {
-                format!("{}[{}...{}]", self.descriptor, from, to)
-            }
-        } else {
-            self.descriptor.clone()
-        }
+    pub(crate) fn cluster_bounds_contain(&self, index: usize) -> bool {
+        let (from, to) = self.cluster_bounds.unwrap();
+        from <= index && index <= to
     }
 
     pub fn new_non_cluster(descriptor: String, loc: Loc,) -> Self {
@@ -1506,8 +1544,8 @@ impl Display for ConDef {
 /// 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ConNodeIdent {
-    Local { loc: Loc, ident: String },
-    Child { loc: Loc, child: String, ident: String }
+    Local { loc: Loc, ident: Ident },
+    Child { loc: Loc, child: Ident, ident: Ident }
 }
 
 impl ConNodeIdent {
@@ -1527,6 +1565,39 @@ impl Display for ConNodeIdent {
         }
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Ident {
+    Direct { ident: String },
+    Clusterd { ident: String, index: usize }
+}
+
+impl Ident {
+    pub(crate) fn unwrap_direct(self) -> String {
+        match self {
+            Self::Direct { ident } => ident,
+            _ => panic!("Unwraped Ident expecting direct, but got clustered")
+        }
+    }
+
+    pub(crate) fn raw_ident(&self) -> &str {
+        match self {
+            Self::Direct { ident } => ident,
+            Self::Clusterd { ident, ..} => ident,
+        }
+    }
+}
+
+impl Display for Ident {
+fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+        Self::Direct { ident } => write!(f, "{}", ident),
+        Self::Clusterd { ident, index } => write!(f, "{}[{}]", ident, index)
+    }
+}
+}
+
+
 
 
 ///
