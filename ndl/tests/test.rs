@@ -145,20 +145,6 @@ fn ndl_parser_test() {
     assert_eq!(result.modules[1].connections.len(), 2);
     assert_eq!(result.modules[1].connections[0].channel, None);
 
-    // TODO: Fix tests that conflic new enum syntax for ConNodeIdent
-    // assert_eq!(result.modules[1].connections[0].from.ident, "some");
-    // assert_eq!(result.modules[1].connections[0].to.ident, "m");
-    // assert_eq!(
-    //     result.modules[1].connections[0].to.subident,
-    //     Some("another".into())
-    // );
-    // assert_eq!(
-    //     result.modules[1].connections[1].channel,
-    //     Some("NewLink".into())
-    // );
-    // assert_eq!(result.modules[1].connections[1].from.ident, "sike");
-    // assert_eq!(result.modules[1].connections[1].to.ident, "same");
-
     assert_eq!(result.networks.len(), 1);
     assert_eq!(result.networks[0].name, "SimMain");
 

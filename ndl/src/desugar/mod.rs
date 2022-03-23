@@ -406,8 +406,6 @@ fn resolve_connection_ident(
                 }),
             };
 
-            // TODO:
-            // if clustered submodule is referneced use clusterd definition
             if let Some(submod_def) = submod_def {
                 // fetch module ty
                 // this can be done outside the following if-else
@@ -434,7 +432,6 @@ fn resolve_connection_ident(
                 };
 
                 // fetch gate
-                // TODO: check
                 let gate_def = match ident {
                     Ident::Direct { ident } => sub_module_ty
                         .gates
