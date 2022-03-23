@@ -1,0 +1,41 @@
+include common/NetworkStack
+
+link SlowLink {
+    latency: 0.025
+    bitrate: 200000
+    jitter: 0.0
+}
+
+link FastLink {
+    latency: 0.010
+    bitrate: 10000000
+    jitter: 0.0
+}
+
+network RoutingNetwork {
+    nodes:
+        Node[1...6]: NetworkNode
+
+    connections:
+        Node[1]/netOut[0] --> FastLink --> Node[2]/netIn[0]
+        Node[1]/netOut[1] --> FastLink --> Node[4]/netIn[0]
+                                                         
+        Node[2]/netOut[0] --> FastLink --> Node[1]/netIn[0] 
+        Node[2]/netOut[1] --> SlowLink --> Node[4]/netIn[1] 
+        Node[2]/netOut[2] --> SlowLink --> Node[3]/netIn[0] 
+        Node[2]/netOut[3] --> SlowLink --> Node[6]/netIn[1] 
+                                                         
+        Node[3]/netOut[0] --> SlowLink --> Node[2]/netIn[2] 
+        Node[3]/netOut[1] --> FastLink --> Node[5]/netIn[1] 
+        Node[3]/netOut[2] --> SlowLink --> Node[6]/netIn[0] 
+                                                         
+        Node[4]/netOut[0] --> FastLink --> Node[1]/netIn[1] 
+        Node[4]/netOut[1] --> SlowLink --> Node[2]/netIn[1] 
+        Node[4]/netOut[2] --> FastLink --> Node[5]/netIn[0] 
+                                                         
+        Node[5]/netOut[0] --> FastLink --> Node[4]/netIn[2] 
+        Node[5]/netOut[1] --> FastLink --> Node[3]/netIn[1] 
+                                                         
+        Node[6]/netOut[0] --> SlowLink --> Node[3]/netIn[2] 
+        Node[6]/netOut[1] --> SlowLink --> Node[2]/netIn[3]
+}

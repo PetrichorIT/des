@@ -274,18 +274,3 @@ impl NdlResolverOptions {
         Self { silent: true }
     }
 }
-
-mod tests {
-    #[test]
-    fn it_works() {
-        use super::*;
-
-        let mut resolver = NdlResolver::new("./examples").expect("Failed to create resolver");
-
-        println!("{}", resolver);
-
-        let _ = resolver.run();
-
-        println!("{}", resolver);
-    }
-}

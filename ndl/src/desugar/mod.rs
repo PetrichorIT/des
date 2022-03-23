@@ -5,7 +5,6 @@ use crate::parser::*;
 use std::fmt::Display;
 
 mod specs;
-mod tests;
 mod tyctx;
 
 pub use specs::*;
@@ -68,7 +67,7 @@ pub fn desugar(unit: &ParsingResult, resolver: &NdlResolver) -> DesugaredParsing
                 for id in from_id..=to_id {
                     module_spec.submodules.push(ChildModuleSpec {
                         loc: *loc,
-                        descriptor: format!("{}{}", desc.descriptor, id),
+                        descriptor: format!("{}[{}]", desc.descriptor, id),
                         ty: ty.clone(),
                     })
                 }
@@ -381,7 +380,7 @@ fn resolve_connection_ident(
                     }
                     Some((1, gate.size, result))
                 }
-                Ident::Clusterd { index, .. } => {
+                Ident::Clustered { index, .. } => {
                     result.push(ConSpecNodeIdent::Local {
                         loc: *loc,
                         gate_ident: ident.raw_ident().to_string(),
@@ -395,10 +394,12 @@ fn resolve_connection_ident(
             // maybe referces clustered submodules.
 
             let submod_def = match child {
-                Ident::Direct { ident } => child_modules
-                    .iter()
-                    .find(|m| m.desc.descriptor == *ident && m.desc.cluster_bounds.is_none()),
-                Ident::Clusterd { ident, index } => child_modules.iter().find(|m| {
+                // Can either describe a primitiv or a clustered group that
+                // will not be indexed.
+                Ident::Direct { ident } => {
+                    child_modules.iter().find(|m| m.desc.descriptor == *ident)
+                }
+                Ident::Clustered { ident, index } => child_modules.iter().find(|m| {
                     m.desc.descriptor == *ident
                         && m.desc.cluster_bounds.is_some()
                         && m.desc.cluster_bounds_contain(*index)
@@ -411,7 +412,7 @@ fn resolve_connection_ident(
                 // fetch module ty
                 // this can be done outside the following if-else
                 // since a cluster-definition shares the same ty
-                let sub_module = match tyctx
+                let sub_module_ty = match tyctx
                     .modules
                     .iter()
                     .find(|module| module.name == submod_def.ty)
@@ -433,20 +434,29 @@ fn resolve_connection_ident(
                 };
 
                 // fetch gate
+                // TODO: check
                 let gate_def = match ident {
-                    Ident::Direct { ident } => sub_module.gates.iter().find(|g| g.name == *ident),
-                    Ident::Clusterd { .. } => todo!(),
+                    Ident::Direct { ident } => sub_module_ty
+                        .gates
+                        .iter()
+                        .find(|g| g.name == *ident)
+                        .map(|g| (g, None)),
+                    Ident::Clustered { ident, index } => sub_module_ty
+                        .gates
+                        .iter()
+                        .find(|g| g.name == *ident)
+                        .map(|g| (g, Some(*index))),
                 };
 
                 // fetch gate
-                let gate_def = match gate_def {
+                let (gate_def, gate_def_cindex) = match gate_def {
                     Some(gate_def) => gate_def,
                     None => {
                         errors.push(Error::new(
                             DsgConInvalidLocalGateIdent,
                             format!(
                                 "No local gate cluster '{}' exists on module '{}'.",
-                                ident, sub_module.name
+                                ident, sub_module_ty.name
                             ),
                             *loc,
                             false,
@@ -469,33 +479,76 @@ fn resolve_connection_ident(
                 let gate_ident = ident.raw_ident();
 
                 if let Some((from_id, to_id)) = submod_def.desc.cluster_bounds {
-                    // Make clustersed spec
-                    for id in from_id..=to_id {
-                        let child_ident = format!("{}{}", child, id);
+                    // referenced child is clustered
 
-                        // maybe add gate.size for debug message creation later
-                        for pos in 0..gate_def.size {
+                    if let Ident::Clustered { ident, index } = child {
+                        // cluster is resolved through indexing
+                        let child_ident = format!("{}[{}]", ident, index);
+
+                        if let Some(gate_def_cindex) = gate_def_cindex {
                             result.push(ConSpecNodeIdent::Child {
                                 loc: *loc,
                                 child_ident: child_ident.clone(),
                                 gate_ident: gate_ident.to_string(),
-                                pos,
-                            });
+                                pos: gate_def_cindex,
+                            })
+                        } else {
+                            for pos in 0..gate_def.size {
+                                result.push(ConSpecNodeIdent::Child {
+                                    loc: *loc,
+                                    child_ident: child_ident.clone(),
+                                    gate_ident: gate_ident.to_string(),
+                                    pos,
+                                });
+                            }
                         }
-                    }
+                        Some((1, gate_def.size, result))
+                    } else {
+                        // Make clustersed spec
+                        for id in from_id..=to_id {
+                            let child_ident = format!("{}[{}]", child, id);
 
-                    Some((to_id + 1 - from_id, gate_def.size, result))
+                            // maybe add gate.size for debug message creation later
+                            if let Some(gate_def_cindex) = gate_def_cindex {
+                                result.push(ConSpecNodeIdent::Child {
+                                    loc: *loc,
+                                    child_ident: child_ident.clone(),
+                                    gate_ident: gate_ident.to_string(),
+                                    pos: gate_def_cindex,
+                                })
+                            } else {
+                                for pos in 0..gate_def.size {
+                                    result.push(ConSpecNodeIdent::Child {
+                                        loc: *loc,
+                                        child_ident: child_ident.clone(),
+                                        gate_ident: gate_ident.to_string(),
+                                        pos,
+                                    });
+                                }
+                            }
+                        }
+                        Some((to_id + 1 - from_id, gate_def.size, result))
+                    }
                 } else {
                     // make normal spec.
 
                     // maybe add gate.size for debug message creation later
-                    for pos in 0..gate_def.size {
+                    if let Some(gate_def_cindex) = gate_def_cindex {
                         result.push(ConSpecNodeIdent::Child {
                             loc: *loc,
                             child_ident: child.to_string(),
                             gate_ident: gate_ident.to_string(),
-                            pos,
-                        });
+                            pos: gate_def_cindex,
+                        })
+                    } else {
+                        for pos in 0..gate_def.size {
+                            result.push(ConSpecNodeIdent::Child {
+                                loc: *loc,
+                                child_ident: child.to_string(),
+                                gate_ident: gate_ident.to_string(),
+                                pos,
+                            });
+                        }
                     }
 
                     Some((1, gate_def.size, result))

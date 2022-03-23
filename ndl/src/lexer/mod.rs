@@ -7,7 +7,6 @@ use self::TokenKind::*;
 use cursor::Cursor;
 
 mod cursor;
-mod tests;
 mod token_stream;
 
 pub use self::token_stream::TokenStream;

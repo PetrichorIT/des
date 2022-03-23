@@ -1,0 +1,15 @@
+module NetworkNode {
+    gates:
+        netIn[5]
+        netOut[5]
+        fromAppl[5]
+        toAppl[5]
+}
+
+module NetworkStack {
+    gates:
+        netIn[5]
+        netOut[5]
+        fromAppl[5]
+        toAppl[5]
+}

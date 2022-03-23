@@ -73,6 +73,8 @@ pub use tycheck::validate_module_ty;
 pub use error::Error;
 pub use error::ErrorCode;
 pub use error::GlobalErrorContext;
+pub use lexer::Base;
+pub use lexer::LiteralKind;
 pub use lexer::Token;
 pub use lexer::TokenKind;
 pub use lexer::TokenStream;
@@ -101,16 +103,3 @@ pub use resolver::NdlResolverState;
 
 // > Static Result
 pub type NdlResult<T> = Result<T, &'static str>;
-
-mod tests {
-    #[test]
-    fn mtest() {
-        use crate::*;
-
-        let mut resolver = NdlResolver::new("./examples")
-            .expect("Failed to create test resolver from examples directory");
-
-        let _ = resolver.run();
-        println!("{}", resolver.units.get("NetworkNode").unwrap());
-    }
-}

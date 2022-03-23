@@ -4,7 +4,6 @@ use crate::desugar::DesugaredParsingResult;
 use crate::error::*;
 use crate::parser::ChildeModuleDef;
 
-mod tests;
 mod tyctx;
 
 pub use tyctx::*;
