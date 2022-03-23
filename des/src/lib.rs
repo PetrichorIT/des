@@ -9,12 +9,13 @@
 //!
 //! # Features
 //!
-//! - 'net' A module for simulating network like module structures.
-//! - 'net-ipv6' A modifer for the net feature that uses 128 bit addresses.
-//! - 'simtime-u128' A modifier that enables the simulation to use u128 timestamps
-//! for maximum precision (this is ca. 10% slower than default).
-//! - 'internal-metrics' A modifier that enables internal metrics for event runtime internal
-//! parameters for debugging.
+//! | Feature          | Description                                                              |
+//! |------------------|--------------------------------------------------------------------------|
+//! | net              | Adds a module oriented design-abstraction that provides its own events.  |
+//! | net-ipv6         | Configures the net module to use IPv6 addresses.                         |
+//! | cqueue           | Configures the runtime to use a calender queue for better performance.   |
+//! | simtime-u128     | Configures the runtime to use a high precsion time primitiv.             |
+//! | internal-metrics | Collects internal metrics about the runtime, to improve parametrization. |
 //!
 
 pub(crate) mod core;
@@ -44,5 +45,5 @@ pub use crate::metrics::StdDev;
 #[cfg(feature = "net")]
 pub use crate::net::*;
 
+pub use util::mm::Mrc;
 pub use util::spmc::*;
-pub use util::Mrc;

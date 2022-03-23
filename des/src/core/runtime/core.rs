@@ -1,4 +1,4 @@
-use crate::{interning::Interner, util::SyncCell, EventId, SimTime, StandardLogger};
+use crate::{interning::Interner, util::mm::SyncCell, EventId, SimTime, StandardLogger};
 use lazy_static::lazy_static;
 use rand::{
     distributions::Standard,

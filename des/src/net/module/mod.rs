@@ -7,7 +7,7 @@ mod tests;
 use std::collections::HashMap;
 
 use crate::net::*;
-use crate::util::Mrc;
+use crate::util::mm::Mrc;
 use crate::*;
 use log::error;
 

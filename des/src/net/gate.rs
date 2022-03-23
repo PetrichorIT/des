@@ -1,5 +1,5 @@
 use crate::net::*;
-use crate::util::Mrc;
+use crate::util::mm::Mrc;
 use std::fmt::{Debug, Display};
 use std::marker::Unsize;
 

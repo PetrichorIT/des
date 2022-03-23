@@ -1,4 +1,4 @@
-use crate::{util::SyncCell, *};
+use crate::{util::mm::SyncCell, *};
 use log::warn;
 use rand::{
     distributions::Standard,

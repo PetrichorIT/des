@@ -2,7 +2,7 @@ use std::marker::Unsize;
 
 use crate::core::*;
 use crate::net::*;
-use crate::util::*;
+use crate::util::{mm::*, spmc::*};
 
 mod events;
 pub use events::*;
@@ -25,7 +25,7 @@ pub struct NetworkRuntime<A> {
     ///
     /// The set of parameters for the module-driven simulation.
     ///
-    parameters: spmc::SpmcWriter<Parameters>,
+    parameters: SpmcWriter<Parameters>,
 
     ///
     /// A inner container for holding user defined global state.
@@ -37,7 +37,7 @@ impl<A> NetworkRuntime<A> {
     ///
     /// Returns the parameter reader of the entire simulation.
     ///
-    pub fn parameters(&self) -> spmc::SpmcReader<Parameters> {
+    pub fn parameters(&self) -> SpmcReader<Parameters> {
         self.parameters.get_reader()
     }
 
@@ -47,7 +47,7 @@ impl<A> NetworkRuntime<A> {
     pub fn new(inner: A) -> Self {
         Self {
             module_list: Vec::new(),
-            parameters: spmc::SpmcWriter::new(Parameters::new()),
+            parameters: SpmcWriter::new(Parameters::new()),
 
             inner,
         }
