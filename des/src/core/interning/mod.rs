@@ -5,7 +5,7 @@
 //!
 
 use crate::util::mm::SyncCell;
-use log::{error, trace, warn};
+use log::{trace, warn};
 use std::alloc::{dealloc, Layout};
 use std::any::{type_name, TypeId};
 use std::fmt::Debug;
@@ -331,7 +331,7 @@ impl Interner {
         // references leak.
         let contents = unsafe { &*self.contents.get() };
         for entry in contents.iter().flatten() {
-            error!(target: "interner", "Undisposed object after runtime end: {:?}", entry);
+            warn!(target: "interner", "Undisposed object after runtime end: {:?}", entry);
         }
     }
 }
