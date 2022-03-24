@@ -15,7 +15,7 @@ module NetworkNode {
         toStack[5],
         fromStack[5],
 
-        channelIncoming,
+        channelIncoming[5],
         channelOutgoing[5],
 
         toAppl[5],

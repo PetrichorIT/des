@@ -7,11 +7,12 @@ network Main {
         node2: NetworkNode
         node3: NetworkNode
 
-        node[1000...10000]: NetworkNode
+        node[1...100]: NetworkNode
 
     connections:
         node1/channelOutgoing --> FastLink --> node2/channelIncoming
         node2/channelOutgoing --> FastLink --> node3/channelIncoming
         node3/channelOutgoing --> FastLink --> node1/channelIncoming
 
+        node[1]/channelOutgoing --> node[2]/channelIncoming
 }

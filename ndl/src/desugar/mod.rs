@@ -216,7 +216,7 @@ pub fn desugar(unit: &ParsingResult, resolver: &NdlResolver) -> DesugaredParsing
                 for id in from_id..=to_id {
                     network_spec.nodes.push(ChildModuleSpec {
                         loc: *loc,
-                        descriptor: format!("{}{}", desc.descriptor, id),
+                        descriptor: format!("{}[{}]", desc.descriptor, id),
                         ty: ty.clone(),
                     })
                 }
@@ -264,9 +264,8 @@ pub fn desugar(unit: &ParsingResult, resolver: &NdlResolver) -> DesugaredParsing
                 None => continue,
             };
 
-            // Gurantee that count(from) <= count(to)
-            // This allows partial targeting of later gates.
-            if from_idents.len() > to_idents.len() {
+            // Gurantee that count(from) = count(to)
+            if from_idents.len() != to_idents.len() {
                 errors.push(Error::new(
                     DsgConGateSizedToNotMatch,
                     format!(
@@ -278,11 +277,6 @@ pub fn desugar(unit: &ParsingResult, resolver: &NdlResolver) -> DesugaredParsing
                 ));
 
                 // Continue anyway will be aborted nonetheless
-            }
-
-            if from_idents.len() < to_idents.len() {
-                // Warn
-                todo!()
             }
 
             // Resolve the channel desc once,

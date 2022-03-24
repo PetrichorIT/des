@@ -7,19 +7,27 @@ fn main() -> std::io::Result<()> {
         vec![std::env::current_dir()?.to_str().unwrap().to_string()]
     };
 
+    let options: Vec<&String> = workspaces.iter().filter(|w| w.starts_with("-")).collect();
+    let workspaces: Vec<&String> = workspaces.iter().filter(|w| !w.starts_with("-")).collect();
+
+    let quiet = options.iter().any(|o| ["-q", "--quiet"].contains(&&o[..]));
+    let help = options
+        .iter()
+        .any(|o| ["-h", "-help", "--help"].contains(&&o[..]));
+
+    if help {
+        println!("ndl [..]");
+        println!("A parser and typechecker for ndl workspaces.\n");
+
+        println!("USAGE:");
+        println!("\tndl <path...>");
+        println!();
+        println!("\tIf no paths are given the current working directory ");
+        println!("\twill be used as the workspace.");
+        return Ok(());
+    }
+
     for workspace in workspaces {
-        if matches!(&workspace[..], "help" | "h" | "-h" | "-help" | "--help") {
-            println!("ndl [..]");
-            println!("A parser and typechecker for ndl workspaces.\n");
-
-            println!("USAGE:");
-            println!("\tndl <path...>");
-            println!();
-            println!("\tIf no paths are given the current working directory ");
-            println!("\twill be used as the workspace.");
-            return Ok(());
-        }
-
         println!("Workspace '{}'", workspace);
         println!();
 
@@ -35,12 +43,14 @@ fn main() -> std::io::Result<()> {
         let g = g.to_owned();
 
         // Modules
-        for module in g.modules {
-            println!("{}", module)
-        }
+        if !quiet {
+            for module in g.modules {
+                println!("{}", module)
+            }
 
-        for network in g.networks {
-            println!("{}", network)
+            for network in g.networks {
+                println!("{}", network)
+            }
         }
     }
 

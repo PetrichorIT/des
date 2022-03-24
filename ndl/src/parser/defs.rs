@@ -102,28 +102,10 @@ impl LocalDescriptorDef {
     }
 
     pub fn new_non_cluster(descriptor: String, loc: Loc) -> Self {
-        // note that idents are ascii so byte indexing should work.
-        let mut idx = descriptor.len();
-        for c in descriptor.chars().rev() {
-            if !c.is_ascii_digit() {
-                break;
-            }
-            idx -= 1;
-        }
-
-        if idx == descriptor.len() {
-            Self {
-                loc,
-                descriptor,
-                cluster_bounds: None,
-            }
-        } else {
-            let implicite_bounds: usize = descriptor[idx..].parse().unwrap();
-            Self {
-                loc,
-                descriptor: String::from(&descriptor[..idx]),
-                cluster_bounds: Some((implicite_bounds, implicite_bounds)),
-            }
+        Self {
+            loc,
+            descriptor,
+            cluster_bounds: None,
         }
     }
 
