@@ -40,6 +40,7 @@ impl GlobalErrorContext {
     pub fn has_errors(&self) -> bool {
         !(self.lexing_errors.is_empty()
             && self.parsing_errors.is_empty()
+            && self.desugaring_errors.is_empty()
             && self.tychecking_errors.is_empty())
     }
 

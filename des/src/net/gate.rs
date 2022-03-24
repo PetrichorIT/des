@@ -258,3 +258,17 @@ where
         Some(Mrc::clone(element))
     }
 }
+
+impl<T> IntoModuleGate<T> for &str
+where
+    T: StaticModuleCore,
+{
+    fn into_gate(self, module: &T) -> Option<GateRef> {
+        let element = module
+            .gates()
+            .iter()
+            .find(|&g| g.name() == self && g.size() == 1)?;
+
+        Some(Mrc::clone(element))
+    }
+}

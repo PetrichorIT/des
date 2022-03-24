@@ -4,6 +4,7 @@
 
 use std::{
     cell::UnsafeCell,
+    hash::Hash,
     marker::Unsize,
     ops::{CoerceUnsized, Deref, DerefMut, DispatchFromDyn},
     rc::Rc,
@@ -102,6 +103,15 @@ where
 }
 
 impl<T> Eq for Mrc<T> where T: Eq {}
+
+impl<T> Hash for Mrc<T>
+where
+    T: Hash,
+{
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.deref().hash(state)
+    }
+}
 
 ///
 /// A implementation of UnsafeCell that implements Sync

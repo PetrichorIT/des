@@ -35,6 +35,7 @@ pub use self::gate::IntoModuleGate;
 // # Messages & Packets
 //
 
+pub use self::message::CustomSizeBody;
 pub use self::message::Message;
 pub use self::message::MessageBody;
 pub use self::message::MessageId;

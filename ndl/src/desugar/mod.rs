@@ -323,6 +323,7 @@ pub fn desugar(unit: &ParsingResult, resolver: &NdlResolver) -> DesugaredParsing
         result.networks.push(network_spec);
     }
 
+    result.errors = errors;
     result
 }
 

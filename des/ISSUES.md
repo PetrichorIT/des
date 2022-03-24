@@ -14,3 +14,5 @@ Also consider Cow prt vs Rc ptr
 
 This change must allow checked casts, be negleable on performace
 and guranatee refence intergrity
+
+# Rework pkt-headers msg size calculations

@@ -49,8 +49,8 @@ pub struct PacketHeader {
     pub source_node: NodeAddress,
     pub source_port: PortAddress,
 
-    pub target_node: NodeAddress,
-    pub target_port: PortAddress,
+    pub dest_node: NodeAddress,
+    pub dest_port: PortAddress,
 
     // should be u8 but test case requies >u16
     pub ttl: usize,
@@ -59,6 +59,8 @@ pub struct PacketHeader {
 
     pub tos: u8,
     pub protocol: u8,
+
+    pub(crate) seq_no: isize,
 
     pub(crate) pkt_bit_len: usize,
     pub pkt_byte_len: u16,
@@ -100,6 +102,18 @@ impl Packet {
         self.header.source_node = node
     }
 
+    pub fn set_source_port(&mut self, port: PortAddress) {
+        self.header.source_port = port
+    }
+
+    pub fn set_dest_node(&mut self, node: NodeAddress) {
+        self.header.dest_node = node
+    }
+
+    pub fn set_dest_port(&mut self, port: PortAddress) {
+        self.header.dest_port = port
+    }
+
     /// Sets the hop counter.
     #[inline(always)]
     pub fn set_hop_count(&mut self, hop_count: usize) {
@@ -116,6 +130,10 @@ impl Packet {
     #[inline(always)]
     pub fn set_ttl(&mut self, ttl: usize) {
         self.header.ttl = ttl
+    }
+
+    pub fn set_seq_no(&mut self, seq_no: isize) {
+        self.header.seq_no = seq_no
     }
 
     ///
@@ -146,14 +164,16 @@ impl Packet {
                 source_node: src.0,
                 source_port: src.1,
 
-                target_node: target.0,
-                target_port: target.1,
+                dest_node: target.0,
+                dest_port: target.1,
 
                 ttl: 0,
                 hop_count: 0,
 
                 tos: 0,
                 protocol: 0,
+
+                seq_no: -1,
 
                 pkt_bit_len: bit_len,
                 pkt_byte_len: byte_len,

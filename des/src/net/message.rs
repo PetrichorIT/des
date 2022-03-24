@@ -294,6 +294,46 @@ macro_rules! msg_body_primitiv {
     };
 }
 
+///
+/// A message body that does mimics a custom size
+/// independet of actualy size.
+///
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct CustomSizeBody<T> {
+    bit_len: usize,
+    inner: T,
+}
+
+impl<T> CustomSizeBody<T> {
+    pub fn new(bit_len: usize, inner: T) -> Self {
+        Self { bit_len, inner }
+    }
+
+    pub fn inner(&self) -> &T {
+        &self.inner
+    }
+
+    pub fn inner_mut(&mut self) -> &mut T {
+        &mut self.inner
+    }
+
+    pub fn into_inner(self) -> T {
+        self.inner
+    }
+}
+
+impl<T> MessageBody for CustomSizeBody<T> {
+    fn byte_len(&self) -> usize {
+        self.bit_len / 8
+    }
+
+    fn bit_len(&self) -> usize {
+        self.bit_len
+    }
+}
+
+msg_body_primitiv!(());
+
 msg_body_primitiv!(u8);
 msg_body_primitiv!(u16);
 msg_body_primitiv!(u32);

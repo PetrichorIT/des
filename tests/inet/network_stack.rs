@@ -56,9 +56,9 @@ impl Module for NetworkStack {
             .handle(&pkt, meta.last_gate.clone().unwrap());
 
         // Route packet
-        if pkt.header().target_node == self.address {
+        if pkt.header().dest_node == self.address {
             info!(target: "Application Layer", "=== Received packet ===");
-        } else if let Some(route) = self.lookup_route(pkt.header().target_node) {
+        } else if let Some(route) = self.lookup_route(pkt.header().dest_node) {
             let route = route.clone();
 
             // PATH ROUTE
