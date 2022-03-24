@@ -66,6 +66,14 @@ impl ModuleCore {
     }
 
     ///
+    /// A runtime-unqiue (not enforced) identifier for this module, based on its
+    /// place in the module tree.
+    ///
+    pub fn path(&self) -> &ModulePath {
+        &self.path
+    }
+
+    ///
     /// Creates a new optionally named instance
     /// of 'Self'.
     ///

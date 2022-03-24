@@ -29,21 +29,22 @@ mod net;
 // # Generic core exports
 //
 
-pub use crate::core::*;
+pub use self::core::*;
 
 //
 // # Metrics & Misc
 //
 
-pub use crate::metrics::Statistic;
-pub use crate::metrics::StdDev;
+pub use self::metrics::OutVec;
+pub use self::metrics::Statistic;
+pub use self::metrics::StdDev;
 
 //
 // # feature = "net"
 //
 
 #[cfg(feature = "net")]
-pub use crate::net::*;
+pub use self::net::*;
 
-pub use util::mm::Mrc;
-pub use util::spmc::*;
+pub use self::util::mm::Mrc;
+pub use self::util::spmc::*;

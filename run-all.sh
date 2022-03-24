@@ -1,0 +1,9 @@
+cargo run --release --bin t-events
+cargo run --release --bin t-inet
+cargo run --release --bin t-metrics
+cargo run --release --bin t-ndl
+cargo run --release --bin t-par
+cargo run --release --bin t-pingpong
+cargo run --release --bin t-ptrhell
+cargo run --release --bin t-utils
+cargo run --release --bin t-waiter

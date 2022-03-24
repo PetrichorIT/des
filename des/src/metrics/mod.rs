@@ -9,6 +9,9 @@ pub use internal::*;
 mod stddev;
 pub use stddev::*;
 
+mod outvec;
+pub use outvec::*;
+
 ///
 /// A type that allows for statistical datacollection
 /// inside a given runtime.

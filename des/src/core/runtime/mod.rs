@@ -286,7 +286,12 @@ where
 
         if self.check_break_condition(&node) {
             let EventNode { time, event, .. } = node;
-            self.future_event_set.add(time, event);
+            self.future_event_set.add(
+                time,
+                event,
+                #[cfg(feature = "internal-metrics")]
+                Mrc::clone(&self.metrics),
+            );
             return false;
         }
 
