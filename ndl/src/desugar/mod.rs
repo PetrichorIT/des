@@ -486,7 +486,7 @@ fn resolve_connection_ident(
                         if let Some(gate_def_cindex) = gate_def_cindex {
                             result.push(ConSpecNodeIdent::Child {
                                 loc: *loc,
-                                child_ident: child_ident.clone(),
+                                child_ident,
                                 gate_ident: gate_ident.to_string(),
                                 pos: gate_def_cindex,
                             })

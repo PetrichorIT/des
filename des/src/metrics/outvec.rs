@@ -54,11 +54,13 @@ impl OutVec {
         }
     }
 
+    #[must_use]
     pub fn buffer_max(mut self, max_buffered_values: usize) -> Self {
         self.max_buffered_values = max_buffered_values;
         self
     }
 
+    #[must_use]
     pub fn result_dir(mut self, dir: String) -> Self {
         self.results_dir = dir;
         self

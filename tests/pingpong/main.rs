@@ -6,11 +6,12 @@ mod bob;
 #[derive(Debug)]
 struct Application();
 
+#[allow(clippy::cmp_owned)]
 fn main() {
     let mut alice = Mrc::new(alice::Alice(ModuleCore::new()));
     let mut bob = Mrc::new(bob::Bob(ModuleCore::new()));
 
-    bob.add_child(&mut *alice);
+    bob.add_child(&mut alice);
 
     let mut app = NetworkRuntime::new(Application());
 

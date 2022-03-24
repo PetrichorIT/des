@@ -86,18 +86,18 @@ impl TestCase {
         let mut parent = Mrc::new(Parent::named(core));
 
         let mut children = vec![
-            Child::named_with_parent("c1", &mut *parent),
-            Child::named_with_parent("c2", &mut *parent),
-            Child::named_with_parent("c3", &mut *parent),
+            Child::named_with_parent("c1", &mut parent),
+            Child::named_with_parent("c2", &mut parent),
+            Child::named_with_parent("c3", &mut parent),
         ];
 
         let grand_children = vec![
-            GrandChild::named_with_parent("left", &mut *children[0]),
-            GrandChild::named_with_parent("right", &mut *children[0]),
-            GrandChild::named_with_parent("left", &mut *children[1]),
-            GrandChild::named_with_parent("right", &mut *children[1]),
-            GrandChild::named_with_parent("left", &mut *children[2]),
-            GrandChild::named_with_parent("right", &mut *children[2]),
+            GrandChild::named_with_parent("left", &mut children[0]),
+            GrandChild::named_with_parent("right", &mut children[0]),
+            GrandChild::named_with_parent("left", &mut children[1]),
+            GrandChild::named_with_parent("right", &mut children[1]),
+            GrandChild::named_with_parent("left", &mut children[2]),
+            GrandChild::named_with_parent("right", &mut children[2]),
         ];
 
         Self {

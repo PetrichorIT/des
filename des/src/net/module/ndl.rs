@@ -15,7 +15,7 @@ pub trait NameableModule: 'static + StaticModuleCore {
     ///
     /// Creates a named instance of self based on the parent hierachical structure.
     ///
-    fn named_with_parent<T>(name: &str, parent: &mut T) -> Mrc<Self>
+    fn named_with_parent<T>(name: &str, parent: &mut Mrc<T>) -> Mrc<Self>
     where
         T: NameableModule,
         Self: Sized,
@@ -23,7 +23,7 @@ pub trait NameableModule: 'static + StaticModuleCore {
         let core = ModuleCore::child_of(name, parent.module_core());
         let mut this = Mrc::new(Self::named(core));
 
-        parent.add_child(&mut *this);
+        parent.add_child(&mut this);
         this
     }
 }
@@ -64,7 +64,7 @@ pub trait BuildableModule: StaticModuleCore {
         T: NameableModule,
         Self: NameableModule + Sized,
     {
-        let obj = Self::named_with_parent(name, &mut **parent);
+        let obj = Self::named_with_parent(name, parent);
         // parent.add_child(&mut (*obj));
         Self::build(obj, rt)
     }

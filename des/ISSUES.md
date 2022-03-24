@@ -10,9 +10,4 @@ Interner(String)
 
 Also consider Cow prt vs Rc ptr
 
-# Change module-level parent-child system to use Mrc
-
-This change must allow checked casts, be negleable on performace
-and guranatee refence intergrity
-
 # Rework pkt-headers msg size calculations

@@ -31,7 +31,7 @@ impl NetworkStack {
 
         let mut router = Mrc::new(router);
 
-        obj.add_child(&mut *router);
+        obj.add_child(&mut router);
         obj.routing_deamon = Some(router);
         obj
     }

@@ -45,6 +45,11 @@ mod default {
             }
         }
 
+        //
+        // clippy::let_and_return occures on not(feature = "internal-metrics")
+        // but would produce invalid code with feature "internal-metrics"
+        //
+        #[allow(clippy::let_and_return)]
         pub fn fetch_next(
             &mut self,
             #[cfg(feature = "internal-metrics")] mut metrics: crate::Mrc<
