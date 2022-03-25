@@ -1,4 +1,4 @@
-use crate::{util::mm::Mrc, *};
+use crate::{net::module::*, util::Mrc};
 
 ///
 /// A trait that prepares a module to be created from a NDL

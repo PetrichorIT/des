@@ -1,4 +1,7 @@
-use crate::{util::mm::SyncCell, *};
+use crate::{
+    core::{event::Application, SimTime},
+    util::*,
+};
 use log::warn;
 use rand::{
     distributions::Standard,
@@ -35,9 +38,9 @@ pub(crate) const FT_INTERNAL_METRICS: bool = cfg!(feature = "internal-metrics");
 ///
 /// - Create an 'App' struct that implements the trait [Application].
 /// This struct will hold the systems state and define the event set used in the simulation.
-/// - Create your events that handle the logic of you simulation. They must implement [Event] with the generic
+/// - Create your events that handle the logic of you simulation. They must implement [Event](crate::core::Event) with the generic
 /// parameter A, where A is your 'App' struct.
-/// - To bind those two together create a enum that implements [EventSet] that holds all your events.
+/// - To bind those two together create a enum that implements [EventSet](crate::core::EventSet) that holds all your events.
 /// This can be done via a macro. The use this event set as the associated event set in 'App'.
 ///
 /// # Usage with module system
@@ -60,7 +63,7 @@ where
     future_event_set: FutureEventSet<A>,
 
     #[cfg(feature = "internal-metrics")]
-    metrics: crate::Mrc<crate::metrics::RuntimeMetrics>,
+    metrics: Mrc<crate::metrics::RuntimeMetrics>,
 }
 
 impl<A> Runtime<A>
@@ -168,12 +171,12 @@ where
 {
     ///
     /// Creates a new [Runtime] Instance using an application as core,
-    /// and accepting events of type [Event<A>].
+    /// and accepting events of type [Event<A>](crate::core::Event).
     ///
     /// # Examples
     ///
     /// ```
-    /// use des::*;
+    /// use des::prelude::*;
     ///
     /// // Assumme Application is implemented for App.
     /// #[derive(Debug)]
@@ -196,13 +199,13 @@ where
 
     ///
     /// Creates a new [Runtime] Instance using an application as core,
-    /// and accepting events of type [Event<A>], using a custom set of
+    /// and accepting events of type [Event<A>](crate::core::Event), using a custom set of
     /// [RuntimeOptions].
     ///
     /// # Examples
     ///
     /// ```
-    /// use des::*;
+    /// use des::prelude::*;
     ///
     /// // Assumme Application is implemented for App.
     /// #[derive(Debug)]
@@ -234,7 +237,7 @@ where
             app,
 
             #[cfg(feature = "internal-metrics")]
-            metrics: crate::Mrc::new(crate::metrics::RuntimeMetrics::new()),
+            metrics: Mrc::new(crate::metrics::RuntimeMetrics::new()),
         };
 
         macro_rules! symbol {
@@ -321,7 +324,7 @@ where
     /// ### Examples
     ///
     /// ```
-    /// use des::*;
+    /// use des::prelude::*;
     ///
     /// struct MyApp();
     /// impl Application for MyApp {
@@ -440,7 +443,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use des::*;
+    /// use des::prelude::*;
     ///
     /// # struct MyApp();
     /// # impl Application for MyApp {
@@ -484,7 +487,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use des::*;
+    /// use des::prelude::*;
     ///
     /// # struct MyApp();
     /// # impl Application for MyApp {
@@ -573,7 +576,7 @@ impl<A> RuntimeResult<A> {
     /// # Examples
     ///
     /// ```
-    /// # use des::*;
+    /// # use des::prelude::*;
     /// # #[derive(Debug, PartialEq, Eq)]
     /// # struct MyApp;
     /// # fn main() {
@@ -583,7 +586,7 @@ impl<A> RuntimeResult<A> {
     /// ```
     ///
     /// ```should_panic
-    /// # use des::*;
+    /// # use des::prelude::*;
     /// # #[derive(Debug, PartialEq, Eq)]
     /// # struct MyApp;
     /// # fn main() {
@@ -645,7 +648,7 @@ impl<A> RuntimeResult<A> {
     /// # Examples
     ///
     /// ```
-    /// # use des::*;
+    /// # use des::prelude::*;
     /// # #[derive(Debug, PartialEq, Eq)]
     /// struct InnerResult { value: usize }
     /// # #[derive(Debug, PartialEq, Eq)]

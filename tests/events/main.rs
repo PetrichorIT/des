@@ -1,4 +1,4 @@
-use des::*;
+use des::prelude::*;
 use rand::prelude::SliceRandom;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]

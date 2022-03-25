@@ -1,5 +1,4 @@
-use des::{Module, ModuleCore, SpmcReader};
-use des::{Parameters, StaticModuleCore};
+use des::prelude::*;
 use log::warn;
 
 use des_derive::Module;
@@ -28,7 +27,7 @@ impl NetworkNode {
 }
 
 impl Module for NetworkNode {
-    fn handle_message(&mut self, msg: des::Message) {
+    fn handle_message(&mut self, msg: Message) {
         let incoming = msg.meta().last_gate.as_ref().unwrap();
 
         let pos = incoming.pos();

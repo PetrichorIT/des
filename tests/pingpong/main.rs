@@ -1,4 +1,4 @@
-use des::*;
+use des::prelude::*;
 
 mod alice;
 mod bob;

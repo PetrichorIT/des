@@ -1,3 +1,7 @@
+//!
+//! Tools for building a module/net oriented simulation.
+//!
+
 mod channel;
 mod common;
 mod gate;

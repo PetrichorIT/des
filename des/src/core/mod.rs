@@ -1,5 +1,8 @@
-mod event;
+//!
+//! The core functionallity of a discrete event simulator.
+//!
 
+mod event;
 mod logger;
 mod runtime;
 mod sim_time;

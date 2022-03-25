@@ -38,7 +38,7 @@ impl SimTime {
     /// # Examples
     ///
     /// ```should_panic
-    /// use des::*;
+    /// use des::prelude::*;
     ///
     /// let t = SimTime::now();
     /// ```
@@ -61,7 +61,7 @@ impl SimTime {
     /// # Examples
     ///
     /// ```
-    /// use des::SimTime;
+    /// use des::core::SimTime;
     ///
     /// let st_1 = SimTime::new(3.4);
     /// let st_2 = SimTime::new(3.0);
@@ -80,7 +80,7 @@ impl SimTime {
     /// # Examples
     ///
     /// ```
-    /// use des::SimTime;
+    /// use des::core::SimTime;
     ///
     /// let st_1 = SimTime::new(3.4);
     /// let st_2 = SimTime::new(1.4);

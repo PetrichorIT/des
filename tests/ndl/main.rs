@@ -1,4 +1,4 @@
-use des::*;
+use des::prelude::*;
 use des_derive::Network;
 
 mod members;
@@ -12,7 +12,7 @@ fn main() {
     let app: NetworkRuntime<A> = A().build_rt();
 
     let ids: Vec<ModuleRef> = (1..=100)
-        .map(|n| app.module(|m| m.name() == format!("bob{}", n)).unwrap())
+        .map(|n| app.module(|m| m.name() == format!("bob[{}]", n)).unwrap())
         .collect();
 
     let mut rt = Runtime::new_with(app, RuntimeOptions::seeded(0x123));
@@ -35,9 +35,6 @@ fn main() {
 
     let (_, time, event_count) = rt.run().unwrap();
 
-    assert_eq!(
-        time,
-	SimTime::from(16779.29102765267)
-    );
+    assert_eq!(time, SimTime::from(16779.29102765267));
     assert_eq!(event_count, 40_001_301);
 }

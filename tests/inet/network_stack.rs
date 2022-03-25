@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
-use des::{rng, GateRef, Message, Module, ModuleCore, Mrc, NodeAddress, Packet, SimTime};
-use des::{ModulePath, StaticModuleCore};
+use des::prelude::*;
 use des_derive::Module;
 use log::info;
 
@@ -46,7 +45,7 @@ impl NetworkStack {
 }
 
 impl Module for NetworkStack {
-    fn handle_message(&mut self, msg: des::Message) {
+    fn handle_message(&mut self, msg: Message) {
         let (mut pkt, meta) = msg.cast::<Packet>();
 
         pkt.inc_hop_count();

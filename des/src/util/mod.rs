@@ -1,3 +1,12 @@
-pub mod macros;
-pub mod mm;
-pub mod spmc;
+//!
+//! Common utilities.
+//!
+
+mod macros;
+pub use macros::*;
+
+mod mm;
+pub use mm::*;
+
+mod spmc;
+pub use spmc::*;

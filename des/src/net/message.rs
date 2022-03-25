@@ -5,7 +5,7 @@ use std::{
 
 use crate::core::*;
 use crate::net::*;
-use crate::{core::interning::*, Mrc};
+use crate::{core::interning::*, util::Mrc};
 
 ///
 /// A ID that defines the meaning of the message in the simulation context.

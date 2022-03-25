@@ -4,14 +4,12 @@ mod ndl;
 #[cfg(test)]
 mod tests;
 
-use std::any::type_name;
-use std::collections::HashMap;
-
-use crate::net::*;
-use crate::util::mm::Mrc;
-use crate::*;
+use crate::{core::SimTime, net::*, util::Mrc};
 use log::error;
-use std::any::Any;
+use std::{
+    any::{type_name, Any},
+    collections::HashMap,
+};
 
 pub use self::core::*;
 pub use self::ndl::*;
@@ -34,7 +32,7 @@ pub trait Module: StaticModuleCore {
     /// # Example
     ///
     /// ```
-    /// use des::*;
+    /// use des::prelude::*;
     /// use des_derive::Module;
     ///
     /// #[derive(Module)]
@@ -61,7 +59,7 @@ pub trait Module: StaticModuleCore {
     /// # Example
     ///
     /// ```
-    /// use des::*;
+    /// use des::prelude::*;
     /// use des_derive::Module;
     /// # fn is_good_packet<T>(_t: T) -> bool { true }
     ///
@@ -100,7 +98,7 @@ pub trait Module: StaticModuleCore {
     /// # Example
     ///
     /// ```
-    /// use des::*;
+    /// use des::prelude::*;
     /// use des_derive::Module;
     /// # type Config = ();
     /// # type Record = u8;

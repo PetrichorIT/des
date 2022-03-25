@@ -54,7 +54,7 @@ pub type RuntimeMetrics = cqueue::CQueueMetrics;
 
 #[cfg(feature = "cqueue")]
 mod cqueue {
-    use crate::{metrics::CompressedStdDev, StdDev};
+    use crate::metrics::{CompressedStdDev, StdDev};
 
     pub struct CQueueMetrics {
         pub overflow_heap_size: StdDev,

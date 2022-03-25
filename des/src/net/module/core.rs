@@ -6,9 +6,10 @@ use std::{
 };
 
 use crate::{
-    net::common::Parameters,
-    util::spmc::{SpmcReader, SpmcWriter},
-    *,
+    core::SimTime,
+    create_global_uid,
+    net::*,
+    util::{Mrc, SpmcReader, SpmcWriter},
 };
 
 create_global_uid!(

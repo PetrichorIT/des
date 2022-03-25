@@ -1,10 +1,15 @@
 #[cfg(not(feature = "cqueue"))]
 mod default {
-    use crate::{core::event::EventNode, Application, RuntimeOptions, SimTime};
+    #[allow(unused)]
+    use crate::{
+        core::{
+            event::{Application, EventNode},
+            RuntimeOptions, SimTime,
+        },
+        metrics::*,
+        util::*,
+    };
     use std::collections::{BinaryHeap, VecDeque};
-
-    #[cfg(feature = "internal-metrics")]
-    use crate::Statistic;
 
     pub(crate) struct FutureEventSet<A>
     where
@@ -52,7 +57,7 @@ mod default {
         #[allow(clippy::let_and_return)]
         pub fn fetch_next(
             &mut self,
-            #[cfg(feature = "internal-metrics")] mut metrics: crate::Mrc<
+            #[cfg(feature = "internal-metrics")] mut metrics: crate::util::Mrc<
                 crate::metrics::RuntimeMetrics,
             >,
         ) -> EventNode<A> {
@@ -96,7 +101,7 @@ mod default {
             &mut self,
             time: SimTime,
             event: impl Into<A::EventSet>,
-            #[cfg(feature = "internal-metrics")] mut metrics: crate::Mrc<
+            #[cfg(feature = "internal-metrics")] mut metrics: crate::util::Mrc<
                 crate::metrics::RuntimeMetrics,
             >,
         ) {
@@ -126,14 +131,19 @@ pub(crate) use default::*;
 
 #[cfg(feature = "cqueue")]
 mod cqueue {
-    use crate::{core::event::EventNode, Application, RuntimeOptions, SimTime};
+    #[allow(unused)]
+    use crate::{
+        core::{
+            event::{Application, EventNode},
+            RuntimeOptions, SimTime,
+        },
+        metrics::*,
+        util::*,
+    };
     use std::collections::{BinaryHeap, VecDeque};
 
     #[cfg(feature = "internal-metrics")]
     use std::ops::AddAssign;
-
-    #[cfg(feature = "internal-metrics")]
-    use crate::Statistic;
 
     pub(crate) struct FutureEventSet<A>
     where
@@ -202,7 +212,7 @@ mod cqueue {
 
         pub fn fetch_next(
             &mut self,
-            #[cfg(feature = "internal-metrics")] mut metrics: crate::Mrc<
+            #[cfg(feature = "internal-metrics")] mut metrics: crate::util::Mrc<
                 crate::metrics::RuntimeMetrics,
             >,
         ) -> EventNode<A> {
@@ -292,7 +302,7 @@ mod cqueue {
             &mut self,
             time: SimTime,
             event: impl Into<A::EventSet>,
-            #[cfg(feature = "internal-metrics")] mut metrics: crate::Mrc<
+            #[cfg(feature = "internal-metrics")] mut metrics: crate::util::Mrc<
                 crate::metrics::RuntimeMetrics,
             >,
         ) {

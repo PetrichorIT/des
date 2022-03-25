@@ -18,33 +18,11 @@
 //! | internal-metrics | Collects internal metrics about the runtime, to improve parametrization. |
 //!
 
-pub(crate) mod core;
-pub(crate) mod metrics;
-pub(crate) mod util;
+pub mod prelude;
+
+pub mod core;
+pub mod metrics;
+pub mod util;
 
 #[cfg(feature = "net")]
-mod net;
-
-//
-// # Generic core exports
-//
-
-pub use self::core::*;
-
-//
-// # Metrics & Misc
-//
-
-pub use self::metrics::OutVec;
-pub use self::metrics::Statistic;
-pub use self::metrics::StdDev;
-
-//
-// # feature = "net"
-//
-
-#[cfg(feature = "net")]
-pub use self::net::*;
-
-pub use self::util::mm::Mrc;
-pub use self::util::spmc::*;
+pub mod net;

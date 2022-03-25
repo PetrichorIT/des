@@ -136,12 +136,12 @@ fn gen_static_module_core(ident: Ident, data: Data) -> TokenStream {
     if let Some((eident, idx)) = elem_ident {
         if let Some(eident) = eident {
             let mut ts = quote! {
-                impl ::des::StaticModuleCore for #ident {
-                    fn module_core(&self) -> &::des::ModuleCore {
+                impl ::des::prelude::StaticModuleCore for #ident {
+                    fn module_core(&self) -> &::des::prelude::ModuleCore {
                         &self.#eident
                     }
 
-                    fn module_core_mut(&mut self) -> &mut ::des::ModuleCore {
+                    fn module_core_mut(&mut self) -> &mut ::des::prelude::ModuleCore {
                         &mut self.#eident
                     }
                 }
@@ -152,12 +152,12 @@ fn gen_static_module_core(ident: Ident, data: Data) -> TokenStream {
         } else {
             let idx = syn::Index::from(idx);
             let mut ts = quote! {
-                impl ::des::StaticModuleCore for #ident {
-                    fn module_core(&self) -> &::des::ModuleCore {
+                impl ::des::prelude::StaticModuleCore for #ident {
+                    fn module_core(&self) -> &::des::prelude::ModuleCore {
                         &self.#idx
                     }
 
-                    fn module_core_mut(&mut self) -> &mut ::des::ModuleCore {
+                    fn module_core_mut(&mut self) -> &mut ::des::prelude::ModuleCore {
                         &mut self.#idx
                     }
                 }
@@ -177,8 +177,8 @@ fn gen_named_object(ident: Ident, data: &DataStruct) -> proc_macro2::TokenStream
             if named.len() == 1 {
                 let field = named.first().unwrap().ident.clone().unwrap();
                 quote! {
-                    impl ::des::NameableModule for #ident {
-                        fn named(core: ::des::ModuleCore) -> Self {
+                    impl ::des::prelude::NameableModule for #ident {
+                        fn named(core: ::des::prelude::ModuleCore) -> Self {
                             Self { #field: core }
                         }
                     }
@@ -190,8 +190,8 @@ fn gen_named_object(ident: Ident, data: &DataStruct) -> proc_macro2::TokenStream
         syn::Fields::Unnamed(FieldsUnnamed { unnamed, .. }) => {
             if unnamed.len() == 1 {
                 quote! {
-                    impl ::des::NameableModule for #ident {
-                        fn named(core: ::des::ModuleCore) -> Self {
+                    impl ::des::prelude::NameableModule for #ident {
+                        fn named(core: ::des::prelude::ModuleCore) -> Self {
                             Self(core)
                         }
                     }
@@ -233,7 +233,7 @@ fn gen_dynamic_module_core(ident: Ident, attrs: Attributes) -> TokenStream {
                     let ident = ident!(format!("{}_child", descriptor));
                     let ty = ident!(ty);
                     token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                        let mut #ident: ::des::Mrc<#ty> = #ty::build_named_with_parent(#descriptor, &mut this, rt);
+                        let mut #ident: ::des::prelude::Mrc<#ty> = #ty::build_named_with_parent(#descriptor, &mut this, rt);
                     })
                 }
 
@@ -270,10 +270,10 @@ fn gen_dynamic_module_core(ident: Ident, attrs: Attributes) -> TokenStream {
                         } = channel;
 
                         token_stream.extend(quote! {
-                            let channel = ::des::Channel::new(des::ChannelMetrics {
+                            let channel = ::des::prelude::Channel::new(::des::prelude::ChannelMetrics {
                                 bitrate: #bitrate,
-                                latency: des::SimTime::from(#latency),
-                                jitter: des::SimTime::from(#jitter),
+                                latency: ::des::prelude::SimTime::from(#latency),
+                                jitter: ::des::prelude::SimTime::from(#jitter),
                             });
                             #from_ident.set_next_gate(#to_ident);
                             #from_ident.set_channel(channel);
@@ -301,8 +301,8 @@ fn gen_dynamic_module_core(ident: Ident, attrs: Attributes) -> TokenStream {
                 let wrapped = WrappedTokenStream(token_stream);
 
                 quote! {
-                    impl ::des::BuildableModule for #ident {
-                        fn build<A>(mut this: ::des::Mrc<Self>, rt: &mut des::NetworkRuntime<A>) -> ::des::Mrc<Self> {
+                    impl ::des::prelude::BuildableModule for #ident {
+                        fn build<A>(mut this: ::des::prelude::Mrc<Self>, rt: &mut ::des::prelude::NetworkRuntime<A>) -> ::des::prelude::Mrc<Self> {
                             #wrapped
                             this
                         }
@@ -314,7 +314,7 @@ fn gen_dynamic_module_core(ident: Ident, attrs: Attributes) -> TokenStream {
         }
     } else {
         quote! {
-            impl ::des::BuildableModule for #ident {}
+            impl ::des::prelude::BuildableModule for #ident {}
         }
         .into()
     }
@@ -336,7 +336,7 @@ fn ident_from_conident(
             let ident_token = ident!(format!("{}_child_{}_gate{}", child_ident, gate_ident, pos));
 
             token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                let mut #ident_token: ::des::GateRef = #submodule_ident.gate_mut(#gate_ident, #pos)
+                let mut #ident_token: ::des::prelude::GateRef = #submodule_ident.gate_mut(#gate_ident, #pos)
                     .expect("Internal macro err.").clone();
             });
 
@@ -348,7 +348,7 @@ fn ident_from_conident(
             let ident = ident!(format!("{}_gate{}_ref", gate_ident, pos));
 
             token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                let mut #ident: ::des::GateRef = this.gate_mut(#gate_ident, #pos)
+                let mut #ident: ::des::prelude::GateRef = this.gate_mut(#gate_ident, #pos)
                     .expect("Internal macro err.").clone();
             });
 
@@ -460,7 +460,7 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> TokenStream {
                     let ident = ident!(format!("{}_child", descriptor));
                     let ty = ident!(ty);
                     token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                        let mut #ident: ::des::Mrc<#ty> = #ty::build_named(#descriptor.parse().unwrap(), rt);
+                        let mut #ident: ::des::prelude::Mrc<#ty> = #ty::build_named(#descriptor.parse().unwrap(), rt);
                     })
                 }
 
@@ -488,10 +488,10 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> TokenStream {
                         } = channel;
 
                         token_stream.extend(quote! {
-                            let channel = ::des::Channel::new(des::ChannelMetrics {
+                            let channel = ::des::prelude::Channel::new(::des::prelude::ChannelMetrics {
                                 bitrate: #bitrate,
-                                latency: des::SimTime::from(#latency),
-                                jitter: des::SimTime::from(#jitter),
+                                latency: ::des::prelude::SimTime::from(#latency),
+                                jitter: ::des::prelude::SimTime::from(#jitter),
                             });
                             #from_ident.set_next_gate(#to_ident);
                             #from_ident.set_channel(channel);
@@ -522,13 +522,13 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> TokenStream {
 
                 quote! {
                     impl #ident {
-                        pub fn run(self) -> ::des::RuntimeResult<Self> {
-                            self.run_with_options(::des::RuntimeOptions::default())
+                        pub fn run(self) -> ::des::prelude::RuntimeResult<Self> {
+                            self.run_with_options(::des::prelude::RuntimeOptions::default())
                         }
 
-                        pub fn run_with_options(self, options: ::des::RuntimeOptions) -> ::des::RuntimeResult<Self> {
-                            use ::des::Runtime;
-                            use ::des::NetworkRuntime;
+                        pub fn run_with_options(self, options: ::des::prelude::RuntimeOptions) -> ::des::prelude::RuntimeResult<Self> {
+                            use ::des::prelude::Runtime;
+                            use ::des::prelude::NetworkRuntime;
 
                             let net_rt = self.build_rt();
                             let rt = Runtime::<NetworkRuntime<Self>>::new_with(net_rt, options);
@@ -537,9 +537,9 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> TokenStream {
                             rt.run().map_app(|network_app| network_app.finish())
                         }
 
-                        pub fn build_rt(self) -> ::des::NetworkRuntime<Self> {
-                            let mut runtime = ::des::NetworkRuntime::new(self);
-                            let rt: &mut ::des::NetworkRuntime<Self> = &mut runtime;
+                        pub fn build_rt(self) -> ::des::prelude::NetworkRuntime<Self> {
+                            let mut runtime = ::des::prelude::NetworkRuntime::new(self);
+                            let rt: &mut ::des::prelude::NetworkRuntime<Self> = &mut runtime;
 
                             #token_stream
 

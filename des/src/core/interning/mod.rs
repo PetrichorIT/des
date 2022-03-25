@@ -4,7 +4,7 @@
 //! * This will only be visible when DES is build with the feature "pub-interning"
 //!
 
-use crate::util::mm::SyncCell;
+use crate::util::SyncCell;
 use log::{trace, warn};
 use std::alloc::{dealloc, Layout};
 use std::any::{type_name, TypeId};

@@ -1,6 +1,6 @@
 use std::any::TypeId;
 
-use crate::{util::mm::Mrc, *};
+use crate::prelude::*;
 
 macro_rules! auto_impl_static {
     ($ident: ident) => {

@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use des::*;
+use des::prelude::*;
 use des_derive::Module;
 
 use log::{info, warn};

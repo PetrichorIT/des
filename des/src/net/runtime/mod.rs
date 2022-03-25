@@ -5,7 +5,7 @@ use std::{
 
 use crate::core::*;
 use crate::net::*;
-use crate::util::{mm::*, spmc::*};
+use crate::util::*;
 
 mod events;
 pub use events::*;

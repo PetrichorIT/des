@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
-use des::{GateRef, Module, ModuleCore, NodeAddress, Packet, Parameters, SpmcReader};
-use des::{ModulePath, StaticModuleCore};
+use des::prelude::*;
 use des_derive::Module;
 use log::info;
 
@@ -43,5 +42,5 @@ impl RandomRoutingDeamon {
 }
 
 impl Module for RandomRoutingDeamon {
-    fn handle_message(&mut self, _msg: des::Message) {}
+    fn handle_message(&mut self, _msg: Message) {}
 }

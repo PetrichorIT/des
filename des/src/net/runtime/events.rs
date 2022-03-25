@@ -2,10 +2,7 @@ use log::{info, warn};
 use std::mem::ManuallyDrop;
 use std::ops::Deref;
 
-use crate::core::*;
-use crate::create_event_set;
-use crate::net::*;
-use crate::Mrc;
+use crate::{core::*, create_event_set, net::*, util::Mrc};
 
 create_event_set!(
     ///
@@ -31,7 +28,7 @@ pub struct MessageAtGateEvent {
 }
 
 impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
-    fn handle(mut self, rt: &mut crate::Runtime<NetworkRuntime<A>>) {
+    fn handle(mut self, rt: &mut Runtime<NetworkRuntime<A>>) {
         let ptr: *const Message = self.message.deref();
         let mut message = unsafe { std::ptr::read(ptr) };
         message.meta.last_gate = Some(Mrc::clone(&self.gate));
@@ -150,7 +147,7 @@ pub struct HandleMessageEvent {
 }
 
 impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
-    fn handle(mut self, rt: &mut crate::Runtime<NetworkRuntime<A>>) {
+    fn handle(mut self, rt: &mut Runtime<NetworkRuntime<A>>) {
         let ptr: *const Message = self.message.deref();
         let mut message = unsafe { std::ptr::read(ptr) };
         message.meta.receiver_module_id = self.module.id();
@@ -182,7 +179,7 @@ pub struct CoroutineMessageEvent {
 }
 
 impl<A> Event<NetworkRuntime<A>> for CoroutineMessageEvent {
-    fn handle(mut self, rt: &mut crate::Runtime<NetworkRuntime<A>>) {
+    fn handle(mut self, rt: &mut Runtime<NetworkRuntime<A>>) {
         let dur = self.module.module_core().activity_period;
         // This message can only occure *after* the activity is
         // fully initalized.
@@ -216,7 +213,7 @@ pub struct ChannelUnbusyNotif {
 }
 
 impl<A> Event<NetworkRuntime<A>> for ChannelUnbusyNotif {
-    fn handle(mut self, _rt: &mut crate::Runtime<NetworkRuntime<A>>) {
+    fn handle(mut self, _rt: &mut Runtime<NetworkRuntime<A>>) {
         self.channel.unbusy()
     }
 }

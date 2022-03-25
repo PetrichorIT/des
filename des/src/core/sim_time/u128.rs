@@ -59,7 +59,7 @@ impl SimTime {
     /// # Examples
     ///
     /// ```should_panic
-    /// use des::*;
+    /// use des::prelude::*;
     ///
     /// let t = SimTime::now();
     /// ```

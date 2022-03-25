@@ -1,4 +1,4 @@
-use des::*;
+use des::prelude::*;
 
 fn main() {
     let mut par = Parameters::new();

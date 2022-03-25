@@ -1,4 +1,8 @@
-use crate::SimTime;
+//!
+//! A set of structs that help with the collection of statistical data.
+//!
+
+use crate::core::SimTime;
 use std::ops::RangeInclusive;
 
 #[cfg(feature = "internal-metrics")]

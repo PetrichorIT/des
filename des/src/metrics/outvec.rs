@@ -1,4 +1,7 @@
-use crate::{SimTime, Statistic, StdDev};
+use crate::{
+    core::SimTime,
+    metrics::{Statistic, StdDev},
+};
 use log::error;
 use std::{
     fmt::Debug,
@@ -7,7 +10,7 @@ use std::{
 };
 
 #[cfg(feature = "net")]
-use crate::ModulePath;
+use crate::net::ModulePath;
 
 ///
 /// A vector of values that will be written to a file.
@@ -118,7 +121,7 @@ impl OutVec {
 impl Statistic for OutVec {
     type Value = f64;
 
-    fn collect_weighted_at(&mut self, value: Self::Value, weight: f64, sim_time: crate::SimTime) {
+    fn collect_weighted_at(&mut self, value: Self::Value, weight: f64, sim_time: SimTime) {
         assert_eq!(weight, 1.0, "OutVec cannot function using specific weights");
         self.stddev.collect_weighted_at(value, weight, sim_time);
         self.buffered_values.push((sim_time.into(), value));
@@ -162,15 +165,15 @@ impl Statistic for OutVec {
     }
 
     fn collect_weighted(&mut self, value: Self::Value, weight: f64) {
-        self.collect_weighted_at(value, weight, crate::SimTime::now())
+        self.collect_weighted_at(value, weight, SimTime::now())
     }
 
-    fn collect_at(&mut self, value: Self::Value, sim_time: crate::SimTime) {
+    fn collect_at(&mut self, value: Self::Value, sim_time: SimTime) {
         self.collect_weighted_at(value, 1.0, sim_time)
     }
 
     fn collect(&mut self, value: Self::Value) {
-        self.collect_weighted_at(value, 1.0, crate::SimTime::now())
+        self.collect_weighted_at(value, 1.0, SimTime::now())
     }
 
     fn is_empty(&self) -> bool {

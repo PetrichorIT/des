@@ -6,7 +6,7 @@ use rand::Rng;
 
 use crate::core::*;
 use crate::net::*;
-use crate::util::mm::Mrc;
+use crate::util::Mrc;
 
 ///
 /// A mutable reference to a channel inside a global buffer.

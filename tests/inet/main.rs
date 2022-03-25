@@ -1,8 +1,4 @@
-use des::StaticModuleCore;
-use des::{
-    Channel, ChannelMetrics, Message, ModuleId, Mrc, NetworkRuntime, Packet, Runtime,
-    RuntimeOptions, SimTime,
-};
+use des::prelude::*;
 use network_node::NetworkNode;
 use network_stack::NetworkStack;
 use routing_deamon::RandomRoutingDeamon;

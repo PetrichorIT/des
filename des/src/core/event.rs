@@ -22,7 +22,7 @@ pub trait Application: Sized {
     /// # Examples
     ///
     /// ```
-    /// # use des::*;
+    /// # use des::prelude::*;
     /// # struct Worker;
     /// # impl Worker { fn initalize(&mut self) {}}
     /// # enum MyEventSet { EventA, EventB }
@@ -46,7 +46,7 @@ pub trait Application: Sized {
     /// # Examples
     ///
     /// ```
-    /// # use des::*;
+    /// # use des::prelude::*;
     /// # struct Worker;
     /// # impl Worker { fn finish(&mut self) {}}
     /// # enum MyEventSet { EventA, EventB }

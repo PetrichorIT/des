@@ -1,5 +1,6 @@
 use crate::{
-    core::event::EventId, interning::Interner, util::mm::SyncCell, SimTime, StandardLogger,
+    core::{event::EventId, interning::Interner, SimTime, StandardLogger},
+    util::SyncCell,
 };
 use lazy_static::lazy_static;
 use rand::{
