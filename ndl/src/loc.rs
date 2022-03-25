@@ -25,7 +25,10 @@ impl Loc {
     /// location and ending at the last character of the 'to' location.
     ///
     pub fn fromto(from: Self, to: Self) -> Self {
-        assert!(from.pos < to.pos);
+        assert!(
+            from.pos < to.pos,
+            "A instance of Loc must span from a smaller value 'from' to a bigger value 'to'."
+        );
         let len = (to.pos + to.len) - from.pos;
         Self {
             pos: from.pos,
@@ -33,7 +36,7 @@ impl Loc {
             len,
         }
     }
-    
+
     ///
     /// Returns a Loc that point directly after the current loc at a zero-width
     /// token.

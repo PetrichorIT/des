@@ -313,7 +313,10 @@ pub trait StaticModuleCore {
     where
         Self: 'static + Sized + Module,
     {
-        assert!(size == next_hops.len());
+        assert!(
+            size == next_hops.len(),
+            "The value 'next_hops' must be equal to the size of the gate cluster"
+        );
 
         let mrc = Mrc::clone(self);
         let descriptor = GateDescription::new(name.to_owned(), size, mrc);
@@ -351,8 +354,9 @@ pub trait StaticModuleCore {
     ///
     /// Enqueues a event that will trigger the [Module::handle_message] function
     /// at the given SimTime
+    ///
     fn schedule_at(&mut self, msg: Message, time: SimTime) {
-        assert!(time >= SimTime::now());
+        assert!(time >= SimTime::now(), "Sorry, we can not timetravel yet!");
         self.module_core_mut().loopback_buffer.push((msg, time))
     }
 

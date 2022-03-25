@@ -1,5 +1,5 @@
-bob1.char = #
-bob2.char = *
+bob[1].char = #
+bob[2].char = *
 
-bob1.child.limit = 10
-bob2.child.limit = 2
+bob[1].child.limit = 10
+bob[2].child.limit = 2

@@ -17,57 +17,126 @@ const FEMTO_ONE_SEC: u64 = 1_000_000_000_000_000;
 const FEMTO_MAX: u64 = FEMTO_ONE_SEC - 1;
 
 impl SimTime {
+    ///
+    /// The simtime instance made of of literal zero values.
+    ///
+    /// Zero-initalized memory transmuted as a simtime should
+    /// result in this instance.
+    ///
     pub const ZERO: Self = Self { femtos: 0, secs: 0 };
 
+    ///
+    /// The smalles valid simtime instance, the default start point
+    /// of a simulation.
+    ///
     pub const MIN: Self = Self { femtos: 0, secs: 0 };
+
+    ///
+    /// The biggest valid simtime instance.
+    ///
     pub const MAX: Self = Self {
         femtos: FEMTO_MAX,
         secs: u64::MAX,
     };
 
+    ///
+    /// Creates a new instance from raw parts.
+    ///
+    pub fn new(femtos: u64, secs: u64) -> Self {
+        assert!(
+            femtos <= FEMTO_MAX,
+            "The value 'femtos' must be below {}.",
+            FEMTO_MAX
+        );
+        Self { femtos, secs }
+    }
+
+    ///
+    /// Creates a new instance holding the current simulation time.
+    /// Note that this requires a global runtime core to be created beforhand,
+    /// if not this function will panic.
+    ///
+    /// # Examples
+    ///
+    /// ```should_panic
+    /// use des::*;
+    ///
+    /// let t = SimTime::now();
+    /// ```
+    ///
+    pub fn now() -> Self {
+        sim_time()
+    }
+
+    ///
+    /// Indicates whether the simtime is a valid instance that,
+    /// can ever be reached.
+    ///
+    pub fn is_valid(&self) -> bool {
+        self.femtos <= FEMTO_MAX
+    }
+
+    ///
+    /// Returns the femtoseconds of the current instance.
+    ///
     pub fn femto(&self) -> u64 {
         self.femtos % 1000
     }
 
+    ///
+    /// Returns the picoseconds of the current instance.
+    ///
     pub fn picos(&self) -> u64 {
         (self.femtos / 1_000) % 1000
     }
 
+    ///
+    /// Returns the nanoseconds of the current instance.
+    ///
     pub fn nanos(&self) -> u64 {
         (self.femtos / 1_000_000) % 1000
     }
 
+    ///
+    /// Returns the microseconds of the current instance.
+    ///
     pub fn micros(&self) -> u64 {
         (self.femtos / 1_000_000_000) % 1000
     }
 
+    ///
+    /// Returns the miliseconds of the current instance.
+    ///
     pub fn millis(&self) -> u64 {
         (self.femtos / 1_000_000_000_000) % 1000
     }
 
+    ///
+    /// Returns the seconds of the current instance.
+    ///
     pub fn secs(&self) -> u64 {
         self.secs % 60
     }
 
+    ///
+    /// Returns the minutes of the current instance.
+    ///
     pub fn mins(&self) -> u64 {
         (self.secs / 60) % 60
     }
 
+    ///
+    /// Returns the hours of the current instance.
+    ///
     pub fn hours(&self) -> u64 {
         (self.secs / (60 * 60)) % 24
     }
 
+    ///
+    /// Returns the days of the current instance.
+    ///
     pub fn days(&self) -> u64 {
         self.secs / (60 * 60 * 24)
-    }
-
-    pub const fn new(femtos: u64, secs: u64) -> Self {
-        assert!(femtos <= FEMTO_MAX);
-        Self { femtos, secs }
-    }
-
-    pub fn now() -> Self {
-        sim_time()
     }
 }
 

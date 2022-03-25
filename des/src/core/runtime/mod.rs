@@ -199,7 +199,7 @@ where
     /// and accepting events of type [Event<A>], using a custom set of
     /// [RuntimeOptions].
     ///
-    ///   /// # Examples
+    /// # Examples
     ///
     /// ```
     /// use des::*;
@@ -224,7 +224,7 @@ where
             future_event_set: FutureEventSet::new_with(&options),
 
             core: RuntimeCore::new(
-                SimTime::ZERO,
+                options.min_sim_time,
                 0,
                 0,
                 options.max_itr,
@@ -273,16 +273,21 @@ where
 
     ///
     /// Processes the next event in the future event list by calling its handler.
-    /// Returns true if there is another event in queue, false if not.
+    /// Returns `true` if there is another event in queue, false if not.
+    ///
+    /// This function requires the caller to guarantee that at least one
+    /// event exists in the future event set.
     ///
     #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> bool {
-        self.core_mut().itr += 1;
+        debug_assert!(!self.future_event_set.is_empty());
 
         let node = self.future_event_set.fetch_next(
             #[cfg(feature = "internal-metrics")]
             Mrc::clone(&self.metrics),
         );
+
+        self.core_mut().itr += 1;
 
         if self.check_break_condition(&node) {
             let EventNode { time, event, .. } = node;
@@ -310,7 +315,46 @@ where
     }
 
     ///
-    /// Runs the application until it terminates or exceeds it max_itr.
+    /// Runs the application until it terminates or a breaking condition
+    /// is reached.
+    ///
+    /// ### Examples
+    ///
+    /// ```
+    /// use des::*;
+    ///
+    /// struct MyApp();
+    /// impl Application for MyApp {
+    ///     type EventSet = MyEventSet;
+    ///
+    ///     fn at_sim_start(rt: &mut Runtime<Self>) {
+    ///         rt.add_event(MyEventSet::EventA, SimTime::from(1.0));
+    ///         rt.add_event(MyEventSet::EventB, SimTime::from(2.0));
+    ///         rt.add_event(MyEventSet::EventA, SimTime::from(3.0));
+    ///     }
+    /// }
+    ///
+    /// enum MyEventSet {
+    ///     EventA,
+    ///     EventB
+    /// }
+    /// impl EventSet<MyApp> for MyEventSet {
+    ///     fn handle(self, rt: &mut Runtime<MyApp>) {}
+    /// }
+    ///
+    /// fn main() {
+    ///     let runtime = Runtime::new(MyApp());
+    ///     let result = runtime.run();
+    ///
+    ///     match result {
+    ///         RuntimeResult::Finished { time, event_count, .. } => {
+    ///             assert_eq!(time, SimTime::from(3.0));
+    ///             assert_eq!(event_count, 3);
+    ///         },
+    ///         _ => panic!("They can't do that! Shoot them or something!")
+    ///     }
+    /// }
+    /// ```
     ///
     pub fn run(mut self) -> RuntimeResult<A> {
         if self.future_event_set.is_empty() {
@@ -325,6 +369,9 @@ where
 
     ///
     /// Decontructs the runtime and returns the application and the final sim_time.
+    ///
+    /// This funtions should only be used when running the simulation with manual calls
+    /// to [next](Runtime::next).
     ///
     #[allow(unused_mut)]
     pub fn finish(mut self) -> RuntimeResult<A> {
@@ -390,6 +437,41 @@ where
     /// Adds and event to the future event heap, that will be handled in 'duration'
     /// time units.
     ///
+    /// # Examples
+    ///
+    /// ```
+    /// use des::*;
+    ///
+    /// # struct MyApp();
+    /// # impl Application for MyApp {
+    /// #     type EventSet = MyEventSet;
+    /// # }
+    /// #
+    /// # enum MyEventSet {
+    /// #     EventA,
+    /// #     EventB
+    /// # }
+    /// # impl EventSet<MyApp> for MyEventSet {
+    /// #     fn handle(self, rt: &mut Runtime<MyApp>) {}
+    /// # }
+    /// #
+    /// fn main() {
+    ///     let mut runtime = Runtime::new_with(
+    ///         MyApp(),
+    ///         RuntimeOptions::seeded(1).min_time(SimTime::from(10.0))
+    ///     );
+    ///     runtime.add_event_in(MyEventSet::EventA, SimTime::from(12.0));
+    ///
+    ///     match runtime.run() {
+    ///         RuntimeResult::Finished { time, event_count, .. } => {
+    ///             assert_eq!(time, SimTime::from(22.0));
+    ///             assert_eq!(event_count, 1);
+    ///         },
+    ///         _ => panic!("They can't do that! Shoot them or something!")
+    ///     }
+    /// }
+    /// ```
+    ///
     pub fn add_event_in(&mut self, event: impl Into<A::EventSet>, duration: SimTime) {
         self.add_event(event, self.sim_time() + duration)
     }
@@ -398,6 +480,41 @@ where
     /// Adds and event to the furtue event heap that will be handled at the given time.
     /// Note that this time must be in the future i.e. greated that sim_time, or this
     /// function will panic.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use des::*;
+    ///
+    /// # struct MyApp();
+    /// # impl Application for MyApp {
+    /// #     type EventSet = MyEventSet;
+    /// # }
+    /// #
+    /// # enum MyEventSet {
+    /// #     EventA,
+    /// #     EventB
+    /// # }
+    /// # impl EventSet<MyApp> for MyEventSet {
+    /// #     fn handle(self, rt: &mut Runtime<MyApp>) {}
+    /// # }
+    /// #
+    /// fn main() {
+    ///     let mut runtime = Runtime::new_with(
+    ///         MyApp(),
+    ///         RuntimeOptions::seeded(1).min_time(SimTime::from(10.0))
+    ///     );
+    ///     runtime.add_event(MyEventSet::EventA, SimTime::from(12.0));
+    ///
+    ///     match runtime.run() {
+    ///         RuntimeResult::Finished { time, event_count, .. } => {
+    ///             assert_eq!(time, SimTime::from(12.0)); // 12 not 10+12 = 22
+    ///             assert_eq!(event_count, 1);
+    ///         },
+    ///         _ => panic!("They can't do that! Shoot them or something!")
+    ///     }
+    /// }
+    /// ```
     ///
     pub fn add_event(&mut self, event: impl Into<A::EventSet>, time: SimTime) {
         self.future_event_set.add(
@@ -431,16 +548,49 @@ pub enum RuntimeResult<A> {
 }
 
 impl<A> RuntimeResult<A> {
-    pub fn unwrap_premature_abort(self) -> (A, SimTime, usize, usize)
-    where
-        A: Debug,
-    {
+    ///
+    /// Returns the contained [`PrematureAbort`](Self::PrematureAbort) variant
+    /// consuming the `self`value.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if self contains another variant that [`PrematureAbort`](Self::PrematureAbort).
+    ///
+    pub fn unwrap_premature_abort(self) -> (A, SimTime, usize, usize) {
         match self {
             Self::PrematureAbort { app, time, event_count, active_events} => (app, time, event_count, active_events),
             _ => panic!("called `RuntimeResult::unwrap_premature_abort` on a value that is not `PrematureAbort`")
         }
     }
 
+    ///
+    /// Returns the contained [`Finished`](Self::Finished) variant consuming the `self` value.
+    ///
+    /// # Panics
+    ///
+    /// This function panics should the `self` value contain another variant.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use des::*;
+    /// # #[derive(Debug, PartialEq, Eq)]
+    /// # struct MyApp;
+    /// # fn main() {
+    /// let result = RuntimeResult::Finished { app: MyApp, time: 1.0.into(), event_count: 1 };
+    /// assert_eq!(result.unwrap(), (MyApp, SimTime::from(1.0), 1));
+    /// # }
+    /// ```
+    ///
+    /// ```should_panic
+    /// # use des::*;
+    /// # #[derive(Debug, PartialEq, Eq)]
+    /// # struct MyApp;
+    /// # fn main() {
+    /// let result = RuntimeResult::EmptySimulation { app: MyApp };
+    /// result.unwrap();
+    /// # }
+    /// ```
     pub fn unwrap(self) -> (A, SimTime, usize) {
         match self {
             Self::Finished {
@@ -452,6 +602,13 @@ impl<A> RuntimeResult<A> {
         }
     }
 
+    ///
+    /// Returns the contained [`Finished`](Self::Finished) variant or
+    /// the provided default.
+    ///
+    /// The argument `default` is eagerly evaulated, for lazy evaluation use
+    /// [unwrap_or_else](Self::unwrap_or_else).
+    ///
     pub fn unwrap_or(self, default: (A, SimTime, usize)) -> (A, SimTime, usize) {
         match self {
             Self::Finished {
@@ -463,6 +620,10 @@ impl<A> RuntimeResult<A> {
         }
     }
 
+    ///
+    /// Returns the contained [`Finished`](Self::Finished) variant or lazily
+    /// computes a fallback value from the given closure.
+    ///
     pub fn unwrap_or_else<F>(self, f: F) -> (A, SimTime, usize)
     where
         F: FnOnce() -> (A, SimTime, usize),
@@ -477,6 +638,28 @@ impl<A> RuntimeResult<A> {
         }
     }
 
+    ///
+    /// Maps the `app` property that is contained in all variants to a new
+    /// value of type T, using the given closure.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use des::*;
+    /// # #[derive(Debug, PartialEq, Eq)]
+    /// struct InnerResult { value: usize }
+    /// # #[derive(Debug, PartialEq, Eq)]
+    /// struct OuterResult { inner: InnerResult }
+    ///
+    /// # fn main() {
+    /// let result = RuntimeResult::EmptySimulation {
+    ///     app: OuterResult { inner: InnerResult { value: 42 } }
+    /// };
+    /// let result = result.map_app(|outer| outer.inner);
+    /// assert_eq!(result, RuntimeResult::EmptySimulation { app: InnerResult { value: 42 } });
+    /// # }
+    /// ```
+    ///
     pub fn map_app<F, T>(self, f: F) -> RuntimeResult<T>
     where
         F: FnOnce(A) -> T,
@@ -514,6 +697,9 @@ use super::event::EventNode;
 
 #[cfg(feature = "net")]
 impl<A> Runtime<NetworkRuntime<A>> {
+    ///
+    /// Adds a message event into a [Runtime<NetworkRuntime<A>>] onto a gate.
+    ///
     pub fn add_message_onto(&mut self, gate: GateRef, message: Message, time: SimTime) {
         let event = MessageAtGateEvent {
             gate,
@@ -524,6 +710,9 @@ impl<A> Runtime<NetworkRuntime<A>> {
         self.add_event(NetEvents::MessageAtGateEvent(event), time)
     }
 
+    ///
+    /// Adds a message event into a [Runtime<NetworkRuntime<A>>] onto a module.
+    ///
     pub fn handle_message_on(&mut self, module: ModuleRef, message: Message, time: SimTime) {
         let event = HandleMessageEvent {
             module,

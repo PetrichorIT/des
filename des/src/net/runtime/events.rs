@@ -111,7 +111,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
         }
 
         // No next gate exists.
-        assert!(current_gate.next_gate().is_none());
+        debug_assert!(current_gate.next_gate().is_none());
 
         info!(
             target: &format!("Gate ({})", current_gate.name()),

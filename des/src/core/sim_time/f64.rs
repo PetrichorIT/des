@@ -25,7 +25,8 @@ impl SimTime {
     /// Creates a new instance from a raw f64.
     /// Note that this function only accepts valid timestamps (positiv).
     ///
-    pub const fn new(time: f64) -> Self {
+    pub fn new(time: f64) -> Self {
+        assert!(time >= 0.0, "Negative simtimes are not supported.");
         Self(time)
     }
 
@@ -47,7 +48,8 @@ impl SimTime {
     }
 
     ///
-    /// Indicates whether the simtime can ever be reached.
+    /// Indicates whether the simtime is a valid instance that,
+    /// can ever be reached.
     ///
     pub fn is_valid(&self) -> bool {
         self.0.is_finite()
@@ -92,6 +94,11 @@ impl SimTime {
         Self(self.0.fract().abs())
     }
 
+    ///
+    /// Returns the raw f64 used to represent the simtime by default.
+    ///
+    /// Only available when feature 'simtime-u128' is inactive.
+    ///
     pub fn raw(self) -> f64 {
         self.0.abs()
     }

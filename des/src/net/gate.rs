@@ -47,7 +47,7 @@ impl GateDescription {
         T: Module + Unsize<dyn Module>,
     {
         let owner: Mrc<dyn Module> = owner;
-        assert!(size >= 1);
+        assert!(size >= 1, "Cannot create with a non-postive size");
         Self { name, size, owner }
     }
 }

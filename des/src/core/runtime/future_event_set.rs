@@ -36,12 +36,12 @@ mod default {
             self.heap.len()
         }
 
-        pub fn new_with(_options: &RuntimeOptions) -> Self {
+        pub fn new_with(options: &RuntimeOptions) -> Self {
             Self {
                 heap: BinaryHeap::with_capacity(64),
                 zero_queue: VecDeque::with_capacity(32),
 
-                last_event_simtime: SimTime::ZERO,
+                last_event_simtime: options.min_sim_time,
             }
         }
 
@@ -196,7 +196,7 @@ mod cqueue {
                 overflow_bucket: BinaryHeap::with_capacity(16),
 
                 len: 0,
-                time: SimTime::ZERO,
+                time: options.min_sim_time,
             }
         }
 

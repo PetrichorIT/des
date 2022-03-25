@@ -19,10 +19,48 @@ pub trait Application: Sized {
     ///
     /// A function that is called only once at the start of the simulation.
     ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use des::*;
+    /// # struct Worker;
+    /// # impl Worker { fn initalize(&mut self) {}}
+    /// # enum MyEventSet { EventA, EventB }
+    /// # impl EventSet<MyApp> for MyEventSet {
+    /// #   fn handle(self, rt: &mut Runtime<MyApp>) {}
+    /// # }
+    /// struct MyApp { workers: Vec<Worker> };
+    /// impl Application for MyApp {
+    ///     type EventSet = MyEventSet;
+    ///     fn at_sim_start(rt: &mut Runtime<Self>) {
+    ///         rt.app.workers.iter_mut().for_each(|w| w.initalize());
+    ///     }
+    /// }
+    /// ```
+    ///
     fn at_sim_start(_rt: &mut Runtime<Self>) {}
 
     ///
     /// A function that is called once the simulation reachted its limit.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use des::*;
+    /// # struct Worker;
+    /// # impl Worker { fn finish(&mut self) {}}
+    /// # enum MyEventSet { EventA, EventB }
+    /// # impl EventSet<MyApp> for MyEventSet {
+    /// #   fn handle(self, rt: &mut Runtime<MyApp>) {}
+    /// # }
+    /// struct MyApp { workers: Vec<Worker> };
+    /// impl Application for MyApp {
+    ///     type EventSet = MyEventSet;
+    ///     fn at_sim_end(rt: &mut Runtime<Self>) {
+    ///         rt.app.workers.iter_mut().for_each(|w| w.finish());
+    ///     }
+    /// }
+    /// ```
     ///
     fn at_sim_end(_rt: &mut Runtime<Self>) {}
 }
@@ -30,8 +68,6 @@ pub trait Application: Sized {
 ///
 /// A type that can be used as a wrapper around all events
 /// handled by an application A.
-///
-/// # Note
 ///
 /// Note that ther is a cyclic dependecy between the event set
 /// and the application.
@@ -47,8 +83,6 @@ where
     /// A function to handle an upcoming event represented as a instance
     /// of the event set.
     ///
-    /// # Note
-    ///
     /// Since events sets are usually macro-generated this is just a match statement that calls
     /// the handle function on the given variant, as defined by the trait [Event].
     ///
@@ -59,6 +93,11 @@ where
 /// A type that can handle an event, specific to the given aplication,
 /// and associated event set.
 ///
+/// Note that events in an event set dont need to implement this trait,
+/// unless the event set is derived using the [`create_event_set`](crate::create_event_set)
+/// macros. Nonetheless is it advised to use this trait to better isolate different events
+/// and their associated data.
+///
 pub trait Event<App>
 where
     App: Application,
@@ -66,8 +105,6 @@ where
     ///
     /// A function to handle an upcoming event represented as a specific
     /// instance of a event type.
-    ///
-    /// # Note
     ///
     /// There is an implicit type bound that the Apps event set must contain
     /// the Self type as a variant. This is usually guaranteed by macro-generting event sets,
@@ -80,7 +117,7 @@ where
 ///
 /// A runtime unqiue identifier for a event.
 ///
-pub type EventId = u64;
+pub(crate) type EventId = u64;
 
 ///
 /// A bin-heap node of a event from the applicaitons event set.

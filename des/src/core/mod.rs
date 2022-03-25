@@ -20,7 +20,6 @@ pub use self::sim_time::SimTime;
 
 pub use self::event::Application;
 pub use self::event::Event;
-pub use self::event::EventId;
 pub use self::event::EventSet;
 
 pub use self::runtime::rng;

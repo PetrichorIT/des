@@ -14,6 +14,14 @@ use std::{
 /// A version of [Rc] that allows internal mutation without explicit
 /// syncroniszation (in single threaded enviroments).
 ///
+/// # Safty contract
+///
+/// Since by default this type breaks rust's safty contract the caller must
+/// ensure, that this type is only used in single threaded enviroments, thereby resolving
+/// double-write or RWR problems. Addtionally no long living refernces to nested components
+/// should be created, since holding a long-lived read reference to a datapoint that can be mutated
+/// by a third party my invalidate the refenrence.
+///  
 #[derive(Debug)]
 pub struct Mrc<T>
 where
@@ -24,7 +32,7 @@ where
 
 impl<T> Mrc<T> {
     ///
-    /// Constructs a new [Mrc<T>]
+    /// Constructs a new [Mrc<T>].
     ///
     pub fn new(value: T) -> Self {
         Self {
