@@ -5,7 +5,7 @@ use std::{
 
 use crate::core::*;
 use crate::net::*;
-use crate::{core::interning::*, util::Mrc};
+use crate::{core::interning::*, util::MrcS};
 
 ///
 /// A ID that defines the meaning of the message in the simulation context.
@@ -67,7 +67,7 @@ impl MessageMetadata {
             sender_module_id: self.sender_module_id,
             receiver_module_id: self.receiver_module_id,
 
-            last_gate: self.last_gate.as_ref().map(Mrc::clone),
+            last_gate: self.last_gate.as_ref().map(MrcS::clone),
 
             creation_time: SimTime::now(),
             send_time: SimTime::MAX,

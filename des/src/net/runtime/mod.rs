@@ -24,7 +24,7 @@ pub struct NetworkRuntime<A> {
     /// The set of module used in the network simulation.
     /// All module must be boxed, since they must conform to the [Module] trait.
     ///
-    module_list: Vec<ModuleRef>,
+    module_list: Vec<ModuleRefMut>,
 
     ///
     /// The set of parameters for the module-driven simulation.
@@ -72,18 +72,18 @@ impl<A> NetworkRuntime<A> {
     /// Returns a mutable refernce to the boxed module.
     /// This reference should be short lived since it blocks any other reference to self.
     ///
-    pub fn create_module<T>(&mut self, module: Mrc<T>)
+    pub fn create_module<T>(&mut self, module: MrcS<T, Mutable>)
     where
         T: Module + Unsize<dyn Module>,
     {
-        let dyned: Mrc<dyn Module> = module;
+        let dyned: ModuleRefMut = module;
         self.module_list.push(dyned);
     }
 
     ///
     /// Returns a reference to the list of all modules.
     ///
-    pub fn modules(&self) -> &Vec<ModuleRef> {
+    pub fn modules(&self) -> &Vec<ModuleRefMut> {
         &self.module_list
     }
 
@@ -91,9 +91,9 @@ impl<A> NetworkRuntime<A> {
     /// Searches a module based on this predicate.
     /// Shortcircuits if found and returns a read-only reference.
     ///
-    pub fn module<F>(&self, predicate: F) -> Option<ModuleRef>
+    pub fn module<F>(&self, predicate: F) -> Option<ModuleRefMut>
     where
-        F: FnMut(&&ModuleRef) -> bool,
+        F: FnMut(&&ModuleRefMut) -> bool,
     {
         self.modules().iter().find(predicate).cloned()
     }

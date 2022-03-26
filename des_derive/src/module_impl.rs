@@ -218,12 +218,12 @@ fn generate_dynamic_builder(ident: Ident, attrs: Attributes, out: &mut TokenStre
                                 latency: ::des::core::SimTime::from(#latency),
                                 jitter: ::des::core::SimTime::from(#jitter),
                             });
-                            #from_ident.set_next_gate(#to_ident);
+                            #from_ident.set_next_gate(#to_ident.make_readonly());
                             #from_ident.set_channel(channel);
                         });
                     } else {
                         token_stream.extend(quote! {
-                                #from_ident.set_next_gate(#to_ident);
+                                #from_ident.set_next_gate(#to_ident.make_readonly());
                         });
                     }
                 }

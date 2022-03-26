@@ -1,4 +1,4 @@
-use crate::{net::module::*, util::Mrc};
+use crate::{net::module::*, util::MrcS};
 
 ///
 /// A trait that prepares a module to be created from a NDL
@@ -15,13 +15,13 @@ pub trait NameableModule: 'static + StaticModuleCore {
     ///
     /// Creates a named instance of self based on the parent hierachical structure.
     ///
-    fn named_with_parent<T>(name: &str, parent: &mut Mrc<T>) -> Mrc<Self>
+    fn named_with_parent<T>(name: &str, parent: &mut MrcS<T, Mutable>) -> MrcS<Self, Mutable>
     where
         T: NameableModule,
         Self: Sized,
     {
         let core = ModuleCore::child_of(name, parent.module_core());
-        let mut this = Mrc::new(Self::named(core));
+        let mut this = MrcS::new(Self::named(core));
 
         parent.add_child(&mut this);
         this
@@ -39,27 +39,27 @@ pub trait BuildableModule: StaticModuleCore {
     /// Builds the given module according to the NDL specification
     /// if any is provided, else doesn't change a thing.
     ///
-    fn build<A>(this: Mrc<Self>, _rt: &mut NetworkRuntime<A>) -> Mrc<Self>
+    fn build<A>(this: MrcS<Self, Mutable>, _rt: &mut NetworkRuntime<A>) -> MrcS<Self, Mutable>
     where
         Self: Sized,
     {
         this
     }
 
-    fn build_named<A>(path: ModulePath, rt: &mut NetworkRuntime<A>) -> Mrc<Self>
+    fn build_named<A>(path: ModulePath, rt: &mut NetworkRuntime<A>) -> MrcS<Self, Mutable>
     where
         Self: NameableModule + Sized,
     {
         let core = ModuleCore::new_with(path, rt.parameters());
-        let this = Mrc::new(Self::named(core));
+        let this = MrcS::new(Self::named(core));
         Self::build(this, rt)
     }
 
     fn build_named_with_parent<A, T>(
         name: &str,
-        parent: &mut Mrc<T>,
+        parent: &mut MrcS<T, Mutable>,
         rt: &mut NetworkRuntime<A>,
-    ) -> Mrc<Self>
+    ) -> MrcS<Self, Mutable>
     where
         T: NameableModule,
         Self: NameableModule + Sized,

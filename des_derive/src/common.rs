@@ -66,7 +66,7 @@ pub fn ident_from_conident(
             let ident_token = ident!(format!("{}_child_{}_gate{}", child_ident, gate_ident, pos));
 
             token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                let mut #ident_token: ::des::net::GateRef = #submodule_ident.gate_mut(#gate_ident, #pos)
+                let mut #ident_token: ::des::net::GateRefMut = #submodule_ident.gate_mut(#gate_ident, #pos)
                     .expect("Internal macro err.").clone();
             });
 
@@ -78,7 +78,7 @@ pub fn ident_from_conident(
             let ident = ident!(format!("{}_gate{}_ref", gate_ident, pos));
 
             token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                let mut #ident: ::des::net::GateRef = this.gate_mut(#gate_ident, #pos)
+                let mut #ident: ::des::net::GateRefMut = this.gate_mut(#gate_ident, #pos)
                     .expect("Internal macro err.").clone();
             });
 

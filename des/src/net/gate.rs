@@ -1,12 +1,17 @@
 use crate::net::*;
-use crate::util::Mrc;
+use crate::util::{MrcS, Mutable, ReadOnly};
 use std::fmt::{Debug, Display};
 use std::marker::Unsize;
 
 ///
-/// A mutable reference to a gate inside a global buffer.
+/// A readonly reference to a gate.
 ///
-pub type GateRef = Mrc<Gate>;
+pub type GateRef = MrcS<Gate, ReadOnly>;
+
+///
+/// A mutable reference to a gate.
+///
+pub type GateRefMut = MrcS<Gate, Mutable>;
 
 ///
 /// A description of a gate / gate cluster on a module.
@@ -42,11 +47,11 @@ impl GateDescription {
     ///
     /// Creates a new descriptor using explicit values.
     ///
-    pub fn new<T>(name: String, size: usize, owner: Mrc<T>) -> Self
+    pub fn new<T>(name: String, size: usize, owner: MrcS<T, ReadOnly>) -> Self
     where
         T: Module + Unsize<dyn Module>,
     {
-        let owner: Mrc<dyn Module> = owner;
+        let owner: ModuleRef = owner;
         assert!(size >= 1, "Cannot create with a non-postive size");
         Self { name, size, owner }
     }
@@ -96,7 +101,7 @@ pub struct Gate {
     ///
     /// A identifier of the channel linked to the gate chain.
     ///
-    channel: Option<ChannelRef>,
+    channel: Option<ChannelRefMut>,
     ///
     /// The next gate in the gate chain, GATE_NULL if non is existent.
     ///
@@ -161,14 +166,23 @@ impl Gate {
     /// Returns the channel attached to this gate, if any exits.
     ///
     pub fn channel(&self) -> Option<ChannelRef> {
-        Some(Mrc::clone(self.channel.as_ref()?))
+        // only provide a read_only interface publicly
+        Some(MrcS::clone(self.channel.as_ref()?).make_readonly())
+    }
+
+    ///
+    /// Returns the channel attached to this gate, if any exits.
+    ///
+    pub(crate) fn channel_mut(&self) -> Option<ChannelRefMut> {
+        // only provide a read_only interface publicly
+        Some(MrcS::clone(self.channel.as_ref()?))
     }
 
     ///
     /// Sets the channel attached to this gate.
     ///
     #[inline(always)]
-    pub fn set_channel(&mut self, channel: ChannelRef) {
+    pub fn set_channel(&mut self, channel: ChannelRefMut) {
         self.channel = Some(channel)
     }
 
@@ -182,7 +196,7 @@ impl Gate {
             current = next_gate
         }
 
-        Some(Mrc::clone(current))
+        Some(MrcS::clone(current))
     }
 
     ///
@@ -199,10 +213,10 @@ impl Gate {
     pub fn new(
         description: GateDescription,
         pos: usize,
-        channel: Option<ChannelRef>,
+        channel: Option<ChannelRefMut>,
         next_gate: Option<GateRef>,
-    ) -> Mrc<Self> {
-        Mrc::new(Self {
+    ) -> GateRefMut {
+        MrcS::new(Self {
             description,
             pos,
             channel,
@@ -241,7 +255,25 @@ where
     T: StaticModuleCore,
 {
     fn into_gate(self, _module: &T) -> Option<GateRef> {
-        Some(Mrc::clone(self))
+        Some(MrcS::clone(self))
+    }
+}
+
+impl<T> IntoModuleGate<T> for GateRefMut
+where
+    T: StaticModuleCore,
+{
+    fn into_gate(self, _module: &T) -> Option<GateRef> {
+        Some(self.make_readonly())
+    }
+}
+
+impl<T> IntoModuleGate<T> for &GateRefMut
+where
+    T: StaticModuleCore,
+{
+    fn into_gate(self, _module: &T) -> Option<GateRef> {
+        Some(MrcS::clone(self).make_readonly())
     }
 }
 
@@ -255,7 +287,7 @@ where
             .iter()
             .find(|&g| g.name() == self.0 && g.pos() == self.1)?;
 
-        Some(Mrc::clone(element))
+        Some(MrcS::clone(element).make_readonly())
     }
 }
 
@@ -269,6 +301,6 @@ where
             .iter()
             .find(|&g| g.name() == self && g.size() == 1)?;
 
-        Some(Mrc::clone(element))
+        Some(MrcS::clone(element).make_readonly())
     }
 }

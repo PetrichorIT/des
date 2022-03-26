@@ -11,7 +11,7 @@ struct A();
 fn main() {
     let app: NetworkRuntime<A> = A().build_rt();
 
-    let ids: Vec<ModuleRef> = (1..=100)
+    let ids: Vec<ModuleRefMut> = (1..=100)
         .map(|n| app.module(|m| m.name() == format!("bob[{}]", n)).unwrap())
         .collect();
 

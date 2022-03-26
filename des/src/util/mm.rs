@@ -6,7 +6,7 @@ use std::{
     any::TypeId,
     cell::UnsafeCell,
     hash::Hash,
-    marker::Unsize,
+    marker::{PhantomData, Unsize},
     ops::{CoerceUnsized, Deref, DerefMut, DispatchFromDyn},
     rc::Rc,
 };
@@ -14,19 +14,19 @@ use std::{
 #[allow(unused)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct UntypedMrc {
-    inner: Mrc<()>,
+    inner: MrcS<(), Mutable>,
     type_id: TypeId,
 }
 
 #[allow(unused)]
 impl UntypedMrc {
-    pub(crate) fn new<T: 'static + Sized>(value: Mrc<T>) -> Self {
-        assert!(std::mem::size_of::<Mrc<T>>() == 8);
+    pub(crate) fn new<T: 'static + Sized>(value: MrcS<T, Mutable>) -> Self {
+        assert!(std::mem::size_of::<MrcS<T, Mutable>>() == 8);
 
         // SAFTY:
         // Transmute used for abstracting inner workings of Rc away
         // and to implement own version of dyn dispatch.
-        let this = unsafe { std::mem::transmute::<Mrc<T>, Mrc<()>>(value) };
+        let this = unsafe { std::mem::transmute::<MrcS<T, Mutable>, MrcS<(), Mutable>>(value) };
         Self {
             inner: this,
             type_id: TypeId::of::<T>(),
@@ -37,17 +37,60 @@ impl UntypedMrc {
         self.type_id == TypeId::of::<T>()
     }
 
-    pub(crate) fn downcast<T: 'static + Sized>(self) -> Option<Mrc<T>> {
+    pub(crate) fn downcast<T: 'static + Sized>(self) -> Option<MrcS<T, Mutable>> {
         if self.is::<T>() {
             // SAFTY:
             // Transmute used for abstracting inner workings of Rc away
             // and to implement own version of dyn dispatch.
             let value = self.inner;
-            Some(unsafe { std::mem::transmute::<Mrc<()>, Mrc<T>>(value) })
+            Some(unsafe { std::mem::transmute::<MrcS<(), Mutable>, MrcS<T, Mutable>>(value) })
         } else {
             None
         }
     }
+}
+
+///
+/// The default case of [MrcS] that allows internal mutability.
+///
+pub type Mrc<T> = MrcS<T, Mutable>;
+
+///
+/// The mutablilty state of a given [Mrc].
+///
+/// Mutable pointers can be converted to readonly pointers,
+/// but not vice-versa.
+///
+/// Note that this trait is sealed, so while it may be public it cannot
+/// be implemented for any trait. Since the defintion for [Mrc] must be public this
+/// trait must be as well, but there is no point in implementing it for a 'third' state.
+///
+#[doc(hidden)]
+pub trait MrcMutabilityState: private::MrcMutabilityStateSealed {}
+
+///
+/// A mutability state that **only** allows acces via [AsRef], [Deref]
+/// and by extension [Borrow](std::borrow::Borrow).
+///
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ReadOnly;
+impl MrcMutabilityState for ReadOnly {}
+
+///
+/// A mutability state that allows full access with [AsRef],
+/// [Deref], [DerefMut] and by extension [Borrow](std::borrow::Borrow)
+/// and [BorrowMut](std::borrow::BorrowMut).
+///
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Mutable;
+impl MrcMutabilityState for Mutable {}
+
+mod private {
+    pub trait MrcMutabilityStateSealed {}
+
+    impl MrcMutabilityStateSealed for super::ReadOnly {}
+    impl MrcMutabilityStateSealed for super::Mutable {}
 }
 
 ///
@@ -60,30 +103,65 @@ impl UntypedMrc {
 /// ensure, that this type is only used in single threaded enviroments, thereby resolving
 /// double-write or RWR problems. Addtionally no long living refernces to nested components
 /// should be created, since holding a long-lived read reference to a datapoint that can be mutated
-/// by a third party my invalidate the refenrence.
+/// by a third party my invalidate the reference.
+///
+/// Note that these rules only apply to instances of `StatedMrc<T, Mutable>`. Should the
+/// type state be set to `ReadOnly` the smart pointer cannot mutate the contained value.
 ///  
 #[derive(Debug)]
-pub struct Mrc<T>
+pub struct MrcS<T, S>
 where
     T: ?Sized,
+    S: MrcMutabilityState,
 {
     inner: Rc<UnsafeCell<T>>,
+    phantom: PhantomData<S>,
 }
 
-impl<T> Mrc<T> {
+impl<T, S> MrcS<T, S>
+where
+    S: MrcMutabilityState,
+{
     ///
     /// Constructs a new [Mrc<T>].
     ///
     pub fn new(value: T) -> Self {
         Self {
             inner: Rc::new(UnsafeCell::new(value)),
+            phantom: PhantomData,
         }
     }
 }
 
-impl<T> AsRef<T> for Mrc<T>
+impl<T: ?Sized> MrcS<T, Mutable> {
+    ///
+    /// Declares a reference as read-only. Not reversable.
+    ///
+    pub fn make_readonly(self) -> MrcS<T, ReadOnly> {
+        MrcS {
+            inner: self.inner,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<T: ?Sized> MrcS<T, ReadOnly> {
+    ///
+    /// Only for internal use
+    ///
+    #[allow(unused)]
+    pub(crate) fn force_mutable(self) -> MrcS<T, Mutable> {
+        MrcS {
+            inner: self.inner,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<T, S> AsRef<T> for MrcS<T, S>
 where
     T: ?Sized,
+    S: MrcMutabilityState,
 {
     fn as_ref(&self) -> &T {
         // SAFTY:
@@ -93,20 +171,23 @@ where
     }
 }
 
-impl<T> Clone for Mrc<T>
+impl<T, S> Clone for MrcS<T, S>
 where
     T: ?Sized,
+    S: MrcMutabilityState,
 {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
+            phantom: PhantomData,
         }
     }
 }
 
-impl<T> Deref for Mrc<T>
+impl<T, S> Deref for MrcS<T, S>
 where
     T: ?Sized,
+    S: MrcMutabilityState,
 {
     type Target = T;
 
@@ -115,7 +196,7 @@ where
     }
 }
 
-impl<T> DerefMut for Mrc<T>
+impl<T> DerefMut for MrcS<T, Mutable>
 where
     T: ?Sized,
 {
@@ -127,34 +208,43 @@ where
     }
 }
 
-impl<T, U> CoerceUnsized<Mrc<U>> for Mrc<T>
+impl<T, S, U> CoerceUnsized<MrcS<U, S>> for MrcS<T, S>
 where
     T: ?Sized + Unsize<U>,
+    S: MrcMutabilityState,
     U: ?Sized,
 {
 }
 
-impl<T, U> DispatchFromDyn<Mrc<U>> for Mrc<T>
+impl<T, S, U> DispatchFromDyn<MrcS<U, S>> for MrcS<T, S>
 where
     T: ?Sized + Unsize<U>,
+    S: MrcMutabilityState,
     U: ?Sized,
 {
 }
 
-impl<T> PartialEq for Mrc<T>
+impl<T, S> PartialEq for MrcS<T, S>
 where
     T: PartialEq,
+    S: MrcMutabilityState,
 {
     fn eq(&self, other: &Self) -> bool {
         self.deref().eq(other.deref())
     }
 }
 
-impl<T> Eq for Mrc<T> where T: Eq {}
+impl<T, S> Eq for MrcS<T, S>
+where
+    T: Eq,
+    S: MrcMutabilityState,
+{
+}
 
-impl<T> Hash for Mrc<T>
+impl<T, S> Hash for MrcS<T, S>
 where
     T: Hash,
+    S: MrcMutabilityState,
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.deref().hash(state)

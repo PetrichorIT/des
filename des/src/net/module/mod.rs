@@ -7,7 +7,7 @@ mod tests;
 use crate::{
     core::SimTime,
     net::*,
-    util::{Mrc, UntypedMrc},
+    util::{MrcS, Mutable, ReadOnly, UntypedMrc},
 };
 use log::error;
 use std::{any::type_name, collections::HashMap};
@@ -16,9 +16,14 @@ pub use self::core::*;
 pub use self::ndl::*;
 
 ///
-/// A reference to a module.
+/// A readonly reference to a module.
 ///
-pub type ModuleRef = Mrc<dyn Module>;
+pub type ModuleRef = MrcS<dyn Module, ReadOnly>;
+
+///
+/// A mutable reference to a module.
+///
+pub type ModuleRefMut = MrcS<dyn Module, Mutable>;
 
 ///
 /// A set of user defined functions for customizing the
@@ -185,14 +190,14 @@ pub trait StaticModuleCore {
     ///
     /// Returns a ref unstructured list of all gates from the current module.
     ///
-    fn gates(&self) -> &Vec<GateRef> {
+    fn gates(&self) -> &Vec<GateRefMut> {
         &self.module_core().gates
     }
 
     ///
     /// Returns a mutable ref to the all gates list.
     ///
-    fn gates_mut(&mut self) -> &mut Vec<GateRef> {
+    fn gates_mut(&mut self) -> &mut Vec<GateRefMut> {
         &mut self.module_core_mut().gates
     }
 
@@ -200,7 +205,7 @@ pub trait StaticModuleCore {
     /// Returns a ref to a gate of the current module dependent on its name and cluster position
     /// if possible.
     ///
-    fn gate_cluster(&self, name: &str) -> Vec<&GateRef> {
+    fn gate_cluster(&self, name: &str) -> Vec<&GateRefMut> {
         self.gates()
             .iter()
             .filter(|&gate| gate.name() == name)
@@ -211,7 +216,7 @@ pub trait StaticModuleCore {
     /// Returns a ref to a gate of the current module dependent on its name and cluster position
     /// if possible.
     ///
-    fn gate_cluster_mut(&mut self, name: &str) -> Vec<&mut GateRef> {
+    fn gate_cluster_mut(&mut self, name: &str) -> Vec<&mut GateRefMut> {
         self.gates_mut()
             .iter_mut()
             .filter(|gate| gate.name() == name)
@@ -223,11 +228,14 @@ pub trait StaticModuleCore {
     /// if possible.
     ///
     fn gate(&self, name: &str, pos: usize) -> Option<GateRef> {
-        Some(Mrc::clone(
-            self.gates()
-                .iter()
-                .find(|&gate| gate.name() == name && gate.pos() == pos)?,
-        ))
+        Some(
+            MrcS::clone(
+                self.gates()
+                    .iter()
+                    .find(|&gate| gate.name() == name && gate.pos() == pos)?,
+            )
+            .make_readonly(),
+        )
     }
 
     #[deprecated(since = "0.2.0", note = "GateIDs are no longer supported")]
@@ -239,7 +247,7 @@ pub trait StaticModuleCore {
     /// Returns a mutable ref to a gate of the current module dependent on its name and cluster position
     /// if possible.
     ///
-    fn gate_mut(&mut self, name: &str, pos: usize) -> Option<&mut GateRef> {
+    fn gate_mut(&mut self, name: &str, pos: usize) -> Option<&mut GateRefMut> {
         self.gates_mut()
             .iter_mut()
             .find(|gate| gate.name() == name && gate.pos() == pos)
@@ -253,7 +261,11 @@ pub trait StaticModuleCore {
     ///
     /// Creates a gate on the current module, returning its ID.
     ///
-    fn create_gate<A>(self: &mut Mrc<Self>, name: &str, rt: &mut NetworkRuntime<A>) -> GateRef
+    fn create_gate<A>(
+        self: &mut MrcS<Self, Mutable>,
+        name: &str,
+        rt: &mut NetworkRuntime<A>,
+    ) -> GateRefMut
     where
         Self: 'static + Sized + Module,
     {
@@ -265,12 +277,12 @@ pub trait StaticModuleCore {
     /// next hop, returning the ID of the created gate.
     ///
     fn create_gate_into<A>(
-        self: &mut Mrc<Self>,
+        self: &mut MrcS<Self, Mutable>,
         name: &str,
-        channel: Option<ChannelRef>,
-        next_hop: Option<GateRef>,
+        channel: Option<ChannelRefMut>,
+        next_hop: Option<GateRefMut>,
         rt: &mut NetworkRuntime<A>,
-    ) -> GateRef
+    ) -> GateRefMut
     where
         Self: 'static + Sized + Module,
     {
@@ -282,11 +294,11 @@ pub trait StaticModuleCore {
     /// Createas a cluster of gates on the current module returning their IDs.
     ///
     fn create_gate_cluster<A>(
-        self: &mut Mrc<Self>,
+        self: &mut MrcS<Self, Mutable>,
         name: &str,
         size: usize,
         rt: &mut NetworkRuntime<A>,
-    ) -> Vec<GateRef>
+    ) -> Vec<GateRefMut>
     where
         Self: 'static + Sized + Module,
     {
@@ -302,13 +314,13 @@ pub trait StaticModuleCore {
     /// This function will panic should size != next_hops.len()
     ///
     fn create_gate_cluster_into<A>(
-        self: &mut Mrc<Self>,
+        self: &mut MrcS<Self, Mutable>,
         name: &str,
         size: usize,
-        channel: Option<ChannelRef>,
-        next_hops: Vec<Option<GateRef>>,
+        channel: Option<ChannelRefMut>,
+        next_hops: Vec<Option<GateRefMut>>,
         _rt: &mut NetworkRuntime<A>,
-    ) -> Vec<GateRef>
+    ) -> Vec<GateRefMut>
     where
         Self: 'static + Sized + Module,
     {
@@ -317,13 +329,18 @@ pub trait StaticModuleCore {
             "The value 'next_hops' must be equal to the size of the gate cluster"
         );
 
-        let mrc = Mrc::clone(self);
+        let mrc = MrcS::clone(self).make_readonly();
         let descriptor = GateDescription::new(name.to_owned(), size, mrc);
         let mut ids = Vec::new();
 
         for (i, item) in next_hops.into_iter().enumerate() {
-            let gate = Gate::new(descriptor.clone(), i, channel.clone(), item);
-            ids.push(Mrc::clone(&gate));
+            let gate = Gate::new(
+                descriptor.clone(),
+                i,
+                channel.clone(),
+                item.map(MrcS::make_readonly),
+            );
+            ids.push(MrcS::clone(&gate));
 
             self.module_core_mut().gates.push(gate);
         }
@@ -380,16 +397,16 @@ pub trait StaticModuleCore {
     /// Adds the given module as a child module, automaticlly seting the childs
     /// parent property .
     ///
-    fn add_child<T>(self: &mut Mrc<Self>, child: &mut Mrc<T>)
+    fn add_child<T>(self: &mut MrcS<Self, Mutable>, child: &mut MrcS<T, Mutable>)
     where
         T: 'static + StaticModuleCore,
         Self: 'static + Sized,
     {
-        let self_clone = Mrc::clone(self);
+        let self_clone = MrcS::clone(self);
         child.module_core_mut().parent = Some(UntypedMrc::new(self_clone));
 
         let child_name = child.name().to_string();
-        let owned_child = Mrc::clone(child);
+        let owned_child = MrcS::clone(child);
         self.module_core_mut()
             .children
             .insert(child_name, UntypedMrc::new(owned_child));
@@ -399,27 +416,20 @@ pub trait StaticModuleCore {
     /// Returns the parent module by reference if a parent exists
     /// and is of type `T`.
     ///
-    fn parent<T>(&self) -> Result<Mrc<T>, ModuleReferencingError>
+    fn parent<T>(&self) -> Result<MrcS<T, ReadOnly>, ModuleReferencingError>
     where
         T: 'static + StaticModuleCore,
         Self: 'static + Sized,
     {
         match self.module_core().parent.clone() {
-            Some(parent) => {
-                // ISSUE
-                // automaticly derefs Mrc<dyn Any> to output the T
-                // so a stored value T will be &T not a Mrc<T> as requested
-                // so ::is::<Mrc<t>> fails
-
-                match parent.downcast::<T>() {
-                    Some(parent) => Ok(parent),
-                    None => Err(ModuleReferencingError::TypeError(format!(
-                        "The parent module of '{}' is not of type {}",
-                        self.path(),
-                        type_name::<T>(),
-                    ))),
-                }
-            }
+            Some(parent) => match parent.downcast::<T>() {
+                Some(parent) => Ok(parent.make_readonly()),
+                None => Err(ModuleReferencingError::TypeError(format!(
+                    "The parent module of '{}' is not of type {}",
+                    self.path(),
+                    type_name::<T>(),
+                ))),
+            },
             None => Err(ModuleReferencingError::NoParent(format!(
                 "The module '{}' does not posses a parent ptr",
                 self.path()
@@ -431,19 +441,32 @@ pub trait StaticModuleCore {
     /// Returns the parent module by mutable reference if a parent exists
     /// and is of type `T`.
     ///
-    fn parent_mut<T>(&mut self) -> Result<Mrc<T>, ModuleReferencingError>
+    fn parent_mut<T>(&mut self) -> Result<MrcS<T, Mutable>, ModuleReferencingError>
     where
         T: 'static + StaticModuleCore,
         Self: 'static + Sized,
     {
-        self.parent()
+        match self.module_core_mut().parent.clone() {
+            Some(parent) => match parent.downcast::<T>() {
+                Some(parent) => Ok(parent),
+                None => Err(ModuleReferencingError::TypeError(format!(
+                    "The parent module of '{}' is not of type {}",
+                    self.path(),
+                    type_name::<T>(),
+                ))),
+            },
+            None => Err(ModuleReferencingError::NoParent(format!(
+                "The module '{}' does not posses a parent ptr",
+                self.path()
+            ))),
+        }
     }
 
     ///
     /// Returns the child module by reference if any child with
     /// the given name exists and is of type `T`.
     ///
-    fn child<T>(&self, name: &str) -> Result<Mrc<T>, ModuleReferencingError>
+    fn child<T>(&self, name: &str) -> Result<MrcS<T, ReadOnly>, ModuleReferencingError>
     where
         T: 'static + StaticModuleCore,
         Self: 'static + Sized,
@@ -452,7 +475,7 @@ pub trait StaticModuleCore {
             Some(parent) => {
                 // Text
                 match parent.clone().downcast::<T>() {
-                    Some(parent) => Ok(parent),
+                    Some(parent) => Ok(parent.make_readonly()),
                     None => Err(ModuleReferencingError::TypeError(String::from(
                         "Type error",
                     ))),
@@ -468,11 +491,24 @@ pub trait StaticModuleCore {
     /// Returns the child module by mutable reference if any child with
     /// the given name exists and is of type `T`.
     ///
-    fn child_mut<T>(&mut self, name: &str) -> Result<Mrc<T>, ModuleReferencingError>
+    fn child_mut<T>(&mut self, name: &str) -> Result<MrcS<T, Mutable>, ModuleReferencingError>
     where
         T: 'static + StaticModuleCore,
         Self: 'static + Sized,
     {
-        self.child(name)
+        match self.module_core_mut().children.get(name) {
+            Some(parent) => {
+                // Text
+                match parent.clone().downcast::<T>() {
+                    Some(parent) => Ok(parent),
+                    None => Err(ModuleReferencingError::TypeError(String::from(
+                        "Type error",
+                    ))),
+                }
+            }
+            None => Err(ModuleReferencingError::NoParent(String::from(
+                "This module does not posses a parent ptr",
+            ))),
+        }
     }
 }

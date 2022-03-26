@@ -33,6 +33,8 @@ pub use crate::util::Mrc;
 pub use crate::util::SpmcReader;
 pub use crate::util::SpmcWriter;
 
+// Do not export StatedMrc only for internal use
+
 //
 // # feature = "net"
 //
@@ -46,6 +48,8 @@ pub use crate::net::Channel;
 pub use crate::net::ChannelMetrics;
 #[cfg(feature = "net")]
 pub use crate::net::ChannelRef;
+#[cfg(feature = "net")]
+pub use crate::net::ChannelRefMut;
 
 #[cfg(feature = "net")]
 pub use crate::net::Gate;
@@ -53,6 +57,8 @@ pub use crate::net::Gate;
 pub use crate::net::GateDescription;
 #[cfg(feature = "net")]
 pub use crate::net::GateRef;
+#[cfg(feature = "net")]
+pub use crate::net::GateRefMut;
 #[cfg(feature = "net")]
 pub use crate::net::IntoModuleGate;
 
@@ -92,6 +98,8 @@ pub use crate::net::ModuleCore;
 pub use crate::net::ModuleId;
 #[cfg(feature = "net")]
 pub use crate::net::ModuleRef;
+#[cfg(feature = "net")]
+pub use crate::net::ModuleRefMut;
 #[cfg(feature = "net")]
 pub use crate::net::ModuleReferencingError;
 #[cfg(feature = "net")]

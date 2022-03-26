@@ -2,7 +2,7 @@ use log::{info, warn};
 use std::mem::ManuallyDrop;
 use std::ops::Deref;
 
-use crate::{core::*, create_event_set, net::*, util::Mrc};
+use crate::{core::*, create_event_set, net::*, util::MrcS};
 
 create_event_set!(
     ///
@@ -31,7 +31,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
     fn handle(mut self, rt: &mut Runtime<NetworkRuntime<A>>) {
         let ptr: *const Message = self.message.deref();
         let mut message = unsafe { std::ptr::read(ptr) };
-        message.meta.last_gate = Some(Mrc::clone(&self.gate));
+        message.meta.last_gate = Some(MrcS::clone(&self.gate));
 
         self.handled = true;
 
@@ -44,7 +44,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
         while let Some(next_gate) = current_gate.next_gate() {
             // A next gate exists.
             // redirect to next channel
-            message.meta.last_gate = Some(Mrc::clone(next_gate));
+            message.meta.last_gate = Some(MrcS::clone(next_gate));
 
             info!(
                 target: &format!("Gate ({})", current_gate.name()),
@@ -53,7 +53,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
                 current_gate.channel().is_some()
             );
 
-            match current_gate.channel() {
+            match current_gate.channel_mut() {
                 Some(mut channel) => {
                     // Channel delayed connection
                     // SAFTY:
@@ -88,7 +88,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
 
                     rt.add_event(
                         NetEvents::MessageAtGateEvent(MessageAtGateEvent {
-                            gate: Mrc::clone(next_gate),
+                            gate: MrcS::clone(next_gate),
                             message: ManuallyDrop::new(message),
                             handled: false,
                         }),
@@ -117,7 +117,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
             current_gate.owner().id()
         );
 
-        let module = Mrc::clone(current_gate.owner());
+        let module = MrcS::clone(current_gate.owner());
         rt.add_event(
             NetEvents::HandleMessageEvent(HandleMessageEvent {
                 module,
@@ -158,9 +158,10 @@ impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
             message.str()
         );
 
-        self.module.handle_message(message);
+        let mut module = MrcS::clone(&self.module).force_mutable();
 
-        Mrc::clone(&self.module).handle_buffers(rt);
+        module.handle_message(message);
+        module.handle_buffers(rt);
 
         self.handled = true;
     }
@@ -175,7 +176,7 @@ impl Drop for HandleMessageEvent {
 }
 
 pub struct CoroutineMessageEvent {
-    module: ModuleRef,
+    module: ModuleRefMut,
 }
 
 impl<A> Event<NetworkRuntime<A>> for CoroutineMessageEvent {
@@ -194,7 +195,7 @@ impl<A> Event<NetworkRuntime<A>> for CoroutineMessageEvent {
             // not schedule a new Coroutine since either:
             // - state remains stable since allready init
             // - activity deactivated.
-            Mrc::clone(&self.module).handle_buffers(rt);
+            MrcS::clone(&self.module).handle_buffers(rt);
 
             if still_active {
                 rt.add_event_in(
@@ -209,7 +210,7 @@ impl<A> Event<NetworkRuntime<A>> for CoroutineMessageEvent {
 }
 
 pub struct ChannelUnbusyNotif {
-    channel: ChannelRef,
+    channel: ChannelRefMut,
 }
 
 impl<A> Event<NetworkRuntime<A>> for ChannelUnbusyNotif {
@@ -226,7 +227,7 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
         // allowing preemtive dropping of 'module' so that rt can be used in
         // 'module_handle_jobs'.
         for i in 0..rt.app.modules().len() {
-            let mut module = Mrc::clone(&rt.app.modules()[i]);
+            let mut module = MrcS::clone(&rt.app.modules()[i]);
             info!(
                 target: &format!("Module: {}", module.str()),
                 "Calling at_sim_start."
@@ -242,7 +243,7 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
 // # Helper functions
 //
 
-impl ModuleRef {
+impl ModuleRefMut {
     fn handle_buffers<A>(mut self, rt: &mut Runtime<NetworkRuntime<A>>) {
         // Check whether a new activity cycle must be initated
         let enqueue_actitivy_msg = self.module_core().activity_period != SimTime::ZERO
@@ -254,7 +255,8 @@ impl ModuleRef {
         for (msg, gate) in self.module_core_mut().out_buffer.drain(..) {
             rt.add_event(
                 NetEvents::MessageAtGateEvent(MessageAtGateEvent {
-                    gate,
+                    // TODO
+                    gate: gate,
                     message: ManuallyDrop::new(msg),
                     handled: false,
                 }),
@@ -262,13 +264,13 @@ impl ModuleRef {
             )
         }
 
-        let mref = Mrc::clone(&self);
+        let mref = MrcS::clone(&self);
 
         // Send loopback events from 'scheduleAt'
         for (msg, time) in self.module_core_mut().loopback_buffer.drain(..) {
             rt.add_event(
                 NetEvents::HandleMessageEvent(HandleMessageEvent {
-                    module: Mrc::clone(&mref),
+                    module: MrcS::clone(&mref).make_readonly(),
                     message: ManuallyDrop::new(msg),
                     handled: false,
                 }),

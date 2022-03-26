@@ -25,6 +25,7 @@ pub use self::runtime::NetworkRuntime;
 pub use self::channel::Channel;
 pub use self::channel::ChannelMetrics;
 pub use self::channel::ChannelRef;
+pub use self::channel::ChannelRefMut;
 
 //
 // # Gate definitions
@@ -33,6 +34,7 @@ pub use self::channel::ChannelRef;
 pub use self::gate::Gate;
 pub use self::gate::GateDescription;
 pub use self::gate::GateRef;
+pub use self::gate::GateRefMut;
 pub use self::gate::IntoModuleGate;
 
 //
@@ -62,6 +64,7 @@ pub use self::module::Module;
 pub use self::module::ModuleCore;
 pub use self::module::ModuleId;
 pub use self::module::ModuleRef;
+pub use self::module::ModuleRefMut;
 pub use self::module::ModuleReferencingError;
 pub use self::module::NameableModule;
 pub use self::module::StaticModuleCore;

@@ -31,7 +31,7 @@ pub struct ModuleCore {
     pub(crate) path: ModulePath,
 
     /// A collection of all gates register to the current module
-    pub(crate) gates: Vec<GateRef>,
+    pub(crate) gates: Vec<GateRefMut>,
 
     /// A buffer of messages to be send out, after the current handle messsage terminates.
     pub(crate) out_buffer: Vec<(Message, GateRef)>,

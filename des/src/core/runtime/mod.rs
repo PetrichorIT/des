@@ -237,7 +237,7 @@ where
             app,
 
             #[cfg(feature = "internal-metrics")]
-            metrics: Mrc::new(crate::metrics::RuntimeMetrics::new()),
+            metrics: MrcS::new(crate::metrics::RuntimeMetrics::new()),
         };
 
         macro_rules! symbol {
@@ -287,7 +287,7 @@ where
 
         let node = self.future_event_set.fetch_next(
             #[cfg(feature = "internal-metrics")]
-            Mrc::clone(&self.metrics),
+            MrcS::clone(&self.metrics),
         );
 
         self.core_mut().itr += 1;
@@ -298,7 +298,7 @@ where
                 time,
                 event,
                 #[cfg(feature = "internal-metrics")]
-                Mrc::clone(&self.metrics),
+                MrcS::clone(&self.metrics),
             );
             return false;
         }
@@ -524,7 +524,7 @@ where
             time,
             event,
             #[cfg(feature = "internal-metrics")]
-            Mrc::clone(&self.metrics),
+            MrcS::clone(&self.metrics),
         )
     }
 }
@@ -703,9 +703,9 @@ impl<A> Runtime<NetworkRuntime<A>> {
     ///
     /// Adds a message event into a [Runtime<NetworkRuntime<A>>] onto a gate.
     ///
-    pub fn add_message_onto(&mut self, gate: GateRef, message: Message, time: SimTime) {
+    pub fn add_message_onto(&mut self, gate: GateRefMut, message: Message, time: SimTime) {
         let event = MessageAtGateEvent {
-            gate,
+            gate: gate.make_readonly(),
             handled: false,
             message: std::mem::ManuallyDrop::new(message),
         };
@@ -716,9 +716,9 @@ impl<A> Runtime<NetworkRuntime<A>> {
     ///
     /// Adds a message event into a [Runtime<NetworkRuntime<A>>] onto a module.
     ///
-    pub fn handle_message_on(&mut self, module: ModuleRef, message: Message, time: SimTime) {
+    pub fn handle_message_on(&mut self, module: ModuleRefMut, message: Message, time: SimTime) {
         let event = HandleMessageEvent {
-            module,
+            module: module.make_readonly(),
             handled: false,
             message: std::mem::ManuallyDrop::new(message),
         };
