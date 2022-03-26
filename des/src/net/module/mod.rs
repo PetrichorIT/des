@@ -4,12 +4,13 @@ mod ndl;
 #[cfg(test)]
 mod tests;
 
-use crate::{core::SimTime, net::*, util::Mrc};
-use log::error;
-use std::{
-    any::{type_name, Any},
-    collections::HashMap,
+use crate::{
+    core::SimTime,
+    net::*,
+    util::{Mrc, UntypedMrc},
 };
+use log::error;
+use std::{any::type_name, collections::HashMap};
 
 pub use self::core::*;
 pub use self::ndl::*;
@@ -385,34 +386,32 @@ pub trait StaticModuleCore {
         Self: 'static + Sized,
     {
         let self_clone = Mrc::clone(self);
-        let dyn_self: Mrc<dyn Any> = self_clone;
-        child.module_core_mut().parent = Some(dyn_self);
+        child.module_core_mut().parent = Some(UntypedMrc::new(self_clone));
 
         let child_name = child.name().to_string();
         let owned_child = Mrc::clone(child);
-        let dyn_child: Mrc<dyn Any> = owned_child;
         self.module_core_mut()
             .children
-            .insert(child_name, dyn_child);
+            .insert(child_name, UntypedMrc::new(owned_child));
     }
 
     ///
     /// Returns the parent module by reference if a parent exists
     /// and is of type `T`.
     ///
-    fn parent<T>(&self) -> Result<&T, ModuleReferencingError>
+    fn parent<T>(&self) -> Result<Mrc<T>, ModuleReferencingError>
     where
         T: 'static + StaticModuleCore,
         Self: 'static + Sized,
     {
-        match self.module_core().parent.as_ref() {
+        match self.module_core().parent.clone() {
             Some(parent) => {
                 // ISSUE
                 // automaticly derefs Mrc<dyn Any> to output the T
                 // so a stored value T will be &T not a Mrc<T> as requested
                 // so ::is::<Mrc<t>> fails
 
-                match parent.downcast_ref::<T>() {
+                match parent.downcast::<T>() {
                     Some(parent) => Ok(parent),
                     None => Err(ModuleReferencingError::TypeError(format!(
                         "The parent module of '{}' is not of type {}",
@@ -432,45 +431,27 @@ pub trait StaticModuleCore {
     /// Returns the parent module by mutable reference if a parent exists
     /// and is of type `T`.
     ///
-    fn parent_mut<T>(&mut self) -> Result<&mut T, ModuleReferencingError>
+    fn parent_mut<T>(&mut self) -> Result<Mrc<T>, ModuleReferencingError>
     where
         T: 'static + StaticModuleCore,
         Self: 'static + Sized,
     {
-        match self.module_core_mut().parent.as_mut() {
-            Some(parent) => {
-                // ISSUE
-                // automaticly derefs Mrc<dyn Any> to output the T
-                // so a stored value T will be &T not a Mrc<T> as requested
-                // so ::is::<Mrc<t>> fails
-
-                match parent.downcast_mut::<T>() {
-                    Some(parent) => Ok(parent),
-                    None => Err(ModuleReferencingError::TypeError(format!(
-                        "Parent is not of type {}",
-                        type_name::<T>(),
-                    ))),
-                }
-            }
-            None => Err(ModuleReferencingError::NoParent(String::from(
-                "This module does not posses a parent ptr",
-            ))),
-        }
+        self.parent()
     }
 
     ///
     /// Returns the child module by reference if any child with
     /// the given name exists and is of type `T`.
     ///
-    fn child<T>(&self, name: &str) -> Result<&T, ModuleReferencingError>
+    fn child<T>(&self, name: &str) -> Result<Mrc<T>, ModuleReferencingError>
     where
         T: 'static + StaticModuleCore,
         Self: 'static + Sized,
     {
-        match &self.module_core().children.get(name) {
+        match self.module_core().children.get(name) {
             Some(parent) => {
                 // Text
-                match parent.downcast_ref::<T>() {
+                match parent.clone().downcast::<T>() {
                     Some(parent) => Ok(parent),
                     None => Err(ModuleReferencingError::TypeError(String::from(
                         "Type error",
@@ -487,24 +468,11 @@ pub trait StaticModuleCore {
     /// Returns the child module by mutable reference if any child with
     /// the given name exists and is of type `T`.
     ///
-    fn child_mut<T>(&mut self, name: &str) -> Result<&mut T, ModuleReferencingError>
+    fn child_mut<T>(&mut self, name: &str) -> Result<Mrc<T>, ModuleReferencingError>
     where
         T: 'static + StaticModuleCore,
         Self: 'static + Sized,
     {
-        match self.module_core_mut().children.get_mut(name) {
-            Some(parent) => {
-                // Text
-                match parent.downcast_mut::<T>() {
-                    Some(parent) => Ok(parent),
-                    None => Err(ModuleReferencingError::TypeError(String::from(
-                        "Type error",
-                    ))),
-                }
-            }
-            None => Err(ModuleReferencingError::NoParent(String::from(
-                "This module does not posses a parent ptr",
-            ))),
-        }
+        self.child(name)
     }
 }

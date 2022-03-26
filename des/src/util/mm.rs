@@ -3,12 +3,52 @@
 //!
 
 use std::{
+    any::TypeId,
     cell::UnsafeCell,
     hash::Hash,
     marker::Unsize,
     ops::{CoerceUnsized, Deref, DerefMut, DispatchFromDyn},
     rc::Rc,
 };
+
+#[allow(unused)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct UntypedMrc {
+    inner: Mrc<()>,
+    type_id: TypeId,
+}
+
+#[allow(unused)]
+impl UntypedMrc {
+    pub(crate) fn new<T: 'static + Sized>(value: Mrc<T>) -> Self {
+        assert!(std::mem::size_of::<Mrc<T>>() == 8);
+
+        // SAFTY:
+        // Transmute used for abstracting inner workings of Rc away
+        // and to implement own version of dyn dispatch.
+        let this = unsafe { std::mem::transmute::<Mrc<T>, Mrc<()>>(value) };
+        Self {
+            inner: this,
+            type_id: TypeId::of::<T>(),
+        }
+    }
+
+    pub(crate) fn is<T: 'static + Sized>(&self) -> bool {
+        self.type_id == TypeId::of::<T>()
+    }
+
+    pub(crate) fn downcast<T: 'static + Sized>(self) -> Option<Mrc<T>> {
+        if self.is::<T>() {
+            // SAFTY:
+            // Transmute used for abstracting inner workings of Rc away
+            // and to implement own version of dyn dispatch.
+            let value = self.inner;
+            Some(unsafe { std::mem::transmute::<Mrc<()>, Mrc<T>>(value) })
+        } else {
+            None
+        }
+    }
+}
 
 ///
 /// A version of [Rc] that allows internal mutation without explicit

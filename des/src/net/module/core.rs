@@ -1,5 +1,4 @@
 use std::{
-    any::Any,
     collections::HashMap,
     error::Error,
     fmt::{Debug, Display},
@@ -9,7 +8,7 @@ use crate::{
     core::SimTime,
     create_global_uid,
     net::*,
-    util::{Mrc, SpmcReader, SpmcWriter},
+    util::{SpmcReader, SpmcWriter, UntypedMrc},
 };
 
 create_global_uid!(
@@ -47,10 +46,10 @@ pub struct ModuleCore {
     pub(crate) activity_active: bool,
 
     /// The reference for the parent module.
-    pub(crate) parent: Option<Mrc<dyn Any>>,
+    pub(crate) parent: Option<UntypedMrc>,
 
     /// The collection of child nodes for the current module.
-    pub(crate) children: HashMap<String, Mrc<dyn Any>>,
+    pub(crate) children: HashMap<String, UntypedMrc>,
 
     /// A set of local parameters.
     parameters: SpmcReader<Parameters>,
