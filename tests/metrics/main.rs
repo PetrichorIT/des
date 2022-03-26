@@ -42,7 +42,8 @@ struct Main {}
 fn main() {
     Main {}.run_with_options(RuntimeOptions::seeded(123).max_itr(1000));
 
-    let contents = std::fs::read_to_string("tests/metrics/results/alice1_sample_vec.out").unwrap();
+    let contents =
+        std::fs::read_to_string("tests/metrics/results/alice[1]_sample_vec.out").unwrap();
 
     assert_eq!(contents.chars().filter(|c| *c == '#').count(), 2);
     assert_eq!(contents.lines().count(), 202)
