@@ -10,7 +10,7 @@ use crate::{
     util::{MrcS, Mutable, ReadOnly, UntypedMrc},
 };
 use log::error;
-use std::{any::type_name, collections::HashMap};
+use std::collections::HashMap;
 
 pub use self::core::*;
 pub use self::ndl::*;
@@ -421,20 +421,7 @@ pub trait StaticModuleCore {
         T: 'static + StaticModuleCore,
         Self: 'static + Sized,
     {
-        match self.module_core().parent.clone() {
-            Some(parent) => match parent.downcast::<T>() {
-                Some(parent) => Ok(parent.make_readonly()),
-                None => Err(ModuleReferencingError::TypeError(format!(
-                    "The parent module of '{}' is not of type {}",
-                    self.path(),
-                    type_name::<T>(),
-                ))),
-            },
-            None => Err(ModuleReferencingError::NoParent(format!(
-                "The module '{}' does not posses a parent ptr",
-                self.path()
-            ))),
-        }
+        self.module_core().parent()
     }
 
     ///
@@ -446,20 +433,7 @@ pub trait StaticModuleCore {
         T: 'static + StaticModuleCore,
         Self: 'static + Sized,
     {
-        match self.module_core_mut().parent.clone() {
-            Some(parent) => match parent.downcast::<T>() {
-                Some(parent) => Ok(parent),
-                None => Err(ModuleReferencingError::TypeError(format!(
-                    "The parent module of '{}' is not of type {}",
-                    self.path(),
-                    type_name::<T>(),
-                ))),
-            },
-            None => Err(ModuleReferencingError::NoParent(format!(
-                "The module '{}' does not posses a parent ptr",
-                self.path()
-            ))),
-        }
+        self.module_core_mut().parent_mut()
     }
 
     ///
@@ -471,20 +445,7 @@ pub trait StaticModuleCore {
         T: 'static + StaticModuleCore,
         Self: 'static + Sized,
     {
-        match self.module_core().children.get(name) {
-            Some(parent) => {
-                // Text
-                match parent.clone().downcast::<T>() {
-                    Some(parent) => Ok(parent.make_readonly()),
-                    None => Err(ModuleReferencingError::TypeError(String::from(
-                        "Type error",
-                    ))),
-                }
-            }
-            None => Err(ModuleReferencingError::NoParent(String::from(
-                "This module does not posses a parent ptr",
-            ))),
-        }
+        self.module_core().child(name)
     }
 
     ///
@@ -496,19 +457,6 @@ pub trait StaticModuleCore {
         T: 'static + StaticModuleCore,
         Self: 'static + Sized,
     {
-        match self.module_core_mut().children.get(name) {
-            Some(parent) => {
-                // Text
-                match parent.clone().downcast::<T>() {
-                    Some(parent) => Ok(parent),
-                    None => Err(ModuleReferencingError::TypeError(String::from(
-                        "Type error",
-                    ))),
-                }
-            }
-            None => Err(ModuleReferencingError::NoParent(String::from(
-                "This module does not posses a parent ptr",
-            ))),
-        }
+        self.module_core_mut().child_mut(name)
     }
 }

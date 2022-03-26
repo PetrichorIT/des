@@ -1,4 +1,5 @@
 use std::{
+    any::type_name,
     collections::HashMap,
     error::Error,
     fmt::{Debug, Display},
@@ -8,7 +9,7 @@ use crate::{
     core::SimTime,
     create_global_uid,
     net::*,
-    util::{SpmcReader, SpmcWriter, UntypedMrc},
+    util::{MrcS, Mutable, ReadOnly, SpmcReader, SpmcWriter, UntypedMrc},
 };
 
 create_global_uid!(
@@ -120,6 +121,108 @@ impl ModuleCore {
             ModulePath::root(String::from("unknown-module")),
             SpmcWriter::new(Parameters::new()).get_reader(),
         )
+    }
+}
+
+impl ModuleCore {
+    ///
+    /// Returns the parent module by reference if a parent exists
+    /// and is of type `T`.
+    ///
+    pub fn parent<T>(&self) -> Result<MrcS<T, ReadOnly>, ModuleReferencingError>
+    where
+        T: 'static + StaticModuleCore,
+        Self: 'static + Sized,
+    {
+        match self.parent.clone() {
+            Some(parent) => match parent.downcast::<T>() {
+                Some(parent) => Ok(parent.make_readonly()),
+                None => Err(ModuleReferencingError::TypeError(format!(
+                    "The parent module of '{}' is not of type {}",
+                    self.path(),
+                    type_name::<T>(),
+                ))),
+            },
+            None => Err(ModuleReferencingError::NoParent(format!(
+                "The module '{}' does not posses a parent ptr",
+                self.path()
+            ))),
+        }
+    }
+
+    ///
+    /// Returns the parent module by mutable reference if a parent exists
+    /// and is of type `T`.
+    ///
+    pub fn parent_mut<T>(&mut self) -> Result<MrcS<T, Mutable>, ModuleReferencingError>
+    where
+        T: 'static + StaticModuleCore,
+        Self: 'static + Sized,
+    {
+        match self.parent.clone() {
+            Some(parent) => match parent.downcast::<T>() {
+                Some(parent) => Ok(parent),
+                None => Err(ModuleReferencingError::TypeError(format!(
+                    "The parent module of '{}' is not of type {}",
+                    self.path(),
+                    type_name::<T>(),
+                ))),
+            },
+            None => Err(ModuleReferencingError::NoParent(format!(
+                "The module '{}' does not posses a parent ptr",
+                self.path()
+            ))),
+        }
+    }
+
+    ///
+    /// Returns the child module by reference if any child with
+    /// the given name exists and is of type `T`.
+    ///
+    pub fn child<T>(&self, name: &str) -> Result<MrcS<T, ReadOnly>, ModuleReferencingError>
+    where
+        T: 'static + StaticModuleCore,
+        Self: 'static + Sized,
+    {
+        match self.children.get(name) {
+            Some(parent) => {
+                // Text
+                match parent.clone().downcast::<T>() {
+                    Some(parent) => Ok(parent.make_readonly()),
+                    None => Err(ModuleReferencingError::TypeError(String::from(
+                        "Type error",
+                    ))),
+                }
+            }
+            None => Err(ModuleReferencingError::NoParent(String::from(
+                "This module does not posses a parent ptr",
+            ))),
+        }
+    }
+
+    ///
+    /// Returns the child module by mutable reference if any child with
+    /// the given name exists and is of type `T`.
+    ///
+    pub fn child_mut<T>(&mut self, name: &str) -> Result<MrcS<T, Mutable>, ModuleReferencingError>
+    where
+        T: 'static + StaticModuleCore,
+        Self: 'static + Sized,
+    {
+        match self.children.get(name) {
+            Some(parent) => {
+                // Text
+                match parent.clone().downcast::<T>() {
+                    Some(parent) => Ok(parent),
+                    None => Err(ModuleReferencingError::TypeError(String::from(
+                        "Type error",
+                    ))),
+                }
+            }
+            None => Err(ModuleReferencingError::NoParent(String::from(
+                "This module does not posses a parent ptr",
+            ))),
+        }
     }
 }
 
