@@ -96,14 +96,14 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> TokenStream {
                                 latency: ::des::core::SimTime::from(#latency),
                                 jitter: ::des::core::SimTime::from(#jitter),
                             });
-                            #from_ident.set_next_gate(#to_ident);
+                            #from_ident.set_next_gate(#to_ident.make_readonly());
                             #from_ident.set_channel(channel);
                         });
                     } else {
                         token_stream.extend(quote! {
                             // assert_eq!(#from_ident.len(), #to_ident.len());
                             for i in 0..#from_ident.len() {
-                                #from_ident[i].set_next_gate(#to_ident[i]);
+                                #from_ident[i].set_next_gate(#to_ident[i].make_readonly());
                             }
                         });
                     }
