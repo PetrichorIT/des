@@ -251,6 +251,26 @@ where
     }
 }
 
+impl<T, S> PartialOrd for MrcS<T, S>
+where
+    T: PartialOrd,
+    S: MrcMutabilityState,
+{
+    fn partial_cmp(&self, rhs: &Self) -> Option<std::cmp::Ordering> {
+        self.deref().partial_cmp(rhs.deref())
+    }
+}
+
+impl<T, S> Ord for MrcS<T, S>
+where
+    T: Ord,
+    S: MrcMutabilityState,
+{
+    fn cmp(&self, rhs: &Self) -> std::cmp::Ordering {
+        self.deref().cmp(rhs.deref())
+    }
+}
+
 ///
 /// A implementation of UnsafeCell that implements Sync
 /// since a corrolated DES simulation is inherintly single threaded.
