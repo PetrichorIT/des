@@ -11,3 +11,7 @@ Interner(String)
 Also consider Cow prt vs Rc ptr
 
 # Rework pkt-headers msg size calculations
+
+# Par Caching
+
+# Channel optional cost field.
