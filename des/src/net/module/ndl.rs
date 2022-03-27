@@ -50,7 +50,7 @@ pub trait BuildableModule: StaticModuleCore {
     where
         Self: NameableModule + Sized,
     {
-        let core = ModuleCore::new_with(path, rt.parameters());
+        let core = ModuleCore::new_with(path, rt.globals());
         let this = MrcS::new(Self::named(core));
         Self::build(this, rt)
     }

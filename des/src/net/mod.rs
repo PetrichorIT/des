@@ -9,6 +9,7 @@ mod message;
 mod module;
 mod packet;
 mod runtime;
+mod topology;
 
 // pub(crate) use self::runtime::ChannelUnbusyNotif; <unused>
 // pub(crate) use self::runtime::CoroutineMessageEvent; <unused>
@@ -17,6 +18,7 @@ pub(crate) use self::runtime::MessageAtGateEvent;
 pub(crate) use self::runtime::NetEvents;
 
 pub use self::runtime::NetworkRuntime;
+pub use self::runtime::NetworkRuntimeGlobals;
 
 //
 // # Channel definitions
@@ -71,3 +73,10 @@ pub use self::module::StaticModuleCore;
 
 pub use self::common::ModulePath;
 pub use self::common::Parameters;
+
+//
+// # Topology
+//
+
+pub use self::topology::OutgoingEdges;
+pub use self::topology::Topology;

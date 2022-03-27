@@ -66,7 +66,7 @@ impl Module for Bob {
                 );
             }
             1 => {
-                info!(target: self.str(), "Called second stage")
+                // Nothing
             }
             _ => unreachable!(),
         }

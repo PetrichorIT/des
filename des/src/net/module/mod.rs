@@ -469,4 +469,11 @@ pub trait StaticModuleCore {
     {
         self.module_core_mut().child_mut(name)
     }
+
+    ///
+    /// Returns a readonly reference to the runtimes globals.
+    ///
+    fn globals(&self) -> MrcS<NetworkRuntimeGlobals, ReadOnly> {
+        self.module_core().globals()
+    }
 }

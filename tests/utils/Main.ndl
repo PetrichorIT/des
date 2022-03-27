@@ -4,6 +4,12 @@ link Link {
     jitter: 0.1
 }
 
+link FastLink {
+    bitrate: 10000
+    latency: 0.05
+    jitter: 0.01
+}
+
 module Bob {
     submodules:
         child: Alice
@@ -12,6 +18,7 @@ module Bob {
         netIn[3]
         netOut[3]
         uplink
+        downlink
 
     connections:
         netOut --> Link --> child/netIn
@@ -27,4 +34,8 @@ module Alice {
 network A {
     nodes:
         bob[1...2]: Bob
+
+    connections:
+        bob[1]/uplink --> FastLink --> bob[2]/downlink
+        bob[2]/uplink --> FastLink --> bob[1]/downlink
 }

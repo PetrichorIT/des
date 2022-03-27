@@ -1,6 +1,10 @@
 use std::collections::HashMap;
 
-use des::prelude::*;
+use des::{
+    net::NetworkRuntimeGlobals,
+    prelude::*,
+    util::{MrcS, ReadOnly},
+};
 use des_derive::Module;
 use log::info;
 
@@ -12,9 +16,9 @@ pub struct RandomRoutingDeamon {
 }
 
 impl RandomRoutingDeamon {
-    pub fn new(parameters: SpmcReader<Parameters>) -> Self {
+    pub fn new(globals: MrcS<NetworkRuntimeGlobals, ReadOnly>) -> Self {
         Self {
-            core: ModuleCore::new_with(ModulePath::root("RoutingDaemon".to_string()), parameters),
+            core: ModuleCore::new_with(ModulePath::root("RoutingDaemon".to_string()), globals),
             hop_counts: HashMap::new(),
         }
     }

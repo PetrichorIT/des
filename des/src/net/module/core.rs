@@ -9,7 +9,7 @@ use crate::{
     core::SimTime,
     create_global_uid,
     net::*,
-    util::{MrcS, Mutable, ReadOnly, SpmcReader, SpmcWriter, UntypedMrc},
+    util::{MrcS, Mutable, ReadOnly, UntypedMrc},
 };
 
 create_global_uid!(
@@ -53,7 +53,7 @@ pub struct ModuleCore {
     pub(crate) children: HashMap<String, UntypedMrc>,
 
     /// A set of local parameters.
-    parameters: SpmcReader<Parameters>,
+    globals: MrcS<NetworkRuntimeGlobals, ReadOnly>,
 }
 
 impl ModuleCore {
@@ -76,7 +76,7 @@ impl ModuleCore {
     /// Creates a new optionally named instance
     /// of 'Self'.
     ///
-    pub fn new_with(path: ModulePath, parameters: SpmcReader<Parameters>) -> Self {
+    pub fn new_with(path: ModulePath, globals: MrcS<NetworkRuntimeGlobals, ReadOnly>) -> Self {
         Self {
             id: ModuleId::gen(),
             path,
@@ -87,7 +87,7 @@ impl ModuleCore {
             activity_active: false,
             parent: None,
             children: HashMap::new(),
-            parameters,
+            globals,
         }
     }
 
@@ -108,7 +108,7 @@ impl ModuleCore {
             activity_active: false,
             parent: None,
             children: HashMap::new(),
-            parameters: parent.parameters.clone(),
+            globals: parent.globals.clone(),
         }
     }
 
@@ -119,7 +119,7 @@ impl ModuleCore {
     pub fn new() -> Self {
         Self::new_with(
             ModulePath::root(String::from("unknown-module")),
-            SpmcWriter::new(Parameters::new()).get_reader(),
+            MrcS::new(NetworkRuntimeGlobals::new()),
         )
     }
 }
@@ -235,15 +235,15 @@ impl ModuleCore {
     /// Returns the parameters for the current module.
     ///
     pub fn pars(&self) -> HashMap<String, String> {
-        self.parameters.get(self.path.path())
+        self.globals.parameters.get(self.path.path())
     }
 
     ///
     /// Returns a reference to the parameter store, used for constructing
     /// custom instances of modules.
     ///
-    pub fn pars_ref(&self) -> SpmcReader<Parameters> {
-        self.parameters.clone()
+    pub fn globals(&self) -> MrcS<NetworkRuntimeGlobals, ReadOnly> {
+        MrcS::clone(&self.globals)
     }
 }
 

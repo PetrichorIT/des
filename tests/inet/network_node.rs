@@ -1,4 +1,8 @@
-use des::prelude::*;
+use des::{
+    net::NetworkRuntimeGlobals,
+    prelude::*,
+    util::{MrcS, ReadOnly},
+};
 use log::warn;
 
 use des_derive::Module;
@@ -10,18 +14,15 @@ pub struct NetworkNode {
 
 impl NetworkNode {
     #[allow(unused)]
-    pub fn new(parameters: SpmcReader<Parameters>) -> Self {
+    pub fn new(globals: MrcS<NetworkRuntimeGlobals, ReadOnly>) -> Self {
         Self {
-            core: ModuleCore::new_with("NetworkNode".parse().unwrap(), parameters),
+            core: ModuleCore::new_with("NetworkNode".parse().unwrap(), globals),
         }
     }
 
-    pub fn named(name: &str, parameters: SpmcReader<Parameters>) -> Self {
+    pub fn named(name: &str, globals: MrcS<NetworkRuntimeGlobals, ReadOnly>) -> Self {
         Self {
-            core: ModuleCore::new_with(
-                format!("NetworkNode - {}", name).parse().unwrap(),
-                parameters,
-            ),
+            core: ModuleCore::new_with(format!("{}", name).parse().unwrap(), globals),
         }
     }
 }

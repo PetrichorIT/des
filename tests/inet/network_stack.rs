@@ -17,11 +17,11 @@ pub struct NetworkStack {
 }
 
 impl NetworkStack {
-    pub fn new(address: NodeAddress, router: RandomRoutingDeamon) -> Mrc<Self> {
+    pub fn new(name: &str, address: NodeAddress, router: RandomRoutingDeamon) -> Mrc<Self> {
         let mut obj = Mrc::new(Self {
             core: ModuleCore::new_with(
-                ModulePath::root("NetworkStack".to_string()),
-                router.module_core().pars_ref(),
+                ModulePath::root(name.to_string()),
+                router.module_core().globals(),
             ),
             address,
             forwarding_table: HashMap::new(),

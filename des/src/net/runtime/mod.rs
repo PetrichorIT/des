@@ -27,9 +27,10 @@ pub struct NetworkRuntime<A> {
     module_list: Vec<ModuleRefMut>,
 
     ///
-    /// The set of parameters for the module-driven simulation.
+    /// The globals provided by the runtime
+    /// that cannot be mutated by the users.
     ///
-    parameters: SpmcWriter<Parameters>,
+    globals: MrcS<NetworkRuntimeGlobals, Mutable>,
 
     ///
     /// A inner container for holding user defined global state.
@@ -39,10 +40,10 @@ pub struct NetworkRuntime<A> {
 
 impl<A> NetworkRuntime<A> {
     ///
-    /// Returns the parameter reader of the entire simulation.
+    /// Returns the globals (readonly) of the entire simulation.
     ///
-    pub fn parameters(&self) -> SpmcReader<Parameters> {
-        self.parameters.get_reader()
+    pub fn globals(&self) -> MrcS<NetworkRuntimeGlobals, ReadOnly> {
+        MrcS::clone(&self.globals).make_readonly()
     }
 
     ///
@@ -51,7 +52,7 @@ impl<A> NetworkRuntime<A> {
     pub fn new(inner: A) -> Self {
         Self {
             module_list: Vec::new(),
-            parameters: SpmcWriter::new(Parameters::new()),
+            globals: MrcS::new(NetworkRuntimeGlobals::new()),
 
             inner,
         }
@@ -62,7 +63,7 @@ impl<A> NetworkRuntime<A> {
     ///
     pub fn include_par_file(&mut self, file: &str) {
         match std::fs::read_to_string(file) {
-            Ok(string) => self.parameters.build(&string),
+            Ok(string) => self.globals.parameters.build(&string),
             Err(e) => error!(target: "ParLoader", "{}", e),
         }
     }
@@ -113,6 +114,9 @@ impl<A> Application for NetworkRuntime<A> {
         // Add inital event
         // this is done via an event to get the usual module buffer clearing behavoir
         // while the end ignores all send packets.
+
+        rt.app.globals.topology.build(&rt.app.module_list);
+
         rt.add_event(NetEvents::SimStartNotif(SimStartNotif()), SimTime::now());
     }
 
@@ -140,7 +144,7 @@ where
 
         f.debug_struct("NetworkRuntime")
             .field("modules", &modules)
-            .field("parameters", &self.parameters)
+            .field("globals", &self.globals)
             .field("app", &self.inner)
             .finish()
     }
@@ -152,5 +156,26 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.inner.fmt(f)
+    }
+}
+
+#[derive(Debug)]
+pub struct NetworkRuntimeGlobals {
+    pub parameters: Parameters,
+    pub topology: Topology,
+}
+
+impl NetworkRuntimeGlobals {
+    pub fn new() -> Self {
+        Self {
+            parameters: Parameters::new(),
+            topology: Topology::new(),
+        }
+    }
+}
+
+impl Default for NetworkRuntimeGlobals {
+    fn default() -> Self {
+        Self::new()
     }
 }

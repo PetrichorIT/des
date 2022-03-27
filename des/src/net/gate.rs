@@ -28,6 +28,7 @@ pub struct GateDescription {
     /// A human readable name for a gate cluster.
     ///
     pub name: String,
+
     ///
     /// The number of elements in the gate cluster.
     ///
