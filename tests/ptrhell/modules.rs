@@ -6,7 +6,7 @@ use des_derive::Module;
 pub struct Alice(ModuleCore);
 
 impl Module for Alice {
-    fn at_sim_start(&mut self) {
+    fn at_sim_start(&mut self, _: usize) {
         let msg = Message::new(
             0,
             1,

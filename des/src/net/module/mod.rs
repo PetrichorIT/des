@@ -99,7 +99,10 @@ pub trait Module: StaticModuleCore {
 
     ///
     /// A function that is run at the start of each simulation,
-    /// for each module.
+    /// for each module. The order in which modules are called is not guranteed
+    /// but the stage numbers are. That means that all stage-0 calls for all modules
+    /// happen before the first (if any) stage-1 calls. Generaly speaking, all stage-i
+    /// calls finish before the first stage-i+1 call.
     ///
     /// # Example
     ///
@@ -119,7 +122,7 @@ pub trait Module: StaticModuleCore {
     /// };
     ///
     /// impl Module for SomeModule {
-    ///     fn at_sim_start(&mut self) {
+    ///     fn at_sim_start(&mut self, _stage: usize) {
     ///         self.config = fetch_config("https://mysimconfig.com/simrun1", self.id());
     ///         self.records.clear();
     ///     }
@@ -130,7 +133,14 @@ pub trait Module: StaticModuleCore {
     /// }
     /// ```
     ///
-    fn at_sim_start(&mut self) {}
+    fn at_sim_start(&mut self, _stage: usize) {}
+
+    ///
+    /// The number of stages used for the module initalization.
+    ///
+    fn num_sim_start_stages(&self) -> usize {
+        1
+    }
 
     ///
     /// A callback function that is invoked should the simulation finish.

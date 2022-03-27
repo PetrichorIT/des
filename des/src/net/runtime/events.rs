@@ -226,15 +226,25 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
         // This is a explicit for loop to prevent borrow rt only in the inner block
         // allowing preemtive dropping of 'module' so that rt can be used in
         // 'module_handle_jobs'.
-        for i in 0..rt.app.modules().len() {
-            let mut module = MrcS::clone(&rt.app.modules()[i]);
-            info!(
-                target: &format!("Module: {}", module.str()),
-                "Calling at_sim_start."
-            );
-            module.at_sim_start();
+        let max_stage = rt
+            .app
+            .modules()
+            .iter()
+            .fold(1, |acc, module| acc.max(module.num_sim_start_stages()));
 
-            module.handle_buffers(rt)
+        for stage in 0..max_stage {
+            // Direct indexing since rt must be borrowed mutably in handle_buffers.
+            for i in 0..rt.app.modules().len() {
+                let mut module = MrcS::clone(&rt.app.modules()[i]);
+                if stage < module.num_sim_start_stages() {
+                    info!(
+                        target: &format!("Module: {}", module.str()),
+                        "Calling at_sim_start({}).", stage
+                    );
+                    module.at_sim_start(stage);
+                    module.handle_buffers(rt);
+                }
+            }
         }
     }
 }
@@ -244,7 +254,7 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
 //
 
 impl ModuleRefMut {
-    fn handle_buffers<A>(mut self, rt: &mut Runtime<NetworkRuntime<A>>) {
+    fn handle_buffers<A>(&mut self, rt: &mut Runtime<NetworkRuntime<A>>) {
         // Check whether a new activity cycle must be initated
         let enqueue_actitivy_msg = self.module_core().activity_period != SimTime::ZERO
             && !self.module_core().activity_active;

@@ -26,7 +26,7 @@ impl Module for Alice {
         }
     }
 
-    fn at_sim_start(&mut self) {
+    fn at_sim_start(&mut self, _: usize) {
         self.enable_activity(SimTime::from(3.0));
     }
 
@@ -40,24 +40,36 @@ impl Module for Alice {
 pub struct Bob(ModuleCore);
 
 impl Module for Bob {
-    fn at_sim_start(&mut self) {
-        info!(target: "Bob", "Initalizing");
-        self.send(
-            Message::new(
-                0,
-                1,
-                None,
-                self.id(),
-                ModuleId::NULL,
-                SimTime::now(),
-                Packet::new(
-                    (0x7f_00_00_01, 80),
-                    (0x7f_00_00_02, 80),
-                    String::from("Ping"),
-                ),
-            ),
-            ("netOut", 2),
-        );
+    fn num_sim_start_stages(&self) -> usize {
+        2
+    }
+
+    fn at_sim_start(&mut self, stage: usize) {
+        match stage {
+            0 => {
+                info!(target: self.str(), "Initalizing");
+                self.send(
+                    Message::new(
+                        0,
+                        1,
+                        None,
+                        self.id(),
+                        ModuleId::NULL,
+                        SimTime::now(),
+                        Packet::new(
+                            (0x7f_00_00_01, 80),
+                            (0x7f_00_00_02, 80),
+                            String::from("Ping"),
+                        ),
+                    ),
+                    ("netOut", 2),
+                );
+            }
+            1 => {
+                info!(target: self.str(), "Called second stage")
+            }
+            _ => unreachable!(),
+        }
     }
 
     fn handle_message(&mut self, msg: Message) {
