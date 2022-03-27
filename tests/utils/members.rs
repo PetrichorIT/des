@@ -18,7 +18,7 @@ impl Module for Alice {
             // TERMINATE
             self.disable_activity()
         } else {
-            pkt.inc_hop_count();
+            pkt.register_hop();
             self.send(
                 Message::new_interned(0, 1, self.id(), SimTime::ZERO, pkt),
                 ("netOut", 0),
@@ -74,7 +74,7 @@ impl Module for Bob {
 
     fn handle_message(&mut self, msg: Message) {
         let (mut pkt, _) = msg.cast::<Packet>();
-        pkt.inc_hop_count();
+        pkt.register_hop();
 
         info!(target: self.name(), "Received at {}: Message with content: {}", sim_time(), pkt.content::<String>().deref());
 

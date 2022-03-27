@@ -17,7 +17,7 @@ impl Module for Alice {
         if pkt.header().hop_count > 100_000 {
             // TERMINATE
         } else {
-            pkt.inc_hop_count();
+            pkt.register_hop();
             self.send(
                 Message::new_interned(0, 1, self.id(), SimTime::ZERO, pkt),
                 ("netOut", 0),
@@ -54,7 +54,7 @@ impl Module for Bob {
             );
         } else {
             let (mut pkt, _) = msg.cast::<Packet>();
-            pkt.inc_hop_count();
+            pkt.register_hop();
 
             info!(target: self.name(), "Received at {}: Message with content: {}", sim_time(),  pkt.content::<String>().deref());
 

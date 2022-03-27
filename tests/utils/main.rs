@@ -28,6 +28,6 @@ fn main() {
         14
     );
 
-    assert_eq!(event_count, 86);
-    assert_eq!(time, SimTime::from(27.0))
+    assert_eq!(event_count, 94);
+    assert_eq!(time, SimTime::from(45.0))
 }

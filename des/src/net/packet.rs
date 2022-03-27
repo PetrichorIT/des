@@ -1,5 +1,3 @@
-use std::mem::size_of;
-
 use crate::core::interning::*;
 use crate::core::*;
 use crate::net::*;
@@ -45,34 +43,222 @@ pub type PortAddress = u16;
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 #[derive(Debug)]
+#[cfg(feature = "net-ipv6")]
 pub struct PacketHeader {
-    pub source_node: NodeAddress,
-    pub source_port: PortAddress,
-
+    // # Ipv6 Header
+    pub src_node: NodeAddress,
     pub dest_node: NodeAddress,
+
+    pub version: u8,
+    pub traffic_class: u8,
+    pub flow_label: u32,
+
+    pub packet_length: u16,
+    pub next_header: u8,
+    pub ttl: u8,
+
+    // # TCP header
+    pub src_port: PortAddress,
     pub dest_port: PortAddress,
 
-    // should be u8 but test case requies >u16
-    pub ttl: usize,
-    // should be u8 but test case requies >u16
+    pub seq_no: u32,
+    pub ack_no: u32,
+    pub data_offset: u8,
+
+    pub flag_ns: bool,
+    pub flag_cwr: bool,
+    pub flag_ece: bool,
+    pub flag_urg: bool,
+    pub flag_ack: bool,
+    pub flag_psh: bool,
+    pub flag_rst: bool,
+    pub flag_syn: bool,
+    pub flag_fin: bool,
+
+    pub window_size: u16,
+    pub tcp_checksum: u16,
+    pub urgent_ptr: u16,
+
+    //# Custom headers
     pub hop_count: usize,
-
-    pub tos: u8,
-    pub protocol: u8,
-
-    pub(crate) seq_no: isize,
-
-    pub(crate) pkt_bit_len: usize,
-    pub pkt_byte_len: u16,
 }
 
+#[cfg(feature = "net-ipv6")]
+impl PacketHeader {
+    pub fn new(
+        src: (NodeAddress, PortAddress),
+        dest: (NodeAddress, PortAddress),
+        packet_length: u16,
+    ) -> Self {
+        Self {
+            // # IPv4 header
+            src_node: src.0,
+            dest_node: dest.0,
+
+            version: 4,
+            traffic_class: 0,
+            flow_label: 0,
+
+            packet_length,
+            next_header: 0,
+            ttl: u8::MAX,
+
+            // # TCP header
+            src_port: src.1,
+            dest_port: dest.1,
+
+            seq_no: 0,
+            ack_no: 0,
+            data_offset: 0,
+
+            flag_ns: false,
+            flag_cwr: false,
+            flag_ece: false,
+            flag_urg: false,
+            flag_ack: false,
+            flag_psh: false,
+            flag_rst: false,
+            flag_syn: false,
+            flag_fin: false,
+
+            window_size: 0,
+            tcp_checksum: 0,
+            urgent_ptr: 0,
+
+            hop_count: 0,
+        }
+    }
+}
+
+#[cfg(feature = "net-ipv6")]
 impl MessageBody for PacketHeader {
     fn bit_len(&self) -> usize {
-        size_of::<NodeAddress>() * 16 + size_of::<PortAddress>() * 16 + 48
+        480 + 128
     }
 
     fn byte_len(&self) -> usize {
-        size_of::<NodeAddress>() * 2 + size_of::<PortAddress>() * 2 + 6
+        60 + 20
+    }
+}
+
+///
+/// A application-addressed header in a network, similar to TCP/UDP.
+///
+/// * This type is only available of DES is build with the `"net"` feature.*
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
+#[derive(Debug)]
+#[cfg(not(feature = "net-ipv6"))]
+pub struct PacketHeader {
+    // # IPv4 header
+    pub src_node: NodeAddress,
+    pub dest_node: NodeAddress,
+
+    pub version: u8,
+    pub internet_header_length: u8,
+
+    pub tos: u8,
+    pub packet_length: u16,
+    pub identification: u16,
+
+    pub flag_0: bool,
+    pub flag_df: bool,
+    pub flag_mf: bool,
+
+    pub fragment_offset: u16,
+    pub ttl: u8,
+    pub protocol: u8,
+    pub header_checksum: u16,
+
+    // # TCP header
+    pub src_port: PortAddress,
+    pub dest_port: PortAddress,
+
+    pub seq_no: u32,
+    pub ack_no: u32,
+    pub data_offset: u8,
+
+    pub flag_ns: bool,
+    pub flag_cwr: bool,
+    pub flag_ece: bool,
+    pub flag_urg: bool,
+    pub flag_ack: bool,
+    pub flag_psh: bool,
+    pub flag_rst: bool,
+    pub flag_syn: bool,
+    pub flag_fin: bool,
+
+    pub window_size: u16,
+    pub tcp_checksum: u16,
+    pub urgent_ptr: u16,
+
+    //# Custom headers
+    pub hop_count: usize,
+}
+
+#[cfg(not(feature = "net-ipv6"))]
+impl PacketHeader {
+    pub fn new(
+        src: (NodeAddress, PortAddress),
+        dest: (NodeAddress, PortAddress),
+        packet_length: u16,
+    ) -> Self {
+        Self {
+            // # IPv4 header
+            src_node: src.0,
+            dest_node: dest.0,
+
+            version: 4,
+
+            internet_header_length: 20,
+
+            tos: 0,
+            packet_length,
+            identification: 0,
+
+            flag_0: false,
+            flag_df: false,
+            flag_mf: false,
+
+            fragment_offset: 0,
+            ttl: u8::MAX,
+            protocol: 0,
+            header_checksum: 0,
+
+            // # TCP header
+            src_port: src.1,
+            dest_port: dest.1,
+
+            seq_no: 0,
+            ack_no: 0,
+            data_offset: 0,
+
+            flag_ns: false,
+            flag_cwr: false,
+            flag_ece: false,
+            flag_urg: false,
+            flag_ack: false,
+            flag_psh: false,
+            flag_rst: false,
+            flag_syn: false,
+            flag_fin: false,
+
+            window_size: 0,
+            tcp_checksum: 0,
+            urgent_ptr: 0,
+
+            hop_count: 0,
+        }
+    }
+}
+
+#[cfg(not(feature = "net-ipv6"))]
+impl MessageBody for PacketHeader {
+    fn bit_len(&self) -> usize {
+        160 + 128
+    }
+
+    fn byte_len(&self) -> usize {
+        20 + 20
     }
 }
 
@@ -99,11 +285,11 @@ impl Packet {
     }
 
     pub fn set_source_node(&mut self, node: NodeAddress) {
-        self.header.source_node = node
+        self.header.src_node = node
     }
 
     pub fn set_source_port(&mut self, port: PortAddress) {
-        self.header.source_port = port
+        self.header.src_port = port
     }
 
     pub fn set_dest_node(&mut self, node: NodeAddress) {
@@ -114,25 +300,16 @@ impl Packet {
         self.header.dest_port = port
     }
 
-    /// Sets the hop counter.
-    #[inline(always)]
-    pub fn set_hop_count(&mut self, hop_count: usize) {
-        self.header.hop_count = hop_count
-    }
-
-    /// Increments the hop counter.
-    #[inline(always)]
-    pub fn inc_hop_count(&mut self) {
+    pub fn register_hop(&mut self) {
+        self.header.ttl = self.header.ttl.wrapping_sub(1);
         self.header.hop_count += 1;
     }
 
-    /// Sets the TTL.
-    #[inline(always)]
-    pub fn set_ttl(&mut self, ttl: usize) {
-        self.header.ttl = ttl
+    pub fn seq_no(&self) -> u32 {
+        self.header.seq_no
     }
 
-    pub fn set_seq_no(&mut self, seq_no: isize) {
+    pub fn set_seq_no(&mut self, seq_no: u32) {
         self.header.seq_no = seq_no
     }
 
@@ -148,36 +325,18 @@ impl Packet {
     ///
     pub fn new<T>(
         src: (NodeAddress, PortAddress),
-        target: (NodeAddress, PortAddress),
+        dest: (NodeAddress, PortAddress),
         content: T,
     ) -> Self
     where
         T: 'static + MessageBody,
     {
-        let bit_len = content.bit_len();
         let byte_len = content.byte_len() as u16;
 
         let interned = unsafe { (*RTC.get()).as_ref().unwrap().interner.intern(content) };
 
         Self {
-            header: PacketHeader {
-                source_node: src.0,
-                source_port: src.1,
-
-                dest_node: target.0,
-                dest_port: target.1,
-
-                ttl: 0,
-                hop_count: 0,
-
-                tos: 0,
-                protocol: 0,
-
-                seq_no: -1,
-
-                pkt_bit_len: bit_len,
-                pkt_byte_len: byte_len,
-            },
+            header: PacketHeader::new(src, dest, byte_len),
 
             content: interned,
         }
@@ -221,10 +380,10 @@ impl Packet {
 
 impl MessageBody for Packet {
     fn bit_len(&self) -> usize {
-        self.header.pkt_bit_len as usize + self.header.bit_len()
+        (self.header.packet_length as usize * 8) + self.header.bit_len()
     }
 
     fn byte_len(&self) -> usize {
-        self.header.pkt_byte_len as usize + self.header.byte_len()
+        self.header.packet_length as usize + self.header.byte_len()
     }
 }

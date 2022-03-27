@@ -48,7 +48,7 @@ impl Module for NetworkStack {
     fn handle_message(&mut self, msg: Message) {
         let (mut pkt, meta) = msg.cast::<Packet>();
 
-        pkt.inc_hop_count();
+        pkt.register_hop();
         self.routing_deamon
             .as_mut()
             .unwrap()

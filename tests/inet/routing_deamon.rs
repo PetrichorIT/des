@@ -24,7 +24,7 @@ impl RandomRoutingDeamon {
     }
 
     pub fn handle(&mut self, pkt: &Packet, incoming: GateRef) {
-        let source = pkt.header().source_node;
+        let source = pkt.header().src_node;
         if let Some(path_cost) = self.hop_counts.get_mut(&source) {
             // Allready knows path
             info!(target: "RandomRoutingDeamon", "Updating backproc path");
