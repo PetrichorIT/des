@@ -143,7 +143,7 @@ impl ModuleCore {
                     type_name::<T>(),
                 ))),
             },
-            None => Err(ModuleReferencingError::NoParent(format!(
+            None => Err(ModuleReferencingError::NoEntry(format!(
                 "The module '{}' does not posses a parent ptr",
                 self.path()
             ))),
@@ -168,7 +168,7 @@ impl ModuleCore {
                     type_name::<T>(),
                 ))),
             },
-            None => Err(ModuleReferencingError::NoParent(format!(
+            None => Err(ModuleReferencingError::NoEntry(format!(
                 "The module '{}' does not posses a parent ptr",
                 self.path()
             ))),
@@ -194,8 +194,9 @@ impl ModuleCore {
                     ))),
                 }
             }
-            None => Err(ModuleReferencingError::NoParent(String::from(
-                "This module does not posses a parent ptr",
+            None => Err(ModuleReferencingError::NoEntry(format!(
+                "This module does not posses a child called '{}'",
+                name
             ))),
         }
     }
@@ -219,8 +220,9 @@ impl ModuleCore {
                     ))),
                 }
             }
-            None => Err(ModuleReferencingError::NoParent(String::from(
-                "This module does not posses a parent ptr",
+            None => Err(ModuleReferencingError::NoEntry(format!(
+                "This module does not posses a child called '{}'",
+                name
             ))),
         }
     }
@@ -269,14 +271,14 @@ impl Debug for ModuleCore {
 ///
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ModuleReferencingError {
-    NoParent(String),
+    NoEntry(String),
     TypeError(String),
 }
 
 impl Display for ModuleReferencingError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::NoParent(str) => write!(f, "{}", str),
+            Self::NoEntry(str) => write!(f, "{}", str),
             Self::TypeError(str) => write!(f, "{}", str),
         }
     }

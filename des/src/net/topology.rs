@@ -90,7 +90,7 @@ impl Topology {
     pub fn dot_output(&self) -> String {
         let mut nodes = String::new();
         for node in self.nodes.iter() {
-            nodes.push_str(&format!("    \"{}\" [shape=circle]\n", node.str()))
+            nodes.push_str(&format!("    \"{}\" [shape=box]\n", node.str()))
         }
 
         let mut edges = String::new();

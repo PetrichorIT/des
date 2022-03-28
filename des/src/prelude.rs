@@ -41,6 +41,8 @@ pub use crate::util::SpmcWriter;
 
 #[cfg(feature = "net")]
 pub use crate::net::NetworkRuntime;
+#[cfg(feature = "net")]
+pub use crate::net::NetworkRuntimeGlobals;
 
 #[cfg(feature = "net")]
 pub use crate::net::Channel;
@@ -111,3 +113,8 @@ pub use crate::net::StaticModuleCore;
 pub use crate::net::ModulePath;
 #[cfg(feature = "net")]
 pub use crate::net::Parameters;
+
+#[cfg(feature = "net")]
+pub use crate::net::OutgoingEdges;
+#[cfg(feature = "net")]
+pub use crate::net::Topology;

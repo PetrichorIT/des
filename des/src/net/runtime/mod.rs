@@ -1,18 +1,16 @@
+use super::common::Parameters;
+use crate::core::*;
+use crate::net::*;
+use crate::util::*;
+use log::error;
+use log::info;
 use std::{
     fmt::{Debug, Display},
     marker::Unsize,
 };
 
-use crate::core::*;
-use crate::net::*;
-use crate::util::*;
-
 mod events;
 pub use events::*;
-use log::error;
-use log::info;
-
-use super::common::Parameters;
 
 ///
 /// A runtime application for a module/network oriantated simulation.
