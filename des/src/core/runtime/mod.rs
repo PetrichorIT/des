@@ -718,7 +718,7 @@ impl<A> Runtime<NetworkRuntime<A>> {
     ///
     pub fn handle_message_on(&mut self, module: ModuleRefMut, message: Message, time: SimTime) {
         let event = HandleMessageEvent {
-            module: module.make_readonly(),
+            module: module,
             handled: false,
             message: std::mem::ManuallyDrop::new(message),
         };

@@ -151,7 +151,7 @@ impl Drop for MessageAtGateEvent {
 }
 
 pub struct HandleMessageEvent {
-    pub module: ModuleRef,
+    pub module: ModuleRefMut,
     pub message: ManuallyDrop<Message>,
     pub handled: bool,
 }
@@ -168,7 +168,7 @@ impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
             message.str()
         );
 
-        let mut module = MrcS::clone(&self.module).force_mutable();
+        let mut module = MrcS::clone(&self.module);
 
         module.handle_message(message);
         module.handle_buffers(rt);
@@ -294,7 +294,7 @@ impl ModuleRefMut {
         for (msg, time) in self.module_core_mut().loopback_buffer.drain(..) {
             rt.add_event(
                 NetEvents::HandleMessageEvent(HandleMessageEvent {
-                    module: MrcS::clone(&mref).make_readonly(),
+                    module: MrcS::clone(&mref),
                     message: ManuallyDrop::new(msg),
                     handled: false,
                 }),

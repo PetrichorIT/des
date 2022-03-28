@@ -343,7 +343,7 @@ pub trait StaticModuleCore {
             "The value 'next_hops' must be equal to the size of the gate cluster"
         );
 
-        let mrc = MrcS::clone(self).make_readonly();
+        let mrc = MrcS::clone(self);
         let descriptor = GateDescription::new(name.to_owned(), size, mrc, typ);
         let mut ids = Vec::new();
 
