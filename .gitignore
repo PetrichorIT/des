@@ -4,3 +4,6 @@ tmp
 
 flamegraph*.svg
 perf.*
+
+graph*.dot
+graph*.svg

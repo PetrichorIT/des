@@ -107,13 +107,13 @@ impl Topology {
                     "    \"{}\" -> \"{}\" [ headlabel=\"{}\" {} taillabel=\"{}\" ]\n",
                     from_node,
                     to_node,
-                    target_gate.name(),
+                    target_gate.str(),
                     if *cost == 0.0 {
                         String::new()
                     } else {
                         format!("label=\"{}\"", cost)
                     },
-                    src_gate.name()
+                    src_gate.str()
                 ));
             }
         }

@@ -1,4 +1,4 @@
-use des::prelude::*;
+use des::{net::Topology, prelude::*};
 use des_derive::Network;
 
 mod members;
@@ -28,6 +28,27 @@ fn main() {
         14
     );
 
+    let _ = write_graph(topo);
+
     assert_eq!(event_count, 94);
     assert_eq!(time, SimTime::from(45.0))
+}
+
+fn write_graph(topo: &Topology) -> std::io::Result<()> {
+    use std::fs::File;
+    use std::io::Write;
+    use std::process::Command;
+    let str = topo.dot_output();
+    let mut file = File::create("tests/utils/graph.dot")?;
+    write!(file, "{}", str)?;
+
+    let output = Command::new("dot")
+        .arg("-Tsvg")
+        .arg("tests/utils/graph.dot")
+        .output()?;
+
+    let mut file = File::create("tests/utils/graph.svg")?;
+    write!(file, "{}", String::from_utf8_lossy(&output.stdout))?;
+
+    Ok(())
 }

@@ -58,24 +58,9 @@ impl GateDescription {
     }
 
     ///
-    /// Creates a new descriptor using explicit values.
-    ///
-    pub fn new<T>(name: String, size: usize, owner: MrcS<T, ReadOnly>) -> Self
-    where
-        T: Module + Unsize<dyn Module>,
-    {
-        Self::new_with_typ(name, size, owner, GateServiceType::Undefined)
-    }
-
-    ///
     /// Creates a new descriptor using explicit values and a service type.
     ///
-    pub fn new_with_typ<T>(
-        name: String,
-        size: usize,
-        owner: MrcS<T, ReadOnly>,
-        typ: GateServiceType,
-    ) -> Self
+    pub fn new<T>(name: String, size: usize, owner: MrcS<T, ReadOnly>, typ: GateServiceType) -> Self
     where
         T: Module + Unsize<dyn Module>,
     {
@@ -102,6 +87,7 @@ impl Debug for GateDescription {
             .field("name", &self.name)
             .field("size", &self.size)
             .field("owner", self.owner.path())
+            .field("typ", &self.typ)
             .finish()
     }
 }
@@ -169,6 +155,17 @@ impl Gate {
     #[inline(always)]
     pub fn name(&self) -> &str {
         &self.description.name
+    }
+
+    ///
+    /// Returns a short identifcator that holds all nessecary information.
+    ///
+    pub fn str(&self) -> String {
+        match self.description.typ {
+            GateServiceType::Input => format!("{} (input)", self.name()),
+            GateServiceType::Output => format!("{} (output)", self.name()),
+            _ => self.name().to_string(),
+        }
     }
 
     ///

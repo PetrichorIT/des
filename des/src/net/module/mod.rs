@@ -344,7 +344,7 @@ pub trait StaticModuleCore {
         );
 
         let mrc = MrcS::clone(self).make_readonly();
-        let descriptor = GateDescription::new_with_typ(name.to_owned(), size, mrc, typ);
+        let descriptor = GateDescription::new(name.to_owned(), size, mrc, typ);
         let mut ids = Vec::new();
 
         for (i, item) in next_hops.into_iter().enumerate() {

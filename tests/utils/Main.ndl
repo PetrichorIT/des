@@ -17,8 +17,8 @@ module Bob {
     gates:
         netIn[3]
         netOut[3]
-        uplink
-        downlink
+        uplink @output
+        downlink @input
 
     connections:
         netOut --> Link --> child/netIn
