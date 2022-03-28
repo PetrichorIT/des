@@ -6,6 +6,9 @@ use quote::ToTokens;
 use std::{collections::HashMap, path::PathBuf, sync::Mutex};
 
 use proc_macro2::TokenStream as TokenStream2;
+use proc_macro_error::Diagnostic;
+
+pub type Result<T> = std::result::Result<T, Diagnostic>;
 
 lazy_static! {
     static ref RESOLVERS: Mutex<HashMap<String, NdlResolver>> = Mutex::new(HashMap::new());
@@ -13,7 +16,7 @@ lazy_static! {
 
 pub fn get_resolver(
     workspace: &str,
-) -> Result<(OwnedTySpecContext, bool, Vec<PathBuf>), &'static str> {
+) -> std::result::Result<(OwnedTySpecContext, bool, Vec<PathBuf>), &'static str> {
     let mut resolvers = RESOLVERS.lock().unwrap();
 
     if !resolvers.contains_key(workspace) {
@@ -22,11 +25,22 @@ pub fn get_resolver(
             NdlResolver::new(workspace).expect("#[derive(Module)] Invalid NDL workspace."),
         );
     }
-    resolvers
-        .get_mut(workspace)
-        .unwrap()
-        .run_cached()
-        .map(|(gtyctx, has_err, pars)| (gtyctx.to_owned(), has_err, pars))
+    let (t, errs, p) =
+        resolvers
+            .get_mut(workspace)
+            .unwrap()
+            .run_cached()
+            .map(|(gtyctx, errs, pars)| {
+                (
+                    gtyctx.to_owned(),
+                    errs.cloned().collect::<Vec<ndl::Error>>(),
+                    pars,
+                )
+            })?;
+
+    let has_errs = errs.is_empty() == false;
+
+    Ok((t, has_errs, p))
 }
 
 //
@@ -67,7 +81,7 @@ pub fn ident_from_conident(
 
             token_stream.extend::<proc_macro2::TokenStream>(quote! {
                 let mut #ident_token: ::des::net::GateRefMut = #submodule_ident.gate_mut(#gate_ident, #pos)
-                    .expect("Internal macro err.").clone();
+                    .expect(&format!("Internal macro err. Could not find child gate '{}[{}]'.", #gate_ident, #pos)).clone();
             });
 
             ident_token
@@ -79,7 +93,7 @@ pub fn ident_from_conident(
 
             token_stream.extend::<proc_macro2::TokenStream>(quote! {
                 let mut #ident: ::des::net::GateRefMut = this.gate_mut(#gate_ident, #pos)
-                    .expect("Internal macro err.").clone();
+                    .expect(&format!("Internal macro err. Could not find local gate '{}[{}]'.", #gate_ident, #pos)).clone();
             });
 
             ident

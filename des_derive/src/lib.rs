@@ -12,6 +12,7 @@ mod network_impl;
 
 use attributes::*;
 use proc_macro::{self, TokenStream};
+use proc_macro_error::proc_macro_error;
 use syn::{parse_macro_input, DeriveInput};
 
 ///
@@ -39,6 +40,7 @@ use syn::{parse_macro_input, DeriveInput};
 /// Make sure all modules types used submodule definitions are in scope.
 ///
 #[proc_macro_derive(Module, attributes(ndl_workspace))]
+#[proc_macro_error]
 pub fn derive_module(input: TokenStream) -> TokenStream {
     let DeriveInput {
         ident, data, attrs, ..
@@ -46,7 +48,10 @@ pub fn derive_module(input: TokenStream) -> TokenStream {
 
     let attrs = Attributes::from_attr(attrs);
 
-    module_impl::derive_module_impl(ident, data, attrs)
+    match module_impl::derive_module_impl(ident, data, attrs) {
+        Ok(token_stream) => token_stream,
+        Err(e) => e.abort(),
+    }
 }
 
 ///
@@ -71,9 +76,13 @@ pub fn derive_module(input: TokenStream) -> TokenStream {
 ///
 
 #[proc_macro_derive(Network, attributes(ndl_workspace))]
+#[proc_macro_error]
 pub fn derive_network(input: TokenStream) -> TokenStream {
     let DeriveInput { ident, attrs, .. } = parse_macro_input!(input);
     let attrs = Attributes::from_attr(attrs);
 
-    network_impl::derive_network_impl(ident, attrs)
+    match network_impl::derive_network_impl(ident, attrs) {
+        Ok(token_stream) => token_stream,
+        Err(e) => e.abort(),
+    }
 }

@@ -372,7 +372,6 @@ fn resolve_connection_ident(
             }
 
             if !(gate.annotation == expected_type || gate.annotation == GateAnnotation::Unknown) {
-                dbg!(gate.annotation, expected_type, global_ident);
                 // invalid annotation connection
                 errors.push(Error::new_with_solution(
                     TycGateConnectionViolatesAnnotation,

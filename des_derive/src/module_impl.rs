@@ -8,27 +8,38 @@ use ndl::ConSpec;
 use ndl::GateAnnotation;
 use ndl::GateSpec;
 use proc_macro2::{Ident, Span};
+use proc_macro_error::{Diagnostic, Level};
 use quote::quote;
 use syn::{Data, DataStruct, FieldsNamed, FieldsUnnamed, Type};
 
+use crate::common::*;
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 
-pub fn derive_module_impl(ident: Ident, data: Data, attrs: Attributes) -> TokenStream {
+pub fn derive_module_impl(ident: Ident, data: Data, attrs: Attributes) -> Result<TokenStream> {
     let mut token_stream = TokenStream::new();
 
-    generate_static_implementations(ident.clone(), data, &mut token_stream);
-    generate_dynamic_builder(ident, attrs, &mut token_stream);
+    generate_static_implementations(ident.clone(), data, &mut token_stream)?;
+    generate_dynamic_builder(ident, &attrs, &mut token_stream)?;
 
-    token_stream
+    // final check for ndl errors
+    if let Some(workspace) = attrs.workspace {
+        if let Ok((_, has_err, _)) = get_resolver(&workspace) {
+            if has_err {
+                Diagnostic::new(Level::Error, String::from("Some NDL error occured")).emit();
+            }
+        }
+    }
+
+    Ok(token_stream)
 }
 
-fn generate_static_implementations(ident: Ident, data: Data, out: &mut TokenStream) {
+fn generate_static_implementations(ident: Ident, data: Data, out: &mut TokenStream) -> Result<()> {
     let token_stream: TokenStream2;
 
     let elem_ident = match &data {
         syn::Data::Struct(s) => {
-            token_stream = gen_named_object(ident.clone(), s);
+            token_stream = gen_named_object(ident.clone(), s)?;
 
             match &s.fields {
                 syn::Fields::Named(FieldsNamed { named, .. }) => named
@@ -63,7 +74,12 @@ fn generate_static_implementations(ident: Ident, data: Data, out: &mut TokenStre
                 syn::Fields::Unit => None,
             }
         }
-        _ => unimplemented!(),
+        _ => {
+            return Err(Diagnostic::new(
+                Level::Error,
+                "Modules are currently only supported on structs.".into(),
+            ))
+        }
     };
 
     if let Some((eident, idx)) = elem_ident {
@@ -102,40 +118,46 @@ fn generate_static_implementations(ident: Ident, data: Data, out: &mut TokenStre
             );
         }
     } else {
-        panic!("#[derive(Module)] -- No assosicated module core field found.")
+        return Err(Diagnostic::new(
+            Level::Error,
+            format!("Failed to find a field containing a module core."),
+        )
+        .help(String::from("Try adding a module core to the struct.")));
     }
+
+    Ok(())
 }
 
-fn gen_named_object(ident: Ident, data: &DataStruct) -> TokenStream2 {
+fn gen_named_object(ident: Ident, data: &DataStruct) -> Result<TokenStream2> {
     match &data.fields {
         syn::Fields::Named(FieldsNamed { named, .. }) => {
             if named.len() == 1 {
                 let field = named.first().unwrap().ident.clone().unwrap();
-                quote! {
+                Ok(quote! {
                     impl ::des::net::NameableModule for #ident {
                         fn named(core: ::des::net::ModuleCore) -> Self {
                             Self { #field: core }
                         }
                     }
-                }
+                })
             } else {
-                TokenStream2::new()
+                Ok(TokenStream2::new())
             }
         }
         syn::Fields::Unnamed(FieldsUnnamed { unnamed, .. }) => {
             if unnamed.len() == 1 {
-                quote! {
+                Ok(quote! {
                     impl ::des::net::NameableModule for #ident {
                         fn named(core: ::des::net::ModuleCore) -> Self {
                             Self(core)
                         }
                     }
-                }
+                })
             } else {
-                TokenStream2::new()
+                Ok(TokenStream2::new())
             }
         }
-        _ => TokenStream2::new(),
+        _ => Ok(TokenStream2::new()),
     }
 }
 
@@ -148,19 +170,15 @@ macro_rules! ident {
     };
 }
 
-fn generate_dynamic_builder(ident: Ident, attrs: Attributes, out: &mut TokenStream) {
+fn generate_dynamic_builder(ident: Ident, attrs: &Attributes, out: &mut TokenStream) -> Result<()> {
     if let Some(workspace) = &attrs.workspace {
         match get_resolver(workspace) {
-            Ok((res, has_errors, _)) => {
-                if has_errors {
-                    panic!("#[derive(Module)] NDL resolver found erros while parsing")
-                }
-
-                let module = if let Some(ident) = attrs.ident {
+            Ok((res, _, _)) => {
+                let module = if let Some(ident) = &attrs.ident {
                     // TODO
                     // Not yet possible since ndl_ident was not yet added to attributes
                     // First implement mapping inside resolver.
-                    res.module(ident)
+                    res.module(ident.to_string())
                         .expect("#[derive(Module)] -- Failed to find NDL module with same name.")
                 } else {
                     res.module(ident.clone())
@@ -260,9 +278,14 @@ fn generate_dynamic_builder(ident: Ident, attrs: Attributes, out: &mut TokenStre
                         }
                     }
                 }
-                .into())
+                .into());
+
+                Ok(())
             }
-            Err(_) => panic!("#[derive(Module)] -- Failed to parse NDl file."),
+            Err(_) => Err(Diagnostic::new(
+                Level::Error,
+                "#[derive(Module)] -- Failed to parse NDl file.".into(),
+            )),
         }
     } else {
         out.extend::<TokenStream>(
@@ -271,5 +294,7 @@ fn generate_dynamic_builder(ident: Ident, attrs: Attributes, out: &mut TokenStre
             }
             .into(),
         );
+
+        Ok(())
     }
 }

@@ -146,21 +146,7 @@ impl NdlResolver {
         // === FIN ===
 
         if self.ectx.has_errors() && !self.options.silent {
-            let mut errs = Vec::new();
-
-            for le in &self.ectx.lexing_errors {
-                errs.push(le)
-            }
-            for pe in &self.ectx.parsing_errors {
-                errs.push(pe)
-            }
-            for te in &self.ectx.desugaring_errors {
-                errs.push(te)
-            }
-            for te in &self.ectx.tychecking_errors {
-                errs.push(te)
-            }
-
+            let mut errs: Vec<&Error> = self.ectx.all().collect();
             errs.sort_by(|&lhs, &rhs| lhs.loc.pos.cmp(&rhs.loc.pos));
 
             for e in errs {
@@ -176,16 +162,19 @@ impl NdlResolver {
 
     pub fn run_cached(
         &mut self,
-    ) -> Result<(GlobalTySpecContext<'_>, bool, Vec<PathBuf>), &'static str> {
+    ) -> Result<
+        (
+            GlobalTySpecContext<'_>,
+            impl Iterator<Item = &Error>,
+            Vec<PathBuf>,
+        ),
+        &'static str,
+    > {
         if self.state != NdlResolverState::Done {
             self.run()?;
         }
 
-        Ok((
-            self.gtyctx_spec(),
-            self.ectx.has_errors(),
-            self.par_files.clone(),
-        ))
+        Ok((self.gtyctx_spec(), self.ectx.all(), self.par_files.clone()))
     }
 
     ///

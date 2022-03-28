@@ -32,7 +32,8 @@ fn main() -> std::io::Result<()> {
         println!();
 
         let mut resolver = NdlResolver::new(&workspace).unwrap();
-        let (g, has_err, par_files) = resolver.run_cached().unwrap();
+        let (g, errs, par_files) = resolver.run_cached().unwrap();
+        let has_err = errs.count() == 0;
 
         println!(
             "> {} errors and found {} par files",

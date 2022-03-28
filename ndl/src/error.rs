@@ -35,6 +35,17 @@ impl GlobalErrorContext {
     }
 
     ///
+    /// Returns a reference to all errors.
+    ///
+    pub fn all(&self) -> impl Iterator<Item = &Error> {
+        self.lexing_errors
+            .iter()
+            .chain(self.parsing_errors.iter())
+            .chain(self.desugaring_errors.iter())
+            .chain(self.tychecking_errors.iter())
+    }
+
+    ///
     /// Indicates whether an error has occured.
     ///
     pub fn has_errors(&self) -> bool {

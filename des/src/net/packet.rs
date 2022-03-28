@@ -152,22 +152,9 @@ pub struct PacketHeader {
     // # IPv4 header
     pub src_node: NodeAddress,
     pub dest_node: NodeAddress,
-
-    pub version: u8,
-    pub internet_header_length: u8,
-
     pub tos: u8,
     pub packet_length: u16,
-    pub identification: u16,
-
-    pub flag_0: bool,
-    pub flag_df: bool,
-    pub flag_mf: bool,
-
-    pub fragment_offset: u16,
     pub ttl: u8,
-    pub protocol: u8,
-    pub header_checksum: u16,
 
     // # TCP header
     pub src_port: PortAddress,
@@ -175,21 +162,7 @@ pub struct PacketHeader {
 
     pub seq_no: u32,
     pub ack_no: u32,
-    pub data_offset: u8,
-
-    pub flag_ns: bool,
-    pub flag_cwr: bool,
-    pub flag_ece: bool,
-    pub flag_urg: bool,
-    pub flag_ack: bool,
-    pub flag_psh: bool,
-    pub flag_rst: bool,
-    pub flag_syn: bool,
-    pub flag_fin: bool,
-
     pub window_size: u16,
-    pub tcp_checksum: u16,
-    pub urgent_ptr: u16,
 
     //# Custom headers
     pub hop_count: usize,
@@ -207,45 +180,17 @@ impl PacketHeader {
             src_node: src.0,
             dest_node: dest.0,
 
-            version: 4,
-
-            internet_header_length: 20,
-
             tos: 0,
             packet_length,
-            identification: 0,
 
-            flag_0: false,
-            flag_df: false,
-            flag_mf: false,
-
-            fragment_offset: 0,
             ttl: u8::MAX,
-            protocol: 0,
-            header_checksum: 0,
 
             // # TCP header
             src_port: src.1,
             dest_port: dest.1,
-
             seq_no: 0,
             ack_no: 0,
-            data_offset: 0,
-
-            flag_ns: false,
-            flag_cwr: false,
-            flag_ece: false,
-            flag_urg: false,
-            flag_ack: false,
-            flag_psh: false,
-            flag_rst: false,
-            flag_syn: false,
-            flag_fin: false,
-
             window_size: 0,
-            tcp_checksum: 0,
-            urgent_ptr: 0,
-
             hop_count: 0,
         }
     }
@@ -298,6 +243,10 @@ impl Packet {
 
     pub fn set_dest_port(&mut self, port: PortAddress) {
         self.header.dest_port = port
+    }
+
+    pub fn set_ttl(&mut self, ttl: u8) {
+        self.header.ttl = ttl
     }
 
     pub fn register_hop(&mut self) {

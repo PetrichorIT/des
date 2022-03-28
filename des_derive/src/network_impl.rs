@@ -1,3 +1,4 @@
+use crate::common::*;
 use crate::{
     attributes::Attributes,
     common::{get_resolver, ident_from_conident, WrappedTokenStream},
@@ -6,12 +7,13 @@ use ndl::ChannelSpec;
 use ndl::ChildModuleSpec;
 use ndl::ConSpec;
 use proc_macro2::Ident;
+use proc_macro_error::{Diagnostic, Level};
 use quote::quote;
 
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 
-pub fn derive_network_impl(ident: Ident, attrs: Attributes) -> TokenStream {
+pub fn derive_network_impl(ident: Ident, attrs: Attributes) -> Result<TokenStream> {
     gen_network_main(ident, attrs)
 }
 
@@ -24,17 +26,13 @@ macro_rules! ident {
     };
 }
 
-fn gen_network_main(ident: Ident, attrs: Attributes) -> TokenStream {
+fn gen_network_main(ident: Ident, attrs: Attributes) -> Result<TokenStream> {
     match get_resolver(
         &attrs
             .workspace
             .expect("#[derive(Network)] Missing NDL worspace"),
     ) {
-        Ok((res, has_errors, par_files)) => {
-            if has_errors {
-                panic!("#[derive(Network)] NDL resolver found erros while parsing")
-            }
-
+        Ok((res, _, par_files)) => {
             let network = if let Some(ident) = attrs.ident {
                 // TODO
                 // Not yet possible since ndl_ident was not yet added to attributes
@@ -123,7 +121,7 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> TokenStream {
 
                 let token_stream = WrappedTokenStream(token_stream);
 
-                quote! {
+                Ok(quote! {
                     impl #ident {
                         pub fn run(self) -> ::des::core::RuntimeResult<Self> {
                             self.run_with_options(::des::core::RuntimeOptions::default())
@@ -150,14 +148,20 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> TokenStream {
                             runtime
                         }
                     }
-                }.into()
+                }.into())
             } else {
-                panic!(
-                    "#[derive(Network)] NDL resolver failed to find network called '{}'",
-                    ident,
-                );
+                return Err(Diagnostic::new(
+                    Level::Error,
+                    format!(
+                        "#[derive(Network)] NDL resolver failed to find network called '{}'",
+                        ident,
+                    ),
+                ));
             }
         }
-        Err(e) => panic!("#[derive(Network)] NDL resolver failed: {}", e),
+        Err(e) => Err(Diagnostic::new(
+            Level::Error,
+            format!("#[derive(Network)] NDL resolver failed: {}", e),
+        )),
     }
 }

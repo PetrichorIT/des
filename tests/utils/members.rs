@@ -5,7 +5,7 @@ use des_derive::Module;
 
 use log::{info, warn};
 
-#[derive(Module)]
+#[derive(Debug, Module)]
 #[ndl_workspace = "tests/utils"]
 pub struct Alice(ModuleCore);
 
