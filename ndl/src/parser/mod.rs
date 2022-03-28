@@ -355,6 +355,7 @@ impl<'a> Parser<'a> {
             self.eat_whitespace();
 
             let (name_token, name) = self.next_token()?;
+            let name_token = name_token.clone();
             let name = String::from(name);
             if name_token.kind != TokenKind::Ident {
 
@@ -373,18 +374,22 @@ impl<'a> Parser<'a> {
             }
 
             let (token, _raw) = self.next_token()?;
+            let token = token.clone();
             if token.kind != TokenKind::OpenBracket {
                 // Single size gate
                 if token.kind == TokenKind::Whitespace {
                     // Consume whitespace and comma optionally
                     self.eat_whitespace();
+                    let annotation = self.parse_optional_gate_annotation(ectx)?;
                     self.eat_optionally(|t| t.kind == TokenKind::Comma);
 
                     // Push gate
-                    gates.push(GateDef { loc: Loc::fromto(name_token.loc, token.loc), name, size: 1 })
+                    gates.push(GateDef { loc: Loc::fromto(name_token.loc, token.loc), name, size: 1, annotation })
                 } else if token.kind == TokenKind::Comma {
                     // Push gate
-                    gates.push(GateDef { loc: Loc::fromto(name_token.loc, token.loc), name, size: 1 })
+                    // instant comma == no annotation
+                    let annotation = GateAnnotation::Unknown;
+                    gates.push(GateDef { loc: Loc::fromto(name_token.loc, token.loc), name, size: 1, annotation })
                 } else if token.kind == TokenKind::Colon {
                     // New identifer
                     self.tokens.bump_back(2);
@@ -412,6 +417,7 @@ impl<'a> Parser<'a> {
                                 Ok(value) => {
                                     self.eat_whitespace();
                                     let (token, _raw) = self.next_token()?;
+                                    let token = token.clone();
                                     if token.kind != TokenKind::CloseBracket {
                                         // The found token wasn't expected
                                         // could be relevant for next pass.
@@ -428,9 +434,10 @@ impl<'a> Parser<'a> {
                                     }
 
                                     self.eat_whitespace();
+                                    let annotation = self.parse_optional_gate_annotation(ectx)?;
                                     self.eat_optionally(|t| t.kind == TokenKind::Comma);
 
-                                    gates.push(GateDef { loc: Loc::fromto(name_token.loc, token.loc), name, size: value }); 
+                                    gates.push(GateDef { loc: Loc::fromto(name_token.loc, token.loc), name, size: value, annotation }); 
                                 },
                                 Err(e) => {
                                     ectx.record(
@@ -470,6 +477,40 @@ impl<'a> Parser<'a> {
             }
         }
 
+    }
+
+    pub fn parse_optional_gate_annotation(&mut self, ectx: &mut ParsingErrorContext<'_>) -> NdlResult<GateAnnotation> {
+        // only allowed if next token.
+        let (token, _) = self.next_token()?;
+        if token.kind != TokenKind::At {
+            self.tokens.bump_back(1);
+            return Ok(GateAnnotation::Unknown)
+        }
+
+        // annotation
+        let (token, raw) = self.next_token()?;
+        if token.kind != TokenKind::Ident {
+            ectx.record(
+                ParModuleGateInvalidServiceAnnotation,
+                format!("Invalid token '{}', expected ident.", raw), 
+                token.loc
+            )?;
+            return Ok(GateAnnotation::Unknown)
+        }
+
+        match raw {
+            "input" => Ok(GateAnnotation::Input),
+            "output" => Ok(GateAnnotation::Output),
+            _ => {
+                ectx.record_with_solution(
+                    ParModuleGateInvalidServiceAnnotation, 
+                    String::from("Invalid service annotation, expected '@input' or '@output'."),
+                    token.loc, 
+                    ErrorSolution::new(String::from("Remove or replace with 'input' or 'output'"), token.loc)
+                )?;
+                Ok(GateAnnotation::Unknown)
+            }
+        }
     }
 
     fn parse_childmodule_def(&mut self, child_modules: &mut Vec<ChildeModuleDef>, ectx: &mut ParsingErrorContext<'_>, escape_keywords: &[&str]) -> NdlResult<bool> {

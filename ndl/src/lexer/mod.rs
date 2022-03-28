@@ -176,6 +176,7 @@ impl TokenKind {
                 | Slash
                 | Dot
                 | Comma
+                | At
         )
     }
 }

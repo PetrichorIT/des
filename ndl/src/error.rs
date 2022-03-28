@@ -315,6 +315,22 @@ impl Error {
         }
     }
 
+    pub fn new_with_solution(
+        code: ErrorCode,
+        msg: String,
+        loc: Loc,
+        transient: bool,
+        solution: ErrorSolution,
+    ) -> Self {
+        Self {
+            code,
+            msg,
+            solution: Some(solution),
+            loc,
+            transient,
+        }
+    }
+
     pub fn new_lex(code: ErrorCode, loc: Loc, asset: Asset<'_>) -> Self {
         let solution = Some(ErrorSolution::new(
             format!("Try removing token '{}'", asset.referenced_slice_for(loc)),
@@ -458,6 +474,7 @@ pub enum ErrorCode {
     ParModuleGateMissingClosingBracket,
     ParModuleGateInvalidIdentifierToken,
     ParModuleGateInvalidGateSize,
+    ParModuleGateInvalidServiceAnnotation,
 
     ParModuleSubInvalidIdentiferToken,
     ParModuleSubInvalidSeperator,
@@ -490,6 +507,8 @@ pub enum ErrorCode {
     DsgConInvalidLocalGateIdent,
     DsgConInvalidGateSize,
     DsgConInvalidField,
+
+    TycGateConnectionViolatesAnnotation,
 
     TycDefNameCollission,
     TycModuleSubmoduleFieldAlreadyDeclared,

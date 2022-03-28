@@ -274,12 +274,13 @@ pub trait StaticModuleCore {
     fn create_gate<A>(
         self: &mut MrcS<Self, Mutable>,
         name: &str,
+        typ: GateServiceType,
         rt: &mut NetworkRuntime<A>,
     ) -> GateRefMut
     where
         Self: 'static + Sized + Module,
     {
-        self.create_gate_cluster(name, 1, rt).remove(0)
+        self.create_gate_cluster(name, 1, typ, rt).remove(0)
     }
 
     ///
@@ -289,6 +290,7 @@ pub trait StaticModuleCore {
     fn create_gate_into<A>(
         self: &mut MrcS<Self, Mutable>,
         name: &str,
+        typ: GateServiceType,
         channel: Option<ChannelRefMut>,
         next_hop: Option<GateRefMut>,
         rt: &mut NetworkRuntime<A>,
@@ -296,7 +298,7 @@ pub trait StaticModuleCore {
     where
         Self: 'static + Sized + Module,
     {
-        self.create_gate_cluster_into(name, 1, channel, vec![next_hop], rt)
+        self.create_gate_cluster_into(name, 1, typ, channel, vec![next_hop], rt)
             .remove(0)
     }
 
@@ -307,12 +309,13 @@ pub trait StaticModuleCore {
         self: &mut MrcS<Self, Mutable>,
         name: &str,
         size: usize,
+        typ: GateServiceType,
         rt: &mut NetworkRuntime<A>,
     ) -> Vec<GateRefMut>
     where
         Self: 'static + Sized + Module,
     {
-        self.create_gate_cluster_into(name, size, None, vec![None; size], rt)
+        self.create_gate_cluster_into(name, size, typ, None, vec![None; size], rt)
     }
 
     ///
@@ -327,6 +330,7 @@ pub trait StaticModuleCore {
         self: &mut MrcS<Self, Mutable>,
         name: &str,
         size: usize,
+        typ: GateServiceType,
         channel: Option<ChannelRefMut>,
         next_hops: Vec<Option<GateRefMut>>,
         _rt: &mut NetworkRuntime<A>,
@@ -340,7 +344,7 @@ pub trait StaticModuleCore {
         );
 
         let mrc = MrcS::clone(self).make_readonly();
-        let descriptor = GateDescription::new(name.to_owned(), size, mrc);
+        let descriptor = GateDescription::new_with_typ(name.to_owned(), size, mrc, typ);
         let mut ids = Vec::new();
 
         for (i, item) in next_hops.into_iter().enumerate() {

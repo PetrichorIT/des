@@ -37,6 +37,7 @@ pub use self::gate::Gate;
 pub use self::gate::GateDescription;
 pub use self::gate::GateRef;
 pub use self::gate::GateRefMut;
+pub use self::gate::GateServiceType;
 pub use self::gate::IntoModuleGate;
 
 //

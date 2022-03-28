@@ -151,14 +151,32 @@ pub struct GateDef {
     pub name: String,
     /// The size of the local gate cluster.
     pub size: usize,
+    /// A annotation indicating a service type.
+    pub annotation: GateAnnotation,
 }
 
 impl Display for GateDef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}[{}]", self.name, self.size)
+        write!(f, "{}[{}] {}", self.name, self.size, self.annotation)
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GateAnnotation {
+    Unknown,
+    Input,
+    Output,
+}
+
+impl Display for GateAnnotation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Unknown => write!(f, ""),
+            Self::Input => write!(f, "@input"),
+            Self::Output => write!(f, "@output"),
+        }
+    }
+}
 ///
 /// A description of a connection, in a modules definition.
 ///

@@ -1,5 +1,5 @@
 use crate::loc::Loc;
-use crate::parser::{GateDef, LinkDef, ModuleDef, NetworkDef, ParamDef};
+use crate::parser::{GateAnnotation, GateDef, LinkDef, ModuleDef, NetworkDef, ParamDef};
 use std::fmt::Display;
 
 ///
@@ -311,6 +311,8 @@ pub struct GateSpec {
     pub ident: String,
     /// The size of the gate cluster.
     pub size: usize,
+    /// The type annotation,
+    pub annotation: GateAnnotation,
 }
 
 impl GateSpec {
@@ -324,13 +326,14 @@ impl GateSpec {
 
             ident: gate_def.name.clone(),
             size: gate_def.size,
+            annotation: gate_def.annotation,
         }
     }
 }
 
 impl Display for GateSpec {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}[{}]", self.ident, self.size)
+        write!(f, "{}[{}] {}", self.ident, self.size, self.annotation)
     }
 }
 

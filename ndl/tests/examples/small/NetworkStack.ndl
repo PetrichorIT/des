@@ -1,0 +1,19 @@
+
+module RoutingDamon {}
+
+module NetworkStack {
+
+    parameters:
+        addr: i32
+
+    submodules:
+        router: RoutingDamon
+
+    gates:
+        netOut[2] @output
+        netIn[2] @input
+
+        fromAppl[2] @input
+        toAppl[2] @output
+}
+

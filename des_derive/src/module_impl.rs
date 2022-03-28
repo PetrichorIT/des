@@ -5,8 +5,9 @@ use crate::{
 use ndl::ChannelSpec;
 use ndl::ChildModuleSpec;
 use ndl::ConSpec;
+use ndl::GateAnnotation;
 use ndl::GateSpec;
-use proc_macro2::Ident;
+use proc_macro2::{Ident, Span};
 use quote::quote;
 use syn::{Data, DataStruct, FieldsNamed, FieldsUnnamed, Type};
 
@@ -184,8 +185,16 @@ fn generate_dynamic_builder(ident: Ident, attrs: Attributes, out: &mut TokenStre
 
                 for gate in &module.gates {
                     let GateSpec { ident, size, .. } = gate;
+                    let typ = Ident::new(
+                        match gate.annotation {
+                            GateAnnotation::Input => "Input",
+                            GateAnnotation::Output => "Output",
+                            GateAnnotation::Unknown => "Undefined",
+                        },
+                        Span::call_site(),
+                    );
                     token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                        let _ = this.create_gate_cluster(#ident, #size, rt);
+                        let _ = this.create_gate_cluster(#ident, #size, ::des::net::GateServiceType::#typ, rt);
                     })
                 }
 

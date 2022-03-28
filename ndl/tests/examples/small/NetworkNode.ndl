@@ -12,14 +12,14 @@ module NetworkNode {
     // This is a comment 😃😃😃😃😃😃😃😃😃😃😃😃
 
     gates:
-        toStack[5],
-        fromStack[5],
+        toStack[2] @output,
+        fromStack[2] @input,
 
-        channelIncoming[5],
-        channelOutgoing[5],
+        channelIncoming[2] @input,
+        channelOutgoing[2] @output,
 
-        toAppl[5],
-        fromAppl[5],
+        toAppl[2] @output,
+        fromAppl[2] @input,
 
     connections:
         toStack --> FastLink --> stack/netIn,

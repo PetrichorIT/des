@@ -1,4 +1,4 @@
-use des::prelude::*;
+use des::{net::GateServiceType, prelude::*};
 
 mod alice;
 mod bob;
@@ -21,11 +21,23 @@ fn main() {
         jitter: 0.0.into(),
     });
 
-    let g1 = alice.create_gate("netIn", &mut app);
-    let g4 = bob.create_gate_into("netOut", Some(channel.clone()), Some(g1), &mut app);
+    let g1 = alice.create_gate("netIn", GateServiceType::Input, &mut app);
+    let g4 = bob.create_gate_into(
+        "netOut",
+        GateServiceType::Output,
+        Some(channel.clone()),
+        Some(g1),
+        &mut app,
+    );
 
-    let r1 = bob.create_gate("netIn", &mut app);
-    let _r4 = alice.create_gate_into("netOut", Some(channel), Some(r1), &mut app);
+    let r1 = bob.create_gate("netIn", GateServiceType::Input, &mut app);
+    let _r4 = alice.create_gate_into(
+        "netOut",
+        GateServiceType::Output,
+        Some(channel),
+        Some(r1),
+        &mut app,
+    );
 
     app.create_module(alice);
     app.create_module(bob);

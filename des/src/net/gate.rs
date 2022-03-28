@@ -13,6 +13,13 @@ pub type GateRef = MrcS<Gate, ReadOnly>;
 ///
 pub type GateRefMut = MrcS<Gate, Mutable>;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum GateServiceType {
+    Input,
+    Output,
+    Undefined,
+}
+
 ///
 /// A description of a gate / gate cluster on a module.
 ///
@@ -33,6 +40,11 @@ pub struct GateDescription {
     /// The number of elements in the gate cluster.
     ///
     pub size: usize,
+
+    ///
+    /// The service type of the given gate.
+    ///
+    pub typ: GateServiceType,
 }
 
 impl GateDescription {
@@ -52,9 +64,29 @@ impl GateDescription {
     where
         T: Module + Unsize<dyn Module>,
     {
+        Self::new_with_typ(name, size, owner, GateServiceType::Undefined)
+    }
+
+    ///
+    /// Creates a new descriptor using explicit values and a service type.
+    ///
+    pub fn new_with_typ<T>(
+        name: String,
+        size: usize,
+        owner: MrcS<T, ReadOnly>,
+        typ: GateServiceType,
+    ) -> Self
+    where
+        T: Module + Unsize<dyn Module>,
+    {
         let owner: ModuleRef = owner;
         assert!(size >= 1, "Cannot create with a non-postive size");
-        Self { name, size, owner }
+        Self {
+            name,
+            size,
+            owner,
+            typ,
+        }
     }
 }
 

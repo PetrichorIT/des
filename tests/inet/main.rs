@@ -1,4 +1,4 @@
-use des::prelude::*;
+use des::{net::GateServiceType, prelude::*};
 use network_node::NetworkNode;
 use network_stack::NetworkStack;
 use routing_deamon::RandomRoutingDeamon;
@@ -30,13 +30,25 @@ fn main() {
     );
     node_alice.add_child(&mut stack_alice);
 
-    let internal_out = node_alice.create_gate("fromStack", &mut app);
+    let internal_out = node_alice.create_gate("fromStack", GateServiceType::Input, &mut app);
 
-    stack_alice.create_gate_into("netOut", None, Some(internal_out), &mut app);
+    stack_alice.create_gate_into(
+        "netOut",
+        GateServiceType::Output,
+        None,
+        Some(internal_out),
+        &mut app,
+    );
 
-    let internal_in = stack_alice.create_gate("netIn", &mut app);
+    let internal_in = stack_alice.create_gate("netIn", GateServiceType::Input, &mut app);
 
-    node_alice.create_gate_into("toStack", None, Some(internal_in), &mut app);
+    node_alice.create_gate_into(
+        "toStack",
+        GateServiceType::Output,
+        None,
+        Some(internal_in),
+        &mut app,
+    );
 
     //
     // BOB
@@ -50,13 +62,25 @@ fn main() {
 
     node_bob.add_child(&mut stack_bob);
 
-    let internal_out = node_bob.create_gate("fromStack", &mut app);
+    let internal_out = node_bob.create_gate("fromStack", GateServiceType::Input, &mut app);
 
-    stack_bob.create_gate_into("netOut", None, Some(internal_out), &mut app);
+    stack_bob.create_gate_into(
+        "netOut",
+        GateServiceType::Output,
+        None,
+        Some(internal_out),
+        &mut app,
+    );
 
-    let internal_in = stack_bob.create_gate("netIn", &mut app);
+    let internal_in = stack_bob.create_gate("netIn", GateServiceType::Input, &mut app);
 
-    node_bob.create_gate_into("toStack", None, Some(internal_in), &mut app);
+    node_bob.create_gate_into(
+        "toStack",
+        GateServiceType::Output,
+        None,
+        Some(internal_in),
+        &mut app,
+    );
 
     //
     // EVE
@@ -71,21 +95,24 @@ fn main() {
 
     node_eve.add_child(&mut stack_eve);
 
-    let internal_out = node_eve.create_gate_cluster("fromStack", 2, &mut app);
+    let internal_out =
+        node_eve.create_gate_cluster("fromStack", 2, GateServiceType::Input, &mut app);
 
     stack_eve.create_gate_cluster_into(
         "netOut",
         2,
+        GateServiceType::Output,
         None,
         internal_out.into_iter().map(Some).collect(),
         &mut app,
     );
 
-    let internal_in = stack_eve.create_gate_cluster("netIn", 2, &mut app);
+    let internal_in = stack_eve.create_gate_cluster("netIn", 2, GateServiceType::Input, &mut app);
 
     node_eve.create_gate_cluster_into(
         "toStack",
         2,
+        GateServiceType::Output,
         None,
         internal_in.into_iter().map(Some).collect(),
         &mut app,
@@ -101,28 +128,32 @@ fn main() {
         jitter: 0.0.into(),
     }));
 
-    let alice_in = node_alice.create_gate("channelIncoming", &mut app);
+    let alice_in = node_alice.create_gate("channelIncoming", GateServiceType::Input, &mut app);
 
-    let bob_in = node_bob.create_gate("channelIncoming", &mut app);
+    let bob_in = node_bob.create_gate("channelIncoming", GateServiceType::Input, &mut app);
 
     node_eve.create_gate_cluster_into(
         "channelOutgoing",
         2,
+        GateServiceType::Output,
         channel.clone(),
         vec![Some(alice_in.clone()), Some(bob_in)],
         &mut app,
     );
 
-    let eve_in = node_eve.create_gate_cluster("channelIncoming", 2, &mut app);
+    let eve_in =
+        node_eve.create_gate_cluster("channelIncoming", 2, GateServiceType::Input, &mut app);
 
     node_alice.create_gate_into(
         "channelOutgoing",
+        GateServiceType::Output,
         channel.clone(),
         Some(eve_in[0].clone()),
         &mut app,
     );
     node_bob.create_gate_into(
         "channelOutgoing",
+        GateServiceType::Output,
         channel,
         Some(eve_in[1].clone()),
         &mut app,

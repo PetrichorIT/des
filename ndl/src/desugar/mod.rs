@@ -97,6 +97,7 @@ pub fn desugar(unit: &ParsingResult, resolver: &NdlResolver) -> DesugaredParsing
                 &tyctx,
                 &gtyctx,
                 &mut errors,
+                GateAnnotation::Output,
             ) {
                 Some(v) => v,
                 None => continue,
@@ -108,6 +109,7 @@ pub fn desugar(unit: &ParsingResult, resolver: &NdlResolver) -> DesugaredParsing
                 &tyctx,
                 &gtyctx,
                 &mut errors,
+                GateAnnotation::Input,
             ) {
                 Some(v) => v,
                 None => continue,
@@ -248,6 +250,7 @@ pub fn desugar(unit: &ParsingResult, resolver: &NdlResolver) -> DesugaredParsing
                 &tyctx,
                 &gtyctx,
                 &mut errors,
+                GateAnnotation::Output,
             ) {
                 Some(v) => v,
                 None => continue,
@@ -259,6 +262,7 @@ pub fn desugar(unit: &ParsingResult, resolver: &NdlResolver) -> DesugaredParsing
                 &tyctx,
                 &gtyctx,
                 &mut errors,
+                GateAnnotation::Input,
             ) {
                 Some(v) => v,
                 None => continue,
@@ -331,10 +335,14 @@ fn resolve_connection_ident(
     tyctx: &TyDefContext,
     gtyctx: &GlobalTyDefContext,
     errors: &mut Vec<Error>,
+    expected_type: GateAnnotation,
 ) -> Option<(usize, usize, Vec<ConSpecNodeIdent>)> {
+    let global_loc = ident.loc();
+
     let mut result = Vec::new();
     match ident {
         ConNodeIdent::Local { loc, ident } => {
+            let global_ident = ident;
             // Local can only reference a modules gate
             let gate = match local_gates
                 .iter()
@@ -361,6 +369,40 @@ fn resolve_connection_ident(
                 ));
 
                 return None;
+            }
+
+            if !(gate.annotation == expected_type || gate.annotation == GateAnnotation::Unknown) {
+                dbg!(gate.annotation, expected_type, global_ident);
+                // invalid annotation connection
+                errors.push(Error::new_with_solution(
+                    TycGateConnectionViolatesAnnotation,
+                    format!(
+                        "Gate '{}' cannot be used as {} of a connection since it is defined as {}.",
+                        global_ident,
+                        if matches!(expected_type, GateAnnotation::Input) {
+                            "start"
+                        } else {
+                            "end"
+                        },
+                        gate.annotation
+                    ),
+                    global_loc,
+                    false,
+                    ErrorSolution::new(
+                        format!(
+                            "Define gate '{}' as {}.",
+                            global_ident,
+                            if matches!(expected_type, GateAnnotation::Input) {
+                                "@output"
+                            } else {
+                                "@input"
+                            }
+                        ),
+                        gate.loc,
+                    ),
+                ));
+                // Continue either way since annotations violations
+                // are not transient
             }
 
             match ident {

@@ -88,6 +88,7 @@ pub use desugar::{
     ChannelSpec, ChildModuleSpec, ConSpec, ConSpecNodeIdent, GateSpec, IncludeSpec, ModuleSpec,
     NetworkSpec, ParamSpec,
 };
+pub use parser::GateAnnotation;
 
 // > TyCtx
 pub use desugar::GlobalTyDefContext;
