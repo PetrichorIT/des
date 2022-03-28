@@ -56,6 +56,11 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
             match current_gate.channel_mut() {
                 Some(mut channel) => {
                     // Channel delayed connection
+                    assert!(
+                        current_gate.service_type() != GateServiceType::Input,
+                        "Channels cannot start at a input node"
+                    );
+
                     // SAFTY:
                     // The rng and random number generator dont interfere so this operation can
                     // be considered safe. Make sure this ref is only used in conjunction with the channel.
@@ -109,6 +114,11 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
 
         // No next gate exists.
         debug_assert!(current_gate.next_gate().is_none());
+
+        assert!(
+            current_gate.service_type() != GateServiceType::Output,
+            "Messages cannot be forwarded to modules on Output gates"
+        );
 
         info!(
             target: &format!("Gate ({})", current_gate.name()),
@@ -263,6 +273,10 @@ impl ModuleRefMut {
 
         // Send gate events from the 'send' method calls
         for (msg, gate) in self.module_core_mut().out_buffer.drain(..) {
+            assert!(
+                gate.service_type() != GateServiceType::Input,
+                "To send messages onto a gate it must have service type of 'Output' or 'Undefined'"
+            );
             rt.add_event(
                 NetEvents::MessageAtGateEvent(MessageAtGateEvent {
                     // TODO

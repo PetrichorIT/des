@@ -158,6 +158,13 @@ impl Gate {
     }
 
     ///
+    /// Returns the serivce type of the gate cluster.
+    ///
+    pub fn service_type(&self) -> GateServiceType {
+        self.description.typ
+    }
+
+    ///
     /// Returns a short identifcator that holds all nessecary information.
     ///
     pub fn str(&self) -> String {
