@@ -73,6 +73,7 @@ pub use self::module::NameableModule;
 pub use self::module::StaticModuleCore;
 
 pub use self::common::ModulePath;
+pub use self::common::ParHandle;
 pub use self::common::Parameters;
 
 //

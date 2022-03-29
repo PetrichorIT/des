@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::ops::Deref;
 
 ///
 /// The collection of all loaded parameters for modules,
@@ -40,11 +41,50 @@ impl Parameters {
         self.tree.get(key, &mut map);
         map
     }
+
+    pub(crate) fn get_value(&self, path: &str, key: &str) -> Option<ParHandle<'_>> {
+        let par = self.tree.get_value(path, key)?.to_string();
+
+        // dirty hack for the time being
+        let ptr: *const Parameters = &*self;
+        let ptr: *mut Parameters = ptr as *mut Parameters;
+        let mut_self = unsafe { &mut *ptr };
+
+        Some(ParHandle {
+            gref: mut_self,
+            path_and_key: format!("{}.{}", path, key),
+            par,
+        })
+    }
 }
 
 impl Default for Parameters {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[derive(Debug)]
+pub struct ParHandle<'a> {
+    gref: &'a mut Parameters,
+    path_and_key: String,
+    par: String,
+}
+
+impl ParHandle<'_> {
+    pub fn set<T>(self, value: T)
+    where
+        T: ToString,
+    {
+        let str = value.to_string();
+        self.gref.insert(&self.path_and_key, &str);
+    }
+}
+
+impl Deref for ParHandle<'_> {
+    type Target = str;
+    fn deref(&self) -> &Self::Target {
+        &self.par
     }
 }
 
@@ -122,6 +162,36 @@ impl ParameterTree {
                     }
                 }
             }
+        }
+    }
+
+    fn get_value(&self, path: &str, key: &str) -> Option<&str> {
+        if path.is_empty() {
+            // Found final node.
+            self.pars.get(key).map(|s| &s[..])
+        } else {
+            let (ele, rem) = path.split_once('.').unwrap_or((path, ""));
+            // Go via exact branch if possible;
+            let ret = self.branches.iter().find_map(|b| {
+                if let ParameterTreeBranch::Path(path, subtree) = b {
+                    if path == ele {
+                        return subtree.get_value(rem, key);
+                    }
+                }
+                None
+            });
+
+            if ret.is_some() {
+                return ret;
+            }
+
+            // Asterix search
+            self.branches.iter().find_map(|b| {
+                if let ParameterTreeBranch::Asterix(subtree) = b {
+                    return subtree.get_value(rem, key);
+                }
+                None
+            })
         }
     }
 }

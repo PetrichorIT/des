@@ -14,7 +14,7 @@ impl Module for Alice {
         let (mut pkt, _) = msg.cast::<Packet>();
         info!(target: self.name(), "Received at {}: Message with content: {}", sim_time(), pkt.content::<String>().deref());
 
-        if pkt.header().hop_count > self.pars()["limit"].parse::<usize>().unwrap() {
+        if pkt.header().hop_count > self.par("limit").unwrap().parse::<usize>().unwrap() {
             // TERMINATE
             self.disable_activity()
         } else {
@@ -78,7 +78,7 @@ impl Module for Bob {
 
         info!(target: self.name(), "Received at {}: Message with content: {}", sim_time(), pkt.content::<String>().deref());
 
-        pkt.content::<String>().push_str(&self.pars()["char"]);
+        pkt.content::<String>().push_str(&self.par("char").unwrap());
 
         self.send(
             Message::new_interned(0, 1, ModuleId::NULL, SimTime::ZERO, pkt),

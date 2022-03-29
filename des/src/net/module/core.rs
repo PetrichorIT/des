@@ -380,6 +380,13 @@ impl ModuleCore {
     }
 
     ///
+    /// Returns a parameter by reference (not parsed).
+    ///
+    pub fn par(&self, key: &str) -> Option<ParHandle<'_>> {
+        self.globals.parameters.get_value(self.path.path(), key)
+    }
+
+    ///
     /// Returns a reference to the parameter store, used for constructing
     /// custom instances of modules.
     ///
