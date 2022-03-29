@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::marker::PhantomData;
 use std::ops::Deref;
 
 ///
@@ -42,19 +43,21 @@ impl Parameters {
         map
     }
 
-    pub(crate) fn get_value(&self, path: &str, key: &str) -> Option<ParHandle<'_>> {
-        let par = self.tree.get_value(path, key)?.to_string();
+    pub(crate) fn get_value(&self, path: &str, key: &str) -> ParHandle<'_, Optional> {
+        let par = self.tree.get_value(path, key).map(str::to_string);
 
         // dirty hack for the time being
         let ptr: *const Parameters = &*self;
         let ptr: *mut Parameters = ptr as *mut Parameters;
         let mut_self = unsafe { &mut *ptr };
 
-        Some(ParHandle {
+        ParHandle {
             gref: mut_self,
             path_and_key: format!("{}.{}", path, key),
             par,
-        })
+
+            _phantom: PhantomData,
+        }
     }
 }
 
@@ -64,14 +67,62 @@ impl Default for Parameters {
     }
 }
 
-#[derive(Debug)]
-pub struct ParHandle<'a> {
-    gref: &'a mut Parameters,
-    path_and_key: String,
-    par: String,
+mod private {
+    pub trait ParHandleState {}
 }
 
-impl ParHandle<'_> {
+///
+/// The state of a [ParHandle] where its not decided
+/// whether data is contained or not. Useful for writing data
+/// to not yet initalized parameters.
+///
+pub struct Optional;
+impl private::ParHandleState for Optional {}
+
+/// The state of a [ParHandle] where the contents are guaranteed
+/// to be there, thus allowing derefs on the handle.
+///
+pub struct Unwraped;
+impl private::ParHandleState for Unwraped {}
+
+///
+/// A handle for a requested parameter, local to a
+/// module path and parameter key.
+///
+#[derive(Debug)]
+pub struct ParHandle<'a, State>
+where
+    State: private::ParHandleState,
+{
+    gref: &'a mut Parameters,
+    path_and_key: String,
+    par: Option<String>,
+
+    _phantom: PhantomData<State>,
+}
+
+impl<'a, State> ParHandle<'a, State>
+where
+    State: private::ParHandleState,
+{
+    pub fn unwrap(self) -> ParHandle<'a, Unwraped> {
+        if self.par.is_some() {
+            ParHandle {
+                gref: self.gref,
+                path_and_key: self.path_and_key,
+                par: self.par,
+
+                _phantom: PhantomData,
+            }
+        } else {
+            panic!("Unwraped par handle that did point to data")
+        }
+    }
+
+    pub fn as_optional(self) -> Option<String> {
+        self.par
+    }
+
     pub fn set<T>(self, value: T)
     where
         T: ToString,
@@ -81,10 +132,10 @@ impl ParHandle<'_> {
     }
 }
 
-impl Deref for ParHandle<'_> {
+impl Deref for ParHandle<'_, Unwraped> {
     type Target = str;
     fn deref(&self) -> &Self::Target {
-        &self.par
+        self.par.as_ref().unwrap()
     }
 }
 

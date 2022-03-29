@@ -10,7 +10,7 @@ use log::error;
 use crate::{
     core::SimTime,
     create_global_uid,
-    net::*,
+    net::{common::Optional, *},
     util::{MrcS, Mutable, ReadOnly, UntypedMrc},
 };
 
@@ -382,7 +382,7 @@ impl ModuleCore {
     ///
     /// Returns a parameter by reference (not parsed).
     ///
-    pub fn par(&self, key: &str) -> Option<ParHandle<'_>> {
+    pub fn par(&self, key: &str) -> ParHandle<'_, Optional> {
         self.globals.parameters.get_value(self.path.path(), key)
     }
 

@@ -56,19 +56,6 @@ impl UntypedMrc {
 pub type Mrc<T> = MrcS<T, Mutable>;
 
 ///
-/// The mutablilty state of a given [Mrc].
-///
-/// Mutable pointers can be converted to readonly pointers,
-/// but not vice-versa.
-///
-/// Note that this trait is sealed, so while it may be public it cannot
-/// be implemented for any trait. Since the defintion for [Mrc] must be public this
-/// trait must be as well, but there is no point in implementing it for a 'third' state.
-///
-#[doc(hidden)]
-pub trait MrcMutabilityState: private::MrcMutabilityStateSealed {}
-
-///
 /// A mutability state that **only** allows acces via [AsRef], [Deref]
 /// and by extension [Borrow](std::borrow::Borrow).
 ///
@@ -86,11 +73,9 @@ impl MrcMutabilityState for ReadOnly {}
 pub struct Mutable;
 impl MrcMutabilityState for Mutable {}
 
+use private::MrcMutabilityState;
 mod private {
-    pub trait MrcMutabilityStateSealed {}
-
-    impl MrcMutabilityStateSealed for super::ReadOnly {}
-    impl MrcMutabilityStateSealed for super::Mutable {}
+    pub trait MrcMutabilityState {}
 }
 
 ///
