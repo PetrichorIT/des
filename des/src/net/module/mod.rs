@@ -5,12 +5,11 @@ mod ndl;
 mod tests;
 
 use crate::{
-    core::SimTime,
     net::*,
     util::{MrcS, Mutable, ReadOnly, UntypedMrc},
 };
-use log::error;
-use std::collections::HashMap;
+
+use std::ops::{Deref, DerefMut};
 
 pub use self::core::*;
 pub use self::ndl::*;
@@ -155,117 +154,19 @@ pub trait Module: StaticModuleCore {
 ///
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-pub trait StaticModuleCore {
-    fn id(&self) -> ModuleId {
-        self.module_core().id()
+pub trait StaticModuleCore: Deref<Target = ModuleCore> + DerefMut<Target = ModuleCore> {
+    ///
+    /// A explicit deref to the Module Core.
+    ///
+    fn module_core(&self) -> &ModuleCore {
+        self.deref()
     }
 
     ///
-    /// Returns a pointer to the modules core, used for handling event and
-    /// buffers that are use case unspecific.
+    /// A explicit deref_mut to the Module Core.
     ///
-    fn module_core(&self) -> &ModuleCore;
-
-    ///
-    /// Returns a mutable pointer to the modules core, used for handling event and
-    /// buffers that are use case unspecific.
-    ///
-    fn module_core_mut(&mut self) -> &mut ModuleCore;
-
-    ///
-    /// Returns a human readable representation of the modules identity.
-    ///
-    fn str(&self) -> &str {
-        self.module_core().path.path()
-    }
-
-    ///
-    /// Returns the name of the module instance.
-    ///
-    fn path(&self) -> &ModulePath {
-        &self.module_core().path
-    }
-
-    ///
-    /// Returns the name of the module instance.
-    ///
-    fn name(&self) -> &str {
-        self.module_core().path.name()
-    }
-
-    fn pars(&self) -> HashMap<String, String> {
-        self.module_core().pars()
-    }
-
-    ///
-    /// Returns a ref unstructured list of all gates from the current module.
-    ///
-    fn gates(&self) -> &Vec<GateRefMut> {
-        &self.module_core().gates
-    }
-
-    ///
-    /// Returns a mutable ref to the all gates list.
-    ///
-    fn gates_mut(&mut self) -> &mut Vec<GateRefMut> {
-        &mut self.module_core_mut().gates
-    }
-
-    ///
-    /// Returns a ref to a gate of the current module dependent on its name and cluster position
-    /// if possible.
-    ///
-    fn gate_cluster(&self, name: &str) -> Vec<&GateRefMut> {
-        self.gates()
-            .iter()
-            .filter(|&gate| gate.name() == name)
-            .collect()
-    }
-
-    ///
-    /// Returns a ref to a gate of the current module dependent on its name and cluster position
-    /// if possible.
-    ///
-    fn gate_cluster_mut(&mut self, name: &str) -> Vec<&mut GateRefMut> {
-        self.gates_mut()
-            .iter_mut()
-            .filter(|gate| gate.name() == name)
-            .collect()
-    }
-
-    ///
-    /// Returns a ref to a gate of the current module dependent on its name and cluster position
-    /// if possible.
-    ///
-    fn gate(&self, name: &str, pos: usize) -> Option<GateRef> {
-        Some(
-            MrcS::clone(
-                self.gates()
-                    .iter()
-                    .find(|&gate| gate.name() == name && gate.pos() == pos)?,
-            )
-            .make_readonly(),
-        )
-    }
-
-    #[deprecated(since = "0.2.0", note = "GateIDs are no longer supported")]
-    fn gate_by_id(&self, _id: ()) -> ! {
-        unimplemented!("GateIDs are no longer supported")
-    }
-
-    ///
-    /// Returns a mutable ref to a gate of the current module dependent on its name and cluster position
-    /// if possible.
-    ///
-    fn gate_mut(&mut self, name: &str, pos: usize) -> Option<&mut GateRefMut> {
-        self.gates_mut()
-            .iter_mut()
-            .find(|gate| gate.name() == name && gate.pos() == pos)
-    }
-
-    #[deprecated(since = "0.2.0", note = "GateIDs are no longer supported")]
-    fn gate_by_id_mut(&mut self, _id: ()) -> ! {
-        unimplemented!("GateIDs are no longer supported")
+    fn module_core_mut(&mut self) -> &mut ModuleCore {
+        self.deref_mut()
     }
 
     ///
@@ -356,55 +257,10 @@ pub trait StaticModuleCore {
             );
             ids.push(MrcS::clone(&gate));
 
-            self.module_core_mut().gates.push(gate);
+            self.deref_mut().gates.push(gate);
         }
 
         ids
-    }
-
-    /// User message handling
-
-    ///
-    /// Sends a message onto a given gate. This operation will be performed after
-    /// handle_message finished.
-    ///
-    fn send<T>(&mut self, msg: Message, gate: T)
-    where
-        T: IntoModuleGate<Self>,
-        Self: Sized,
-    {
-        let gate = gate.into_gate(self);
-        if let Some(gate) = gate {
-            self.module_core_mut().out_buffer.push((msg, gate))
-        } else {
-            error!(target: self.str(),"Error: Could not find gate in current module");
-        }
-    }
-
-    ///
-    /// Enqueues a event that will trigger the [Module::handle_message] function
-    /// at the given SimTime
-    ///
-    fn schedule_at(&mut self, msg: Message, time: SimTime) {
-        assert!(time >= SimTime::now(), "Sorry, we can not timetravel yet!");
-        self.module_core_mut().loopback_buffer.push((msg, time))
-    }
-
-    ///
-    /// Enables the activity corountine using the given period.
-    /// This function should only be called from [Module::handle_message].
-    ///
-    fn enable_activity(&mut self, period: SimTime) {
-        self.module_core_mut().activity_period = period;
-        self.module_core_mut().activity_active = false;
-    }
-
-    ///
-    /// Disables the activity coroutine cancelling the next call.
-    ///
-    fn disable_activity(&mut self) {
-        self.module_core_mut().activity_period = SimTime::ZERO;
-        self.module_core_mut().activity_active = false;
     }
 
     ///
@@ -417,67 +273,14 @@ pub trait StaticModuleCore {
         Self: 'static + Sized,
     {
         let self_clone = MrcS::clone(self);
-        child.module_core_mut().parent = Some(UntypedMrc::new(self_clone));
+        child.deref_mut().parent = Some(UntypedMrc::new(self_clone));
 
         let child_name = child.name().to_string();
         let owned_child = MrcS::clone(child);
-        self.module_core_mut()
+        self.deref_mut()
             .children
             .insert(child_name, UntypedMrc::new(owned_child));
     }
-
-    ///
-    /// Returns the parent module by reference if a parent exists
-    /// and is of type `T`.
-    ///
-    fn parent<T>(&self) -> Result<MrcS<T, ReadOnly>, ModuleReferencingError>
-    where
-        T: 'static + StaticModuleCore,
-        Self: 'static + Sized,
-    {
-        self.module_core().parent()
-    }
-
-    ///
-    /// Returns the parent module by mutable reference if a parent exists
-    /// and is of type `T`.
-    ///
-    fn parent_mut<T>(&mut self) -> Result<MrcS<T, Mutable>, ModuleReferencingError>
-    where
-        T: 'static + StaticModuleCore,
-        Self: 'static + Sized,
-    {
-        self.module_core_mut().parent_mut()
-    }
-
-    ///
-    /// Returns the child module by reference if any child with
-    /// the given name exists and is of type `T`.
-    ///
-    fn child<T>(&self, name: &str) -> Result<MrcS<T, ReadOnly>, ModuleReferencingError>
-    where
-        T: 'static + StaticModuleCore,
-        Self: 'static + Sized,
-    {
-        self.module_core().child(name)
-    }
-
-    ///
-    /// Returns the child module by mutable reference if any child with
-    /// the given name exists and is of type `T`.
-    ///
-    fn child_mut<T>(&mut self, name: &str) -> Result<MrcS<T, Mutable>, ModuleReferencingError>
-    where
-        T: 'static + StaticModuleCore,
-        Self: 'static + Sized,
-    {
-        self.module_core_mut().child_mut(name)
-    }
-
-    ///
-    /// Returns a readonly reference to the runtimes globals.
-    ///
-    fn globals(&self) -> MrcS<NetworkRuntimeGlobals, ReadOnly> {
-        self.module_core().globals()
-    }
 }
+
+impl<T> StaticModuleCore for T where T: Deref<Target = ModuleCore> + DerefMut<Target = ModuleCore> {}

@@ -5,6 +5,8 @@ use std::{
     fmt::{Debug, Display},
 };
 
+use log::error;
+
 use crate::{
     core::SimTime,
     create_global_uid,
@@ -54,6 +56,9 @@ pub struct ModuleCore {
 
     /// A set of local parameters.
     globals: MrcS<NetworkRuntimeGlobals, ReadOnly>,
+
+    /// A refence to one self
+    pub(crate) self_ref: Option<UntypedMrc>,
 }
 
 impl ModuleCore {
@@ -73,6 +78,81 @@ impl ModuleCore {
     }
 
     ///
+    /// Returns a human readable representation of the modules identity.
+    ///
+    pub fn str(&self) -> &str {
+        self.path.path()
+    }
+
+    ///
+    /// Returns the name of the module instance.
+    ///
+    pub fn name(&self) -> &str {
+        self.path.name()
+    }
+
+    ///
+    /// Returns a ref unstructured list of all gates from the current module.
+    ///
+    pub fn gates(&self) -> &Vec<GateRefMut> {
+        &self.gates
+    }
+
+    ///
+    /// Returns a mutable ref to the all gates list.
+    ///
+    pub fn gates_mut(&mut self) -> &mut Vec<GateRefMut> {
+        &mut self.gates
+    }
+
+    ///
+    /// Returns a ref to a gate of the current module dependent on its name and cluster position
+    /// if possible.
+    ///
+    pub fn gate_cluster(&self, name: &str) -> Vec<&GateRefMut> {
+        self.gates()
+            .iter()
+            .filter(|&gate| gate.name() == name)
+            .collect()
+    }
+
+    ///
+    /// Returns a ref to a gate of the current module dependent on its name and cluster position
+    /// if possible.
+    ///
+    pub fn gate_cluster_mut(&mut self, name: &str) -> Vec<&mut GateRefMut> {
+        self.gates_mut()
+            .iter_mut()
+            .filter(|gate| gate.name() == name)
+            .collect()
+    }
+
+    ///
+    /// Returns a ref to a gate of the current module dependent on its name and cluster position
+    /// if possible.
+    ///
+    pub fn gate(&self, name: &str, pos: usize) -> Option<GateRef> {
+        Some(
+            MrcS::clone(
+                self.gates()
+                    .iter()
+                    .find(|&gate| gate.name() == name && gate.pos() == pos)?,
+            )
+            .make_readonly(),
+        )
+    }
+
+    ///
+    /// Returns a mutable ref to a gate of the current module dependent on its name and cluster position
+    /// if possible.
+    ///
+    pub fn gate_mut(&mut self, name: &str, pos: usize) -> Option<&mut GateRefMut> {
+        self.gates_mut()
+            .iter_mut()
+            .find(|gate| gate.name() == name && gate.pos() == pos)
+    }
+
+    ///
     /// Creates a new optionally named instance
     /// of 'Self'.
     ///
@@ -88,6 +168,7 @@ impl ModuleCore {
             parent: None,
             children: HashMap::new(),
             globals,
+            self_ref: None,
         }
     }
 
@@ -109,6 +190,7 @@ impl ModuleCore {
             parent: None,
             children: HashMap::new(),
             globals: parent.globals.clone(),
+            self_ref: None,
         }
     }
 
@@ -125,6 +207,63 @@ impl ModuleCore {
 }
 
 impl ModuleCore {
+    ///
+    /// Sends a message onto a given gate. This operation will be performed after
+    /// handle_message finished.
+    ///
+    pub fn send<T>(&mut self, msg: Message, gate: T)
+    where
+        T: IntoModuleGate,
+    {
+        let gate = gate.into_gate(self);
+        if let Some(gate) = gate {
+            self.out_buffer.push((msg, gate))
+        } else {
+            error!(target: self.str(),"Error: Could not find gate in current module");
+        }
+    }
+
+    ///
+    /// Enqueues a event that will trigger the [Module::handle_message] function
+    /// at the given SimTime
+    ///
+    pub fn schedule_at(&mut self, msg: Message, time: SimTime) {
+        assert!(time >= SimTime::now(), "Sorry, we can not timetravel yet!");
+        self.loopback_buffer.push((msg, time))
+    }
+
+    ///
+    /// Enables the activity corountine using the given period.
+    /// This function should only be called from [Module::handle_message].
+    ///
+    pub fn enable_activity(&mut self, period: SimTime) {
+        self.activity_period = period;
+        self.activity_active = false;
+    }
+
+    ///
+    /// Disables the activity coroutine cancelling the next call.
+    ///
+    pub fn disable_activity(&mut self) {
+        self.activity_period = SimTime::ZERO;
+        self.activity_active = false;
+    }
+}
+
+impl ModuleCore {
+    ///
+    /// Returns wether the moudule attached to this core is of type T.
+    ///
+    pub fn is<T>(&self) -> bool
+    where
+        T: 'static + StaticModuleCore,
+    {
+        self.self_ref
+            .as_ref()
+            .map(UntypedMrc::is::<T>)
+            .unwrap_or(false)
+    }
+
     ///
     /// Returns the parent module by reference if a parent exists
     /// and is of type `T`.

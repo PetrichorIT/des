@@ -16,7 +16,7 @@ impl Module for Alice {
                 0,
                 1,
                 None,
-                self.id(),
+                ModuleId::NULL,
                 ModuleId::NULL,
                 SimTime::ZERO,
                 String::from("Pong"),

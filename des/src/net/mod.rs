@@ -79,5 +79,5 @@ pub use self::common::Parameters;
 // # Topology
 //
 
-pub use self::topology::OutgoingEdges;
+pub use self::topology::NodeDefinition;
 pub use self::topology::Topology;

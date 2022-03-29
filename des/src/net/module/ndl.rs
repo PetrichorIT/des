@@ -51,7 +51,12 @@ pub trait BuildableModule: StaticModuleCore {
         Self: NameableModule + Sized,
     {
         let core = ModuleCore::new_with(path, rt.globals());
-        let this = MrcS::new(Self::named(core));
+        let mut this = MrcS::new(Self::named(core));
+
+        // Attach self to module core
+        let clone = MrcS::clone(&this);
+        this.deref_mut().self_ref = Some(UntypedMrc::new(clone));
+
         Self::build(this, rt)
     }
 

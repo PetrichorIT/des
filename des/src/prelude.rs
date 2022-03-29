@@ -62,6 +62,8 @@ pub use crate::net::GateRef;
 #[cfg(feature = "net")]
 pub use crate::net::GateRefMut;
 #[cfg(feature = "net")]
+pub use crate::net::GateServiceType;
+#[cfg(feature = "net")]
 pub use crate::net::IntoModuleGate;
 
 #[cfg(feature = "net")]
@@ -115,6 +117,6 @@ pub use crate::net::ModulePath;
 pub use crate::net::Parameters;
 
 #[cfg(feature = "net")]
-pub use crate::net::OutgoingEdges;
+pub use crate::net::NodeDefinition;
 #[cfg(feature = "net")]
 pub use crate::net::Topology;

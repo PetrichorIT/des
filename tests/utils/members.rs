@@ -20,7 +20,7 @@ impl Module for Alice {
         } else {
             pkt.register_hop();
             self.send(
-                Message::new_interned(0, 1, self.id(), SimTime::ZERO, pkt),
+                Message::new_interned(0, 1, ModuleId::NULL, SimTime::ZERO, pkt),
                 ("netOut", 0),
             )
         }
@@ -53,7 +53,7 @@ impl Module for Bob {
                         0,
                         1,
                         None,
-                        self.id(),
+                        ModuleId::NULL,
                         ModuleId::NULL,
                         SimTime::now(),
                         Packet::new(
@@ -81,7 +81,7 @@ impl Module for Bob {
         pkt.content::<String>().push_str(&self.pars()["char"]);
 
         self.send(
-            Message::new_interned(0, 1, self.id(), SimTime::ZERO, pkt),
+            Message::new_interned(0, 1, ModuleId::NULL, SimTime::ZERO, pkt),
             ("netOut", 2),
         );
     }

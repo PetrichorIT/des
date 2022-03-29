@@ -4,12 +4,15 @@ use crate::{net::NetworkRuntimeGlobals, prelude::*, util::MrcS};
 
 macro_rules! auto_impl_static {
     ($ident: ident) => {
-        impl StaticModuleCore for $ident {
-            fn module_core(&self) -> &ModuleCore {
+        impl std::ops::Deref for $ident {
+            type Target = ModuleCore;
+            fn deref(&self) -> &Self::Target {
                 &self.core
             }
+        }
 
-            fn module_core_mut(&mut self) -> &mut ModuleCore {
+        impl std::ops::DerefMut for $ident {
+            fn deref_mut(&mut self) -> &mut Self::Target {
                 &mut self.core
             }
         }

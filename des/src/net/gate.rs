@@ -265,60 +265,42 @@ impl Gate {
 ///
 /// A trait for a type to refrence a module specific gate.
 ///
-pub trait IntoModuleGate<T>: Sized
-where
-    T: StaticModuleCore,
-{
+pub trait IntoModuleGate: Sized {
     ///
     /// Extracts a gate identifier from a module using the given
     /// value as implicit reference.
     ///
-    fn into_gate(self, _module: &T) -> Option<GateRef> {
+    fn into_gate(self, _module: &ModuleCore) -> Option<GateRef> {
         None
     }
 }
 
-impl<T> IntoModuleGate<T> for GateRef
-where
-    T: StaticModuleCore,
-{
-    fn into_gate(self, _module: &T) -> Option<GateRef> {
+impl IntoModuleGate for GateRef {
+    fn into_gate(self, _module: &ModuleCore) -> Option<GateRef> {
         Some(self)
     }
 }
 
-impl<T> IntoModuleGate<T> for &GateRef
-where
-    T: StaticModuleCore,
-{
-    fn into_gate(self, _module: &T) -> Option<GateRef> {
+impl IntoModuleGate for &GateRef {
+    fn into_gate(self, _module: &ModuleCore) -> Option<GateRef> {
         Some(MrcS::clone(self))
     }
 }
 
-impl<T> IntoModuleGate<T> for GateRefMut
-where
-    T: StaticModuleCore,
-{
-    fn into_gate(self, _module: &T) -> Option<GateRef> {
+impl IntoModuleGate for GateRefMut {
+    fn into_gate(self, _module: &ModuleCore) -> Option<GateRef> {
         Some(self.make_readonly())
     }
 }
 
-impl<T> IntoModuleGate<T> for &GateRefMut
-where
-    T: StaticModuleCore,
-{
-    fn into_gate(self, _module: &T) -> Option<GateRef> {
+impl IntoModuleGate for &GateRefMut {
+    fn into_gate(self, _module: &ModuleCore) -> Option<GateRef> {
         Some(MrcS::clone(self).make_readonly())
     }
 }
 
-impl<T> IntoModuleGate<T> for (&str, usize)
-where
-    T: StaticModuleCore,
-{
-    fn into_gate(self, module: &T) -> Option<GateRef> {
+impl IntoModuleGate for (&str, usize) {
+    fn into_gate(self, module: &ModuleCore) -> Option<GateRef> {
         let element = module
             .gates()
             .iter()
@@ -328,11 +310,8 @@ where
     }
 }
 
-impl<T> IntoModuleGate<T> for &str
-where
-    T: StaticModuleCore,
-{
-    fn into_gate(self, module: &T) -> Option<GateRef> {
+impl IntoModuleGate for &str {
+    fn into_gate(self, module: &ModuleCore) -> Option<GateRef> {
         let element = module
             .gates()
             .iter()

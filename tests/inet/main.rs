@@ -1,7 +1,4 @@
-use des::{
-    net::{GateServiceType, Topology},
-    prelude::*,
-};
+use des::prelude::*;
 use network_node::NetworkNode;
 use network_stack::NetworkStack;
 use routing_deamon::RandomRoutingDeamon;
@@ -192,26 +189,8 @@ fn main() {
 
     let (app, time, event_count) = rt.run().unwrap();
 
-    let _ = write_graph(&app.globals().topology);
+    let _ = app.globals().topology.write_to_svg("tests/inet/graph");
 
     assert_eq!(time, SimTime::from(0.200128));
     assert_eq!(event_count, 21);
-}
-fn write_graph(topo: &Topology) -> std::io::Result<()> {
-    use std::fs::File;
-    use std::io::Write;
-    use std::process::Command;
-    let str = topo.dot_output();
-    let mut file = File::create("tests/inet/graph.dot")?;
-    write!(file, "{}", str)?;
-
-    let output = Command::new("dot")
-        .arg("-Tsvg")
-        .arg("tests/inet/graph.dot")
-        .output()?;
-
-    let mut file = File::create("tests/inet/graph.svg")?;
-    write!(file, "{}", String::from_utf8_lossy(&output.stdout))?;
-
-    Ok(())
 }

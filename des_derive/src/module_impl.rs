@@ -88,12 +88,14 @@ fn generate_static_implementations(ident: Ident, data: Data, out: &mut TokenStre
         if let Some(eident) = eident {
             out.extend::<TokenStream>(
                 quote! {
-                    impl ::des::net::StaticModuleCore for #ident {
-                        fn module_core(&self) -> &::des::net::ModuleCore {
+                    impl ::std::ops::Deref for #ident {
+                        type Target = ::des::net::ModuleCore;
+                        fn deref(&self) -> &Self::Target {
                             &self.#eident
                         }
-
-                        fn module_core_mut(&mut self) -> &mut ::des::net::ModuleCore {
+                    }
+                    impl ::std::ops::DerefMut for #ident {
+                        fn deref_mut(&mut self) -> &mut Self::Target {
                             &mut self.#eident
                         }
                     }
@@ -104,12 +106,14 @@ fn generate_static_implementations(ident: Ident, data: Data, out: &mut TokenStre
             let idx = syn::Index::from(idx);
             out.extend::<TokenStream>(
                 quote! {
-                    impl ::des::net::StaticModuleCore for #ident {
-                        fn module_core(&self) -> &::des::net::ModuleCore {
+                    impl ::std::ops::Deref for #ident {
+                        type Target = ::des::net::ModuleCore;
+                        fn deref(&self) -> &Self::Target {
                             &self.#idx
                         }
-
-                        fn module_core_mut(&mut self) -> &mut ::des::net::ModuleCore {
+                    }
+                    impl ::std::ops::DerefMut for #ident {
+                        fn deref_mut(&mut self) -> &mut Self::Target {
                             &mut self.#idx
                         }
                     }
