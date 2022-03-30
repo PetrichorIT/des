@@ -41,7 +41,7 @@ impl<'a> GlobalTyDefContext<'a> {
     ///
     pub fn module(&self, ident: &str) -> Option<&ModuleDef> {
         for unit in self.resolver.units.values() {
-            match unit.modules.iter().find(|l| l.name == ident) {
+            match unit.modules_and_prototypes.iter().find(|l| l.name == ident) {
                 Some(module) => return Some(module),
                 None => continue,
             }
@@ -155,7 +155,7 @@ impl<'a> TyDefContext<'a> {
             self.links.push(link)
         }
 
-        for module in &unit.modules {
+        for module in &unit.modules_and_prototypes {
             self.modules.push(module)
         }
 

@@ -383,7 +383,7 @@ impl ModuleCore {
     /// Returns a parameter by reference (not parsed).
     ///
     pub fn par(&self, key: &str) -> ParHandle<'_, Optional> {
-        self.globals.parameters.get_value(self.path.path(), key)
+        self.globals.parameters.get_handle(self.path.path(), key)
     }
 
     ///

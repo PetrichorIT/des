@@ -38,6 +38,8 @@ pub struct ModuleSpec {
     pub gates: Vec<GateSpec>,
     /// A collection of parameters.
     pub params: Vec<ParamSpec>,
+    /// Indicator whether the module was constructed from a prototype.
+    pub derived_from: Option<String>,
 }
 
 impl ModuleSpec {
@@ -58,13 +60,23 @@ impl ModuleSpec {
             connections: Vec::new(),
             gates: module_def.gates.iter().map(GateSpec::new).collect(),
             params: module_def.parameters.iter().map(ParamSpec::new).collect(),
+
+            derived_from: if module_def.is_prototype {
+                Some(module_def.name.clone())
+            } else {
+                None
+            },
         }
     }
 }
 
 impl Display for ModuleSpec {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "module {} {{", self.ident)?;
+        if let Some(derived_from) = &self.derived_from {
+            writeln!(f, "module {} like {} {{", self.ident, derived_from)?;
+        } else {
+            writeln!(f, "module {} {{", self.ident)?;
+        }
 
         if !self.submodules.is_empty() {
             writeln!(f, "\tsubmodules: ")?;

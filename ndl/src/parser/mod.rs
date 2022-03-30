@@ -27,7 +27,8 @@ pub fn parse(asset: Asset<'_>, tokens: TokenStream) -> ParsingResult {
 
         includes: Vec::new(),
         links: Vec::new(),
-        modules: Vec::new(),
+        modules_and_prototypes: Vec::new(),
+        aliases: Vec::new(),
         networks: Vec::new(),
 
         errors: Vec::new(),
@@ -46,7 +47,9 @@ pub fn parse(asset: Asset<'_>, tokens: TokenStream) -> ParsingResult {
                         let ident = raw_parts;
                         match ident {
                             "include" => parser.parse_include(&mut ectx)?,
-                            "module" => parser.parse_module(&mut ectx)?,
+                            "module" => parser.parse_module(false, &mut ectx)?,
+                            "prototype" => parser.parse_module(true, &mut ectx)?,
+                            "alias" => parser.parse_alias(&mut ectx)?,
                             "link" => parser.parse_link(&mut ectx)?,
                             "network" => parser.parse_network(&mut ectx)?,
                             _ => { 
@@ -80,7 +83,7 @@ pub fn parse(asset: Asset<'_>, tokens: TokenStream) -> ParsingResult {
 ///
 /// The result of parsing an asset.
 /// 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsingResult {
     /// The descriptor of the asset that was parsed.
     pub asset: AssetDescriptor,
@@ -93,7 +96,9 @@ pub struct ParsingResult {
     /// A collection of all unchecked channel definitions.
     pub links: Vec<LinkDef>,
     /// A collection of all unchecked modules definitions.
-    pub modules: Vec<ModuleDef>,
+    pub modules_and_prototypes: Vec<ModuleDef>,
+    /// A collection of all aliases refering to prototypes.
+    pub aliases: Vec<AliasDef>,
     /// A collection of all unchecked network definitions.
     pub networks: Vec<NetworkDef>,
 
@@ -181,7 +186,7 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    fn parse_module(&mut self, ectx: &mut ParsingErrorContext<'_>) -> NdlResult<()> {
+    fn parse_module(&mut self, is_prototype: bool,  ectx: &mut ParsingErrorContext<'_>) -> NdlResult<()> {
         ectx.reset_transient();
         self.eat_whitespace();
 
@@ -219,6 +224,8 @@ impl<'a> Parser<'a> {
             submodules: Vec::new(),
             connections: Vec::new(),
             parameters: Vec::new(),
+            
+            is_prototype,
         };
 
         loop {
@@ -232,7 +239,7 @@ impl<'a> Parser<'a> {
                     ectx.reset_transient();
 
                     module_def.loc = Loc::fromto(id_token_loc, subsec_token.loc);
-                    self.result.modules.push(module_def);
+                    self.result.modules_and_prototypes.push(module_def);
                     return Ok(());
                 }
 
@@ -282,7 +289,7 @@ impl<'a> Parser<'a> {
             .unwrap_or_else(|_| self.asset.end_pos()) - id_token_loc.pos;
         module_def.loc = Loc::new(id_token_loc.pos, len, id_token_loc.line);
 
-        self.result.modules.push(module_def);
+        self.result.modules_and_prototypes.push(module_def);
 
         Ok(())
     }
@@ -938,6 +945,52 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn parse_alias(&mut self, ectx: &mut ParsingErrorContext<'_>) -> NdlResult<()> {
+        let loc = {
+            self.tokens.bump_back(1);
+            self.next_token().unwrap().0.loc
+        };
+        // Consumed keyword already
+        // expect next token to be a whitspace so eat it.
+        self.eat_whitespace();
+
+        let (token, name) = self.next_token()?;
+        let name = name.to_string();
+        if token.kind != TokenKind::Ident {
+            ectx.record(ParAliasMissingIdent, format!("Unexpected token '{}'. Expected ident.", name), token.loc)?;
+            return Ok(())
+        }
+
+        self.eat_whitespace();
+        let (token_like, like) = self.next_token()?;
+        if token_like.kind != TokenKind::Ident {
+            ectx.record(ParAliasMissingLikeToken, format!("Unexpected token '{}'. Expected 'like'.", &like), token_like.loc)?;
+            return Ok(())
+        }
+
+        if like != "like" {
+            ectx.record(ParAliasMissingLikeKeyword, format!("Unexpected keyword '{}'. Expected 'like'.", like), token_like.loc)?;
+            return Ok(())
+        }
+
+        self.eat_whitespace();
+        let (token, prototype) = self.next_token()?;
+        let prototype = prototype.to_string();
+        if token.kind != TokenKind::Ident {
+            ectx.record(ParAliasMissingPrototypeIdent, format!("Unexpected token '{}'. Expected ident.", name), token.loc)?;
+            return Ok(())
+        }
+
+        self.result.aliases.push(AliasDef {
+            loc,
+
+            name,
+            prototype
+        });
+
+        Ok(())
+    }
+
     fn parse_network(&mut self, ectx: &mut ParsingErrorContext<'_>) -> NdlResult<()> {
         ectx.reset_transient();
         self.eat_whitespace();
@@ -1313,8 +1366,8 @@ impl Display for ParsingResult {
 
         writeln!(f)?;
         writeln!(f, "    modules:")?;
-        for module in &self.modules {
-            writeln!(f, "    - {} {{", module.name)?;
+        for module in &self.modules_and_prototypes {
+            writeln!(f, "    - {}{} {{", module.name, if module.is_prototype { " @prototype" } else { "" })?;
 
             writeln!(f, "      submodules:")?;
             for submodule in &module.submodules {
@@ -1334,6 +1387,12 @@ impl Display for ParsingResult {
             }
 
             writeln!(f, "    }}")?;
+        }
+
+        writeln!(f)?;
+        writeln!(f, "    aliases:")?;
+        for alias in &self.aliases {
+            writeln!(f, "    - alias {} like {}", alias.name, alias.prototype)?
         }
 
         writeln!(f)?;

@@ -118,32 +118,40 @@ fn ndl_parser_test() {
         (300, 0.1, 0.1)
     );
 
-    assert_eq!(result.modules.len(), 2);
+    assert_eq!(result.modules_and_prototypes.len(), 2);
 
-    assert_eq!(result.modules[0].name, "SubM");
-    assert_eq!(result.modules[0].gates.len(), 1);
-    assert_eq!(result.modules[0].gates[0].name, "another");
-    assert_eq!(result.modules[0].gates[0].size, 5);
+    assert_eq!(result.modules_and_prototypes[0].name, "SubM");
+    assert_eq!(result.modules_and_prototypes[0].gates.len(), 1);
+    assert_eq!(result.modules_and_prototypes[0].gates[0].name, "another");
+    assert_eq!(result.modules_and_prototypes[0].gates[0].size, 5);
 
-    assert_eq!(result.modules[0].parameters.len(), 1);
-    assert_eq!(result.modules[0].parameters[0].ident, "addr");
-    assert_eq!(result.modules[0].parameters[0].ty, "usize");
+    assert_eq!(result.modules_and_prototypes[0].parameters.len(), 1);
+    assert_eq!(result.modules_and_prototypes[0].parameters[0].ident, "addr");
+    assert_eq!(result.modules_and_prototypes[0].parameters[0].ty, "usize");
 
-    assert_eq!(result.modules[1].name, "Main");
-    assert_eq!(result.modules[1].gates.len(), 3);
-    assert_eq!(result.modules[1].gates[0].name, "some");
-    assert_eq!(result.modules[1].gates[0].size, 5);
-    assert_eq!(result.modules[1].gates[1].name, "same");
-    assert_eq!(result.modules[1].gates[1].size, 5);
-    assert_eq!(result.modules[1].gates[2].name, "sike");
-    assert_eq!(result.modules[1].gates[2].size, 1);
+    assert_eq!(result.modules_and_prototypes[1].name, "Main");
+    assert_eq!(result.modules_and_prototypes[1].gates.len(), 3);
+    assert_eq!(result.modules_and_prototypes[1].gates[0].name, "some");
+    assert_eq!(result.modules_and_prototypes[1].gates[0].size, 5);
+    assert_eq!(result.modules_and_prototypes[1].gates[1].name, "same");
+    assert_eq!(result.modules_and_prototypes[1].gates[1].size, 5);
+    assert_eq!(result.modules_and_prototypes[1].gates[2].name, "sike");
+    assert_eq!(result.modules_and_prototypes[1].gates[2].size, 1);
 
-    assert_eq!(result.modules[1].submodules.len(), 1);
-    assert_eq!(result.modules[1].submodules[0].ty, "SubM");
-    assert_eq!(result.modules[1].submodules[0].desc.descriptor, "m");
+    assert_eq!(result.modules_and_prototypes[1].submodules.len(), 1);
+    assert_eq!(result.modules_and_prototypes[1].submodules[0].ty, "SubM");
+    assert_eq!(
+        result.modules_and_prototypes[1].submodules[0]
+            .desc
+            .descriptor,
+        "m"
+    );
 
-    assert_eq!(result.modules[1].connections.len(), 2);
-    assert_eq!(result.modules[1].connections[0].channel, None);
+    assert_eq!(result.modules_and_prototypes[1].connections.len(), 2);
+    assert_eq!(
+        result.modules_and_prototypes[1].connections[0].channel,
+        None
+    );
 
     assert_eq!(result.networks.len(), 1);
     assert_eq!(result.networks[0].name, "SimMain");
@@ -153,19 +161,20 @@ fn ndl_parser_test() {
     assert_eq!(result.networks[0].nodes[0].ty, "Main");
 }
 
-#[test]
-fn ndl_desugar_test() {
-    use crate::*;
+// #[test]
+// fn ndl_desugar_test() {
+//     use crate::*;
 
-    let mut resolver = NdlResolver::new("tests/examples/TycTest").expect("Failed to load TcyTest");
-    let _ = resolver.run();
+//     let mut resolver = NdlResolver::new("tests/examples/TycTest").expect("Failed to load TcyTest");
+//     let _ = resolver.run();
 
-    let unit = resolver.units.get("Main").unwrap();
-    let desugared_unit = desugar(unit, &resolver);
+//     let unit = resolver.units.get("Main").unwrap();
 
-    println!("{}", unit);
-    println!("{}", desugared_unit);
-}
+//     let desugared_unit = desugar_unit(unit, &resolver);
+
+//     println!("{}", unit);
+//     println!("{}", desugared_unit);
+// }
 
 #[test]
 fn ndl_tycheck_test() {
@@ -198,6 +207,18 @@ fn ndl_full_test() {
 fn ndl_protsim_test() {
     let mut resolver =
         NdlResolver::new("tests/examples/protsim").expect("Failed to create resolver");
+
+    println!("{}", resolver);
+
+    let _ = resolver.run();
+
+    println!("{}", resolver);
+}
+
+#[test]
+fn ndl_prototype_test() {
+    let mut resolver =
+        NdlResolver::new("tests/examples/prototype").expect("Failed to create resolver.");
 
     println!("{}", resolver);
 

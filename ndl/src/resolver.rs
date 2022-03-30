@@ -126,14 +126,16 @@ impl NdlResolver {
 
         // === TY DESUGAR ==
 
-        for (alias, unit) in &self.units {
-            let desugared = desugar(unit, self);
-            self.ectx
-                .desugaring_errors
-                .append(&mut desugared.errors.clone());
+        desugar::desugar_ctx(self);
 
-            self.desugared_units.insert(alias.clone(), desugared);
-        }
+        // for (alias, unit) in &self.units {
+        //     let desugared = desugar_unit(unit, self);
+        //     self.ectx
+        //         .desugaring_errors
+        //         .append(&mut desugared.errors.clone());
+
+        //     self.desugared_units.insert(alias.clone(), desugared);
+        // }
 
         // === TY CHECK ===
 

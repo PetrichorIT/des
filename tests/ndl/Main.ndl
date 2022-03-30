@@ -9,8 +9,8 @@ module Bob {
         child: Alice
 
     gates:
-        netIn[3]
-        netOut[3]
+        netIn[3] @input
+        netOut[3] @output
         uplink
 
     connections:

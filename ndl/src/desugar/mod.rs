@@ -2,6 +2,7 @@ use crate::*;
 
 use crate::error::*;
 use crate::parser::*;
+use std::collections::HashMap;
 use std::fmt::Display;
 
 mod specs;
@@ -10,11 +11,82 @@ mod tyctx;
 pub use specs::*;
 pub use tyctx::*;
 
+pub fn desugar_ctx(resolver: &mut NdlResolver) {
+    let mut first_pass_units: HashMap<String, FirstPassDesugarResult> = HashMap::new();
+
+    // First pass
+    for (alias, unit) in &resolver.units {
+        let desugared = desugar_unit(unit, resolver);
+
+        first_pass_units.insert(alias.clone(), desugared);
+    }
+
+    // Second pass
+    for (alias, fpass) in first_pass_units {
+        let result = desugar_second_pass(fpass, resolver);
+
+        // Defer errors
+        resolver
+            .ectx
+            .desugaring_errors
+            .append(&mut result.errors.clone());
+
+        resolver.desugared_units.insert(alias, result);
+    }
+}
+
+fn desugar_second_pass(
+    unit: FirstPassDesugarResult,
+    resolver: &NdlResolver,
+) -> DesugaredParsingResult {
+    let FirstPassDesugarResult {
+        asset,
+        mut errors,
+        includes,
+        mut modules,
+        prototypes,
+        aliases,
+        networks,
+    } = unit;
+
+    let gtyctx = resolver.gtyctx_def();
+
+    for AliasDef {
+        loc,
+        name,
+        prototype,
+    } in aliases
+    {
+        // search for proto
+        if let Some(proto) = prototypes.iter().find(|p| p.ident == prototype) {
+            let mut proto = proto.clone();
+            proto.ident = name;
+            modules.push(proto);
+        } else {
+            errors.push(Error::new_ty_missing(
+                DsgInvalidPrototype,
+                format!("No prototype called '{}' found.", prototype),
+                loc,
+                &resolver.source_map,
+                gtyctx.module(&prototype).map(|m| m.loc),
+            ));
+        }
+    }
+
+    DesugaredParsingResult {
+        asset,
+        errors,
+        includes,
+        modules,
+        networks,
+    }
+}
+
 ///
 /// Transforms a given a internal ParsingResult into a internal DesugaredParsingResult
 /// by removing syntactic sugar, and turning Defs into Specs.
 ///
-pub fn desugar(unit: &ParsingResult, resolver: &NdlResolver) -> DesugaredParsingResult {
+fn desugar_unit(unit: &ParsingResult, resolver: &NdlResolver) -> FirstPassDesugarResult {
     let mut errors = Vec::new();
     let tyctx = TyDefContext::new_for(unit, resolver, &mut errors);
     let gtyctx = resolver.gtyctx_def();
@@ -31,7 +103,8 @@ pub fn desugar(unit: &ParsingResult, resolver: &NdlResolver) -> DesugaredParsing
         // Continue anyway.
     }
 
-    let mut result = DesugaredParsingResult::new(unit);
+    let mut result = FirstPassDesugarResult::new(unit);
+    result.aliases = unit.aliases.clone();
 
     //
     // === Map includes ===
@@ -50,7 +123,7 @@ pub fn desugar(unit: &ParsingResult, resolver: &NdlResolver) -> DesugaredParsing
     // === Map Modules ===
     //
 
-    for module in &unit.modules {
+    for module in &unit.modules_and_prototypes {
         let mut module_spec = ModuleSpec::new(module);
 
         // Resolve ChildModuleDef to ChildModuleSpec
@@ -172,7 +245,11 @@ pub fn desugar(unit: &ParsingResult, resolver: &NdlResolver) -> DesugaredParsing
             }
         }
 
-        result.modules.push(module_spec);
+        if module_spec.derived_from.is_some() {
+            result.prototypes.push(module_spec);
+        } else {
+            result.modules.push(module_spec);
+        }
     }
 
     //
@@ -604,6 +681,106 @@ fn resolve_connection_ident(
 /// A raw specification of a assets defined modules, networks and includes.
 ///
 #[derive(Debug, Clone, PartialEq)]
+pub struct FirstPassDesugarResult {
+    /// The asset the [ParsingResult] was derived from.
+    pub asset: AssetDescriptor,
+
+    /// The errors that occured while desugaring,
+    pub errors: Vec<Error>,
+
+    /// The direct includes of the asset.
+    pub includes: Vec<IncludeSpec>,
+    /// The defined modules of the asset.
+    pub modules: Vec<ModuleSpec>, // Link specs are removed and link data is stored directly in connections.
+
+    pub prototypes: Vec<ModuleSpec>,
+    pub aliases: Vec<AliasDef>,
+
+    /// The defined networks of the asset.
+    pub networks: Vec<NetworkSpec>,
+}
+
+impl FirstPassDesugarResult {
+    ///
+    /// Creates a new instance of Self, by referencing the [ParsingResult]
+    /// to be desugared.
+    ///
+    fn new(unit: &ParsingResult) -> Self {
+        Self {
+            asset: unit.asset.clone(),
+
+            errors: Vec::new(),
+
+            includes: Vec::with_capacity(unit.includes.len()),
+            modules: Vec::with_capacity(unit.modules_and_prototypes.len()),
+            prototypes: Vec::with_capacity(unit.modules_and_prototypes.len() / 2),
+            aliases: Vec::with_capacity(unit.aliases.len()),
+            networks: Vec::with_capacity(unit.networks.len()),
+        }
+    }
+}
+
+impl Display for FirstPassDesugarResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "DesugaredParsingResult {{")?;
+
+        writeln!(f, "    includes:")?;
+        for include in &self.includes {
+            writeln!(f, "    - {}", include)?;
+        }
+
+        writeln!(f)?;
+        writeln!(f, "    modules:")?;
+        for module in &self.modules {
+            writeln!(f, "    - {} {{", module.ident)?;
+
+            writeln!(f, "      submodules:")?;
+            for submodule in &module.submodules {
+                writeln!(f, "        {} {}", submodule.ty, submodule.descriptor)?;
+            }
+
+            writeln!(f)?;
+            writeln!(f, "      gates:")?;
+            for gate in &module.gates {
+                writeln!(f, "        {}", gate)?;
+            }
+
+            writeln!(f)?;
+            writeln!(f, "      connections:")?;
+            for con in &module.connections {
+                writeln!(f, "        {}", con)?;
+            }
+
+            writeln!(f, "    }}")?;
+        }
+
+        writeln!(f)?;
+        writeln!(f, "    networks:")?;
+        for module in &self.networks {
+            writeln!(f, "    - {} {{", module.ident)?;
+
+            writeln!(f, "      nodes:")?;
+            for submodule in &module.nodes {
+                writeln!(f, "        {} {}", submodule.ty, submodule.descriptor)?;
+            }
+
+            writeln!(f)?;
+            writeln!(f, "      connections:")?;
+            for con in &module.connections {
+                writeln!(f, "        {}", con)?;
+            }
+
+            writeln!(f, "    }}")?;
+        }
+
+        write!(f, "}}")
+    }
+}
+
+///
+/// A raw specification of a assets defined modules, networks and includes.
+///
+#[derive(Debug, Clone, PartialEq)]
 pub struct DesugaredParsingResult {
     /// The asset the [ParsingResult] was derived from.
     pub asset: AssetDescriptor,
@@ -617,24 +794,6 @@ pub struct DesugaredParsingResult {
     pub modules: Vec<ModuleSpec>, // Link specs are removed and link data is stored directly in connections.
     /// The defined networks of the asset.
     pub networks: Vec<NetworkSpec>,
-}
-
-impl DesugaredParsingResult {
-    ///
-    /// Creates a new instance of Self, by referencing the [ParsingResult]
-    /// to be desugared.
-    ///
-    fn new(unit: &ParsingResult) -> Self {
-        Self {
-            asset: unit.asset.clone(),
-
-            errors: Vec::new(),
-
-            includes: Vec::with_capacity(unit.includes.len()),
-            modules: Vec::with_capacity(unit.modules.len()),
-            networks: Vec::with_capacity(unit.networks.len()),
-        }
-    }
 }
 
 impl Display for DesugaredParsingResult {

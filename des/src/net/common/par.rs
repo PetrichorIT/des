@@ -43,7 +43,7 @@ impl Parameters {
         map
     }
 
-    pub(crate) fn get_value(&self, path: &str, key: &str) -> ParHandle<'_, Optional> {
+    pub(crate) fn get_handle(&self, path: &str, key: &str) -> ParHandle<'_, Optional> {
         let par = self.tree.get_value(path, key).map(str::to_string);
 
         // dirty hack for the time being
@@ -105,6 +105,14 @@ impl<'a, State> ParHandle<'a, State>
 where
     State: private::ParHandleState,
 {
+    ///
+    /// Unwraps the handle allowing [Deref] on the contained
+    /// value consuming self.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the handle points to no existing value.
+    ///
     pub fn unwrap(self) -> ParHandle<'a, Unwraped> {
         if self.par.is_some() {
             ParHandle {
@@ -119,10 +127,31 @@ where
         }
     }
 
+    ///
+    /// Indicates whether the handle contains a value.
+    ///
+    pub fn is_some(&self) -> bool {
+        self.par.is_some()
+    }
+
+    ///
+    /// Indicates whether the handle contains a value.
+    ///
+    pub fn is_none(&self) -> bool {
+        self.par.is_some()
+    }
+
+    ///
+    /// Returns the contained value optionally, thereby losing the
+    /// ability to set the par.
+    ///
     pub fn as_optional(self) -> Option<String> {
         self.par
     }
 
+    ///
+    /// Sets the parameter to the given value.
+    ///
     pub fn set<T>(self, value: T)
     where
         T: ToString,

@@ -39,6 +39,8 @@ pub struct LinkDef {
     pub jitter: f64,
 }
 
+impl Eq for LinkDef {}
+
 impl Display for LinkDef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -67,6 +69,8 @@ pub struct ModuleDef {
     pub connections: Vec<ConDef>,
     /// The parameters expected by this module.
     pub parameters: Vec<ParamDef>,
+    /// Indicate whether this type will actually be instantiated
+    pub is_prototype: bool,
 }
 
 ///
@@ -303,4 +307,15 @@ pub struct NetworkDef {
     pub connections: Vec<ConDef>,
     /// The parameters expected by this module.
     pub parameters: Vec<ParamDef>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AliasDef {
+    /// The tokens location in the source asset.
+    pub loc: Loc,
+
+    /// The identifier of the alias.
+    pub name: String,
+    /// The identifier of the network.
+    pub prototype: String,
 }

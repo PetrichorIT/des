@@ -497,6 +497,11 @@ pub enum ErrorCode {
     ParModuleConInvaldiChannelSyntax,
     ParModuleConMissingClosingBracketForCLusterIdent,
 
+    ParAliasMissingIdent,
+    ParAliasMissingLikeToken,
+    ParAliasMissingLikeKeyword,
+    ParAliasMissingPrototypeIdent,
+
     ParNetworkMissingIdentifer,
     ParNetworkMissingDefBlockOpen,
     ParNetworkMissingSectionIdentifier,
@@ -518,6 +523,8 @@ pub enum ErrorCode {
     DsgConInvalidLocalGateIdent,
     DsgConInvalidGateSize,
     DsgConInvalidField,
+
+    DsgInvalidPrototype,
 
     TycGateConnectionViolatesAnnotation,
 

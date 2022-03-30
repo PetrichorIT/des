@@ -1,0 +1,13 @@
+prototype Application {
+    gates:
+        in @input
+        out @output
+}
+
+alias PingPongAppl like Application
+
+module X {
+    gates:
+        a @input
+        b[5]
+}
