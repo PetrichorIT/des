@@ -157,8 +157,8 @@ pub enum TyDef {
 impl TyDef {
     pub fn inner(&self) -> &str {
         match self {
-            Self::Static(ref s) => &s,
-            Self::Dynamic(ref s) => &s,
+            Self::Static(ref s) => s,
+            Self::Dynamic(ref s) => s,
         }
     }
 }

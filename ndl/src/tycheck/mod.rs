@@ -16,7 +16,7 @@ const PAR_TYPES: [&str; 15] = [
 pub fn validate_module_ty(def: &ChildModuleDef, tyctx: &TyDefContext<'_>, gtyctx: &GlobalTyDefContext, smap: &SourceMap, errors: &mut Vec<Error>) {
     if !tyctx.modules_and_prototypes.iter().any(|m| m.name == def.ty.inner()) {
         // Ty missing 
-        let global_ty = gtyctx.module(&def.ty.inner()).map(|m| m.loc);
+        let global_ty = gtyctx.module(def.ty.inner()).map(|m| m.loc);
         errors.push(Error::new_ty_missing(
             TycNetworkSubmoduleInvalidTy,
             format!(

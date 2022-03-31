@@ -218,16 +218,13 @@ pub enum TySpec {
 
 impl TySpec {
     pub fn is_dynamic(&self) -> bool {
-        match self {
-            Self::Dynamic(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Dynamic(_))
     }
 
     pub fn inner(&self) -> &str {
         match self {
-            Self::Static(ref s) => &s,
-            Self::Dynamic(ref s) => &s,
+            Self::Static(ref s) => s,
+            Self::Dynamic(ref s) => s,
         }
     }
 

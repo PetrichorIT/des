@@ -6,7 +6,7 @@ pub(crate) fn second_pass(
     resolver: &NdlResolver,
 ) -> DesugaredParsingResult {
     let mut errors = Vec::new();
-    let tyctx = SecondPassTyCtx::new_for(&unit, all, &mut errors);
+    let tyctx = SecondPassTyCtx::new_for(unit, all, &mut errors);
 
     let asset = unit.asset.clone();
     let mut modules = unit.modules.clone();
@@ -39,7 +39,7 @@ pub(crate) fn second_pass(
                 format!("No prototype called '{}' found.", prototype),
                 *loc,
                 &resolver.source_map,
-                gtyctx.module(&prototype).map(|m| m.loc),
+                gtyctx.module(prototype).map(|m| m.loc),
             ));
         }
     }
