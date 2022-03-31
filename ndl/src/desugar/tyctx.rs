@@ -1,7 +1,12 @@
+use std::collections::HashMap;
+
 use crate::error::*;
 use crate::parser::*;
 use crate::resolver::*;
 use crate::source::*;
+use crate::ModuleSpec;
+
+use super::FirstPassDesugarResult;
 
 ///
 /// A global type context over the definitions stored in a resolver.
@@ -61,7 +66,7 @@ pub struct TyDefContext<'a> {
     /// A collection of all included channel definitions.
     pub links: Vec<&'a LinkDef>,
     /// A collection of all included module definitions.
-    pub modules: Vec<&'a ModuleDef>,
+    pub modules_and_prototypes: Vec<&'a ModuleDef>,
     /// A collection of all included network definitions.
     pub networks: Vec<&'a NetworkDef>,
 }
@@ -75,7 +80,7 @@ impl<'a> TyDefContext<'a> {
             included: Vec::new(),
 
             links: Vec::new(),
-            modules: Vec::new(),
+            modules_and_prototypes: Vec::new(),
             networks: Vec::new(),
         }
     }
@@ -128,8 +133,9 @@ impl<'a> TyDefContext<'a> {
     ///
     pub fn check_name_collision(&self) -> Result<(), &'static str> {
         let dup_links = (1..self.links.len()).any(|i| self.links[i..].contains(&self.links[i - 1]));
-        let dup_modules =
-            (1..self.modules.len()).any(|i| self.modules[i..].contains(&self.modules[i - 1]));
+        let dup_modules = (1..self.modules_and_prototypes.len()).any(|i| {
+            self.modules_and_prototypes[i..].contains(&self.modules_and_prototypes[i - 1])
+        });
         let dup_networks =
             (1..self.networks.len()).any(|i| self.networks[i..].contains(&self.networks[i - 1]));
 
@@ -156,7 +162,7 @@ impl<'a> TyDefContext<'a> {
         }
 
         for module in &unit.modules_and_prototypes {
-            self.modules.push(module)
+            self.modules_and_prototypes.push(module)
         }
 
         for network in &unit.networks {
@@ -168,6 +174,78 @@ impl<'a> TyDefContext<'a> {
 }
 
 impl Default for TyDefContext<'_> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+pub(crate) struct SecondPassTyCtx<'a> {
+    pub included: Vec<AssetDescriptor>,
+
+    pub prototypes: Vec<&'a ModuleSpec>,
+}
+
+impl<'a> SecondPassTyCtx<'a> {
+    pub fn new() -> Self {
+        Self {
+            included: Vec::new(),
+            prototypes: Vec::new(),
+        }
+    }
+
+    pub fn new_for(
+        fpass: &'a FirstPassDesugarResult,
+        all: &'a HashMap<String, FirstPassDesugarResult>,
+        errors: &mut Vec<Error>,
+    ) -> Self {
+        let mut obj = Self::new();
+
+        fn resolve_recursive<'a>(
+            all: &'a HashMap<String, FirstPassDesugarResult>,
+            unit: &'a FirstPassDesugarResult,
+            tyctx: &mut SecondPassTyCtx<'a>,
+            errors: &mut Vec<Error>,
+        ) {
+            let new_unit = tyctx.include(unit);
+            if new_unit {
+                // resolve meta imports.
+                for include in &unit.includes {
+                    if let Some(unit) = all.get(&include.path) {
+                        resolve_recursive(all, unit, tyctx, errors);
+                    } else {
+                        errors.push(Error::new(
+                            DsgIncludeInvalidAlias,
+                            format!(
+                                "Include '{}' cannot be resolved. No such file exists. {:?}",
+                                include.path, include.loc
+                            ),
+                            include.loc,
+                            false,
+                        ))
+                    }
+                }
+            }
+        }
+
+        resolve_recursive(all, fpass, &mut obj, errors);
+
+        obj
+    }
+
+    pub fn include(&mut self, fpass: &'a FirstPassDesugarResult) -> bool {
+        if self.included.contains(&fpass.asset) {
+            return false;
+        }
+
+        for proto in &fpass.prototypes {
+            self.prototypes.push(proto)
+        }
+
+        true
+    }
+}
+
+impl Default for SecondPassTyCtx<'_> {
     fn default() -> Self {
         Self::new()
     }

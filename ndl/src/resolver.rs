@@ -1,6 +1,6 @@
 use crate::*;
 
-use crate::desugar::DesugaredParsingResult;
+use crate::desugar::{DesugaredParsingResult, GlobalTyDefContext};
 use crate::error::*;
 use crate::parser::ParsingResult;
 use crate::tycheck::GlobalTySpecContext;

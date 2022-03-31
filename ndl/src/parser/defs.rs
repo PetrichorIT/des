@@ -62,7 +62,7 @@ pub struct ModuleDef {
     /// The identifier of the module.
     pub name: String,
     /// The local submodules defined for this module.
-    pub submodules: Vec<ChildeModuleDef>,
+    pub submodules: Vec<ChildModuleDef>,
     /// The gates exposed on this module.
     pub gates: Vec<GateDef>,
     /// The connections defined by this module.
@@ -77,12 +77,12 @@ pub struct ModuleDef {
 /// A definition of a local submodule, in a modules definition.
 ///
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChildeModuleDef {
+pub struct ChildModuleDef {
     /// The location of the source tokens.
     pub loc: Loc,
 
     /// The type of the submodule.
-    pub ty: String,
+    pub ty: TyDef,
     /// A module internal descriptor for the created submodule.
     pub desc: LocalDescriptorDef,
 }
@@ -139,6 +139,33 @@ impl Display for LocalDescriptorDef {
             write!(f, "{}[{}...{}]", self.descriptor, from, to)
         } else {
             write!(f, "{}", self.descriptor)
+        }
+    }
+}
+
+///
+/// A definition of a submodules type.
+///
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TyDef {
+    Static(String),
+    Dynamic(String),
+}
+
+impl TyDef {
+    pub fn inner(&self) -> &str {
+        match self {
+            Self::Static(ref s) => &s,
+            Self::Dynamic(ref s) => &s,
+        }
+    }
+}
+
+impl Display for TyDef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Static(ref s) => write!(f, "{}", s),
+            Self::Dynamic(ref s) => write!(f, "some {}", s),
         }
     }
 }
@@ -302,7 +329,7 @@ pub struct NetworkDef {
     /// The identifier of the network.
     pub name: String,
     /// The local submodules defined for this module.
-    pub nodes: Vec<ChildeModuleDef>,
+    pub nodes: Vec<ChildModuleDef>,
     /// The connections defined by this module.
     pub connections: Vec<ConDef>,
     /// The parameters expected by this module.

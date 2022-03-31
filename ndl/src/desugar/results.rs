@@ -6,7 +6,9 @@ use super::*;
 /// A raw specification of a assets defined modules, networks and includes.
 ///
 #[derive(Debug, Clone, PartialEq)]
-pub struct FirstPassDesugarResult {
+pub(crate) struct FirstPassDesugarResult<'a> {
+    pub unit: &'a ParsingResult,
+
     /// The asset the [ParsingResult] was derived from.
     pub asset: AssetDescriptor,
 
@@ -25,13 +27,14 @@ pub struct FirstPassDesugarResult {
     pub networks: Vec<NetworkSpec>,
 }
 
-impl FirstPassDesugarResult {
+impl<'a> FirstPassDesugarResult<'a> {
     ///
     /// Creates a new instance of Self, by referencing the [ParsingResult]
     /// to be desugared.
     ///
-    pub(crate) fn new(unit: &ParsingResult) -> Self {
+    pub(crate) fn new(unit: &'a ParsingResult) -> Self {
         Self {
+            unit,
             asset: unit.asset.clone(),
 
             errors: Vec::new(),
@@ -45,7 +48,7 @@ impl FirstPassDesugarResult {
     }
 }
 
-impl Display for FirstPassDesugarResult {
+impl Display for FirstPassDesugarResult<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "DesugaredParsingResult {{")?;
 

@@ -139,7 +139,10 @@ fn ndl_parser_test() {
     assert_eq!(result.modules_and_prototypes[1].gates[2].size, 1);
 
     assert_eq!(result.modules_and_prototypes[1].submodules.len(), 1);
-    assert_eq!(result.modules_and_prototypes[1].submodules[0].ty, "SubM");
+    assert_eq!(
+        result.modules_and_prototypes[1].submodules[0].ty.inner(),
+        "SubM"
+    );
     assert_eq!(
         result.modules_and_prototypes[1].submodules[0]
             .desc
@@ -158,7 +161,7 @@ fn ndl_parser_test() {
 
     assert_eq!(result.networks[0].nodes.len(), 1);
     assert_eq!(result.networks[0].nodes[0].desc.descriptor, "router");
-    assert_eq!(result.networks[0].nodes[0].ty, "Main");
+    assert_eq!(result.networks[0].nodes[0].ty.inner(), "Main");
 }
 
 // #[test]

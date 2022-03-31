@@ -26,8 +26,8 @@ pub fn desugar(resolver: &mut NdlResolver) {
     }
 
     // Second pass
-    for (alias, fpass) in first_pass_units {
-        let result = desugar_second_pass(fpass, resolver);
+    for (alias, fpass) in &first_pass_units {
+        let result = desugar_second_pass(fpass, &first_pass_units, resolver);
 
         // Defer errors
         resolver
@@ -37,54 +37,82 @@ pub fn desugar(resolver: &mut NdlResolver) {
 
         resolver.write_if_verbose(format!("{}.sdesugar", alias), &result);
 
-        resolver.desugared_units.insert(alias, result);
+        resolver.desugared_units.insert(alias.clone(), result);
     }
 }
 
 fn desugar_second_pass(
-    unit: FirstPassDesugarResult,
+    unit: &FirstPassDesugarResult,
+    all: &HashMap<String, FirstPassDesugarResult>,
     resolver: &NdlResolver,
 ) -> DesugaredParsingResult {
-    let FirstPassDesugarResult {
-        asset,
-        mut errors,
-        includes,
-        mut modules,
-        prototypes,
-        aliases,
-        networks,
-    } = unit;
+    let mut errors = Vec::new();
+    let tyctx = SecondPassTyCtx::new_for(&unit, all, &mut errors);
+
+    let asset = unit.asset.clone();
+    let mut modules = unit.modules.clone();
+
+    // let asset = asset.clone();
+    // let includes = includes.clone();
+    // let networks = networks.clone();
 
     let gtyctx = resolver.gtyctx_def();
 
+    //
+    // Alias derefing,
+    //
     for AliasDef {
         loc,
         name,
         prototype,
-    } in aliases
+    } in &unit.aliases
     {
         // search for proto
-        if let Some(proto) = prototypes.iter().find(|p| p.ident == prototype) {
-            let mut proto = proto.clone();
-            proto.ident = name;
+        let proto = tyctx.prototypes.iter().find(|p| p.ident == *prototype);
+
+        if let Some(proto) = proto {
+            let mut proto: ModuleSpec = proto.to_owned().to_owned();
+            proto.ident = name.clone();
             modules.push(proto);
         } else {
             errors.push(Error::new_ty_missing(
                 DsgInvalidPrototype,
                 format!("No prototype called '{}' found.", prototype),
-                loc,
+                *loc,
                 &resolver.source_map,
                 gtyctx.module(&prototype).map(|m| m.loc),
             ));
         }
     }
 
+    //
+    // 'some' checking (order is important) for modules
+    //
+    for module in &modules {
+        for child in &module.submodules {
+            if let TySpec::Dynamic(ref s) = child.ty {
+                // check whether s is a existing prototype.
+
+                let exists = tyctx.prototypes.iter().any(|p| &p.ident == s);
+                if !exists {
+                    errors.push(Error::new_ty_missing(
+                        DsgInvalidPrototype,
+                        format!("Unknown prototype '{}'.", s),
+                        child.loc,
+                        &resolver.source_map,
+                        gtyctx.module(s).map(|m| m.loc),
+                    ))
+                }
+            }
+        }
+    }
+
     DesugaredParsingResult {
         asset,
         errors,
-        includes,
+        includes: unit.includes.clone(),
         modules,
-        networks,
+        networks: unit.networks.clone(),
     }
 }
 
@@ -92,7 +120,7 @@ fn desugar_second_pass(
 /// Transforms a given a internal ParsingResult into a internal DesugaredParsingResult
 /// by removing syntactic sugar, and turning Defs into Specs.
 ///
-fn desugar_unit(unit: &ParsingResult, resolver: &NdlResolver) -> FirstPassDesugarResult {
+fn desugar_unit<'a>(unit: &'a ParsingResult, resolver: &NdlResolver) -> FirstPassDesugarResult<'a> {
     let mut errors = Vec::new();
     let tyctx = TyDefContext::new_for(unit, resolver, &mut errors);
     let gtyctx = resolver.gtyctx_def();
@@ -139,7 +167,7 @@ fn desugar_unit(unit: &ParsingResult, resolver: &NdlResolver) -> FirstPassDesuga
             // on expanded macro types.
             validate_module_ty(child, &tyctx, &gtyctx, &resolver.source_map, &mut errors);
 
-            let ChildeModuleDef { loc, ty, desc } = child;
+            let ChildModuleDef { loc, ty, desc } = child;
 
             if let Some((from_id, to_id)) = desc.cluster_bounds {
                 // Desugar macro
@@ -147,7 +175,7 @@ fn desugar_unit(unit: &ParsingResult, resolver: &NdlResolver) -> FirstPassDesuga
                     module_spec.submodules.push(ChildModuleSpec {
                         loc: *loc,
                         descriptor: format!("{}[{}]", desc.descriptor, id),
-                        ty: ty.clone(),
+                        ty: TySpec::new(ty),
                     })
                 }
             } else {
@@ -155,7 +183,7 @@ fn desugar_unit(unit: &ParsingResult, resolver: &NdlResolver) -> FirstPassDesuga
                 module_spec.submodules.push(ChildModuleSpec {
                     loc: *loc,
                     descriptor: desc.descriptor.clone(),
-                    ty: ty.clone(),
+                    ty: TySpec::new(ty),
                 })
             }
         }
@@ -269,7 +297,7 @@ fn desugar_unit(unit: &ParsingResult, resolver: &NdlResolver) -> FirstPassDesuga
         // Defines that tycheck should be done on unexpanded macros
 
         let occupied_namespaces = Vec::<&LocalDescriptorDef>::new();
-        for ChildeModuleDef { desc, .. } in &network_def.nodes {
+        for ChildModuleDef { desc, .. } in &network_def.nodes {
             // check collisions.
             if let Some(col) = occupied_namespaces
                 .iter()
@@ -295,14 +323,14 @@ fn desugar_unit(unit: &ParsingResult, resolver: &NdlResolver) -> FirstPassDesuga
             // on expanded macro types.
             validate_module_ty(child, &tyctx, &gtyctx, &resolver.source_map, &mut errors);
 
-            let ChildeModuleDef { loc, ty, desc } = child;
+            let ChildModuleDef { loc, ty, desc } = child;
             if let Some((from_id, to_id)) = desc.cluster_bounds {
                 // Desugar macro
                 for id in from_id..=to_id {
                     network_spec.nodes.push(ChildModuleSpec {
                         loc: *loc,
                         descriptor: format!("{}[{}]", desc.descriptor, id),
-                        ty: ty.clone(),
+                        ty: TySpec::new(ty),
                     })
                 }
             } else {
@@ -310,7 +338,7 @@ fn desugar_unit(unit: &ParsingResult, resolver: &NdlResolver) -> FirstPassDesuga
                 network_spec.nodes.push(ChildModuleSpec {
                     loc: *loc,
                     descriptor: desc.descriptor.clone(),
-                    ty: ty.clone(),
+                    ty: TySpec::new(ty),
                 })
             }
         }
@@ -414,7 +442,7 @@ fn desugar_unit(unit: &ParsingResult, resolver: &NdlResolver) -> FirstPassDesuga
 fn resolve_connection_ident(
     ident: &ConNodeIdent,
     local_gates: &[GateDef],
-    child_modules: &[ChildeModuleDef],
+    child_modules: &[ChildModuleDef],
     tyctx: &TyDefContext,
     gtyctx: &GlobalTyDefContext,
     errors: &mut Vec<Error>,
@@ -530,9 +558,9 @@ fn resolve_connection_ident(
                 // this can be done outside the following if-else
                 // since a cluster-definition shares the same ty
                 let sub_module_ty = match tyctx
-                    .modules
+                    .modules_and_prototypes
                     .iter()
-                    .find(|module| module.name == submod_def.ty)
+                    .find(|module| module.name == submod_def.ty.inner())
                 {
                     Some(sub_module) => sub_module,
                     None => {
@@ -544,7 +572,9 @@ fn resolve_connection_ident(
                             ),
                             *loc,
                             gtyctx.source_map(),
-                            gtyctx.module(&submod_def.ty).map(|module| module.loc),
+                            gtyctx
+                                .module(&submod_def.ty.inner())
+                                .map(|module| module.loc),
                         ));
                         return None;
                     }

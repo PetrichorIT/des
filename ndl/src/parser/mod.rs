@@ -5,6 +5,9 @@ use crate::lexer::LiteralKind;
 
 use std::fmt::Display;
 
+mod result;
+pub use result::*;
+
 mod defs;
 pub use defs::*;
 
@@ -80,31 +83,7 @@ pub fn parse(asset: Asset<'_>, tokens: TokenStream) -> ParsingResult {
     parser.finish(ectx)
 }
 
-///
-/// The result of parsing an asset.
-/// 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParsingResult {
-    /// The descriptor of the asset that was parsed.
-    pub asset: AssetDescriptor,
 
-    /// The location of the referenced asset.
-    pub loc: Loc,
-
-    /// A collection of all unchecked includes.
-    pub includes: Vec<IncludeDef>,
-    /// A collection of all unchecked channel definitions.
-    pub links: Vec<LinkDef>,
-    /// A collection of all unchecked modules definitions.
-    pub modules_and_prototypes: Vec<ModuleDef>,
-    /// A collection of all aliases refering to prototypes.
-    pub aliases: Vec<AliasDef>,
-    /// A collection of all unchecked network definitions.
-    pub networks: Vec<NetworkDef>,
-
-    /// A list of all parsing errors that were encountered.
-    pub errors: Vec<Error>,
-}
 
 struct Parser<'a> {
     result: ParsingResult,
@@ -273,7 +252,7 @@ impl<'a> Parser<'a> {
 
             let done = match &subsection_id[..] {
                 "gates" => self.parse_module_gates(&mut module_def.gates, ectx)?,
-                "submodules" => self.parse_childmodule_def(&mut module_def.submodules, ectx, &MODULE_SUBSECTION_IDENT)?,
+                "submodules" => self.parse_childmodule_def(false, &mut module_def.submodules, ectx, &MODULE_SUBSECTION_IDENT)?,
                 "connections" => self.parse_node_connections(&mut module_def.connections, ectx, &MODULE_SUBSECTION_IDENT)?,
                 "parameters" => self.parse_par(&mut module_def.parameters, ectx, &MODULE_SUBSECTION_IDENT)?,
                 _ => unreachable!()
@@ -520,7 +499,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_childmodule_def(&mut self, child_modules: &mut Vec<ChildeModuleDef>, ectx: &mut ParsingErrorContext<'_>, escape_keywords: &[&str]) -> NdlResult<bool> {
+    fn parse_childmodule_def(&mut self, is_network: bool, child_modules: &mut Vec<ChildModuleDef>, ectx: &mut ParsingErrorContext<'_>, escape_keywords: &[&str]) -> NdlResult<bool> {
 
         loop {
             self.eat_whitespace();
@@ -618,7 +597,7 @@ impl<'a> Parser<'a> {
                         self.eat_whitespace();
 
                         let (second_token, ty) = self.next_token()?;
-                        let ty = String::from(ty);
+                        let mut ty_def = TyDef::Static(ty.to_string());
                         if second_token.kind != TokenKind::Ident {
                             ectx.record(
                                 ParModuleSubInvalidIdentiferToken,
@@ -628,10 +607,41 @@ impl<'a> Parser<'a> {
                             return Ok(false);
                         }
 
+                        if ty == "some" {
+                            if is_network {
+
+                                ectx.record(
+                                    ParNetworkDoesntAllowSome,
+                                    "Unexpected keyword 'some'. This is not allowed on network definitions.".to_string(),
+                                    second_token.loc
+                                )?;
+                                return Ok(false)
+                            }
+
+                           self.eat_whitespace();
+                            
+                           // Dynamic type definition
+                            let (token, real_ty) = self.next_token()?;
+                            if token.kind != TokenKind::Ident {
+                                ectx.record(
+                                    ParModuleSubInvalidIdentiferToken,
+                                    String::from("Unexpected token. Expected type identifer."),
+                                    second_token.loc
+                                )?;
+                                return Ok(false);
+                            }
+                            
+                            ty_def = TyDef::Dynamic(real_ty.to_string());
+                        }
+
                         self.eat_whitespace();
                         self.eat_optionally(|t| t.kind == TokenKind::Comma);
 
-                        child_modules.push(ChildeModuleDef { loc: Loc::fromto(first_token_loc, second_token.loc), ty, desc });
+                        child_modules.push(ChildModuleDef { 
+                            loc: Loc::fromto(first_token_loc, second_token.loc), 
+                            ty: ty_def, 
+                            desc 
+                        });
                     }
                 },
                 _ => {
@@ -992,6 +1002,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_network(&mut self, ectx: &mut ParsingErrorContext<'_>) -> NdlResult<()> {
+        
         ectx.reset_transient();
         self.eat_whitespace();
 
@@ -1074,7 +1085,7 @@ impl<'a> Parser<'a> {
             ectx.reset_transient();
 
             let done = match &subsection_id[..] {
-                "nodes" => self.parse_childmodule_def(&mut network_def.nodes, ectx, &NETWORK_SUBSECTION_IDENT)?,
+                "nodes" => self.parse_childmodule_def(true, &mut network_def.nodes, ectx, &NETWORK_SUBSECTION_IDENT)?,
                 "connections" => self.parse_node_connections(&mut network_def.connections, ectx, &NETWORK_SUBSECTION_IDENT)?,
                 "parameters" => self.parse_par(&mut network_def.parameters, ectx, &NETWORK_SUBSECTION_IDENT)?,
                 _ => unreachable!()
@@ -1349,74 +1360,6 @@ impl<'a> Parser<'a> {
     }
 }
 
-impl Display for ParsingResult {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "ParsingResult {{")?;
-        
-        writeln!(f, "    includes:")?;
-        for include in &self.includes {
-            writeln!(f, "    - {}", include)?;
-        }
-
-        writeln!(f)?;
-        writeln!(f, "    links:")?;
-        for link in &self.links {
-            writeln!(f, "    - {}", link)?;
-        }
-
-        writeln!(f)?;
-        writeln!(f, "    modules:")?;
-        for module in &self.modules_and_prototypes {
-            writeln!(f, "    - {}{} {{", module.name, if module.is_prototype { " @prototype" } else { "" })?;
-
-            writeln!(f, "      submodules:")?;
-            for submodule in &module.submodules {
-                writeln!(f, "        {} {}", submodule.ty, submodule.desc)?;
-            }
-
-            writeln!(f)?;
-            writeln!(f, "      gates:")?;
-            for gate in &module.gates {
-                writeln!(f, "        {}", gate)?;
-            }
-
-            writeln!(f)?;
-            writeln!(f, "      connections:")?;
-            for con in &module.connections {
-                writeln!(f, "        {}", con)?;
-            }
-
-            writeln!(f, "    }}")?;
-        }
-
-        writeln!(f)?;
-        writeln!(f, "    aliases:")?;
-        for alias in &self.aliases {
-            writeln!(f, "    - alias {} like {}", alias.name, alias.prototype)?
-        }
-
-        writeln!(f)?;
-        writeln!(f, "    networks:")?;
-        for module in &self.networks {
-            writeln!(f, "    - {} {{", module.name)?;
-
-            writeln!(f, "      nodes:")?;
-            for submodule in &module.nodes {
-                writeln!(f, "        {} {}", submodule.ty, submodule.desc)?;
-            }
-
-            writeln!(f)?;
-            writeln!(f, "      connections:")?;
-            for con in &module.connections {
-                writeln!(f, "        {}", con)?;
-            }
-
-            writeln!(f, "    }}")?;
-        }
-
-        write!(f, "}}")
-    }
-}
 
 enum ConIdentiferResult {
     Error,

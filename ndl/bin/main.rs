@@ -28,11 +28,15 @@ fn main() -> std::io::Result<()> {
     } = Opt::from_args();
 
     if workspaces.is_empty() {
-        workspaces.push(std::env::current_dir()?.to_str().unwrap().to_string());
+        workspaces.push("ndl/tests/examples/prototype".to_string());
     }
 
+    // if workspaces.is_empty() {
+    //     workspaces.push(std::env::current_dir()?.to_str().unwrap().to_string());
+    // }
+
     let opts = NdlResolverOptions {
-        silent: true,
+        silent: false,
         verbose: verbose_with_dir.is_some(),
         verbose_output_dir: verbose_with_dir.map(PathBuf::from).unwrap_or_default(),
     };

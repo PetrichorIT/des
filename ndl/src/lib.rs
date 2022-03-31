@@ -90,9 +90,11 @@ pub use desugar::{
 };
 pub use parser::GateAnnotation;
 
+#[cfg(test)]
+pub use parser::TyDef;
+
 // > TyCtx
-pub use desugar::GlobalTyDefContext;
-pub use desugar::TyDefContext;
+
 pub use tycheck::GlobalTySpecContext;
 pub use tycheck::OwnedTySpecContext;
 pub use tycheck::TySpecContext;

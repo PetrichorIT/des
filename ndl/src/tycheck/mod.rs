@@ -1,8 +1,8 @@
 use crate::*;
 
-use crate::desugar::DesugaredParsingResult;
+use crate::desugar::{TyDefContext, GlobalTyDefContext, DesugaredParsingResult};
 use crate::error::*;
-use crate::parser::ChildeModuleDef;
+use crate::parser::ChildModuleDef;
 
 mod tyctx;
 
@@ -13,10 +13,10 @@ const PAR_TYPES: [&str; 15] = [
     "char", "String",
 ];
 
-pub fn validate_module_ty(def: &ChildeModuleDef, tyctx: &TyDefContext<'_>, gtyctx: &GlobalTyDefContext, smap: &SourceMap, errors: &mut Vec<Error>) {
-    if !tyctx.modules.iter().any(|m| m.name == def.ty) {
+pub fn validate_module_ty(def: &ChildModuleDef, tyctx: &TyDefContext<'_>, gtyctx: &GlobalTyDefContext, smap: &SourceMap, errors: &mut Vec<Error>) {
+    if !tyctx.modules_and_prototypes.iter().any(|m| m.name == def.ty.inner()) {
         // Ty missing 
-        let global_ty = gtyctx.module(&def.ty).map(|m| m.loc);
+        let global_ty = gtyctx.module(&def.ty.inner()).map(|m| m.loc);
         errors.push(Error::new_ty_missing(
             TycNetworkSubmoduleInvalidTy,
             format!(
@@ -77,7 +77,7 @@ pub fn validate(
                 // 
 
                 for submodule in &module.submodules {
-                    if submodule.ty == *self_ty {
+                    if submodule.ty.inner() == *self_ty {
                         errors.push(Error::new(
                             TycModuleSubmoduleRecrusiveTyDefinition,
                             format!("Module '{0}' has a required submodule of type '{0}'. Cannot create cyclic definitions.", submodule.ty),

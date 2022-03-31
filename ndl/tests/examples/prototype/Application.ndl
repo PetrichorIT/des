@@ -1,0 +1,5 @@
+prototype Application {
+    gates:
+        in @input
+        out @output
+}

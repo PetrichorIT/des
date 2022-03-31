@@ -1,5 +1,5 @@
 use crate::loc::Loc;
-use crate::parser::{GateAnnotation, GateDef, LinkDef, ModuleDef, NetworkDef, ParamDef};
+use crate::parser::{GateAnnotation, GateDef, LinkDef, ModuleDef, NetworkDef, ParamDef, TyDef};
 use std::fmt::Display;
 
 ///
@@ -43,6 +43,16 @@ pub struct ModuleSpec {
 }
 
 impl ModuleSpec {
+    pub fn degrees_of_freedom(&self) -> impl Iterator<Item = &String> {
+        self.submodules.iter().filter_map(|c| {
+            if let TySpec::Dynamic(ref s) = c.ty {
+                Some(s)
+            } else {
+                None
+            }
+        })
+    }
+
     ///
     /// Creates a partially initalized instance from a [ModuleDef].
     /// This means 'loc', 'ident' and 'gates' will be initalized
@@ -175,7 +185,7 @@ pub struct ChildModuleSpec {
     /// The local identifer for the parents local namespace.
     pub descriptor: String,
     /// The global type identifier for the type of the child module.
-    pub ty: String,
+    pub ty: TySpec,
 }
 
 impl Display for ChildModuleSpec {
@@ -184,6 +194,46 @@ impl Display for ChildModuleSpec {
     }
 }
 
+///
+/// A specificication of a submodules type.
+///
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TySpec {
+    Static(String),
+    Dynamic(String),
+}
+
+impl TySpec {
+    pub fn is_dynamic(&self) -> bool {
+        match self {
+            Self::Dynamic(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn inner(&self) -> &str {
+        match self {
+            Self::Static(ref s) => &s,
+            Self::Dynamic(ref s) => &s,
+        }
+    }
+
+    pub fn new(def: &TyDef) -> Self {
+        match def {
+            TyDef::Static(ref s) => Self::Static(s.to_string()),
+            TyDef::Dynamic(ref s) => Self::Dynamic(s.to_string()),
+        }
+    }
+}
+
+impl Display for TySpec {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Static(ref s) => write!(f, "{}", s),
+            Self::Dynamic(ref s) => write!(f, "some {}", s),
+        }
+    }
+}
 ///
 /// A connection specification in either a module or a network.
 ///

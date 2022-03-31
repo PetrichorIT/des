@@ -1,13 +1,9 @@
-prototype Application {
-    gates:
-        in @input
-        out @output
-}
+include Application
 
 alias PingPongAppl like Application
+alias Router like Application
 
-module X {
-    gates:
-        a @input
-        b[5]
+module Main {
+    submodules:
+        app: some Application
 }

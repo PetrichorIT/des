@@ -507,6 +507,7 @@ pub enum ErrorCode {
     ParNetworkMissingSectionIdentifier,
     ParNetworkInvalidSectionIdentifer,
     ParNetworkInvalidSeperator,
+    ParNetworkDoesntAllowSome,
 
     ParExpectedIntLiteral,
     ParLiteralIntParseError,
