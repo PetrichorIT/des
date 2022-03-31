@@ -34,9 +34,7 @@ fn main() -> std::io::Result<()> {
     let opts = NdlResolverOptions {
         silent: true,
         verbose: verbose_with_dir.is_some(),
-        verbose_output_dir: verbose_with_dir
-            .map(|s| PathBuf::from(s))
-            .unwrap_or(PathBuf::new()),
+        verbose_output_dir: verbose_with_dir.map(PathBuf::from).unwrap_or_default(),
     };
 
     for workspace in workspaces {

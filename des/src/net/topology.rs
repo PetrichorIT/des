@@ -23,7 +23,7 @@ impl Topology {
     /// The complete set of edges defined per-source.
     ///
     pub fn edges(&self) -> impl Iterator<Item = &Edge> {
-        self.nodes.iter().map(|def| def.edges.iter()).flatten()
+        self.nodes.iter().flat_map(|def| def.edges.iter())
     }
 
     ///
@@ -61,8 +61,8 @@ impl Topology {
         }
 
         // created edges
-        for i in 0..modules.len() {
-            let module = &modules[i];
+        for (i, module) in modules.iter().enumerate() {
+            // let module = &modules[i];
             let mut outgoing_edges = Vec::new();
             let gates = module.gates();
 
@@ -94,6 +94,7 @@ impl Topology {
     /// Creates a new topology only containing nodes
     /// that conform to the predicate, pruning dangeling edges.
     ///
+    #[must_use]
     pub fn filter_nodes<P>(&self, mut predicate: P) -> Self
     where
         P: FnMut(&ModuleRefMut) -> bool,
@@ -108,8 +109,8 @@ impl Topology {
 
         let ids: Vec<ModuleId> = nodes.iter().map(|def| def.node.id()).collect();
 
-        for m in 0..nodes.len() {
-            let node = &mut nodes[m];
+        for node in &mut nodes {
+            // let node = &mut nodes[m];
 
             node.edges = node
                 .edges
@@ -126,13 +127,14 @@ impl Topology {
     /// Creates a new topology all previous nodes,
     /// but only edges that conform to the predicate.
     ///
+    #[must_use]
     pub fn filter_edges<P>(&self, mut predicate: P) -> Self
     where
         P: FnMut(&ModuleRefMut, &Edge) -> bool,
     {
         let mut nodes = self.nodes.clone();
-        for m in 0..nodes.len() {
-            let def = &mut nodes[m];
+        for def in &mut nodes {
+            // let def = &mut nodes[m];
 
             def.edges = def
                 .edges
@@ -199,6 +201,12 @@ impl Topology {
         write!(file, "{}", String::from_utf8_lossy(&output.stdout))?;
 
         Ok(())
+    }
+}
+
+impl Default for Topology {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

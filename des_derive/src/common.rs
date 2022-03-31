@@ -38,7 +38,7 @@ pub fn get_resolver(
                 )
             })?;
 
-    let has_errs = errs.is_empty() == false;
+    let has_errs = !errs.is_empty();
 
     Ok((t, has_errs, p))
 }

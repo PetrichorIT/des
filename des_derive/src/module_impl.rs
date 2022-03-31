@@ -124,7 +124,7 @@ fn generate_static_implementations(ident: Ident, data: Data, out: &mut TokenStre
     } else {
         return Err(Diagnostic::new(
             Level::Error,
-            format!("Failed to find a field containing a module core."),
+            "Failed to find a field containing a module core.".to_string(),
         )
         .help(String::from("Try adding a module core to the struct.")));
     }

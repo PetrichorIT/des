@@ -345,18 +345,18 @@ where
     ///     fn handle(self, rt: &mut Runtime<MyApp>) {}
     /// }
     ///
-    /// fn main() {
-    ///     let runtime = Runtime::new(MyApp());
-    ///     let result = runtime.run();
     ///
-    ///     match result {
-    ///         RuntimeResult::Finished { time, event_count, .. } => {
-    ///             assert_eq!(time, SimTime::from(3.0));
-    ///             assert_eq!(event_count, 3);
-    ///         },
-    ///         _ => panic!("They can't do that! Shoot them or something!")
-    ///     }
+    /// let runtime = Runtime::new(MyApp());
+    /// let result = runtime.run();
+    ///
+    /// match result {
+    ///     RuntimeResult::Finished { time, event_count, .. } => {
+    ///         assert_eq!(time, SimTime::from(3.0));
+    ///         assert_eq!(event_count, 3);
+    ///     },
+    ///     _ => panic!("They can't do that! Shoot them or something!")
     /// }
+    ///
     /// ```
     ///
     pub fn run(mut self) -> RuntimeResult<A> {
@@ -718,7 +718,7 @@ impl<A> Runtime<NetworkRuntime<A>> {
     ///
     pub fn handle_message_on(&mut self, module: ModuleRefMut, message: Message, time: SimTime) {
         let event = HandleMessageEvent {
-            module: module,
+            module,
             handled: false,
             message: std::mem::ManuallyDrop::new(message),
         };

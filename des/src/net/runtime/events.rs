@@ -280,7 +280,7 @@ impl ModuleRefMut {
             rt.add_event(
                 NetEvents::MessageAtGateEvent(MessageAtGateEvent {
                     // TODO
-                    gate: gate,
+                    gate,
                     message: ManuallyDrop::new(msg),
                     handled: false,
                 }),
@@ -288,7 +288,7 @@ impl ModuleRefMut {
             )
         }
 
-        let mref = MrcS::clone(&self);
+        let mref = MrcS::clone(self);
 
         // Send loopback events from 'scheduleAt'
         for (msg, time) in self.module_core_mut().loopback_buffer.drain(..) {

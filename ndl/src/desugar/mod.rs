@@ -13,14 +13,14 @@ pub use results::*;
 pub use specs::*;
 pub use tyctx::*;
 
-pub fn desugar_ctx(resolver: &mut NdlResolver) {
+pub fn desugar(resolver: &mut NdlResolver) {
     let mut first_pass_units: HashMap<String, FirstPassDesugarResult> = HashMap::new();
 
     // First pass
     for (alias, unit) in &resolver.units {
         let desugared = desugar_unit(unit, resolver);
 
-        resolver.write_to_file(format!("{}.fdesguar", alias), &desugared);
+        resolver.write_if_verbose(format!("{}.fdesugar", alias), &desugared);
 
         first_pass_units.insert(alias.clone(), desugared);
     }
@@ -35,7 +35,7 @@ pub fn desugar_ctx(resolver: &mut NdlResolver) {
             .desugaring_errors
             .append(&mut result.errors.clone());
 
-        resolver.write_to_file(format!("{}.sdesguar", alias), &result);
+        resolver.write_if_verbose(format!("{}.sdesugar", alias), &result);
 
         resolver.desugared_units.insert(alias, result);
     }

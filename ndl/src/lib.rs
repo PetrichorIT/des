@@ -62,7 +62,7 @@ mod tycheck;
 // ### Exports ###
 
 // > Function exports
-pub use desugar::desugar_ctx;
+pub use desugar::desugar;
 pub use lexer::tokenize;
 pub use lexer::tokenize_and_validate;
 pub use parser::parse;

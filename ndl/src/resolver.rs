@@ -120,9 +120,7 @@ impl NdlResolver {
             self.ectx.parsing_errors.append(&mut unit.errors.clone());
 
             // write verbose output to file
-            if self.options.verbose {
-                self.write_to_file(format!("{}.parse", unit.asset.alias), &unit)
-            }
+            self.write_if_verbose(format!("{}.parse", unit.asset.alias), &unit);
 
             self.units.insert(unit.asset.alias.clone(), unit);
         }
@@ -131,7 +129,7 @@ impl NdlResolver {
 
         // === TY DESUGAR ==
 
-        desugar::desugar_ctx(self);
+        desugar::desugar(self);
 
         // for (alias, unit) in &self.units {
         //     let desugared = desugar_unit(unit, self);
@@ -221,9 +219,13 @@ impl NdlResolver {
         recursive(self.root_dir.clone(), &mut 0, self);
     }
 
-    pub(crate) fn write_to_file(&self, object_name: String, object: impl Display) {
+    pub(crate) fn write_if_verbose(&self, object_name: String, object: impl Display) {
         use std::fs::*;
         use std::io::Write;
+
+        if !self.options.verbose {
+            return;
+        }
 
         let mut path = self.options.verbose_output_dir.clone();
         path.push(object_name);

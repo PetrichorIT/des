@@ -22,7 +22,7 @@ impl NetworkNode {
 
     pub fn named(name: &str, globals: MrcS<NetworkRuntimeGlobals, ReadOnly>) -> Self {
         Self {
-            core: ModuleCore::new_with(format!("{}", name).parse().unwrap(), globals),
+            core: ModuleCore::new_with(name.parse().unwrap(), globals),
         }
     }
 }
