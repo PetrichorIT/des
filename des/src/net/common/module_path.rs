@@ -35,6 +35,9 @@ impl ModulePath {
         }
     }
 
+    ///
+    /// Creates a new module path without a parent.
+    ///
     pub fn root(name: String) -> Self {
         Self {
             full_path: name,
@@ -42,6 +45,10 @@ impl ModulePath {
         }
     }
 
+    ///
+    /// Creates a new module path composed from the
+    /// parents path and an extension name.
+    ///
     pub fn new_with_parent(name: &str, parent: &ModulePath) -> Self {
         let full_path = format!("{}.{}", parent.full_path, name);
         let name_start = parent.full_path.len() + 1;

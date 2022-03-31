@@ -85,6 +85,9 @@ pub struct PacketHeader {
 
 #[cfg(feature = "net-ipv6")]
 impl PacketHeader {
+    ///
+    /// Creates a new instance of `Self`.
+    ///
     pub fn new(
         src: (NodeAddress, PortAddress),
         dest: (NodeAddress, PortAddress),
@@ -170,6 +173,9 @@ pub struct PacketHeader {
 
 #[cfg(not(feature = "net-ipv6"))]
 impl PacketHeader {
+    ///
+    /// Creates a new instance of `Self`.
+    ///
     pub fn new(
         src: (NodeAddress, PortAddress),
         dest: (NodeAddress, PortAddress),
@@ -225,39 +231,61 @@ impl Packet {
         unimplemented!("PacketIDs are no longer supported")
     }
 
+    ///
+    /// Returns the header as a readonly ref.
+    ///
     pub fn header(&self) -> &PacketHeader {
         &self.header
     }
 
+    ///
+    /// Sets the source node of the packet.
+    ///
     pub fn set_source_node(&mut self, node: NodeAddress) {
         self.header.src_node = node
     }
 
+    ///
+    /// Sets the source port of the packet.
+    ///
     pub fn set_source_port(&mut self, port: PortAddress) {
         self.header.src_port = port
     }
 
+    ///
+    /// Sets the destintation node of the packet.
+    ///
     pub fn set_dest_node(&mut self, node: NodeAddress) {
         self.header.dest_node = node
     }
 
+    ///
+    /// Sets the destintation port of the packet.
+    ///
     pub fn set_dest_port(&mut self, port: PortAddress) {
         self.header.dest_port = port
     }
 
+    ///
+    /// Sets the packets time to live.
+    ///
     pub fn set_ttl(&mut self, ttl: u8) {
         self.header.ttl = ttl
     }
 
+    ///
+    /// Registers a hop in the header, thereby decrementing ttl
+    /// while incrementing the hop count.
+    ///
     pub fn register_hop(&mut self) {
         self.header.ttl = self.header.ttl.wrapping_sub(1);
         self.header.hop_count += 1;
     }
 
-    pub fn seq_no(&self) -> u32 {
-        self.header.seq_no
-    }
 
+    ///
+    /// Sets the sequence number of the packet.
+    ///
     pub fn set_seq_no(&mut self, seq_no: u32) {
         self.header.seq_no = seq_no
     }

@@ -204,10 +204,6 @@ impl ModuleCore {
             MrcS::new(NetworkRuntimeGlobals::new()),
         )
     }
-
-    pub fn __link_self(&mut self, ptr: UntypedMrc) {
-        self.self_ref = Some(ptr)
-    }
 }
 
 impl ModuleCore {

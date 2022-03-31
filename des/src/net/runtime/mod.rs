@@ -157,13 +157,28 @@ where
     }
 }
 
+///
+/// The global parameters about a [NetworkRuntime] that are publicly
+/// exposed.
+///
 #[derive(Debug)]
 pub struct NetworkRuntimeGlobals {
+    ///
+    /// The current state of the parameter tree, derived from *.par
+    /// files and parameter changes at runtime.
+    ///
     pub parameters: Parameters,
+
+    ///
+    /// The topology of the network from a module viewpoint.
+    ///
     pub topology: Topology,
 }
 
 impl NetworkRuntimeGlobals {
+    ///
+    /// Creates a new instance of Self.
+    ///
     pub fn new() -> Self {
         Self {
             parameters: Parameters::new(),

@@ -57,7 +57,7 @@ dependencies = [
 
 [[package]]
 name = "des"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "des_derive",
  "lazy_static",
@@ -71,7 +71,7 @@ dependencies = [
 
 [[package]]
 name = "des_derive"
-version = "0.1.0"
+version = "0.2.1"
 dependencies = [
  "lazy_static",
  "ndl",
@@ -133,7 +133,7 @@ dependencies = [
 
 [[package]]
 name = "ndl"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "log",
  "structopt",

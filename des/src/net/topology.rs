@@ -184,6 +184,15 @@ impl Topology {
         format!("digraph D {{\n{}\n{}\n}}", nodes_out, edges_out)
     }
 
+    ///
+    /// Writes the dot output to a *.dot file
+    /// and converts this file into a svg.
+    /// 
+    /// # Note
+    ///
+    /// Be aware that this command relies on the 'dot' command line
+    /// programm to generate the svg.
+    ///
     pub fn write_to_svg(&self, path: &str) -> std::io::Result<()> {
         use std::fs::File;
         use std::io::Write;
@@ -216,7 +225,13 @@ impl Default for Topology {
 ///
 #[derive(Clone)]
 pub struct NodeDefinition {
+    ///
+    /// A reference of the described node.
+    ///
     pub node: ModuleRefMut,
+    ///
+    /// All edges, starting from this node.
+    ///
     pub edges: Vec<Edge>,
 }
 

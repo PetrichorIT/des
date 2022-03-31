@@ -13,7 +13,7 @@ use std::{
 
 #[allow(unused)]
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UntypedMrc {
+pub(crate) struct UntypedMrc {
     inner: MrcS<(), Mutable>,
     type_id: TypeId,
 }
@@ -262,7 +262,7 @@ where
 ///
 #[repr(transparent)]
 #[derive(Debug)]
-pub struct SyncCell<T: ?Sized> {
+pub(crate) struct SyncCell<T: ?Sized> {
     cell: std::cell::UnsafeCell<T>,
 }
 

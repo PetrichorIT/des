@@ -305,18 +305,30 @@ pub struct CustomSizeBody<T> {
 }
 
 impl<T> CustomSizeBody<T> {
+    ///
+    /// Creates a new instance of `Self`.
+    ///
     pub fn new(bit_len: usize, inner: T) -> Self {
         Self { bit_len, inner }
     }
 
+    ///
+    /// Returns a reference to the real contained body.
+    ///
     pub fn inner(&self) -> &T {
         &self.inner
     }
 
+    ///
+    /// Returns a mutable reference to the real contained body. 
+    ///
     pub fn inner_mut(&mut self) -> &mut T {
         &mut self.inner
     }
 
+    ///
+    /// Returns the body, consuming `self``.
+    ///
     pub fn into_inner(self) -> T {
         self.inner
     }

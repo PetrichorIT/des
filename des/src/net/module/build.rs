@@ -42,7 +42,8 @@ macro_rules! impl_buildable {
 
 }
 
-/// Trait used by [ndl] internally.
+/// Trait used by ndl internally.
+#[doc(hidden)]
 pub trait __Buildable0 {
     ///
     /// Builds the given module according to the NDL specification
@@ -84,37 +85,43 @@ pub trait __Buildable0 {
     }
 }
 
-/// Trait used by [ndl] internally.
+/// Trait used by ndl internally.
+#[doc(hidden)]
 pub trait __Buildable1 {
     impl_buildable! { T1 }
 }
-
-/// Trait used by [ndl] internally.
+/// Trait used by ndl internally.
+#[doc(hidden)]
 pub trait __Buildable2 {
     impl_buildable! { T0, T1 }
 }
 
-/// Trait used by [ndl] internally.
+/// Trait used by ndl internally.
+#[doc(hidden)]
 pub trait __Buildable3 {
     impl_buildable! { T0, T1, T2 }
 }
 
-/// Trait used by [ndl] internally.
+/// Trait used by ndl internally.
+#[doc(hidden)]
 pub trait __Buildable4 {
     impl_buildable! { T0, T1, T2, T3 }
 }
 
-/// Trait used by [ndl] internally.
+/// Trait used by ndl internally.
+#[doc(hidden)]
 pub trait __Buildable5 {
     impl_buildable! { T0, T1, T2, T3, T4 }
 }
 
-/// Trait used by [ndl] internally.
+/// Trait used by ndl internally.
+#[doc(hidden)]
 pub trait __Buildable6 {
     impl_buildable! { T0, T1, T2, T3, T4, T5 }
 }
 
-/// Trait used by [ndl] internally.
+/// Trait used by ndl internally.
+#[doc(hidden)]
 pub trait __Buildable7 {
     impl_buildable! { T0, T1, T2, T3, T4, T5, T6 }
 }

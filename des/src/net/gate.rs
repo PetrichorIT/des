@@ -13,6 +13,9 @@ pub type GateRef = MrcS<Gate, ReadOnly>;
 ///
 pub type GateRefMut = MrcS<Gate, Mutable>;
 
+///
+/// The type of service a gate cluster can support.
+///
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GateServiceType {
     Input,
