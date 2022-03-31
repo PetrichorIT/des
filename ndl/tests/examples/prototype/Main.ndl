@@ -6,4 +6,14 @@ alias Router like Application
 module Main {
     submodules:
         app: some Application
+        backup: some Application
 }
+
+module A {
+    submodules:
+        m: Main {
+            app = Router,
+            backup = Router,
+        },
+}
+

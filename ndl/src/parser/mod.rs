@@ -608,6 +608,7 @@ impl<'a> Parser<'a> {
                         }
 
                         if ty == "some" {
+                            // PROTO DEF
                             if is_network {
 
                                 ectx.record(
@@ -632,16 +633,103 @@ impl<'a> Parser<'a> {
                             }
                             
                             ty_def = TyDef::Dynamic(real_ty.to_string());
+
+                            self.eat_whitespace();
+                            self.eat_optionally(|t| t.kind == TokenKind::Comma);
+    
+                            child_modules.push(ChildModuleDef { 
+                                loc: Loc::fromto(first_token_loc, second_token.loc), 
+                                ty: ty_def, 
+                                desc,
+                                proto_impl: None,
+                            });
+                        } else {
+                            // PROTO NONE / PROTO IMPL
+                            self.eat_whitespace();
+
+                            // check for proto impl block
+                            let token = self.tokens.peek()?;
+                            if token.kind == TokenKind::OpenBrace {
+                                self.tokens.bump()?;
+
+                                // PROTO IMPL
+                                let mut proto_impl = ProtoImpl::new();
+
+                                loop {
+                                 
+                                    // read impls
+                                    self.eat_whitespace();
+                                    let (f_token, ident) = self.next_token()?;
+                                    let ident = ident.to_string();
+                                    if f_token.kind != TokenKind::Ident {
+                                        // break options
+                                        if f_token.kind == TokenKind::CloseBrace {
+                                            break;
+                                        }
+                                        ectx.record(
+                                            ParProtoImplInvalidIdent,
+                                        format!("Unexpected token '{}'. Expected ident.", ident), 
+                                            f_token.loc
+                                        )?;
+                                        continue;
+                                    }
+
+                                    self.eat_whitespace();
+                                    let (token_eq, raw_eq) = self.next_token()?;
+                                    if token_eq.kind != TokenKind::Eq {
+                                        ectx.record(
+                                            ParProtoImplExpectedEq,
+                                        format!("Unexpected token '{}'. Expected '=''.", raw_eq), 
+                                            f_token.loc
+                                        )?;
+                                        
+                                        if token_eq.kind == TokenKind::CloseBrace {
+                                            break;
+                                        }
+                                        continue;
+                                    }
+
+                                    self.eat_whitespace();
+                                    let (s_token, ty) = self.next_token()?;
+                                    let ty = ty.to_string();
+                                    if s_token.kind != TokenKind::Ident {
+                                        ectx.record(
+                                            ParProtoImplInvalidIdent,
+                                        format!("Unexpected token '{}'. Expected type ident.", raw_eq), 
+                                            f_token.loc
+                                        )?;
+
+                                        if s_token.kind == TokenKind::CloseBrace {
+                                            break;
+                                        }
+                                        continue;
+                                    }
+
+                                    proto_impl.defs.insert(ident, ty);
+
+                                    self.eat_whitespace();
+                                    self.eat_optionally(|t| t.kind == TokenKind::Comma);
+                                }
+
+                                self.eat_optionally(|t| t.kind == TokenKind::Comma);
+                                child_modules.push(ChildModuleDef { 
+                                    loc: Loc::fromto(first_token_loc, second_token.loc), 
+                                    ty: ty_def, 
+                                    desc,
+                                    proto_impl: Some(proto_impl),
+                                });
+                            } else {
+                                // PROTO NONE
+                                self.eat_optionally(|t| t.kind == TokenKind::Comma);
+    
+                                child_modules.push(ChildModuleDef { 
+                                    loc: Loc::fromto(first_token_loc, second_token.loc), 
+                                    ty: ty_def, 
+                                    desc,
+                                    proto_impl: None,
+                                });
+                            }
                         }
-
-                        self.eat_whitespace();
-                        self.eat_optionally(|t| t.kind == TokenKind::Comma);
-
-                        child_modules.push(ChildModuleDef { 
-                            loc: Loc::fromto(first_token_loc, second_token.loc), 
-                            ty: ty_def, 
-                            desc 
-                        });
                     }
                 },
                 _ => {

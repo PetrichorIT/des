@@ -58,7 +58,12 @@ impl Display for ParsingResult {
 
             writeln!(f, "      submodules:")?;
             for submodule in &module.submodules {
-                writeln!(f, "        {} {}", submodule.ty, submodule.desc)?;
+                writeln!(f, "        {}: {}", submodule.desc, submodule.ty)?;
+                if let Some(ref proto) = submodule.proto_impl {
+                    for (ident, ty) in &proto.defs {
+                        writeln!(f, "          -> {} = {}", ident, ty)?
+                    }
+                }
             }
 
             writeln!(f)?;

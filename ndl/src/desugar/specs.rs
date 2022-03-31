@@ -1,5 +1,7 @@
 use crate::loc::Loc;
-use crate::parser::{GateAnnotation, GateDef, LinkDef, ModuleDef, NetworkDef, ParamDef, TyDef};
+use crate::parser::{
+    GateAnnotation, GateDef, LinkDef, ModuleDef, NetworkDef, ParamDef, ProtoImpl, TyDef,
+};
 use std::fmt::Display;
 
 ///
@@ -43,10 +45,10 @@ pub struct ModuleSpec {
 }
 
 impl ModuleSpec {
-    pub fn degrees_of_freedom(&self) -> impl Iterator<Item = &String> {
+    pub fn degrees_of_freedom(&self) -> impl Iterator<Item = (&String, &String)> {
         self.submodules.iter().filter_map(|c| {
             if let TySpec::Dynamic(ref s) = c.ty {
-                Some(s)
+                Some((&c.descriptor, s))
             } else {
                 None
             }
@@ -186,11 +188,22 @@ pub struct ChildModuleSpec {
     pub descriptor: String,
     /// The global type identifier for the type of the child module.
     pub ty: TySpec,
+    /// proto impl block
+    pub proto_impl: Option<ProtoImpl>,
 }
 
 impl Display for ChildModuleSpec {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {}", self.descriptor, self.ty)
+        write!(f, "{}: {} ", self.descriptor, self.ty)?;
+        if let Some(ref proto) = self.proto_impl {
+            write!(f, "{{ ")?;
+            for p in &proto.defs {
+                write!(f, "{} = {}, ", p.0, p.1)?
+            }
+            write!(f, "}}")?;
+        }
+
+        Ok(())
     }
 }
 

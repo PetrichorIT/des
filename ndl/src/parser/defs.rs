@@ -1,5 +1,5 @@
 use crate::Loc;
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display};
 
 ///
 /// A definition of a include statement.
@@ -85,6 +85,8 @@ pub struct ChildModuleDef {
     pub ty: TyDef,
     /// A module internal descriptor for the created submodule.
     pub desc: LocalDescriptorDef,
+    /// A block for proto impls
+    pub proto_impl: Option<ProtoImpl>,
 }
 
 ///
@@ -167,6 +169,38 @@ impl Display for TyDef {
             Self::Static(ref s) => write!(f, "{}", s),
             Self::Dynamic(ref s) => write!(f, "some {}", s),
         }
+    }
+}
+
+///
+/// A proto impl block
+///
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProtoImpl {
+    pub defs: HashMap<String, String>,
+}
+
+impl ProtoImpl {
+    pub fn new() -> Self {
+        Self {
+            defs: HashMap::new(),
+        }
+    }
+}
+
+impl Default for ProtoImpl {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Display for ProtoImpl {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for def in &self.defs {
+            writeln!(f, "{} = {}", def.0, def.1)?
+        }
+
+        Ok(())
     }
 }
 

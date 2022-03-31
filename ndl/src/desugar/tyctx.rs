@@ -1,12 +1,8 @@
-use std::collections::HashMap;
-
 use crate::error::*;
 use crate::parser::*;
 use crate::resolver::*;
 use crate::source::*;
-use crate::ModuleSpec;
-
-use super::FirstPassDesugarResult;
+use crate::Loc;
 
 ///
 /// A global type context over the definitions stored in a resolver.
@@ -49,6 +45,19 @@ impl<'a> GlobalTyDefContext<'a> {
             match unit.modules_and_prototypes.iter().find(|l| l.name == ident) {
                 Some(module) => return Some(module),
                 None => continue,
+            }
+        }
+        None
+    }
+
+    pub fn module_or_alias_loc(&self, ident: &str) -> Option<Loc> {
+        for unit in self.resolver.units.values() {
+            match unit.modules_and_prototypes.iter().find(|l| l.name == ident) {
+                Some(module) => return Some(module.loc),
+                None => match unit.aliases.iter().find(|a| a.name == ident) {
+                    Some(alias) => return Some(alias.loc),
+                    None => continue,
+                },
             }
         }
         None
@@ -174,78 +183,6 @@ impl<'a> TyDefContext<'a> {
 }
 
 impl Default for TyDefContext<'_> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-pub(crate) struct SecondPassTyCtx<'a> {
-    pub included: Vec<AssetDescriptor>,
-
-    pub prototypes: Vec<&'a ModuleSpec>,
-}
-
-impl<'a> SecondPassTyCtx<'a> {
-    pub fn new() -> Self {
-        Self {
-            included: Vec::new(),
-            prototypes: Vec::new(),
-        }
-    }
-
-    pub fn new_for(
-        fpass: &'a FirstPassDesugarResult,
-        all: &'a HashMap<String, FirstPassDesugarResult>,
-        errors: &mut Vec<Error>,
-    ) -> Self {
-        let mut obj = Self::new();
-
-        fn resolve_recursive<'a>(
-            all: &'a HashMap<String, FirstPassDesugarResult>,
-            unit: &'a FirstPassDesugarResult,
-            tyctx: &mut SecondPassTyCtx<'a>,
-            errors: &mut Vec<Error>,
-        ) {
-            let new_unit = tyctx.include(unit);
-            if new_unit {
-                // resolve meta imports.
-                for include in &unit.includes {
-                    if let Some(unit) = all.get(&include.path) {
-                        resolve_recursive(all, unit, tyctx, errors);
-                    } else {
-                        errors.push(Error::new(
-                            DsgIncludeInvalidAlias,
-                            format!(
-                                "Include '{}' cannot be resolved. No such file exists. {:?}",
-                                include.path, include.loc
-                            ),
-                            include.loc,
-                            false,
-                        ))
-                    }
-                }
-            }
-        }
-
-        resolve_recursive(all, fpass, &mut obj, errors);
-
-        obj
-    }
-
-    pub fn include(&mut self, fpass: &'a FirstPassDesugarResult) -> bool {
-        if self.included.contains(&fpass.asset) {
-            return false;
-        }
-
-        for proto in &fpass.prototypes {
-            self.prototypes.push(proto)
-        }
-
-        true
-    }
-}
-
-impl Default for SecondPassTyCtx<'_> {
     fn default() -> Self {
         Self::new()
     }

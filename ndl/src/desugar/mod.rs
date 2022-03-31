@@ -6,11 +6,15 @@ use std::collections::HashMap;
 use std::fmt::Display;
 
 mod results;
+mod second;
 mod specs;
+mod third;
 mod tyctx;
 
 pub use results::*;
+use second::second_pass;
 pub use specs::*;
+use third::third_pass;
 pub use tyctx::*;
 
 pub fn desugar(resolver: &mut NdlResolver) {
@@ -27,7 +31,7 @@ pub fn desugar(resolver: &mut NdlResolver) {
 
     // Second pass
     for (alias, fpass) in &first_pass_units {
-        let result = desugar_second_pass(fpass, &first_pass_units, resolver);
+        let result = second_pass(fpass, &first_pass_units, resolver);
 
         // Defer errors
         resolver
@@ -35,84 +39,23 @@ pub fn desugar(resolver: &mut NdlResolver) {
             .desugaring_errors
             .append(&mut result.errors.clone());
 
-        resolver.write_if_verbose(format!("{}.sdesugar", alias), &result);
-
         resolver.desugared_units.insert(alias.clone(), result);
     }
-}
 
-fn desugar_second_pass(
-    unit: &FirstPassDesugarResult,
-    all: &HashMap<String, FirstPassDesugarResult>,
-    resolver: &NdlResolver,
-) -> DesugaredParsingResult {
-    let mut errors = Vec::new();
-    let tyctx = SecondPassTyCtx::new_for(&unit, all, &mut errors);
+    // third pass
+    for (alias, pass) in &resolver.desugared_units {
+        let mut errs = third_pass(pass, &resolver.desugared_units, resolver);
 
-    let asset = unit.asset.clone();
-    let mut modules = unit.modules.clone();
+        resolver.write_if_verbose(format!("{}.sdesugar", alias), &pass);
 
-    // let asset = asset.clone();
-    // let includes = includes.clone();
-    // let networks = networks.clone();
+        // Defer errors
+        resolver
+            .ectx
+            .desugaring_errors
+            .append(&mut pass.errors.clone());
 
-    let gtyctx = resolver.gtyctx_def();
-
-    //
-    // Alias derefing,
-    //
-    for AliasDef {
-        loc,
-        name,
-        prototype,
-    } in &unit.aliases
-    {
-        // search for proto
-        let proto = tyctx.prototypes.iter().find(|p| p.ident == *prototype);
-
-        if let Some(proto) = proto {
-            let mut proto: ModuleSpec = proto.to_owned().to_owned();
-            proto.ident = name.clone();
-            modules.push(proto);
-        } else {
-            errors.push(Error::new_ty_missing(
-                DsgInvalidPrototype,
-                format!("No prototype called '{}' found.", prototype),
-                *loc,
-                &resolver.source_map,
-                gtyctx.module(&prototype).map(|m| m.loc),
-            ));
-        }
-    }
-
-    //
-    // 'some' checking (order is important) for modules
-    //
-    for module in &modules {
-        for child in &module.submodules {
-            if let TySpec::Dynamic(ref s) = child.ty {
-                // check whether s is a existing prototype.
-
-                let exists = tyctx.prototypes.iter().any(|p| &p.ident == s);
-                if !exists {
-                    errors.push(Error::new_ty_missing(
-                        DsgInvalidPrototype,
-                        format!("Unknown prototype '{}'.", s),
-                        child.loc,
-                        &resolver.source_map,
-                        gtyctx.module(s).map(|m| m.loc),
-                    ))
-                }
-            }
-        }
-    }
-
-    DesugaredParsingResult {
-        asset,
-        errors,
-        includes: unit.includes.clone(),
-        modules,
-        networks: unit.networks.clone(),
+        // TODO: Attach third pass errors to units
+        resolver.ectx.desugaring_errors.append(&mut errs);
     }
 }
 
@@ -167,7 +110,12 @@ fn desugar_unit<'a>(unit: &'a ParsingResult, resolver: &NdlResolver) -> FirstPas
             // on expanded macro types.
             validate_module_ty(child, &tyctx, &gtyctx, &resolver.source_map, &mut errors);
 
-            let ChildModuleDef { loc, ty, desc } = child;
+            let ChildModuleDef {
+                loc,
+                ty,
+                desc,
+                proto_impl,
+            } = child;
 
             if let Some((from_id, to_id)) = desc.cluster_bounds {
                 // Desugar macro
@@ -176,6 +124,7 @@ fn desugar_unit<'a>(unit: &'a ParsingResult, resolver: &NdlResolver) -> FirstPas
                         loc: *loc,
                         descriptor: format!("{}[{}]", desc.descriptor, id),
                         ty: TySpec::new(ty),
+                        proto_impl: proto_impl.clone(),
                     })
                 }
             } else {
@@ -184,6 +133,7 @@ fn desugar_unit<'a>(unit: &'a ParsingResult, resolver: &NdlResolver) -> FirstPas
                     loc: *loc,
                     descriptor: desc.descriptor.clone(),
                     ty: TySpec::new(ty),
+                    proto_impl: proto_impl.clone(),
                 })
             }
         }
@@ -323,7 +273,12 @@ fn desugar_unit<'a>(unit: &'a ParsingResult, resolver: &NdlResolver) -> FirstPas
             // on expanded macro types.
             validate_module_ty(child, &tyctx, &gtyctx, &resolver.source_map, &mut errors);
 
-            let ChildModuleDef { loc, ty, desc } = child;
+            let ChildModuleDef {
+                loc,
+                ty,
+                desc,
+                proto_impl,
+            } = child;
             if let Some((from_id, to_id)) = desc.cluster_bounds {
                 // Desugar macro
                 for id in from_id..=to_id {
@@ -331,6 +286,7 @@ fn desugar_unit<'a>(unit: &'a ParsingResult, resolver: &NdlResolver) -> FirstPas
                         loc: *loc,
                         descriptor: format!("{}[{}]", desc.descriptor, id),
                         ty: TySpec::new(ty),
+                        proto_impl: proto_impl.clone(),
                     })
                 }
             } else {
@@ -339,6 +295,7 @@ fn desugar_unit<'a>(unit: &'a ParsingResult, resolver: &NdlResolver) -> FirstPas
                     loc: *loc,
                     descriptor: desc.descriptor.clone(),
                     ty: TySpec::new(ty),
+                    proto_impl: proto_impl.clone(),
                 })
             }
         }

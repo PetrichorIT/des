@@ -502,6 +502,9 @@ pub enum ErrorCode {
     ParAliasMissingLikeKeyword,
     ParAliasMissingPrototypeIdent,
 
+    ParProtoImplInvalidIdent,
+    ParProtoImplExpectedEq,
+
     ParNetworkMissingIdentifer,
     ParNetworkMissingDefBlockOpen,
     ParNetworkMissingSectionIdentifier,
@@ -526,6 +529,11 @@ pub enum ErrorCode {
     DsgConInvalidField,
 
     DsgInvalidPrototype,
+    DsgProtoImplForNonProtoValue,
+    DsgProtoImplMissingField,
+    DsgProtoImplTyMissing,
+    DsgProtoImplAssociatedTyNotDerivedFromProto,
+    DsgProtoImlMissing,
 
     TycGateConnectionViolatesAnnotation,
 

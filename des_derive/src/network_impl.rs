@@ -20,7 +20,7 @@ pub fn derive_network_impl(ident: Ident, attrs: Attributes) -> Result<TokenStrea
 macro_rules! ident {
     ($e:expr) => {
         proc_macro2::Ident::new(
-            &$e.as_str().replace("[", "").replace("]", ""),
+            &$e.replace("[", "").replace("]", ""),
             proc_macro2::Span::call_site(),
         )
     };
@@ -59,7 +59,7 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> Result<TokenStream> {
                 for node in &network.nodes {
                     let ChildModuleSpec { descriptor, ty, .. } = node;
                     let ident = ident!(format!("{}_child", descriptor));
-                    let ty = ident!(ty);
+                    let ty = ident!(ty.inner());
                     token_stream.extend::<proc_macro2::TokenStream>(quote! {
                         let mut #ident: ::des::util::Mrc<#ty> = #ty::build_named(#descriptor.parse().unwrap(), rt);
                     })

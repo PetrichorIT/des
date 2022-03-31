@@ -168,7 +168,7 @@ fn gen_named_object(ident: Ident, data: &DataStruct) -> Result<TokenStream2> {
 macro_rules! ident {
     ($e:expr) => {
         proc_macro2::Ident::new(
-            &$e.as_str().replace("[", "").replace("]", ""),
+            &$e.replace("[", "").replace("]", ""),
             proc_macro2::Span::call_site(),
         )
     };
@@ -197,7 +197,7 @@ fn generate_dynamic_builder(ident: Ident, attrs: &Attributes, out: &mut TokenStr
                     let ChildModuleSpec { descriptor, ty, .. } = module;
 
                     let ident = ident!(format!("{}_child", descriptor));
-                    let ty = ident!(ty);
+                    let ty = ident!(ty.inner());
                     token_stream.extend::<proc_macro2::TokenStream>(quote! {
                         let mut #ident: ::des::util::Mrc<#ty> = #ty::build_named_with_parent(#descriptor, &mut this, rt);
                     })
