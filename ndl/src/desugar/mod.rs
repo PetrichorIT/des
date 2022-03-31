@@ -5,9 +5,11 @@ use crate::parser::*;
 use std::collections::HashMap;
 use std::fmt::Display;
 
+mod results;
 mod specs;
 mod tyctx;
 
+pub use results::*;
 pub use specs::*;
 pub use tyctx::*;
 
@@ -17,6 +19,8 @@ pub fn desugar_ctx(resolver: &mut NdlResolver) {
     // First pass
     for (alias, unit) in &resolver.units {
         let desugared = desugar_unit(unit, resolver);
+
+        resolver.write_to_file(format!("{}.fdesguar", alias), &desugared);
 
         first_pass_units.insert(alias.clone(), desugared);
     }
@@ -30,6 +34,8 @@ pub fn desugar_ctx(resolver: &mut NdlResolver) {
             .ectx
             .desugaring_errors
             .append(&mut result.errors.clone());
+
+        resolver.write_to_file(format!("{}.sdesguar", alias), &result);
 
         resolver.desugared_units.insert(alias, result);
     }
@@ -674,181 +680,5 @@ fn resolve_connection_ident(
                 None
             }
         }
-    }
-}
-
-///
-/// A raw specification of a assets defined modules, networks and includes.
-///
-#[derive(Debug, Clone, PartialEq)]
-pub struct FirstPassDesugarResult {
-    /// The asset the [ParsingResult] was derived from.
-    pub asset: AssetDescriptor,
-
-    /// The errors that occured while desugaring,
-    pub errors: Vec<Error>,
-
-    /// The direct includes of the asset.
-    pub includes: Vec<IncludeSpec>,
-    /// The defined modules of the asset.
-    pub modules: Vec<ModuleSpec>, // Link specs are removed and link data is stored directly in connections.
-
-    pub prototypes: Vec<ModuleSpec>,
-    pub aliases: Vec<AliasDef>,
-
-    /// The defined networks of the asset.
-    pub networks: Vec<NetworkSpec>,
-}
-
-impl FirstPassDesugarResult {
-    ///
-    /// Creates a new instance of Self, by referencing the [ParsingResult]
-    /// to be desugared.
-    ///
-    fn new(unit: &ParsingResult) -> Self {
-        Self {
-            asset: unit.asset.clone(),
-
-            errors: Vec::new(),
-
-            includes: Vec::with_capacity(unit.includes.len()),
-            modules: Vec::with_capacity(unit.modules_and_prototypes.len()),
-            prototypes: Vec::with_capacity(unit.modules_and_prototypes.len() / 2),
-            aliases: Vec::with_capacity(unit.aliases.len()),
-            networks: Vec::with_capacity(unit.networks.len()),
-        }
-    }
-}
-
-impl Display for FirstPassDesugarResult {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "DesugaredParsingResult {{")?;
-
-        writeln!(f, "    includes:")?;
-        for include in &self.includes {
-            writeln!(f, "    - {}", include)?;
-        }
-
-        writeln!(f)?;
-        writeln!(f, "    modules:")?;
-        for module in &self.modules {
-            writeln!(f, "    - {} {{", module.ident)?;
-
-            writeln!(f, "      submodules:")?;
-            for submodule in &module.submodules {
-                writeln!(f, "        {} {}", submodule.ty, submodule.descriptor)?;
-            }
-
-            writeln!(f)?;
-            writeln!(f, "      gates:")?;
-            for gate in &module.gates {
-                writeln!(f, "        {}", gate)?;
-            }
-
-            writeln!(f)?;
-            writeln!(f, "      connections:")?;
-            for con in &module.connections {
-                writeln!(f, "        {}", con)?;
-            }
-
-            writeln!(f, "    }}")?;
-        }
-
-        writeln!(f)?;
-        writeln!(f, "    networks:")?;
-        for module in &self.networks {
-            writeln!(f, "    - {} {{", module.ident)?;
-
-            writeln!(f, "      nodes:")?;
-            for submodule in &module.nodes {
-                writeln!(f, "        {} {}", submodule.ty, submodule.descriptor)?;
-            }
-
-            writeln!(f)?;
-            writeln!(f, "      connections:")?;
-            for con in &module.connections {
-                writeln!(f, "        {}", con)?;
-            }
-
-            writeln!(f, "    }}")?;
-        }
-
-        write!(f, "}}")
-    }
-}
-
-///
-/// A raw specification of a assets defined modules, networks and includes.
-///
-#[derive(Debug, Clone, PartialEq)]
-pub struct DesugaredParsingResult {
-    /// The asset the [ParsingResult] was derived from.
-    pub asset: AssetDescriptor,
-
-    /// The errors that occured while desugaring,
-    pub errors: Vec<Error>,
-
-    /// The direct includes of the asset.
-    pub includes: Vec<IncludeSpec>,
-    /// The defined modules of the asset.
-    pub modules: Vec<ModuleSpec>, // Link specs are removed and link data is stored directly in connections.
-    /// The defined networks of the asset.
-    pub networks: Vec<NetworkSpec>,
-}
-
-impl Display for DesugaredParsingResult {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "DesugaredParsingResult {{")?;
-
-        writeln!(f, "    includes:")?;
-        for include in &self.includes {
-            writeln!(f, "    - {}", include)?;
-        }
-
-        writeln!(f)?;
-        writeln!(f, "    modules:")?;
-        for module in &self.modules {
-            writeln!(f, "    - {} {{", module.ident)?;
-
-            writeln!(f, "      submodules:")?;
-            for submodule in &module.submodules {
-                writeln!(f, "        {} {}", submodule.ty, submodule.descriptor)?;
-            }
-
-            writeln!(f)?;
-            writeln!(f, "      gates:")?;
-            for gate in &module.gates {
-                writeln!(f, "        {}", gate)?;
-            }
-
-            writeln!(f)?;
-            writeln!(f, "      connections:")?;
-            for con in &module.connections {
-                writeln!(f, "        {}", con)?;
-            }
-
-            writeln!(f, "    }}")?;
-        }
-
-        writeln!(f)?;
-        writeln!(f, "    networks:")?;
-        for module in &self.networks {
-            writeln!(f, "    - {} {{", module.ident)?;
-
-            writeln!(f, "      nodes:")?;
-            for submodule in &module.nodes {
-                writeln!(f, "        {} {}", submodule.ty, submodule.descriptor)?;
-            }
-
-            writeln!(f)?;
-            writeln!(f, "      connections:")?;
-            for con in &module.connections {
-                writeln!(f, "        {}", con)?;
-            }
-
-            writeln!(f, "    }}")?;
-        }
-
-        write!(f, "}}")
     }
 }

@@ -13,7 +13,9 @@ path = "bin/main.rs"
 name = "ndl-test"
 path = "tests/test.rs"
 
+
 [dependencies]
+structopt = "0.3.26"
 log = "0.4.14"
 termcolor = "1.1.2"
 unic-emoji-char = "0.9.0"

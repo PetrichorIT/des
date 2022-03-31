@@ -119,6 +119,11 @@ impl NdlResolver {
             let unit = parse(asset, validated_token_stream);
             self.ectx.parsing_errors.append(&mut unit.errors.clone());
 
+            // write verbose output to file
+            if self.options.verbose {
+                self.write_to_file(format!("{}.parse", unit.asset.alias), &unit)
+            }
+
             self.units.insert(unit.asset.alias.clone(), unit);
         }
 
@@ -215,6 +220,21 @@ impl NdlResolver {
 
         recursive(self.root_dir.clone(), &mut 0, self);
     }
+
+    pub(crate) fn write_to_file(&self, object_name: String, object: impl Display) {
+        use std::fs::*;
+        use std::io::Write;
+
+        let mut path = self.options.verbose_output_dir.clone();
+        path.push(object_name);
+
+        let mut file = match File::create(path) {
+            Ok(file) => file,
+            Err(_) => return,
+        };
+
+        let _ = write!(file, "{}", object);
+    }
 }
 
 impl Display for NdlResolver {
@@ -258,10 +278,16 @@ pub enum NdlResolverState {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct NdlResolverOptions {
     pub silent: bool,
+    pub verbose: bool,
+    pub verbose_output_dir: PathBuf,
 }
 
 impl NdlResolverOptions {
     pub fn bench() -> Self {
-        Self { silent: true }
+        Self {
+            silent: true,
+            verbose: false,
+            verbose_output_dir: PathBuf::new(),
+        }
     }
 }

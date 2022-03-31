@@ -1,37 +1,49 @@
+use std::path::PathBuf;
+
 use ndl::*;
+use structopt::StructOpt;
+
+#[derive(Debug, StructOpt)]
+#[structopt(name = "ndl", about = "A parser for network description files.")]
+struct Opt {
+    #[structopt(short, long, help = "Prevents ndl from printing the result.")]
+    quiet: bool,
+
+    #[structopt(
+        short = "v",
+        long = "verbose",
+        help = "Defines a output directory which stores incremental results."
+    )]
+    verbose_with_dir: Option<String>,
+
+    #[structopt(name = "Workspaces")]
+    workspaces: Vec<String>,
+}
 
 fn main() -> std::io::Result<()> {
-    let workspaces: Vec<String> = if std::env::args().len() >= 2 {
-        std::env::args().skip(1).collect()
-    } else {
-        vec![std::env::current_dir()?.to_str().unwrap().to_string()]
-    };
+    let Opt {
+        quiet,
+        verbose_with_dir,
+        mut workspaces,
+    } = Opt::from_args();
 
-    let options: Vec<&String> = workspaces.iter().filter(|w| w.starts_with("-")).collect();
-    let workspaces: Vec<&String> = workspaces.iter().filter(|w| !w.starts_with("-")).collect();
-
-    let quiet = options.iter().any(|o| ["-q", "--quiet"].contains(&&o[..]));
-    let help = options
-        .iter()
-        .any(|o| ["-h", "-help", "--help"].contains(&&o[..]));
-
-    if help {
-        println!("ndl [..]");
-        println!("A parser and typechecker for ndl workspaces.\n");
-
-        println!("USAGE:");
-        println!("\tndl <path...>");
-        println!();
-        println!("\tIf no paths are given the current working directory ");
-        println!("\twill be used as the workspace.");
-        return Ok(());
+    if workspaces.is_empty() {
+        workspaces.push(std::env::current_dir()?.to_str().unwrap().to_string());
     }
+
+    let opts = NdlResolverOptions {
+        silent: true,
+        verbose: verbose_with_dir.is_some(),
+        verbose_output_dir: verbose_with_dir
+            .map(|s| PathBuf::from(s))
+            .unwrap_or(PathBuf::new()),
+    };
 
     for workspace in workspaces {
         println!("Workspace '{}'", workspace);
         println!();
 
-        let mut resolver = NdlResolver::new(&workspace).unwrap();
+        let mut resolver = NdlResolver::new_with(&workspace, opts.clone()).unwrap();
         let (g, errs, par_files) = resolver.run_cached().unwrap();
         let has_err = errs.count() == 0;
 
