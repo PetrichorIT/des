@@ -93,8 +93,6 @@ pub use crate::net::NODE_ADDR_BROADCAST;
 pub use crate::net::NODE_ADDR_LOOPBACK;
 
 #[cfg(feature = "net")]
-pub use crate::net::BuildableModule;
-#[cfg(feature = "net")]
 pub use crate::net::Module;
 #[cfg(feature = "net")]
 pub use crate::net::ModuleCore;

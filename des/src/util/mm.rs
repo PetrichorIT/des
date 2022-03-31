@@ -13,14 +13,14 @@ use std::{
 
 #[allow(unused)]
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct UntypedMrc {
+pub struct UntypedMrc {
     inner: MrcS<(), Mutable>,
     type_id: TypeId,
 }
 
 #[allow(unused)]
 impl UntypedMrc {
-    pub(crate) fn new<T: 'static + Sized>(value: MrcS<T, Mutable>) -> Self {
+    pub fn new<T: 'static + Sized>(value: MrcS<T, Mutable>) -> Self {
         assert!(std::mem::size_of::<MrcS<T, Mutable>>() == 8);
 
         // SAFTY:

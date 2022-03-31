@@ -86,7 +86,7 @@ pub use source::SourceMap;
 // > Spec Exports.
 pub use desugar::{
     ChannelSpec, ChildModuleSpec, ConSpec, ConSpecNodeIdent, GateSpec, IncludeSpec, ModuleSpec,
-    NetworkSpec, ParamSpec,
+    NetworkSpec, ParamSpec, TySpec,
 };
 pub use parser::GateAnnotation;
 

@@ -62,7 +62,6 @@ pub use self::packet::NODE_ADDR_LOOPBACK;
 // # Modules
 //
 
-pub use self::module::BuildableModule;
 pub use self::module::Module;
 pub use self::module::ModuleCore;
 pub use self::module::ModuleId;
@@ -71,6 +70,15 @@ pub use self::module::ModuleRefMut;
 pub use self::module::ModuleReferencingError;
 pub use self::module::NameableModule;
 pub use self::module::StaticModuleCore;
+
+pub use self::module::__Buildable0;
+pub use self::module::__Buildable1;
+pub use self::module::__Buildable2;
+pub use self::module::__Buildable3;
+pub use self::module::__Buildable4;
+pub use self::module::__Buildable5;
+pub use self::module::__Buildable6;
+pub use self::module::__Buildable7;
 
 pub use self::common::ModulePath;
 pub use self::common::ParHandle;

@@ -41,6 +41,10 @@ path = "ptrhell/main.rs"
 name = "t-par"
 path = "par/main.rs"
 
+[[bin]]
+name = "t-proto"
+path = "proto/main.rs"
+
 [dependencies]
 des = {path = "../des", features = ["net"]}
 des_derive = {path = "../des_derive"}

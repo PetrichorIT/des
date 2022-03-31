@@ -47,7 +47,7 @@ fn main() -> std::io::Result<()> {
 
         let mut resolver = NdlResolver::new_with(&workspace, opts.clone()).unwrap();
         let (g, errs, par_files) = resolver.run_cached().unwrap();
-        let has_err = errs.count() == 0;
+        let has_err = errs.count() != 0;
 
         println!(
             "> {} errors and found {} par files",

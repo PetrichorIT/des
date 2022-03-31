@@ -68,7 +68,7 @@ pub(crate) fn first_pass<'a>(
                         loc: *loc,
                         descriptor: format!("{}[{}]", desc.descriptor, id),
                         ty: TySpec::new(ty),
-                        proto_impl: proto_impl.clone(),
+                        proto_impl: proto_impl.as_ref().map(ProtoImplSpec::new),
                     })
                 }
             } else {
@@ -77,7 +77,7 @@ pub(crate) fn first_pass<'a>(
                     loc: *loc,
                     descriptor: desc.descriptor.clone(),
                     ty: TySpec::new(ty),
-                    proto_impl: proto_impl.clone(),
+                    proto_impl: proto_impl.as_ref().map(ProtoImplSpec::new),
                 })
             }
         }
@@ -230,7 +230,7 @@ pub(crate) fn first_pass<'a>(
                         loc: *loc,
                         descriptor: format!("{}[{}]", desc.descriptor, id),
                         ty: TySpec::new(ty),
-                        proto_impl: proto_impl.clone(),
+                        proto_impl: proto_impl.as_ref().map(ProtoImplSpec::new),
                     })
                 }
             } else {
@@ -239,7 +239,7 @@ pub(crate) fn first_pass<'a>(
                     loc: *loc,
                     descriptor: desc.descriptor.clone(),
                     ty: TySpec::new(ty),
-                    proto_impl: proto_impl.clone(),
+                    proto_impl: proto_impl.as_ref().map(ProtoImplSpec::new),
                 })
             }
         }

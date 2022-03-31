@@ -16,8 +16,6 @@ macro_rules! auto_impl_static {
                 &mut self.core
             }
         }
-
-        impl BuildableModule for $ident {}
     };
 }
 

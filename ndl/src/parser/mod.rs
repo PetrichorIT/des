@@ -653,7 +653,7 @@ impl<'a> Parser<'a> {
                                 self.tokens.bump()?;
 
                                 // PROTO IMPL
-                                let mut proto_impl = ProtoImpl::new();
+                                let mut proto_impl = ProtoImplDef::new();
 
                                 loop {
                                  

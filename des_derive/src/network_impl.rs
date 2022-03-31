@@ -12,6 +12,8 @@ use quote::quote;
 
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
+use syn::punctuated::Punctuated;
+use syn::token::Comma;
 
 pub fn derive_network_impl(ident: Ident, attrs: Attributes) -> Result<TokenStream> {
     gen_network_main(ident, attrs)
@@ -60,9 +62,21 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> Result<TokenStream> {
                     let ChildModuleSpec { descriptor, ty, .. } = node;
                     let ident = ident!(format!("{}_child", descriptor));
                     let ty = ident!(ty.inner());
-                    token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                        let mut #ident: ::des::util::Mrc<#ty> = #ty::build_named(#descriptor.parse().unwrap(), rt);
-                    })
+
+                    if let Some(ref proto) = node.proto_impl {
+                        let mut p = Punctuated::<Ident, Comma>::new();
+                        for (_descr, ty) in &proto.sorted {
+                            p.push(ident!(ty));
+                        }
+
+                        token_stream.extend::<proc_macro2::TokenStream>(quote! {
+                            let mut #ident: ::des::util::Mrc<#ty> = #ty::build_named::<Self, #p>(#descriptor.parse().unwrap(), rt);
+                        });
+                    } else {
+                        token_stream.extend::<proc_macro2::TokenStream>(quote! {
+                            let mut #ident: ::des::util::Mrc<#ty> = #ty::build_named(#descriptor.parse().unwrap(), rt);
+                        })
+                    }
                 }
 
                 // Create connections.
@@ -100,9 +114,7 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> Result<TokenStream> {
                     } else {
                         token_stream.extend(quote! {
                             // assert_eq!(#from_ident.len(), #to_ident.len());
-                            for i in 0..#from_ident.len() {
-                                #from_ident[i].set_next_gate(#to_ident[i].make_readonly());
-                            }
+                            #from_ident.set_next_gate(#to_ident.make_readonly());
                         });
                     }
                 }
@@ -142,6 +154,7 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> Result<TokenStream> {
                             let mut runtime = ::des::net::NetworkRuntime::new(self);
                             let rt: &mut ::des::net::NetworkRuntime<Self> = &mut runtime;
 
+                            use ::des::net::*;
                             #token_stream
 
                             // rt.finish_building()

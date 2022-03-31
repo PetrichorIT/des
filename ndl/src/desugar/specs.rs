@@ -1,6 +1,6 @@
 use crate::loc::Loc;
 use crate::parser::{
-    GateAnnotation, GateDef, LinkDef, ModuleDef, NetworkDef, ParamDef, ProtoImpl, TyDef,
+    GateAnnotation, GateDef, LinkDef, ModuleDef, NetworkDef, ParamDef, ProtoImplDef, TyDef,
 };
 use std::fmt::Display;
 
@@ -189,7 +189,7 @@ pub struct ChildModuleSpec {
     /// The global type identifier for the type of the child module.
     pub ty: TySpec,
     /// proto impl block
-    pub proto_impl: Option<ProtoImpl>,
+    pub proto_impl: Option<ProtoImplSpec>,
 }
 
 impl Display for ChildModuleSpec {
@@ -197,13 +197,37 @@ impl Display for ChildModuleSpec {
         write!(f, "{}: {} ", self.descriptor, self.ty)?;
         if let Some(ref proto) = self.proto_impl {
             write!(f, "{{ ")?;
-            for p in &proto.defs {
+            for p in &proto.sorted {
                 write!(f, "{} = {}, ", p.0, p.1)?
             }
             write!(f, "}}")?;
         }
 
         Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProtoImplSpec {
+    // HashMap<ident, ty>
+    pub sorted: Vec<(String, String)>,
+}
+
+impl ProtoImplSpec {
+    pub(crate) fn get(&self, key: &str) -> Option<&String> {
+        self.sorted
+            .iter()
+            .find_map(|(k, v)| if k == key { Some(v) } else { None })
+    }
+
+    pub fn new(def: &ProtoImplDef) -> Self {
+        Self {
+            sorted: def
+                .defs
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect(),
+        }
     }
 }
 

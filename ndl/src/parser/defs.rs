@@ -86,7 +86,7 @@ pub struct ChildModuleDef {
     /// A module internal descriptor for the created submodule.
     pub desc: LocalDescriptorDef,
     /// A block for proto impls
-    pub proto_impl: Option<ProtoImpl>,
+    pub proto_impl: Option<ProtoImplDef>,
 }
 
 ///
@@ -176,11 +176,11 @@ impl Display for TyDef {
 /// A proto impl block
 ///
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ProtoImpl {
+pub struct ProtoImplDef {
     pub defs: HashMap<String, String>,
 }
 
-impl ProtoImpl {
+impl ProtoImplDef {
     pub fn new() -> Self {
         Self {
             defs: HashMap::new(),
@@ -188,13 +188,13 @@ impl ProtoImpl {
     }
 }
 
-impl Default for ProtoImpl {
+impl Default for ProtoImplDef {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Display for ProtoImpl {
+impl Display for ProtoImplDef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for def in &self.defs {
             writeln!(f, "{} = {}", def.0, def.1)?

@@ -2,11 +2,11 @@ use crate::{
     attributes::Attributes,
     common::{get_resolver, ident_from_conident, WrappedTokenStream},
 };
-use ndl::ChannelSpec;
 use ndl::ChildModuleSpec;
 use ndl::ConSpec;
 use ndl::GateAnnotation;
 use ndl::GateSpec;
+use ndl::{ChannelSpec, TySpec};
 use proc_macro2::{Ident, Span};
 use proc_macro_error::{Diagnostic, Level};
 use quote::quote;
@@ -193,11 +193,19 @@ fn generate_dynamic_builder(ident: Ident, attrs: &Attributes, out: &mut TokenStr
 
                 // Submodule configuration
 
+                let mut proto_t_counter = 0;
                 for module in &module.submodules {
                     let ChildModuleSpec { descriptor, ty, .. } = module;
 
                     let ident = ident!(format!("{}_child", descriptor));
-                    let ty = ident!(ty.inner());
+                    let ty = match ty {
+                        TySpec::Static(s) => ident!(s),
+                        TySpec::Dynamic(_) => {
+                            let ident = ident!(format!("T{}", descriptor));
+                            proto_t_counter += 1;
+                            ident
+                        }
+                    };
                     token_stream.extend::<proc_macro2::TokenStream>(quote! {
                         let mut #ident: ::des::util::Mrc<#ty> = #ty::build_named_with_parent(#descriptor, &mut this, rt);
                     })
@@ -232,8 +240,8 @@ fn generate_dynamic_builder(ident: Ident, attrs: &Attributes, out: &mut TokenStr
 
                     // get gate cluster for specific nodes
                     let to_ident = ident_from_conident(&mut token_stream, target);
-
                     let from_ident = ident_from_conident(&mut token_stream, source);
+
                     // Define n channels (n == gate_cluster.size())
                     if let Some(channel) = channel {
                         let ChannelSpec {
@@ -274,15 +282,12 @@ fn generate_dynamic_builder(ident: Ident, attrs: &Attributes, out: &mut TokenStr
 
                 let wrapped = WrappedTokenStream(token_stream);
 
-                out.extend::<TokenStream>(quote! {
-                    impl ::des::net::BuildableModule for #ident {
-                        fn build<A>(mut this: ::des::util::Mrc<Self>, rt: &mut ::des::net::NetworkRuntime<A>) -> ::des::util::Mrc<Self> {
-                            #wrapped
-                            this
-                        }
-                    }
-                }
-                .into());
+                out.extend::<TokenStream>(build_impl_from(
+                    ident,
+                    wrapped,
+                    &module.submodules,
+                    proto_t_counter,
+                ));
 
                 Ok(())
             }
@@ -292,13 +297,6 @@ fn generate_dynamic_builder(ident: Ident, attrs: &Attributes, out: &mut TokenStr
             )),
         }
     } else {
-        out.extend::<TokenStream>(
-            quote! {
-                impl ::des::net::BuildableModule for #ident {}
-            }
-            .into(),
-        );
-
         Ok(())
     }
 }
