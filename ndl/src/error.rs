@@ -529,7 +529,8 @@ pub enum ErrorCode {
     DsgConInvalidGateSize,
     DsgConInvalidField,
 
-    DsgInvalidPrototype,
+    DsgInvalidPrototypeAtAlias,
+    DsgInvalidPrototypeAtSome,
     DsgProtoImplForNonProtoValue,
     DsgProtoImplMissingField,
     DsgProtoImplTyMissing,

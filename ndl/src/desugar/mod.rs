@@ -32,11 +32,11 @@ pub fn desugar(resolver: &mut NdlResolver) {
     for (alias, fpass) in &first_pass_units {
         let result = second::second_pass(fpass, &first_pass_units, resolver);
 
-        // Defer errors
-        resolver
-            .ectx
-            .desugaring_errors
-            .append(&mut result.errors.clone());
+        // // Defer errors
+        // resolver
+        //     .ectx
+        //     .desugaring_errors
+        //     .append(&mut result.errors.clone());
 
         resolver.desugared_units.insert(alias.clone(), result);
     }

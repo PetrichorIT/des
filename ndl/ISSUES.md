@@ -22,3 +22,7 @@ module B {}
 module C instanceof B
 
 # Crash on empty files
+
+# Check for cyclic types
+
+# TODO(Cleanup): Use check_error macro in all examples

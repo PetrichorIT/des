@@ -40,6 +40,23 @@ impl<'a> GlobalTyDefContext<'a> {
     ///
     /// REturns a module def with the given ident from the type context.
     ///
+    pub fn prototype(&self, ident: &str) -> Option<&ModuleDef> {
+        for unit in self.resolver.units.values() {
+            match unit
+                .modules_and_prototypes
+                .iter()
+                .find(|l| l.name == ident && l.is_prototype)
+            {
+                Some(module) => return Some(module),
+                None => continue,
+            }
+        }
+        None
+    }
+
+    ///
+    /// REturns a module def with the given ident from the type context.
+    ///
     pub fn module(&self, ident: &str) -> Option<&ModuleDef> {
         for unit in self.resolver.units.values() {
             match unit.modules_and_prototypes.iter().find(|l| l.name == ident) {

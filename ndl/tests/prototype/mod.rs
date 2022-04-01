@@ -1,6 +1,15 @@
 use ndl::ErrorCode::*;
 use ndl::*;
 
+macro_rules! check_err {
+    ($e:expr => $code:ident, $msg:literal, $transient:literal, $solution:expr) => {
+        assert_eq!($e.code, $code);
+        assert_eq!($e.msg, $msg);
+        assert_eq!($e.transient, $transient);
+        assert_eq!($e.solution, $solution);
+    };
+}
+
 #[test]
 fn base() {
     let mut resolver =
@@ -11,16 +20,33 @@ fn base() {
     let _ = resolver.run();
 
     println!("{}", resolver);
-
     assert!(!resolver.ectx.has_errors())
 }
 
+///
+/// P
+///
+
 #[test]
-fn par_failed_network_as_proto() {
-    let path = "tests/prototype/P_Network_Proto.ndl";
+fn par_proto_is_proto() {
+    let path = "tests/prototype/P_Proto_IsProto.ndl";
     let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
 
     r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 1);
+
+    assert!(!r.ectx.has_errors());
+    assert!(r.gtyctx_def().module("A").unwrap().is_prototype);
+    assert!(r.gtyctx_spec().module("A").is_none());
+}
+
+#[test]
+fn par_proto_failed_at_network() {
+    let path = "tests/prototype/P_Proto_Network.ndl";
+    let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
+
+    r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 1);
 
     assert!(r.ectx.has_errors());
 
@@ -46,6 +72,7 @@ fn par_alias_no_ident() {
     let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
 
     r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 1);
 
     assert!(r.ectx.has_errors());
 
@@ -85,6 +112,7 @@ fn par_alias_like_keyword_invalid() {
     let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
 
     r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 1);
 
     assert!(r.ectx.has_errors());
 
@@ -124,6 +152,7 @@ fn par_alias_no_tyident() {
     let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
 
     r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 1);
 
     assert!(r.ectx.has_errors());
 
@@ -165,6 +194,7 @@ fn par_pimpl_def_and_impl() {
     let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
 
     r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 1);
 
     assert!(r.ectx.has_errors());
 
@@ -195,6 +225,7 @@ fn par_pimpl_no_ident() {
     let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
 
     r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 1);
 
     assert!(r.ectx.has_errors());
 
@@ -231,6 +262,7 @@ fn par_pimpl_no_eq() {
     let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
 
     r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 1);
 
     assert!(r.ectx.has_errors());
 
@@ -269,6 +301,7 @@ fn par_pimpl_no_ty_ident() {
     let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
 
     r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 1);
 
     assert!(r.ectx.has_errors());
 
@@ -349,6 +382,7 @@ fn par_some_in_network() {
     let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
 
     r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 1);
 
     assert!(r.ectx.has_errors());
 
@@ -377,6 +411,7 @@ fn par_some_no_proto() {
     let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
 
     r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 1);
 
     assert!(r.ectx.has_errors());
 
@@ -404,4 +439,373 @@ fn par_some_no_proto() {
     );
 
     assert_eq!(r.gtyctx_spec().module("X2").unwrap().gates.len(), 2);
+}
+
+///
+/// D2
+///
+
+#[test]
+fn dsg2_alias_chk_no_proto() {
+    //
+    // Error output sorting may reorder stdout
+    //
+    let path = "tests/prototype/D2_AliasChk_NoProto.ndl";
+    let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
+
+    r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 1);
+
+    assert!(r.ectx.has_errors());
+
+    let errs = r.ectx.all().collect::<Vec<&Error>>();
+    assert_eq!(errs.len(), 2);
+
+    assert_eq!(
+        *errs[0],
+        Error::new(
+            DsgInvalidPrototypeAtAlias,
+            "No prototype called 'B' found. Module 'B' is no prototype.".to_string(),
+            Loc::new(44, 5, 5),
+            false,
+        )
+    );
+
+    assert_eq!(
+        *errs[1],
+        Error::new(
+            DsgInvalidPrototypeAtAlias,
+            "No prototype called 'C' found.".to_string(),
+            Loc::new(59, 5, 6),
+            false,
+        )
+    );
+}
+
+#[test]
+fn dsg2_alias_chk_need_include() {
+    //
+    // Error output sorting may reorder stdout
+    //
+    let path = "tests/prototype/D2_AliasChk_Include";
+    let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
+
+    r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 2);
+
+    assert!(r.ectx.has_errors());
+
+    let errs = r.ectx.all().collect::<Vec<&Error>>();
+    assert_eq!(errs.len(), 1);
+
+    assert_eq!(
+        *errs[0],
+        Error::new_with_solution(
+            DsgInvalidPrototypeAtAlias,
+            "No prototype called 'A' found.".to_string(),
+            Loc::new(0, 5, 1),
+            false,
+            ErrorSolution::new("Try including 'Other'".to_string(), Loc::new(0, 1, 1))
+        )
+    );
+}
+
+#[test]
+fn dsg2_some_chk_no_proto() {
+    //
+    // Error output sorting may reorder stdout
+    //
+    let path = "tests/prototype/D2_SomeChk_NoProto.ndl";
+    let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
+
+    r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 1);
+
+    assert!(r.ectx.has_errors());
+
+    let errs = r.ectx.all().collect::<Vec<&Error>>();
+    assert_eq!(errs.len(), 2);
+
+    assert_eq!(
+        *errs[0],
+        Error::new(
+            DsgInvalidPrototypeAtSome,
+            "No prototype called 'A' found. Module 'A' is no prototype.".to_string(),
+            Loc::new(48, 7, 5),
+            false,
+        )
+    );
+
+    assert_eq!(
+        *errs[1],
+        Error::new(
+            DsgInvalidPrototypeAtSome,
+            "No prototype called 'C' found.".to_string(),
+            Loc::new(66, 7, 6),
+            false,
+        )
+    );
+}
+
+#[test]
+fn dsg2_some_chk_need_include() {
+    //
+    // Error output sorting may reorder stdout
+    //
+    let path = "tests/prototype/D2_SomeChk_Include";
+    let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
+
+    r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 2);
+
+    assert!(r.ectx.has_errors());
+
+    let errs = r.ectx.all().collect::<Vec<&Error>>();
+    assert_eq!(errs.len(), 1);
+
+    assert_eq!(
+        *errs[0],
+        Error::new_with_solution(
+            DsgInvalidPrototypeAtSome,
+            "No prototype called 'A' found.".to_string(),
+            Loc::new(35, 7, 3),
+            false,
+            ErrorSolution::new("Try including 'Other'".to_string(), Loc::new(0, 1, 1))
+        )
+    );
+}
+
+#[test]
+fn dsg3_impl_for_no_proto() {
+    //
+    // Error output sorting may reorder stdout
+    //
+    let path = "tests/prototype/D3_Impl_ForNoProto.ndl";
+    let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
+
+    r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 1);
+
+    assert!(r.ectx.has_errors());
+
+    let errs = r.ectx.all().collect::<Vec<&Error>>();
+    assert_eq!(errs.len(), 2);
+
+    assert_eq!(
+        *errs[0],
+        Error::new(
+            DsgProtoImplForNonProtoValue,
+            "Cannot at a prototype implmentation block to a child of type 'B' that has no prototype components.".to_string(),
+            Loc::new(98, 4, 11),
+            false,
+        )
+    );
+
+    assert_eq!(
+        *errs[1],
+        Error::new(
+            DsgProtoImplForNonProtoValue,
+            "Cannot at a prototype implmentation block to a child of type 'B' that has no prototype components.".to_string(),
+            Loc::new(151, 4, 16),
+            false,
+        )
+    );
+}
+
+#[test]
+fn dsg3_impl_missing_field() {
+    //
+    // Error output sorting may reorder stdout
+    //
+    let path = "tests/prototype/D3_Impl_MissingField.ndl";
+    let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
+
+    r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 1);
+
+    assert!(r.ectx.has_errors());
+
+    let errs = r.ectx.all().collect::<Vec<&Error>>();
+    assert_eq!(errs.len(), 3 + 3);
+
+    assert_eq!(
+        *errs[0],
+        Error::new(
+            DsgProtoImplMissingField,
+            "Missing prototype impl field 'sub'.".to_string(),
+            Loc::new(141, 4, 13),
+            false,
+        )
+    );
+
+    assert_eq!(
+        *errs[1],
+        Error::new(
+            DsgProtoImplMissingField,
+            "Missing prototype impl field 'sub2'.".to_string(),
+            Loc::new(141, 4, 13),
+            false,
+        )
+    );
+
+    assert_eq!(
+        *errs[2],
+        Error::new(
+            DsgProtoImplMissingField,
+            "Missing prototype impl field 'sub2'.".to_string(),
+            Loc::new(158, 4, 14),
+            false,
+        )
+    );
+
+    // NET
+
+    assert_eq!(
+        *errs[3],
+        Error::new(
+            DsgProtoImplMissingField,
+            "Missing prototype impl field 'sub'.".to_string(),
+            Loc::new(231, 4, 21),
+            false,
+        )
+    );
+
+    assert_eq!(
+        *errs[4],
+        Error::new(
+            DsgProtoImplMissingField,
+            "Missing prototype impl field 'sub2'.".to_string(),
+            Loc::new(231, 4, 21),
+            false,
+        )
+    );
+
+    check_err!(
+        *errs[5] =>
+        DsgProtoImplMissingField,
+        "Missing prototype impl field 'sub2'.",
+        false,
+        None
+    );
+}
+
+#[test]
+fn dsg3_impl_no_ty_or_include() {
+    //
+    // Error output sorting may reorder stdout
+    //
+    let path = "tests/prototype/D3_Impl_NoTyOrInclude";
+    let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
+
+    r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 2);
+
+    assert!(r.ectx.has_errors());
+
+    let errs = r.ectx.all().collect::<Vec<&Error>>();
+    assert_eq!(errs.len(), 2 + 2);
+
+    check_err!(
+        *errs[0] =>
+        DsgProtoImplTyMissing,
+        "Unknown type 'B'.",
+        false,
+        Some(ErrorSolution::new("Try including 'Other'".to_string(), Loc::new(0, 1, 1)))
+    );
+
+    check_err!(
+        *errs[1] =>
+        DsgProtoImplTyMissing,
+        "Unknown type 'C'.",
+        false,
+        None
+    );
+
+    // Net
+
+    check_err!(
+        *errs[2] =>
+        DsgProtoImplTyMissing,
+        "Unknown type 'B'.",
+        false,
+        Some(ErrorSolution::new("Try including 'Other'".to_string(), Loc::new(0, 1, 1)))
+    );
+
+    check_err!(
+        *errs[3] =>
+        DsgProtoImplTyMissing,
+        "Unknown type 'C'.",
+        false,
+        None
+    );
+}
+
+#[test]
+fn dsg3_impl_assoc_not_proto() {
+    //
+    // Error output sorting may reorder stdout
+    //
+    let path = "tests/prototype/D3_Impl_AssocNotProto.ndl";
+    let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
+
+    r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 1);
+
+    assert!(r.ectx.has_errors());
+
+    let errs = r.ectx.all().collect::<Vec<&Error>>();
+    assert_eq!(errs.len(), 1 + 1);
+
+    check_err!(
+        *errs[0] =>
+        DsgProtoImplAssociatedTyNotDerivedFromProto,
+        "Assigned type 'X' does not fulfill the prototype 'A'.",
+        false,
+        None
+    );
+
+    // Net
+
+    check_err!(
+        *errs[1] =>
+        DsgProtoImplAssociatedTyNotDerivedFromProto,
+        "Assigned type 'X' does not fulfill the prototype 'A'.",
+        false,
+        None
+    );
+}
+
+#[test]
+fn dsg3_impl_no_impl() {
+    //
+    // Error output sorting may reorder stdout
+    //
+    let path = "tests/prototype/D3_Impl_NoImpl.ndl";
+    let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
+
+    r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 1);
+
+    assert!(r.ectx.has_errors());
+
+    let errs = r.ectx.all().collect::<Vec<&Error>>();
+    assert_eq!(errs.len(), 1 + 1);
+
+    check_err!(
+        *errs[0] =>
+        DsgProtoImlMissing,
+        "Missing prototype impl block for type 'M'.",
+        false,
+        None
+    );
+
+    // Net
+
+    check_err!(
+        *errs[1] =>
+        DsgProtoImlMissing,
+        "Missing prototype impl block for type 'M'.",
+        false,
+        None
+    );
 }

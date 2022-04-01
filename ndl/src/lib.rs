@@ -72,6 +72,7 @@ pub use tycheck::validate_module_ty;
 // > Global primitivs
 pub use error::Error;
 pub use error::ErrorCode;
+pub use error::ErrorSolution;
 pub use error::GlobalErrorContext;
 pub use lexer::Base;
 pub use lexer::LiteralKind;

@@ -1,0 +1,17 @@
+module A {}
+
+module B {
+    submodules:
+        sub: A 
+}
+
+
+module Main {
+    submodules:
+        b: B { sub = A }
+}
+
+network Net {
+    nodes:
+        b: B { sub = A }
+}

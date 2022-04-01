@@ -1,0 +1,4 @@
+module X {
+    submodules:
+        x: some A
+}

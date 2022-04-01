@@ -1,0 +1,19 @@
+prototype A {}
+
+alias B like A
+
+module M {
+    submodules:
+        sub: some A
+        sub2: some A
+}
+
+module Main {
+    submodules:
+        a: M
+}
+
+network Net {
+    nodes:
+        a: M
+}

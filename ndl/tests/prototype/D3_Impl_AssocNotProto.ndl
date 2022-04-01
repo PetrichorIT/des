@@ -1,0 +1,18 @@
+prototype A {}
+
+module M {
+    submodules:
+        inner: some A
+}
+
+module X {}
+
+module Main {
+    submodules:
+        a: M { inner = X }
+}
+
+network Main {
+    nodes:
+        a: M { inner = X }
+}

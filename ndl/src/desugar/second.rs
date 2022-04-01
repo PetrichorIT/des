@@ -34,12 +34,24 @@ pub(crate) fn second_pass(
             proto.ident = name.clone();
             modules.push(proto);
         } else {
+            let g_proto = gtyctx.prototype(prototype).map(|m| m.loc);
+            let g_module_or_proto = gtyctx.module(prototype).map(|m| m.loc).is_some();
+
+            let module_as_proto = g_module_or_proto && g_proto.is_none();
+
             errors.push(Error::new_ty_missing(
-                DsgInvalidPrototype,
-                format!("No prototype called '{}' found.", prototype),
+                DsgInvalidPrototypeAtAlias,
+                if module_as_proto {
+                    format!(
+                        "No prototype called '{0}' found. Module '{0}' is no prototype.",
+                        prototype
+                    )
+                } else {
+                    format!("No prototype called '{}' found.", prototype)
+                },
                 *loc,
                 &resolver.source_map,
-                gtyctx.module(prototype).map(|m| m.loc),
+                g_proto,
             ));
         }
     }
@@ -55,12 +67,24 @@ pub(crate) fn second_pass(
 
                 let exists = tyctx.prototypes.iter().any(|p| &p.ident == s);
                 if !exists {
+                    let g_proto = gtyctx.prototype(s).map(|m| m.loc);
+                    let g_module = gtyctx.module(s).map(|m| m.loc).is_some();
+
+                    let module_as_proto = g_module && g_proto.is_none();
+
                     errors.push(Error::new_ty_missing(
-                        DsgInvalidPrototype,
-                        format!("Unknown prototype '{}'.", s),
+                        DsgInvalidPrototypeAtSome,
+                        if module_as_proto {
+                            format!(
+                                "No prototype called '{0}' found. Module '{0}' is no prototype.",
+                                s
+                            )
+                        } else {
+                            format!("No prototype called '{}' found.", s)
+                        },
                         child.loc,
                         &resolver.source_map,
-                        gtyctx.module(s).map(|m| m.loc),
+                        g_proto,
                     ))
                 }
             }
