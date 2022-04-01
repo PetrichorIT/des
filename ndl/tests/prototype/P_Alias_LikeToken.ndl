@@ -1,0 +1,4 @@
+prototype A {}
+
+alias B laik A
+alias C 1234 A 

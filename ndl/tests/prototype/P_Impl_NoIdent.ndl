@@ -1,0 +1,13 @@
+prototype A {}
+
+alias C like A
+
+module X {
+    submodules:
+        x: some A
+}
+
+network Y {
+    nodes:
+        x: X { 123 }
+}

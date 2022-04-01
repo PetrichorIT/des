@@ -249,6 +249,12 @@ impl AssetDescriptor {
     /// path and the relative workspace root.
     ///
     pub fn from_path(path: PathBuf, rel_root: &Path) -> Self {
+        // Single file mode
+        if path == rel_root {
+            let file_name = path.file_name().unwrap().to_str().unwrap().to_string();
+            return Self::new(path, file_name);
+        }
+
         let components = path.components().collect::<Vec<Component>>();
         let naming_subset = &components[rel_root.components().count()..]
             .iter()

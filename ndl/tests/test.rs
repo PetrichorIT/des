@@ -3,7 +3,7 @@ use ndl::*;
 #[test]
 #[cfg(target_os = "linux")]
 fn ndl_lexer_test() {
-    let contents = std::fs::read_to_string("tests/examples/LexTest.ndl")
+    let contents = std::fs::read_to_string("tests/LexTest.ndl")
         .expect("Failed to read static test file 'LexTest.ndl'");
 
     let token_stream = tokenize(&contents, 0).collect::<Vec<Token>>();
@@ -89,7 +89,7 @@ fn ndl_parser_test() {
     let mut smap = SourceMap::new();
     let asset = smap
         .load(AssetDescriptor::new(
-            "tests/examples/ParTest.ndl".into(),
+            "tests/ParTest.ndl".into(),
             "ParTest".into(),
         ))
         .expect("Failed to load test asset 'ParTest.ndl'");
@@ -168,7 +168,7 @@ fn ndl_parser_test() {
 // fn ndl_desugar_test() {
 //     use crate::*;
 
-//     let mut resolver = NdlResolver::new("tests/examples/TycTest").expect("Failed to load TcyTest");
+//     let mut resolver = NdlResolver::new("tests/TycTest").expect("Failed to load TcyTest");
 //     let _ = resolver.run();
 
 //     let unit = resolver.units.get("Main").unwrap();
@@ -183,8 +183,8 @@ fn ndl_parser_test() {
 fn ndl_tycheck_test() {
     use crate::*;
 
-    let mut resolver = NdlResolver::new("./tests/examples/TycTest")
-        .expect("Failed to create resovler with valid root.");
+    let mut resolver =
+        NdlResolver::new("./tests/TycTest").expect("Failed to create resovler with valid root.");
 
     let _ = resolver.run();
 
@@ -197,7 +197,7 @@ fn ndl_tycheck_test() {
 
 #[test]
 fn ndl_full_test() {
-    let mut resolver = NdlResolver::new("tests/examples/full").expect("Failed to create resolver");
+    let mut resolver = NdlResolver::new("tests/full").expect("Failed to create resolver");
 
     println!("{}", resolver);
 
@@ -208,8 +208,7 @@ fn ndl_full_test() {
 
 #[test]
 fn ndl_protsim_test() {
-    let mut resolver =
-        NdlResolver::new("tests/examples/protsim").expect("Failed to create resolver");
+    let mut resolver = NdlResolver::new("tests/protsim").expect("Failed to create resolver");
 
     println!("{}", resolver);
 
@@ -218,14 +217,4 @@ fn ndl_protsim_test() {
     println!("{}", resolver);
 }
 
-#[test]
-fn ndl_prototype_test() {
-    let mut resolver =
-        NdlResolver::new("tests/examples/prototype").expect("Failed to create resolver.");
-
-    println!("{}", resolver);
-
-    let _ = resolver.run();
-
-    println!("{}", resolver);
-}
+mod prototype;

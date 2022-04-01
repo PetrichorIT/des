@@ -20,3 +20,5 @@ app: some B
 module B {}
 
 module C instanceof B
+
+# Crash on empty files

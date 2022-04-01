@@ -1,0 +1,27 @@
+prototype A {}
+
+alias B like A
+
+module X {
+    submodules:
+        inner: some A
+        second: some A
+}
+
+network Y {
+    nodes:
+        x: X {
+            inner = 123
+            second = B
+        }
+        x2: B
+}
+
+network Y2 {
+    nodes:
+        x: X {
+            second = B
+            inner =
+        }
+        x2: B
+}

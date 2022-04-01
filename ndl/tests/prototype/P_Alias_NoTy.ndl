@@ -1,0 +1,10 @@
+prototype A {}
+
+alias B like 
+module X {}
+
+alias C like
+alias D like A
+
+alias E like
+123

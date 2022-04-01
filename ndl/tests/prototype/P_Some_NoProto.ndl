@@ -1,0 +1,14 @@
+prototype A {}
+
+module X {
+    submodules:
+        x: some 123
+}
+
+module X2 {
+    submodules:
+        x: some
+    gates:
+        in @input
+        out @output
+}

@@ -1,0 +1,10 @@
+prototype A {}
+
+module B {}
+
+module X {
+    submodules:
+        x: some A {
+            app = B
+        }
+}

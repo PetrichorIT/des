@@ -45,6 +45,17 @@ impl NdlResolver {
         Self::new_with(raw_path, NdlResolverOptions::default())
     }
 
+    pub fn quiet(raw_path: &str) -> Result<Self, &'static str> {
+        Self::new_with(
+            raw_path,
+            NdlResolverOptions {
+                silent: true,
+                verbose: false,
+                verbose_output_dir: PathBuf::new(),
+            },
+        )
+    }
+
     pub fn gtyctx_def(&self) -> GlobalTyDefContext<'_> {
         GlobalTyDefContext::new(self)
     }

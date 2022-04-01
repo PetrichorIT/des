@@ -9,12 +9,18 @@ struct Opt {
     #[structopt(short, long, help = "Prevents ndl from printing the result.")]
     quiet: bool,
 
+    #[structopt(short, long, help = "Suppreses errors.")]
+    suppres_errors: bool,
+
     #[structopt(
         short = "v",
         long = "verbose",
         help = "Defines a output directory which stores incremental results."
     )]
     verbose_with_dir: Option<String>,
+
+    #[structopt(short, long, default_value = "1")]
+    times: usize,
 
     #[structopt(name = "Workspaces")]
     workspaces: Vec<String>,
@@ -23,12 +29,14 @@ struct Opt {
 fn main() -> std::io::Result<()> {
     let Opt {
         quiet,
+        suppres_errors,
         verbose_with_dir,
+        times,
         mut workspaces,
     } = Opt::from_args();
 
     if workspaces.is_empty() {
-        workspaces.push("ndl/tests/examples/prototype".to_string());
+        workspaces.push("ndl/tests/prototype".to_string());
     }
 
     // if workspaces.is_empty() {
@@ -36,7 +44,7 @@ fn main() -> std::io::Result<()> {
     // }
 
     let opts = NdlResolverOptions {
-        silent: false,
+        silent: suppres_errors,
         verbose: verbose_with_dir.is_some(),
         verbose_output_dir: verbose_with_dir.map(PathBuf::from).unwrap_or_default(),
     };
@@ -45,26 +53,29 @@ fn main() -> std::io::Result<()> {
         println!("Workspace '{}'", workspace);
         println!();
 
-        let mut resolver = NdlResolver::new_with(&workspace, opts.clone()).unwrap();
-        let (g, errs, par_files) = resolver.run_cached().unwrap();
-        let has_err = errs.count() != 0;
+        // For debug
+        for _ in 0..times {
+            let mut resolver = NdlResolver::new_with(&workspace, opts.clone()).unwrap();
+            let (g, errs, par_files) = resolver.run_cached().unwrap();
+            let has_err = errs.count() != 0;
 
-        println!(
-            "> {} errors and found {} par files",
-            if has_err { "has" } else { "free of" },
-            par_files.len()
-        );
+            let g = g.to_owned();
 
-        let g = g.to_owned();
+            // Modules
+            if !quiet {
+                println!(
+                    "> {} errors and found {} par files",
+                    if has_err { "has" } else { "free of" },
+                    par_files.len()
+                );
 
-        // Modules
-        if !quiet {
-            for module in g.modules {
-                println!("{}", module)
-            }
+                for module in g.modules {
+                    println!("{}", module)
+                }
 
-            for network in g.networks {
-                println!("{}", network)
+                for network in g.networks {
+                    println!("{}", network)
+                }
             }
         }
     }

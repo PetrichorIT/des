@@ -1,0 +1,15 @@
+prototype A {}
+
+alias B like A
+
+module X {
+    submodules:
+        inner: some A
+}
+
+network Y {
+    nodes:
+        x: X {
+            inner is B
+        }
+}

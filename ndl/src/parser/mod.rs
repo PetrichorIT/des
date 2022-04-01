@@ -11,8 +11,10 @@ pub use result::*;
 mod defs;
 pub use defs::*;
 
+const GLOBAL_KEYWORDS: [&str; 5] = ["module", "network", "prototype", "alias", "link"];
 const MODULE_SUBSECTION_IDENT: [&str; 4] = ["gates", "submodules", "connections", "parameters"];
 const NETWORK_SUBSECTION_IDENT: [&str; 3] = ["nodes", "connections", "parameters"];
+
 
 
 ///
@@ -49,19 +51,36 @@ pub fn parse(asset: Asset<'_>, tokens: TokenStream) -> ParsingResult {
                     TokenKind::Ident => {
                         let ident = raw_parts;
                         match ident {
-                            "include" => parser.parse_include(&mut ectx)?,
-                            "module" => parser.parse_module(false, &mut ectx)?,
-                            "prototype" => parser.parse_module(true, &mut ectx)?,
-                            "alias" => parser.parse_alias(&mut ectx)?,
-                            "link" => parser.parse_link(&mut ectx)?,
-                            "network" => parser.parse_network(&mut ectx)?,
+                            "include" => { 
+                                ectx.reset_transient(); 
+                                parser.parse_include(&mut ectx)? 
+                            },
+                            "module" => { 
+                                ectx.reset_transient();
+                                parser.parse_module(false, &mut ectx)?
+                            },
+                            "prototype" => { 
+                                ectx.reset_transient();
+                                parser.parse_module(true, &mut ectx)?
+                            },
+                            "alias" => {
+                                ectx.reset_transient();
+                                parser.parse_alias(&mut ectx)?
+                            },
+                            "link" => {
+                                ectx.reset_transient();
+                                parser.parse_link(&mut ectx)?
+                            },
+                            "network" => {
+                                ectx.reset_transient();
+                                parser.parse_network(&mut ectx)?
+                            },
                             _ => { 
                                 ectx.record(
                                     ParUnexpectedKeyword, 
                                     format!("Unexpected keyword '{}'. Expected include / module / link or network", ident), 
                                     token.loc
                                 );
-                                ectx.reset_transient()
                             }
                         }
                     }
@@ -626,15 +645,40 @@ impl<'a> Parser<'a> {
                             if token.kind != TokenKind::Ident {
                                 ectx.record(
                                     ParModuleSubInvalidIdentiferToken,
-                                    String::from("Unexpected token. Expected type identifer."),
+                                    format!("Unexpected token '{}'. Expected prototype identifer.", real_ty),
                                     second_token.loc
                                 )?;
                                 return Ok(false);
                             }
+
+                            // check for name col
+                            if escape_keywords.contains(&real_ty) {
+                                ectx.record(
+                                    ParModuleSubInvalidIdentiferToken,
+                                    format!("Unexpected keyword '{}'. Expected prototype identifer.", real_ty),
+                                    second_token.loc
+                                )?;
+                                self.tokens.bump_back(1);
+                                return Ok(false);
+                            }
+                            
                             
                             ty_def = TyDef::Dynamic(real_ty.to_string());
 
                             self.eat_whitespace();
+
+                            // Check for def_and_impl error
+                            if self.tokens.peek()?.kind == TokenKind::OpenBrace {
+                                
+                                ectx.record(
+                                    ParProtoImplAtSomeDef,
+                                    "Unexpected token '{'. Cannot add prototype impl block after use of keyword 'some'.".to_string(),
+                                    self.tokens.peek()?.loc,
+                                )?;
+                                self.tokens.bump()?;
+                                // continue eitherway
+                            }
+
                             self.eat_optionally(|t| t.kind == TokenKind::Comma);
     
                             child_modules.push(ChildModuleDef { 
@@ -679,8 +723,8 @@ impl<'a> Parser<'a> {
                                     if token_eq.kind != TokenKind::Eq {
                                         ectx.record(
                                             ParProtoImplExpectedEq,
-                                        format!("Unexpected token '{}'. Expected '=''.", raw_eq), 
-                                            f_token.loc
+                                        format!("Unexpected token '{}'. Expected '='.", raw_eq), 
+                                        token_eq.loc
                                         )?;
                                         
                                         if token_eq.kind == TokenKind::CloseBrace {
@@ -695,8 +739,8 @@ impl<'a> Parser<'a> {
                                     if s_token.kind != TokenKind::Ident {
                                         ectx.record(
                                             ParProtoImplInvalidIdent,
-                                        format!("Unexpected token '{}'. Expected type ident.", raw_eq), 
-                                            f_token.loc
+                                        format!("Unexpected token '{}'. Expected type ident.", ty), 
+                                            s_token.loc
                                         )?;
 
                                         if s_token.kind == TokenKind::CloseBrace {
@@ -1054,7 +1098,7 @@ impl<'a> Parser<'a> {
 
         let (token, name) = self.next_token()?;
         let name = name.to_string();
-        if token.kind != TokenKind::Ident {
+        if token.kind != TokenKind::Ident || name == "like" {  
             ectx.record(ParAliasMissingIdent, format!("Unexpected token '{}'. Expected ident.", name), token.loc)?;
             return Ok(())
         }
@@ -1075,9 +1119,16 @@ impl<'a> Parser<'a> {
         let (token, prototype) = self.next_token()?;
         let prototype = prototype.to_string();
         if token.kind != TokenKind::Ident {
-            ectx.record(ParAliasMissingPrototypeIdent, format!("Unexpected token '{}'. Expected ident.", name), token.loc)?;
+            ectx.record(ParAliasMissingPrototypeIdent, format!("Unexpected token '{}'. Expected prototype ident.", prototype), token.loc)?;
             return Ok(())
         }
+
+        if GLOBAL_KEYWORDS.contains(&&prototype[..]) {
+            self.tokens.bump_back(1);
+            ectx.record(ParAliasMissingPrototypeIdent, format!("Unexpected keyword '{}'. Expected prototype ident.", prototype), token.loc)?;
+            return Ok(())
+        }
+
 
         self.result.aliases.push(AliasDef {
             loc,

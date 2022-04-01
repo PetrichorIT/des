@@ -1,0 +1,6 @@
+prototype A {}
+
+network X {
+    nodes:
+        x: some A
+}

@@ -504,6 +504,7 @@ pub enum ErrorCode {
 
     ParProtoImplInvalidIdent,
     ParProtoImplExpectedEq,
+    ParProtoImplAtSomeDef,
 
     ParNetworkMissingIdentifer,
     ParNetworkMissingDefBlockOpen,

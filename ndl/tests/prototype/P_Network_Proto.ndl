@@ -1,0 +1,11 @@
+module A {}
+
+prototype AbstractNetwork {
+    nodes:
+        submodule: A
+}
+
+//
+// This should fail since only modules can be prototyped
+// thus the keyword 'nodes' should not be availabe.
+// 
