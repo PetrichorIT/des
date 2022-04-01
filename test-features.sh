@@ -1,3 +1,12 @@
+#!/bin/bash
+
+#
+# This should only test 'real' test not examples in 
+# the 'tests' crate
+#
+
+# 'des' tests
+
 cargo test -p des
 cargo test -p des --features cqueue
 cargo test -p des --features internal-metrics
@@ -10,3 +19,7 @@ cargo test -p des --features net --features net-ipv6
 cargo test -p des --features net --features net-ipv6 --features cqueue
 cargo test -p des --features net --features net-ipv6 --features internal-metrics
 cargo test -p des --features net --features net-ipv6 --features cqueue --features internal-metrics
+
+# 'ndl' tests
+
+cargo test -p ndl
