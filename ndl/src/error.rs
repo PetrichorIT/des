@@ -176,6 +176,10 @@ impl<'a> ParsingErrorContext<'a> {
         self.transient = true;
     }
 
+    pub fn is_transient(&self) -> bool {
+        self.transient
+    }
+
     ///
     /// Creates a new context bound to the given asset.
     ///
@@ -479,23 +483,23 @@ pub enum ErrorCode {
     ParLinkInvalidValueType,     // Tested
     ParLinkIncompleteDefinition, // Tested
 
-    ParModuleMissingIdentifer,
-    ParModuleMissingDefBlockOpen,
-    ParModuleMissingSectionIdentifier,
-    ParModuleInvalidSectionIdentifer,
-    ParModuleInvalidSeperator,
-    ParModuleInvalidKeyToken,
+    ParModuleMissingIdentifer,         // Tested
+    ParModuleMissingDefBlockOpen,      // Tested
+    ParModuleMissingSectionIdentifier, // Tested
+    ParModuleInvalidSectionIdentifer,  // Tested
+    ParModuleInvalidSeperator,         // Tested
+    ParModuleInvalidKeyToken,          // Tested
 
-    ParModuleGateMissingClosingBracket,
-    ParModuleGateInvalidIdentifierToken,
-    ParModuleGateInvalidGateSize,
-    ParModuleGateInvalidServiceAnnotation,
+    ParModuleGateMissingClosingBracket,    // Tested
+    ParModuleGateInvalidIdentifierToken,   // Tested
+    ParModuleGateInvalidGateSize,          // Tested
+    ParModuleGateInvalidServiceAnnotation, // Tested
 
-    ParModuleSubInvalidIdentiferToken,
-    ParModuleSubInvalidSeperator,
-    ParModuleSubInvalidClusterLiteral,
-    ParModuleSubInvalidClusterDotChain,
-    ParModuleSubMissingClosingBracket,
+    ParModuleSubInvalidIdentiferToken,  // Tested
+    ParModuleSubInvalidSeperator,       // Tested
+    ParModuleSubInvalidClusterLiteral,  // Tested
+    ParModuleSubInvalidClusterDotChain, // Tested
+    ParModuleSubMissingClosingBracket,  // Tested
 
     ParModuleConInvalidIdentiferToken,
     ParModuleConInvaldiChannelSyntax,

@@ -1,0 +1,7 @@
+module X {}
+
+module A {
+    submodules:
+        a[1...3: X
+       
+}

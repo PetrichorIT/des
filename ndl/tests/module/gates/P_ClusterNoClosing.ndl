@@ -1,0 +1,6 @@
+module A {
+    gates:
+        in @input
+        error[5
+        out @output
+}

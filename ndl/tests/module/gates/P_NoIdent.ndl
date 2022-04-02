@@ -1,0 +1,6 @@
+module A {
+    gates:
+        in @input
+        123
+        out @output
+}
