@@ -263,13 +263,13 @@ impl<'a> Parser<'a> {
             self.eat_whitespace();
             let (token, _raw) = self.next_token()?;
             if token.kind != TokenKind::Colon {
- 
+                let is_transient = ectx.is_transient();
                 ectx.record(
                     ParModuleInvalidSeperator,
                     format!("Unexpected token '{}'. Expected colon ':'.", _raw),
                     token.loc,
                 )?;
-                if ectx.is_transient() {
+                if is_transient {
                     // do not make errounous assumtions, that may reset the ectx
                     continue;
                 } else {
@@ -745,6 +745,7 @@ impl<'a> Parser<'a> {
                                     self.tokens.peek()?.loc,
                                 )?;
                                 self.tokens.bump()?;
+                                self.eat_while(|t| t.kind != TokenKind::CloseBrace);
                                 // continue eitherway
                             }
 

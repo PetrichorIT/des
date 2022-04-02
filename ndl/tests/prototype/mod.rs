@@ -44,7 +44,7 @@ fn par_proto_failed_at_network() {
     assert!(r.ectx.has_errors());
 
     let errs = r.ectx.all().collect::<Vec<&Error>>();
-    assert_eq!(errs.len(), 3);
+    assert_eq!(errs.len(), 5);
 
     assert_eq!(*errs[0], Error::new(
             ParModuleInvalidSectionIdentifer,
@@ -54,9 +54,13 @@ fn par_proto_failed_at_network() {
         ));
 
     assert!(errs[1].transient);
-    assert_eq!(errs[1].code, ParUnexpectedKeyword);
+    assert_eq!(errs[1].code, ParModuleMissingSectionIdentifier);
     assert!(errs[2].transient);
-    assert_eq!(errs[2].code, ParUnexpectedKeyword);
+    assert_eq!(errs[2].code, ParModuleInvalidSectionIdentifer);
+    assert!(errs[3].transient);
+    assert_eq!(errs[3].code, ParModuleMissingSectionIdentifier);
+    assert!(errs[4].transient);
+    assert_eq!(errs[4].code, ParModuleInvalidSectionIdentifer);
 }
 
 #[test]
@@ -192,7 +196,7 @@ fn par_pimpl_def_and_impl() {
     assert!(r.ectx.has_errors());
 
     let errs = r.ectx.all().collect::<Vec<&Error>>();
-    assert_eq!(errs.len(), 3);
+    assert_eq!(errs.len(), 1);
 
     assert_eq!(
         *errs[0],
@@ -204,9 +208,6 @@ fn par_pimpl_def_and_impl() {
             false,
         )
     );
-
-    assert!(errs[1].transient);
-    assert!(errs[2].transient);
 }
 
 #[test]
