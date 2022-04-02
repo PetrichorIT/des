@@ -1,14 +1,7 @@
 use ndl::ErrorCode::*;
 use ndl::*;
 
-macro_rules! check_err {
-    ($e:expr => $code:ident, $msg:literal, $transient:literal, $solution:expr) => {
-        assert_eq!($e.code, $code);
-        assert_eq!($e.msg, $msg);
-        assert_eq!($e.transient, $transient);
-        assert_eq!($e.solution, $solution);
-    };
-}
+use crate::check_err;
 
 #[test]
 fn base() {

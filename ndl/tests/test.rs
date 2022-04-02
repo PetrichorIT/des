@@ -217,4 +217,27 @@ fn ndl_protsim_test() {
     println!("{}", resolver);
 }
 
+///
+/// Tests all synatx & semantic errors concerning links.
+///
+mod link;
+
+///
+/// Tests for all syntax & sematntics errors concerning prototyping.
+///
 mod prototype;
+
+///
+/// Tests for all syntax & sematntics errors concerning modules.
+///
+mod module;
+
+#[macro_export]
+macro_rules! check_err {
+    ($e:expr => $code:ident, $msg:literal, $transient:literal, $solution:expr) => {
+        assert_eq!($e.code, $code);
+        assert_eq!($e.msg, $msg);
+        assert_eq!($e.transient, $transient);
+        assert_eq!($e.solution, $solution);
+    };
+}

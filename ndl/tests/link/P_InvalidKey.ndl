@@ -1,0 +1,11 @@
+link A {
+    latency: 0.9
+    123: 10000
+    jitter: 0.6
+}
+
+link B {
+   latency: 0.9
+   byterate: 10000
+   jitter: 0.6
+}

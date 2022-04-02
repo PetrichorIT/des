@@ -1254,7 +1254,7 @@ impl<'a> Parser<'a> {
         if id_token.kind != TokenKind::Ident {
             ectx.record(
                 ParLinkMissingIdentifier,
-                String::from("Unexpected token. Expected identifer for link definition"),
+                format!("Unexpected token '{}'. Expected identifer for link definition.", identifier),
                 id_token.loc,
             )?;
             return Ok(());
@@ -1267,7 +1267,7 @@ impl<'a> Parser<'a> {
         if paran_open.kind != TokenKind::OpenBrace {
             ectx.record(
                 ParLinkMissingDefBlockOpen,
-                String::from("Unexpected token. Expected block for link definition"),
+                format!("Unexpected token '{}'. Expected block for link definition.", _raw),
                 paran_open.loc,
             )?;
             return Ok(());
@@ -1276,6 +1276,8 @@ impl<'a> Parser<'a> {
         let mut bitrate: Option<usize> = None;
         let mut jitter: Option<f64> = None;
         let mut latency: Option<f64> = None;
+
+        let mut errornous = false;
 
         while bitrate.is_none() || jitter.is_none() || latency.is_none() {
             self.eat_whitespace();
@@ -1289,27 +1291,48 @@ impl<'a> Parser<'a> {
                     break;
                 }
 
+                errornous = true;
                 ectx.record(
                     ParLinkInvalidKeyToken,
-                    String::from("Unexpected token. Expected identifer for definition key."),
+                    format!("Unexpected token '{}'. Expected identifer for definition key.", raw),
                     key_token.loc,
                 )?;
-                return Ok(());
+                continue;
+            } 
+
+            if !["latency", "bitrate", "jitter"].contains(&raw) {
+                errornous = true;
+                ectx.record(
+                    ParLinkInvalidKey, 
+                    format!("Invalid key '{}' in kv-pair. Valid keys are latency, bitrate or jitter.", raw), 
+                    key_token.loc,
+                )?;
+                continue;
             }
+
+            ectx.reset_transient();
             let identifier = String::from(raw);
 
             self.eat_whitespace();
 
             let (token, _raw) = self.next_token()?;
             if token.kind != TokenKind::Colon {
+                if key_token.kind == TokenKind::CloseBrace {
+                    // Unfinished def. Add to stack anyway but print error
+                    self.tokens.bump_back(1);
+                    break;
+                }
+
+                errornous = true;
                 ectx.record(
                     ParLinkInvalidKvSeperator,
-                    String::from(
-                        "Unexpected token. Expected colon ':' between definition key and value",
+                    format!(
+                        "Unexpected token '{}'. Expected colon ':' between definition key and value.",
+                        _raw,
                     ),
                     token.loc,
                 )?;
-                return Ok(());
+                continue;
             }
 
             self.eat_whitespace();
@@ -1325,21 +1348,23 @@ impl<'a> Parser<'a> {
                             match usize::from_str_radix(raw, base.radix()) {
                                 Ok(value) => bitrate = Some(value),
                                 Err(e) => {
+                                    errornous = true;
                                     ectx.record(
                                         ParLiteralIntParseError,
-                                        format!("Int parsing error: {}", e), 
+                                        format!("Int parsing error: {}.", e), 
                                         token.loc,
                                     )?;
-                                    return Ok(());
+                                    continue
                                 }
                             }
                         } else {
+                            errornous = true;
                             ectx.record(
                                 ParLinkInvalidValueType, 
                                 String::from("Invalid value type. Expected integer."), 
                                 token.loc,
                             )?;
-                            return Ok(());
+                            continue
                         }
                     }
 
@@ -1352,21 +1377,23 @@ impl<'a> Parser<'a> {
                             match f64::from_str(raw) {
                                 Ok(value) => latency = Some(value),
                                 Err(e) => {
+                                    errornous = true;
                                     ectx.record(
                                         ParLiteralFloatParseError,
-                                        format!("Float parsing error: {}", e), 
+                                        format!("Float parsing error: {}.", e), 
                                         token.loc
                                     )?;
-                                    return Ok(());
+                                    continue;
                                 }
                             }
                         } else {
+                            errornous = true;
                             ectx.record(
                                 ParLinkInvalidValueType, 
                                 String::from("Invalid value type. Expected float."), 
                                 token.loc,
                             )?;
-                            return Ok(());
+                            continue;
                         }
                     }
                     "jitter" => {
@@ -1378,39 +1405,40 @@ impl<'a> Parser<'a> {
                             match f64::from_str(raw) {
                                 Ok(value) => jitter = Some(value),
                                 Err(e) => {
+                                    errornous = true;
                                     ectx.record(
                                         ParLiteralFloatParseError,
-                                        format!("Float parsing error: {}", e), 
+                                        format!("Float parsing error: {}.", e), 
                                         token.loc,
                                     )?;
-                                    return Ok(());
+                                    continue;
                                 }
                             }
                         } else {
+                            errornous = true;
                             ectx.record(
                                 ParLinkInvalidValueType, 
                                 String::from("Invalid value type. Expected float."), 
                                 token.loc
                             )?;
-                            return Ok(());
+                            continue;
                         }
                     }
-                    _ => {
-                        ectx.record(
-                            ParLinkInvalidKey, 
-                            format!("Invalid key '{}' in kv-pair. Valid keys are latency, bitrate or jitter.", identifier), 
-                            key_token.loc,
-                        )?;
-                        return Ok(());
-                    }
+                    _ => unreachable!()
                 },
                 _ => {
+                    errornous = true;
                     ectx.record(
                         ParLinkInvalidValueToken,
-                        String::from("Unexpected token. Expected literal"),
+                        format!("Unexpected token '{}'. Expected literal.", raw),
                         token.loc,
                     )?;
-                    return Ok(());
+
+                    if token.kind == TokenKind::CloseBrace {
+                        break;
+                    }
+
+                    continue;
                 }
             }
         }
@@ -1432,10 +1460,11 @@ impl<'a> Parser<'a> {
 
             let missing_par = [(bitrate.is_some(), "bitrate"), (jitter.is_some(), "jitter"), (latency.is_some(), "latency")]
                 .iter()
-                .filter_map(|(v, n)| if *v { Some(*n) } else { None })
+                .filter_map(|(v, n)| if !*v { Some(*n) } else { None })
                 .collect::<Vec<&str>>()
                 .join(" + ");
 
+            if errornous { ectx.set_transient() }
             ectx.record_with_solution(
                 ParLinkIncompleteDefinition,
                 format!("Channel '{}' was missing some parameters.", identifier),
@@ -1449,6 +1478,9 @@ impl<'a> Parser<'a> {
 
         let token_loc = token.loc;
 
+        //
+        // Push default configs anyway
+        // 
         self.result.links.push(LinkDef {
             loc: Loc::fromto(id_token_loc, token_loc),
             

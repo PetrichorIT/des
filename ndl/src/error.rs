@@ -172,6 +172,10 @@ impl IntoIterator for ParsingErrorContext<'_> {
 }
 
 impl<'a> ParsingErrorContext<'a> {
+    pub fn set_transient(&mut self) {
+        self.transient = true;
+    }
+
     ///
     /// Creates a new context bound to the given asset.
     ///
@@ -465,15 +469,15 @@ pub enum ErrorCode {
 
     ParUnexpectedKeyword,
 
-    ParLinkMissingIdentifier,
-    ParLinkMissingDefBlockOpen,
-    ParLinkMissingDefBlockClose,
-    ParLinkInvalidKeyToken,
-    ParLinkInvalidKey,
-    ParLinkInvalidKvSeperator,
-    ParLinkInvalidValueToken,
-    ParLinkInvalidValueType,
-    ParLinkIncompleteDefinition,
+    ParLinkMissingIdentifier,    // Tested
+    ParLinkMissingDefBlockOpen,  // Tested
+    ParLinkMissingDefBlockClose, // Missing Test Case
+    ParLinkInvalidKeyToken,      // Tested
+    ParLinkInvalidKey,           // Tested
+    ParLinkInvalidKvSeperator,   // Tested
+    ParLinkInvalidValueToken,    // Tested
+    ParLinkInvalidValueType,     // Tested
+    ParLinkIncompleteDefinition, // Tested
 
     ParModuleMissingIdentifer,
     ParModuleMissingDefBlockOpen,
@@ -497,14 +501,14 @@ pub enum ErrorCode {
     ParModuleConInvaldiChannelSyntax,
     ParModuleConMissingClosingBracketForCLusterIdent,
 
-    ParAliasMissingIdent,
-    ParAliasMissingLikeToken,
-    ParAliasMissingLikeKeyword,
-    ParAliasMissingPrototypeIdent,
+    ParAliasMissingIdent,          // Tested
+    ParAliasMissingLikeToken,      // Tested
+    ParAliasMissingLikeKeyword,    // Tested
+    ParAliasMissingPrototypeIdent, // Tested
 
-    ParProtoImplInvalidIdent,
-    ParProtoImplExpectedEq,
-    ParProtoImplAtSomeDef,
+    ParProtoImplInvalidIdent, // Tested
+    ParProtoImplExpectedEq,   // Tested
+    ParProtoImplAtSomeDef,    // Tested
 
     ParNetworkMissingIdentifer,
     ParNetworkMissingDefBlockOpen,
@@ -513,10 +517,10 @@ pub enum ErrorCode {
     ParNetworkInvalidSeperator,
     ParNetworkDoesntAllowSome,
 
-    ParExpectedIntLiteral,
-    ParLiteralIntParseError,
-    ParExpectedFloatLiteral,
-    ParLiteralFloatParseError,
+    ParExpectedIntLiteral,     // Missing Test Case
+    ParLiteralIntParseError,   // Tested
+    ParExpectedFloatLiteral,   // Missing Test Case
+    ParLiteralFloatParseError, // Tested
 
     LexInvalidSouceToken,
     LexInvalidSouceIdentifier,
@@ -529,13 +533,13 @@ pub enum ErrorCode {
     DsgConInvalidGateSize,
     DsgConInvalidField,
 
-    DsgInvalidPrototypeAtAlias,
-    DsgInvalidPrototypeAtSome,
-    DsgProtoImplForNonProtoValue,
-    DsgProtoImplMissingField,
-    DsgProtoImplTyMissing,
-    DsgProtoImplAssociatedTyNotDerivedFromProto,
-    DsgProtoImlMissing,
+    DsgInvalidPrototypeAtAlias,                  // Tested
+    DsgInvalidPrototypeAtSome,                   // Tested
+    DsgProtoImplForNonProtoValue,                // Tested
+    DsgProtoImplMissingField,                    // Tested
+    DsgProtoImplTyMissing,                       // Tested
+    DsgProtoImplAssociatedTyNotDerivedFromProto, // Tested
+    DsgProtoImlMissing,                          // Tested
 
     TycGateConnectionViolatesAnnotation,
 

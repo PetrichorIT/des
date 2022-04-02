@@ -1,0 +1,5 @@
+link A 
+    latency: 0.1
+    bitarate: 1000
+    jitter: 0.0
+}
