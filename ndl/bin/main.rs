@@ -36,7 +36,7 @@ fn main() -> std::io::Result<()> {
     } = Opt::from_args();
 
     if workspaces.is_empty() {
-        workspaces.push("ndl/tests/prototype".to_string());
+        workspaces.push("ndl/tests/module/connections/P_NoSlashOrWhitespace.ndl".to_string());
     }
 
     // if workspaces.is_empty() {

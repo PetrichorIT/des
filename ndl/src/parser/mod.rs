@@ -868,32 +868,21 @@ impl<'a> Parser<'a> {
         loop {
             let front_ident = match self.parse_connetion_identifer_token(ectx)? {
                 ConIdentiferResult::Result(ident) => ident,
-                ConIdentiferResult::Error => return Ok(false),
+                ConIdentiferResult::Error => continue,
                 ConIdentiferResult::NewSubsection => return Ok(false),
-                ConIdentiferResult::Done => return Ok(true),
+                ConIdentiferResult::Done => {
+                    return Ok(true)},
             };
 
             self.eat_whitespace();
 
-            let (t1, _raw) = self.next_token()?;
-            let (t2, _raw) = self.next_token()?;
-            let (t3, _raw) = self.next_token()?;
-
-            let t3_loc = t3.loc;
-
-            use TokenKind::*;
-            let to_right = match (t1.kind, t2.kind, t3.kind) {
-                (Minus, Minus, Gt) => true,
-                (Lt, Minus, Minus) => false,
-                _ => {
-                    ectx.record(
-                        ParModuleConInvaldiChannelSyntax,
-                        String::from("Unexpected token. Expected arrow syntax."),
-                        Loc::fromto(t1.loc, t3.loc),
-                    )?;
-                    return Ok(false);
-                }
+            
+            let (t3_loc, to_right) = match self.parse_arrow_token(ectx)? {
+                Some(v) => v,
+                None => continue,
             };
+            ectx.reset_transient();
+          
 
 
             let mid_ident = match self.parse_connetion_identifer_token(ectx)? {
@@ -949,7 +938,8 @@ impl<'a> Parser<'a> {
 
                     // check for second arrow
                     let (t1, _raw) = self.next_token()?;
-    
+                    let t1_loc = t1.loc;
+
                     // Next line, expecting next conident or subident or closing delim
                     if matches!(t1.kind, TokenKind::Ident | TokenKind::CloseBrace | TokenKind::Comma) {
                         // Record valid result
@@ -990,22 +980,12 @@ impl<'a> Parser<'a> {
                         }
                     }
 
-                    let (t2, _raw) = self.next_token()?;
-                    let (t3, _raw) = self.next_token()?;
-    
-                    let t3_loc = t3.loc;
-    
-                    let to_right2 = match (t1.kind, t2.kind, t3.kind) {
-                        (Minus, Minus, Gt) => true,
-                        (Lt, Minus, Minus) => false,
-                        _ => {
-                            ectx.record(
-                                ParModuleConInvaldiChannelSyntax,
-                                String::from("Unexpected token. Expected arrow syntax"),
-                                Loc::fromto(t1.loc, t3.loc),
-                            )?;
-                            return Ok(false);
-                        }
+                    // Bump back to use parsing function for whole expression.
+                    self.tokens.bump_back(1);
+
+                    let (t3_loc, to_right2) = match self.parse_arrow_token(ectx)? {
+                        Some(v) => v,
+                        None => continue,
                     };
     
                     if (to_right && to_right2) || (!to_right && !to_right2) {
@@ -1042,13 +1022,46 @@ impl<'a> Parser<'a> {
                         ectx.record(
                             ParModuleConInvaldiChannelSyntax,
                             String::from("Invalid arrow syntax. Both arrows must match."),
-                            Loc::fromto(t1.loc, t3.loc),
+                            Loc::fromto(t1_loc, t3_loc),
                         )?;
-                        return Ok(false);
+                        continue;
                     }
                 }
             }
         }
+    }
+
+    ///
+    /// Fails with Err if err_push failes
+    /// Returns None if token stream ends.
+    /// Returns Some on valid parse.
+    /// 
+    fn parse_arrow_token(&mut self, ectx: &mut ParsingErrorContext<'_>) -> NdlResult<Option<(Loc, bool)>> {
+        
+        if self.tokens.remaining() < 3 {
+            return Ok(None)
+        }
+
+        let (t1, _raw) =  self.next_token()?;
+        let (t2, _raw) = self.next_token()?;
+        let (t3, _raw) = self.next_token()?;
+
+        use TokenKind::*;
+        let to_right = match (t1.kind, t2.kind, t3.kind) {
+            (Minus, Minus, Gt) => true,
+            (Lt, Minus, Minus) => false,
+            _ => {
+                ectx.record(
+                    ParModuleConInvaldiChannelSyntax,
+                    String::from("Unexpected token. Expected arrow syntax."),
+                    Loc::fromto(t1.loc, t3.loc),
+                )?;
+                self.tokens.bump_back(3);
+                return Ok(None);
+            }
+        };
+
+        Ok(Some((t3.loc, to_right)))
     }
 
     fn parse_connetion_identifer_token(&mut self, ectx: &mut ParsingErrorContext<'_>) -> NdlResult<ConIdentiferResult> {
@@ -1056,9 +1069,9 @@ impl<'a> Parser<'a> {
 
         self.eat_whitespace();
 
-        let (first_token, id) = self.next_token()?;
+        let (first_token, _id) = self.next_token()?;
         let first_token = first_token.clone();
-        let mut id = Ident::Direct { ident: String::from(id) };
+        let mut id = Ident::Direct { ident: String::from(_id) };
 
         if first_token.kind != TokenKind::Ident {
             
@@ -1069,25 +1082,38 @@ impl<'a> Parser<'a> {
 
             ectx.record(
                 ParModuleConInvalidIdentiferToken,
-                String::from("Unexpected token. Expected identifer."),
+                format!("Unexpected token '{}'. Expected identifer.", _id),
                 first_token.loc,
             )?;
             return Ok(Error);
         }
 
-        let (token, _) = self.next_token()?;
+        let (token, _traw) = self.next_token()?;
         let mut token = token.clone();
+        let mut _traw = _traw.to_string();
 
         if token.kind == TokenKind::OpenBracket {
             // Cluster definition
             let num = self.parse_literal_usize(ectx)?;
             // reade closing bracket
+            
+            self.eat_whitespace();
             let (token_br, _) = self.next_token()?;
 
             if token_br.kind != TokenKind::CloseBracket {
-                ectx.record_missing_token(ParModuleConMissingClosingBracketForCLusterIdent, String::from("Missing closing bracket for clustered ident."), token_br, "]")?;
-            } else if let Some(num) = num{
+                ectx.record_missing_token(
+                    ParModuleConMissingClosingBracketForCLusterIdent, 
+                    String::from("Missing closing bracket for clustered ident."), 
+                    token_br, 
+                    "]"
+                )?;
                 
+                // Assume typo and continue
+                self.tokens.bump_back(1);
+                self.tokens.bump_back_while(|t| t.kind != TokenKind::Whitespace);
+            }
+            
+            if let Some(num) = num{
                 // Reset id
                 if let Ident::Direct { ident } = id {
                     id = Ident::Clustered { ident, index: num }
@@ -1096,7 +1122,9 @@ impl<'a> Parser<'a> {
                 }
 
                 // reset given token and raw to match the next var
-                token = self.next_token()?.0.clone();
+                let (t, r) = self.next_token()?;
+                token = t.clone();
+                _traw = r.to_string();
             }
         }
 
@@ -1106,9 +1134,11 @@ impl<'a> Parser<'a> {
                 let (token, id_second) = self.next_token()?;
                 let id_second = String::from(id_second) ;
                 if token.kind != TokenKind::Ident {
+                    // Will not add token to the error message since it could 
+                    // be a whitespace
                     ectx.record(
                         ParModuleConInvalidIdentiferToken,
-                        String::from("Unexpected token. Expected second part identifer"),
+                        String::from("Unexpected token. Expected second part identifer."),
                         token.loc,
                     )?;
                     return Ok(Error);
@@ -1122,35 +1152,42 @@ impl<'a> Parser<'a> {
                     let (token, _raw) = self.next_token()?;
 
                     if token.kind != TokenKind::CloseBracket {
-                        ectx.record_missing_token(ParModuleConMissingClosingBracketForCLusterIdent, String::from("Missing closing bracket for clustered ident."), token, "]")?;
+                        ectx.record_missing_token(
+                            ParModuleConMissingClosingBracketForCLusterIdent, 
+                            String::from("Missing closing bracket for clustered gate ident."), 
+                            token, 
+                            "]"
+                        )?;
+                        // Assume typo continue anyway
                     } 
 
                     if let Some(num) = num {
-                        ectx.reset_transient();
+                        // ectx.reset_transient();
                         Ok(Result(ConNodeIdent::Child { loc: Loc::fromto(first_token.loc, token.loc), child: id, ident: Ident::Clustered { ident: id_second, index: num}}))
                     } else {
                         Ok(Error)
                     }
                 } else {
-                    ectx.reset_transient();
+                    // ectx.reset_transient();
                     Ok(Result(ConNodeIdent::Child { loc: Loc::fromto(first_token.loc, token.loc), child: id, ident: Ident::Direct { ident: id_second } }))
                 }
               },
             TokenKind::Whitespace => {
-                ectx.reset_transient();
+                // ectx.reset_transient();
                 Ok(Result(ConNodeIdent::Local { loc: Loc::fromto(first_token.loc, token.loc), ident: id }))
             },
             TokenKind::Colon => {
                 self.tokens.bump_back(2);
-                ectx.reset_transient();
+                // ectx.reset_transient();
                 Ok(NewSubsection)
             },
             _ => {
                 ectx.record(
                     ParModuleConInvalidIdentiferToken,
-                    String::from("Unexpected token. Expected whitespace or slash."),
+                    format!("Unexpected token '{}'. Expected whitespace or slash.", _traw),
                     token.loc,
                 )?;
+                // self.tokens.bump_back(1);
                 
                 Ok(Error)
             },

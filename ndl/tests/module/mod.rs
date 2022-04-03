@@ -144,4 +144,5 @@ fn par_subsection_no_colon() {
 }
 
 mod children;
+mod connections;
 mod gates;

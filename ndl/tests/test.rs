@@ -101,6 +101,10 @@ fn ndl_parser_test() {
 
     let result = parse(asset, tokens);
 
+    for error in &result.errors {
+        error.print(&smap).unwrap();
+    }
+
     assert!(result.errors.is_empty());
 
     assert_eq!(result.includes.len(), 2);

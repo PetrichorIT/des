@@ -1,0 +1,15 @@
+module Sub {
+    gates:
+        in @input
+}
+
+module A {
+    submodules:
+        sub: Sub
+
+    gates:
+        out @output
+
+    connections:
+        --> sub/in
+}
