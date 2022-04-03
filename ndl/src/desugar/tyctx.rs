@@ -148,8 +148,8 @@ impl<'a> TyDefContext<'a> {
                         errors.push(Error::new(
                             DsgIncludeInvalidAlias,
                             format!(
-                                "Include '{}' cannot be resolved. No such file exists. {:?}",
-                                include.path, include.loc
+                                "Include '{}' cannot be resolved. No such file exists.",
+                                include.path,
                             ),
                             include.loc,
                             false,
@@ -195,7 +195,7 @@ impl<'a> TyDefContext<'a> {
                         format!("Cannot create two modules with name '{}'.", module.name),
                         module.loc,
                         false,
-                        ErrorSolution::new("Try renaming this modules".to_string(), dup.loc),
+                        ErrorSolution::new("Try renaming this module".to_string(), dup.loc),
                     ));
                 }
             }

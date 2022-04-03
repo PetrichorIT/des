@@ -177,3 +177,25 @@ fn par_invalid_annotation() {
 
     assert_eq!(r.gtyctx_def().module("A").unwrap().gates.len(), 3);
 }
+
+#[test]
+fn dsg1_invalid_gate_size() {
+    let path = "tests/module/gates/D1_InvalidGateSize.ndl";
+    let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
+
+    r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 1);
+
+    assert!(r.ectx.has_errors());
+
+    let errs = r.ectx.all().collect::<Vec<&Error>>();
+    assert_eq!(errs.len(), 1);
+
+    check_err!(
+        *errs[0] =>
+        TycGateInvalidNullGate,
+        "Cannot create gate of size 0.",
+        false,
+        None
+    );
+}

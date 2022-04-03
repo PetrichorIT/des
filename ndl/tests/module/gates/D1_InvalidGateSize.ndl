@@ -1,0 +1,4 @@
+module X {
+    gates:
+        input[0]
+}

@@ -241,6 +241,8 @@ mod module;
 ///
 mod network;
 
+mod include;
+
 #[macro_export]
 macro_rules! check_err {
     ($e:expr => $code:ident, $msg:literal, $transient:literal, $solution:expr) => {

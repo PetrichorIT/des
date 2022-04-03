@@ -138,15 +138,17 @@ impl<'a> SecondPassTyCtx<'a> {
                     if let Some(unit) = all.get(&include.path) {
                         resolve_recursive(all, unit, tyctx, errors);
                     } else {
-                        errors.push(Error::new(
-                            DsgIncludeInvalidAlias,
-                            format!(
-                                "Include '{}' cannot be resolved. No such file exists. {:?}",
-                                include.path, include.loc
-                            ),
-                            include.loc,
-                            false,
-                        ))
+                        // Allready logged
+
+                        // errors.push(Error::new(
+                        //     DsgIncludeInvalidAlias,
+                        //     format!(
+                        //         "Include '{}' cannot be resolved. No such file exists. {:?}",
+                        //         include.path, include.loc
+                        //     ),
+                        //     include.loc,
+                        //     false,
+                        // ))
                     }
                 }
             }

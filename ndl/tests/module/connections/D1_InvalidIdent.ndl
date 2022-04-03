@@ -1,0 +1,17 @@
+module A {
+    gates:
+        x
+}
+
+module X {
+    submodules:
+        sub: A
+
+    gates:
+        g
+
+    connections:
+        a --> g
+        sub/g --> g
+        err/x --> g
+}

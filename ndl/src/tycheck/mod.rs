@@ -61,13 +61,13 @@ pub fn validate(
                 let self_ty = &module.ident;
 
                 if module_names.contains(&self_ty) {
-                    errors.push(Error::new(
-                        TycModuleAllreadyDefined,
-                        format!("Module '{}' was allready defined.", self_ty),
-                        module.loc,
-                        false,
+                    // errors.push(Error::new(
+                    //     TycModuleAllreadyDefined,
+                    //     format!("Module '{}' was allready defined.", self_ty),
+                    //     module.loc,
+                    //     false,
                     
-                    ))
+                    // ))
                 } else {
                     module_names.push(self_ty)
                 }
@@ -162,13 +162,13 @@ pub fn validate(
                 let self_ty = &network.ident;
 
                 if network_names.contains(&self_ty) {
-                    errors.push(Error::new(
-                        TycNetworkAllreadyDefined,
-                        format!("Network '{}' was allready defined.", self_ty),
-                        network.loc,
-                        false,
+                    // errors.push(Error::new(
+                    //     TycNetworkAllreadyDefined,
+                    //     format!("Network '{}' was allready defined.", self_ty),
+                    //     network.loc,
+                    //     false,
                     
-                    ))
+                    // ))
                 } else {
                     network_names.push(self_ty)
                 }
@@ -241,15 +241,17 @@ pub fn resolve_includes<'a>(
             if let Some(unit) = resolver.desugared_units.get(&include.path) {
                 resolve_includes(resolver, unit, tyctx, errors);
             } else {
-                errors.push(Error::new(
-                    TycIncludeInvalidAlias,
-                    format!(
-                        "Include '{}' cannot be resolved. No such file exists. {:?}",
-                        include.path, include.loc
-                    ),
-                    include.loc,
-                    false,
-                ))
+                // This should have been checked beforehand
+                
+                // errors.push(Error::new(
+                //     TycIncludeInvalidAlias,
+                //     format!(
+                //         "Include '{}' cannot be resolved. No such file exists. {:?}",
+                //         include.path, include.loc
+                //     ),
+                //     include.loc,
+                //     false,
+                // ))
             }
         }
     }

@@ -170,3 +170,123 @@ fn par_arrow_direction_missmatch() {
 
     assert_eq!(r.gtyctx_def().module("A").unwrap().connections.len(), 0)
 }
+
+#[test]
+fn dsg1_gate_size_missmatch() {
+    let path = "tests/module/connections/D1_SizeMissmatch.ndl";
+    let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
+
+    r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 1);
+
+    assert!(r.ectx.has_errors());
+
+    let errs = r.ectx.all().collect::<Vec<&Error>>();
+    assert_eq!(errs.len(), 1);
+
+    check_err!(
+        *errs[0] =>
+        DsgConGateSizedToNotMatch,
+        "Connection gate cluster sizes do not match (1*5 != 1*1).",
+        false,
+        None
+    );
+}
+
+#[test]
+fn dsg1_invalid_channel() {
+    let path = "tests/module/connections/D1_UnknownChannel";
+    let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
+
+    r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 2);
+
+    assert!(r.ectx.has_errors());
+
+    let errs = r.ectx.all().collect::<Vec<&Error>>();
+    assert_eq!(errs.len(), 2);
+
+    check_err!(
+        *errs[0] =>
+        DsgConInvalidChannel,
+        "No link called 'L' found.",
+        false,
+        Some(ErrorSolution::new("Try including 'Other'".to_string(), Loc::new(0,1,1)))
+    );
+
+    check_err!(
+        *errs[1] =>
+        DsgConInvalidChannel,
+        "No link called 'LL' found.",
+        false,
+        None
+    );
+}
+
+#[test]
+fn dsg1_invalid_con_ident() {
+    let path = "tests/module/connections/D1_InvalidIdent.ndl";
+    let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
+
+    r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 1);
+
+    assert!(r.ectx.has_errors());
+
+    let errs = r.ectx.all().collect::<Vec<&Error>>();
+    assert_eq!(errs.len(), 3);
+
+    check_err!(
+        *errs[0] =>
+        DsgConInvalidLocalGateIdent,
+        "No local gate cluster 'a' exists on this module.",
+        false,
+        None
+    );
+
+    check_err!(
+        *errs[1] =>
+        DsgConInvalidLocalGateIdent,
+        "No local gate cluster 'g' exists on module 'A'.",
+        false,
+        None
+    );
+
+    check_err!(
+        *errs[2] =>
+        DsgConInvalidField,
+        "Invalid field 'err'.",
+        false,
+        None
+    );
+}
+
+#[test]
+fn dsg1_annotation_conflict() {
+    let path = "tests/module/connections/D1_AnnotationConflict.ndl";
+    let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
+
+    r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 1);
+
+    assert!(r.ectx.has_errors());
+
+    let errs = r.ectx.all().collect::<Vec<&Error>>();
+    assert_eq!(errs.len(), 2);
+
+    check_err!(
+        *errs[0] =>
+        DsgGateConnectionViolatesAnnotation,
+        "Gate 'out' cannot be used as start of a connection since it is defined as @input.",
+        false,
+        Some(ErrorSolution::new("Define gate 'out' as @output".to_string(), Loc::new(146, 4, 13)))
+    );
+
+    check_err!(
+        *errs[1] =>
+        DsgGateConnectionViolatesAnnotation,
+        "Gate 'out' cannot be used as end of a connection since it is defined as @output.",
+        false,
+        Some(ErrorSolution::new("Define gate 'out' as @input".to_string(), Loc::new(32, 4, 3)))
+    );
+}

@@ -39,6 +39,7 @@ pub(crate) fn first_pass<'a>(
         let mut module_spec = ModuleSpec::new(module);
 
         // Resolve ChildModuleDef to ChildModuleSpec
+        let mut occupied_c_namespace = Vec::<&LocalDescriptorDef>::new();
         for child in &module.submodules {
             // Issue (001)
             // Added type checking in desugar to prevent redundand checks
@@ -54,6 +55,24 @@ pub(crate) fn first_pass<'a>(
                 desc,
                 proto_impl,
             } = child;
+
+            if let Some(col) = occupied_c_namespace
+                .iter()
+                .find(|n| n.descriptor == desc.descriptor && n.cluster_bounds_overlap(desc))
+            {
+                // naming collision.
+                errors.push(Error::new(
+                    DsgModuleSubmoduleFieldAlreadyDeclared,
+                    format!(
+                        "Naming collision. Namespaces of '{}' and '{}' collide.",
+                        col, desc
+                    ),
+                    desc.loc,
+                    false,
+                ));
+            }
+
+            occupied_c_namespace.push(desc);
 
             if let Some((from_id, to_id)) = desc.cluster_bounds {
                 // Desugar macro
@@ -112,7 +131,7 @@ pub(crate) fn first_pass<'a>(
 
             // Gurantee that count(from) <= count(to)
             // This allows partial targeting of later gates.
-            if from_idents.len() > to_idents.len() {
+            if from_idents.len() != to_idents.len() {
                 errors.push(Error::new(
                     DsgConGateSizedToNotMatch,
                     format!(
@@ -124,11 +143,6 @@ pub(crate) fn first_pass<'a>(
                 ));
 
                 // Continue anyway will be aborted nonetheless
-            }
-
-            if from_idents.len() < to_idents.len() {
-                // Warn
-                todo!()
             }
 
             // Resolve the channel desc once,
@@ -193,7 +207,7 @@ pub(crate) fn first_pass<'a>(
             {
                 // naming collision.
                 errors.push(Error::new(
-                    TycModuleSubmoduleFieldAlreadyDeclared,
+                    DsgModuleSubmoduleFieldAlreadyDeclared,
                     format!(
                         "Naming collision. Namespaces of '{}' and '{}' collide.",
                         col, desc
@@ -367,12 +381,14 @@ fn resolve_connection_ident(
             };
 
             if gate.size < 1 {
-                errors.push(Error::new(
-                    DsgConInvalidGateSize,
-                    format!("Gate size 0 is invalid for gate cluster '{}'.", ident),
-                    *loc,
-                    false,
-                ));
+                // This should be catched by the [tychk]
+
+                // errors.push(Error::new(
+                //     DsgConInvalidGateSize,
+                //     format!("Gate size 0 is invalid for gate cluster '{}'.", ident),
+                //     *loc,
+                //     false,
+                // ));
 
                 return None;
             }
@@ -380,14 +396,14 @@ fn resolve_connection_ident(
             if !(gate.annotation == expected_type || gate.annotation == GateAnnotation::Unknown) {
                 // invalid annotation connection
                 errors.push(Error::new_with_solution(
-                    TycGateConnectionViolatesAnnotation,
+                    DsgGateConnectionViolatesAnnotation,
                     format!(
                         "Gate '{}' cannot be used as {} of a connection since it is defined as {}.",
                         global_ident,
                         if matches!(expected_type, GateAnnotation::Input) {
-                            "start"
-                        } else {
                             "end"
+                        } else {
+                            "start"
                         },
                         gate.annotation
                     ),
@@ -395,12 +411,12 @@ fn resolve_connection_ident(
                     false,
                     ErrorSolution::new(
                         format!(
-                            "Define gate '{}' as {}.",
+                            "Define gate '{}' as {}",
                             global_ident,
                             if matches!(expected_type, GateAnnotation::Input) {
-                                "@output"
-                            } else {
                                 "@input"
+                            } else {
+                                "@output"
                             }
                         ),
                         gate.loc,
@@ -433,6 +449,8 @@ fn resolve_connection_ident(
             }
         }
         ConNodeIdent::Child { loc, child, ident } => {
+            let global_ident = ident;
+
             // maybe referces clustered submodules.
 
             let submod_def = match child {
@@ -507,14 +525,51 @@ fn resolve_connection_ident(
                 };
 
                 if gate_def.size < 1 {
-                    errors.push(Error::new(
-                        DsgConInvalidGateSize,
-                        format!("Gate size 0 is invalid for gate cluster '{}'.", ident),
-                        *loc,
-                        false,
-                    ));
+                    // This should be catched by [tychk]
+
+                    // errors.push(Error::new(
+                    //     DsgConInvalidGateSize,
+                    //     format!("Gate size 0 is invalid for gate cluster '{}'.", ident),
+                    //     *loc,
+                    //     false,
+                    // ));
 
                     return None;
+                }
+
+                if !(gate_def.annotation == expected_type
+                    || gate_def.annotation == GateAnnotation::Unknown)
+                {
+                    // invalid annotation connection
+                    errors.push(Error::new_with_solution(
+                        DsgGateConnectionViolatesAnnotation,
+                        format!(
+                            "Gate '{}' cannot be used as {} of a connection since it is defined as {}.",
+                            global_ident,
+                            if matches!(expected_type, GateAnnotation::Input) {
+                                "end"
+                            } else {
+                                "start"
+                            },
+                            gate_def.annotation
+                        ),
+                        global_loc,
+                        false,
+                        ErrorSolution::new(
+                            format!(
+                                "Define gate '{}' as {}",
+                                global_ident,
+                                if matches!(expected_type, GateAnnotation::Input) {
+                                    "@input"
+                                } else {
+                                    "@output"
+                                }
+                            ),
+                            gate_def.loc,
+                        ),
+                    ));
+                    // Continue either way since annotations violations
+                    // are not transient
                 }
 
                 let gate_ident = ident.raw_ident();

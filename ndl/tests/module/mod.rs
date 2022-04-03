@@ -143,6 +143,28 @@ fn par_subsection_no_colon() {
     assert_eq!(r.gtyctx_def().module("A").unwrap().gates.len(), 2);
 }
 
+#[test]
+fn dsg1_name_collision() {
+    let path = "tests/module/D1_NameCollision.ndl";
+    let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
+
+    r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 1);
+
+    assert!(r.ectx.has_errors());
+
+    let errs = r.ectx.all().collect::<Vec<&Error>>();
+    assert_eq!(errs.len(), 1);
+
+    check_err!(
+        *errs[0] =>
+        DsgDefNameCollision,
+        "Cannot create two modules with name 'X'.",
+        false,
+        Some(ErrorSolution::new("Try renaming this module".to_string(), Loc::new(20, 4, 3)))
+    );
+}
+
 mod children;
 mod connections;
 mod gates;

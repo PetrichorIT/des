@@ -131,7 +131,8 @@ impl LocalDescriptorDef {
             }
         }
 
-        false
+        // is a sense they do,
+        true
     }
 }
 

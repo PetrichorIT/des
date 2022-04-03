@@ -1,0 +1,18 @@
+module Sub {
+    gates:
+        out @output
+}
+
+module X {
+    submodules:
+        s: Sub
+
+    gates:
+        s1 @input
+        s2 @output
+        out @input
+
+    connections:
+        s1 <-- out
+        s2 --> s/out
+}

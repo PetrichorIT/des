@@ -529,13 +529,13 @@ pub enum ErrorCode {
     LexInvalidSouceToken,      // Tested
     LexInvalidSouceIdentifier, // Tested
 
-    DsgIncludeInvalidAlias,
-    DsgDefNameCollision,
-    DsgConGateSizedToNotMatch,
-    DsgConInvalidChannel,
-    DsgConInvalidLocalGateIdent,
-    DsgConInvalidGateSize,
-    DsgConInvalidField,
+    DsgIncludeInvalidAlias,      // Tested
+    DsgDefNameCollision,         // Tested
+    DsgConGateSizedToNotMatch,   // Tested
+    DsgConInvalidChannel,        // Tested
+    DsgConInvalidLocalGateIdent, // Tested
+    DsgConInvalidGateSize,       // Obsolete
+    DsgConInvalidField,          // Tested
 
     DsgInvalidPrototypeAtAlias,                  // Tested
     DsgInvalidPrototypeAtSome,                   // Tested
@@ -545,17 +545,17 @@ pub enum ErrorCode {
     DsgProtoImplAssociatedTyNotDerivedFromProto, // Tested
     DsgProtoImlMissing,                          // Tested
 
-    TycGateConnectionViolatesAnnotation,
+    DsgGateConnectionViolatesAnnotation,    // Tested
+    DsgModuleSubmoduleFieldAlreadyDeclared, // Tesed
 
-    TycDefNameCollission,
-    TycModuleSubmoduleFieldAlreadyDeclared,
+    TycDefNameCollission, // Obsolete ?
     TycModuleSubmoduleRecrusiveTyDefinition,
     TycModuleSubmoduleInvalidTy,
     TycModuleConInvalidChannelTy,
     TycModuleConUnknownIdentSymbol,
     TycModuleConNonMatchingGateSizes,
     TycIncludeInvalidAlias,
-    TycGateInvalidNullGate,
+    TycGateInvalidNullGate, // Tesed
     TycGateFieldDuplication,
     TycParInvalidType,
     TycParAllreadyDefined,
