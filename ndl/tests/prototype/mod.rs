@@ -501,7 +501,7 @@ fn dsg2_some_chk_no_proto() {
     // Error output sorting may reorder stdout
     //
     let path = "tests/prototype/D2_SomeChk_NoProto.ndl";
-    let mut r = NdlResolver::new(path).expect("Test case file does not seem to exist");
+    let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
 
     r.run().expect("Failed run");
     assert_eq!(r.scopes.len(), 1);
