@@ -471,7 +471,7 @@ pub enum ErrorCode {
     ParUnexpectedEOF,
     TooManyErrors,
 
-    ParUnexpectedKeyword,
+    ParUnexpectedKeyword, // Tested
 
     ParLinkMissingIdentifier,    // Tested
     ParLinkMissingDefBlockOpen,  // Tested
@@ -501,9 +501,9 @@ pub enum ErrorCode {
     ParModuleSubInvalidClusterDotChain, // Tested
     ParModuleSubMissingClosingBracket,  // Tested
 
-    ParModuleConInvalidIdentiferToken,
-    ParModuleConInvaldiChannelSyntax,
-    ParModuleConMissingClosingBracketForCLusterIdent,
+    ParModuleConInvalidIdentiferToken,                // Tested
+    ParModuleConInvaldiChannelSyntax,                 // Tested
+    ParModuleConMissingClosingBracketForCLusterIdent, // Tested
 
     ParAliasMissingIdent,          // Tested
     ParAliasMissingLikeToken,      // Tested
@@ -514,20 +514,20 @@ pub enum ErrorCode {
     ParProtoImplExpectedEq,   // Tested
     ParProtoImplAtSomeDef,    // Tested
 
-    ParNetworkMissingIdentifer,
-    ParNetworkMissingDefBlockOpen,
-    ParNetworkMissingSectionIdentifier,
-    ParNetworkInvalidSectionIdentifer,
-    ParNetworkInvalidSeperator,
-    ParNetworkDoesntAllowSome,
+    ParNetworkMissingIdentifer,         // Tested
+    ParNetworkMissingDefBlockOpen,      // Tested
+    ParNetworkMissingSectionIdentifier, // Tested
+    ParNetworkInvalidSectionIdentifer,  // Tested
+    ParNetworkInvalidSeperator,         // tested
+    ParNetworkDoesntAllowSome,          // Tested
 
     ParExpectedIntLiteral,     // Missing Test Case
     ParLiteralIntParseError,   // Tested
     ParExpectedFloatLiteral,   // Missing Test Case
     ParLiteralFloatParseError, // Tested
 
-    LexInvalidSouceToken,
-    LexInvalidSouceIdentifier,
+    LexInvalidSouceToken,      // Tested
+    LexInvalidSouceIdentifier, // Tested
 
     DsgIncludeInvalidAlias,
     DsgDefNameCollision,

@@ -1,6 +1,10 @@
+// Just to suppres 'missing any nodes'
+module Y {}
+
 prototype A {}
 
 network X {
     nodes:
+        y: Y
         x: some A
 }

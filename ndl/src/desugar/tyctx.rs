@@ -79,6 +79,16 @@ impl<'a> GlobalTyDefContext<'a> {
         }
         None
     }
+
+    pub fn network(&self, ident: &str) -> Option<&NetworkDef> {
+        for unit in self.resolver.units.values() {
+            match unit.networks.iter().find(|l| l.name == ident) {
+                Some(network) => return Some(network),
+                None => continue,
+            }
+        }
+        None
+    }
 }
 
 ///

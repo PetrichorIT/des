@@ -1,0 +1,13 @@
+module X {}
+
+network A {
+    
+    colons:
+
+    123:
+
+    submodules:
+
+    nodes:
+        a: X
+}

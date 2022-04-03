@@ -1258,7 +1258,7 @@ impl<'a> Parser<'a> {
         if id_token.kind != TokenKind::Ident {
             ectx.record(
                 ParNetworkMissingIdentifer, 
-                String::from("Invalid token. Expected network identfier."), 
+                format!("Invalid token '{}'. Expected network identifier.", id), 
                 id_token.loc
             )?;
             return Ok(());
@@ -1270,7 +1270,7 @@ impl<'a> Parser<'a> {
         if token.kind != TokenKind::OpenBrace {
             ectx.record(
                 ParNetworkMissingDefBlockOpen, 
-                String::from("Invalid token. Expected network definition block (OpenBrace)"), 
+                format!("Invalid token '{}'. Expected network definition block (OpenBrace).", _raw), 
                 token.loc,
             )?;
             return Ok(());
@@ -1304,10 +1304,10 @@ impl<'a> Parser<'a> {
 
                 ectx.record(
                     ParNetworkMissingSectionIdentifier, 
-                    format!("Invalid token. Expected identifier for subsection are {}.", NETWORK_SUBSECTION_IDENT.join(" / ")), 
+                    format!("Invalid token '{}'. Expected identifier for subsection are {}.", subsection_id, NETWORK_SUBSECTION_IDENT.join(" / ")), 
                     subsec_token.loc,
                 )?;
-                return Ok(());
+                continue;
             }
 
             if !NETWORK_SUBSECTION_IDENT.contains(&&subsection_id[..]) {
@@ -1316,16 +1316,20 @@ impl<'a> Parser<'a> {
                     format!("Invalid subsection identifier '{}'. Possibilities are {}.", subsection_id, NETWORK_SUBSECTION_IDENT.join(" / ")),
                     subsec_token.loc,
                 )?;
-                return Ok(());
+                continue;
             }
 
+            self.eat_whitespace();
             let (token, _raw) = self.next_token()?;
             if token.kind != TokenKind::Colon {
                 ectx.record(
                     ParNetworkInvalidSeperator,
-                    String::from("Unexpected token. Expected colon ':'."),
+                    format!("Unexpected token '{}'. Expected colon ':'.", _raw),
                     token.loc,
                 )?;
+
+                // assumme correct
+                self.tokens.bump_back(1);
             };
 
             ectx.reset_transient();

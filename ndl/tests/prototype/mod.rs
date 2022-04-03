@@ -383,14 +383,12 @@ fn par_some_in_network() {
     let errs = r.ectx.all().collect::<Vec<&Error>>();
     assert_eq!(errs.len(), 2);
 
-    assert_eq!(
-        *errs[0],
-        Error::new(
-            ParNetworkDoesntAllowSome,
-            "Unexpected keyword 'some'. This is not allowed on network definitions.".to_string(),
-            Loc::new(50, 4, 5),
-            false,
-        )
+    check_err!(
+        *errs[0] =>
+        ParNetworkDoesntAllowSome,
+        "Unexpected keyword 'some'. This is not allowed on network definitions.",
+        false,
+        None
     );
 
     assert!(errs[1].transient);

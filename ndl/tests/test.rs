@@ -2,7 +2,7 @@ use ndl::*;
 
 #[test]
 #[cfg(target_os = "linux")]
-fn ndl_lexer_test() {
+fn lex_full() {
     let contents = std::fs::read_to_string("tests/LexTest.ndl")
         .expect("Failed to read static test file 'LexTest.ndl'");
 
@@ -235,6 +235,11 @@ mod prototype;
 /// Tests for all syntax & sematntics errors concerning modules.
 ///
 mod module;
+
+///
+/// Tests for all syntax & semantic errors concerning networks.
+///
+mod network;
 
 #[macro_export]
 macro_rules! check_err {
