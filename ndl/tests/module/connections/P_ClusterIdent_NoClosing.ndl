@@ -8,8 +8,8 @@ module A {
         sub[1...3]: Sub
 
     gates:
-        out @output
+        out[5] @output
 
     connections:
-       sub[1 --> sub/in
+       out[1 --> sub[1]/in
 }

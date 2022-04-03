@@ -280,3 +280,25 @@ fn par_literal_parse_error() {
     assert_eq!(r.gtyctx_def().link("A").unwrap().jitter, 0.1);
     assert_eq!(r.gtyctx_def().link("A").unwrap().latency, 0.9);
 }
+
+#[test]
+fn dsg1_name_collision() {
+    let path = "tests/link/D1_NameCollision.ndl";
+    let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
+
+    r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 1);
+
+    assert!(r.ectx.has_errors());
+
+    let errs = r.ectx.all().collect::<Vec<&Error>>();
+    assert_eq!(errs.len(), 1);
+
+    check_err!(
+        *errs[0] =>
+        DsgDefNameCollision,
+        "Cannot create two links with name 'A'.",
+        false,
+        Some(ErrorSolution::new("Try renaming this link".to_string(), Loc::new(71, 60, 7)))
+    );
+}

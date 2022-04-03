@@ -47,7 +47,7 @@ fn par_cluster_ident_no_closing() {
         ParModuleConMissingClosingBracketForCLusterIdent,
         "Missing closing bracket for clustered ident.",
         false,
-        Some(ErrorSolution::new("Try adding ']'".to_string(), Loc::new(160, 0, 14)))
+        Some(ErrorSolution::new("Try adding ']'".to_string(), Loc::new(163, 0, 14)))
     );
 
     assert_eq!(r.gtyctx_def().module("A").unwrap().connections.len(), 1)

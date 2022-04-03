@@ -164,21 +164,60 @@ impl<'a> TyDefContext<'a> {
         obj
     }
 
-    ///
-    /// Checks the type context for name collsions.
-    ///
-    pub fn check_name_collision(&self) -> Result<(), &'static str> {
-        let dup_links = (1..self.links.len()).any(|i| self.links[i..].contains(&self.links[i - 1]));
-        let dup_modules = (1..self.modules_and_prototypes.len()).any(|i| {
-            self.modules_and_prototypes[i..].contains(&self.modules_and_prototypes[i - 1])
-        });
-        let dup_networks =
-            (1..self.networks.len()).any(|i| self.networks[i..].contains(&self.networks[i - 1]));
+    pub fn check_for_name_collisions(&self, errors: &mut Vec<Error>) {
+        // check links
+        if self.links.len() >= 2 {
+            for i in 0..(self.links.len() - 1) {
+                let link = &self.links[i];
+                let dup = self.links[(i + 1)..].iter().find(|l| l.name == link.name);
+                if let Some(dup) = dup {
+                    errors.push(Error::new_with_solution(
+                        DsgDefNameCollision,
+                        format!("Cannot create two links with name '{}'.", link.name),
+                        link.loc,
+                        false,
+                        ErrorSolution::new("Try renaming this link".to_string(), dup.loc),
+                    ));
+                }
+            }
+        }
 
-        if dup_links || dup_modules || dup_networks {
-            Err("Found duplicated symbols")
-        } else {
-            Ok(())
+        // check links
+        if self.modules_and_prototypes.len() >= 2 {
+            for i in 0..(self.modules_and_prototypes.len() - 1) {
+                let module = &self.modules_and_prototypes[i];
+                let dup = self.modules_and_prototypes[(i + 1)..]
+                    .iter()
+                    .find(|m| m.name == module.name);
+                if let Some(dup) = dup {
+                    errors.push(Error::new_with_solution(
+                        DsgDefNameCollision,
+                        format!("Cannot create two modules with name '{}'.", module.name),
+                        module.loc,
+                        false,
+                        ErrorSolution::new("Try renaming this modules".to_string(), dup.loc),
+                    ));
+                }
+            }
+        }
+
+        // check links
+        if self.networks.len() >= 2 {
+            for i in 0..(self.networks.len() - 1) {
+                let network = &self.networks[i];
+                let dup = self.networks[(i + 1)..]
+                    .iter()
+                    .find(|n| n.name == network.name);
+                if let Some(dup) = dup {
+                    errors.push(Error::new_with_solution(
+                        DsgDefNameCollision,
+                        format!("Cannot create two networks with name '{}'.", network.name),
+                        network.loc,
+                        false,
+                        ErrorSolution::new("Try renaming this network".to_string(), dup.loc),
+                    ));
+                }
+            }
         }
     }
 

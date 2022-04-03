@@ -2,6 +2,8 @@ prototype A {}
 
 alias B like A
 
+module C {}
+
 module X {
     submodules:
         inner: some A
@@ -14,7 +16,7 @@ network Y {
             inner = 123
             second = B
         }
-        x2: B
+        x2: C
 }
 
 network Y2 {
@@ -23,5 +25,5 @@ network Y2 {
             second = B
             inner =
         }
-        x2: B
+        x2: C
 }

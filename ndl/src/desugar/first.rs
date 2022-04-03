@@ -13,16 +13,7 @@ pub(crate) fn first_pass<'a>(
     let gtyctx = resolver.gtyctx_def();
 
     // Assume that no name collision occured, else dont proceed thing will get funky
-    if let Err(_e) = tyctx.check_name_collision() {
-        errors.push(Error::new(
-            DsgDefNameCollision,
-            String::from("Name collision in local scope."),
-            unit.loc,
-            false,
-        ));
-
-        // Continue anyway.
-    }
+    tyctx.check_for_name_collisions(&mut errors);
 
     let mut result = FirstPassDesugarResult::new(unit);
     result.aliases = unit.aliases.clone();
@@ -52,7 +43,10 @@ pub(crate) fn first_pass<'a>(
             // Issue (001)
             // Added type checking in desugar to prevent redundand checks
             // on expanded macro types.
-            validate_module_ty(child, &tyctx, &gtyctx, &resolver.source_map, &mut errors);
+            if matches!(child.ty, TyDef::Static(_)) {
+                // Can ingore dyn types since they are checked later anyway
+                validate_module_ty(child, &tyctx, &gtyctx, &resolver.source_map, &mut errors);
+            }
 
             let ChildModuleDef {
                 loc,

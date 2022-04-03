@@ -26,3 +26,5 @@ module C instanceof B
 # Check for cyclic types
 
 # TODO(Cleanup): Use check_error macro in all examples
+
+# Reorder dgs passes to use alias as a not proto impl module

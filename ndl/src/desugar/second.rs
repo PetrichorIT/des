@@ -6,6 +6,8 @@ pub(crate) fn second_pass(
     resolver: &NdlResolver,
 ) -> DesugaredParsingResult {
     let mut errors = Vec::new();
+    errors.append(&mut unit.errors.clone());
+
     let tyctx = SecondPassTyCtx::new_for(unit, all, &mut errors);
 
     let asset = unit.asset.clone();

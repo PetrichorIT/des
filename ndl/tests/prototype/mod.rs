@@ -303,24 +303,21 @@ fn par_pimpl_no_ty_ident() {
     assert_eq!(errs.len(), 4);
 
     // Case 1
-    assert_eq!(
-        *errs[0],
-        Error::new(
-            ParProtoImplInvalidIdent,
-            "Unexpected token '123'. Expected type ident.".to_string(),
-            Loc::new(165, 3, 14),
-            false,
-        )
+
+    check_err!(
+        *errs[0] =>
+        ParProtoImplInvalidIdent,
+        "Unexpected token '123'. Expected type ident.",
+        false,
+        None
     );
 
-    assert_eq!(
-        *errs[2],
-        Error::new(
-            DsgProtoImplMissingField,
-            "Missing prototype impl field 'inner'.".to_string(),
-            Loc::new(138, 4, 13),
-            false,
-        )
+    check_err!(
+        *errs[2] =>
+        DsgProtoImplMissingField,
+        "Missing prototype impl field 'inner'.",
+        false,
+        None
     );
 
     assert_eq!(r.gtyctx_spec().network("Y").unwrap().nodes.len(), 2);
@@ -335,24 +332,20 @@ fn par_pimpl_no_ty_ident() {
     );
 
     // Case 2
-    assert_eq!(
-        *errs[1],
-        Error::new(
-            ParProtoImplInvalidIdent,
-            "Unexpected token '}'. Expected type ident.".to_string(),
-            Loc::new(309, 1, 25),
-            false,
-        )
+    check_err!(
+        *errs[1] =>
+        ParProtoImplInvalidIdent,
+        "Unexpected token '}'. Expected type ident.",
+        false,
+        None
     );
 
-    assert_eq!(
-        *errs[3],
-        Error::new(
-            DsgProtoImplMissingField,
-            "Missing prototype impl field 'inner'.".to_string(),
-            Loc::new(251, 4, 22),
-            false,
-        )
+    check_err!(
+        *errs[3] =>
+        DsgProtoImplMissingField,
+        "Missing prototype impl field 'inner'.",
+        false,
+        None
     );
 
     assert_eq!(r.gtyctx_spec().network("Y2").unwrap().nodes.len(), 2);
@@ -508,7 +501,7 @@ fn dsg2_some_chk_no_proto() {
     // Error output sorting may reorder stdout
     //
     let path = "tests/prototype/D2_SomeChk_NoProto.ndl";
-    let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
+    let mut r = NdlResolver::new(path).expect("Test case file does not seem to exist");
 
     r.run().expect("Failed run");
     assert_eq!(r.scopes.len(), 1);
