@@ -193,24 +193,21 @@ pub fn third_pass(
                 }
             } else if !child.ty.is_dynamic() {
                 // NO IMPL
-                let ty = tyctx
-                    .modules
-                    .iter()
-                    .find(|m| m.ident == child.ty.inner())
-                    .expect("[desugar] This should have bee checked in the first pass");
-
-                // all proto ty must have an impl
-                if ty.degrees_of_freedom().count() > 0 {
-                    // err
-                    errors.push(Error::new(
-                        DsgProtoImlMissing,
-                        format!(
-                            "Missing prototype impl block for type '{}'.",
-                            child.ty.inner()
-                        ),
-                        child.loc,
-                        false,
-                    ))
+                // if not ty then allready logged at first pass
+                if let Some(ty) = tyctx.modules.iter().find(|m| m.ident == child.ty.inner()) {
+                    // all proto ty must have an impl
+                    if ty.degrees_of_freedom().count() > 0 {
+                        // err
+                        errors.push(Error::new(
+                            DsgProtoImlMissing,
+                            format!(
+                                "Missing prototype impl block for type '{}'.",
+                                child.ty.inner()
+                            ),
+                            child.loc,
+                            false,
+                        ))
+                    }
                 }
             }
         }

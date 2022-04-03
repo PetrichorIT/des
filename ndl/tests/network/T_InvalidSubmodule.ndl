@@ -1,0 +1,7 @@
+module A {}
+
+network X {
+    nodes:
+        a: A
+        b: B
+}

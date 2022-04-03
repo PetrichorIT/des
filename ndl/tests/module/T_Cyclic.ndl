@@ -1,0 +1,4 @@
+module X {
+    submodules:
+        self: X
+}

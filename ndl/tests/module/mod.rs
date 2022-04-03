@@ -165,6 +165,28 @@ fn dsg1_name_collision() {
     );
 }
 
+#[test]
+fn tychk_cyclic() {
+    let path = "tests/module/T_Cyclic.ndl";
+    let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
+
+    r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 1);
+
+    assert!(r.ectx.has_errors());
+
+    let errs = r.ectx.all().collect::<Vec<&Error>>();
+    assert_eq!(errs.len(), 1);
+
+    check_err!(
+        *errs[0] =>
+        TycModuleSubmoduleRecrusiveTyDefinition,
+        "Module 'X' has a required submodule of type 'X'. Cannot create cyclic definitions.",
+        false,
+        None
+    );
+}
+
 mod children;
 mod connections;
 mod gates;

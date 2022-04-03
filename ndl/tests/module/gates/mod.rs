@@ -199,3 +199,25 @@ fn dsg1_invalid_gate_size() {
         None
     );
 }
+
+#[test]
+fn tychk_name_collision() {
+    let path = "tests/module/gates/T_NameCollision.ndl";
+    let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
+
+    r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 1);
+
+    assert!(r.ectx.has_errors());
+
+    let errs = r.ectx.all().collect::<Vec<&Error>>();
+    assert_eq!(errs.len(), 1);
+
+    check_err!(
+        *errs[0] =>
+        TycGateFieldDuplication,
+        "Gate 'in' was allready defined.",
+        false,
+        None
+    );
+}

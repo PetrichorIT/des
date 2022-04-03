@@ -78,6 +78,7 @@ pub fn validate(
 
                 for submodule in &module.submodules {
                     if submodule.ty.inner() == *self_ty {
+                        // TODO: Make full recusive checker and remove this edge case
                         errors.push(Error::new(
                             TycModuleSubmoduleRecrusiveTyDefinition,
                             format!("Module '{0}' has a required submodule of type '{0}'. Cannot create cyclic definitions.", submodule.ty),
@@ -105,6 +106,7 @@ pub fn validate(
                     }
 
                     if self_gates.iter().any(|&n| n == &gate.ident) {
+                        // TODO: Defer to dsg else UB
                         errors.push(Error::new(
                             TycGateFieldDuplication,
                             format!("Gate '{}' was allready defined.", gate.ident),

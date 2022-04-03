@@ -162,3 +162,47 @@ fn dsg1_name_collision() {
         Some(ErrorSolution::new("Try renaming this network".to_string(), Loc::new(60, 29, 8)))
     );
 }
+
+#[test]
+fn tychk_invalid_sub_ty() {
+    let path = "tests/network/T_InvalidSubmodule.ndl";
+    let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
+
+    r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 1);
+
+    assert!(r.ectx.has_errors());
+
+    let errs = r.ectx.all().collect::<Vec<&Error>>();
+    assert_eq!(errs.len(), 1);
+
+    check_err!(
+        *errs[0] =>
+        TycNetworkSubmoduleInvalidTy,
+        "No module with name 'B' exists in the scope.",
+        false,
+        None
+    );
+}
+
+#[test]
+fn tychk_empty() {
+    let path = "tests/network/T_Empty.ndl";
+    let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
+
+    r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 1);
+
+    assert!(r.ectx.has_errors());
+
+    let errs = r.ectx.all().collect::<Vec<&Error>>();
+    assert_eq!(errs.len(), 1);
+
+    check_err!(
+        *errs[0] =>
+        TycNetworkEmptyNetwork,
+        "Network 'A' does not contain any nodes.",
+        false,
+        None
+    );
+}

@@ -548,26 +548,26 @@ pub enum ErrorCode {
     DsgGateConnectionViolatesAnnotation,    // Tested
     DsgModuleSubmoduleFieldAlreadyDeclared, // Tesed
 
-    TycDefNameCollission, // Obsolete ?
-    TycModuleSubmoduleRecrusiveTyDefinition,
-    TycModuleSubmoduleInvalidTy,
-    TycModuleConInvalidChannelTy,
-    TycModuleConUnknownIdentSymbol,
-    TycModuleConNonMatchingGateSizes,
-    TycIncludeInvalidAlias,
-    TycGateInvalidNullGate, // Tesed
-    TycGateFieldDuplication,
-    TycParInvalidType,
-    TycParAllreadyDefined,
-    TycModuleAllreadyDefined,
-    TycLinkAllreadyDefined,
+    TycDefNameCollission,                    // Obsolete ?
+    TycModuleSubmoduleRecrusiveTyDefinition, // Tested
+    TycModuleSubmoduleInvalidTy,             // Obsolete
+    TycModuleConInvalidChannelTy,            // Obsolete
+    TycModuleConUnknownIdentSymbol,          // Obsolete
+    TycModuleConNonMatchingGateSizes,        // Obsolete
+    TycIncludeInvalidAlias,                  // Obsolete (checked by dsg)
+    TycGateInvalidNullGate,                  // Tested
+    TycGateFieldDuplication,                 // Tested
+    TycParInvalidType,                       // 'par' Currently deprecated
+    TycParAllreadyDefined,                   // 'par' Currently deprecated
+    TycModuleAllreadyDefined,                // Obsolete
+    TycLinkAllreadyDefined,                  // Obsolete
 
-    TycNetworkAllreadyDefined,
-    TycnetworkSubmoduleFieldAlreadyDeclared,
-    TycNetworkSubmoduleInvalidTy,
-    TycNetworkConInvalidChannelTy,
-    TycNetworkConUnknownIdentSymbol,
-    TycNetworkConIllegalLocalNodeIdent,
-    TycNetworkConNonMatchingGateSizes,
-    TycNetworkEmptyNetwork,
+    TycNetworkAllreadyDefined,               // Obsolete
+    TycnetworkSubmoduleFieldAlreadyDeclared, // Obsolete
+    TycNetworkSubmoduleInvalidTy,            // Tested (TODO: rename for ctx)
+    TycNetworkConInvalidChannelTy,           // Obsolete
+    TycNetworkConUnknownIdentSymbol,         // Obsolete
+    TycNetworkConIllegalLocalNodeIdent,      // Obsolete
+    TycNetworkConNonMatchingGateSizes,       // Obsolet
+    TycNetworkEmptyNetwork,                  // Tested
 }
