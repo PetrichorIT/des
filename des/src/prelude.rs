@@ -30,8 +30,6 @@ pub use crate::metrics::Statistic;
 pub use crate::metrics::StdDev;
 
 pub use crate::util::Mrc;
-pub use crate::util::SpmcReader;
-pub use crate::util::SpmcWriter;
 
 // Do not export StatedMrc only for internal use
 

@@ -7,6 +7,3 @@ pub use macros::*;
 
 mod mm;
 pub use mm::*;
-
-mod spmc;
-pub use spmc::*;

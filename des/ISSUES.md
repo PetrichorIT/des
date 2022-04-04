@@ -15,3 +15,8 @@ Also consider Cow prt vs Rc ptr
 # Check ParHandle costs of std::cell::RefCell
 
 # Channel optional cost field.
+
+# Removed std::ops::ManualDrop from NetEvents & unsafe ptr reads
+
+- since a while handle consumes self so this can be done
+- otherwise use a Cell<Option<Message>> and then swap with None.
