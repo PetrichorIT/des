@@ -10,8 +10,6 @@ Interner(String)
 
 Also consider Cow prt vs Rc ptr
 
-# Rework pkt-headers msg size calculations
-
 # Check ParHandle costs of std::cell::RefCell
 
 # Channel optional cost field.
