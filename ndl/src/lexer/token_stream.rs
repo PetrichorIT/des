@@ -1,8 +1,6 @@
 use crate::*;
-
 use crate::error::*;
-
-use std::cell::UnsafeCell;
+use std::cell::RefCell;
 
 ///
 /// A stream of NDL tokens referncing an [Asset].
@@ -10,7 +8,7 @@ use std::cell::UnsafeCell;
 #[derive(Debug)]
 pub struct TokenStream {
     inner: Vec<Token>,
-    head: UnsafeCell<usize>,
+    head: RefCell<usize>,
 }
 
 impl TokenStream {
@@ -26,20 +24,21 @@ impl TokenStream {
 
         Ok(Self {
             inner,
-            head: UnsafeCell::new(0),
+            head: RefCell::new(0),
         })
     }
 
     pub fn head(&self) -> usize {
-        unsafe { *self.head.get() }
+        *self.head.borrow()
     }
 
     pub fn total_len(&self) -> usize {
         self.inner.len()
     }
 
+    // TODO: rematch this function
     pub fn len(&self) -> usize {
-        unsafe { self.inner.len() - *self.head.get() }
+        self.inner.len() - self.head()
     }
 
     pub fn remaining(&self) -> usize {
@@ -72,18 +71,18 @@ impl TokenStream {
     }
 
     pub fn bump(&self) -> NdlResult<&Token> {
-        unsafe {
-            if *self.head.get() < self.inner.len() {
-                *self.head.get() += 1;
-                Ok(&self.inner[*self.head.get() - 1])
-            } else {
-                Err("Unexpected end of token stream while peeking.")
-            }
+        let mut head = self.head.borrow_mut();
+        if *head < self.inner.len() {
+            *head += 1;
+            Ok(&self.inner[*head - 1])
+        } else {
+            Err("Unexpected end of token stream while peeking")
         }
     }
 
     pub fn bump_back(&self, steps: usize) {
-        unsafe { *self.head.get() = (*self.head.get()).saturating_sub(steps) }
+        let mut head = self.head.borrow_mut();
+        *head = head.saturating_sub(steps);
     }
 
     pub fn bump_back_while<P>(&self, mut p: P)
@@ -100,7 +99,7 @@ impl Clone for TokenStream {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
-            head: UnsafeCell::new(unsafe { *self.head.get() }),
+            head: RefCell::new(self.head()),
         }
     }
 }
@@ -109,7 +108,7 @@ impl FromIterator<Token> for TokenStream {
     fn from_iter<T: IntoIterator<Item = Token>>(iter: T) -> Self {
         Self {
             inner: iter.into_iter().collect(),
-            head: UnsafeCell::new(0),
+            head: RefCell::new(0),
         }
     }
 }
