@@ -12,6 +12,6 @@ Also consider Cow prt vs Rc ptr
 
 # Rework pkt-headers msg size calculations
 
-# Par Caching
+# Check ParHandle costs of std::cell::RefCell
 
 # Channel optional cost field.

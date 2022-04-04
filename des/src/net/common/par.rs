@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::ops::Deref;
+use std::cell::RefCell;
+use std::cell::RefMut;
 
 ///
 /// The collection of all loaded parameters for modules,
@@ -8,7 +10,7 @@ use std::ops::Deref;
 ///
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Parameters {
-    tree: ParameterTree,
+    tree: RefCell<ParameterTree>,
 }
 
 impl Parameters {
@@ -17,7 +19,7 @@ impl Parameters {
     ///
     pub fn new() -> Self {
         Self {
-            tree: ParameterTree::new(),
+            tree: RefCell::new(ParameterTree::new()),
         }
     }
 
@@ -34,25 +36,20 @@ impl Parameters {
     }
 
     pub(crate) fn insert(&mut self, key: &str, value: &str) {
-        self.tree.insert(key, value)
+        self.tree.borrow_mut().insert(key, value)
     }
 
     pub(crate) fn get(&self, key: &str) -> HashMap<String, String> {
         let mut map = HashMap::new();
-        self.tree.get(key, &mut map);
+        self.tree.borrow().get(key, &mut map);
         map
     }
 
     pub(crate) fn get_handle(&self, path: &str, key: &str) -> ParHandle<'_, Optional> {
-        let par = self.tree.get_value(path, key).map(str::to_string);
-
-        // dirty hack for the time being
-        let ptr: *const Parameters = &*self;
-        let ptr: *mut Parameters = ptr as *mut Parameters;
-        let mut_self = unsafe { &mut *ptr };
+        let par = self.tree.borrow().get_value(path, key).map(str::to_string);
 
         ParHandle {
-            gref: mut_self,
+            gref: self.tree.borrow_mut(),
             path_and_key: format!("{}.{}", path, key),
             par,
 
@@ -94,7 +91,7 @@ pub struct ParHandle<'a, State>
 where
     State: private::ParHandleState,
 {
-    gref: &'a mut Parameters,
+    gref: RefMut<'a, ParameterTree>,
     path_and_key: String,
     par: Option<String>,
 
@@ -152,12 +149,12 @@ where
     ///
     /// Sets the parameter to the given value.
     ///
-    pub fn set<T>(self, value: T)
+    pub fn set<T>(mut self, value: T)
     where
         T: ToString,
     {
         let str = value.to_string();
-        self.gref.insert(&self.path_and_key, &str);
+        (*self.gref).insert(&self.path_and_key, &str);
     }
 }
 
