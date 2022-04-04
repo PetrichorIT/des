@@ -976,7 +976,7 @@ impl<'a> Parser<'a> {
                                 // terminate module / network parsing
                                 return Ok(true);
                             },
-                            _ => unsafe { std::hint::unreachable_unchecked() }
+                            _ => unreachable!()
                         }
                     }
 
