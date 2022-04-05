@@ -366,6 +366,8 @@ pub struct ChannelSpec {
     pub latency: f64,
     /// The jitter of the given connection.
     pub jitter: f64,
+    /// The cost of the link.
+    pub cost: f64,
 }
 
 impl ChannelSpec {
@@ -381,6 +383,7 @@ impl ChannelSpec {
             bitrate: link_def.bitrate,
             latency: link_def.latency,
             jitter: link_def.jitter,
+            cost: link_def.cost,
         }
     }
 }

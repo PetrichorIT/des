@@ -1387,10 +1387,11 @@ impl<'a> Parser<'a> {
         let mut bitrate: Option<usize> = None;
         let mut jitter: Option<f64> = None;
         let mut latency: Option<f64> = None;
+        let mut cost: Option<f64> = None;
 
         let mut errornous = false;
 
-        while bitrate.is_none() || jitter.is_none() || latency.is_none() {
+        while bitrate.is_none() || jitter.is_none() || latency.is_none() || cost.is_none() {
             self.eat_whitespace();
 
             let (key_token, raw) = self.next_token()?;
@@ -1411,7 +1412,7 @@ impl<'a> Parser<'a> {
                 continue;
             } 
 
-            if !["latency", "bitrate", "jitter"].contains(&raw) {
+            if !["latency", "bitrate", "jitter", "cost"].contains(&raw) {
                 errornous = true;
                 ectx.record(
                     ParLinkInvalidKey, 
@@ -1430,6 +1431,7 @@ impl<'a> Parser<'a> {
             if token.kind != TokenKind::Colon {
                 if key_token.kind == TokenKind::CloseBrace {
                     // Unfinished def. Add to stack anyway but print error
+                    println!("AAA");
                     self.tokens.bump_back(1);
                     break;
                 }
@@ -1534,6 +1536,35 @@ impl<'a> Parser<'a> {
                             )?;
                             continue;
                         }
+                    },
+
+                    "cost" => {
+                        use std::str::FromStr;
+                        self.eat_whitespace();
+                        self.eat_optionally(|t| t.kind == TokenKind::Comma);
+
+                        if let LiteralKind::Float { .. } = kind {
+                            match f64::from_str(raw) {
+                                Ok(value) => cost = Some(value),
+                                Err(e) => {
+                                    errornous = true;
+                                    ectx.record(
+                                        ParLiteralFloatParseError,
+                                        format!("Float parsing error: {}.", e), 
+                                        token.loc,
+                                    )?;
+                                    continue;
+                                }
+                            }
+                        } else {
+                            errornous = true;
+                            ectx.record(
+                                ParLinkInvalidValueType, 
+                                String::from("Invalid value type. Expected float."), 
+                                token.loc
+                            )?;
+                            continue;
+                        }
                     }
                     _ => unreachable!()
                 },
@@ -1566,6 +1597,7 @@ impl<'a> Parser<'a> {
             return Ok(());
         }
 
+        // Do not include cost it has a valid default value
         if bitrate.is_none() || latency.is_none() || jitter.is_none() {
             // Broke read loop with incomplete def.
 
@@ -1598,7 +1630,8 @@ impl<'a> Parser<'a> {
             name: identifier,
             bitrate: bitrate.unwrap_or(1_000),
             latency: latency.unwrap_or(0.1),
-            jitter: jitter.unwrap_or(0.1)
+            jitter: jitter.unwrap_or(0.1),
+            cost: cost.unwrap_or(1.0)
         });
 
         ectx.reset_transient();

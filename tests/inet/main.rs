@@ -122,11 +122,11 @@ fn main() {
     // Application config
     //
 
-    let channel = Some(Channel::new(ChannelMetrics {
-        bitrate: 5_000_000,
-        latency: 0.1.into(),
-        jitter: 0.0.into(),
-    }));
+    let channel = Some(Channel::new(ChannelMetrics::new(
+        5_000_000,
+        0.1.into(),
+        0.0.into(),
+    )));
 
     let alice_in = node_alice.create_gate("channelIncoming", GateServiceType::Input, &mut app);
 

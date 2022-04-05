@@ -25,7 +25,7 @@ pub type ChannelRefMut = MrcS<Channel, Mutable>;
 ///
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ChannelMetrics {
     /// The maximum throughput of the channel in bit/s
     pub bitrate: usize,
@@ -33,17 +33,33 @@ pub struct ChannelMetrics {
     pub latency: SimTime,
     /// The variance in latency.
     pub jitter: SimTime,
+
+    /// A userdefined cost for the channel.
+    pub cost: f64,
 }
 
 impl ChannelMetrics {
     ///
     /// Creates a new instance of channel metrics.
     ///
-    pub fn new(bitrate: usize, latency: SimTime, jitter: SimTime) -> Self {
+    pub const fn new(bitrate: usize, latency: SimTime, jitter: SimTime) -> Self {
+        Self::new_with_cost(bitrate, latency, jitter, 1.0)
+    }
+
+    ///
+    /// Creates a new instance of channel metrics.
+    ///
+    pub const fn new_with_cost(
+        bitrate: usize,
+        latency: SimTime,
+        jitter: SimTime,
+        cost: f64,
+    ) -> Self {
         Self {
             bitrate,
             latency,
             jitter,
+            cost,
         }
     }
 
@@ -89,6 +105,8 @@ impl Display for ChannelMetrics {
             .finish()
     }
 }
+
+impl Eq for ChannelMetrics {}
 
 ///
 /// A representation of a one directional delayed link,.

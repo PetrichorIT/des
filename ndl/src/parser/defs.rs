@@ -37,6 +37,9 @@ pub struct LinkDef {
 
     /// The defining metric for the channel.
     pub jitter: f64,
+
+    /// The cost of the link.
+    pub cost: f64,
 }
 
 impl Eq for LinkDef {}
