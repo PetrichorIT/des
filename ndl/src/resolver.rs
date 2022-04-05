@@ -52,6 +52,8 @@ impl NdlResolver {
                 silent: true,
                 verbose: false,
                 verbose_output_dir: PathBuf::new(),
+                desugar: true,
+                tychk: true,
             },
         )
     }
@@ -140,18 +142,19 @@ impl NdlResolver {
 
         // === TY DESUGAR ==
 
+        if !self.options.desugar {
+            self.print_errs();
+            return Ok(());
+        }
+
         desugar::desugar(self);
 
-        // for (alias, unit) in &self.units {
-        //     let desugared = desugar_unit(unit, self);
-        //     self.ectx
-        //         .desugaring_errors
-        //         .append(&mut desugared.errors.clone());
-
-        //     self.desugared_units.insert(alias.clone(), desugared);
-        // }
-
         // === TY CHECK ===
+
+        if !self.options.tychk {
+            self.print_errs();
+            return Ok(());
+        }
 
         for unit in self.desugared_units.values() {
             self.ectx
@@ -161,6 +164,13 @@ impl NdlResolver {
 
         // === FIN ===
 
+        self.print_errs();
+        self.state = NdlResolverState::Done;
+
+        Ok(())
+    }
+
+    fn print_errs(&self) {
         if self.ectx.has_errors() && !self.options.silent {
             let mut errs: Vec<&Error> = self.ectx.all().collect();
             errs.sort_by(|&lhs, &rhs| lhs.loc.pos.cmp(&rhs.loc.pos));
@@ -170,10 +180,6 @@ impl NdlResolver {
                     .expect("Failed to write error to stderr")
             }
         }
-
-        self.state = NdlResolverState::Done;
-
-        Ok(())
     }
 
     pub fn run_cached(
@@ -288,11 +294,14 @@ pub enum NdlResolverState {
 ///
 /// Options for specificing the behaviour of a resolver.
 ///
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NdlResolverOptions {
     pub silent: bool,
     pub verbose: bool,
     pub verbose_output_dir: PathBuf,
+
+    pub desugar: bool,
+    pub tychk: bool,
 }
 
 impl NdlResolverOptions {
@@ -301,6 +310,21 @@ impl NdlResolverOptions {
             silent: true,
             verbose: false,
             verbose_output_dir: PathBuf::new(),
+
+            desugar: true,
+            tychk: true,
+        }
+    }
+}
+
+impl Default for NdlResolverOptions {
+    fn default() -> Self {
+        Self {
+            silent: false,
+            verbose: false,
+            verbose_output_dir: PathBuf::new(),
+            desugar: true,
+            tychk: true,
         }
     }
 }

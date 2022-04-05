@@ -9,7 +9,3 @@ Interner(String)
 }
 
 Also consider Cow prt vs Rc ptr
-
-# Check ParHandle costs of std::cell::RefCell
-
-# Channel optional cost field.

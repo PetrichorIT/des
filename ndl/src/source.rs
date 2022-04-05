@@ -339,7 +339,7 @@ impl<'a> Asset<'a> {
     /// of the given asset.
     ///
     pub fn end_loc(&self) -> Loc {
-        Loc::new(self.end_pos() - 1, 1, self.asset.len_lines)
+        Loc::new(self.end_pos(), 0, self.asset.len_lines)
     }
 
     ///
