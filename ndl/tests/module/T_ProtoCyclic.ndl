@@ -1,0 +1,9 @@
+prototype A {
+    submodules:
+        b: B
+}
+
+module B {
+    submodules:
+        a: some A
+}

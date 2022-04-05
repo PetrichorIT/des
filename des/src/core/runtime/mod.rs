@@ -140,7 +140,7 @@ where
     /// Returns the random number generator by mutable refernce
     ///
     #[allow(unused)]
-    pub(crate) unsafe fn rng(&mut self) -> *mut StdRng {
+    pub(crate) fn rng(&mut self) -> *mut StdRng {
         &mut self.core_mut().rng
     }
 
@@ -706,8 +706,7 @@ impl<A> Runtime<NetworkRuntime<A>> {
     pub fn add_message_onto(&mut self, gate: GateRefMut, message: Message, time: SimTime) {
         let event = MessageAtGateEvent {
             gate: gate.make_readonly(),
-            handled: false,
-            message: std::mem::ManuallyDrop::new(message),
+            message,
         };
 
         self.add_event(NetEvents::MessageAtGateEvent(event), time)
@@ -717,11 +716,7 @@ impl<A> Runtime<NetworkRuntime<A>> {
     /// Adds a message event into a [Runtime<NetworkRuntime<A>>] onto a module.
     ///
     pub fn handle_message_on(&mut self, module: ModuleRefMut, message: Message, time: SimTime) {
-        let event = HandleMessageEvent {
-            module,
-            handled: false,
-            message: std::mem::ManuallyDrop::new(message),
-        };
+        let event = HandleMessageEvent { module, message };
 
         self.add_event(NetEvents::HandleMessageEvent(event), time)
     }

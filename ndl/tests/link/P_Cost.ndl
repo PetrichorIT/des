@@ -1,0 +1,6 @@
+link A {
+    latency: 0.1
+    jitter: 0.1
+    bitrate: 10000
+    cost: 2.0
+}

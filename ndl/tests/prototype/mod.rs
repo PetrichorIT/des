@@ -23,14 +23,14 @@ fn base() {
 #[test]
 fn par_proto_is_proto() {
     let path = "tests/prototype/P_Proto_IsProto.ndl";
-    let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
+    let mut r = NdlResolver::new(path).expect("Test case file does not seem to exist");
 
     r.run().expect("Failed run");
     assert_eq!(r.scopes.len(), 1);
 
     assert!(!r.ectx.has_errors());
-    assert!(r.gtyctx_def().module("A").unwrap().is_prototype);
-    assert!(r.gtyctx_spec().module("A").is_none());
+    assert!(r.gtyctx_def().prototype("A").unwrap().is_prototype);
+    // assert!(r.gtyctx_spec().prototype("A").is_none());
 }
 
 #[test]
@@ -793,4 +793,20 @@ fn dsg3_impl_no_impl() {
         false,
         None
     );
+}
+
+#[test]
+fn par_alias_as_standalone() {
+    //
+    // Error output sorting may reorder stdout
+    //
+    let path = "tests/prototype/D1_AliasAsStandalone.ndl";
+    let mut r = NdlResolver::new(path).expect("Test case file does not seem to exist");
+
+    r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 1);
+
+    assert!(!r.ectx.has_errors());
+
+    assert_eq!(r.gtyctx_spec().module("M").unwrap().submodules.len(), 1);
 }

@@ -1,59 +1,45 @@
-use crate::*;
-
-use crate::error::*;
-use crate::parser::*;
 use std::collections::HashMap;
-use std::fmt::Display;
 
-mod first;
-mod second;
-mod third;
+use crate::tycheck;
+use crate::NdlResolver;
+
+pub(crate) mod first_pass;
+pub(crate) mod second_pass;
+
+mod specs;
+pub use specs::*;
 
 mod results;
-mod specs;
-mod tyctx;
 pub use results::*;
-pub use specs::*;
-pub use tyctx::*;
+
+mod ctx;
+pub use ctx::*;
 
 pub fn desugar(resolver: &mut NdlResolver) {
-    let mut first_pass_units: HashMap<String, FirstPassDesugarResult> = HashMap::new();
+    let mut fst_pass_results = HashMap::new();
 
-    // First pass
     for (alias, unit) in &resolver.units {
-        let desugared = first::first_pass(unit, resolver);
-
-        resolver.write_if_verbose(format!("{}.fdesugar", alias), &desugared);
-
-        first_pass_units.insert(alias.clone(), desugared);
+        let result = first_pass::first_pass(unit, resolver);
+        resolver.write_if_verbose(format!("{}.fdesugar", alias), &result);
+        fst_pass_results.insert(alias.clone(), result);
     }
 
-    // Second pass
-    for (alias, fpass) in &first_pass_units {
-        let result = second::second_pass(fpass, &first_pass_units, resolver);
+    let mut errs = Vec::new();
+    tycheck::check_cyclic_types(&fst_pass_results, &mut errs);
 
-        // // Defer errors
-        // resolver
-        //     .ectx
-        //     .desugaring_errors
-        //     .append(&mut result.errors.clone());
+    for (alias, unit) in &fst_pass_results {
+        let result = second_pass::second_pass(unit, &fst_pass_results, resolver);
+        resolver.write_if_verbose(format!("{}.sdesugar", alias), &result);
+
+        resolver
+            .ectx
+            .desugaring_errors
+            .append(&mut result.errors.clone());
 
         resolver.desugared_units.insert(alias.clone(), result);
     }
 
-    // third pass
-    for (alias, pass) in &resolver.desugared_units {
-        let mut errs = third::third_pass(pass, &resolver.desugared_units, resolver);
+    tycheck::check_proto_impl(&resolver.desugared_units, &resolver.source_map, &mut errs);
 
-        resolver.write_if_verbose(format!("{}.sdesugar", alias), &pass);
-
-        // Defer errors
-        resolver
-            .ectx
-            .desugaring_errors
-            .append(&mut pass.errors.clone());
-
-        // TODO: Attach third pass errors to units
-        resolver.ectx.desugaring_errors.append(&mut errs);
-    }
+    resolver.ectx.desugaring_errors.append(&mut errs);
 }

@@ -282,6 +282,23 @@ fn par_literal_parse_error() {
 }
 
 #[test]
+fn par_cost() {
+    let path = "tests/link/P_Cost.ndl";
+    let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
+
+    r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 1);
+
+    //dbg!(&r);
+
+    assert_eq!(r.gtyctx_def().link("A").unwrap().bitrate, 10_000);
+    assert_eq!(r.gtyctx_def().link("A").unwrap().jitter, 0.1);
+    assert_eq!(r.gtyctx_def().link("A").unwrap().latency, 0.1);
+
+    assert_eq!(r.gtyctx_def().link("A").unwrap().cost, 2.0);
+}
+
+#[test]
 fn dsg1_name_collision() {
     let path = "tests/link/D1_NameCollision.ndl";
     let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");

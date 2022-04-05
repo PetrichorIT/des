@@ -1,22 +1,36 @@
-use super::*;
+use std::collections::HashMap;
 
-///
-/// Transforms a given a internal ParsingResult into a internal DesugaredParsingResult
-/// by removing syntactic sugar, and turning Defs into Specs.
-///
-pub(crate) fn first_pass<'a>(
-    unit: &'a ParsingResult,
+use crate::desugar::{DesugaredParsingResult, ProtoImplSpec, ScndPassTyCtx};
+use crate::error::ErrorCode::*;
+use crate::parser::*;
+use crate::*;
+
+use super::ctx::ScndPassGlobalTyCtx;
+use super::first_pass::FstPassResult;
+
+pub fn second_pass<'a>(
+    unit: &'a FstPassResult,
+    all: &'a HashMap<String, FstPassResult>,
     resolver: &NdlResolver,
-) -> FirstPassDesugarResult<'a> {
+) -> DesugaredParsingResult {
     let mut errors = Vec::new();
-    let tyctx = TyDefContext::new_for(unit, resolver, &mut errors);
-    let gtyctx = resolver.gtyctx_def();
+    let tyctx = ScndPassTyCtx::new_for(unit, all, &mut errors);
+    let gtyctx = ScndPassGlobalTyCtx::new(all, &resolver.source_map);
 
     // Assume that no name collision occured, else dont proceed thing will get funky
     tyctx.check_for_name_collisions(&mut errors);
 
-    let mut result = FirstPassDesugarResult::new(unit);
-    result.aliases = unit.aliases.clone();
+    let mut result = DesugaredParsingResult {
+        asset: unit.asset.clone(),
+        includes: Vec::new(),
+        modules: Vec::new(),
+        networks: Vec::new(),
+
+        errors: Vec::new(),
+    };
+
+    // fwd errors
+    errors.append(&mut unit.errors.clone());
 
     //
     // === Map includes ===
@@ -35,7 +49,7 @@ pub(crate) fn first_pass<'a>(
     // === Map Modules ===
     //
 
-    for module in &unit.modules_and_prototypes {
+    for module in &unit.modules {
         let mut module_spec = ModuleSpec::new(module);
 
         // Resolve ChildModuleDef to ChildModuleSpec
@@ -46,7 +60,17 @@ pub(crate) fn first_pass<'a>(
             // on expanded macro types.
             if matches!(child.ty, TyDef::Static(_)) {
                 // Can ingore dyn types since they are checked later anyway
-                validate_module_ty(child, &tyctx, &gtyctx, &resolver.source_map, &mut errors);
+                let exists = validate_module_ty(
+                    child,
+                    &tyctx.modules,
+                    &gtyctx,
+                    &resolver.source_map,
+                    &mut errors,
+                );
+
+                if !exists {
+                    continue;
+                }
             }
 
             let ChildModuleDef {
@@ -181,11 +205,7 @@ pub(crate) fn first_pass<'a>(
             }
         }
 
-        if module_spec.derived_from.is_some() {
-            result.prototypes.push(module_spec);
-        } else {
-            result.modules.push(module_spec);
-        }
+        result.modules.push(module_spec);
     }
 
     //
@@ -223,7 +243,17 @@ pub(crate) fn first_pass<'a>(
             // Issue (001)
             // Added type checking in desugar to prevent redundand checks
             // on expanded macro types.
-            validate_module_ty(child, &tyctx, &gtyctx, &resolver.source_map, &mut errors);
+            let exists = validate_module_ty(
+                child,
+                &tyctx.modules,
+                &gtyctx,
+                &resolver.source_map,
+                &mut errors,
+            );
+
+            if !exists {
+                continue;
+            }
 
             let ChildModuleDef {
                 loc,
@@ -344,16 +374,12 @@ pub(crate) fn first_pass<'a>(
     result.errors = errors;
     result
 }
-
-///
-/// Returns (<num_nodes>,<gate_size>,<idents>)
-///
 fn resolve_connection_ident(
     ident: &ConNodeIdent,
     local_gates: &[GateDef],
     child_modules: &[ChildModuleDef],
-    tyctx: &TyDefContext,
-    gtyctx: &GlobalTyDefContext,
+    tyctx: &ScndPassTyCtx<'_>,
+    gtyctx: &ScndPassGlobalTyCtx<'_>,
     errors: &mut Vec<Error>,
     expected_type: GateAnnotation,
 ) -> Option<(usize, usize, Vec<ConSpecNodeIdent>)> {
@@ -470,11 +496,7 @@ fn resolve_connection_ident(
                 // fetch module ty
                 // this can be done outside the following if-else
                 // since a cluster-definition shares the same ty
-                let sub_module_ty = match tyctx
-                    .modules_and_prototypes
-                    .iter()
-                    .find(|module| module.name == submod_def.ty.inner())
-                {
+                let sub_module_ty = match tyctx.module_or_proto(&submod_def.ty) {
                     Some(sub_module) => sub_module,
                     None => {
                         errors.push(Error::new_ty_missing(

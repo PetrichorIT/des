@@ -176,12 +176,66 @@ fn tychk_cyclic() {
     assert!(r.ectx.has_errors());
 
     let errs = r.ectx.all().collect::<Vec<&Error>>();
-    assert_eq!(errs.len(), 1);
+    assert_eq!(errs.len(), 4);
 
     check_err!(
         *errs[0] =>
         TycModuleSubmoduleRecrusiveTyDefinition,
-        "Module 'X' has a required submodule of type 'X'. Cannot create cyclic definitions.",
+        "Cannot create cyclic definition for type 'X' via path 'self'.",
+        false,
+        None
+    );
+
+    check_err!(
+        *errs[1] =>
+        TycModuleSubmoduleRecrusiveTyDefinition,
+        "Cannot create cyclic definition for type 'A' via path 'b/c/a'.",
+        false,
+        None
+    );
+
+    check_err!(
+        *errs[2] =>
+        TycModuleSubmoduleRecrusiveTyDefinition,
+        "Cannot create cyclic definition for type 'B' via path 'c/a/b'.",
+        false,
+        None
+    );
+
+    check_err!(
+        *errs[3] =>
+        TycModuleSubmoduleRecrusiveTyDefinition,
+        "Cannot create cyclic definition for type 'C' via path 'a/b/c'.",
+        false,
+        None
+    );
+}
+
+#[test]
+fn tychk_proto_cyclic() {
+    let path = "tests/module/T_ProtoCyclic.ndl";
+    let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
+
+    r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 1);
+
+    assert!(r.ectx.has_errors());
+
+    let errs = r.ectx.all().collect::<Vec<&Error>>();
+    assert_eq!(errs.len(), 2);
+
+    check_err!(
+        *errs[0] =>
+        TycModuleSubmoduleRecrusiveTyDefinition,
+        "Cannot create cyclic definition for type 'B' via path 'a/b'.",
+        false,
+        None
+    );
+
+    check_err!(
+        *errs[1] =>
+        TycModuleSubmoduleRecrusiveTyDefinition,
+        "Cannot create cyclic definition for type 'A' via path 'b/a'.",
         false,
         None
     );

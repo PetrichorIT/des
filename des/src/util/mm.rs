@@ -256,17 +256,17 @@ where
     }
 }
 
-pub(crate) struct Sync<T> {
+pub(crate) struct SyncWrap<T> {
     inner: T,
 }
 
-impl<T> Sync<T> {
+impl<T> SyncWrap<T> {
     pub const fn new(item: T) -> Self {
         Self { inner: item }
     }
 }
 
-impl<T> Deref for Sync<T> {
+impl<T> Deref for SyncWrap<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -274,61 +274,10 @@ impl<T> Deref for Sync<T> {
     }
 }
 
-impl<T> DerefMut for Sync<T> {
+impl<T> DerefMut for SyncWrap<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }
 }
 
-unsafe impl<T> std::marker::Sync for Sync<T> {}
-
-///
-/// A implementation of UnsafeCell that implements Sync
-/// since a corrolated DES simulation is inherintly single threaded.
-///
-#[repr(transparent)]
-#[derive(Debug)]
-pub(crate) struct SyncCell<T: ?Sized> {
-    cell: std::cell::UnsafeCell<T>,
-}
-
-impl<T> SyncCell<T> {
-    pub fn new(value: T) -> Self {
-        Self {
-            cell: std::cell::UnsafeCell::new(value),
-        }
-    }
-
-    #[allow(unused)]
-    pub fn into_inner(self) -> T {
-        self.cell.into_inner()
-    }
-}
-
-impl<T> SyncCell<T>
-where
-    T: ?Sized,
-{
-    pub fn get(&self) -> *mut T {
-        self.cell.get()
-    }
-
-    #[allow(unused)]
-    pub fn get_mut(&mut self) -> &mut T {
-        self.cell.get_mut()
-    }
-}
-
-unsafe impl<T> std::marker::Sync for SyncCell<T> where T: ?Sized {}
-
-impl<T> Clone for SyncCell<T>
-where
-    T: Clone,
-{
-    fn clone(&self) -> Self {
-        let r = unsafe { &*self.cell.get() };
-        Self {
-            cell: UnsafeCell::new(r.clone()),
-        }
-    }
-}
+unsafe impl<T> Sync for SyncWrap<T> {}

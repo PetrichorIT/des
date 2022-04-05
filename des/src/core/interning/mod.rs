@@ -4,10 +4,10 @@
 //! * This will only be visible when DES is build with the feature "pub-interning"
 //!
 
-use crate::util::SyncCell;
 use log::{trace, warn};
 use std::alloc::{dealloc, Layout};
 use std::any::{type_name, TypeId};
+use std::cell::UnsafeCell;
 use std::fmt::Debug;
 use std::ops::{Deref, DerefMut};
 
@@ -38,7 +38,7 @@ mod tests;
 ///
 #[derive(Debug)]
 pub struct Interner {
-    contents: SyncCell<Vec<Option<InteredValueDescriptor>>>,
+    contents: UnsafeCell<Vec<Option<InteredValueDescriptor>>>,
 }
 
 impl Interner {
@@ -47,7 +47,7 @@ impl Interner {
     ///
     pub fn new() -> Self {
         Self {
-            contents: SyncCell::new(Vec::new()),
+            contents: UnsafeCell::new(Vec::new()),
         }
     }
 

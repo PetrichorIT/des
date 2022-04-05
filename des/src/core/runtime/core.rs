@@ -1,7 +1,7 @@
 use crate::{
     core::{event::EventId, interning::Interner, SimTime, StandardLogger},
     prelude::Mrc,
-    util::Sync,
+    util::SyncWrap,
 };
 use lazy_static::lazy_static;
 use rand::{
@@ -9,22 +9,16 @@ use rand::{
     prelude::{Distribution, StdRng},
     Rng,
 };
-// use std::ops::{Deref, DerefMut};
-
 lazy_static! {
-    pub(crate) static ref RTC: Sync<Mrc<Option<RuntimeCore>>> = Sync::new(Mrc::new(None));
+    pub(crate) static ref RTC: SyncWrap<Mrc<Option<RuntimeCore>>> = SyncWrap::new(Mrc::new(None));
 }
 
-pub(crate) fn get_mrc_mut() -> Mrc<Option<RuntimeCore>> {
+pub(crate) fn get_rtc_ptr() -> Mrc<Option<RuntimeCore>> {
     use std::ops::Deref;
 
     let mrc: &Mrc<Option<RuntimeCore>> = RTC.deref();
     Mrc::clone(mrc)
 }
-
-// lazy_static! {
-//     pub(crate) static ref RTC: SyncCell<Option<RuntimeCore>> = SyncCell::new(None);
-// }
 
 ///
 /// Returns the current simulation time of the currentlly active
@@ -32,7 +26,7 @@ pub(crate) fn get_mrc_mut() -> Mrc<Option<RuntimeCore>> {
 ///
 #[inline(always)]
 pub fn sim_time() -> SimTime {
-    (*get_mrc_mut()).as_ref().unwrap().sim_time
+    (*get_rtc_ptr()).as_ref().unwrap().sim_time
 }
 
 ///
@@ -42,7 +36,7 @@ pub fn rng<T>() -> T
 where
     Standard: Distribution<T>,
 {
-    get_mrc_mut().as_mut().unwrap().rng.gen()
+    get_rtc_ptr().as_mut().unwrap().rng.gen()
 }
 
 ///
@@ -53,7 +47,7 @@ pub fn sample<T, D>(distr: D) -> T
 where
     D: Distribution<T>,
 {
-    get_mrc_mut().as_mut().unwrap().rng.sample(distr)
+    get_rtc_ptr().as_mut().unwrap().rng.sample(distr)
 }
 
 #[derive(Debug)]
@@ -99,8 +93,8 @@ impl RuntimeCore {
             eprintln!("{}", e)
         }
 
-        *get_mrc_mut() = Some(rtc);
+        *get_rtc_ptr() = Some(rtc);
 
-        get_mrc_mut()
+        get_rtc_ptr()
     }
 }

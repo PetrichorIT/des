@@ -17,7 +17,11 @@ pub struct ParsingResult {
     /// A collection of all unchecked channel definitions.
     pub links: Vec<LinkDef>,
     /// A collection of all unchecked modules definitions.
-    pub modules_and_prototypes: Vec<ModuleDef>,
+    pub modules: Vec<ModuleDef>,
+
+    /// A collection of unchecked prototypes.
+    pub prototypes: Vec<ModuleDef>,
+
     /// A collection of all aliases refering to prototypes.
     pub aliases: Vec<AliasDef>,
     /// A collection of all unchecked network definitions.
@@ -44,7 +48,7 @@ impl Display for ParsingResult {
 
         writeln!(f)?;
         writeln!(f, "    modules:")?;
-        for module in &self.modules_and_prototypes {
+        for module in &self.modules {
             writeln!(
                 f,
                 "    - {}{} {{",

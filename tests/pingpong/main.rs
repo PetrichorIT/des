@@ -15,11 +15,7 @@ fn main() {
 
     let mut app = NetworkRuntime::new(Application());
 
-    let channel = Channel::new(ChannelMetrics {
-        bitrate: 5_000_000,
-        latency: 0.1.into(),
-        jitter: 0.0.into(),
-    });
+    let channel = Channel::new(ChannelMetrics::new(5_000_000, 0.1.into(), 0.0.into()));
 
     let g1 = alice.create_gate("netIn", GateServiceType::Input, &mut app);
     let g4 = bob.create_gate_into(

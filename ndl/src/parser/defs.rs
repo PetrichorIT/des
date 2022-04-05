@@ -1,4 +1,4 @@
-use crate::Loc;
+use crate::{Loc, SourceMap};
 use std::{collections::HashMap, fmt::Display};
 
 ///
@@ -37,6 +37,9 @@ pub struct LinkDef {
 
     /// The defining metric for the channel.
     pub jitter: f64,
+
+    /// The cost of the link.
+    pub cost: f64,
 }
 
 impl Eq for LinkDef {}
@@ -71,6 +74,15 @@ pub struct ModuleDef {
     pub parameters: Vec<ParamDef>,
     /// Indicate whether this type will actually be instantiated
     pub is_prototype: bool,
+
+    pub derived_from: Option<String>,
+}
+
+impl ModuleDef {
+    pub fn full_path<'a>(&self, smap: &'a SourceMap) -> (&str, &'a str) {
+        let asset = smap.get_asset_for_loc(self.loc);
+        (&self.name, &asset.alias)
+    }
 }
 
 ///

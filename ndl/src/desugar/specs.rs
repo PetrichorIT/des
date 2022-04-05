@@ -73,11 +73,7 @@ impl ModuleSpec {
             gates: module_def.gates.iter().map(GateSpec::new).collect(),
             params: module_def.parameters.iter().map(ParamSpec::new).collect(),
 
-            derived_from: if module_def.is_prototype {
-                Some(module_def.name.clone())
-            } else {
-                None
-            },
+            derived_from: module_def.derived_from.clone(),
         }
     }
 }
@@ -366,6 +362,8 @@ pub struct ChannelSpec {
     pub latency: f64,
     /// The jitter of the given connection.
     pub jitter: f64,
+    /// The cost of the link.
+    pub cost: f64,
 }
 
 impl ChannelSpec {
@@ -381,6 +379,7 @@ impl ChannelSpec {
             bitrate: link_def.bitrate,
             latency: link_def.latency,
             jitter: link_def.jitter,
+            cost: link_def.cost,
         }
     }
 }

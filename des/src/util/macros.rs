@@ -123,14 +123,3 @@ macro_rules! create_event_set {
         );
     };
 }
-
-// #[macro_export]
-// macro_rules! static_ref {
-//     ($e:expr) => {
-//         unsafe {
-//             let ptr: *const _ = $e;
-//             let r: &'static _ = &*ptr;
-//             r
-//         }
-//     };
-// }
