@@ -105,6 +105,8 @@ pub fn first_pass(unit: &ParsingResult, resolver: &NdlResolver) -> FstPassResult
 
         if let Some(proto) = proto {
             let mut proto: ModuleDef = proto.to_owned().to_owned();
+
+            proto.loc = *loc;
             proto.name = name.clone();
             proto.derived_from = Some(prototype.to_string());
 

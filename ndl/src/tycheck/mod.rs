@@ -16,13 +16,16 @@ const PAR_TYPES: [&str; 15] = [
     "char", "String",
 ];
 
+///
+/// Validates that the type exists, returning an indicator.
+///
 pub fn validate_module_ty(
     def: &ChildModuleDef,
     tyctx: &[&ModuleDef],
     gtyctx: &ScndPassGlobalTyCtx,
     smap: &SourceMap,
     errors: &mut Vec<Error>,
-) {
+) -> bool {
     if !tyctx.iter().any(|m| m.name == def.ty.inner()) {
         // Ty missing
         let global_ty = gtyctx.module(def.ty.inner()).map(|m| m.loc);
@@ -33,6 +36,10 @@ pub fn validate_module_ty(
             smap,
             global_ty,
         ));
+
+        false
+    } else {
+        true
     }
 }
 
@@ -132,6 +139,129 @@ pub fn check_cyclic_types(all: &HashMap<String, FstPassResult>, errors: &mut Vec
                 module.loc,
                 false,
             ));
+        }
+    }
+}
+
+pub fn check_proto_impl(
+    all: &HashMap<String, DesugaredParsingResult>,
+    smap: &SourceMap,
+    errors: &mut Vec<Error>,
+) {
+    let gtyctx = GlobalTySpecContext::new(all, smap);
+    for (_alias, unit) in all.iter() {
+        let tyctx = TySpecContext::new_for(unit, all);
+
+        for module in &unit.modules {
+            for child in &module.submodules {
+                check_proto_impl_block(child, &tyctx, &gtyctx, errors)
+            }
+        }
+
+        for network in &unit.networks {
+            for child in &network.nodes {
+                check_proto_impl_block(child, &tyctx, &gtyctx, errors)
+            }
+        }
+    }
+}
+
+fn check_proto_impl_block(
+    child: &ChildModuleSpec,
+    tyctx: &TySpecContext,
+    gtyctx: &GlobalTySpecContext,
+    errors: &mut Vec<Error>,
+) {
+    // PROTO IMPL
+    if let Some(ref p) = child.proto_impl {
+        let ty = tyctx
+            .modules
+            .iter()
+            .find(|m| m.ident == child.ty.inner())
+            .expect("[desugar] This should have bee checked in the first pass");
+
+        // check whether a proto impl makes any sense
+        let dof: Vec<(&String, &String)> = ty.degrees_of_freedom().collect();
+        if dof.is_empty() {
+            // makes no sense
+            errors.push(Error::new(
+                DsgProtoImplForNonProtoValue,
+                format!("Cannot at a prototype implmentation block to a child of type '{}' that has no prototype components.", child.ty.inner()),
+                child.loc,
+                false,
+            ));
+            return;
+        }
+
+        // check whether all protos are correctly implemented
+        for (ident, proto_ty) in dof {
+            let associated_ty = p.get(ident);
+
+            let associated_ty = match associated_ty {
+                Some(t) => t,
+                None => {
+                    errors.push(Error::new(
+                        DsgProtoImplMissingField,
+                        format!("Missing prototype impl field '{}'.", ident),
+                        child.loc,
+                        false,
+                    ));
+                    continue;
+                }
+            };
+
+            // check for associated ty
+            let assoc_ty_spec = tyctx.modules.iter().find(|m| m.ident == *associated_ty);
+
+            let assoc_ty_spec = match assoc_ty_spec {
+                Some(s) => s,
+                None => {
+                    errors.push(Error::new_ty_missing(
+                        DsgProtoImplTyMissing,
+                        format!("Unknown type '{}'.", associated_ty),
+                        child.loc,
+                        gtyctx.source_map(),
+                        gtyctx.module(&associated_ty[..]).map(|t| t.loc),
+                    ));
+                    continue;
+                }
+            };
+
+            // check whether the associated type fulfills the prototype criteria
+            if assoc_ty_spec.derived_from.is_none()
+                || assoc_ty_spec.derived_from.as_ref().unwrap() != proto_ty
+            {
+                errors.push(Error::new(
+                    DsgProtoImplAssociatedTyNotDerivedFromProto,
+                    format!(
+                        "Assigned type '{}' does not fulfill the prototype '{}'.",
+                        associated_ty, proto_ty
+                    ),
+                    child.loc,
+                    false,
+                ));
+            }
+        }
+    } else if !child.ty.is_dynamic() {
+        // NO IMPL
+        let ty = tyctx
+            .modules
+            .iter()
+            .find(|m| m.ident == child.ty.inner())
+            .expect("[desugar] This should have bee checked in the first pass");
+
+        // all proto ty must have an impl
+        if ty.degrees_of_freedom().count() > 0 {
+            // err
+            errors.push(Error::new(
+                DsgProtoImlMissing,
+                format!(
+                    "Missing prototype impl block for type '{}'.",
+                    child.ty.inner()
+                ),
+                child.loc,
+                false,
+            ))
         }
     }
 }

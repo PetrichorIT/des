@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::*;
 
 use crate::desugar::DesugaredParsingResult;
@@ -7,27 +9,28 @@ use crate::desugar::DesugaredParsingResult;
 /// a resolver.
 ///
 pub struct GlobalTySpecContext<'a> {
-    resolver: &'a NdlResolver,
+    smap: &'a SourceMap,
+    all: &'a HashMap<String, DesugaredParsingResult>,
 }
 
 impl<'a> GlobalTySpecContext<'a> {
     /// The [SourceMap] of the referenced resolver.
     pub fn source_map(&self) -> &SourceMap {
-        &self.resolver.source_map
+        &self.smap
     }
 
     ///
     /// Creates a new instance of self given a resolver ref.
     ///
-    pub fn new(resolver: &'a NdlResolver) -> Self {
-        Self { resolver }
+    pub fn new(all: &'a HashMap<String, DesugaredParsingResult>, smap: &'a SourceMap) -> Self {
+        Self { all, smap }
     }
 
     ///
     /// Returns a module spec with the given ident from the type context.
     ///
-    pub fn module<T: PartialEq<String>>(&self, ident: T) -> Option<&ModuleSpec> {
-        for unit in self.resolver.desugared_units.values() {
+    pub fn module(&self, ident: &str) -> Option<&ModuleSpec> {
+        for unit in self.all.values() {
             match unit.modules.iter().find(|l| ident == l.ident) {
                 Some(module) => return Some(module),
                 None => continue,
@@ -40,7 +43,7 @@ impl<'a> GlobalTySpecContext<'a> {
     /// Returns a network sepc with the given ident from the type context.
     ///
     pub fn network<T: PartialEq<String>>(&self, ident: T) -> Option<&NetworkSpec> {
-        for unit in self.resolver.desugared_units.values() {
+        for unit in self.all.values() {
             match unit.networks.iter().find(|l| ident == l.ident) {
                 Some(network) => return Some(network),
                 None => continue,
@@ -76,7 +79,7 @@ impl OwnedTySpecContext {
         let mut modules = Vec::new();
         let mut networks = Vec::new();
 
-        for unit in gtyctx.resolver.desugared_units.values() {
+        for unit in gtyctx.all.values() {
             for module in &unit.modules {
                 modules.push(module.clone())
             }
@@ -129,6 +132,35 @@ impl<'a> TySpecContext<'a> {
             modules: Vec::new(),
             networks: Vec::new(),
         }
+    }
+
+    pub fn new_for(
+        fpass: &'a DesugaredParsingResult,
+        all: &'a HashMap<String, DesugaredParsingResult>,
+    ) -> Self {
+        let mut obj = Self::new();
+
+        fn resolve_recursive<'a>(
+            all: &'a HashMap<String, DesugaredParsingResult>,
+            unit: &'a DesugaredParsingResult,
+            tyctx: &mut TySpecContext<'a>,
+        ) {
+            let new_unit = tyctx.include(unit);
+            if new_unit {
+                // resolve meta imports.
+                for include in &unit.includes {
+                    if let Some(unit) = all.get(&include.path) {
+                        resolve_recursive(all, unit, tyctx);
+                    } else {
+                        // Allready logged
+                    }
+                }
+            }
+        }
+
+        resolve_recursive(all, fpass, &mut obj);
+
+        obj
     }
 
     ///

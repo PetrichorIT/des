@@ -60,13 +60,17 @@ pub fn second_pass<'a>(
             // on expanded macro types.
             if matches!(child.ty, TyDef::Static(_)) {
                 // Can ingore dyn types since they are checked later anyway
-                validate_module_ty(
+                let exists = validate_module_ty(
                     child,
                     &tyctx.modules,
                     &gtyctx,
                     &resolver.source_map,
                     &mut errors,
                 );
+
+                if !exists {
+                    continue;
+                }
             }
 
             let ChildModuleDef {
@@ -239,13 +243,17 @@ pub fn second_pass<'a>(
             // Issue (001)
             // Added type checking in desugar to prevent redundand checks
             // on expanded macro types.
-            validate_module_ty(
+            let exists = validate_module_ty(
                 child,
                 &tyctx.modules,
                 &gtyctx,
                 &resolver.source_map,
                 &mut errors,
             );
+
+            if !exists {
+                continue;
+            }
 
             let ChildModuleDef {
                 loc,

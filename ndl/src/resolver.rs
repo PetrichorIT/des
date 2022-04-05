@@ -63,7 +63,7 @@ impl NdlResolver {
     }
 
     pub fn gtyctx_spec(&self) -> GlobalTySpecContext<'_> {
-        GlobalTySpecContext::new(self)
+        GlobalTySpecContext::new(&self.desugared_units, &self.source_map)
     }
 
     ///

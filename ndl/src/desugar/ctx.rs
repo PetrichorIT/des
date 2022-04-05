@@ -202,6 +202,10 @@ impl Default for TyDefContext<'_> {
     }
 }
 
+//
+// Second pass
+//
+
 #[derive(Debug)]
 pub struct ScndPassGlobalTyCtx<'a> {
     smap: &'a SourceMap,

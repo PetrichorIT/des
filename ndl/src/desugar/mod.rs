@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
+use crate::tycheck;
 use crate::NdlResolver;
 
 pub(crate) mod first_pass;
 pub(crate) mod second_pass;
-pub(crate) mod tychk;
 
 mod specs;
 pub use specs::*;
@@ -25,23 +25,21 @@ pub fn desugar(resolver: &mut NdlResolver) {
     }
 
     let mut errs = Vec::new();
-    crate::tycheck::check_cyclic_types(&fst_pass_results, &mut errs);
+    tycheck::check_cyclic_types(&fst_pass_results, &mut errs);
 
     for (alias, unit) in &fst_pass_results {
         let result = second_pass::second_pass(unit, &fst_pass_results, resolver);
         resolver.write_if_verbose(format!("{}.sdesugar", alias), &result);
-        resolver.desugared_units.insert(alias.clone(), result);
-    }
 
-    for (_alias, unit) in &resolver.desugared_units {
-        tychk::tychk(unit, &resolver.desugared_units, resolver, &mut errs);
-
-        // error aligment
         resolver
             .ectx
             .desugaring_errors
-            .append(&mut unit.errors.clone());
+            .append(&mut result.errors.clone());
+
+        resolver.desugared_units.insert(alias.clone(), result);
     }
+
+    tycheck::check_proto_impl(&resolver.desugared_units, &resolver.source_map, &mut errs);
 
     resolver.ectx.desugaring_errors.append(&mut errs);
 }
