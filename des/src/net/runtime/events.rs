@@ -1,6 +1,4 @@
 use log::{info, warn};
-use std::mem::ManuallyDrop;
-use std::ops::Deref;
 
 use crate::{core::*, create_event_set, net::*, util::MrcS};
 
@@ -23,17 +21,17 @@ create_event_set!(
 
 pub struct MessageAtGateEvent {
     pub gate: GateRef,
-    pub message: ManuallyDrop<Message>,
-    pub handled: bool,
+    pub message: Message,
 }
 
 impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
-    fn handle(mut self, rt: &mut Runtime<NetworkRuntime<A>>) {
-        let ptr: *const Message = self.message.deref();
-        let mut message = unsafe { std::ptr::read(ptr) };
-        message.meta.last_gate = Some(MrcS::clone(&self.gate));
+    fn handle(self, rt: &mut Runtime<NetworkRuntime<A>>) {
+        // let ptr: *const Message = self.message.deref();
+        // let mut message = unsafe { std::ptr::read(ptr) };
+        // message.meta.last_gate = Some(MrcS::clone(&self.gate));
 
-        self.handled = true;
+        let mut message = self.message;
+        message.meta.last_gate = Some(MrcS::clone(&self.gate));
 
         //
         // Iterate through gates until:
@@ -94,8 +92,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
                     rt.add_event(
                         NetEvents::MessageAtGateEvent(MessageAtGateEvent {
                             gate: MrcS::clone(next_gate),
-                            message: ManuallyDrop::new(message),
-                            handled: false,
+                            message,
                         }),
                         next_event_time,
                     );
@@ -129,37 +126,20 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
 
         let module = MrcS::clone(current_gate.owner());
         rt.add_event(
-            NetEvents::HandleMessageEvent(HandleMessageEvent {
-                module,
-                message: ManuallyDrop::new(message),
-                handled: false,
-            }),
+            NetEvents::HandleMessageEvent(HandleMessageEvent { module, message }),
             SimTime::now(),
         );
     }
 }
 
-impl Drop for MessageAtGateEvent {
-    fn drop(&mut self) {
-        if !self.handled && std::mem::needs_drop::<Message>() {
-            // SAFTY:
-            // If the message was no forwarded to another party
-            // drop it manully
-            unsafe { ManuallyDrop::drop(&mut self.message) }
-        }
-    }
-}
-
 pub struct HandleMessageEvent {
     pub module: ModuleRefMut,
-    pub message: ManuallyDrop<Message>,
-    pub handled: bool,
+    pub message: Message,
 }
 
 impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
-    fn handle(mut self, rt: &mut Runtime<NetworkRuntime<A>>) {
-        let ptr: *const Message = self.message.deref();
-        let mut message = unsafe { std::ptr::read(ptr) };
+    fn handle(self, rt: &mut Runtime<NetworkRuntime<A>>) {
+        let mut message = self.message;
         message.meta.receiver_module_id = self.module.id();
 
         info!(
@@ -172,16 +152,6 @@ impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
 
         module.handle_message(message);
         module.handle_buffers(rt);
-
-        self.handled = true;
-    }
-}
-
-impl Drop for HandleMessageEvent {
-    fn drop(&mut self) {
-        if !self.handled {
-            unsafe { ManuallyDrop::drop(&mut self.message) }
-        }
     }
 }
 
@@ -272,7 +242,7 @@ impl ModuleRefMut {
         self.module_core_mut().activity_active = true;
 
         // Send gate events from the 'send' method calls
-        for (msg, gate) in self.module_core_mut().out_buffer.drain(..) {
+        for (message, gate) in self.module_core_mut().out_buffer.drain(..) {
             assert!(
                 gate.service_type() != GateServiceType::Input,
                 "To send messages onto a gate it must have service type of 'Output' or 'Undefined'"
@@ -281,8 +251,7 @@ impl ModuleRefMut {
                 NetEvents::MessageAtGateEvent(MessageAtGateEvent {
                     // TODO
                     gate,
-                    message: ManuallyDrop::new(msg),
-                    handled: false,
+                    message,
                 }),
                 SimTime::now(),
             )
@@ -291,12 +260,11 @@ impl ModuleRefMut {
         let mref = MrcS::clone(self);
 
         // Send loopback events from 'scheduleAt'
-        for (msg, time) in self.module_core_mut().loopback_buffer.drain(..) {
+        for (message, time) in self.module_core_mut().loopback_buffer.drain(..) {
             rt.add_event(
                 NetEvents::HandleMessageEvent(HandleMessageEvent {
                     module: MrcS::clone(&mref),
-                    message: ManuallyDrop::new(msg),
-                    handled: false,
+                    message,
                 }),
                 time,
             )
