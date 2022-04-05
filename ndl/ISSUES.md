@@ -42,3 +42,10 @@ module C instanceof B
 [TyChk] passes are done internaly by the deps aboth
 
 The central Ctx caches all results behind a std::rc::Arc
+
+# Dsg internals
+
+1. Resolve alias by copinign ModuleDef of prototype onto alias
+2. Set derived from to check for compliance.
+3. Desctructure into ModuleSpec
+4. some / p-impl checking passes (read-only)

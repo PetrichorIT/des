@@ -73,11 +73,7 @@ impl ModuleSpec {
             gates: module_def.gates.iter().map(GateSpec::new).collect(),
             params: module_def.parameters.iter().map(ParamSpec::new).collect(),
 
-            derived_from: if module_def.is_prototype {
-                Some(module_def.name.clone())
-            } else {
-                None
-            },
+            derived_from: module_def.derived_from.clone(),
         }
     }
 }

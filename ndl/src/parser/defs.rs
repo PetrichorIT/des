@@ -74,6 +74,8 @@ pub struct ModuleDef {
     pub parameters: Vec<ParamDef>,
     /// Indicate whether this type will actually be instantiated
     pub is_prototype: bool,
+
+    pub derived_from: Option<String>,
 }
 
 ///

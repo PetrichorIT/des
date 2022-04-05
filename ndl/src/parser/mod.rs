@@ -32,7 +32,8 @@ pub fn parse(asset: Asset<'_>, tokens: TokenStream) -> ParsingResult {
 
         includes: Vec::new(),
         links: Vec::new(),
-        modules_and_prototypes: Vec::new(),
+        modules: Vec::new(),
+        prototypes: Vec::new(),
         aliases: Vec::new(),
         networks: Vec::new(),
 
@@ -226,6 +227,7 @@ impl<'a> Parser<'a> {
             parameters: Vec::new(),
             
             is_prototype,
+            derived_from: None,
         };
 
         loop {
@@ -239,7 +241,12 @@ impl<'a> Parser<'a> {
                     ectx.reset_transient();
 
                     module_def.loc = Loc::fromto(id_token_loc, subsec_token.loc);
-                    self.result.modules_and_prototypes.push(module_def);
+                    if is_prototype {
+                        self.result.prototypes.push(module_def)
+                    } else {
+                        self.result.modules.push(module_def);
+                    }
+                    
                     return Ok(());
                 }
 
@@ -299,8 +306,14 @@ impl<'a> Parser<'a> {
             .unwrap_or_else(|_| self.asset.end_pos()) - id_token_loc.pos;
         module_def.loc = Loc::new(id_token_loc.pos, len, id_token_loc.line);
 
-        self.result.modules_and_prototypes.push(module_def);
+        if module_def.is_prototype {
+            self.result.prototypes.push(module_def);
 
+        } else {
+            self.result.modules.push(module_def);
+
+        }
+      
         Ok(())
     }
 

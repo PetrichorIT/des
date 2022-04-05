@@ -1,9 +1,13 @@
-use super::*;
+use std::collections::HashMap;
+
+use crate::desugar::{DesugaredParsingResult, GlobalTyDefContext};
+use crate::error::ErrorCode::*;
+use crate::*;
 
 ///
 /// ONlY A CHECK PASS
 ///
-pub fn third_pass(
+pub fn tychk(
     unit: &DesugaredParsingResult,
     all: &HashMap<String, DesugaredParsingResult>,
     resolver: &NdlResolver,

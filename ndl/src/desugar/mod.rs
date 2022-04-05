@@ -1,59 +1,43 @@
-use crate::*;
-
-use crate::error::*;
-use crate::parser::*;
 use std::collections::HashMap;
-use std::fmt::Display;
 
-mod first;
-mod second;
-mod third;
+use crate::NdlResolver;
+
+pub(crate) mod first_pass;
+pub(crate) mod second_pass;
+pub(crate) mod tychk;
+
+mod specs;
+pub use specs::*;
 
 mod results;
-mod specs;
-mod tyctx;
 pub use results::*;
-pub use specs::*;
-pub use tyctx::*;
+
+mod ctx;
+pub use ctx::*;
 
 pub fn desugar(resolver: &mut NdlResolver) {
-    let mut first_pass_units: HashMap<String, FirstPassDesugarResult> = HashMap::new();
+    let mut fst_pass_results = HashMap::new();
 
-    // First pass
     for (alias, unit) in &resolver.units {
-        let desugared = first::first_pass(unit, resolver);
-
-        resolver.write_if_verbose(format!("{}.fdesugar", alias), &desugared);
-
-        first_pass_units.insert(alias.clone(), desugared);
+        let result = first_pass::first_pass(unit, resolver);
+        resolver.write_if_verbose(format!("{}.fdesugar", alias), &result);
+        fst_pass_results.insert(alias.clone(), result);
     }
 
-    // Second pass
-    for (alias, fpass) in &first_pass_units {
-        let result = second::second_pass(fpass, &first_pass_units, resolver);
-
-        // // Defer errors
-        // resolver
-        //     .ectx
-        //     .desugaring_errors
-        //     .append(&mut result.errors.clone());
-
+    for (alias, unit) in &fst_pass_results {
+        let result = second_pass::second_pass(unit, &fst_pass_results, resolver);
+        resolver.write_if_verbose(format!("{}.sdesugar", alias), &result);
         resolver.desugared_units.insert(alias.clone(), result);
     }
 
-    // third pass
-    for (alias, pass) in &resolver.desugared_units {
-        let mut errs = third::third_pass(pass, &resolver.desugared_units, resolver);
+    for (_alias, unit) in &resolver.desugared_units {
+        let mut errs = tychk::tychk(unit, &resolver.desugared_units, resolver);
 
-        resolver.write_if_verbose(format!("{}.sdesugar", alias), &pass);
-
-        // Defer errors
+        // error aligment
         resolver
             .ectx
             .desugaring_errors
-            .append(&mut pass.errors.clone());
-
-        // TODO: Attach third pass errors to units
+            .append(&mut unit.errors.clone());
         resolver.ectx.desugaring_errors.append(&mut errs);
     }
 }
