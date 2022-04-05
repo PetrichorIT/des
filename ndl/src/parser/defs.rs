@@ -1,4 +1,4 @@
-use crate::Loc;
+use crate::{Loc, SourceMap};
 use std::{collections::HashMap, fmt::Display};
 
 ///
@@ -76,6 +76,13 @@ pub struct ModuleDef {
     pub is_prototype: bool,
 
     pub derived_from: Option<String>,
+}
+
+impl ModuleDef {
+    pub fn full_path<'a>(&self, smap: &'a SourceMap) -> (&str, &'a str) {
+        let asset = smap.get_asset_for_loc(self.loc);
+        (&self.name, &asset.alias)
+    }
 }
 
 ///

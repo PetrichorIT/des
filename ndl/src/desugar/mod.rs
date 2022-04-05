@@ -24,6 +24,9 @@ pub fn desugar(resolver: &mut NdlResolver) {
         fst_pass_results.insert(alias.clone(), result);
     }
 
+    let mut errs = Vec::new();
+    crate::tycheck::check_cyclic_types(&fst_pass_results, &mut errs);
+
     for (alias, unit) in &fst_pass_results {
         let result = second_pass::second_pass(unit, &fst_pass_results, resolver);
         resolver.write_if_verbose(format!("{}.sdesugar", alias), &result);
@@ -31,13 +34,14 @@ pub fn desugar(resolver: &mut NdlResolver) {
     }
 
     for (_alias, unit) in &resolver.desugared_units {
-        let mut errs = tychk::tychk(unit, &resolver.desugared_units, resolver);
+        tychk::tychk(unit, &resolver.desugared_units, resolver, &mut errs);
 
         // error aligment
         resolver
             .ectx
             .desugaring_errors
             .append(&mut unit.errors.clone());
-        resolver.ectx.desugaring_errors.append(&mut errs);
     }
+
+    resolver.ectx.desugaring_errors.append(&mut errs);
 }

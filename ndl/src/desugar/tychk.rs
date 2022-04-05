@@ -11,9 +11,9 @@ pub fn tychk(
     unit: &DesugaredParsingResult,
     all: &HashMap<String, DesugaredParsingResult>,
     resolver: &NdlResolver,
-) -> Vec<Error> {
-    let mut errors = Vec::new();
-    let tyctx = ThirdPassTyCtx::new_for(unit, all, &mut errors);
+    errors: &mut Vec<Error>,
+) {
+    let tyctx = ThirdPassTyCtx::new_for(unit, all, errors);
     let gtyctx = GlobalTyDefContext::new(resolver);
 
     //
@@ -216,8 +216,6 @@ pub fn tychk(
             }
         }
     }
-
-    errors
 }
 
 pub(crate) struct ThirdPassTyCtx<'a> {

@@ -2,3 +2,26 @@ module X {
     submodules:
         self: X
 }
+
+module A {
+    submodules:
+        h: Harmless
+        b: B
+}
+
+module B {
+    submodules:
+        c: C
+        h: Harmless
+}
+
+module C {
+    submodules:
+        h: Harmless
+        h2: Harmless
+        a: A
+}
+
+module Harmless {
+
+}
