@@ -26,10 +26,6 @@ pub struct MessageAtGateEvent {
 
 impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
     fn handle(self, rt: &mut Runtime<NetworkRuntime<A>>) {
-        // let ptr: *const Message = self.message.deref();
-        // let mut message = unsafe { std::ptr::read(ptr) };
-        // message.meta.last_gate = Some(MrcS::clone(&self.gate));
-
         let mut message = self.message;
         message.meta.last_gate = Some(MrcS::clone(&self.gate));
 
@@ -59,10 +55,8 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
                         "Channels cannot start at a input node"
                     );
 
-                    // SAFTY:
-                    // The rng and random number generator dont interfere so this operation can
-                    // be considered safe. Make sure this ref is only used in conjunction with the channel.
-                    let rng_ref = unsafe { &mut (*rt.rng()) };
+                    let mut ptr = get_rtc_ptr();
+                    let rng_ref = &mut ptr.as_mut().unwrap().rng;
 
                     if channel.is_busy() {
                         warn!(
