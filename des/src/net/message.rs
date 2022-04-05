@@ -179,7 +179,7 @@ impl Message {
         let bit_len = content.bit_len();
         let byte_len = content.byte_len();
 
-        let interned = unsafe { (*RTC.get()).as_ref().unwrap().interner.intern(content) };
+        let interned = RTC.as_ref().as_ref().unwrap().interner.intern(content);
 
         let meta = MessageMetadata {
             id,
@@ -320,7 +320,7 @@ impl<T> CustomSizeBody<T> {
     }
 
     ///
-    /// Returns a mutable reference to the real contained body. 
+    /// Returns a mutable reference to the real contained body.
     ///
     pub fn inner_mut(&mut self) -> &mut T {
         &mut self.inner

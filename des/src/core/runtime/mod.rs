@@ -58,7 +58,7 @@ where
     /// The contained runtime application, defining globals and the used event set.
     pub app: A,
 
-    core: &'static SyncCell<Option<RuntimeCore>>,
+    core: Mrc<Option<RuntimeCore>>,
 
     future_event_set: FutureEventSet<A>,
 
@@ -71,11 +71,11 @@ where
     A: Application,
 {
     fn core(&self) -> &RuntimeCore {
-        unsafe { (*self.core.get()).as_ref().unwrap() }
+        (*self.core).as_ref().unwrap()
     }
 
     fn core_mut(&mut self) -> &mut RuntimeCore {
-        unsafe { (*self.core.get()).as_mut().unwrap() }
+        self.core.as_mut().unwrap()
     }
 
     ///

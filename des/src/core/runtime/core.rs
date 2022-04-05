@@ -1,6 +1,7 @@
 use crate::{
     core::{event::EventId, interning::Interner, SimTime, StandardLogger},
-    util::SyncCell,
+    prelude::Mrc,
+    util::SyncWrap,
 };
 use lazy_static::lazy_static;
 use rand::{
@@ -8,9 +9,15 @@ use rand::{
     prelude::{Distribution, StdRng},
     Rng,
 };
-
 lazy_static! {
-    pub(crate) static ref RTC: SyncCell<Option<RuntimeCore>> = SyncCell::new(None);
+    pub(crate) static ref RTC: SyncWrap<Mrc<Option<RuntimeCore>>> = SyncWrap::new(Mrc::new(None));
+}
+
+pub(crate) fn get_rtc_ptr() -> Mrc<Option<RuntimeCore>> {
+    use std::ops::Deref;
+
+    let mrc: &Mrc<Option<RuntimeCore>> = RTC.deref();
+    Mrc::clone(mrc)
 }
 
 ///
@@ -19,7 +26,7 @@ lazy_static! {
 ///
 #[inline(always)]
 pub fn sim_time() -> SimTime {
-    unsafe { (*RTC.get()).as_ref().unwrap().sim_time }
+    (*get_rtc_ptr()).as_ref().unwrap().sim_time
 }
 
 ///
@@ -29,7 +36,7 @@ pub fn rng<T>() -> T
 where
     Standard: Distribution<T>,
 {
-    unsafe { (*RTC.get()).as_mut().unwrap().rng.gen() }
+    get_rtc_ptr().as_mut().unwrap().rng.gen()
 }
 
 ///
@@ -40,7 +47,7 @@ pub fn sample<T, D>(distr: D) -> T
 where
     D: Distribution<T>,
 {
-    unsafe { (*RTC.get()).as_mut().unwrap().rng.sample(distr) }
+    get_rtc_ptr().as_mut().unwrap().rng.sample(distr)
 }
 
 #[derive(Debug)]
@@ -68,7 +75,7 @@ impl RuntimeCore {
         max_itr: usize,
         max_sim_time: SimTime,
         rng: StdRng,
-    ) -> &'static SyncCell<Option<RuntimeCore>> {
+    ) -> Mrc<Option<RuntimeCore>> {
         let rtc = Self {
             sim_time,
             max_sim_time,
@@ -86,8 +93,8 @@ impl RuntimeCore {
             eprintln!("{}", e)
         }
 
-        unsafe { *RTC.get() = Some(rtc) };
+        *get_rtc_ptr() = Some(rtc);
 
-        &RTC
+        get_rtc_ptr()
     }
 }

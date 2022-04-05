@@ -282,7 +282,6 @@ impl Packet {
         self.header.hop_count += 1;
     }
 
-
     ///
     /// Sets the sequence number of the packet.
     ///
@@ -310,7 +309,7 @@ impl Packet {
     {
         let byte_len = content.byte_len() as u16;
 
-        let interned = unsafe { (*RTC.get()).as_ref().unwrap().interner.intern(content) };
+        let interned = RTC.as_ref().as_ref().unwrap().interner.intern(content);
 
         Self {
             header: PacketHeader::new(src, dest, byte_len),
