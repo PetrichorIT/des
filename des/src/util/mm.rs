@@ -256,6 +256,32 @@ where
     }
 }
 
+pub(crate) struct Sync<T> {
+    inner: T,
+}
+
+impl<T> Sync<T> {
+    pub const fn new(item: T) -> Self {
+        Self { inner: item }
+    }
+}
+
+impl<T> Deref for Sync<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<T> DerefMut for Sync<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+unsafe impl<T> std::marker::Sync for Sync<T> {}
+
 ///
 /// A implementation of UnsafeCell that implements Sync
 /// since a corrolated DES simulation is inherintly single threaded.
@@ -293,7 +319,7 @@ where
     }
 }
 
-unsafe impl<T> Sync for SyncCell<T> where T: ?Sized {}
+unsafe impl<T> std::marker::Sync for SyncCell<T> where T: ?Sized {}
 
 impl<T> Clone for SyncCell<T>
 where

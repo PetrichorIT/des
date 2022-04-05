@@ -38,4 +38,8 @@ pub use self::runtime::RuntimeResult;
 
 pub(crate) use self::logger::StandardLogger;
 #[allow(unused)]
+pub(crate) use self::runtime::get_mrc_mut;
+#[allow(unused)]
+pub(crate) use self::runtime::RuntimeCore;
+#[allow(unused)]
 pub(crate) use self::runtime::RTC;
