@@ -95,9 +95,8 @@ impl Topology {
                 let mut cost = 0.0;
                 let mut current = MrcS::clone(start).make_readonly();
                 while let Some(next_gate) = current.next_gate() {
-                    if let Some(_channel) = current.channel() {
-                        // TODO: Compute channel cost
-                        cost += 1.0;
+                    if let Some(channel) = current.channel() {
+                        cost += channel.metrics().cost;
                     }
                     current = MrcS::clone(next_gate);
                 }
