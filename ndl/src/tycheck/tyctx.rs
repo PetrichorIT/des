@@ -16,7 +16,7 @@ pub struct GlobalTySpecContext<'a> {
 impl<'a> GlobalTySpecContext<'a> {
     /// The [SourceMap] of the referenced resolver.
     pub fn source_map(&self) -> &SourceMap {
-        &self.smap
+        self.smap
     }
 
     ///

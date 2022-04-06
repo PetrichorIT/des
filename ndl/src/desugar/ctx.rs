@@ -219,7 +219,7 @@ impl<'a> ScndPassGlobalTyCtx<'a> {
 
     /// The used [SourceMap] of the resolver.
     pub fn source_map(&self) -> &SourceMap {
-        &self.smap
+        self.smap
     }
 
     ///

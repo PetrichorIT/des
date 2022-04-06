@@ -51,8 +51,7 @@ pub fn validate_module_ty(
 pub fn check_cyclic_types(all: &HashMap<String, FstPassResult>, errors: &mut Vec<Error>) {
     let modules = all
         .iter()
-        .map(|(_k, v)| v.modules.iter().chain(v.prototypes.iter()))
-        .flatten()
+        .flat_map(|(_k, v)| v.modules.iter().chain(v.prototypes.iter()))
         .collect::<Vec<&ModuleDef>>();
 
     let mut edges: Vec<Vec<usize>> = Vec::new();
@@ -92,11 +91,7 @@ pub fn check_cyclic_types(all: &HashMap<String, FstPassResult>, errors: &mut Vec
     ) -> bool {
         let (node, _) = *call_path.last().unwrap();
         if visited[node] {
-            if node == start {
-                return true;
-            } else {
-                return false;
-            }
+            return node == start;
         }
 
         visited[node] = true;

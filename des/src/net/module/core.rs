@@ -265,6 +265,17 @@ impl ModuleCore {
     }
 
     ///
+    /// Returns wether the moudule attached to this core is of type T.
+    ///
+    pub fn self_as<T>(&self) -> Option<MrcS<T, Mutable>>
+    where
+        T: 'static + Module,
+    {
+        let a = self.self_ref.as_ref().unwrap().clone();
+        a.downcast()
+    }
+
+    ///
     /// Returns the parent module by reference if a parent exists
     /// and is of type `T`.
     ///

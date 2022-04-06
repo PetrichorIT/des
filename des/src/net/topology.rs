@@ -13,6 +13,20 @@ pub struct Topology {
 
 impl Topology {
     ///
+    /// Returns the number of nodes in the topology.
+    ///
+    pub fn len(&self) -> usize {
+        self.nodes.len()
+    }
+
+    ///
+    /// Indicates wether the topology is empty.
+    ///
+    pub fn is_empty(&self) -> bool {
+        self.nodes.is_empty()
+    }
+
+    ///
     /// The full set of nodes in the topology.
     ///
     pub fn nodes(&self) -> impl Iterator<Item = &ModuleRefMut> {
@@ -35,6 +49,17 @@ impl Topology {
             .iter()
             .find(|def| def.node.id() == node.id())
             .map(|def| &def.edges)
+    }
+
+    ///
+    /// Returns the set of edges starting at the given node,
+    /// or `None` if the nodes does not exist.
+    ///
+    pub fn edges_mut_for(&mut self, node: &ModuleRefMut) -> Option<&mut Vec<Edge>> {
+        self.nodes
+            .iter_mut()
+            .find(|def| def.node.id() == node.id())
+            .map(|def| &mut def.edges)
     }
 
     ///
@@ -187,7 +212,7 @@ impl Topology {
     ///
     /// Writes the dot output to a *.dot file
     /// and converts this file into a svg.
-    /// 
+    ///
     /// # Note
     ///
     /// Be aware that this command relies on the 'dot' command line

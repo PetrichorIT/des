@@ -657,26 +657,23 @@ impl<'a> Parser<'a> {
                             }
 
                             desc.loc = Loc::fromto(first_token_loc, token.loc);
+                        } else if token.kind == TokenKind::Ident {
+                            // Assume typo
+                            ectx.record_with_solution(
+                                ParModuleSubInvalidSeperator,
+                                format!("Unexpected token '{}'. Expected colon ':'.", _raw),
+                                token.loc,
+                                ErrorSolution::new("Try adding ':'".to_string(), token.loc)
+                            )?;
+                            ectx.reset_transient();
+                            self.tokens.bump_back(1);
                         } else {
-                            if token.kind == TokenKind::Ident {
-                                // Assume typo
-                                ectx.record_with_solution(
-                                    ParModuleSubInvalidSeperator,
-                                    format!("Unexpected token '{}'. Expected colon ':'.", _raw),
-                                    token.loc,
-                                    ErrorSolution::new("Try adding ':'".to_string(), token.loc)
-                                )?;
-                                ectx.reset_transient();
-                                self.tokens.bump_back(1);
-                            } else {
-                                ectx.record(
-                                    ParModuleSubInvalidSeperator,
-                                    format!("Unexpected token '{}'. Expected colon ':'.", _raw),
-                                    token.loc,
-                                )?;
-                                return Ok(false);
-                            }
-                            
+                            ectx.record(
+                                ParModuleSubInvalidSeperator,
+                                format!("Unexpected token '{}'. Expected colon ':'.", _raw),
+                                token.loc,
+                            )?;
+                            return Ok(false); 
                         }
                     } else {
                         desc.loc = Loc::fromto(first_token_loc, token.loc);

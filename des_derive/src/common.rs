@@ -127,7 +127,7 @@ pub fn build_impl_from(ident: Ident, wrapped: WrappedTokenStream, submodules: &[
     });
    
     let mut puntuated_a: Punctuated<GenericParam, Comma> = Punctuated::new();   
-    puntuated_a.push(param_a.clone());
+    puntuated_a.push(param_a);
 
     for ty in submodules.iter().filter_map(|c| 
         if c.ty.is_dynamic() {
@@ -203,6 +203,8 @@ pub fn build_impl_from(ident: Ident, wrapped: WrappedTokenStream, submodules: &[
         impl ::des::net::#build_trait for #ident {
             fn build<#puntuated_a>(mut this: ::des::util::Mrc<Self>, rt: &mut ::des::net::NetworkRuntime<A>) 
             -> ::des::util::Mrc<Self> {
+                use des::net::*;
+                
                 #wrapped
                 this
             }
