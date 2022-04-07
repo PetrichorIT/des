@@ -176,6 +176,8 @@ mod cqueue {
                 num_buckets: options.cqueue_num_buckets,
                 bucket_timespan: options.cqueue_bucket_timespan,
                 min_time: options.min_sim_time,
+
+                ..Default::default()
             };
 
             Self {

@@ -1,11 +1,12 @@
-use num_traits::Zero;
+use num_traits::{One, Zero};
 use std::cmp::{Ord, PartialOrd};
 use std::collections::{BinaryHeap, VecDeque};
+use std::fmt::Debug;
 
 #[derive(Debug, Clone)]
 pub struct Node<T, A>
 where
-    T: Zero + Ord,
+    T: Zero + PartialOrd,
 {
     pub time: T,
     pub value: A,
@@ -14,18 +15,18 @@ where
 
 impl<T, A> PartialEq for Node<T, A>
 where
-    T: Zero + Ord,
+    T: Zero + PartialOrd,
 {
     fn eq(&self, other: &Self) -> bool {
         self.value_cookie == other.value_cookie
     }
 }
 
-impl<T, A> Eq for Node<T, A> where T: Zero + Ord {}
+impl<T, A> Eq for Node<T, A> where T: Zero + PartialOrd {}
 
 impl<T, A> PartialOrd for Node<T, A>
 where
-    T: Zero + Ord,
+    T: Zero + PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
@@ -34,25 +35,49 @@ where
 
 impl<T, A> Ord for Node<T, A>
 where
-    T: Zero + Ord,
+    T: Zero + PartialOrd,
 {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        other.time.cmp(&self.time)
+        other
+            .time
+            .partial_cmp(&self.time)
+            .unwrap_or(std::cmp::Ordering::Equal)
     }
 }
 
 pub struct CalenderQueueOptions<T>
 where
-    T: Zero + Copy + Ord,
+    T: Zero + Copy + PartialOrd,
 {
     pub num_buckets: usize,
     pub bucket_timespan: T,
+    pub bucket_capacity: usize,
+
+    pub overflow_capacity: usize,
+
     pub min_time: T,
+}
+
+impl<T> Default for CalenderQueueOptions<T>
+where
+    T: Zero + One + Copy + PartialOrd,
+{
+    fn default() -> Self {
+        Self {
+            num_buckets: 10,
+            bucket_timespan: T::one(),
+            bucket_capacity: 16,
+
+            overflow_capacity: 16,
+
+            min_time: T::zero(),
+        }
+    }
 }
 
 pub struct CalenderQueue<T, A>
 where
-    T: Zero + Ord,
+    T: Zero + PartialOrd,
 {
     n: usize,
     t: T,
@@ -70,7 +95,7 @@ where
 
 impl<T, A> CalenderQueue<T, A>
 where
-    T: Zero + Copy + Ord,
+    T: Zero + Copy + PartialOrd,
 {
     pub fn len(&self) -> usize {
         self.len
@@ -135,6 +160,25 @@ where
             cookie: 0,
             len: 0,
             time: options.min_time,
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.buckets.iter_mut().for_each(|b| b.clear());
+        self.zero_bucket.clear();
+        self.overflow_bucket.clear();
+        self.len = 0;
+    }
+
+    pub fn reset(&mut self, time: T) {
+        self.clear();
+        self.time = time;
+        // no cookie reset
+
+        let mut time = self.time;
+        for i in 0..self.n {
+            self.upper_bounds[i] = time;
+            time = time + self.t;
         }
     }
 
@@ -212,7 +256,8 @@ where
             } else {
                 // Insert into finite bucket
 
-                match self.buckets[i].binary_search_by(|node| node.time.cmp(&time)) {
+                match self.buckets[i].binary_search_by(|node| node.time.partial_cmp(&time).unwrap())
+                {
                     Ok(mut idx) => {
                         // A event at the same time allready exits
                         // thus make sure the ord is right;
@@ -241,11 +286,16 @@ where
     }
 }
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
+impl<T, A> Debug for CalenderQueue<T, A>
+where
+    T: Zero + Copy + PartialOrd + Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CalenderQueue")
+            .field("n", &self.n)
+            .field("t", &self.t)
+            .field("bounds", &self.upper_bounds)
+            .field("time", &self.time)
+            .finish()
     }
 }
