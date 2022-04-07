@@ -337,12 +337,15 @@ where
     ///     }
     /// }
     ///
+    /// #[derive(Debug)]
     /// enum MyEventSet {
     ///     EventA,
     ///     EventB
     /// }
     /// impl EventSet<MyApp> for MyEventSet {
-    ///     fn handle(self, rt: &mut Runtime<MyApp>) {}
+    ///     fn handle(self, rt: &mut Runtime<MyApp>) {
+    ///         dbg!(self, SimTime::now());
+    ///     }
     /// }
     ///
     ///
@@ -364,7 +367,6 @@ where
             warn!(target: "des::core", "Running simulation without any events. Think about adding some inital events.");
             return RuntimeResult::EmptySimulation { app: self.app };
         }
-
         while self.next() {}
 
         self.finish()

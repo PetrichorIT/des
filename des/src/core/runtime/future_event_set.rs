@@ -131,6 +131,8 @@ pub(crate) use default::*;
 
 #[cfg(feature = "cqueue")]
 mod cqueue {
+    use std::marker::PhantomData;
+
     #[allow(unused)]
     use crate::{
         core::{
@@ -140,26 +142,13 @@ mod cqueue {
         metrics::*,
         util::*,
     };
-    use std::collections::{BinaryHeap, VecDeque};
-
-    #[cfg(feature = "internal-metrics")]
-    use std::ops::AddAssign;
+    use calender_queue::*;
 
     pub(crate) struct FutureEventSet<A>
     where
         A: Application,
     {
-        n: usize,
-        t: SimTime,
-
-        upper_bounds: Vec<SimTime>,
-
-        zero_bucket: VecDeque<EventNode<A>>,
-        buckets: Vec<VecDeque<EventNode<A>>>,
-        overflow_bucket: BinaryHeap<EventNode<A>>,
-
-        len: usize,
-        time: SimTime,
+        inner: CalenderQueue<SimTime, A::EventSet>,
     }
 
     impl<A> FutureEventSet<A>
@@ -167,192 +156,97 @@ mod cqueue {
         A: Application,
     {
         pub fn len(&self) -> usize {
-            self.len
-        }
-
-        pub fn is_empty(&self) -> bool {
-            self.len() == 0
-        }
-
-        pub fn len_zero(&self) -> usize {
-            self.zero_bucket.len()
+            self.inner.len()
         }
 
         pub fn len_nonzero(&self) -> usize {
-            self.len - self.zero_bucket.len()
+            self.inner.len_nonzero()
+        }
+
+        pub fn len_zero(&self) -> usize {
+            self.inner.len_zero()
+        }
+
+        pub fn is_empty(&self) -> bool {
+            self.inner.is_empty()
         }
 
         pub fn new_with(options: &RuntimeOptions) -> Self {
-            let n = options.cqueue_num_buckets;
-            let t = options.cqueue_bucket_timespan;
-
-            let mut upper_bounds = Vec::with_capacity(n);
-            let mut time = SimTime::ZERO;
-            for _ in 0..n {
-                upper_bounds.push(time);
-                time += t;
-            }
+            let cqueue_options = CalenderQueueOptions {
+                num_buckets: options.cqueue_num_buckets,
+                bucket_timespan: options.cqueue_bucket_timespan,
+                min_time: options.min_sim_time,
+            };
 
             Self {
-                n,
-                t,
-
-                upper_bounds,
-
-                zero_bucket: VecDeque::with_capacity(16),
-                buckets: std::iter::repeat_with(|| VecDeque::with_capacity(16))
-                    .take(n)
-                    .collect(),
-                overflow_bucket: BinaryHeap::with_capacity(16),
-
-                len: 0,
-                time: options.min_sim_time,
+                inner: CalenderQueue::new_with(cqueue_options),
             }
         }
 
         pub fn fetch_next(
             &mut self,
-            #[cfg(feature = "internal-metrics")] mut metrics: crate::util::Mrc<
-                crate::metrics::RuntimeMetrics,
-            >,
+            #[cfg(feature = "internal-metrics")] mut metrics: Mrc<RuntimeMetrics>,
         ) -> EventNode<A> {
-            assert!(!self.is_empty());
-
-            // Zero event optimization
-            if let Some(event) = self.zero_bucket.pop_front() {
-                #[cfg(feature = "internal-metrics")]
-                metrics.zero_event_count.add_assign(1);
-
-                self.len -= 1;
-
-                event
-            } else {
-                // Assure that the eralies bucket contains elements
-                self.cleanup_empty_buckets();
-
-                #[cfg(feature = "internal-metrics")]
-                metrics.nonzero_event_count.add_assign(1);
-
-                let event = self.buckets[0].pop_front().unwrap();
-                self.len -= 1;
-                self.time = event.time;
-
-                #[cfg(feature = "internal-metrics")]
-                {
-                    metrics
-                        .overflow_heap_size
-                        .collect_at(self.overflow_bucket.len() as f64, event.time);
-                    metrics.queue_bucket_size.collect_at(
-                        (self.len_nonzero() - self.overflow_bucket.len()) as f64,
-                        event.time,
-                    );
-
-                    metrics
-                        .avg_first_bucket_fill
-                        .collect_at((self.buckets[0].len() + 1usize) as f64, event.time);
-                    metrics.avg_filled_buckets.collect_at(
-                        self.buckets
-                            .iter()
-                            .enumerate()
-                            .find(|(_, b)| b.len() == 0)
-                            .map(|(idx, _)| idx)
-                            .unwrap_or(self.n) as f64,
-                        event.time,
-                    );
+            #[cfg(feature = "internal-metrics")]
+            {
+                use std::ops::AddAssign;
+                let is_zero_time = self.inner.len_zero() > 0;
+                if is_zero_time {
+                    metrics.zero_event_count.add_assign(1);
+                } else {
+                    metrics.nonzero_event_count.add_assign(1);
                 }
+            }
 
-                event
+            let Node {
+                time,
+                value,
+                value_cookie,
+            } = self.inner.fetch_next();
+
+            #[cfg(feature = "internal-metrics")]
+            {
+                metrics
+                    .overflow_heap_size
+                    .collect_at(self.inner.len_overflow() as f64, time);
+                metrics.queue_bucket_size.collect_at(
+                    (self.inner.len_nonzero() - self.inner.len_overflow()) as f64,
+                    time,
+                );
+                metrics
+                    .avg_first_bucket_fill
+                    .collect_at((self.inner.len_first_bucket() + 1usize) as f64, time);
+
+                metrics
+                    .avg_filled_buckets
+                    .collect_at(self.inner.len_buckets_filled() as f64, time);
+            }
+
+            EventNode {
+                time,
+                id: value_cookie,
+                event: value,
+
+                _phantom: PhantomData,
             }
         }
 
-        #[inline(always)]
-        fn cleanup_empty_buckets(&mut self) {
-            assert!(!self.is_empty());
-
-            // Check for empty buckets
-            while self.buckets[0].is_empty() {
-                // Shift up all finite buckets
-                for i in 0..(self.n - 1) {
-                    self.buckets.swap(i, i + 1);
-                    self.upper_bounds.swap(i, i + 1);
-                }
-
-                // Now at N-1 there is an empty bucket
-                // at N there is a inifinte bucket
-                assert!(self.buckets[self.n - 1].is_empty());
-
-                // Set new bound
-                let bound = self.upper_bounds[self.n - 2] + self.t;
-                self.upper_bounds[self.n - 1] = bound;
-
-                // Filter elements
-                while let Some(element) = self.overflow_bucket.peek() {
-                    if element.time <= bound {
-                        let element = self.overflow_bucket.pop().unwrap();
-
-                        // This is super inefficient
-                        self.buckets[self.n - 1].push_back(element);
-                    } else {
-                        break;
-                    }
-                }
-            }
-        }
         pub fn add(
             &mut self,
             time: SimTime,
             event: impl Into<A::EventSet>,
-            #[cfg(feature = "internal-metrics")] mut metrics: crate::util::Mrc<
-                crate::metrics::RuntimeMetrics,
-            >,
+            #[cfg(feature = "internal-metrics")] mut metrics: Mrc<RuntimeMetrics>,
         ) {
-            let node = EventNode::create_no_id(event.into(), time);
-            self.len += 1;
-
-            // Zero event optimization
-            if time == self.time {
-                self.zero_bucket.push_back(node);
-                return;
-            }
-
-            // Messure the avg age of events.
             #[cfg(feature = "internal-metrics")]
-            metrics
-                .non_zero_event_wait_time
-                .collect_at((time - SimTime::now()).into(), SimTime::now());
-
-            for i in 0..self.n {
-                if time > self.upper_bounds[i] {
-                    continue;
-                } else {
-                    // Insert into finite bucket
-
-                    match self.buckets[i].binary_search_by(|node| node.time.cmp(&time)) {
-                        Ok(mut idx) => {
-                            // A event at the same time allready exits
-                            // thus make sure the ord is right;
-
-                            // Order is important to shortciruit
-                            while idx < self.buckets[i].len() && self.buckets[i][idx].time == time {
-                                idx += 1;
-                            }
-
-                            idx -= 1;
-
-                            self.buckets[i].insert(idx, node);
-                        }
-                        Err(idx) => {
-                            // New timestamp
-                            self.buckets[i].insert(idx, node);
-                        }
-                    }
-
-                    return;
+            {
+                if time > self.inner.time() {
+                    metrics
+                        .non_zero_event_wait_time
+                        .collect_at((time - SimTime::now()).into(), SimTime::now());
                 }
             }
 
-            // insert into infinite bucket
-            self.overflow_bucket.push(node)
+            self.inner.add(time, event.into())
         }
     }
 }

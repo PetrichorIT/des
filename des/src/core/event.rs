@@ -142,7 +142,7 @@ where
 
     /// A marker to preserve the type information concerning the application
     /// not only the Event set.
-    _phantom: PhantomData<A>,
+    pub(crate) _phantom: PhantomData<A>,
 }
 
 impl<A> EventNode<A>
@@ -157,6 +157,7 @@ where
         self.event.handle(rt)
     }
 
+    #[allow(unused)]
     pub fn create_no_id(event: A::EventSet, time: SimTime) -> Self {
         Self {
             id: 0,

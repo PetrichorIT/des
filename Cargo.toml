@@ -5,6 +5,7 @@ debug = true
 
 members = [
   "des",
+  "calender_queue",
   "tests",
   "des_derive",
 ]

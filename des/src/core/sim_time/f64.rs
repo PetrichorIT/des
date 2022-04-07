@@ -270,6 +270,26 @@ impl DivAssign<f64> for SimTime {
     }
 }
 
+// Num Traits
+
+use num_traits::*;
+
+impl Zero for SimTime {
+    fn zero() -> Self {
+        Self(f64::zero())
+    }
+
+    fn is_zero(&self) -> bool {
+        self.0.is_zero()
+    }
+}
+
+impl One for SimTime {
+    fn one() -> Self {
+        Self(f64::one())
+    }
+}
+
 ///
 /// A type to represent the minimum time-step of the simulation time,
 /// thus the raw value of simtime.
