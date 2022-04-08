@@ -45,7 +45,7 @@ fn throughput_by_batch_size(c: &mut Criterion) {
         overflow_capacity: 200,
     });
 
-    let mut group = c.benchmark_group("throughput_by_batch_size");
+    let mut group = c.benchmark_group("cqueue::throuput::by_batch_size");
     for c in configs.iter() {
         group.throughput(Throughput::Elements(*c as u64));
         group.bench_with_input(BenchmarkId::from_parameter(c), c, |b, c| {
@@ -146,7 +146,7 @@ fn throughput_relativ_pos(c: &mut Criterion) {
         })
         .collect::<Vec<Vec<(f64, i32)>>>();
 
-    let mut group = c.benchmark_group("throughput_by_insert_position");
+    let mut group = c.benchmark_group("cqueue::throughput::by_insert_position");
     for c in configs.iter().enumerate() {
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}", c.1.end)),
@@ -219,7 +219,7 @@ fn throughput_by_parameters(c: &mut Criterion) {
         C { n: 5, t: 0.2 }, // 1%
     ];
 
-    let mut group = c.benchmark_group("throughput_5_buckets");
+    let mut group = c.benchmark_group("cqueue::throuput::5_buckets");
     for c in configs.iter() {
         // group.throughput(Throughput::Elements(*size as u64));
         group.bench_with_input(BenchmarkId::from_parameter(c), c, |b, c| {
@@ -258,7 +258,7 @@ fn throughput_by_parameters(c: &mut Criterion) {
         C { n: 10, t: 0.1 },
     ];
 
-    let mut group = c.benchmark_group("throughput_10_buckets");
+    let mut group = c.benchmark_group("cqueue::throuput::10_buckets");
     for c in configs.iter() {
         // group.throughput(Throughput::Elements(*size as u64));
         group.bench_with_input(BenchmarkId::from_parameter(c), c, |b, c| {
@@ -296,7 +296,7 @@ fn throughput_by_parameters(c: &mut Criterion) {
         C { n: 20, t: 0.05 },
     ];
 
-    let mut group = c.benchmark_group("throughput_20_buckets");
+    let mut group = c.benchmark_group("cqueue::throuput::20_buckets");
     for c in configs.iter() {
         // group.throughput(Throughput::Elements(*size as u64));
         group.bench_with_input(BenchmarkId::from_parameter(c), c, |b, c| {

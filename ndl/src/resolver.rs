@@ -91,6 +91,27 @@ impl NdlResolver {
     }
 
     ///
+    /// Loads all assets into the source map without further processing.
+    ///
+    pub fn preload(&mut self) {
+        self.get_ndl_scopes();
+
+        for scope in self.scopes.iter() {
+            // === Namespacing ===
+            let descriptor = AssetDescriptor::from_path(scope.clone(), &self.root_dir);
+
+            // === Asset Loading ===
+            let _ = match self.source_map.load(descriptor) {
+                Ok(asset) => asset,
+                Err(_e) => {
+                    // Log error
+                    continue;
+                }
+            };
+        }
+    }
+
+    ///
     /// Runs the parser. This creates asssets, lexes and parses them
     /// and finally typchecks and validates the results.
     ///
@@ -156,11 +177,7 @@ impl NdlResolver {
             return Ok(());
         }
 
-        for unit in self.desugared_units.values() {
-            self.ectx
-                .tychecking_errors
-                .append(&mut validate(unit, self))
-        }
+        tycheck::tychk(self);
 
         // === FIN ===
 

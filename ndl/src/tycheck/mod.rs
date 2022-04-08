@@ -261,6 +261,15 @@ fn check_proto_impl_block(
     }
 }
 
+pub fn tychk(resolver: &mut NdlResolver) {
+    for unit in resolver.desugared_units.values() {
+        resolver
+            .ectx
+            .tychecking_errors
+            .append(&mut validate(unit, resolver))
+    }
+}
+
 ///
 /// Validates the given an internal DesugaredParsingResult 'unit' using the resovler
 /// as parameters.

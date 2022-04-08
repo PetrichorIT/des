@@ -66,6 +66,7 @@ pub use desugar::desugar;
 pub use lexer::tokenize;
 pub use lexer::tokenize_and_validate;
 pub use parser::parse;
+pub use tycheck::tychk;
 pub use tycheck::validate;
 pub use tycheck::validate_module_ty;
 

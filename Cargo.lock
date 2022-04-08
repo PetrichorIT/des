@@ -332,6 +332,7 @@ dependencies = [
 name = "ndl"
 version = "0.2.1"
 dependencies = [
+ "criterion",
  "log",
  "structopt",
  "termcolor",
