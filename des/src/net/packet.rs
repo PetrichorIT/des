@@ -413,55 +413,52 @@ impl MessageBody for Packet {
 /// A intermediary type for constructing packets.
 ///
 pub struct PacketBuilder {
-    src_node: Option<NodeAddress>,
-    src_port: Option<PortAddress>,
-    dest_node: Option<NodeAddress>,
-    dest_port: Option<PortAddress>,
-
+    header: PacketHeader,
     content: Option<(usize, InternedValue<'static>)>,
 }
 
 impl PacketBuilder {
     pub fn new() -> Self {
         Self {
-            src_node: None,
-            src_port: None,
-            dest_node: None,
-            dest_port: None,
-
+            header: PacketHeader::default(),
             content: None,
         }
     }
 
     pub fn src(mut self, src_node: NodeAddress, src_port: PortAddress) -> Self {
-        self.src_node = Some(src_node);
-        self.src_port = Some(src_port);
+        self.header.src_node = src_node;
+        self.header.src_port = src_port;
         self
     }
 
     pub fn src_node(mut self, src_node: NodeAddress) -> Self {
-        self.src_node = Some(src_node);
+        self.header.src_node = src_node;
         self
     }
 
     pub fn src_port(mut self, src_port: PortAddress) -> Self {
-        self.src_port = Some(src_port);
+        self.header.src_port = src_port;
         self
     }
 
     pub fn dest(mut self, dest_node: NodeAddress, dest_port: PortAddress) -> Self {
-        self.dest_node = Some(dest_node);
-        self.dest_port = Some(dest_port);
+        self.header.dest_node = dest_node;
+        self.header.dest_port = dest_port;
         self
     }
 
     pub fn dest_node(mut self, dest_node: NodeAddress) -> Self {
-        self.dest_node = Some(dest_node);
+        self.header.dest_node = dest_node;
         self
     }
 
     pub fn dest_port(mut self, dest_port: PortAddress) -> Self {
-        self.dest_port = Some(dest_port);
+        self.header.dest_port = dest_port;
+        self
+    }
+
+    pub fn seq_no(mut self, seq_no: u32) -> Self {
+        self.header.seq_no = seq_no;
         self
     }
 
@@ -486,11 +483,7 @@ impl PacketBuilder {
     pub fn build(self) -> Packet {
         // Packet { header: PacketHeader::new(src, dest, packet_length), content: () }}
         let PacketBuilder {
-            src_node,
-            src_port,
-            dest_node,
-            dest_port,
-
+            mut header,
             content,
         } = self;
 
@@ -499,19 +492,8 @@ impl PacketBuilder {
             None => (0, None),
         };
 
-        Packet {
-            header: PacketHeader {
-                src_node: src_node.unwrap_or(0),
-                src_port: src_port.unwrap_or(0),
+        header.packet_length = byte_len as u16;
 
-                dest_node: dest_node.unwrap_or(0),
-                dest_port: dest_port.unwrap_or(0),
-
-                packet_length: byte_len as u16,
-
-                ..Default::default()
-            },
-            content,
-        }
+        Packet { header, content }
     }
 }

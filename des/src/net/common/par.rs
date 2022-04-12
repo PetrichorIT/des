@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::cell::RefMut;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::ops::Deref;
@@ -45,13 +44,13 @@ impl Parameters {
         map
     }
 
-    pub(crate) fn get_handle(&self, path: &str, key: &str) -> ParHandle<'_, Optional> {
-        let par = self.tree.borrow().get_value(path, key).map(str::to_string);
-
+    pub(crate) fn get_handle<'a>(&'a self, path: &'a str, key: &'a str) -> ParHandle<'a, Optional> {
         ParHandle {
-            gref: self.tree.borrow_mut(),
-            path_and_key: format!("{}.{}", path, key),
-            par,
+            tree_ref: &self.tree,
+            path,
+            key,
+
+            value: None,
 
             _phantom: PhantomData,
         }
@@ -91,9 +90,11 @@ pub struct ParHandle<'a, State>
 where
     State: private::ParHandleState,
 {
-    gref: RefMut<'a, ParameterTree>,
-    path_and_key: String,
-    par: Option<String>,
+    tree_ref: &'a RefCell<ParameterTree>,
+    path: &'a str,
+    key: &'a str,
+
+    value: Option<String>,
 
     _phantom: PhantomData<State>,
 }
@@ -111,11 +112,13 @@ where
     /// Panics if the handle points to no existing value.
     ///
     pub fn unwrap(self) -> ParHandle<'a, Unwraped> {
-        if self.par.is_some() {
+        if let Some(val) = self.tree_ref.borrow().get_value(self.path, self.key) {
             ParHandle {
-                gref: self.gref,
-                path_and_key: self.path_and_key,
-                par: self.par,
+                tree_ref: self.tree_ref,
+                path: self.path,
+                key: self.key,
+
+                value: Some(val.to_string()),
 
                 _phantom: PhantomData,
             }
@@ -131,7 +134,7 @@ where
     where
         F: FnMut(ParHandle<'_, Unwraped>) -> T,
     {
-        if self.par.is_some() {
+        if self.is_some() {
             Some(f(self.unwrap()))
         } else {
             None
@@ -142,14 +145,19 @@ where
     /// Indicates whether the handle contains a value.
     ///
     pub fn is_some(&self) -> bool {
-        self.par.is_some()
+        self.value.is_some()
+            || self
+                .tree_ref
+                .borrow()
+                .get_value(self.path, self.key)
+                .is_some()
     }
 
     ///
     /// Indicates whether the handle contains a value.
     ///
     pub fn is_none(&self) -> bool {
-        self.par.is_some()
+        !self.is_some()
     }
 
     ///
@@ -157,25 +165,35 @@ where
     /// ability to set the par.
     ///
     pub fn as_optional(self) -> Option<String> {
-        self.par
+        match self.value {
+            Some(value) => Some(value),
+            None => self
+                .tree_ref
+                .borrow()
+                .get_value(self.path, self.key)
+                .map(str::to_string),
+        }
     }
 
     ///
     /// Sets the parameter to the given value.
     ///
-    pub fn set<T>(mut self, value: T)
+    pub fn set<T>(self, value: T)
     where
         T: ToString,
     {
         let str = value.to_string();
-        (*self.gref).insert(&self.path_and_key, &str);
+        self.tree_ref
+            .borrow_mut()
+            .insert(&format!("{}.{}", self.path, self.key), &str);
+        // (*self.tree_ref).insert(&self.path_and_key, &str);
     }
 }
 
 impl Deref for ParHandle<'_, Unwraped> {
     type Target = str;
     fn deref(&self) -> &Self::Target {
-        self.par.as_ref().unwrap()
+        self.value.as_ref().unwrap()
     }
 }
 

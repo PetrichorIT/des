@@ -7,7 +7,7 @@ pub struct Alice(ModuleCore);
 
 impl Module for Alice {
     fn at_sim_start(&mut self, _: usize) {
-        let msg = Message::new().kind(1).content(42).build();
+        let msg = Message::new().kind(1).content(42usize).build();
         self.send(msg, ("netOut", 0));
 
         println!("SimStared");
