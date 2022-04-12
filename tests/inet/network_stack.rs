@@ -62,7 +62,12 @@ impl Module for NetworkStack {
 
             // PATH ROUTE
             info!(target: "NetworkStack", "Routing over backproc path");
-            let msg = Message::new_interned(0, 2, self.id(), SimTime::now(), pkt);
+            let msg = Message::new()
+                .kind(2)
+                .timestamp(SimTime::now())
+                .content_interned(pkt)
+                .build();
+            // let msg = Message::legacy_new_interned(0, 2, self.id(), SimTime::now(), pkt);
             self.send(msg, route);
         } else {
             // RANDOM ROUTE
@@ -76,7 +81,12 @@ impl Module for NetworkStack {
                 gate_id = self.gate("netOut", (idx + 1) % self.gates().len()).unwrap()
             }
 
-            let msg = Message::new_interned(0, 2, self.id(), SimTime::now(), pkt);
+            let msg = Message::new()
+                .kind(2)
+                .timestamp(SimTime::now())
+                .content_interned(pkt)
+                .build();
+            // let msg = Message::legacy_new_interned(0, 2, self.id(), SimTime::now(), pkt);
             self.send(msg, gate_id);
         }
     }

@@ -18,9 +18,8 @@ impl Module for Alice {
             // TERMINATE
         } else {
             pkt.register_hop();
-            let id = self.id();
             self.send(
-                Message::new_interned(0, 1, id, SimTime::ZERO, pkt),
+                Message::new().kind(1).content_interned(pkt).build(),
                 ("netOut", 0),
             )
         }
@@ -37,21 +36,17 @@ impl Module for Bob {
             info!(target: "Bob", "Initalizing");
             drop(msg);
             info!(target: "Bob", "Dropped init msg");
-            let id = self.id();
             self.send(
-                Message::new(
-                    0,
-                    1,
-                    None,
-                    id,
-                    ModuleId::NULL,
-                    SimTime::now(),
-                    Packet::new(
-                        (0x7f_00_00_01, 80),
-                        (0x7f_00_00_02, 80),
-                        String::from("Ping"),
-                    ),
-                ),
+                Message::new()
+                    .kind(1)
+                    .content(
+                        Packet::new()
+                            .src(0x7f_00_00_01, 80)
+                            .dest(0x7f_00_00_02, 80)
+                            .content("Ping".to_string())
+                            .build(),
+                    )
+                    .build(),
                 ("netOut", 2),
             );
         } else {
@@ -62,9 +57,8 @@ impl Module for Bob {
 
             pkt.content::<String>().push('#');
 
-            let id = self.id();
             self.send(
-                Message::new_interned(0, 1, id, SimTime::ZERO, pkt),
+                Message::new().kind(1).content_interned(pkt).build(),
                 ("netOut", 2),
             );
         }

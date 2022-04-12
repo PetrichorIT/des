@@ -170,20 +170,23 @@ fn main() {
 
     let mut rt = Runtime::new_with(app, RuntimeOptions::seeded(0x123));
 
-    let pkt = Packet::new(
-        (0x00_00_00_ff, 0x00_fe),
-        (0x00_00_00_ee, 0x00_fe),
-        String::from("PING"),
-    );
-    let msg = Message::new(
-        0,
-        2,
-        None,
-        ModuleId::NULL,
-        ModuleId::NULL,
-        SimTime::ZERO,
-        pkt,
-    );
+    let pkt = Packet::new()
+        .src(0x_00_00_00_ff, 0x00_fe)
+        .dest(0x00_00_00_ee, 0x00_fe)
+        .content("PING".to_string())
+        .build();
+
+    let msg = Message::new().kind(2).content(pkt).build();
+
+    // let msg = Message::legacy_new(
+    //     0,
+    //     2,
+    //     None,
+    //     ModuleId::NULL,
+    //     ModuleId::NULL,
+    //     SimTime::ZERO,
+    //     pkt,
+    // );
 
     rt.add_message_onto(alice_in, msg, 0.0.into());
 

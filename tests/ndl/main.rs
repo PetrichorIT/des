@@ -18,15 +18,10 @@ fn main() {
     let mut rt = Runtime::new_with(app, RuntimeOptions::seeded(0x123));
 
     for id in ids {
-        let msg = Message::new(
-            0,
-            0xff,
-            None,
-            ModuleId::NULL,
-            ModuleId::NULL,
-            SimTime::now(),
-            String::from("Init"),
-        );
+        let msg = Message::new()
+            .kind(0xff)
+            .content("Init".to_string())
+            .build();
 
         let arr_time = SimTime::ZERO;
 

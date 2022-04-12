@@ -235,12 +235,15 @@ impl ModuleRefMut {
 
         self.module_core_mut().activity_active = true;
 
+        let self_id = self.id();
+
         // Send gate events from the 'send' method calls
-        for (message, gate) in self.module_core_mut().out_buffer.drain(..) {
+        for (mut message, gate) in self.module_core_mut().out_buffer.drain(..) {
             assert!(
                 gate.service_type() != GateServiceType::Input,
                 "To send messages onto a gate it must have service type of 'Output' or 'Undefined'"
             );
+            message.meta.sender_module_id = self_id;
             rt.add_event(
                 NetEvents::MessageAtGateEvent(MessageAtGateEvent {
                     // TODO

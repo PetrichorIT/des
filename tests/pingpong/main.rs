@@ -40,15 +40,7 @@ fn main() {
 
     let mut rt = Runtime::new_with(app, RuntimeOptions::seeded(0x56123).max_time(420.0.into()));
 
-    let msg = Message::new(
-        0,
-        1,
-        None,
-        ModuleId::NULL,
-        ModuleId::NULL,
-        SimTime::now(),
-        String::from("Ping"),
-    );
+    let msg = Message::new().content("Ping".to_string()).build();
 
     rt.add_message_onto(g4, msg, 1.0.into());
 

@@ -11,15 +11,7 @@ impl Module for Bob {
         info!(target: "Bob", "Received at {}: message #{:?} content: {}", sim_time(), meta.id, *str);
 
         if *str == "Pong" {
-            let msg = Message::new(
-                0,
-                1,
-                None,
-                ModuleId::NULL,
-                ModuleId::NULL,
-                SimTime::now(),
-                String::from("Ping"),
-            );
+            let msg = Message::new().content("Ping".to_string()).build();
 
             self.send(msg, ("netOut", 0))
         }

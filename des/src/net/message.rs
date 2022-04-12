@@ -75,6 +75,21 @@ impl MessageMetadata {
     }
 }
 
+impl Default for MessageMetadata {
+    fn default() -> Self {
+        Self {
+            id: 0,
+            kind: 0,
+            timestamp: SimTime::MIN,
+            sender_module_id: ModuleId::NULL,
+            receiver_module_id: ModuleId::NULL,
+            last_gate: None,
+            creation_time: SimTime::now(),
+            send_time: SimTime::MAX,
+        }
+    }
+}
+
 ///
 /// A generic network message holding a payload.
 ///
@@ -83,7 +98,7 @@ impl MessageMetadata {
 pub struct Message {
     pub(crate) meta: MessageMetadata,
 
-    pub(crate) content: InternedValue<'static>,
+    pub(crate) content: Option<InternedValue<'static>>,
     pub(crate) bit_len: usize,
     pub(crate) byte_len: usize,
 }
@@ -104,99 +119,11 @@ impl Message {
         format!("#{} {} bits", self.meta.id, self.bit_len)
     }
 
-    #[allow(clippy::too_many_arguments)]
-    fn new_raw(
-        meta: MessageMetadata,
-        content: InternedValue<'static>,
-        bit_len: usize,
-        byte_len: usize,
-    ) -> Self {
-        Self {
-            meta,
-            content,
-            bit_len,
-            byte_len,
-        }
-    }
-
     ///
-    /// Creates a new message with the given metadata and
-    /// a content of type Box<T>.
+    /// Creates a new instance of self through a builder.
     ///
-    /// ## Guarantees
-    ///
-    /// The value of type T will be moved into a box which is then
-    /// transmuted into a raw ptr. The allocated memory of T will only
-    /// be dropped if the message is extracted.
-    ///
-    pub fn new_interned<T: MessageBody>(
-        id: MessageId,
-        kind: MessageKind,
-        sender_module_id: ModuleId,
-        timestamp: SimTime,
-        content: TypedInternedValue<'static, T>,
-    ) -> Self {
-        let bit_len = content.bit_len();
-        let byte_len = content.byte_len();
-
-        let meta = MessageMetadata {
-            id,
-
-            kind,
-            timestamp,
-
-            sender_module_id,
-            receiver_module_id: ModuleId::NULL,
-
-            last_gate: None,
-
-            creation_time: SimTime::now(),
-            send_time: SimTime::MAX,
-        };
-
-        Self::new_raw(meta, content.uncast(), bit_len, byte_len)
-    }
-
-    ///
-    /// Creates a new message with the given metadata and
-    /// a content of type T.
-    ///
-    /// ## Guarantees
-    ///
-    /// The value of type T will be moved into a box which is then
-    /// transmuted into a raw ptr. The allocated memory of T will only
-    /// be dropped if the message is extracted.
-    ///
-    pub fn new<T: 'static + MessageBody>(
-        id: MessageId,
-        kind: MessageKind,
-        last_gate: Option<GateRef>,
-        sender_module_id: ModuleId,
-        receiver_module_id: ModuleId,
-        timestamp: SimTime,
-        content: T,
-    ) -> Self {
-        let bit_len = content.bit_len();
-        let byte_len = content.byte_len();
-
-        let interned = RTC.as_ref().as_ref().unwrap().interner.intern(content);
-
-        let meta = MessageMetadata {
-            id,
-
-            kind,
-            timestamp,
-
-            sender_module_id,
-            receiver_module_id,
-
-            last_gate,
-
-            creation_time: SimTime::now(),
-            send_time: SimTime::MAX,
-        };
-
-        Self::new_raw(meta, interned, bit_len, byte_len)
+    pub fn new() -> MessageBuilder {
+        MessageBuilder::new()
     }
 
     ///
@@ -212,7 +139,7 @@ impl Message {
     ///
     pub fn cast<T: MessageBody>(self) -> (TypedInternedValue<'static, T>, MessageMetadata) {
         let Message { meta, content, .. } = self;
-        (content.cast(), meta)
+        (content.unwrap().cast(), meta)
     }
 
     ///
@@ -229,18 +156,21 @@ impl Message {
     ///
     #[inline(always)]
     pub fn can_cast<T: 'static + MessageBody>(&self) -> bool {
-        self.content.can_cast::<T>()
+        self.content
+            .as_ref()
+            .map(|v| v.can_cast::<T>())
+            .unwrap_or(false)
     }
 }
 
 impl Clone for Message {
     fn clone(&self) -> Self {
-        Self::new_raw(
-            self.meta.clone_message(),
-            self.content.clone(),
-            self.bit_len,
-            self.byte_len,
-        )
+        Self {
+            meta: self.meta.clone_message(),
+            content: self.content.clone(),
+            bit_len: self.bit_len,
+            byte_len: self.byte_len,
+        }
     }
 }
 
@@ -403,5 +333,97 @@ impl<T: MessageBody> MessageBody for LinkedList<T> {
 impl<T: MessageBody> MessageBody for [T] {
     fn byte_len(&self) -> usize {
         self.iter().fold(0, |acc, v| acc + v.byte_len())
+    }
+}
+
+///
+/// A intermediary type for constructing messages.
+///
+pub struct MessageBuilder {
+    meta: MessageMetadata,
+    content: Option<(usize, usize, InternedValue<'static>)>,
+}
+
+impl MessageBuilder {
+    pub fn new() -> Self {
+        Self {
+            meta: MessageMetadata::default(),
+            content: None,
+        }
+    }
+
+    pub fn id(mut self, id: MessageId) -> Self {
+        self.meta.id = id;
+        self
+    }
+
+    pub fn kind(mut self, kind: MessageKind) -> Self {
+        self.meta.kind = kind;
+        self
+    }
+
+    pub fn timestamp(mut self, timestamp: SimTime) -> Self {
+        self.meta.timestamp = timestamp;
+        self
+    }
+
+    pub fn receiver_module_id(mut self, receiver_module_id: ModuleId) -> Self {
+        self.meta.receiver_module_id = receiver_module_id;
+        self
+    }
+
+    pub fn sender_module_id(mut self, sender_module_id: ModuleId) -> Self {
+        self.meta.sender_module_id = sender_module_id;
+        self
+    }
+
+    pub fn last_gate(mut self, last_gate: GateRef) -> Self {
+        self.meta.last_gate = Some(last_gate);
+        self
+    }
+
+    pub fn creation_time(mut self, creation_time: SimTime) -> Self {
+        self.meta.creation_time = creation_time;
+        self
+    }
+
+    pub fn send_time(mut self, send_time: SimTime) -> Self {
+        self.meta.send_time = send_time;
+        self
+    }
+
+    pub fn content<T>(mut self, content: T) -> Self
+    where
+        T: 'static + MessageBody,
+    {
+        let bit_len = content.bit_len();
+        let byte_len = content.byte_len();
+        let interned = RTC.as_ref().as_ref().unwrap().interner.intern(content);
+        self.content = Some((bit_len, byte_len, interned));
+        self
+    }
+
+    pub fn content_interned<T>(mut self, content: TypedInternedValue<'static, T>) -> Self
+    where
+        T: 'static + MessageBody,
+    {
+        self.content = Some((content.bit_len(), content.byte_len(), content.uncast()));
+        self
+    }
+
+    pub fn build(self) -> Message {
+        let MessageBuilder { meta, content } = self;
+
+        let (bit_len, byte_len, content) = match content {
+            Some((bit_len, byte_len, content)) => (bit_len, byte_len, Some(content)),
+            None => (0, 0, None),
+        };
+
+        Message {
+            meta,
+            bit_len,
+            byte_len,
+            content,
+        }
     }
 }

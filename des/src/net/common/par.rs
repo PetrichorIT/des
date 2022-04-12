@@ -1,8 +1,8 @@
+use std::cell::RefCell;
+use std::cell::RefMut;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::ops::Deref;
-use std::cell::RefCell;
-use std::cell::RefMut;
 
 ///
 /// The collection of all loaded parameters for modules,
@@ -121,6 +121,20 @@ where
             }
         } else {
             panic!("Unwraped par handle that did point to data")
+        }
+    }
+
+    ///
+    /// Maps the internal value if exisitent to a given output.
+    ///
+    pub fn map<F, T>(self, mut f: F) -> Option<T>
+    where
+        F: FnMut(ParHandle<'_, Unwraped>) -> T,
+    {
+        if self.par.is_some() {
+            Some(f(self.unwrap()))
+        } else {
+            None
         }
     }
 

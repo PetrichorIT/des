@@ -12,28 +12,12 @@ impl Module for Alice {
         info!(target: "Alice", "Received at {}: message #{:?} content: {}", sim_time(), meta.id, *str);
 
         self.send(
-            Message::new(
-                0,
-                1,
-                None,
-                ModuleId::NULL,
-                ModuleId::NULL,
-                SimTime::ZERO,
-                String::from("Pong"),
-            ),
+            Message::new().content("Pong".to_string()).build(),
             ("netOut", 0),
         );
 
         self.parent_mut::<super::bob::Bob>()
             .unwrap()
-            .handle_message(Message::new(
-                0,
-                31,
-                None,
-                ModuleId::NULL,
-                ModuleId::NULL,
-                SimTime::ZERO,
-                String::from("Pang"),
-            ));
+            .handle_message(Message::new().kind(31).content("Pang".to_string()).build());
     }
 }

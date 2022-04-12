@@ -144,6 +144,49 @@ impl MessageBody for PacketHeader {
     }
 }
 
+#[cfg(feature = "net-ipv6")]
+impl Default for PacketHeader {
+    fn default() -> Self {
+        Self {
+            // # IPv4 header
+            src_node: 0,
+            dest_node: 0,
+
+            version: 4,
+            traffic_class: 0,
+            flow_label: 0,
+
+            packet_length: 0,
+            next_header: 0,
+            ttl: u8::MAX,
+
+            // # TCP header
+            src_port: 0,
+            dest_port: 0,
+
+            seq_no: 0,
+            ack_no: 0,
+            data_offset: 0,
+
+            flag_ns: false,
+            flag_cwr: false,
+            flag_ece: false,
+            flag_urg: false,
+            flag_ack: false,
+            flag_psh: false,
+            flag_rst: false,
+            flag_syn: false,
+            flag_fin: false,
+
+            window_size: 0,
+            tcp_checksum: 0,
+            urgent_ptr: 0,
+
+            hop_count: 0,
+        }
+    }
+}
+
 ///
 /// A application-addressed header in a network, similar to TCP/UDP.
 ///
@@ -213,6 +256,30 @@ impl MessageBody for PacketHeader {
     }
 }
 
+#[cfg(not(feature = "net-ipv6"))]
+impl Default for PacketHeader {
+    fn default() -> Self {
+        Self {
+            // # IPv4 header
+            src_node: 0,
+            dest_node: 0,
+
+            tos: 0,
+            packet_length: 0,
+
+            ttl: u8::MAX,
+
+            // # TCP header
+            src_port: 0,
+            dest_port: 0,
+            seq_no: 0,
+            ack_no: 0,
+            window_size: 0,
+            hop_count: 0,
+        }
+    }
+}
+
 ///
 /// A application-addressed message in a network, similar to TCP/UDP.
 ///
@@ -222,7 +289,7 @@ impl MessageBody for PacketHeader {
 #[derive(Debug)]
 pub struct Packet {
     header: PacketHeader,
-    content: InternedValue<'static>,
+    content: Option<InternedValue<'static>>,
 }
 
 impl Packet {
@@ -290,32 +357,10 @@ impl Packet {
     }
 
     ///
-    /// Creates a new message with the given metadata and
-    /// a content of type T.
+    /// Creates a new instance of self through a builder.
     ///
-    /// # Guarntees
-    ///
-    /// The value of type T will be moved into a box which is then
-    /// transmuted into a raw ptr. The allocated memory of T will only
-    /// be dropped if the message is extracted.
-    ///
-    pub fn new<T>(
-        src: (NodeAddress, PortAddress),
-        dest: (NodeAddress, PortAddress),
-        content: T,
-    ) -> Self
-    where
-        T: 'static + MessageBody,
-    {
-        let byte_len = content.byte_len() as u16;
-
-        let interned = RTC.as_ref().as_ref().unwrap().interner.intern(content);
-
-        Self {
-            header: PacketHeader::new(src, dest, byte_len),
-
-            content: interned,
-        }
+    pub fn new() -> PacketBuilder {
+        PacketBuilder::new()
     }
 
     ///
@@ -335,7 +380,7 @@ impl Packet {
         let Self {
             content, header, ..
         } = self;
-        (content.cast(), header)
+        (content.unwrap().cast(), header)
     }
 
     ///
@@ -350,7 +395,7 @@ impl Packet {
     /// be freed until this function is called, and ownership is thereby moved..
     ///
     pub fn content<T: 'static + MessageBody>(&self) -> TypedInternedValue<'static, T> {
-        self.content.clone().cast()
+        self.content.clone().unwrap().cast()
     }
 }
 
@@ -361,5 +406,112 @@ impl MessageBody for Packet {
 
     fn byte_len(&self) -> usize {
         self.header.packet_length as usize + self.header.byte_len()
+    }
+}
+
+///
+/// A intermediary type for constructing packets.
+///
+pub struct PacketBuilder {
+    src_node: Option<NodeAddress>,
+    src_port: Option<PortAddress>,
+    dest_node: Option<NodeAddress>,
+    dest_port: Option<PortAddress>,
+
+    content: Option<(usize, InternedValue<'static>)>,
+}
+
+impl PacketBuilder {
+    pub fn new() -> Self {
+        Self {
+            src_node: None,
+            src_port: None,
+            dest_node: None,
+            dest_port: None,
+
+            content: None,
+        }
+    }
+
+    pub fn src(mut self, src_node: NodeAddress, src_port: PortAddress) -> Self {
+        self.src_node = Some(src_node);
+        self.src_port = Some(src_port);
+        self
+    }
+
+    pub fn src_node(mut self, src_node: NodeAddress) -> Self {
+        self.src_node = Some(src_node);
+        self
+    }
+
+    pub fn src_port(mut self, src_port: PortAddress) -> Self {
+        self.src_port = Some(src_port);
+        self
+    }
+
+    pub fn dest(mut self, dest_node: NodeAddress, dest_port: PortAddress) -> Self {
+        self.dest_node = Some(dest_node);
+        self.dest_port = Some(dest_port);
+        self
+    }
+
+    pub fn dest_node(mut self, dest_node: NodeAddress) -> Self {
+        self.dest_node = Some(dest_node);
+        self
+    }
+
+    pub fn dest_port(mut self, dest_port: PortAddress) -> Self {
+        self.dest_port = Some(dest_port);
+        self
+    }
+
+    pub fn content<T>(mut self, content: T) -> Self
+    where
+        T: 'static + MessageBody,
+    {
+        let byte_len = content.byte_len();
+        let interned = RTC.as_ref().as_ref().unwrap().interner.intern(content);
+        self.content = Some((byte_len, interned));
+        self
+    }
+
+    pub fn content_interned<T>(mut self, content: TypedInternedValue<'static, T>) -> Self
+    where
+        T: 'static + MessageBody,
+    {
+        self.content = Some((content.byte_len(), content.uncast()));
+        self
+    }
+
+    pub fn build(self) -> Packet {
+        // Packet { header: PacketHeader::new(src, dest, packet_length), content: () }}
+        let PacketBuilder {
+            src_node,
+            src_port,
+            dest_node,
+            dest_port,
+
+            content,
+        } = self;
+
+        let (byte_len, content) = match content {
+            Some((byte_len, content)) => (byte_len, Some(content)),
+            None => (0, None),
+        };
+
+        Packet {
+            header: PacketHeader {
+                src_node: src_node.unwrap_or(0),
+                src_port: src_port.unwrap_or(0),
+
+                dest_node: dest_node.unwrap_or(0),
+                dest_port: dest_port.unwrap_or(0),
+
+                packet_length: byte_len as u16,
+
+                ..Default::default()
+            },
+            content,
+        }
     }
 }
