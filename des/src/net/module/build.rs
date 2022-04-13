@@ -62,7 +62,6 @@ pub trait __Buildable0 {
     {
         let core = ModuleCore::new_with(path, rt.globals());
         let mut this = MrcS::new(Self::named(core));
-
         // Attach self to module core
         let clone = MrcS::clone(&this);
         this.deref_mut().self_ref = Some(UntypedMrc::new(clone));
@@ -79,9 +78,12 @@ pub trait __Buildable0 {
         T: NameableModule,
         Self: NameableModule + Sized,
     {
-        let obj = Self::named_with_parent(name, parent);
-        // parent.add_child(&mut (*obj));
-        Self::build(obj, rt)
+        let mut this = Self::named_with_parent(name, parent);
+
+        let clone = MrcS::clone(&this);
+        this.deref_mut().self_ref = Some(UntypedMrc::new(clone));
+
+        Self::build(this, rt)
     }
 }
 
