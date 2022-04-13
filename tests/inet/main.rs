@@ -170,13 +170,12 @@ fn main() {
 
     let mut rt = Runtime::new_with(app, RuntimeOptions::seeded(0x123));
 
-    let pkt = Packet::new()
+    let msg = Packet::new()
         .src(0x_00_00_00_ff, 0x00_fe)
         .dest(0x00_00_00_ee, 0x00_fe)
         .content("PING".to_string())
+        .kind(2)
         .build();
-
-    let msg = Message::new().kind(2).content(pkt).build();
 
     // let msg = Message::legacy_new(
     //     0,

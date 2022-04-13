@@ -705,10 +705,15 @@ impl<A> Runtime<NetworkRuntime<A>> {
     ///
     /// Adds a message event into a [Runtime<NetworkRuntime<A>>] onto a gate.
     ///
-    pub fn add_message_onto(&mut self, gate: GateRefMut, message: Message, time: SimTime) {
+    pub fn add_message_onto(
+        &mut self,
+        gate: GateRefMut,
+        message: impl Into<Message>,
+        time: SimTime,
+    ) {
         let event = MessageAtGateEvent {
             gate: gate.make_readonly(),
-            message,
+            message: message.into(),
         };
 
         self.add_event(NetEvents::MessageAtGateEvent(event), time)
@@ -717,8 +722,16 @@ impl<A> Runtime<NetworkRuntime<A>> {
     ///
     /// Adds a message event into a [Runtime<NetworkRuntime<A>>] onto a module.
     ///
-    pub fn handle_message_on(&mut self, module: ModuleRefMut, message: Message, time: SimTime) {
-        let event = HandleMessageEvent { module, message };
+    pub fn handle_message_on(
+        &mut self,
+        module: ModuleRefMut,
+        message: impl Into<Message>,
+        time: SimTime,
+    ) {
+        let event = HandleMessageEvent {
+            module,
+            message: message.into(),
+        };
 
         self.add_event(NetEvents::HandleMessageEvent(event), time)
     }

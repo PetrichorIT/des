@@ -143,6 +143,15 @@ impl Message {
     }
 
     ///
+    /// A special cast for casting values that are packets.
+    ///
+    pub fn as_packet(self) -> TypedInternedValue<'static, Packet> {
+        let (mut pkt, meta) = self.cast::<Packet>();
+        pkt.message_meta = Some(meta);
+        pkt
+    }
+
+    ///
     /// Indicates wheter a cast to a instance of type T ca
     /// succeed.
     ///
@@ -340,8 +349,8 @@ impl<T: MessageBody> MessageBody for [T] {
 /// A intermediary type for constructing messages.
 ///
 pub struct MessageBuilder {
-    meta: MessageMetadata,
-    content: Option<(usize, usize, InternedValue<'static>)>,
+    pub(crate) meta: MessageMetadata,
+    pub(crate) content: Option<(usize, usize, InternedValue<'static>)>,
 }
 
 impl MessageBuilder {
@@ -350,6 +359,11 @@ impl MessageBuilder {
             meta: MessageMetadata::default(),
             content: None,
         }
+    }
+
+    pub fn meta(mut self, meta: MessageMetadata) -> Self {
+        self.meta = meta;
+        self
     }
 
     pub fn id(mut self, id: MessageId) -> Self {

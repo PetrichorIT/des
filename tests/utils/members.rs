@@ -11,7 +11,7 @@ pub struct Alice(ModuleCore);
 
 impl Module for Alice {
     fn handle_message(&mut self, msg: Message) {
-        let (mut pkt, _) = msg.cast::<Packet>();
+        let mut pkt = msg.as_packet();
         info!(target: self.name(), "Received at {}: Message with content: {}", sim_time(), pkt.content::<String>().deref());
 
         if pkt.header().hop_count > self.par("limit").unwrap().parse::<usize>().unwrap() {
@@ -19,10 +19,7 @@ impl Module for Alice {
             self.disable_activity()
         } else {
             pkt.register_hop();
-            self.send(
-                Message::new().kind(1).content_interned(pkt).build(),
-                ("netOut", 0),
-            )
+            self.send(pkt, ("netOut", 0))
         }
     }
 
@@ -49,15 +46,11 @@ impl Module for Bob {
             0 => {
                 info!(target: self.str(), "Initalizing");
                 self.send(
-                    Message::new()
+                    Packet::new()
                         .kind(1)
-                        .content(
-                            Packet::new()
-                                .src(0x7f_00_00_01, 80)
-                                .dest(0x7f_00_00_02, 80)
-                                .content("Ping".to_string())
-                                .build(),
-                        )
+                        .src(0x7f_00_00_01, 80)
+                        .dest(0x7f_00_00_02, 80)
+                        .content("Ping".to_string())
                         .build(),
                     ("netOut", 2),
                 );
@@ -70,16 +63,13 @@ impl Module for Bob {
     }
 
     fn handle_message(&mut self, msg: Message) {
-        let (mut pkt, _) = msg.cast::<Packet>();
+        let mut pkt = msg.as_packet();
         pkt.register_hop();
 
         info!(target: self.name(), "Received at {}: Message with content: {}", sim_time(), pkt.content::<String>().deref());
 
         pkt.content::<String>().push_str(&self.par("char").unwrap());
 
-        self.send(
-            Message::new().kind(1).content_interned(pkt).build(),
-            ("netOut", 2),
-        );
+        self.send(pkt, ("netOut", 2));
     }
 }

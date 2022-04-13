@@ -211,13 +211,13 @@ impl ModuleCore {
     /// Sends a message onto a given gate. This operation will be performed after
     /// handle_message finished.
     ///
-    pub fn send<T>(&mut self, msg: Message, gate: T)
+    pub fn send<T>(&mut self, msg: impl Into<Message>, gate: T)
     where
         T: IntoModuleGate,
     {
         let gate = gate.into_gate(self);
         if let Some(gate) = gate {
-            self.out_buffer.push((msg, gate))
+            self.out_buffer.push((msg.into(), gate))
         } else {
             error!(target: self.str(),"Error: Could not find gate in current module");
         }
@@ -227,9 +227,9 @@ impl ModuleCore {
     /// Enqueues a event that will trigger the [Module::handle_message] function
     /// at the given SimTime
     ///
-    pub fn schedule_at(&mut self, msg: Message, time: SimTime) {
+    pub fn schedule_at(&mut self, msg: impl Into<Message>, time: SimTime) {
         assert!(time >= SimTime::now(), "Sorry, we can not timetravel yet!");
-        self.loopback_buffer.push((msg, time))
+        self.loopback_buffer.push((msg.into(), time))
     }
 
     ///

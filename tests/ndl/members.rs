@@ -11,17 +11,14 @@ pub struct Alice(ModuleCore);
 
 impl Module for Alice {
     fn handle_message(&mut self, msg: Message) {
-        let (mut pkt, _) = msg.cast::<Packet>();
+        let mut pkt = msg.as_packet();
         info!(target: self.name(), "Received at {}: Message with content: {}", sim_time(), pkt.content::<String>().deref());
 
         if pkt.header().hop_count > 100_000 {
             // TERMINATE
         } else {
             pkt.register_hop();
-            self.send(
-                Message::new().kind(1).content_interned(pkt).build(),
-                ("netOut", 0),
-            )
+            self.send(pkt, ("netOut", 0))
         }
     }
 }
@@ -37,15 +34,11 @@ impl Module for Bob {
             drop(msg);
             info!(target: "Bob", "Dropped init msg");
             self.send(
-                Message::new()
+                Packet::new()
                     .kind(1)
-                    .content(
-                        Packet::new()
-                            .src(0x7f_00_00_01, 80)
-                            .dest(0x7f_00_00_02, 80)
-                            .content("Ping".to_string())
-                            .build(),
-                    )
+                    .src(0x7f_00_00_01, 80)
+                    .dest(0x7f_00_00_02, 80)
+                    .content("Ping".to_string())
                     .build(),
                 ("netOut", 2),
             );
@@ -57,10 +50,7 @@ impl Module for Bob {
 
             pkt.content::<String>().push('#');
 
-            self.send(
-                Message::new().kind(1).content_interned(pkt).build(),
-                ("netOut", 2),
-            );
+            self.send(pkt, ("netOut", 2));
         }
     }
 }

@@ -81,6 +81,7 @@ pub struct PacketHeader {
 
     //# Custom headers
     pub hop_count: usize,
+    pub last_node: NodeAddress,
 }
 
 #[cfg(feature = "net-ipv6")]
@@ -97,38 +98,13 @@ impl PacketHeader {
             // # IPv4 header
             src_node: src.0,
             dest_node: dest.0,
-
-            version: 4,
-            traffic_class: 0,
-            flow_label: 0,
-
             packet_length,
-            next_header: 0,
-            ttl: u8::MAX,
 
             // # TCP header
             src_port: src.1,
             dest_port: dest.1,
 
-            seq_no: 0,
-            ack_no: 0,
-            data_offset: 0,
-
-            flag_ns: false,
-            flag_cwr: false,
-            flag_ece: false,
-            flag_urg: false,
-            flag_ack: false,
-            flag_psh: false,
-            flag_rst: false,
-            flag_syn: false,
-            flag_fin: false,
-
-            window_size: 0,
-            tcp_checksum: 0,
-            urgent_ptr: 0,
-
-            hop_count: 0,
+            ..Default::default()
         }
     }
 }
@@ -183,6 +159,7 @@ impl Default for PacketHeader {
             urgent_ptr: 0,
 
             hop_count: 0,
+            last_node: 0,
         }
     }
 }
@@ -212,6 +189,7 @@ pub struct PacketHeader {
 
     //# Custom headers
     pub hop_count: usize,
+    pub last_node: NodeAddress,
 }
 
 #[cfg(not(feature = "net-ipv6"))]
@@ -228,19 +206,13 @@ impl PacketHeader {
             // # IPv4 header
             src_node: src.0,
             dest_node: dest.0,
-
-            tos: 0,
             packet_length,
-
-            ttl: u8::MAX,
 
             // # TCP header
             src_port: src.1,
             dest_port: dest.1,
-            seq_no: 0,
-            ack_no: 0,
-            window_size: 0,
-            hop_count: 0,
+
+            ..Default::default()
         }
     }
 }
@@ -276,6 +248,7 @@ impl Default for PacketHeader {
             ack_no: 0,
             window_size: 0,
             hop_count: 0,
+            last_node: 0,
         }
     }
 }
@@ -288,14 +261,19 @@ impl Default for PacketHeader {
 #[allow(unused)]
 #[derive(Debug)]
 pub struct Packet {
-    header: PacketHeader,
-    content: Option<InternedValue<'static>>,
+    pub(crate) header: PacketHeader,
+    pub(crate) message_meta: Option<MessageMetadata>,
+    pub(crate) content: Option<InternedValue<'static>>,
 }
 
 impl Packet {
     #[deprecated(since = "0.2.0", note = "PacketIDs are no longer supported")]
     pub fn id(&self) -> ! {
         unimplemented!("PacketIDs are no longer supported")
+    }
+
+    pub fn meta(&self) -> &MessageMetadata {
+        self.message_meta.as_ref().unwrap()
     }
 
     ///
@@ -356,6 +334,10 @@ impl Packet {
         self.header.seq_no = seq_no
     }
 
+    pub fn set_last_node(&mut self, last_node: NodeAddress) {
+        self.header.last_node = last_node
+    }
+
     ///
     /// Creates a new instance of self through a builder.
     ///
@@ -409,10 +391,27 @@ impl MessageBody for Packet {
     }
 }
 
+impl From<Packet> for Message {
+    fn from(mut pkt: Packet) -> Self {
+        // Take the meta away to prevent old metadata after incorrect reconstruction of packet.
+        let meta = pkt.message_meta.take().unwrap_or_default();
+        Message::new().meta(meta).content(pkt).build()
+    }
+}
+
+impl From<TypedInternedValue<'static, Packet>> for Message {
+    fn from(mut pkt: TypedInternedValue<'static, Packet>) -> Self {
+        // Take the meta away to prevent old metadata after incorrect reconstruction of packet.
+        let meta = pkt.message_meta.take().unwrap_or_default();
+        Message::new().meta(meta).content_interned(pkt).build()
+    }
+}
+
 ///
 /// A intermediary type for constructing packets.
 ///
 pub struct PacketBuilder {
+    message_builder: MessageBuilder,
     header: PacketHeader,
     content: Option<(usize, InternedValue<'static>)>,
 }
@@ -420,6 +419,7 @@ pub struct PacketBuilder {
 impl PacketBuilder {
     pub fn new() -> Self {
         Self {
+            message_builder: MessageBuilder::new(),
             header: PacketHeader::default(),
             content: None,
         }
@@ -480,9 +480,54 @@ impl PacketBuilder {
         self
     }
 
+    // MESSAGE BUILDER EXT
+
+    pub fn id(mut self, id: MessageId) -> Self {
+        self.message_builder = self.message_builder.id(id);
+        self
+    }
+
+    pub fn kind(mut self, kind: MessageKind) -> Self {
+        self.message_builder = self.message_builder.kind(kind);
+        self
+    }
+
+    pub fn timestamp(mut self, timestamp: SimTime) -> Self {
+        self.message_builder = self.message_builder.timestamp(timestamp);
+        self
+    }
+
+    pub fn receiver_module_id(mut self, receiver_module_id: ModuleId) -> Self {
+        self.message_builder = self.message_builder.receiver_module_id(receiver_module_id);
+        self
+    }
+
+    pub fn sender_module_id(mut self, sender_module_id: ModuleId) -> Self {
+        self.message_builder = self.message_builder.sender_module_id(sender_module_id);
+        self
+    }
+
+    pub fn last_gate(mut self, last_gate: GateRef) -> Self {
+        self.message_builder = self.message_builder.last_gate(last_gate);
+        self
+    }
+
+    pub fn creation_time(mut self, creation_time: SimTime) -> Self {
+        self.message_builder = self.message_builder.creation_time(creation_time);
+        self
+    }
+
+    pub fn send_time(mut self, send_time: SimTime) -> Self {
+        self.message_builder = self.message_builder.send_time(send_time);
+        self
+    }
+
+    // END
+
     pub fn build(self) -> Packet {
         // Packet { header: PacketHeader::new(src, dest, packet_length), content: () }}
         let PacketBuilder {
+            message_builder,
             mut header,
             content,
         } = self;
@@ -494,6 +539,15 @@ impl PacketBuilder {
 
         header.packet_length = byte_len as u16;
 
-        Packet { header, content }
+        let msg = message_builder.build();
+        assert!(msg.content.is_none());
+
+        let meta = msg.meta;
+
+        Packet {
+            message_meta: Some(meta),
+            header,
+            content,
+        }
     }
 }
