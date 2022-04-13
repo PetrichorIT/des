@@ -193,7 +193,7 @@ impl Display for ChildModuleSpec {
         write!(f, "{}: {} ", self.descriptor, self.ty)?;
         if let Some(ref proto) = self.proto_impl {
             write!(f, "{{ ")?;
-            for p in &proto.sorted {
+            for p in &proto.values {
                 write!(f, "{} = {}, ", p.0, p.1)?
             }
             write!(f, "}}")?;
@@ -206,19 +206,58 @@ impl Display for ChildModuleSpec {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProtoImplSpec {
     // HashMap<ident, ty>
-    pub sorted: Vec<(String, String)>,
+    pub values: Vec<(String, String)>,
 }
 
 impl ProtoImplSpec {
     pub(crate) fn get(&self, key: &str) -> Option<&String> {
-        self.sorted
+        self.values
             .iter()
             .find_map(|(k, v)| if k == key { Some(v) } else { None })
     }
 
+    pub fn sorted_according_to(mut self, ty: Option<&ModuleDef>) -> Self {
+        if let Some(ty) = ty {
+            let mut ret = Vec::with_capacity(self.values.len());
+
+            for child in ty.submodules.iter() {
+                if matches!(child.ty, TyDef::Dynamic(_)) {
+                    // Expecte impls for dynamic types
+
+                    if let Some((from, to)) = &child.desc.cluster_bounds {
+                        for idx in *from..*to {
+                            // if not found asserted elsewhere
+                            if let Some(v) = self
+                                .values
+                                .iter()
+                                .find(|v| v.0 == format!("{}[{}]", child.desc.descriptor, idx))
+                            {
+                                ret.push(v.clone());
+                            } else {
+                                // DEBUG WARN
+                            }
+                        }
+                    } else {
+                        // if not found asserted elsewhere
+                        if let Some(v) = self.values.iter().find(|v| v.0 == child.desc.descriptor) {
+                            ret.push(v.clone());
+                        } else {
+                            // DEBUG WARN
+                        }
+                    }
+                }
+            }
+
+            // assert_eq!(ret.len(), self.values.len());
+            self.values = ret;
+        }
+
+        self
+    }
+
     pub fn new(def: &ProtoImplDef) -> Self {
         Self {
-            sorted: def
+            values: def
                 .defs
                 .iter()
                 .map(|(k, v)| (k.clone(), v.clone()))

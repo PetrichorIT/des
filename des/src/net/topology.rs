@@ -99,6 +99,10 @@ impl Topology {
                         cost += channel.metrics().cost;
                     }
                     current = MrcS::clone(next_gate);
+
+                    if current.owner().id() != start.owner().id() {
+                        break;
+                    }
                 }
 
                 if *current != **start {

@@ -110,7 +110,7 @@ impl Eq for GateDescription {}
 ///
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct Gate {
     ///
     /// A descriptor of the cluster this gate belongs to.
@@ -124,10 +124,12 @@ pub struct Gate {
     /// A identifier of the channel linked to the gate chain.
     ///
     channel: Option<ChannelRefMut>,
+
     ///
     /// The next gate in the gate chain, GATE_NULL if non is existent.
     ///
     next_gate: Option<GateRef>,
+    previous_gate: Option<GateRef>,
 }
 
 impl Gate {
@@ -189,6 +191,14 @@ impl Gate {
     /// The next gate in the gate chain by reference.
     ///
     #[inline(always)]
+    pub fn previous_gate(&self) -> Option<&GateRef> {
+        self.previous_gate.as_ref()
+    }
+
+    ///
+    /// The next gate in the gate chain by reference.
+    ///
+    #[inline(always)]
     pub fn next_gate(&self) -> Option<&GateRef> {
         self.next_gate.as_ref()
     }
@@ -198,8 +208,9 @@ impl Gate {
     /// its identifier.
     ///
     #[inline(always)]
-    pub fn set_next_gate(&mut self, next_gate: GateRef) {
-        self.next_gate = Some(next_gate);
+    pub fn set_next_gate(self: &mut MrcS<Self, Mutable>, mut next_gate: GateRefMut) {
+        self.next_gate = Some(MrcS::clone(&next_gate).make_readonly());
+        next_gate.previous_gate = Some(self.clone().make_readonly());
     }
 
     ///
@@ -224,6 +235,19 @@ impl Gate {
     #[inline(always)]
     pub fn set_channel(&mut self, channel: ChannelRefMut) {
         self.channel = Some(channel)
+    }
+
+    ///
+    /// Follows the previous-gate references until a gate without a previous-gate
+    /// was found.
+    ///
+    pub fn path_start(&self) -> Option<GateRef> {
+        let mut current = self.previous_gate.as_ref()?;
+        while let Some(previous_gate) = &current.previous_gate {
+            current = previous_gate
+        }
+
+        Some(MrcS::clone(current))
     }
 
     ///
@@ -254,16 +278,31 @@ impl Gate {
         description: GateDescription,
         pos: usize,
         channel: Option<ChannelRefMut>,
-        next_gate: Option<GateRef>,
+        next_gate: Option<GateRefMut>,
     ) -> GateRefMut {
-        MrcS::new(Self {
+        let mut this = MrcS::new(Self {
             description,
             pos,
             channel,
-            next_gate,
-        })
+            next_gate: None,
+            previous_gate: None,
+        });
+
+        if let Some(next_gate) = next_gate {
+            this.set_next_gate(next_gate);
+        }
+        this
     }
 }
+
+// SOLVED ISSUE: stack overflow when comaring circular ptr
+// next_gate & previous_gate --> Custim PartialEq impl
+impl PartialEq for Gate {
+    fn eq(&self, other: &Self) -> bool {
+        self.description == other.description && self.pos == other.pos
+    }
+}
+impl Eq for Gate {}
 
 ///
 /// A trait for a type to refrence a module specific gate.

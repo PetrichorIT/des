@@ -65,7 +65,7 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> Result<TokenStream> {
 
                     if let Some(ref proto) = node.proto_impl {
                         let mut p = Punctuated::<Ident, Comma>::new();
-                        for (_descr, ty) in &proto.sorted {
+                        for (_descr, ty) in &proto.values {
                             p.push(ident!(ty));
                         }
 
@@ -110,13 +110,13 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> Result<TokenStream> {
                                 jitter: ::des::core::SimTime::from(#jitter),
                                 cost: #cost,
                             });
-                            #from_ident.set_next_gate(#to_ident.make_readonly());
+                            #from_ident.set_next_gate(#to_ident);
                             #from_ident.set_channel(channel);
                         });
                     } else {
                         token_stream.extend(quote! {
                             // assert_eq!(#from_ident.len(), #to_ident.len());
-                            #from_ident.set_next_gate(#to_ident.make_readonly());
+                            #from_ident.set_next_gate(#to_ident);
                         });
                     }
                 }

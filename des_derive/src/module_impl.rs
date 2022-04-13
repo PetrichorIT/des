@@ -259,12 +259,12 @@ fn generate_dynamic_builder(ident: Ident, attrs: &Attributes, out: &mut TokenStr
                                 jitter: ::des::core::SimTime::from(#jitter),
                                 cost: #cost,
                             });
-                            #from_ident.set_next_gate(#to_ident.make_readonly());
+                            #from_ident.set_next_gate(#to_ident);
                             #from_ident.set_channel(channel);
                         });
                     } else {
                         token_stream.extend(quote! {
-                                #from_ident.set_next_gate(#to_ident.make_readonly());
+                                #from_ident.set_next_gate(#to_ident);
                         });
                     }
                 }

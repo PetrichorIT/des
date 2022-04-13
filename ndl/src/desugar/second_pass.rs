@@ -261,6 +261,15 @@ pub fn second_pass<'a>(
                 desc,
                 proto_impl,
             } = child;
+
+            // Solved issue:
+            // Proto-impl operand order must match child definition order
+            // to ensure safe generics.
+            let proto_impl = proto_impl
+                .as_ref()
+                .map(ProtoImplSpec::new)
+                .map(|pimpl| pimpl.sorted_according_to(gtyctx.module(ty.inner())));
+
             if let Some((from_id, to_id)) = desc.cluster_bounds {
                 // Desugar macro
                 for id in from_id..=to_id {
@@ -268,7 +277,7 @@ pub fn second_pass<'a>(
                         loc: *loc,
                         descriptor: format!("{}[{}]", desc.descriptor, id),
                         ty: TySpec::new(ty),
-                        proto_impl: proto_impl.as_ref().map(ProtoImplSpec::new),
+                        proto_impl: proto_impl.clone(),
                     })
                 }
             } else {
@@ -277,7 +286,7 @@ pub fn second_pass<'a>(
                     loc: *loc,
                     descriptor: desc.descriptor.clone(),
                     ty: TySpec::new(ty),
-                    proto_impl: proto_impl.as_ref().map(ProtoImplSpec::new),
+                    proto_impl: proto_impl,
                 })
             }
         }

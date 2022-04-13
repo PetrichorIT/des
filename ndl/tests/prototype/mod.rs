@@ -326,7 +326,7 @@ fn par_pimpl_no_ty_ident() {
             .proto_impl
             .as_ref()
             .unwrap()
-            .sorted
+            .values
             .len(),
         1
     );
@@ -354,7 +354,7 @@ fn par_pimpl_no_ty_ident() {
             .proto_impl
             .as_ref()
             .unwrap()
-            .sorted
+            .values
             .len(),
         1
     );

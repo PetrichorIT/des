@@ -251,12 +251,7 @@ pub trait StaticModuleCore: Deref<Target = ModuleCore> + DerefMut<Target = Modul
         let mut ids = Vec::new();
 
         for (i, item) in next_hops.into_iter().enumerate() {
-            let gate = Gate::new(
-                descriptor.clone(),
-                i,
-                channel.clone(),
-                item.map(MrcS::make_readonly),
-            );
+            let gate = Gate::new(descriptor.clone(), i, channel.clone(), item);
             ids.push(MrcS::clone(&gate));
 
             self.deref_mut().gates.push(gate);

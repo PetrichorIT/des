@@ -108,7 +108,9 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
 
         assert!(
             current_gate.service_type() != GateServiceType::Output,
-            "Messages cannot be forwarded to modules on Output gates"
+            "Messages cannot be forwarded to modules on Output gates. (Gate '{}' owned by Module '{}')",
+            current_gate.str(),
+            current_gate.owner().str()
         );
 
         info!(
