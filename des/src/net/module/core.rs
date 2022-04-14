@@ -36,8 +36,11 @@ pub struct ModuleCore {
     /// A collection of all gates register to the current module
     pub(crate) gates: Vec<GateRefMut>,
 
+    /// A offset for the out_buffer,
+    pub(crate) processing_time_delay: SimTime,
+
     /// A buffer of messages to be send out, after the current handle messsage terminates.
-    pub(crate) out_buffer: Vec<(Message, GateRef)>,
+    pub(crate) out_buffer: Vec<(Message, GateRef, SimTime)>,
 
     /// A buffer of wakeup calls to be enqueued, after the current handle message terminates.
     pub(crate) loopback_buffer: Vec<(Message, SimTime)>,
@@ -161,6 +164,7 @@ impl ModuleCore {
             id: ModuleId::gen(),
             path,
             gates: Vec::new(),
+            processing_time_delay: SimTime::ZERO,
             out_buffer: Vec::new(),
             loopback_buffer: Vec::new(),
             activity_period: SimTime::ZERO,
@@ -183,6 +187,7 @@ impl ModuleCore {
             id: ModuleId::gen(),
             path,
             gates: Vec::new(),
+            processing_time_delay: SimTime::ZERO,
             out_buffer: Vec::new(),
             loopback_buffer: Vec::new(),
             activity_period: SimTime::ZERO,
@@ -208,6 +213,15 @@ impl ModuleCore {
 
 impl ModuleCore {
     ///
+    /// Adds the duration to the processing time offset.
+    /// All messages send after this time will be delayed by the
+    /// processing time delay.
+    ///
+    pub fn processing_time(&mut self, duration: SimTime) {
+        self.processing_time_delay += duration;
+    }
+
+    ///
     /// Sends a message onto a given gate. This operation will be performed after
     /// handle_message finished.
     ///
@@ -217,7 +231,8 @@ impl ModuleCore {
     {
         let gate = gate.into_gate(self);
         if let Some(gate) = gate {
-            self.out_buffer.push((msg.into(), gate))
+            self.out_buffer
+                .push((msg.into(), gate, self.processing_time_delay))
         } else {
             error!(target: self.str(),"Error: Could not find gate in current module");
         }
@@ -225,10 +240,26 @@ impl ModuleCore {
 
     ///
     /// Enqueues a event that will trigger the [Module::handle_message] function
+    /// in duration seconds, shifted by the processing time delay.
+    ///
+    pub fn schedule_in(&mut self, msg: impl Into<Message>, duration: SimTime) {
+        assert!(
+            duration >= SimTime::ZERO,
+            "While we could maybe do this, we should not timetravel yet!"
+        );
+        self.loopback_buffer
+            .push((msg.into(), self.processing_time_delay + duration))
+    }
+
+    ///
+    /// Enqueues a event that will trigger the [Module::handle_message] function
     /// at the given SimTime
     ///
     pub fn schedule_at(&mut self, msg: impl Into<Message>, time: SimTime) {
-        assert!(time >= SimTime::now(), "Sorry, we can not timetravel yet!");
+        assert!(
+            time >= SimTime::now() + self.processing_time_delay,
+            "Sorry, you can not timetravel as well!"
+        );
         self.loopback_buffer.push((msg.into(), time))
     }
 

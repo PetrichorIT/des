@@ -146,6 +146,7 @@ impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
 
         let mut module = MrcS::clone(&self.module);
 
+        module.prepare_buffers();
         module.handle_message(message);
         module.handle_buffers(rt);
     }
@@ -163,6 +164,7 @@ impl<A> Event<NetworkRuntime<A>> for CoroutineMessageEvent {
         // It can be the case that this is wrong .. if handle_message at invalidated activity
         // but a event still remains in queue.
         if dur != SimTime::ZERO && self.module.module_core().activity_active {
+            self.module.prepare_buffers();
             self.module.activity();
 
             let still_active = self.module.module_core().activity_active;
@@ -217,6 +219,7 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
                         target: &format!("Module: {}", module.str()),
                         "Calling at_sim_start({}).", stage
                     );
+                    module.prepare_buffers();
                     module.at_sim_start(stage);
                     module.handle_buffers(rt);
                 }
@@ -230,6 +233,10 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
 //
 
 impl ModuleRefMut {
+    fn prepare_buffers(&mut self) {
+        self.processing_time_delay = SimTime::ZERO;
+    }
+
     fn handle_buffers<A>(&mut self, rt: &mut Runtime<NetworkRuntime<A>>) {
         // Check whether a new activity cycle must be initated
         let enqueue_actitivy_msg = self.module_core().activity_period != SimTime::ZERO
@@ -240,7 +247,7 @@ impl ModuleRefMut {
         let self_id = self.id();
 
         // Send gate events from the 'send' method calls
-        for (mut message, gate) in self.module_core_mut().out_buffer.drain(..) {
+        for (mut message, gate, offset) in self.module_core_mut().out_buffer.drain(..) {
             assert!(
                 gate.service_type() != GateServiceType::Input,
                 "To send messages onto a gate it must have service type of 'Output' or 'Undefined'"
@@ -252,7 +259,7 @@ impl ModuleRefMut {
                     gate,
                     message,
                 }),
-                SimTime::now(),
+                SimTime::now() + offset,
             )
         }
 
