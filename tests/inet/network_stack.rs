@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use des::prelude::*;
-use des_derive::Module;
 use log::info;
 
 use crate::routing_deamon::RandomRoutingDeamon;

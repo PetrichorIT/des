@@ -7,9 +7,10 @@ version = "0.2.1"
 
 [features]
 internal-metrics = []
-net = []
+net = [ "dep:des_derive" ]
 net-ipv6 = ["net"]
 simtime-u128 = []
+# cqueue = [ "dep:cqueue" ]
 
 
 [dependencies]
@@ -20,7 +21,7 @@ rand = {version = "*", features = ["std_rng"]}
 termcolor = "1.1.2"
 unic-emoji-char = "0.9.0"
 unicode-xid = "0.2.0"
-cqueue = { path = "../cqueue", optional = true }
 
-[dev-dependencies]
-des_derive = {path = "../des_derive"}
+cqueue = { path = "../cqueue", optional = true }
+des_derive = { path = "../des_derive", optional = true }
+

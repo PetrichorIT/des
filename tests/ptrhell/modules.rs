@@ -1,6 +1,4 @@
 use des::prelude::*;
-use des_derive::Module;
-
 #[derive(Debug, Module)]
 #[ndl_workspace = "tests/ptrhell"]
 pub struct Alice(ModuleCore);

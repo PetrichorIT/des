@@ -1,5 +1,4 @@
 use des::prelude::*;
-use des_derive::Module;
 
 use log::info;
 

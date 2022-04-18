@@ -646,7 +646,6 @@ name = "tests"
 version = "0.1.0"
 dependencies = [
  "des",
- "des_derive",
  "log",
  "ndl",
  "rand",

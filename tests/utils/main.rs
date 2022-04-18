@@ -1,5 +1,4 @@
 use des::prelude::*;
-use des_derive::Network;
 
 mod members;
 use members::*;

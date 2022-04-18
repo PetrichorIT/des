@@ -5,8 +5,6 @@ use des::{
 };
 use log::info;
 
-use des_derive::Module;
-
 #[derive(Module)]
 pub struct NetworkNode {
     core: ModuleCore,
