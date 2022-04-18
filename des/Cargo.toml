@@ -9,7 +9,6 @@ version = "0.2.1"
 internal-metrics = []
 net = []
 net-ipv6 = ["net"]
-pub-interning = []
 simtime-u128 = []
 cqueue = []
 

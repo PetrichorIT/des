@@ -1,4 +1,6 @@
-use crate::core::interning::*;
+use std::any::Any;
+use std::rc::Rc;
+
 use crate::core::*;
 use crate::net::*;
 
@@ -42,7 +44,7 @@ pub type PortAddress = u16;
 ///
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[cfg(feature = "net-ipv6")]
 pub struct PacketHeader {
     // # Ipv6 Header
@@ -169,7 +171,7 @@ impl Default for PacketHeader {
 ///
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[cfg(not(feature = "net-ipv6"))]
 pub struct PacketHeader {
     // # IPv4 header
@@ -259,11 +261,11 @@ impl Default for PacketHeader {
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 #[allow(unused)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Packet {
     pub(crate) header: PacketHeader,
     pub(crate) message_meta: Option<MessageMetadata>,
-    pub(crate) content: Option<InternedValue<'static>>,
+    pub(crate) content: Option<Rc<dyn Any>>,
 }
 
 impl Packet {
@@ -356,14 +358,15 @@ impl Packet {
     /// Note that DES guarntees that the data refernced by ptr will not
     /// be freed until this function is called, and ownership is thereby moved..
     ///
-    pub fn decapsulate<T: 'static + MessageBody>(
-        self,
-    ) -> (TypedInternedValue<'static, T>, PacketHeader) {
-        let Self {
-            content, header, ..
-        } = self;
-        (content.unwrap().cast(), header)
-    }
+
+    // pub fn decapsulate<T: 'static + MessageBody>(
+    //     self,
+    // ) -> (TypedInternedValue<'static, T>, PacketHeader) {
+    //     let Self {
+    //         content, header, ..
+    //     } = self;
+    //     (content.unwrap().cast(), header)
+    // }
 
     ///
     /// Extracts the message casting the stored ptr
@@ -376,8 +379,23 @@ impl Packet {
     /// Note that DES guarntees that the data refernced by ptr will not
     /// be freed until this function is called, and ownership is thereby moved..
     ///
-    pub fn content<T: 'static + MessageBody>(&self) -> TypedInternedValue<'static, T> {
-        self.content.clone().unwrap().cast()
+
+    pub fn try_content<T: 'static + MessageBody>(&self) -> Option<&T> {
+        Some(self.content.as_ref()?.downcast_ref::<T>()?)
+    }
+
+    pub fn content<T: 'static + MessageBody>(&self) -> &T {
+        self.try_content().expect("Failed to unwrap")
+    }
+
+    pub fn try_content_mut<T: 'static + MessageBody>(&mut self) -> Option<&mut T> {
+        let mut_rc = self.content.as_mut()?;
+        let mut_any = Rc::get_mut(mut_rc)?;
+        Some(mut_any.downcast_mut()?)
+    }
+
+    pub fn content_mut<T: 'static + MessageBody>(&mut self) -> &mut T {
+        self.try_content_mut().expect("Failed to unwrap")
     }
 }
 
@@ -399,13 +417,13 @@ impl From<Packet> for Message {
     }
 }
 
-impl From<TypedInternedValue<'static, Packet>> for Message {
-    fn from(mut pkt: TypedInternedValue<'static, Packet>) -> Self {
-        // Take the meta away to prevent old metadata after incorrect reconstruction of packet.
-        let meta = pkt.message_meta.take().unwrap_or_default();
-        Message::new().meta(meta).content_interned(pkt).build()
-    }
-}
+// impl From<TypedInternedValue<'static, Packet>> for Message {
+//     fn from(mut pkt: TypedInternedValue<'static, Packet>) -> Self {
+//         // Take the meta away to prevent old metadata after incorrect reconstruction of packet.
+//         let meta = pkt.message_meta.take().unwrap_or_default();
+//         Message::new().meta(meta).content_interned(pkt).build()
+//     }
+// }
 
 ///
 /// A intermediary type for constructing packets.
@@ -413,7 +431,7 @@ impl From<TypedInternedValue<'static, Packet>> for Message {
 pub struct PacketBuilder {
     message_builder: MessageBuilder,
     header: PacketHeader,
-    content: Option<(usize, InternedValue<'static>)>,
+    content: Option<(usize, Rc<dyn Any>)>,
 }
 
 impl PacketBuilder {
@@ -467,16 +485,16 @@ impl PacketBuilder {
         T: 'static + MessageBody,
     {
         let byte_len = content.byte_len();
-        let interned = RTC.as_ref().as_ref().unwrap().interner.intern(content);
+        let interned = Rc::new(content);
         self.content = Some((byte_len, interned));
         self
     }
 
-    pub fn content_interned<T>(mut self, content: TypedInternedValue<'static, T>) -> Self
+    pub fn content_interned<T>(mut self, content: Rc<T>) -> Self
     where
         T: 'static + MessageBody,
     {
-        self.content = Some((content.byte_len(), content.uncast()));
+        self.content = Some((content.byte_len(), content));
         self
     }
 

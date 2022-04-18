@@ -49,6 +49,6 @@ path = "proto/main.rs"
 des = {path = "../des", features = ["net", "cqueue"]}
 des_derive = {path = "../des_derive"}
 ndl = {path = "../ndl"}
-log = {version = "*", features = ["max_level_error"]}
+log = {version = "*", features = ["max_level_warn"]}
 # log = "*"
 rand = "*"

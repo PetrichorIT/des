@@ -1,11 +1,15 @@
 use std::{
+    any::Any,
     collections::{LinkedList, VecDeque},
     fmt::Debug,
+    rc::Rc,
 };
 
 use crate::core::*;
 use crate::net::*;
-use crate::{core::interning::*, util::MrcS};
+use crate::util::MrcS;
+
+use log::warn;
 
 ///
 /// A ID that defines the meaning of the message in the simulation context.
@@ -98,7 +102,7 @@ impl Default for MessageMetadata {
 pub struct Message {
     pub(crate) meta: MessageMetadata,
 
-    pub(crate) content: Option<InternedValue<'static>>,
+    pub(crate) content: Option<Rc<dyn Any>>,
     pub(crate) bit_len: usize,
     pub(crate) byte_len: usize,
 }
@@ -137,18 +141,52 @@ impl Message {
     /// Note that DES guarntees that the data refernced by ptr will not
     /// be freed until this function is called, and ownership is thereby moved..
     ///
-    pub fn cast<T: MessageBody>(self) -> (TypedInternedValue<'static, T>, MessageMetadata) {
+
+    pub fn try_cast<T: 'static + MessageBody>(self) -> Option<(T, MessageMetadata)> {
         let Message { meta, content, .. } = self;
-        (content.unwrap().cast(), meta)
+        let content = match content?.downcast::<T>() {
+            Ok(c) => c,
+            Err(_) => return None,
+        };
+
+        let content = match Rc::try_unwrap(content) {
+            Ok(c) => c,
+            //
+            Err(c) => {
+                warn!(target: "des", "Multiple messages refered to the same content: Cloned content at `try_cast`.");
+                (*c).clone()
+            }
+        };
+
+        Some((content, meta))
+    }
+
+    pub fn cast<T: 'static + MessageBody>(self) -> (T, MessageMetadata) {
+        self.try_cast().expect("Could not cast to type T")
     }
 
     ///
     /// A special cast for casting values that are packets.
     ///
-    pub fn as_packet(self) -> TypedInternedValue<'static, Packet> {
-        let (mut pkt, meta) = self.cast::<Packet>();
+    ///
+
+    pub fn try_as_packet(self) -> Option<Packet> {
+        let Message { meta, content, .. } = self;
+        // SAFTY:
+        // This packet may contain a value that is used elsewhere,
+        // but the metadate is used exclusivly.
+        let pkt = content.as_ref()?.downcast_ref::<Packet>().unwrap();
+
+        // This packet holds a reference to the same packet content but to
+        // use message metadata & packet metadata ecxlusivly, new packets is created.
+        let mut pkt: Packet = pkt.clone();
         pkt.message_meta = Some(meta);
-        pkt
+
+        Some(pkt)
+    }
+
+    pub fn as_packet(self) -> Packet {
+        self.try_as_packet().expect("Could not cast self to packet")
     }
 
     ///
@@ -165,10 +203,7 @@ impl Message {
     ///
     #[inline(always)]
     pub fn can_cast<T: 'static + MessageBody>(&self) -> bool {
-        self.content
-            .as_ref()
-            .map(|v| v.can_cast::<T>())
-            .unwrap_or(false)
+        self.content.as_ref().map(|v| v.is::<T>()).unwrap_or(false)
     }
 }
 
@@ -207,7 +242,7 @@ impl Debug for Message {
 ///
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-pub trait MessageBody {
+pub trait MessageBody: Clone {
     ///
     /// The length of the message body in bytes.
     ///
@@ -273,7 +308,10 @@ impl<T> CustomSizeBody<T> {
     }
 }
 
-impl<T> MessageBody for CustomSizeBody<T> {
+impl<T> MessageBody for CustomSizeBody<T>
+where
+    T: Clone,
+{
     fn byte_len(&self) -> usize {
         self.bit_len / 8
     }
@@ -339,7 +377,7 @@ impl<T: MessageBody> MessageBody for LinkedList<T> {
 
 // [T]
 
-impl<T: MessageBody> MessageBody for [T] {
+impl<T: MessageBody> MessageBody for &[T] {
     fn byte_len(&self) -> usize {
         self.iter().fold(0, |acc, v| acc + v.byte_len())
     }
@@ -350,7 +388,7 @@ impl<T: MessageBody> MessageBody for [T] {
 ///
 pub struct MessageBuilder {
     pub(crate) meta: MessageMetadata,
-    pub(crate) content: Option<(usize, usize, InternedValue<'static>)>,
+    pub(crate) content: Option<(usize, usize, Rc<dyn Any>)>,
 }
 
 impl MessageBuilder {
@@ -412,16 +450,16 @@ impl MessageBuilder {
     {
         let bit_len = content.bit_len();
         let byte_len = content.byte_len();
-        let interned = RTC.as_ref().as_ref().unwrap().interner.intern(content);
+        let interned = Rc::new(content);
         self.content = Some((bit_len, byte_len, interned));
         self
     }
 
-    pub fn content_interned<T>(mut self, content: TypedInternedValue<'static, T>) -> Self
+    pub fn content_boxed<T>(mut self, content: Rc<T>) -> Self
     where
         T: 'static + MessageBody,
     {
-        self.content = Some((content.bit_len(), content.byte_len(), content.uncast()));
+        self.content = Some((content.bit_len(), content.byte_len(), content));
         self
     }
 

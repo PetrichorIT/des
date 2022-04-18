@@ -15,7 +15,7 @@ impl Module for Alice {
 
     fn handle_message(&mut self, msg: Message) {
         let (msg, head) = msg.cast::<usize>();
-        println!("Received msg: {} - {:?}", *msg, head);
+        println!("Received msg: {} - {:?}", msg, head);
     }
 }
 
@@ -27,9 +27,9 @@ impl Module for Bob {
     fn handle_message(&mut self, msg: Message) {
         let (msg, head) = msg.cast::<usize>();
 
-        println!("Received msg: {} - {:?}", *msg, head);
+        println!("Received msg: {} - {:?}", msg, head);
 
-        let msg = Message::new().kind(2).content_interned(msg).build();
+        let msg = Message::new().kind(2).content(msg).build();
         self.send(msg, ("netOut", 0))
     }
 }

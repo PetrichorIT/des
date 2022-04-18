@@ -1,5 +1,5 @@
 use crate::{
-    core::{event::EventId, interning::Interner, SimTime, StandardLogger},
+    core::{event::EventId, SimTime, StandardLogger},
     prelude::Mrc,
     util::SyncWrap,
 };
@@ -60,9 +60,6 @@ pub(crate) struct RuntimeCore {
     pub itr: usize,
     pub max_itr: usize,
 
-    // interning
-    pub interner: Interner,
-
     // Misc
     pub rng: StdRng,
 }
@@ -83,8 +80,6 @@ impl RuntimeCore {
             event_id,
             itr,
             max_itr,
-
-            interner: Interner::new(),
 
             rng,
         };

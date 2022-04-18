@@ -7,14 +7,6 @@ mod logger;
 mod runtime;
 mod sim_time;
 
-// # Feature "pubintering"
-
-#[cfg(not(feature = "pub-interning"))]
-pub(crate) mod interning;
-
-#[cfg(feature = "pub-interning")]
-pub mod interning;
-
 //
 // # Exposed publics
 //

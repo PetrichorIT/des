@@ -385,7 +385,6 @@ where
 
         if self.future_event_set.is_empty() {
             let time = self.sim_time();
-            self.core().interner.fincheck();
 
             println!("\u{23A1}");
             println!("\u{23A2} Simulation ended");
@@ -410,7 +409,6 @@ where
             }
         } else {
             let time = self.sim_time();
-            self.core().interner.fincheck();
 
             println!("\u{23A1}");
             println!("\u{23A2} Simulation ended prematurly");

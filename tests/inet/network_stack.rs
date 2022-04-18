@@ -65,7 +65,7 @@ impl Module for NetworkStack {
             let msg = Message::new()
                 .kind(2)
                 .timestamp(SimTime::now())
-                .content_interned(pkt)
+                .content(pkt)
                 .build();
             // let msg = Message::legacy_new_interned(0, 2, self.id(), SimTime::now(), pkt);
             self.send(msg, route);
@@ -84,7 +84,7 @@ impl Module for NetworkStack {
             let msg = Message::new()
                 .kind(2)
                 .timestamp(SimTime::now())
-                .content_interned(pkt)
+                .content(pkt)
                 .build();
             // let msg = Message::legacy_new_interned(0, 2, self.id(), SimTime::now(), pkt);
             self.send(msg, gate_id);
