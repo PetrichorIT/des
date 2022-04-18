@@ -1,0 +1,2 @@
+- Improved performance to log n in buckets
+- Evaluate parallel processing
