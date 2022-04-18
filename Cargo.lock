@@ -53,15 +53,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4a45a46ab1f2412e53d3a0ade76ffad2025804294569aae387231a0cd6e0899"
 
 [[package]]
-name = "calender_queue"
-version = "0.1.0"
-dependencies = [
- "criterion",
- "num-traits",
- "rand",
-]
-
-[[package]]
 name = "cast"
 version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -89,6 +80,15 @@ dependencies = [
  "textwrap",
  "unicode-width",
  "vec_map",
+]
+
+[[package]]
+name = "cqueue"
+version = "0.1.0"
+dependencies = [
+ "criterion",
+ "num-traits",
+ "rand",
 ]
 
 [[package]]
@@ -198,7 +198,7 @@ dependencies = [
 name = "des"
 version = "0.2.1"
 dependencies = [
- "calender_queue",
+ "cqueue",
  "des_derive",
  "lazy_static",
  "log",
