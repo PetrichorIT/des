@@ -1,6 +1,6 @@
 use log::{info, warn};
 
-use crate::{core::*, create_event_set, net::*, util::MrcS};
+use crate::{core::*, create_event_set, net::*, util::*};
 
 create_event_set!(
     ///
@@ -120,7 +120,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
             current_gate.owner().id()
         );
 
-        let module = MrcS::clone(current_gate.owner());
+        let module = PtrWeakMut::clone(current_gate.owner());
         rt.add_event(
             NetEvents::HandleMessageEvent(HandleMessageEvent { module, message }),
             SimTime::now(),
@@ -129,7 +129,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
 }
 
 pub struct HandleMessageEvent {
-    pub module: ModuleRefMut,
+    pub module: PtrWeakMut<dyn Module>,
     pub message: Message,
 }
 
@@ -144,7 +144,7 @@ impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
             message.str()
         );
 
-        let mut module = MrcS::clone(&self.module);
+        let mut module = PtrWeakMut::clone(&self.module);
 
         module.prepare_buffers();
         module.handle_message(message);
@@ -153,7 +153,7 @@ impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
 }
 
 pub struct CoroutineMessageEvent {
-    module: ModuleRefMut,
+    module: PtrWeakMut<dyn Module>,
 }
 
 impl<A> Event<NetworkRuntime<A>> for CoroutineMessageEvent {
@@ -173,7 +173,7 @@ impl<A> Event<NetworkRuntime<A>> for CoroutineMessageEvent {
             // not schedule a new Coroutine since either:
             // - state remains stable since allready init
             // - activity deactivated.
-            MrcS::clone(&self.module).handle_buffers(rt);
+            PtrWeakMut::clone(&self.module).handle_buffers(rt);
 
             if still_active {
                 rt.add_event_in(
@@ -213,7 +213,7 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
         for stage in 0..max_stage {
             // Direct indexing since rt must be borrowed mutably in handle_buffers.
             for i in 0..rt.app.modules().len() {
-                let mut module = MrcS::clone(&rt.app.modules()[i]);
+                let mut module = PtrWeakMut::from_strong(&rt.app.modules()[i]);
                 if stage < module.num_sim_start_stages() {
                     info!(
                         target: &format!("Module: {}", module.str()),
@@ -232,7 +232,7 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
 // # Helper functions
 //
 
-impl ModuleRefMut {
+impl PtrWeakMut<dyn Module> {
     fn prepare_buffers(&mut self) {
         self.processing_time_delay = SimTime::ZERO;
     }
@@ -263,13 +263,13 @@ impl ModuleRefMut {
             )
         }
 
-        let mref = MrcS::clone(self);
+        let mref = PtrWeakMut::clone(self);
 
         // Send loopback events from 'scheduleAt'
         for (message, time) in self.module_core_mut().loopback_buffer.drain(..) {
             rt.add_event(
                 NetEvents::HandleMessageEvent(HandleMessageEvent {
-                    module: MrcS::clone(&mref),
+                    module: PtrWeakMut::clone(&mref),
                     message,
                 }),
                 time,

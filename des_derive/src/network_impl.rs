@@ -70,11 +70,11 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> Result<TokenStream> {
                         }
 
                         token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                            let mut #ident: ::des::util::Mrc<#ty> = #ty::build_named::<Self, #p>(#descriptor.parse().unwrap(), rt);
+                            let mut #ident: ::des::util::PtrMut<#ty> = #ty::build_named::<Self, #p>(#descriptor.parse().unwrap(), rt);
                         });
                     } else {
                         token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                            let mut #ident: ::des::util::Mrc<#ty> = #ty::build_named(#descriptor.parse().unwrap(), rt);
+                            let mut #ident: ::des::util::PtrMut<#ty> = #ty::build_named(#descriptor.parse().unwrap(), rt);
                         })
                     }
                 }

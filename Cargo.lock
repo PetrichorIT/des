@@ -196,7 +196,7 @@ dependencies = [
 
 [[package]]
 name = "des"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "cqueue",
  "des_derive",

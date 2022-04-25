@@ -1,6 +1,10 @@
 use std::any::TypeId;
 
-use crate::{net::NetworkRuntimeGlobals, prelude::*, util::MrcS};
+use crate::{
+    net::NetworkRuntimeGlobals,
+    prelude::*,
+    util::{MrcS, PtrMut},
+};
 
 macro_rules! auto_impl_static {
     ($ident: ident) => {
@@ -51,7 +55,7 @@ impl NameableModule for Child {
 impl Child {
     fn inc(&mut self, amount: usize) {
         self.counter += amount;
-        self.parent_mut::<Parent>().unwrap().acummulated_counter += amount;
+        self.parent_mut_as::<Parent>().unwrap().acummulated_counter += amount;
     }
 }
 
@@ -72,9 +76,9 @@ auto_impl_static!(GrandChild);
 
 #[derive(Debug)]
 struct TestCase {
-    parent: Mrc<Parent>,
-    children: Vec<Mrc<Child>>,
-    grand_children: Vec<Mrc<GrandChild>>,
+    parent: PtrMut<Parent>,
+    children: Vec<PtrMut<Child>>,
+    grand_children: Vec<PtrMut<GrandChild>>,
 }
 
 impl TestCase {
@@ -84,7 +88,7 @@ impl TestCase {
             MrcS::new(NetworkRuntimeGlobals::new()),
         );
 
-        let mut parent = Mrc::new(Parent::named(core));
+        let mut parent = Parent::named_root(core);
 
         let mut children = vec![
             Child::named_with_parent("c1", &mut parent),
@@ -125,28 +129,25 @@ fn test_parent_ptr() {
     println!("{:?}", case.children[0]);
 
     assert_eq!(
-        case.children[0].parent::<Parent>().unwrap().id(),
+        case.children[0].parent_as::<Parent>().unwrap().id(),
         case.parent.id()
     );
+    assert_eq!(case.children[1].parent().unwrap().id(), case.parent.id());
     assert_eq!(
-        case.children[1].parent::<Parent>().unwrap().id(),
-        case.parent.id()
-    );
-    assert_eq!(
-        case.children[2].parent::<Parent>().unwrap().id(),
+        case.children[2].parent_as::<Parent>().unwrap().id(),
         case.parent.id()
     );
 
     assert_eq!(
-        case.grand_children[0].parent::<Child>().unwrap().id(),
+        case.grand_children[0].parent_as::<Child>().unwrap().id(),
         case.children[0].id()
     );
     assert_eq!(
-        case.grand_children[1].parent::<Child>().unwrap().id(),
+        case.grand_children[1].parent_as::<Child>().unwrap().id(),
         case.children[0].id()
     );
     assert_eq!(
-        case.grand_children[2].parent::<Child>().unwrap().id(),
+        case.grand_children[2].parent().unwrap().id(),
         case.children[1].id()
     );
 }

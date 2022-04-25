@@ -31,6 +31,14 @@ pub use crate::metrics::StdDev;
 
 pub use crate::util::Mrc;
 
+pub use crate::util::Ptr;
+pub use crate::util::PtrMut;
+pub use crate::util::PtrConst;
+
+pub use crate::util::PtrWeak;
+pub use crate::util::PtrWeakMut;
+pub use crate::util::PtrWeakConst;
+
 // Do not export StatedMrc only for internal use
 
 //

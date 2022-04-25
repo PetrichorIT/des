@@ -5,10 +5,9 @@ mod ndl;
 #[cfg(test)]
 mod tests;
 
-use crate::{
-    net::*,
-    util::{MrcS, Mutable, ReadOnly, UntypedMrc},
-};
+use log::warn;
+
+use crate::{net::*, util::*};
 
 use std::ops::{Deref, DerefMut};
 
@@ -19,12 +18,12 @@ pub use self::ndl::*;
 ///
 /// A readonly reference to a module.
 ///
-pub type ModuleRef = MrcS<dyn Module, ReadOnly>;
+pub type ModuleRef = PtrConst<dyn Module>;
 
 ///
 /// A mutable reference to a module.
 ///
-pub type ModuleRefMut = MrcS<dyn Module, Mutable>;
+pub type ModuleRefMut = PtrMut<dyn Module>;
 
 ///
 /// A set of user defined functions for customizing the
@@ -175,7 +174,7 @@ pub trait StaticModuleCore: Deref<Target = ModuleCore> + DerefMut<Target = Modul
     /// Creates a gate on the current module, returning its ID.
     ///
     fn create_gate<A>(
-        self: &mut MrcS<Self, Mutable>,
+        self: &mut PtrMut<Self>,
         name: &str,
         typ: GateServiceType,
         rt: &mut NetworkRuntime<A>,
@@ -191,7 +190,7 @@ pub trait StaticModuleCore: Deref<Target = ModuleCore> + DerefMut<Target = Modul
     /// next hop, returning the ID of the created gate.
     ///
     fn create_gate_into<A>(
-        self: &mut MrcS<Self, Mutable>,
+        self: &mut PtrMut<Self>,
         name: &str,
         typ: GateServiceType,
         channel: Option<ChannelRefMut>,
@@ -209,7 +208,7 @@ pub trait StaticModuleCore: Deref<Target = ModuleCore> + DerefMut<Target = Modul
     /// Createas a cluster of gates on the current module returning their IDs.
     ///
     fn create_gate_cluster<A>(
-        self: &mut MrcS<Self, Mutable>,
+        self: &mut PtrMut<Self>,
         name: &str,
         size: usize,
         typ: GateServiceType,
@@ -230,7 +229,7 @@ pub trait StaticModuleCore: Deref<Target = ModuleCore> + DerefMut<Target = Modul
     /// This function will panic should size != next_hops.len()
     ///
     fn create_gate_cluster_into<A>(
-        self: &mut MrcS<Self, Mutable>,
+        self: &mut PtrMut<Self>,
         name: &str,
         size: usize,
         typ: GateServiceType,
@@ -246,7 +245,7 @@ pub trait StaticModuleCore: Deref<Target = ModuleCore> + DerefMut<Target = Modul
             "The value 'next_hops' must be equal to the size of the gate cluster"
         );
 
-        let mrc = MrcS::clone(self);
+        let mrc = PtrWeakMut::from_strong(self);
         let descriptor = GateDescription::new(name.to_owned(), size, mrc, typ);
         let mut ids = Vec::new();
 
@@ -264,19 +263,28 @@ pub trait StaticModuleCore: Deref<Target = ModuleCore> + DerefMut<Target = Modul
     /// Adds the given module as a child module, automaticlly seting the childs
     /// parent property .
     ///
-    fn add_child<T>(self: &mut MrcS<Self, Mutable>, child: &mut MrcS<T, Mutable>)
+    fn add_child<T>(self: &mut PtrMut<Self>, child: &mut PtrMut<T>)
     where
         T: 'static + StaticModuleCore,
         Self: 'static + Sized,
     {
-        let self_clone = MrcS::clone(self);
-        child.deref_mut().parent = Some(UntypedMrc::new(self_clone));
+        // Self refs mus be set
+        if self.module_core_mut().self_ref.is_none() {
+            warn!(target: self.str(), "Setting self_ref at child assignal (self = parent)");
+            self.module_core_mut().self_ref = Some(PtrWeakVoid::new(PtrWeakMut::from_strong(self)))
+        }
+        if child.module_core_mut().self_ref.is_none() {
+            warn!(target: child.str(), "Setting self_ref at child assignal (self = child)");
+            child.module_core_mut().self_ref =
+                Some(PtrWeakVoid::new(PtrWeakMut::from_strong(child)))
+        }
+
+        let self_clone = PtrWeakMut::from_strong(self);
+        child.deref_mut().parent = Some(self_clone);
 
         let child_name = child.name().to_string();
-        let owned_child = MrcS::clone(child);
-        self.deref_mut()
-            .children
-            .insert(child_name, UntypedMrc::new(owned_child));
+        let owned_child = PtrWeakMut::from_strong(child);
+        self.deref_mut().children.insert(child_name, owned_child);
     }
 }
 

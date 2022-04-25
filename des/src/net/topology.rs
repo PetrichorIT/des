@@ -80,7 +80,7 @@ impl Topology {
         // Setup nodes
         for module in modules {
             self.nodes.push(NodeDefinition {
-                node: MrcS::clone(module),
+                node: PtrMut::clone(module),
                 edges: Vec::new(),
             });
         }

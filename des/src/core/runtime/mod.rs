@@ -722,12 +722,12 @@ impl<A> Runtime<NetworkRuntime<A>> {
     ///
     pub fn handle_message_on(
         &mut self,
-        module: ModuleRefMut,
+        module: impl Into<PtrWeakMut<dyn Module>>,
         message: impl Into<Message>,
         time: SimTime,
     ) {
         let event = HandleMessageEvent {
-            module,
+            module: module.into(),
             message: message.into(),
         };
 

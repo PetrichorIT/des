@@ -207,7 +207,7 @@ fn generate_dynamic_builder(ident: Ident, attrs: &Attributes, out: &mut TokenStr
                         }
                     };
                     token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                        let mut #ident: ::des::util::Mrc<#ty> = #ty::build_named_with_parent(#descriptor, &mut this, rt);
+                        let mut #ident: ::des::util::PtrMut<#ty> = #ty::build_named_with_parent(#descriptor, &mut this, rt);
                     })
                 }
 

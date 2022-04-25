@@ -12,12 +12,12 @@ pub struct NetworkStack {
     address: NodeAddress,
 
     forwarding_table: HashMap<NodeAddress, GateRef>,
-    routing_deamon: Option<Mrc<RandomRoutingDeamon>>,
+    routing_deamon: Option<PtrMut<RandomRoutingDeamon>>,
 }
 
 impl NetworkStack {
-    pub fn new(name: &str, address: NodeAddress, router: RandomRoutingDeamon) -> Mrc<Self> {
-        let mut obj = Mrc::new(Self {
+    pub fn new(name: &str, address: NodeAddress, router: RandomRoutingDeamon) -> PtrMut<Self> {
+        let mut obj = PtrMut::new(Self {
             core: ModuleCore::new_with(
                 ModulePath::root(name.to_string()),
                 router.module_core().globals(),
@@ -27,7 +27,7 @@ impl NetworkStack {
             routing_deamon: None,
         });
 
-        let mut router = Mrc::new(router);
+        let mut router = PtrMut::new(router);
 
         obj.add_child(&mut router);
         obj.routing_deamon = Some(router);

@@ -1,34 +1,34 @@
 use crate::{
     prelude::{Module, ModulePath, NetworkRuntime},
-    util::{MrcS, Mutable, UntypedMrc},
+    util::*,
 };
 
 use super::{ModuleCore, NameableModule};
 
 macro_rules! impl_buildable {
     ($($g: ident),*) => {
-        fn build<A$(,$g: Module + NameableModule + __Buildable0)*>(this: MrcS<Self, Mutable>, rt: &mut NetworkRuntime<A>) -> MrcS<Self, Mutable>
+        fn build<A$(,$g: Module + NameableModule + __Buildable0)*>(this: PtrMut<Self>, rt: &mut NetworkRuntime<A>) -> PtrMut<Self>
             where Self: Sized;
 
-        fn build_named<A$(,$g: Module + NameableModule + __Buildable0)*>(path: ModulePath, rt: &mut NetworkRuntime<A>) -> MrcS<Self, Mutable>
+        fn build_named<A$(,$g: Module + NameableModule + __Buildable0)*>(path: ModulePath, rt: &mut NetworkRuntime<A>) -> PtrMut<Self>
             where
                 Self: NameableModule + Sized,
         {
             let core = ModuleCore::new_with(path, rt.globals());
-            let mut this = MrcS::new(Self::named(core));
+            let mut this = Ptr::new(Self::named(core));
 
             // Attach self to module core
-            let clone = MrcS::clone(&this);
-            this.deref_mut().self_ref = Some(UntypedMrc::new(clone));
+            let clone = PtrWeak::from_strong(&this);
+            this.deref_mut().self_ref = Some(PtrWeakVoid::new(clone));
 
             Self::build::<A$(,$g)*>(this, rt)
         }
 
         fn build_named_with_parent<A, T$(,$g: Module + NameableModule + __Buildable0)*>(
             name: &str,
-            parent: &mut MrcS<T, Mutable>,
+            parent: &mut PtrMut<T>,
             rt: &mut NetworkRuntime<A>,
-        ) -> MrcS<Self, Mutable>
+        ) -> PtrMut<Self>
             where
                 T: NameableModule,
                 Self: NameableModule + Sized,
@@ -49,39 +49,39 @@ pub trait __Buildable0 {
     /// Builds the given module according to the NDL specification
     /// if any is provided, else doesn't change a thing.
     ///
-    fn build<A>(this: MrcS<Self, Mutable>, _rt: &mut NetworkRuntime<A>) -> MrcS<Self, Mutable>
+    fn build<A>(this: PtrMut<Self>, _rt: &mut NetworkRuntime<A>) -> PtrMut<Self>
     where
         Self: Sized,
     {
         this
     }
 
-    fn build_named<A>(path: ModulePath, rt: &mut NetworkRuntime<A>) -> MrcS<Self, Mutable>
+    fn build_named<A>(path: ModulePath, rt: &mut NetworkRuntime<A>) -> PtrMut<Self>
     where
         Self: NameableModule + Sized,
     {
         let core = ModuleCore::new_with(path, rt.globals());
-        let mut this = MrcS::new(Self::named(core));
+        let mut this = PtrMut::new(Self::named(core));
         // Attach self to module core
-        let clone = MrcS::clone(&this);
-        this.deref_mut().self_ref = Some(UntypedMrc::new(clone));
+        let clone = PtrWeak::from_strong(&this);
+        this.deref_mut().self_ref = Some(PtrWeakVoid::new(clone));
 
         Self::build(this, rt)
     }
 
     fn build_named_with_parent<A, T>(
         name: &str,
-        parent: &mut MrcS<T, Mutable>,
+        parent: &mut PtrMut<T>,
         rt: &mut NetworkRuntime<A>,
-    ) -> MrcS<Self, Mutable>
+    ) -> PtrMut<Self>
     where
         T: NameableModule,
         Self: NameableModule + Sized,
     {
         let mut this = Self::named_with_parent(name, parent);
 
-        let clone = MrcS::clone(&this);
-        this.deref_mut().self_ref = Some(UntypedMrc::new(clone));
+        let clone = PtrWeak::from_strong(&this);
+        this.deref_mut().self_ref = Some(PtrWeakVoid::new(clone));
 
         Self::build(this, rt)
     }

@@ -29,7 +29,7 @@ impl RandomRoutingDeamon {
             info!(target: "RandomRoutingDeamon", "Updating backproc path");
             if pkt.header().hop_count < *path_cost {
                 *path_cost = pkt.header().hop_count;
-                self.parent_mut::<super::network_stack::NetworkStack>()
+                self.parent_mut_as::<super::network_stack::NetworkStack>()
                     .unwrap()
                     .add_route(source, incoming)
             }
@@ -37,7 +37,7 @@ impl RandomRoutingDeamon {
             // Does not know path
             info!(target: "RandomRoutingDeamon", "Recording new backproc path");
             self.hop_counts.insert(source, pkt.header().hop_count);
-            self.parent_mut::<super::network_stack::NetworkStack>()
+            self.parent_mut_as::<super::network_stack::NetworkStack>()
                 .unwrap()
                 .add_route(source, incoming);
         }

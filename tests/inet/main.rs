@@ -22,7 +22,7 @@ fn main() {
     //
     // ALICE
     //
-    let mut node_alice = Mrc::new(NetworkNode::named("Alice", app.globals()));
+    let mut node_alice = PtrMut::new(NetworkNode::named("Alice", app.globals()));
     let mut stack_alice = NetworkStack::new(
         "Alice.NetworkStack",
         0x00_00_00_ff,
@@ -53,7 +53,7 @@ fn main() {
     //
     // BOB
     //
-    let mut node_bob = Mrc::new(NetworkNode::named("Bob", app.globals()));
+    let mut node_bob = PtrMut::new(NetworkNode::named("Bob", app.globals()));
     let mut stack_bob = NetworkStack::new(
         "Bob.NetworkStack",
         0x00_00_00_ee,
@@ -86,7 +86,7 @@ fn main() {
     // EVE
     //
 
-    let mut node_eve = Mrc::new(NetworkNode::named("Eve", app.globals()));
+    let mut node_eve = PtrMut::new(NetworkNode::named("Eve", app.globals()));
     let mut stack_eve = NetworkStack::new(
         "Eve.NetworkStack",
         0x00_00_00_dd,

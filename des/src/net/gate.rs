@@ -1,5 +1,5 @@
 use crate::net::*;
-use crate::util::{MrcS, Mutable, ReadOnly};
+use crate::util::*;
 use std::fmt::{Debug, Display};
 use std::marker::Unsize;
 
@@ -33,7 +33,7 @@ pub struct GateDescription {
     ///
     /// The identifier of the module the gate was created on.
     ///
-    pub owner: ModuleRefMut,
+    pub owner: PtrWeakMut<dyn Module>,
     ///
     /// A human readable name for a gate cluster.
     ///
@@ -63,11 +63,11 @@ impl GateDescription {
     ///
     /// Creates a new descriptor using explicit values and a service type.
     ///
-    pub fn new<T>(name: String, size: usize, owner: MrcS<T, Mutable>, typ: GateServiceType) -> Self
+    pub fn new<T>(name: String, size: usize, owner: PtrWeakMut<T>, typ: GateServiceType) -> Self
     where
         T: Module + Unsize<dyn Module>,
     {
-        let owner: ModuleRefMut = owner;
+        let owner: PtrWeakMut<dyn Module> = owner;
         assert!(size >= 1, "Cannot create with a non-postive size");
         Self {
             name,
@@ -267,7 +267,7 @@ impl Gate {
     /// Returns the owner module by reference of this gate.
     ///
     #[inline(always)]
-    pub fn owner(&self) -> &ModuleRefMut {
+    pub fn owner(&self) -> &PtrWeakMut<dyn Module> {
         &self.description.owner
     }
 

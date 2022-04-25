@@ -1,5 +1,4 @@
 use std::{
-    any::type_name,
     collections::HashMap,
     error::Error,
     fmt::{Debug, Display},
@@ -11,7 +10,7 @@ use crate::{
     core::SimTime,
     create_global_uid,
     net::{common::Optional, *},
-    util::{MrcS, Mutable, ReadOnly, UntypedMrc},
+    util::*,
 };
 
 create_global_uid!(
@@ -52,16 +51,16 @@ pub struct ModuleCore {
     pub(crate) activity_active: bool,
 
     /// The reference for the parent module.
-    pub(crate) parent: Option<UntypedMrc>,
+    pub(crate) parent: Option<PtrWeakMut<dyn StaticModuleCore>>,
 
     /// The collection of child nodes for the current module.
-    pub(crate) children: HashMap<String, UntypedMrc>,
+    pub(crate) children: HashMap<String, PtrWeakMut<dyn StaticModuleCore>>,
 
     /// A set of local parameters.
     globals: MrcS<NetworkRuntimeGlobals, ReadOnly>,
 
     /// A refence to one self
-    pub(crate) self_ref: Option<UntypedMrc>,
+    pub(crate) self_ref: Option<PtrWeakVoid>,
 }
 
 impl ModuleCore {
@@ -291,39 +290,28 @@ impl ModuleCore {
     {
         self.self_ref
             .as_ref()
-            .map(UntypedMrc::is::<T>)
+            .map(PtrWeakVoid::is::<T>)
             .unwrap_or(false)
     }
 
     ///
     /// Returns wether the moudule attached to this core is of type T.
     ///
-    pub fn self_as<T>(&self) -> Option<MrcS<T, Mutable>>
-    where
-        T: 'static + Module,
-    {
-        let a = self.self_ref.as_ref().unwrap().clone();
-        a.downcast()
-    }
-
-    ///
-    /// Returns the parent module by reference if a parent exists
-    /// and is of type `T`.
-    ///
-    pub fn parent<T>(&self) -> Result<MrcS<T, ReadOnly>, ModuleReferencingError>
+    pub fn self_as<T>(&self) -> Option<PtrWeakMut<T>>
     where
         T: 'static + StaticModuleCore,
-        Self: 'static + Sized,
     {
-        match self.parent.clone() {
-            Some(parent) => match parent.downcast::<T>() {
-                Some(parent) => Ok(parent.make_readonly()),
-                None => Err(ModuleReferencingError::TypeError(format!(
-                    "The parent module of '{}' is not of type {}",
-                    self.path(),
-                    type_name::<T>(),
-                ))),
-            },
+        match self.self_ref.as_ref() {
+            Some(r) => r.clone().downcast(),
+            None => panic!("Missing self ref at {}", self.str()),
+        }
+        // let a = self.self_ref.as_ref().unwrap().clone();
+        // a.downcast()
+    }
+
+    pub fn parent(&self) -> Result<PtrWeakConst<dyn StaticModuleCore>, ModuleReferencingError> {
+        match self.parent.as_ref() {
+            Some(parent) => Ok(PtrWeakMut::clone(parent).make_readonly()),
             None => Err(ModuleReferencingError::NoEntry(format!(
                 "The module '{}' does not posses a parent ptr",
                 self.path()
@@ -331,24 +319,12 @@ impl ModuleCore {
         }
     }
 
-    ///
-    /// Returns the parent module by mutable reference if a parent exists
-    /// and is of type `T`.
-    ///
-    pub fn parent_mut<T>(&mut self) -> Result<MrcS<T, Mutable>, ModuleReferencingError>
+    pub fn parent_as<T>(&self) -> Result<PtrWeakConst<T>, ModuleReferencingError>
     where
         T: 'static + StaticModuleCore,
-        Self: 'static + Sized,
     {
-        match self.parent.clone() {
-            Some(parent) => match parent.downcast::<T>() {
-                Some(parent) => Ok(parent),
-                None => Err(ModuleReferencingError::TypeError(format!(
-                    "The parent module of '{}' is not of type {}",
-                    self.path(),
-                    type_name::<T>(),
-                ))),
-            },
+        match self.parent.as_ref() {
+            Some(parent) => Ok(parent.self_as::<T>().unwrap().make_readonly()),
             None => Err(ModuleReferencingError::NoEntry(format!(
                 "The module '{}' does not posses a parent ptr",
                 self.path()
@@ -356,25 +332,37 @@ impl ModuleCore {
         }
     }
 
-    ///
-    /// Returns the child module by reference if any child with
-    /// the given name exists and is of type `T`.
-    ///
-    pub fn child<T>(&self, name: &str) -> Result<MrcS<T, ReadOnly>, ModuleReferencingError>
+    pub fn parent_mut(
+        &mut self,
+    ) -> Result<PtrWeakMut<dyn StaticModuleCore>, ModuleReferencingError> {
+        match self.parent.as_ref() {
+            Some(parent) => Ok(PtrWeakMut::clone(parent)),
+            None => Err(ModuleReferencingError::NoEntry(format!(
+                "The module '{}' does not posses a parent ptr",
+                self.path()
+            ))),
+        }
+    }
+
+    pub fn parent_mut_as<T>(&mut self) -> Result<PtrWeakMut<T>, ModuleReferencingError>
     where
         T: 'static + StaticModuleCore,
-        Self: 'static + Sized,
     {
+        match self.parent.as_ref() {
+            Some(parent) => Ok(parent.self_as::<T>().unwrap()),
+            None => Err(ModuleReferencingError::NoEntry(format!(
+                "The module '{}' does not posses a parent ptr",
+                self.path()
+            ))),
+        }
+    }
+
+    pub fn child(
+        &self,
+        name: &str,
+    ) -> Result<PtrWeakConst<dyn StaticModuleCore>, ModuleReferencingError> {
         match self.children.get(name) {
-            Some(parent) => {
-                // Text
-                match parent.clone().downcast::<T>() {
-                    Some(parent) => Ok(parent.make_readonly()),
-                    None => Err(ModuleReferencingError::TypeError(String::from(
-                        "Type error",
-                    ))),
-                }
-            }
+            Some(child) => Ok(PtrWeakMut::clone(child).make_readonly()),
             None => Err(ModuleReferencingError::NoEntry(format!(
                 "This module does not posses a child called '{}'",
                 name
@@ -382,25 +370,38 @@ impl ModuleCore {
         }
     }
 
-    ///
-    /// Returns the child module by mutable reference if any child with
-    /// the given name exists and is of type `T`.
-    ///
-    pub fn child_mut<T>(&mut self, name: &str) -> Result<MrcS<T, Mutable>, ModuleReferencingError>
+    pub fn child_as<T>(&self, name: &str) -> Result<PtrWeakConst<T>, ModuleReferencingError>
     where
         T: 'static + StaticModuleCore,
-        Self: 'static + Sized,
     {
         match self.children.get(name) {
-            Some(parent) => {
-                // Text
-                match parent.clone().downcast::<T>() {
-                    Some(parent) => Ok(parent),
-                    None => Err(ModuleReferencingError::TypeError(String::from(
-                        "Type error",
-                    ))),
-                }
-            }
+            Some(child) => Ok(child.self_as::<T>().unwrap().make_readonly()),
+            None => Err(ModuleReferencingError::NoEntry(format!(
+                "This module does not posses a child called '{}'",
+                name
+            ))),
+        }
+    }
+
+    pub fn child_mut(
+        &mut self,
+        name: &str,
+    ) -> Result<PtrWeakMut<dyn StaticModuleCore>, ModuleReferencingError> {
+        match self.children.get(name) {
+            Some(child) => Ok(PtrWeakMut::clone(child)),
+            None => Err(ModuleReferencingError::NoEntry(format!(
+                "This module does not posses a child called '{}'",
+                name
+            ))),
+        }
+    }
+
+    pub fn child_mut_as<T>(&mut self, name: &str) -> Result<PtrWeakMut<T>, ModuleReferencingError>
+    where
+        T: 'static + StaticModuleCore,
+    {
+        match self.children.get(name) {
+            Some(child) => Ok(child.self_as::<T>().unwrap()),
             None => Err(ModuleReferencingError::NoEntry(format!(
                 "This module does not posses a child called '{}'",
                 name

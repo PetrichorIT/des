@@ -15,7 +15,7 @@ impl Module for Alice {
             ("netOut", 0),
         );
 
-        self.parent_mut::<super::bob::Bob>()
+        self.parent_mut_as::<super::bob::Bob>()
             .unwrap()
             .handle_message(Message::new().kind(31).content("Pang".to_string()).build());
     }
