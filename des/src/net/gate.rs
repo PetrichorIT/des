@@ -6,12 +6,12 @@ use std::marker::Unsize;
 ///
 /// A readonly reference to a gate.
 ///
-pub type GateRef = MrcS<Gate, ReadOnly>;
+pub type GateRef = PtrConst<Gate>;
 
 ///
 /// A mutable reference to a gate.
 ///
-pub type GateRefMut = MrcS<Gate, Mutable>;
+pub type GateRefMut = PtrMut<Gate>;
 
 ///
 /// The type of service a gate cluster can support.
@@ -208,9 +208,9 @@ impl Gate {
     /// its identifier.
     ///
     #[inline(always)]
-    pub fn set_next_gate(self: &mut MrcS<Self, Mutable>, mut next_gate: GateRefMut) {
-        self.next_gate = Some(MrcS::clone(&next_gate).make_readonly());
-        next_gate.previous_gate = Some(self.clone().make_readonly());
+    pub fn set_next_gate(self: &mut PtrMut<Self>, mut next_gate: GateRefMut) {
+        self.next_gate = Some(PtrMut::clone(&next_gate).make_const());
+        next_gate.previous_gate = Some(self.clone().make_const());
     }
 
     ///
@@ -218,7 +218,7 @@ impl Gate {
     ///
     pub fn channel(&self) -> Option<ChannelRef> {
         // only provide a read_only interface publicly
-        Some(MrcS::clone(self.channel.as_ref()?).make_readonly())
+        Some(Ptr::clone(self.channel.as_ref()?).make_const())
     }
 
     ///
@@ -226,7 +226,7 @@ impl Gate {
     ///
     pub(crate) fn channel_mut(&self) -> Option<ChannelRefMut> {
         // only provide a read_only interface publicly
-        Some(MrcS::clone(self.channel.as_ref()?))
+        Some(Ptr::clone(self.channel.as_ref()?))
     }
 
     ///
@@ -247,7 +247,7 @@ impl Gate {
             current = previous_gate
         }
 
-        Some(MrcS::clone(current))
+        Some(PtrConst::clone(current))
     }
 
     ///
@@ -260,7 +260,7 @@ impl Gate {
             current = next_gate
         }
 
-        Some(MrcS::clone(current))
+        Some(PtrConst::clone(current))
     }
 
     ///
@@ -280,7 +280,7 @@ impl Gate {
         channel: Option<ChannelRefMut>,
         next_gate: Option<GateRefMut>,
     ) -> GateRefMut {
-        let mut this = MrcS::new(Self {
+        let mut this = PtrMut::new(Self {
             description,
             pos,
             channel,
@@ -325,19 +325,19 @@ impl IntoModuleGate for GateRef {
 
 impl IntoModuleGate for &GateRef {
     fn into_gate(self, _module: &ModuleCore) -> Option<GateRef> {
-        Some(MrcS::clone(self))
+        Some(Ptr::clone(self))
     }
 }
 
 impl IntoModuleGate for GateRefMut {
     fn into_gate(self, _module: &ModuleCore) -> Option<GateRef> {
-        Some(self.make_readonly())
+        Some(self.make_const())
     }
 }
 
 impl IntoModuleGate for &GateRefMut {
     fn into_gate(self, _module: &ModuleCore) -> Option<GateRef> {
-        Some(MrcS::clone(self).make_readonly())
+        Some(Ptr::clone(self).make_const())
     }
 }
 
@@ -348,7 +348,7 @@ impl IntoModuleGate for (&str, usize) {
             .iter()
             .find(|&g| g.name() == self.0 && g.pos() == self.1)?;
 
-        Some(MrcS::clone(element).make_readonly())
+        Some(Ptr::clone(element).make_const())
     }
 }
 
@@ -359,6 +359,6 @@ impl IntoModuleGate for &str {
             .iter()
             .find(|&g| g.name() == self && g.size() == 1)?;
 
-        Some(MrcS::clone(element).make_readonly())
+        Some(Ptr::clone(element).make_const())
     }
 }

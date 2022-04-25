@@ -57,7 +57,7 @@ mod default {
         #[allow(clippy::let_and_return)]
         pub fn fetch_next(
             &mut self,
-            #[cfg(feature = "internal-metrics")] mut metrics: crate::util::Mrc<
+            #[cfg(feature = "internal-metrics")] mut metrics: crate::util::PtrMut<
                 crate::metrics::RuntimeMetrics,
             >,
         ) -> EventNode<A> {
@@ -101,7 +101,7 @@ mod default {
             &mut self,
             time: SimTime,
             event: impl Into<A::EventSet>,
-            #[cfg(feature = "internal-metrics")] mut metrics: crate::util::Mrc<
+            #[cfg(feature = "internal-metrics")] mut metrics: crate::util::PtrMut<
                 crate::metrics::RuntimeMetrics,
             >,
         ) {
@@ -187,7 +187,7 @@ mod cqueue {
 
         pub fn fetch_next(
             &mut self,
-            #[cfg(feature = "internal-metrics")] mut metrics: Mrc<RuntimeMetrics>,
+            #[cfg(feature = "internal-metrics")] mut metrics: PtrMut<RuntimeMetrics>,
         ) -> EventNode<A> {
             #[cfg(feature = "internal-metrics")]
             {
@@ -237,7 +237,7 @@ mod cqueue {
             &mut self,
             time: SimTime,
             event: impl Into<A::EventSet>,
-            #[cfg(feature = "internal-metrics")] mut metrics: Mrc<RuntimeMetrics>,
+            #[cfg(feature = "internal-metrics")] mut metrics: PtrMut<RuntimeMetrics>,
         ) {
             #[cfg(feature = "internal-metrics")]
             {

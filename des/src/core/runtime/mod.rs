@@ -58,12 +58,12 @@ where
     /// The contained runtime application, defining globals and the used event set.
     pub app: A,
 
-    core: Mrc<Option<RuntimeCore>>,
+    core: PtrMut<Option<RuntimeCore>>,
 
     future_event_set: FutureEventSet<A>,
 
     #[cfg(feature = "internal-metrics")]
-    metrics: Mrc<crate::metrics::RuntimeMetrics>,
+    metrics: PtrMut<crate::metrics::RuntimeMetrics>,
 }
 
 impl<A> Runtime<A>
@@ -237,7 +237,7 @@ where
             app,
 
             #[cfg(feature = "internal-metrics")]
-            metrics: MrcS::new(crate::metrics::RuntimeMetrics::new()),
+            metrics: PtrMut::new(crate::metrics::RuntimeMetrics::new()),
         };
 
         macro_rules! symbol {
@@ -287,7 +287,7 @@ where
 
         let node = self.future_event_set.fetch_next(
             #[cfg(feature = "internal-metrics")]
-            MrcS::clone(&self.metrics),
+            PtrMut::clone(&self.metrics),
         );
 
         self.core_mut().itr += 1;
@@ -298,7 +298,7 @@ where
                 time,
                 event,
                 #[cfg(feature = "internal-metrics")]
-                MrcS::clone(&self.metrics),
+                PtrMut::clone(&self.metrics),
             );
             return false;
         }
@@ -524,7 +524,7 @@ where
             time,
             event,
             #[cfg(feature = "internal-metrics")]
-            MrcS::clone(&self.metrics),
+            PtrMut::clone(&self.metrics),
         )
     }
 }
@@ -710,7 +710,7 @@ impl<A> Runtime<NetworkRuntime<A>> {
         time: SimTime,
     ) {
         let event = MessageAtGateEvent {
-            gate: gate.make_readonly(),
+            gate: gate.make_const(),
             message: message.into(),
         };
 

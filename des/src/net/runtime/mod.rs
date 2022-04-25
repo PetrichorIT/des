@@ -28,7 +28,7 @@ pub struct NetworkRuntime<A> {
     /// The globals provided by the runtime
     /// that cannot be mutated by the users.
     ///
-    globals: MrcS<NetworkRuntimeGlobals, Mutable>,
+    globals: PtrMut<NetworkRuntimeGlobals>,
 
     ///
     /// A inner container for holding user defined global state.
@@ -40,8 +40,8 @@ impl<A> NetworkRuntime<A> {
     ///
     /// Returns the globals (readonly) of the entire simulation.
     ///
-    pub fn globals(&self) -> MrcS<NetworkRuntimeGlobals, ReadOnly> {
-        MrcS::clone(&self.globals).make_readonly()
+    pub fn globals(&self) -> PtrConst<NetworkRuntimeGlobals> {
+        Ptr::clone(&self.globals).make_const()
     }
 
     ///
@@ -50,7 +50,7 @@ impl<A> NetworkRuntime<A> {
     pub fn new(inner: A) -> Self {
         Self {
             module_list: Vec::new(),
-            globals: MrcS::new(NetworkRuntimeGlobals::new()),
+            globals: PtrMut::new(NetworkRuntimeGlobals::new()),
 
             inner,
         }

@@ -57,7 +57,7 @@ pub struct ModuleCore {
     pub(crate) children: HashMap<String, PtrWeakMut<dyn StaticModuleCore>>,
 
     /// A set of local parameters.
-    globals: MrcS<NetworkRuntimeGlobals, ReadOnly>,
+    globals: PtrConst<NetworkRuntimeGlobals>,
 
     /// A refence to one self
     pub(crate) self_ref: Option<PtrWeakVoid>,
@@ -135,12 +135,12 @@ impl ModuleCore {
     ///
     pub fn gate(&self, name: &str, pos: usize) -> Option<GateRef> {
         Some(
-            MrcS::clone(
+            Ptr::clone(
                 self.gates()
                     .iter()
                     .find(|&gate| gate.name() == name && gate.pos() == pos)?,
             )
-            .make_readonly(),
+            .make_const(),
         )
     }
 
@@ -158,7 +158,7 @@ impl ModuleCore {
     /// Creates a new optionally named instance
     /// of 'Self'.
     ///
-    pub fn new_with(path: ModulePath, globals: MrcS<NetworkRuntimeGlobals, ReadOnly>) -> Self {
+    pub fn new_with(path: ModulePath, globals: PtrConst<NetworkRuntimeGlobals>) -> Self {
         Self {
             id: ModuleId::gen(),
             path,
@@ -205,7 +205,7 @@ impl ModuleCore {
     pub fn new() -> Self {
         Self::new_with(
             ModulePath::root(String::from("unknown-module")),
-            MrcS::new(NetworkRuntimeGlobals::new()),
+            PtrConst::new(NetworkRuntimeGlobals::new()),
         )
     }
 }
@@ -311,7 +311,7 @@ impl ModuleCore {
 
     pub fn parent(&self) -> Result<PtrWeakConst<dyn StaticModuleCore>, ModuleReferencingError> {
         match self.parent.as_ref() {
-            Some(parent) => Ok(PtrWeakMut::clone(parent).make_readonly()),
+            Some(parent) => Ok(PtrWeakMut::clone(parent).make_const()),
             None => Err(ModuleReferencingError::NoEntry(format!(
                 "The module '{}' does not posses a parent ptr",
                 self.path()
@@ -324,7 +324,7 @@ impl ModuleCore {
         T: 'static + StaticModuleCore,
     {
         match self.parent.as_ref() {
-            Some(parent) => Ok(parent.self_as::<T>().unwrap().make_readonly()),
+            Some(parent) => Ok(parent.self_as::<T>().unwrap().make_const()),
             None => Err(ModuleReferencingError::NoEntry(format!(
                 "The module '{}' does not posses a parent ptr",
                 self.path()
@@ -362,7 +362,7 @@ impl ModuleCore {
         name: &str,
     ) -> Result<PtrWeakConst<dyn StaticModuleCore>, ModuleReferencingError> {
         match self.children.get(name) {
-            Some(child) => Ok(PtrWeakMut::clone(child).make_readonly()),
+            Some(child) => Ok(PtrWeakMut::clone(child).make_const()),
             None => Err(ModuleReferencingError::NoEntry(format!(
                 "This module does not posses a child called '{}'",
                 name
@@ -375,7 +375,7 @@ impl ModuleCore {
         T: 'static + StaticModuleCore,
     {
         match self.children.get(name) {
-            Some(child) => Ok(child.self_as::<T>().unwrap().make_readonly()),
+            Some(child) => Ok(child.self_as::<T>().unwrap().make_const()),
             None => Err(ModuleReferencingError::NoEntry(format!(
                 "This module does not posses a child called '{}'",
                 name
@@ -433,8 +433,8 @@ impl ModuleCore {
     /// Returns a reference to the parameter store, used for constructing
     /// custom instances of modules.
     ///
-    pub fn globals(&self) -> MrcS<NetworkRuntimeGlobals, ReadOnly> {
-        MrcS::clone(&self.globals)
+    pub fn globals(&self) -> PtrConst<NetworkRuntimeGlobals> {
+        PtrConst::clone(&self.globals)
     }
 }
 

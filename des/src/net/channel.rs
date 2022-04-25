@@ -6,19 +6,17 @@ use rand::Rng;
 
 use crate::core::*;
 use crate::net::*;
-use crate::util::MrcS;
-use crate::util::Mutable;
-use crate::util::ReadOnly;
+use crate::util::*;
 
 ///
 /// A readonly reference to a channel.
 ///
-pub type ChannelRef = MrcS<Channel, ReadOnly>;
+pub type ChannelRef = PtrConst<Channel>;
 
 ///
 /// A mutable reference to a channel.
 ///
-pub type ChannelRefMut = MrcS<Channel, Mutable>;
+pub type ChannelRefMut = PtrMut<Channel>;
 
 ///
 /// Metrics that define a channels capabilitites.
@@ -182,7 +180,7 @@ impl Channel {
     /// with an initially unbusy state.
     ///
     pub fn new(metrics: ChannelMetrics) -> ChannelRefMut {
-        MrcS::new(Self {
+        Ptr::new(Self {
             metrics,
             busy: false,
             transmission_finish_time: SimTime::ZERO,

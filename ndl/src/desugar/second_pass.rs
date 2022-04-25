@@ -286,7 +286,7 @@ pub fn second_pass<'a>(
                     loc: *loc,
                     descriptor: desc.descriptor.clone(),
                     ty: TySpec::new(ty),
-                    proto_impl: proto_impl,
+                    proto_impl,
                 })
             }
         }

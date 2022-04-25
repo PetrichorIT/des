@@ -1,10 +1,6 @@
 use std::collections::HashMap;
 
-use des::{
-    net::NetworkRuntimeGlobals,
-    prelude::*,
-    util::{MrcS, ReadOnly},
-};
+use des::{net::NetworkRuntimeGlobals, prelude::*};
 use log::info;
 
 #[derive(Module)]
@@ -15,7 +11,7 @@ pub struct RandomRoutingDeamon {
 }
 
 impl RandomRoutingDeamon {
-    pub fn new(globals: MrcS<NetworkRuntimeGlobals, ReadOnly>) -> Self {
+    pub fn new(globals: PtrConst<NetworkRuntimeGlobals>) -> Self {
         Self {
             core: ModuleCore::new_with(ModulePath::root("RoutingDaemon".to_string()), globals),
             hop_counts: HashMap::new(),

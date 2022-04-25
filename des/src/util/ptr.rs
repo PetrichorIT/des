@@ -80,7 +80,7 @@ where
     S: MutabilityState,
 {
     ///
-    /// Constructs a new [Mrc<T>].
+    /// Constructs a new [Ptr<T>].
     ///
     pub fn new(value: T) -> Self {
         Self {
@@ -94,7 +94,7 @@ impl<T: ?Sized> Ptr<T, Mut> {
     ///
     /// Declares a reference as read-only. Not reversable.
     ///
-    pub fn make_readonly(self) -> Ptr<T, Const> {
+    pub fn make_const(self) -> Ptr<T, Const> {
         Ptr {
             inner: self.inner,
             _phantom: PhantomData,
@@ -122,7 +122,7 @@ where
 {
     fn as_ref(&self) -> &T {
         // SAFTY:
-        // This deref in considered safe since it only extends Mrc
+        // This deref in considered safe since it only extends Ptr
         // with the default Rc behaviour
         unsafe { &*self.inner.as_ref().get() }
     }
@@ -246,7 +246,7 @@ where
     S: MutabilityState,
 {
     ///
-    /// Constructs a new [Mrc<T>].
+    /// Constructs a new [PtrWeak<T>] from a [Ptr<T>].
     ///
     pub fn from_strong(ptr: &Ptr<T, S>) -> Self {
         Self {
@@ -260,7 +260,7 @@ impl<T: ?Sized> PtrWeak<T, Mut> {
     ///
     /// Declares a reference as read-only. Not reversable.
     ///
-    pub fn make_readonly(self) -> PtrWeak<T, Const> {
+    pub fn make_const(self) -> PtrWeak<T, Const> {
         PtrWeak {
             inner: self.inner,
             _phantom: PhantomData,
@@ -288,7 +288,7 @@ where
 {
     fn as_ref(&self) -> &T {
         // SAFTY:
-        // This deref in considered safe since it only extends Mrc
+        // This deref in considered safe since it only extends Ptr
         // with the default Rc behaviour
         unsafe { &*self.inner.upgrade().as_ref().unwrap().get() }
     }

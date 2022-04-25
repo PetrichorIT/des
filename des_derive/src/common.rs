@@ -213,30 +213,3 @@ pub fn build_impl_from(ident: Ident, wrapped: WrappedTokenStream, submodules: &[
     .into()
 }
 
-// fn build_named<A>(path: ModulePath, rt: &mut NetworkRuntime<A>) -> MrcS<Self, Mutable>
-//     where
-//         Self: NameableModule + Sized,
-//     {
-//         let core = ModuleCore::new_with(path, rt.globals());
-//         let mut this = MrcS::new(Self::named(core));
-
-//         // Attach self to module core
-//         let clone = MrcS::clone(&this);
-//         this.deref_mut().self_ref = Some(UntypedMrc::new(clone));
-
-//         Self::build(this, rt)
-//     }
-
-//     fn build_named_with_parent<A, T>(
-//         name: &str,
-//         parent: &mut MrcS<T, Mutable>,
-//         rt: &mut NetworkRuntime<A>,
-//     ) -> MrcS<Self, Mutable>
-//     where
-//         T: NameableModule,
-//         Self: NameableModule + Sized,
-//     {
-//         let obj = Self::named_with_parent(name, parent);
-//         // parent.add_child(&mut (*obj));
-//         Self::build(obj, rt)
-//     }

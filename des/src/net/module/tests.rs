@@ -1,10 +1,6 @@
 use std::any::TypeId;
 
-use crate::{
-    net::NetworkRuntimeGlobals,
-    prelude::*,
-    util::{MrcS, PtrMut},
-};
+use crate::{net::NetworkRuntimeGlobals, prelude::*, util::PtrMut};
 
 macro_rules! auto_impl_static {
     ($ident: ident) => {
@@ -85,7 +81,7 @@ impl TestCase {
     fn build() -> Self {
         let core = ModuleCore::new_with(
             ModulePath::root("Root".into()),
-            MrcS::new(NetworkRuntimeGlobals::new()),
+            PtrConst::new(NetworkRuntimeGlobals::new()),
         );
 
         let mut parent = Parent::named_root(core);

@@ -343,6 +343,7 @@ impl Packet {
     ///
     /// Creates a new instance of self through a builder.
     ///
+    #[allow(clippy::new_ret_no_self)]
     pub fn new() -> PacketBuilder {
         PacketBuilder::new()
     }
@@ -381,7 +382,7 @@ impl Packet {
     ///
 
     pub fn try_content<T: 'static + MessageBody>(&self) -> Option<&T> {
-        Some(self.content.as_ref()?.downcast_ref::<T>()?)
+        Some(self.content.as_ref()?.downcast_ref::<T>())?
     }
 
     pub fn content<T: 'static + MessageBody>(&self) -> &T {
@@ -391,7 +392,7 @@ impl Packet {
     pub fn try_content_mut<T: 'static + MessageBody>(&mut self) -> Option<&mut T> {
         let mut_rc = self.content.as_mut()?;
         let mut_any = Rc::get_mut(mut_rc)?;
-        Some(mut_any.downcast_mut()?)
+        Some(mut_any.downcast_mut())?
     }
 
     pub fn content_mut<T: 'static + MessageBody>(&mut self) -> &mut T {
@@ -567,5 +568,11 @@ impl PacketBuilder {
             header,
             content,
         }
+    }
+}
+
+impl Default for PacketBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }

@@ -129,7 +129,7 @@ where
         self.buckets
             .iter()
             .enumerate()
-            .find(|(_, b)| b.len() == 0)
+            .find(|(_, b)| b.is_empty())
             .map(|(idx, _)| idx)
             .unwrap_or(self.n)
     }

@@ -297,14 +297,14 @@ impl<'a> ScndPassTyCtx<'a> {
             all: &'a HashMap<String, FstPassResult>,
             unit: &'a FstPassResult,
             tyctx: &mut ScndPassTyCtx<'a>,
-            errors: &mut Vec<Error>,
+            _errors: &mut Vec<Error>,
         ) {
             let new_unit = tyctx.include(unit);
             if new_unit {
                 // resolve meta imports.
                 for include in &unit.includes {
                     if let Some(unit) = all.get(&include.path) {
-                        resolve_recursive(all, unit, tyctx, errors);
+                        resolve_recursive(all, unit, tyctx, _errors);
                     } else {
                         // Allready thrown
 

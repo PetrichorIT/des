@@ -1,8 +1,4 @@
-use des::{
-    net::NetworkRuntimeGlobals,
-    prelude::*,
-    util::{MrcS, ReadOnly},
-};
+use des::{net::NetworkRuntimeGlobals, prelude::*};
 use log::info;
 
 #[derive(Module)]
@@ -12,13 +8,13 @@ pub struct NetworkNode {
 
 impl NetworkNode {
     #[allow(unused)]
-    pub fn new(globals: MrcS<NetworkRuntimeGlobals, ReadOnly>) -> Self {
+    pub fn new(globals: PtrConst<NetworkRuntimeGlobals>) -> Self {
         Self {
             core: ModuleCore::new_with("NetworkNode".parse().unwrap(), globals),
         }
     }
 
-    pub fn named(name: &str, globals: MrcS<NetworkRuntimeGlobals, ReadOnly>) -> Self {
+    pub fn named(name: &str, globals: PtrConst<NetworkRuntimeGlobals>) -> Self {
         Self {
             core: ModuleCore::new_with(name.parse().unwrap(), globals),
         }

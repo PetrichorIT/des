@@ -7,7 +7,7 @@ use std::{
 
 use crate::core::*;
 use crate::net::*;
-use crate::util::MrcS;
+use crate::util::*;
 
 use log::warn;
 
@@ -71,7 +71,7 @@ impl MessageMetadata {
             sender_module_id: self.sender_module_id,
             receiver_module_id: self.receiver_module_id,
 
-            last_gate: self.last_gate.as_ref().map(MrcS::clone),
+            last_gate: self.last_gate.as_ref().map(Ptr::clone),
 
             creation_time: SimTime::now(),
             send_time: SimTime::MAX,
@@ -126,6 +126,7 @@ impl Message {
     ///
     /// Creates a new instance of self through a builder.
     ///
+    #[allow(clippy::new_ret_no_self)]
     pub fn new() -> MessageBuilder {
         MessageBuilder::new()
     }
@@ -477,5 +478,11 @@ impl MessageBuilder {
             byte_len,
             content,
         }
+    }
+}
+
+impl Default for MessageBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }

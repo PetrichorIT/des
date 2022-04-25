@@ -27,7 +27,7 @@ pub struct MessageAtGateEvent {
 impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
     fn handle(self, rt: &mut Runtime<NetworkRuntime<A>>) {
         let mut message = self.message;
-        message.meta.last_gate = Some(MrcS::clone(&self.gate));
+        message.meta.last_gate = Some(Ptr::clone(&self.gate));
 
         //
         // Iterate through gates until:
@@ -38,7 +38,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
         while let Some(next_gate) = current_gate.next_gate() {
             // A next gate exists.
             // redirect to next channel
-            message.meta.last_gate = Some(MrcS::clone(next_gate));
+            message.meta.last_gate = Some(Ptr::clone(next_gate));
 
             info!(
                 target: &format!("Gate ({})", current_gate.name()),
@@ -85,7 +85,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
 
                     rt.add_event(
                         NetEvents::MessageAtGateEvent(MessageAtGateEvent {
-                            gate: MrcS::clone(next_gate),
+                            gate: Ptr::clone(next_gate),
                             message,
                         }),
                         next_event_time,

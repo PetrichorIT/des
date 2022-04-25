@@ -1,7 +1,6 @@
 use crate::{
     core::{event::EventId, SimTime, StandardLogger},
-    prelude::Mrc,
-    util::SyncWrap,
+    util::{PtrMut, SyncWrap},
 };
 use lazy_static::lazy_static;
 use rand::{
@@ -10,14 +9,15 @@ use rand::{
     Rng,
 };
 lazy_static! {
-    pub(crate) static ref RTC: SyncWrap<Mrc<Option<RuntimeCore>>> = SyncWrap::new(Mrc::new(None));
+    pub(crate) static ref RTC: SyncWrap<PtrMut<Option<RuntimeCore>>> =
+        SyncWrap::new(PtrMut::new(None));
 }
 
-pub(crate) fn get_rtc_ptr() -> Mrc<Option<RuntimeCore>> {
+pub(crate) fn get_rtc_ptr() -> PtrMut<Option<RuntimeCore>> {
     use std::ops::Deref;
 
-    let mrc: &Mrc<Option<RuntimeCore>> = RTC.deref();
-    Mrc::clone(mrc)
+    let ptr: &PtrMut<Option<RuntimeCore>> = RTC.deref();
+    PtrMut::clone(ptr)
 }
 
 ///
@@ -72,7 +72,7 @@ impl RuntimeCore {
         max_itr: usize,
         max_sim_time: SimTime,
         rng: StdRng,
-    ) -> Mrc<Option<RuntimeCore>> {
+    ) -> PtrMut<Option<RuntimeCore>> {
         let rtc = Self {
             sim_time,
             max_sim_time,

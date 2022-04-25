@@ -245,13 +245,13 @@ pub trait StaticModuleCore: Deref<Target = ModuleCore> + DerefMut<Target = Modul
             "The value 'next_hops' must be equal to the size of the gate cluster"
         );
 
-        let mrc = PtrWeakMut::from_strong(self);
-        let descriptor = GateDescription::new(name.to_owned(), size, mrc, typ);
+        let ptr = PtrWeakMut::from_strong(self);
+        let descriptor = GateDescription::new(name.to_owned(), size, ptr, typ);
         let mut ids = Vec::new();
 
         for (i, item) in next_hops.into_iter().enumerate() {
             let gate = Gate::new(descriptor.clone(), i, channel.clone(), item);
-            ids.push(MrcS::clone(&gate));
+            ids.push(Ptr::clone(&gate));
 
             self.deref_mut().gates.push(gate);
         }

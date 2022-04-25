@@ -93,12 +93,12 @@ impl Topology {
 
             for start in gates {
                 let mut cost = 0.0;
-                let mut current = MrcS::clone(start).make_readonly();
+                let mut current = Ptr::clone(start).make_const();
                 while let Some(next_gate) = current.next_gate() {
                     if let Some(channel) = current.channel() {
                         cost += channel.metrics().cost;
                     }
-                    current = MrcS::clone(next_gate);
+                    current = Ptr::clone(next_gate);
 
                     if current.owner().id() != start.owner().id() {
                         break;
@@ -107,7 +107,7 @@ impl Topology {
 
                 if *current != **start {
                     outgoing_edges.push(Edge {
-                        src_gate: MrcS::clone(start).make_readonly(),
+                        src_gate: Ptr::clone(start).make_const(),
                         target_gate: current,
                         cost,
                     })

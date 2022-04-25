@@ -445,14 +445,14 @@ pub fn resolve_includes<'a>(
     resolver: &'a NdlResolver,
     unit: &'a DesugaredParsingResult,
     tyctx: &mut TySpecContext<'a>,
-    errors: &mut Vec<Error>,
+    _errors: &mut Vec<Error>,
 ) {
     let new_unit = tyctx.include(unit);
     if new_unit {
         // resolve meta imports.
         for include in &unit.includes {
             if let Some(unit) = resolver.desugared_units.get(&include.path) {
-                resolve_includes(resolver, unit, tyctx, errors);
+                resolve_includes(resolver, unit, tyctx, _errors);
             } else {
                 // This should have been checked beforehand
 
