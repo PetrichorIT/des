@@ -5,7 +5,8 @@ debug = true
 
 members = [
   "des",
-  "cqueue", 
+  "cqueue",
+  "ndl",
   "tests",
   "des_derive",
 ]
