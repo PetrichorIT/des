@@ -1,9 +1,8 @@
 use std::ops::Deref;
 
 use des::prelude::*;
-use des_derive::Module;
 
-use log::{info, warn};
+use log::info;
 
 #[derive(Debug, Module)]
 #[ndl_workspace = "tests/utils"]
@@ -28,7 +27,7 @@ impl Module for Alice {
     }
 
     fn activity(&mut self) {
-        warn!(target: self.str(), "ACTIVITY");
+        info!(target: self.str(), "ACTIVITY");
     }
 }
 
@@ -68,7 +67,8 @@ impl Module for Bob {
 
         info!(target: self.name(), "Received at {}: Message with content: {}", sim_time(), pkt.content::<String>().deref());
 
-        pkt.content::<String>().push_str(&self.par("char").unwrap());
+        pkt.content_mut::<String>()
+            .push_str(&self.par("char").unwrap());
 
         self.send(pkt, ("netOut", 2));
     }

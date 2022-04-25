@@ -32,6 +32,9 @@ macro_rules! create_global_uid {
                 /// Generates a new unique id.
                 ///
                 pub fn gen() -> Self {
+                    // SAFTY:
+                    // Since uids should only be created over primitive data types
+                    // mutable usage of statics is save since no associated data is generated.
                     unsafe {
                         let a = $sident;
                         $sident += 1;

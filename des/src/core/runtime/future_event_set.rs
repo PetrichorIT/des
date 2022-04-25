@@ -142,7 +142,7 @@ mod cqueue {
         metrics::*,
         util::*,
     };
-    use calender_queue::*;
+    use cqueue::*;
 
     pub(crate) struct FutureEventSet<A>
     where
@@ -254,4 +254,4 @@ mod cqueue {
 }
 
 #[cfg(feature = "cqueue")]
-pub(crate) use cqueue::*;
+pub(crate) use self::cqueue::*;

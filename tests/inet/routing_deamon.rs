@@ -5,7 +5,6 @@ use des::{
     prelude::*,
     util::{MrcS, ReadOnly},
 };
-use des_derive::Module;
 use log::info;
 
 #[derive(Module)]

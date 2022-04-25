@@ -1,8 +1,6 @@
 use std::ops::Deref;
 
 use des::prelude::*;
-use des_derive::Module;
-
 use log::info;
 
 #[derive(Debug, Module)]
@@ -48,7 +46,7 @@ impl Module for Bob {
 
             info!(target: self.name(), "Received at {}: Message with content: {}", sim_time(),  pkt.content::<String>().deref());
 
-            pkt.content::<String>().push('#');
+            pkt.content_mut::<String>().push('#');
 
             self.send(pkt, ("netOut", 2));
         }

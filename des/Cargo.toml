@@ -1,17 +1,17 @@
 [package]
 edition = "2021"
 name = "des"
-version = "0.2.1"
+version = "0.2.2"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
 internal-metrics = []
-net = []
+net = [ "dep:des_derive" ]
 net-ipv6 = ["net"]
-pub-interning = []
 simtime-u128 = []
-cqueue = []
+# cqueue = [ "dep:cqueue" ]
+
 
 [dependencies]
 lazy_static = "1.4.0"
@@ -21,7 +21,7 @@ rand = {version = "*", features = ["std_rng"]}
 termcolor = "1.1.2"
 unic-emoji-char = "0.9.0"
 unicode-xid = "0.2.0"
-calender_queue = { path = "../calender_queue" }
 
-[dev-dependencies]
-des_derive = {path = "../des_derive"}
+cqueue = { path = "../cqueue", optional = true }
+des_derive = { path = "../des_derive", optional = true }
+

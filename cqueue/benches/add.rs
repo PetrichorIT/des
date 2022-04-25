@@ -10,7 +10,7 @@ use rand::prelude::StdRng;
 use rand::Rng;
 use rand::SeedableRng;
 
-use calender_queue::*;
+use cqueue::*;
 
 struct C {
     n: usize,

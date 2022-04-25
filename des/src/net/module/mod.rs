@@ -53,7 +53,7 @@ pub trait Module: StaticModuleCore {
     /// impl Module for MyModule {
     ///     fn handle_message(&mut self, msg: Message) {
     ///         let (pkt, meta) = msg.cast::<Packet>();
-    ///         println!("Received {:?} with metadata {:?}", *pkt, meta);
+    ///         println!("Received {:?} with metadata {:?}", pkt, meta);
     ///     }
     /// }
     /// ```

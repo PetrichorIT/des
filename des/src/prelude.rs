@@ -116,3 +116,10 @@ pub use crate::net::Parameters;
 pub use crate::net::NodeDefinition;
 #[cfg(feature = "net")]
 pub use crate::net::Topology;
+
+//
+// Export the derives if net
+//
+
+#[cfg(feature = "net")]
+pub use des_derive::*;

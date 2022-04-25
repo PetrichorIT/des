@@ -1,5 +1,4 @@
 use des::prelude::*;
-use des_derive::{Module, Network};
 
 #[derive(Debug, Module)]
 #[ndl_workspace = "tests/metrics"]

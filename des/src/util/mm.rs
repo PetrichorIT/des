@@ -280,4 +280,7 @@ impl<T> DerefMut for SyncWrap<T> {
     }
 }
 
+// SAFTY:
+// This wrapper should only be used to make statics thread safe,
+// since by design event simulation is single-threded (in the same context).
 unsafe impl<T> Sync for SyncWrap<T> {}

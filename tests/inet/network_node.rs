@@ -3,9 +3,7 @@ use des::{
     prelude::*,
     util::{MrcS, ReadOnly},
 };
-use log::warn;
-
-use des_derive::Module;
+use log::info;
 
 #[derive(Module)]
 pub struct NetworkNode {
@@ -32,7 +30,7 @@ impl Module for NetworkNode {
         let incoming = msg.meta().last_gate.as_ref().unwrap();
 
         let pos = incoming.pos();
-        warn!(target: self.str(), "Node incoming at gate {:?}", incoming);
+        info!(target: self.str(), "Node incoming at gate {:?}", incoming);
         if incoming.name().eq("channelIncoming") {
             // From channel
             self.send(msg, ("toStack", pos))
