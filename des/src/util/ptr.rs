@@ -53,19 +53,45 @@ mod private {
     pub trait MutabilityState {}
 }
 
+/// A [Ptr] that does not support mutation ([Const]).
 pub type PtrConst<T> = Ptr<T, Const>;
+/// A [Ptr] that does support mutation ([Mut]).
 pub type PtrMut<T> = Ptr<T, Mut>;
+/// A [PtrWeak] that does not support mutation ([Const]).
 pub type PtrWeakConst<T> = PtrWeak<T, Const>;
+/// A [PtrWeak] that does support mutation ([Mut]).
 pub type PtrWeakMut<T> = PtrWeak<T, Mut>;
 
+///
+/// An annotation type that indicates a [Ptr] or a [PtrWeak]
+/// does not support mutation.
+///
 #[derive(Debug)]
 pub struct Const;
 impl private::MutabilityState for Const {}
 
+///
+/// An annotation type that indicates a [Ptr] or a [PtrWeak]
+/// does support mutation.
+///
 #[derive(Debug)]
 pub struct Mut;
 impl private::MutabilityState for Mut {}
 
+///
+/// A wrapper to a [Rc] that allows interior mutability
+/// in a uncontrolled manner.
+///
+/// # Safty contract
+///
+/// This type should not be used with container types
+/// since having it allows simultanios &T and &mut T borrows.
+/// Because of that the integrity of refences into a container
+/// can not be guranteed.
+///
+/// As a quick rule of thumb do not store the references
+/// returned by [Deref] or [DerefMut] anywhere.
+///
 pub struct Ptr<T, S>
 where
     T: ?Sized,
@@ -95,10 +121,43 @@ where
     T: ?Sized,
     S: MutabilityState,
 {
+    ///
+    /// Gets the number of strong ([Ptr])
+    /// pointers to the underlying allocation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use des::prelude::*;
+    /// let the_solution: PtrMut<usize> = Ptr::new(42);
+    /// let _copy_cat = Ptr::clone(&the_solution);
+    ///
+    /// assert_eq!(Ptr::strong_count(&the_solution), 2);
+    /// #
+    /// # drop(the_solution);
+    /// # drop(_copy_cat);
+    /// ```
     pub fn strong_count(this: &Self) -> usize {
         Rc::strong_count(&this.inner)
     }
 
+    ///
+    /// Gets the number of weak ([PtrWeak])
+    /// pointer to the underlying allocation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use des::prelude::*;
+    /// #
+    /// let pw: PtrConst<String> = Ptr::new("SuperSecretPW".to_string());
+    /// let _weak = PtrWeak::from_strong(&pw);
+    ///
+    /// assert_eq!(Ptr::weak_count(&pw), 1);
+    /// #
+    /// # drop(pw);
+    /// # drop(_weak);
+    /// ```
     pub fn weak_count(this: &Self) -> usize {
         Rc::weak_count(&this.inner)
     }
@@ -258,6 +317,20 @@ where
 
 // WEAK
 
+///
+/// A wrapper to a [Weak] that allows interior mutability
+/// in a uncontrolled manner.
+///
+/// # Safty contract
+///
+/// This type should not be used with container types
+/// since having it allows simultanios &T and &mut T borrows.
+/// Because of that the integrity of refences into a container
+/// can not be guranteed.
+///
+/// As a quick rule of thumb do not store the references
+/// returned by [Deref] or [DerefMut] anywhere.
+///
 pub struct PtrWeak<T, S>
 where
     T: ?Sized,
@@ -273,6 +346,19 @@ where
     S: MutabilityState,
 {
     ///
+    /// Creates a new empty instance of [PtrWeak].
+    ///
+    pub fn new() -> Self
+    where
+        T: Sized,
+    {
+        Self {
+            inner: Weak::new(),
+            _phantom: PhantomData,
+        }
+    }
+
+    ///
     /// Constructs a new [PtrWeak<T>] from a [Ptr<T>].
     ///
     pub fn from_strong(ptr: &Ptr<T, S>) -> Self {
@@ -280,6 +366,24 @@ where
             inner: Rc::downgrade(&ptr.inner),
             _phantom: PhantomData,
         }
+    }
+
+    ///
+    /// Gets the number of strong ([Ptr]) pointers pointing to this allocation.
+    ///
+    /// If self was created using [PtrWeak::new], this will return 0.
+    ///
+    pub fn strong_count(&self) -> usize {
+        self.inner.strong_count()
+    }
+
+    ///
+    /// Gets the number of [PtrWeak] pointers pointing to this allocation.
+    ///
+    /// If no strong pointers remain, this will return zero.
+    ///
+    pub fn weak_count(&self) -> usize {
+        self.inner.weak_count()
     }
 }
 
@@ -305,6 +409,15 @@ impl<T: ?Sized> PtrWeak<T, Const> {
             inner: self.inner,
             _phantom: PhantomData,
         }
+    }
+}
+
+impl<T, S> Default for PtrWeak<T, S>
+where
+    S: MutabilityState,
+{
+    fn default() -> Self {
+        Self::new()
     }
 }
 

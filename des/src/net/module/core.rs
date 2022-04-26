@@ -309,6 +309,9 @@ impl ModuleCore {
         // a.downcast()
     }
 
+    ///
+    /// Returns the parent as a [PtrWeakConst].
+    ///
     pub fn parent(&self) -> Result<PtrWeakConst<dyn StaticModuleCore>, ModuleReferencingError> {
         match self.parent.as_ref() {
             Some(parent) => Ok(PtrWeakMut::clone(parent).make_const()),
@@ -319,6 +322,9 @@ impl ModuleCore {
         }
     }
 
+    ///
+    /// Returns the parent as a [PtrWeakConst] casted to the given type T.
+    ///
     pub fn parent_as<T>(&self) -> Result<PtrWeakConst<T>, ModuleReferencingError>
     where
         T: 'static + StaticModuleCore,
@@ -332,6 +338,9 @@ impl ModuleCore {
         }
     }
 
+    ///
+    /// Returns the parent as a [PtrWeakMut].
+    ///
     pub fn parent_mut(
         &mut self,
     ) -> Result<PtrWeakMut<dyn StaticModuleCore>, ModuleReferencingError> {
@@ -344,6 +353,9 @@ impl ModuleCore {
         }
     }
 
+    ///
+    /// Returns the parent as a [PtrWeakMut] casted to the type T.
+    ///
     pub fn parent_mut_as<T>(&mut self) -> Result<PtrWeakMut<T>, ModuleReferencingError>
     where
         T: 'static + StaticModuleCore,
@@ -357,6 +369,9 @@ impl ModuleCore {
         }
     }
 
+    ///
+    /// Returns the child with the given name if existent, as a [PtrWeakConst].
+    ///
     pub fn child(
         &self,
         name: &str,
@@ -370,6 +385,10 @@ impl ModuleCore {
         }
     }
 
+    ///
+    /// Returns the child with the given name if existent, as a [PtrWeakConst]
+    /// casted to the type T.
+    ///
     pub fn child_as<T>(&self, name: &str) -> Result<PtrWeakConst<T>, ModuleReferencingError>
     where
         T: 'static + StaticModuleCore,
@@ -383,6 +402,9 @@ impl ModuleCore {
         }
     }
 
+    ///
+    /// Returns the child with the given name if existent, as a [PtrWeakMut].
+    ///
     pub fn child_mut(
         &mut self,
         name: &str,
@@ -396,6 +418,10 @@ impl ModuleCore {
         }
     }
 
+    ///
+    /// Returns the child with the given name if existent, as a [PtrWeakMut]
+    /// casted to the type T.
+    ///
     pub fn child_mut_as<T>(&mut self, name: &str) -> Result<PtrWeakMut<T>, ModuleReferencingError>
     where
         T: 'static + StaticModuleCore,

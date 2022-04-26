@@ -274,6 +274,9 @@ impl Packet {
         unimplemented!("PacketIDs are no longer supported")
     }
 
+    ///
+    /// Returns the attached [MessageMetadata] of the attached [Message].
+    ///
     pub fn meta(&self) -> &MessageMetadata {
         self.message_meta.as_ref().unwrap()
     }
@@ -336,6 +339,9 @@ impl Packet {
         self.header.seq_no = seq_no
     }
 
+    ///
+    /// Set s the last node to the packet header.
+    ///
     pub fn set_last_node(&mut self, last_node: NodeAddress) {
         self.header.last_node = last_node
     }
@@ -349,52 +355,35 @@ impl Packet {
     }
 
     ///
-    /// Extracts the message casting the stored ptr
-    /// into a Box of type T.
+    /// Trys to return the content by reference casted to the given type T.
+    /// Returns [None] if the no content exists or the content is not of type T.
     ///
-    /// # Safty
-    ///
-    /// The caller must ensure that the stored data is a valid instance
-    /// of type T. If this cannot be guarnteed this is UB.
-    /// Note that DES guarntees that the data refernced by ptr will not
-    /// be freed until this function is called, and ownership is thereby moved..
-    ///
-
-    // pub fn decapsulate<T: 'static + MessageBody>(
-    //     self,
-    // ) -> (TypedInternedValue<'static, T>, PacketHeader) {
-    //     let Self {
-    //         content, header, ..
-    //     } = self;
-    //     (content.unwrap().cast(), header)
-    // }
-
-    ///
-    /// Extracts the message casting the stored ptr
-    /// into a Box of type T.
-    ///
-    /// # Safty
-    ///
-    /// The caller must ensure that the stored data is a valid instance
-    /// of type T. If this cannot be guarnteed this is UB.
-    /// Note that DES guarntees that the data refernced by ptr will not
-    /// be freed until this function is called, and ownership is thereby moved..
-    ///
-
     pub fn try_content<T: 'static + MessageBody>(&self) -> Option<&T> {
         Some(self.content.as_ref()?.downcast_ref::<T>())?
     }
 
+    ///
+    /// Trys to return the content by reference casted to the given type T.
+    /// Panics if the no content exists or the content is not of type T.
+    ///
     pub fn content<T: 'static + MessageBody>(&self) -> &T {
         self.try_content().expect("Failed to unwrap")
     }
 
+    ///
+    /// Trys to return the content by mutable ref casted to the given type T.
+    /// Returns [None] if the no content exists or the content is not of type T.
+    ///
     pub fn try_content_mut<T: 'static + MessageBody>(&mut self) -> Option<&mut T> {
         let mut_rc = self.content.as_mut()?;
         let mut_any = Rc::get_mut(mut_rc)?;
         Some(mut_any.downcast_mut())?
     }
 
+    ///
+    /// Trys to return the content by mutable ref casted to the given type T.
+    /// Panics if the no content exists or the content is not of type T.
+    ///
     pub fn content_mut<T: 'static + MessageBody>(&mut self) -> &mut T {
         self.try_content_mut().expect("Failed to unwrap")
     }
@@ -436,6 +425,9 @@ pub struct PacketBuilder {
 }
 
 impl PacketBuilder {
+    ///
+    /// Creates a new [PacketBuilder].
+    ///
     pub fn new() -> Self {
         Self {
             message_builder: MessageBuilder::new(),
@@ -543,6 +535,9 @@ impl PacketBuilder {
 
     // END
 
+    ///
+    /// Builds a [Packet] from the values given in the builder.
+    ///
     pub fn build(self) -> Packet {
         // Packet { header: PacketHeader::new(src, dest, packet_length), content: () }}
         let PacketBuilder {

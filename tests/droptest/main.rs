@@ -19,7 +19,7 @@ fn main() {
     let rt = Runtime::new_with(app, RuntimeOptions::seeded(0x123));
 
     let (app, time, event_count) = rt.run().unwrap();
-    let globals = app.globals().clone();
+    let globals = app.globals();
 
     drop(app);
 
