@@ -40,6 +40,14 @@ impl<A> NetworkRuntime<A> {
     ///
     /// Returns the globals (readonly) of the entire simulation.
     ///
+    #[doc(hidden)]
+    pub fn globals_weak(&self) -> PtrWeakConst<NetworkRuntimeGlobals> {
+        PtrWeak::from_strong(&self.globals).make_const()
+    }
+
+    ///
+    /// Returns the globals (readonly) of the entire simulation.
+    ///
     pub fn globals(&self) -> PtrConst<NetworkRuntimeGlobals> {
         Ptr::clone(&self.globals).make_const()
     }

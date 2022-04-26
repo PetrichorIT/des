@@ -646,6 +646,7 @@ name = "tests"
 version = "0.1.0"
 dependencies = [
  "des",
+ "lazy_static",
  "log",
  "ndl",
  "rand",

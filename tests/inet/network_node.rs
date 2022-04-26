@@ -8,13 +8,13 @@ pub struct NetworkNode {
 
 impl NetworkNode {
     #[allow(unused)]
-    pub fn new(globals: PtrConst<NetworkRuntimeGlobals>) -> Self {
+    pub fn new(globals: PtrWeakConst<NetworkRuntimeGlobals>) -> Self {
         Self {
             core: ModuleCore::new_with("NetworkNode".parse().unwrap(), globals),
         }
     }
 
-    pub fn named(name: &str, globals: PtrConst<NetworkRuntimeGlobals>) -> Self {
+    pub fn named(name: &str, globals: PtrWeakConst<NetworkRuntimeGlobals>) -> Self {
         Self {
             core: ModuleCore::new_with(name.parse().unwrap(), globals),
         }

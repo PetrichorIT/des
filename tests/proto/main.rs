@@ -72,7 +72,7 @@ fn main() {
     let (app, _time, _event_count) = rt.run().unwrap();
 
     let _ = app
-        .globals()
+        .globals_weak()
         .topology
         .write_to_svg("tests/proto/graph")
         .unwrap();

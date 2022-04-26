@@ -57,7 +57,7 @@ pub struct ModuleCore {
     pub(crate) children: HashMap<String, PtrWeakMut<dyn StaticModuleCore>>,
 
     /// A set of local parameters.
-    globals: PtrConst<NetworkRuntimeGlobals>,
+    globals: PtrWeakConst<NetworkRuntimeGlobals>,
 
     /// A refence to one self
     pub(crate) self_ref: Option<PtrWeakVoid>,
@@ -158,7 +158,7 @@ impl ModuleCore {
     /// Creates a new optionally named instance
     /// of 'Self'.
     ///
-    pub fn new_with(path: ModulePath, globals: PtrConst<NetworkRuntimeGlobals>) -> Self {
+    pub fn new_with(path: ModulePath, globals: PtrWeakConst<NetworkRuntimeGlobals>) -> Self {
         Self {
             id: ModuleId::gen(),
             path,
@@ -205,7 +205,7 @@ impl ModuleCore {
     pub fn new() -> Self {
         Self::new_with(
             ModulePath::root(String::from("unknown-module")),
-            PtrConst::new(NetworkRuntimeGlobals::new()),
+            PtrWeakConst::from_strong(&PtrConst::new(NetworkRuntimeGlobals::new())),
         )
     }
 }
@@ -433,8 +433,8 @@ impl ModuleCore {
     /// Returns a reference to the parameter store, used for constructing
     /// custom instances of modules.
     ///
-    pub fn globals(&self) -> PtrConst<NetworkRuntimeGlobals> {
-        PtrConst::clone(&self.globals)
+    pub fn globals(&self) -> PtrWeakConst<NetworkRuntimeGlobals> {
+        PtrWeakConst::clone(&self.globals)
     }
 }
 

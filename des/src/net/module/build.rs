@@ -14,7 +14,7 @@ macro_rules! impl_buildable {
             where
                 Self: NameableModule + Sized,
         {
-            let core = ModuleCore::new_with(path, rt.globals());
+            let core = ModuleCore::new_with(path, rt.globals_weak());
             let mut this = Ptr::new(Self::named(core));
 
             // Attach self to module core
@@ -60,7 +60,7 @@ pub trait __Buildable0 {
     where
         Self: NameableModule + Sized,
     {
-        let core = ModuleCore::new_with(path, rt.globals());
+        let core = ModuleCore::new_with(path, rt.globals_weak());
         let mut this = PtrMut::new(Self::named(core));
         // Attach self to module core
         let clone = PtrWeak::from_strong(&this);

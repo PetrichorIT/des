@@ -10,3 +10,4 @@ cargo run --release --bin t-ptrhell
 cargo run --release --bin t-utils
 cargo run --release --bin t-waiter
 cargo run --release --bin t-proto
+cargo run --release --bin t-droptest

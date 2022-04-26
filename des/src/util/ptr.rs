@@ -1,6 +1,7 @@
 use std::{
     any::TypeId,
     cell::UnsafeCell,
+    fmt::Debug,
     hash::Hash,
     marker::{PhantomData, Unsize},
     ops::{CoerceUnsized, Deref, DerefMut, DispatchFromDyn},
@@ -65,7 +66,6 @@ impl private::MutabilityState for Const {}
 pub struct Mut;
 impl private::MutabilityState for Mut {}
 
-#[derive(Debug)]
 pub struct Ptr<T, S>
 where
     T: ?Sized,
@@ -87,6 +87,20 @@ where
             inner: Rc::new(UnsafeCell::new(value)),
             _phantom: PhantomData,
         }
+    }
+}
+
+impl<T, S> Ptr<T, S>
+where
+    T: ?Sized,
+    S: MutabilityState,
+{
+    pub fn strong_count(this: &Self) -> usize {
+        Rc::strong_count(&this.inner)
+    }
+
+    pub fn weak_count(this: &Self) -> usize {
+        Rc::weak_count(&this.inner)
     }
 }
 
@@ -112,6 +126,20 @@ impl<T: ?Sized> Ptr<T, Const> {
             inner: self.inner,
             _phantom: PhantomData,
         }
+    }
+}
+
+impl<T, S> Debug for Ptr<T, S>
+where
+    T: ?Sized,
+    S: MutabilityState,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Ptr")
+            .field("value", &"Some(_)")
+            .field("strong_count", &Self::strong_count(self))
+            .field("weak_count", &Self::weak_count(self))
+            .finish()
     }
 }
 
@@ -230,7 +258,6 @@ where
 
 // WEAK
 
-#[derive(Debug)]
 pub struct PtrWeak<T, S>
 where
     T: ?Sized,
@@ -278,6 +305,27 @@ impl<T: ?Sized> PtrWeak<T, Const> {
             inner: self.inner,
             _phantom: PhantomData,
         }
+    }
+}
+
+impl<T, S> Debug for PtrWeak<T, S>
+where
+    T: ?Sized,
+    S: MutabilityState,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PtrWeak")
+            .field(
+                "value",
+                if self.inner.upgrade().is_some() {
+                    &"Some(_)"
+                } else {
+                    &"None"
+                },
+            )
+            .field("strong_count", &self.inner.strong_count())
+            .field("weak_count", &self.inner.weak_count())
+            .finish()
     }
 }
 

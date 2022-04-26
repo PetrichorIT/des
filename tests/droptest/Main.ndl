@@ -1,0 +1,43 @@
+module Alice {
+    gates:
+        netOut
+        netIn
+}
+
+module Bob {
+    gates:
+        netOut
+        netIn
+}
+
+module Network {
+    submodules:
+        alice: Alice
+        bob: Bob
+
+    gates: 
+        fromAlice
+        fromBob
+        toAlice
+        toBob
+
+    connections:
+        alice/netOut --> fromAlice
+        fromAlice --> SlowLink --> toBob
+        toBob --> bob/netIn
+
+        bob/netOut --> fromBob
+        fromBob --> SlowLink --> toAlice
+        toAlice --> alice/netIn
+}
+
+link SlowLink {
+    bitrate: 10000
+    jitter: 0.1
+    latency: 0.1
+}
+
+network Main {
+    nodes:
+        network: Network
+}

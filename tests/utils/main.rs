@@ -10,12 +10,12 @@ struct A();
 fn main() {
     let app: NetworkRuntime<A> = A().build_rt();
 
-    println!("{:?}", app.globals().parameters);
+    println!("{:?}", app.globals_weak().parameters);
 
     let rt = Runtime::new_with(app, RuntimeOptions::seeded(0x123));
     let (app, time, event_count) = rt.run().unwrap();
 
-    let topo = &app.globals().topology;
+    let topo = &app.globals_weak().topology;
 
     assert_eq!(topo.nodes().count(), 4);
     assert_eq!(topo.edges().count(), 14);

@@ -29,7 +29,7 @@ impl Topology {
     ///
     /// The full set of nodes in the topology.
     ///
-    pub fn nodes(&self) -> impl Iterator<Item = &ModuleRefMut> {
+    pub fn nodes(&self) -> impl Iterator<Item = &PtrMut<dyn Module>> {
         self.nodes.iter().map(|def| &def.node)
     }
 
@@ -125,7 +125,7 @@ impl Topology {
     #[must_use]
     pub fn filter_nodes<P>(&self, mut predicate: P) -> Self
     where
-        P: FnMut(&ModuleRefMut) -> bool,
+        P: FnMut(&PtrMut<dyn Module>) -> bool,
     {
         // Remove unwanted nodes
         let mut nodes: Vec<NodeDefinition> = self
@@ -158,7 +158,7 @@ impl Topology {
     #[must_use]
     pub fn filter_edges<P>(&self, mut predicate: P) -> Self
     where
-        P: FnMut(&ModuleRefMut, &Edge) -> bool,
+        P: FnMut(&PtrMut<dyn Module>, &Edge) -> bool,
     {
         let mut nodes = self.nodes.clone();
         for def in &mut nodes {
@@ -256,7 +256,7 @@ pub struct NodeDefinition {
     ///
     /// A reference of the described node.
     ///
-    pub node: ModuleRefMut,
+    pub node: PtrMut<dyn Module>,
     ///
     /// All edges, starting from this node.
     ///

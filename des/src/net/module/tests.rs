@@ -81,7 +81,7 @@ impl TestCase {
     fn build() -> Self {
         let core = ModuleCore::new_with(
             ModulePath::root("Root".into()),
-            PtrConst::new(NetworkRuntimeGlobals::new()),
+            PtrWeakConst::from_strong(&PtrConst::new(NetworkRuntimeGlobals::new())),
         );
 
         let mut parent = Parent::named_root(core);

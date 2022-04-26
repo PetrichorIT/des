@@ -22,11 +22,11 @@ fn main() {
     //
     // ALICE
     //
-    let mut node_alice = PtrMut::new(NetworkNode::named("Alice", app.globals()));
+    let mut node_alice = PtrMut::new(NetworkNode::named("Alice", app.globals_weak()));
     let mut stack_alice = NetworkStack::new(
         "Alice.NetworkStack",
         0x00_00_00_ff,
-        RandomRoutingDeamon::new(app.globals()),
+        RandomRoutingDeamon::new(app.globals_weak()),
     );
     node_alice.add_child(&mut stack_alice);
 
@@ -53,11 +53,11 @@ fn main() {
     //
     // BOB
     //
-    let mut node_bob = PtrMut::new(NetworkNode::named("Bob", app.globals()));
+    let mut node_bob = PtrMut::new(NetworkNode::named("Bob", app.globals_weak()));
     let mut stack_bob = NetworkStack::new(
         "Bob.NetworkStack",
         0x00_00_00_ee,
-        RandomRoutingDeamon::new(app.globals()),
+        RandomRoutingDeamon::new(app.globals_weak()),
     );
 
     node_bob.add_child(&mut stack_bob);
@@ -86,11 +86,11 @@ fn main() {
     // EVE
     //
 
-    let mut node_eve = PtrMut::new(NetworkNode::named("Eve", app.globals()));
+    let mut node_eve = PtrMut::new(NetworkNode::named("Eve", app.globals_weak()));
     let mut stack_eve = NetworkStack::new(
         "Eve.NetworkStack",
         0x00_00_00_dd,
-        RandomRoutingDeamon::new(app.globals()),
+        RandomRoutingDeamon::new(app.globals_weak()),
     );
 
     node_eve.add_child(&mut stack_eve);
@@ -191,7 +191,7 @@ fn main() {
 
     let (app, time, event_count) = rt.run().unwrap();
 
-    let _ = app.globals().topology.write_to_svg("tests/inet/graph");
+    let _ = app.globals_weak().topology.write_to_svg("tests/inet/graph");
 
     assert_eq!(time, SimTime::from(0.200128));
     assert_eq!(event_count, 21);
