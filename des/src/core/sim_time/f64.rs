@@ -205,10 +205,10 @@ impl SubAssign for SimTime {
 }
 
 impl Div for SimTime {
-    type Output = f64;
+    type Output = SimTime;
 
     fn div(self, rhs: Self) -> Self::Output {
-        self.0 / rhs.0
+        SimTime(self.0 / rhs.0)
     }
 }
 
@@ -270,6 +270,14 @@ impl DivAssign<f64> for SimTime {
     }
 }
 
+impl Rem<SimTime> for SimTime {
+    type Output = SimTime;
+
+    fn rem(self, rhs: SimTime) -> Self::Output {
+        SimTime(self.0.rem(rhs.0))
+    }
+}
+
 // Num Traits
 
 use num_traits::*;
@@ -287,6 +295,17 @@ impl Zero for SimTime {
 impl One for SimTime {
     fn one() -> Self {
         Self(f64::one())
+    }
+}
+
+#[cfg(feature = "cqueue")]
+impl cqueue::TimeLike for SimTime {
+    fn as_usize(self) -> usize {
+        self.0 as usize
+    }
+
+    fn min(self, other: Self) -> Self {
+        SimTime(f64::min(self.0, other.0))
     }
 }
 

@@ -148,7 +148,7 @@ mod cqueue {
     where
         A: Application,
     {
-        inner: CalenderQueue<SimTime, A::EventSet>,
+        inner: CQueue<SimTime, A::EventSet>,
     }
 
     impl<A> FutureEventSet<A>
@@ -160,11 +160,13 @@ mod cqueue {
         }
 
         pub fn len_nonzero(&self) -> usize {
-            self.inner.len_nonzero()
+            // self.inner.len_nonzero()
+            todo!();
         }
 
         pub fn len_zero(&self) -> usize {
-            self.inner.len_zero()
+            // self.inner.len_zero()
+            todo!();
         }
 
         pub fn is_empty(&self) -> bool {
@@ -172,16 +174,15 @@ mod cqueue {
         }
 
         pub fn new_with(options: &RuntimeOptions) -> Self {
-            let cqueue_options = CalenderQueueOptions {
+            let cqueue_options = CQueueOptions {
                 num_buckets: options.cqueue_num_buckets,
                 bucket_timespan: options.cqueue_bucket_timespan,
-                min_time: options.min_sim_time,
 
                 ..Default::default()
             };
 
             Self {
-                inner: CalenderQueue::new_with(cqueue_options),
+                inner: CQueue::new(cqueue_options),
             }
         }
 
@@ -202,8 +203,9 @@ mod cqueue {
 
             let Node {
                 time,
-                value,
-                value_cookie,
+                event,
+                cookie,
+                ..
             } = self.inner.fetch_next();
 
             #[cfg(feature = "internal-metrics")]
@@ -226,8 +228,8 @@ mod cqueue {
 
             EventNode {
                 time,
-                id: value_cookie,
-                event: value,
+                id: cookie,
+                event: event,
 
                 _phantom: PhantomData,
             }

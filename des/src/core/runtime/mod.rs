@@ -100,7 +100,7 @@ where
     /// Returns the number of events that were dispatched on this [Runtime] instance.
     ///
     #[inline(always)]
-    pub fn num_events_dispatched(&self) -> u64 {
+    pub fn num_events_dispatched(&self) -> usize {
         self.core().event_id
     }
 

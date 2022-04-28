@@ -117,7 +117,7 @@ where
 ///
 /// A runtime unqiue identifier for a event.
 ///
-pub(crate) type EventId = u64;
+pub(crate) type EventId = usize;
 
 ///
 /// A bin-heap node of a event from the applicaitons event set.

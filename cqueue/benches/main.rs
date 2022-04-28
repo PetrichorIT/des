@@ -37,18 +37,58 @@ fn throughput_by_batch_size(c: &mut Criterion) {
 
     let configs = [10, 25, 50, 100, 150, 200, 350, 500];
 
-    let mut queue: CalenderQueue<f64, i32> = CalenderQueue::new_with(CalenderQueueOptions {
-        num_buckets: 10,
-        bucket_timespan: 20.0,
-        min_time: 0.0f64,
-        bucket_capacity: 50,
-        overflow_capacity: 200,
-    });
+    let mut queue: overflow_heap::CQueue<f64, i32> =
+        overflow_heap::CQueue::new(overflow_heap::CQueueOptions {
+            num_buckets: 10,
+            bucket_timespan: 20.0,
+            min_time: 0.0f64,
+            bucket_capacity: 50,
+            overflow_capacity: 200,
+        });
 
     let mut group = c.benchmark_group("cqueue::throuput::by_batch_size");
     for c in configs.iter() {
         group.throughput(Throughput::Elements(*c as u64));
-        group.bench_with_input(BenchmarkId::from_parameter(c), c, |b, c| {
+        group.bench_with_input(BenchmarkId::new("overflow", c), c, |b, c| {
+            b.iter_custom(|iters| {
+                let start = Instant::now();
+                for i in 0..iters {
+                    let i = i as usize;
+                    let mut i = i % 10_000;
+                    let mut i_end = (i + *c) % 10_000;
+                    if i_end < i {
+                        i = i_end;
+                        i_end = i + *c;
+                    }
+                    let subsection = &events[i..i_end];
+
+                    // Add elements in all buckets to prevent bucket collpasing
+                    for k in 0..10 {
+                        let time = 20.0 * k as f64;
+                        queue.add(time, k);
+                    }
+
+                    for (t, v) in subsection {
+                        queue.add(*t, *v);
+                    }
+
+                    for _ in subsection {
+                        queue.fetch_next();
+                    }
+
+                    queue.reset(0.0);
+                }
+                start.elapsed()
+            })
+        });
+    }
+
+    let mut queue: const_time::CQueue<f64, i32> =
+        const_time::CQueue::new(const_time::CQueueOptions { n: 30, t: 5.0 });
+
+    for c in configs.iter() {
+        group.throughput(Throughput::Elements(*c as u64));
+        group.bench_with_input(BenchmarkId::new("const_time", c), c, |b, c| {
             b.iter_custom(|iters| {
                 let start = Instant::now();
                 for i in 0..iters {
@@ -98,13 +138,14 @@ fn throughput_relativ_pos(c: &mut Criterion) {
         events.push((time, i))
     }
 
-    let mut queue: CalenderQueue<f64, i32> = CalenderQueue::new_with(CalenderQueueOptions {
-        num_buckets: 10,
-        bucket_timespan: 20.0,
-        min_time: 0.0f64,
-        bucket_capacity: 50,
-        overflow_capacity: 200,
-    });
+    let mut queue: overflow_heap::CQueue<f64, i32> =
+        overflow_heap::CQueue::new(overflow_heap::CQueueOptions {
+            num_buckets: 10,
+            bucket_timespan: 20.0,
+            min_time: 0.0f64,
+            bucket_capacity: 50,
+            overflow_capacity: 200,
+        });
 
     let configs = [
         0.0..10.0,
@@ -149,7 +190,7 @@ fn throughput_relativ_pos(c: &mut Criterion) {
     let mut group = c.benchmark_group("cqueue::throughput::by_insert_position");
     for c in configs.iter().enumerate() {
         group.bench_with_input(
-            BenchmarkId::from_parameter(format!("{}", c.1.end)),
+            BenchmarkId::new("overflow", format!("{}", c.1.end)),
             &c,
             |b, c| {
                 let subsegement = &subsegements[c.0];
@@ -159,10 +200,6 @@ fn throughput_relativ_pos(c: &mut Criterion) {
 
                     for i in 0..iters {
                         let i = i as usize % subsegement.len();
-
-                        // println!("\na) {:?}", queue);
-
-                        // Add elements in all buckets to prevent bucket collpasing
                         for k in 0..10 {
                             let time = 20.0 * k as f64;
                             queue.add(time, k);
@@ -173,12 +210,6 @@ fn throughput_relativ_pos(c: &mut Criterion) {
                             let (time, value) = &subsegement[j];
                             queue.add(*time, *value);
                         }
-
-                        // println!("\nb) {:?}", queue);
-                        // assert!(queue.len_overflow() > 0);
-
-                        // println!("{} {}", queue.len_first_bucket(), queue.len_overflow());
-
                         for _j in 0..100 {
                             queue.fetch_next();
                         }
@@ -191,6 +222,45 @@ fn throughput_relativ_pos(c: &mut Criterion) {
             },
         );
     }
+
+    let mut queue: const_time::CQueue<f64, i32> =
+        const_time::CQueue::new(const_time::CQueueOptions { n: 30, t: 5.0 });
+
+    for c in configs.iter().enumerate() {
+        group.bench_with_input(
+            BenchmarkId::new("const_time", format!("{}", c.1.end)),
+            &c,
+            |b, c| {
+                let subsegement = &subsegements[c.0];
+                b.iter_custom(|iters| {
+                    queue.clear();
+                    let start = Instant::now();
+
+                    for i in 0..iters {
+                        let i = i as usize % subsegement.len();
+                        for k in 0..10 {
+                            let time = 20.0 * k as f64;
+                            queue.add(time, k);
+                        }
+
+                        for j in i..(i + 100) {
+                            let j = j % subsegement.len();
+                            let (time, value) = &subsegement[j];
+                            queue.add(*time, *value);
+                        }
+                        for _j in 0..100 {
+                            queue.fetch_next();
+                        }
+
+                        queue.reset(0.0)
+                    }
+
+                    start.elapsed()
+                });
+            },
+        );
+    }
+
     group.finish()
 }
 
@@ -219,18 +289,35 @@ fn throughput_by_parameters(c: &mut Criterion) {
         C { n: 5, t: 0.2 }, // 1%
     ];
 
-    let mut group = c.benchmark_group("cqueue::throuput::5_buckets");
+    let mut group = c.benchmark_group("cqueue::throughput::5_buckets");
     for c in configs.iter() {
         // group.throughput(Throughput::Elements(*size as u64));
-        group.bench_with_input(BenchmarkId::from_parameter(c), c, |b, c| {
-            let mut queue: CalenderQueue<f64, i32> =
-                CalenderQueue::new_with(CalenderQueueOptions {
+        group.bench_with_input(BenchmarkId::new("overflow", c), c, |b, c| {
+            let mut queue: overflow_heap::CQueue<f64, i32> =
+                overflow_heap::CQueue::new(overflow_heap::CQueueOptions {
                     num_buckets: c.n,
                     bucket_timespan: c.t,
                     min_time: 0.0f64,
                     bucket_capacity: 50,
                     overflow_capacity: 200,
                 });
+
+            b.iter(|| {
+                queue.reset(0.0);
+
+                for (t, v) in events {
+                    queue.add(*t, *v)
+                }
+
+                for _ in events {
+                    queue.fetch_next();
+                }
+            });
+        });
+
+        group.bench_with_input(BenchmarkId::new("const_time", c), c, |b, c| {
+            let mut queue: const_time::CQueue<f64, i32> =
+                const_time::CQueue::new(const_time::CQueueOptions { n: c.n, t: c.t });
 
             b.iter(|| {
                 queue.reset(0.0);
@@ -258,18 +345,34 @@ fn throughput_by_parameters(c: &mut Criterion) {
         C { n: 10, t: 0.1 },
     ];
 
-    let mut group = c.benchmark_group("cqueue::throuput::10_buckets");
+    let mut group = c.benchmark_group("cqueue::throughput::10_buckets");
     for c in configs.iter() {
         // group.throughput(Throughput::Elements(*size as u64));
-        group.bench_with_input(BenchmarkId::from_parameter(c), c, |b, c| {
-            let mut queue: CalenderQueue<f64, i32> =
-                CalenderQueue::new_with(CalenderQueueOptions {
+        group.bench_with_input(BenchmarkId::new("overflow", c), c, |b, c| {
+            let mut queue: overflow_heap::CQueue<f64, i32> =
+                overflow_heap::CQueue::new(overflow_heap::CQueueOptions {
                     num_buckets: c.n,
                     bucket_timespan: c.t,
                     min_time: 0.0f64,
                     bucket_capacity: 50,
                     overflow_capacity: 200,
                 });
+
+            b.iter(|| {
+                queue.reset(0.0);
+                for (t, v) in events.iter() {
+                    queue.add(*t, *v);
+                }
+
+                for _ in events {
+                    queue.fetch_next();
+                }
+            });
+        });
+
+        group.bench_with_input(BenchmarkId::new("const_time", c), c, |b, c| {
+            let mut queue: const_time::CQueue<f64, i32> =
+                const_time::CQueue::new(const_time::CQueueOptions { n: c.n, t: c.t });
 
             b.iter(|| {
                 queue.reset(0.0);
@@ -296,12 +399,12 @@ fn throughput_by_parameters(c: &mut Criterion) {
         C { n: 20, t: 0.05 },
     ];
 
-    let mut group = c.benchmark_group("cqueue::throuput::20_buckets");
+    let mut group = c.benchmark_group("cqueue::throughput::20_buckets");
     for c in configs.iter() {
         // group.throughput(Throughput::Elements(*size as u64));
-        group.bench_with_input(BenchmarkId::from_parameter(c), c, |b, c| {
-            let mut queue: CalenderQueue<f64, i32> =
-                CalenderQueue::new_with(CalenderQueueOptions {
+        group.bench_with_input(BenchmarkId::new("overflow", c), c, |b, c| {
+            let mut queue: overflow_heap::CQueue<f64, i32> =
+                overflow_heap::CQueue::new(overflow_heap::CQueueOptions {
                     num_buckets: c.n,
                     bucket_timespan: c.t,
                     min_time: 0.0f64,
@@ -320,11 +423,27 @@ fn throughput_by_parameters(c: &mut Criterion) {
                 }
             });
         });
+
+        group.bench_with_input(BenchmarkId::new("const_time", c), c, |b, c| {
+            let mut queue: const_time::CQueue<f64, i32> =
+                const_time::CQueue::new(const_time::CQueueOptions { n: c.n, t: c.t });
+
+            b.iter(|| {
+                queue.reset(0.0);
+                for (t, v) in events.iter() {
+                    queue.add(*t, *v);
+                }
+
+                for _ in events {
+                    queue.fetch_next();
+                }
+            });
+        });
     }
     group.finish();
 }
 
-// criterion_group!(benches, add, add_by_future_pos);
+// criterion_group!(benches, add, add_by_future_pos");
 criterion_group!(
     benches,
     throughput_by_batch_size,

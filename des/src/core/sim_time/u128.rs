@@ -1,3 +1,5 @@
+use num_traits::{One, Zero};
+
 use crate::core::sim_time;
 use std::cmp::{Eq, Ord, Ordering};
 use std::fmt::{Display, Formatter};
@@ -208,6 +210,12 @@ impl Ord for SimTime {
     }
 }
 
+impl PartialEq<f64> for SimTime {
+    fn eq(&self, other: &f64) -> bool {
+        *self == Self::from(*other)
+    }
+}
+
 impl Display for SimTime {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         // ignore femtos they are just for rounding
@@ -281,6 +289,14 @@ impl Add for SimTime {
     }
 }
 
+impl Add<f64> for SimTime {
+    type Output = SimTime;
+
+    fn add(self, rhs: f64) -> Self::Output {
+        Self::add(self, Self::from(rhs))
+    }
+}
+
 impl AddAssign for SimTime {
     fn add_assign(&mut self, rhs: Self) {
         self.femtos += rhs.femtos;
@@ -290,6 +306,12 @@ impl AddAssign for SimTime {
             self.secs += 1;
             self.femtos -= FEMTO_MAX;
         }
+    }
+}
+
+impl AddAssign<f64> for SimTime {
+    fn add_assign(&mut self, rhs: f64) {
+        Self::add_assign(self, Self::from(rhs))
     }
 }
 
@@ -318,10 +340,10 @@ impl SubAssign for SimTime {
 // thus only Div no DivAssign
 
 impl Div for SimTime {
-    type Output = f64;
+    type Output = SimTime;
 
     fn div(self, rhs: Self) -> Self::Output {
-        f64::from(self) / f64::from(rhs)
+        SimTime::from(f64::from(self) / f64::from(rhs))
     }
 }
 
@@ -362,5 +384,109 @@ impl Div<f64> for SimTime {
 impl DivAssign<f64> for SimTime {
     fn div_assign(&mut self, rhs: f64) {
         self.mul_assign(1.0_f64 / rhs);
+    }
+}
+
+#[cfg(feature = "cqueue")]
+impl cqueue::TimeLike for SimTime {
+    fn as_usize(self) -> usize {
+        self.secs as usize
+    }
+
+    fn min(self, other: Self) -> Self {
+        if self < other {
+            self
+        } else {
+            other
+        }
+    }
+}
+
+impl Rem for SimTime {
+    type Output = SimTime;
+
+    fn rem(self, rhs: Self) -> Self::Output {
+        // self % rhs
+
+        let secs = self.secs % rhs.secs;
+        let femtos = self.femtos % rhs.femtos;
+
+        Self { femtos, secs }
+    }
+}
+
+impl Zero for SimTime {
+    fn zero() -> Self {
+        SimTime { secs: 0, femtos: 0 }
+    }
+
+    fn is_zero(&self) -> bool {
+        self.secs == 0 && self.femtos == 0
+    }
+}
+
+impl One for SimTime {
+    fn one() -> Self {
+        SimTime { secs: 1, femtos: 0 }
+    }
+}
+
+impl Mul for SimTime {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        let secs = self.secs * rhs.secs;
+        let femtos = self.femtos * rhs.femtos;
+
+        let rep = femtos / FEMTO_MAX;
+        let rem = femtos % FEMTO_MAX;
+
+        Self {
+            secs: secs + rep,
+            femtos: rem,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    #[test]
+    fn add() {
+        use super::*;
+
+        let s1 = SimTime::new(123, 23123);
+        let s2 = SimTime::new(FEMTO_MAX - 2, 12);
+
+        let sum = s1 + s2;
+
+        assert_eq!(sum.secs, 23123 + 12 + 1);
+        assert_eq!(sum.femtos, 121);
+    }
+
+    #[test]
+    fn sub() {
+        use super::*;
+
+        let s1 = SimTime::new(123, 23123);
+        let s2 = SimTime::new(FEMTO_MAX - 2, 12);
+
+        let sum = s1 - s2;
+
+        assert_eq!(sum.secs, 23123 - 12 - 1);
+        assert_eq!(sum.femtos, 125);
+    }
+
+    #[test]
+    fn div() {
+        use super::*;
+
+        let s1 = SimTime::new(2000, 1000);
+        let s2 = SimTime::new(0, 2);
+
+        let div = s1 / s2;
+
+        assert_eq!(div.secs, 500);
+        assert_eq!(div.femtos, 100);
     }
 }

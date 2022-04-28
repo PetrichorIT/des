@@ -91,10 +91,10 @@ impl Default for RuntimeOptions {
             max_sim_time: SimTime::MAX,
 
             #[cfg(feature = "cqueue")]
-            cqueue_num_buckets: 10,
+            cqueue_num_buckets: 30,
 
             #[cfg(feature = "cqueue")]
-            cqueue_bucket_timespan: crate::core::SimTime::from(0.2),
+            cqueue_bucket_timespan: crate::core::SimTime::from(0.1),
         }
     }
 }
