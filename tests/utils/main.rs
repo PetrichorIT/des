@@ -22,6 +22,6 @@ fn main() {
 
     let _ = topo.write_to_svg("tests/utils/graph");
 
-    assert_eq!(event_count, 94);
+    assert_eq!(event_count, 93);
     assert_eq!(time, SimTime::from(45.0))
 }

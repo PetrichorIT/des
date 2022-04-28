@@ -25,6 +25,10 @@ mod default {
     where
         A: Application,
     {
+        pub fn descriptor(&self) -> String {
+            format!("FutureEventSet::BinaryHeap()")
+        }
+
         pub fn len(&self) -> usize {
             self.len_zero() + self.len_nonzero()
         }
@@ -46,7 +50,7 @@ mod default {
                 heap: BinaryHeap::with_capacity(64),
                 zero_queue: VecDeque::with_capacity(32),
 
-                last_event_simtime: options.min_sim_time,
+                last_event_simtime: options.min_sim_time.unwrap_or(SimTime::MIN),
             }
         }
 
@@ -155,6 +159,10 @@ mod cqueue {
     where
         A: Application,
     {
+        pub fn descriptor(&self) -> String {
+            format!("FutureEventSet::CQueue::{}", self.inner.descriptor())
+        }
+
         pub fn len(&self) -> usize {
             self.inner.len()
         }
@@ -210,20 +218,20 @@ mod cqueue {
 
             #[cfg(feature = "internal-metrics")]
             {
-                metrics
-                    .overflow_heap_size
-                    .collect_at(self.inner.len_overflow() as f64, time);
-                metrics.queue_bucket_size.collect_at(
-                    (self.inner.len_nonzero() - self.inner.len_overflow()) as f64,
-                    time,
-                );
-                metrics
-                    .avg_first_bucket_fill
-                    .collect_at((self.inner.len_first_bucket() + 1usize) as f64, time);
-
-                metrics
-                    .avg_filled_buckets
-                    .collect_at(self.inner.len_buckets_filled() as f64, time);
+                // metrics
+                //    .overflow_heap_size
+                //    .collect_at(self.inner.len_overflow() as f64, time);
+                // metrics.queue_bucket_size.collect_at(
+                //     (self.inner.len_nonzero() - self.inner.len_overflow()) as f64,
+                //     time,
+                // );
+                // metrics
+                //    .avg_first_bucket_fill
+                //    .collect_at((self.inner.len_first_bucket() + 1usize) as f64, time);
+                //
+                // metrics
+                //     .avg_filled_buckets
+                //    .collect_at(self.inner.len_buckets_filled() as f64, time);
             }
 
             EventNode {

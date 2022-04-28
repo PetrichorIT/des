@@ -1,7 +1,6 @@
 use std::collections::VecDeque;
-
+use std::fmt::Display;
 use num_traits::One;
-
 use crate::TimeLike;
 
 #[derive(Debug, Clone)]
@@ -43,8 +42,8 @@ where
 }
 
 pub struct CQueueOptions<T> {
-    pub n: usize,
-    pub t: T,
+    pub num_buckets: usize,
+    pub bucket_timespan: T,
 }
 
 impl<T> Default for CQueueOptions<T>
@@ -52,7 +51,7 @@ where
     T: One,
 {
     fn default() -> Self {
-        Self { n: 30, t: T::one() }
+        Self { num_buckets: 30, bucket_timespan: T::one() }
     }
 }
 
@@ -63,6 +62,8 @@ pub struct CQueue<T, E> {
     pub(crate) t: T,
 
     // Buckets
+    pub(crate) zero_event_bucket: VecDeque<Node<T, E>>,
+
     pub(crate) buckets: Vec<VecDeque<Node<T, E>>>,
     pub(crate) head: usize,
 
@@ -81,16 +82,32 @@ impl<T, E> CQueue<T, E>
 where
     T: TimeLike,
 {
+    pub fn descriptor(&self) -> String where T: Display {
+        format!("CTimeVDeque({}, {})", self.n, self.t)
+    }
+
     pub fn len(&self) -> usize {
         self.len
+    }
+
+    pub fn len_zero(&self) -> usize {
+        self.zero_event_bucket.len()
+    }
+
+    pub fn len_nonzero(&self) -> usize {
+        self.len() - self.len_zero()
     }
 
     pub fn is_empty(&self) -> bool {
         self.len == 0
     }
 
+    pub fn time(&self) -> T {
+        self.t_current
+    }
+
     pub fn new(options: CQueueOptions<T>) -> Self {
-        let CQueueOptions { n, t } = options;
+        let CQueueOptions { num_buckets: n, bucket_timespan: t } = options;
 
         // essentialy t*n
         let mut t_all = t;
@@ -102,6 +119,7 @@ where
             n,
             t,
 
+            zero_event_bucket: VecDeque::with_capacity(16),
             buckets: std::iter::repeat_with(|| VecDeque::with_capacity(16))
                 .take(n)
                 .collect(),
@@ -135,12 +153,19 @@ where
         };
         self.running_cookie = self.running_cookie.wrapping_add(1);
 
+        if time == self.t_current {
+            self.zero_event_bucket.push_back(node);
+            self.len += 1;
+            return;
+        }
+
         // delta time ?
 
         let time_mod = time.rem(self.t_all);
 
         let index = time_mod / self.t;
         let index: usize = index.as_usize();
+        let index = index % self.n;
 
         // let index_mod = (index + self.head) % self.n;
         // dbg!(index_mod);
@@ -178,6 +203,11 @@ where
             return None;
         }
 
+        if let Some(node) = self.zero_event_bucket.pop_front() {
+            self.len -= 1;
+            return Some(node)
+        }
+
         loop {
             // Move until full bucket is found.
             while self.buckets[self.head].is_empty() {
@@ -204,6 +234,7 @@ where
     }
 
     pub fn clear(&mut self) {
+        self.zero_event_bucket.clear();
         self.buckets.iter_mut().for_each(VecDeque::clear);
         self.len = 0;
         self.head = 0;

@@ -7,15 +7,18 @@ pub mod overflow_heap;
 
 use std::ops::{Add, Div, Rem};
 
-#[cfg(feature = "linked_list")]
+#[cfg(feature = "optimized")]
 pub use const_time::*;
 
 use num_traits::Zero;
-#[cfg(not(feature = "linked_list"))]
+#[cfg(not(feature = "optimized"))]
 pub use overflow_heap::*;
 
+
+use std::fmt::Debug;
+
 pub trait TimeLike:
-    Zero + Rem<Output = Self> + Copy + Add + Div<Output = Self> + PartialOrd
+    Debug + Zero + Rem<Output = Self> + Copy + Add + Div<Output = Self> + PartialOrd
 {
     fn as_usize(self) -> usize;
     fn min(self, other: Self) -> Self;

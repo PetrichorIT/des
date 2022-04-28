@@ -4,6 +4,8 @@ use crate::{
 };
 use log::warn;
 use rand::{
+    SeedableRng,
+    rngs::OsRng,
     distributions::Standard,
     prelude::{Distribution, StdRng},
     Rng,
@@ -21,6 +23,9 @@ pub use self::options::*;
 
 mod core;
 pub use self::core::*;
+
+mod limit;
+pub use self::limit::*;
 
 pub(crate) const FT_NET: bool = cfg!(feature = "net");
 pub(crate) const FT_SIMTIME_U128: bool = cfg!(feature = "simtime-u128");
@@ -112,22 +117,6 @@ where
         self.core().itr
     }
 
-    ///
-    /// Returns the maximum number of events will be received on this [Runtime] instance before
-    /// the instance shuts down.
-    ///
-    #[inline(always)]
-    pub fn max_itr(&self) -> usize {
-        self.core().max_itr
-    }
-
-    ///
-    /// Sets the maximum number of iterations for this [Runtime] instance.
-    ///
-    #[inline(always)]
-    pub fn set_max_itr(&mut self, value: usize) {
-        self.core_mut().max_itr = value;
-    }
 
     ///
     /// Returns the current simulation time.
@@ -227,12 +216,21 @@ where
             future_event_set: FutureEventSet::new_with(&options),
 
             core: RuntimeCore::new(
-                options.min_sim_time,
+                options.min_sim_time.unwrap_or(SimTime::MIN),
                 0,
                 0,
-                options.max_itr,
-                options.max_sim_time,
-                options.rng,
+                options.custom_limit.unwrap_or_else(|| {
+                    match (options.max_itr, options.max_sim_time) {
+                        (None, None) => RuntimeLimit::None,
+                        (Some(i), None) => RuntimeLimit::EventCount(i),
+                        (None, Some(t)) => RuntimeLimit::SimTime(t),
+                        (Some(i), Some(t)) => RuntimeLimit::CombinedOr(
+                                Box::new(RuntimeLimit::EventCount(i)),
+                                Box::new(RuntimeLimit::SimTime(t))
+                            ),
+                    }
+                }),
+                options.rng.unwrap_or(StdRng::from_rng(OsRng::default()).unwrap()),
             ),
             app,
 
@@ -260,14 +258,9 @@ where
             symbol!(FT_SIMTIME_U128),
             symbol!(FT_CQUEUE)
         );
+        println!("\u{23A2}  Executor := {}", this.future_event_set.descriptor());
         println!(
-            "\u{23A2}  Event limit := {}",
-            if this.max_itr() == !0 {
-                "∞".to_string()
-            } else {
-                format!("{}", this.max_itr())
-            }
-        );
+            "\u{23A2}  Event limit := {}", this.core().limit);
         println!("\u{23A3}");
 
         A::at_sim_start(&mut this);
@@ -313,8 +306,9 @@ where
     ///
     /// Returns true if the one of the break conditions is met.
     ///
+    #[inline]
     fn check_break_condition(&self, node: &EventNode<A>) -> bool {
-        self.core().itr > self.core().max_itr || node.time > self.core().max_sim_time
+        self.core().limit.applies(self.core().itr, node)
     }
 
     ///
@@ -746,11 +740,7 @@ where
             type_name::<A>(),
             self.sim_time(),
             self.num_events_received(),
-            if self.max_itr() == !0 {
-                String::from("inf")
-            } else {
-                format!("{}", self.max_itr())
-            },
+            self.core().limit,
             self.num_events_dispatched(),
             self.future_event_set.len()
         )
@@ -768,11 +758,7 @@ where
             type_name::<A>(),
             self.sim_time(),
             self.num_events_received(),
-            if self.max_itr() == !0 {
-                String::from("inf")
-            } else {
-                format!("{}", self.max_itr())
-            },
+            self.core().limit,
             self.num_events_dispatched(),
             self.future_event_set.len()
         )

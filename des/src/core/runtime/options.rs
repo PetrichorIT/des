@@ -1,5 +1,5 @@
-use rand::{prelude::StdRng, rngs::OsRng, SeedableRng};
-
+use rand::{prelude::StdRng, SeedableRng};
+use crate::core::runtime::*;
 use crate::core::SimTime;
 
 ///
@@ -13,22 +13,24 @@ pub struct RuntimeOptions {
     /// This can be seeded to ensure reproducability.
     /// Defaults to a [OsRng] which does NOT provide reproducability.
     ///
-    pub rng: StdRng,
+    pub rng: Option<StdRng>,
 
     ///
     /// The maximum number of events processed by the simulation. Defaults to [usize::MAX].
     ///
-    pub max_itr: usize,
+    pub max_itr: Option<usize>,
 
     ///
     /// The simtime the simulation starts on.
     ///
-    pub min_sim_time: SimTime,
+    pub min_sim_time: Option<SimTime>,
+
+    pub custom_limit: Option<RuntimeLimit>,
 
     ///
     /// The maximum time the simulation should reach.
     ///
-    pub max_sim_time: SimTime,
+    pub max_sim_time: Option<SimTime>,
 
     ///
     /// The number of buckets used in the cqueue for storing events.
@@ -49,7 +51,7 @@ impl RuntimeOptions {
     ///
     pub fn seeded(state: u64) -> Self {
         Self {
-            rng: StdRng::seed_from_u64(state),
+            rng: Some(StdRng::seed_from_u64(state)),
             ..Self::default()
         }
     }
@@ -59,7 +61,7 @@ impl RuntimeOptions {
     ///
     #[must_use]
     pub fn max_itr(mut self, max_itr: usize) -> Self {
-        self.max_itr = max_itr;
+        self.max_itr = Some(max_itr);
         self
     }
 
@@ -68,16 +70,26 @@ impl RuntimeOptions {
     ///
     #[must_use]
     pub fn max_time(mut self, max_time: SimTime) -> Self {
-        self.max_sim_time = max_time;
+        self.max_sim_time = Some(max_time);
         self
     }
 
     ///
-    /// Chnages the minimum simtime of a runtime (default: 0).
+    /// Changes the minimum simtime of a runtime (default: 0).
     ///
     #[must_use]
     pub fn min_time(mut self, min_time: SimTime) -> Self {
-        self.min_sim_time = min_time;
+        self.min_sim_time = Some(min_time);
+        self
+    }
+
+    /// 
+    /// Sets a custom limit to the end of the runtime, overwriting 
+    /// all max_itr and max_time options.
+    ///
+    #[must_use]
+    pub fn limit(mut self, limit: RuntimeLimit) -> Self {
+        self.custom_limit = Some(limit);
         self
     }
 }
@@ -85,13 +97,15 @@ impl RuntimeOptions {
 impl Default for RuntimeOptions {
     fn default() -> Self {
         Self {
-            rng: StdRng::from_rng(OsRng::default()).unwrap(),
-            max_itr: !0,
-            min_sim_time: SimTime::MIN,
-            max_sim_time: SimTime::MAX,
+            rng: None,
+            max_itr: None,
+            min_sim_time: None,
+            max_sim_time: None,
+
+            custom_limit: None,
 
             #[cfg(feature = "cqueue")]
-            cqueue_num_buckets: 30,
+            cqueue_num_buckets: 20,
 
             #[cfg(feature = "cqueue")]
             cqueue_bucket_timespan: crate::core::SimTime::from(0.1),

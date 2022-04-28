@@ -1,5 +1,5 @@
 use crate::{
-    core::{event::EventId, SimTime, StandardLogger},
+    core::{event::EventId, runtime::RuntimeLimit, SimTime, StandardLogger},
     util::{PtrMut, SyncWrap},
 };
 use lazy_static::lazy_static;
@@ -53,12 +53,12 @@ where
 #[derive(Debug)]
 pub(crate) struct RuntimeCore {
     pub sim_time: SimTime,
-    pub max_sim_time: SimTime,
 
     // Rt limits
+    pub limit: RuntimeLimit,
+
     pub event_id: EventId,
     pub itr: usize,
-    pub max_itr: usize,
 
     // Misc
     pub rng: StdRng,
@@ -69,17 +69,15 @@ impl RuntimeCore {
         sim_time: SimTime,
         event_id: EventId,
         itr: usize,
-        max_itr: usize,
-        max_sim_time: SimTime,
+        limit: RuntimeLimit,
         rng: StdRng,
     ) -> PtrMut<Option<RuntimeCore>> {
         let rtc = Self {
             sim_time,
-            max_sim_time,
-
+            
+            limit,
             event_id,
             itr,
-            max_itr,
 
             rng,
         };
