@@ -37,10 +37,13 @@ pub fn get_resolver(
             NdlResolver::new(workspace).expect("#[derive(Module)] Invalid NDL workspace."),
         );
     }
-    let (t, errs, p) =
-        resolvers
+    let (t, errs, p) = {
+        let resolver = resolvers
             .get_mut(workspace)
-            .unwrap()
+            .unwrap();
+        
+
+        let result = resolver
             .run_cached()
             .map(|(gtyctx, errs, pars)| {
                 (
@@ -48,14 +51,25 @@ pub fn get_resolver(
                     errs.cloned().collect::<Vec<ndl::Error>>(),
                     pars,
                 )
-            })?;
+        })?;
+        
+        // Parse successful from a access persepective
+        setup_path_tracking(&resolver.scopes);
+        result
+    };
+        
 
     let has_errs = !errs.is_empty();
 
     Ok((t, has_errs, p))
 }
 
-//
+pub fn setup_path_tracking(paths: &[PathBuf]) {
+    for path in paths {
+        proc_macro::tracked_path::path(path.to_string_lossy())
+    }
+   
+}
 
 macro_rules! ident {
     ($e:expr) => {

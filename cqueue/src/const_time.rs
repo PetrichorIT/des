@@ -1,7 +1,7 @@
+use crate::TimeLike;
+use num_traits::One;
 use std::collections::VecDeque;
 use std::fmt::Display;
-use num_traits::One;
-use crate::TimeLike;
 
 #[derive(Debug, Clone)]
 pub struct Node<T, E> {
@@ -51,7 +51,10 @@ where
     T: One,
 {
     fn default() -> Self {
-        Self { num_buckets: 30, bucket_timespan: T::one() }
+        Self {
+            num_buckets: 30,
+            bucket_timespan: T::one(),
+        }
     }
 }
 
@@ -82,7 +85,10 @@ impl<T, E> CQueue<T, E>
 where
     T: TimeLike,
 {
-    pub fn descriptor(&self) -> String where T: Display {
+    pub fn descriptor(&self) -> String
+    where
+        T: Display,
+    {
         format!("CTimeVDeque({}, {})", self.n, self.t)
     }
 
@@ -107,7 +113,10 @@ where
     }
 
     pub fn new(options: CQueueOptions<T>) -> Self {
-        let CQueueOptions { num_buckets: n, bucket_timespan: t } = options;
+        let CQueueOptions {
+            num_buckets: n,
+            bucket_timespan: t,
+        } = options;
 
         // essentialy t*n
         let mut t_all = t;
@@ -205,7 +214,7 @@ where
 
         if let Some(node) = self.zero_event_bucket.pop_front() {
             self.len -= 1;
-            return Some(node)
+            return Some(node);
         }
 
         loop {
@@ -279,7 +288,10 @@ mod tests {
     fn f64_test() {
         use super::*;
 
-        let mut cqueue = CQueue::new(CQueueOptions { n: 10, t: 1.0 });
+        let mut cqueue = CQueue::new(CQueueOptions {
+            num_buckets: 10,
+            bucket_timespan: 1.0,
+        });
         cqueue.enqueue(12.62, "event");
 
         cqueue.enqueue(6.62, "event");

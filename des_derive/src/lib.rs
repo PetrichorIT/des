@@ -1,3 +1,4 @@
+#![feature(track_path)]
 //!
 //! A crate for extending a DES simulation with NDL definitions.
 //!

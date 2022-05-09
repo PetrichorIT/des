@@ -84,7 +84,10 @@ fn throughput_by_batch_size(c: &mut Criterion) {
     }
 
     let mut queue: const_time::CQueue<f64, i32> =
-        const_time::CQueue::new(const_time::CQueueOptions { n: 30, t: 5.0 });
+        const_time::CQueue::new(const_time::CQueueOptions {
+            num_buckets: 30,
+            bucket_timespan: 5.0,
+        });
 
     for c in configs.iter() {
         group.throughput(Throughput::Elements(*c as u64));
@@ -224,7 +227,10 @@ fn throughput_relativ_pos(c: &mut Criterion) {
     }
 
     let mut queue: const_time::CQueue<f64, i32> =
-        const_time::CQueue::new(const_time::CQueueOptions { n: 30, t: 5.0 });
+        const_time::CQueue::new(const_time::CQueueOptions {
+            num_buckets: 30,
+            bucket_timespan: 5.0,
+        });
 
     for c in configs.iter().enumerate() {
         group.bench_with_input(
@@ -317,7 +323,10 @@ fn throughput_by_parameters(c: &mut Criterion) {
 
         group.bench_with_input(BenchmarkId::new("const_time", c), c, |b, c| {
             let mut queue: const_time::CQueue<f64, i32> =
-                const_time::CQueue::new(const_time::CQueueOptions { n: c.n, t: c.t });
+                const_time::CQueue::new(const_time::CQueueOptions {
+                    num_buckets: c.n,
+                    bucket_timespan: c.t,
+                });
 
             b.iter(|| {
                 queue.reset(0.0);
@@ -372,7 +381,10 @@ fn throughput_by_parameters(c: &mut Criterion) {
 
         group.bench_with_input(BenchmarkId::new("const_time", c), c, |b, c| {
             let mut queue: const_time::CQueue<f64, i32> =
-                const_time::CQueue::new(const_time::CQueueOptions { n: c.n, t: c.t });
+                const_time::CQueue::new(const_time::CQueueOptions {
+                    num_buckets: c.n,
+                    bucket_timespan: c.t,
+                });
 
             b.iter(|| {
                 queue.reset(0.0);
@@ -426,7 +438,10 @@ fn throughput_by_parameters(c: &mut Criterion) {
 
         group.bench_with_input(BenchmarkId::new("const_time", c), c, |b, c| {
             let mut queue: const_time::CQueue<f64, i32> =
-                const_time::CQueue::new(const_time::CQueueOptions { n: c.n, t: c.t });
+                const_time::CQueue::new(const_time::CQueueOptions {
+                    num_buckets: c.n,
+                    bucket_timespan: c.t,
+                });
 
             b.iter(|| {
                 queue.reset(0.0);
