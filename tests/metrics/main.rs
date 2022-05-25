@@ -20,7 +20,7 @@ impl NameableModule for Alice {
 
 impl Module for Alice {
     fn at_sim_start(&mut self, _: usize) {
-        self.enable_activity(SimTime::from(1.0))
+        self.enable_activity(Duration::from(1.0))
     }
 
     fn activity(&mut self) {

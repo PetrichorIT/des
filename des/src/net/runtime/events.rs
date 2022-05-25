@@ -163,7 +163,7 @@ impl<A> Event<NetworkRuntime<A>> for CoroutineMessageEvent {
         // fully initalized.
         // It can be the case that this is wrong .. if handle_message at invalidated activity
         // but a event still remains in queue.
-        if dur != SimTime::ZERO && self.module.module_core().activity_active {
+        if dur != Duration::ZERO && self.module.module_core().activity_active {
             self.module.prepare_buffers();
             self.module.activity();
 
@@ -234,12 +234,12 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
 
 impl PtrWeakMut<dyn Module> {
     fn prepare_buffers(&mut self) {
-        self.processing_time_delay = SimTime::ZERO;
+        self.processing_time_delay = Duration::ZERO;
     }
 
     fn handle_buffers<A>(&mut self, rt: &mut Runtime<NetworkRuntime<A>>) {
         // Check whether a new activity cycle must be initated
-        let enqueue_actitivy_msg = self.module_core().activity_period != SimTime::ZERO
+        let enqueue_actitivy_msg = self.module_core().activity_period != Duration::ZERO
             && !self.module_core().activity_active;
 
         self.module_core_mut().activity_active = true;
@@ -259,7 +259,7 @@ impl PtrWeakMut<dyn Module> {
                     gate,
                     message,
                 }),
-                SimTime::now() + offset,
+                offset,
             )
         }
 

@@ -15,5 +15,5 @@ fn main() {
     let (_, time, event_count) = rt.run().unwrap();
 
     assert_eq!(event_count, 9);
-    assert_eq!(time, SimTime::from(0.28533015283430085))
+    assert_eq!(time, SimTime::from(0.285330151))
 }

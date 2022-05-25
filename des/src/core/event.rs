@@ -130,7 +130,8 @@ pub(crate) type EventId = usize;
 /// only used inside a [std::collections::BinaryHeap].
 ///
 pub(crate) struct EventNode<A>
-where A: Application
+where
+    A: Application,
 {
     /// The deadline timestamp for the event.
     pub(crate) time: SimTime,

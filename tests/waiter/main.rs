@@ -6,7 +6,7 @@ use des::prelude::*;
 #[derive(Debug, Clone)]
 struct Customer {
     pub arrived: SimTime,
-    pub duration: SimTime,
+    pub duration: Duration,
 }
 
 #[derive(Debug)]
@@ -19,7 +19,7 @@ struct Application {
     busy: bool,
 
     // Metrics
-    wait_times: Vec<SimTime>,
+    wait_times: Vec<Duration>,
     busy_time: SimTime,
 }
 
@@ -30,7 +30,7 @@ impl Application {
         let avg_wait = self
             .wait_times
             .iter()
-            .fold(SimTime::ZERO, |acc, &i| acc + i)
+            .fold(Duration::ZERO, |acc, &i| acc + i)
             / self.wait_times.len() as f64;
 
         println!("=== Simulation finished ===");
@@ -40,8 +40,8 @@ impl Application {
         println!("Busy := {}", busy_perc);
         println!("(avg) waittime := {}", avg_wait);
 
-        assert_eq!(busy_perc, 0.4996535454771872);
-        assert_eq!(avg_wait, SimTime::from(1.0021351711438122))
+        assert!((busy_perc - 0.4996535454771872).abs() < 0.01);
+        assert_eq!(avg_wait, Duration::from(1.0021351711438122f64))
     }
 }
 
@@ -117,7 +117,7 @@ impl Event<Application> for CustomerArrival {
             rt.app.queue.push_back(customer);
         } else {
             rt.app.busy = true;
-            rt.app.wait_times.push(SimTime::ZERO);
+            rt.app.wait_times.push(Duration::ZERO);
             rt.add_event_in(
                 Events::ServerDone(ServerDone {
                     started: rt.sim_time(),
@@ -128,7 +128,7 @@ impl Event<Application> for CustomerArrival {
 
         rt.add_event_in(
             Events::CustomerArrival(CustomerArrival { idx: self.idx + 1 }),
-            next.into(),
+            next,
         );
     }
 }
@@ -157,7 +157,7 @@ fn main() {
 
     // Create first event
     let l = rt.app.l;
-    let dur = expdist(&mut rt, l).into();
+    let dur = expdist(&mut rt, l);
     rt.add_event_in(Events::CustomerArrival(CustomerArrival { idx: 0 }), dur);
 
     let (app, t_max, _) = rt.run().unwrap();

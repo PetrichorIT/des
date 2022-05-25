@@ -10,6 +10,7 @@ pub use crate::core::Runtime;
 pub use crate::core::RuntimeOptions;
 pub use crate::core::RuntimeResult;
 
+pub use crate::core::Duration;
 pub use crate::core::SimTime;
 
 pub use crate::core::Application;

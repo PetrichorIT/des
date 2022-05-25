@@ -1,7 +1,7 @@
 use num_traits::{One, Zero};
 use std::cmp::{Ord, PartialOrd};
 use std::collections::{BinaryHeap, VecDeque};
-use std::fmt::{Display, Debug};
+use std::fmt::{Debug, Display};
 
 #[derive(Debug, Clone)]
 pub struct Node<T, A>
@@ -97,7 +97,10 @@ impl<T, A> CQueue<T, A>
 where
     T: Zero + Copy + PartialOrd,
 {
-    pub fn descriptor(&self) -> String where T: Display {
+    pub fn descriptor(&self) -> String
+    where
+        T: Display,
+    {
         format!("OverflowHeapNBucket({}, {})", self.n, self.t)
     }
 

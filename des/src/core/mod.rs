@@ -11,6 +11,7 @@ mod sim_time;
 // # Exposed publics
 //
 
+pub use self::sim_time::Duration;
 pub use self::sim_time::SimTime;
 
 pub use self::event::Application;

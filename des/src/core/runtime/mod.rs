@@ -1,14 +1,13 @@
 use crate::{
-    core::{event::Application, SimTime},
+    core::{event::Application, Duration, SimTime},
     util::*,
 };
 use log::warn;
 use rand::{
-    SeedableRng,
-    rngs::OsRng,
     distributions::Standard,
     prelude::{Distribution, StdRng},
-    Rng,
+    rngs::OsRng,
+    Rng, SeedableRng,
 };
 use std::{
     any::type_name,
@@ -28,7 +27,6 @@ mod limit;
 pub use self::limit::*;
 
 pub(crate) const FT_NET: bool = cfg!(feature = "net");
-pub(crate) const FT_SIMTIME_U128: bool = cfg!(feature = "simtime-u128");
 pub(crate) const FT_CQUEUE: bool = cfg!(feature = "cqueue");
 pub(crate) const FT_INTERNAL_METRICS: bool = cfg!(feature = "internal-metrics");
 
@@ -116,7 +114,6 @@ where
     pub fn num_events_received(&self) -> usize {
         self.core().itr
     }
-
 
     ///
     /// Returns the current simulation time.
@@ -225,12 +222,14 @@ where
                         (Some(i), None) => RuntimeLimit::EventCount(i),
                         (None, Some(t)) => RuntimeLimit::SimTime(t),
                         (Some(i), Some(t)) => RuntimeLimit::CombinedOr(
-                                Box::new(RuntimeLimit::EventCount(i)),
-                                Box::new(RuntimeLimit::SimTime(t))
-                            ),
+                            Box::new(RuntimeLimit::EventCount(i)),
+                            Box::new(RuntimeLimit::SimTime(t)),
+                        ),
                     }
                 }),
-                options.rng.unwrap_or(StdRng::from_rng(OsRng::default()).unwrap()),
+                options
+                    .rng
+                    .unwrap_or(StdRng::from_rng(OsRng::default()).unwrap()),
             ),
             app,
 
@@ -252,15 +251,16 @@ where
         println!("\u{23A1}");
         println!("\u{23A2} Simulation starting");
         println!(
-            "\u{23A2}  net [{}] metrics [{}] precision time [{}] cqueue [{}]",
+            "\u{23A2}  net [{}] metrics [{}] cqueue [{}]",
             symbol!(FT_NET),
             symbol!(FT_INTERNAL_METRICS),
-            symbol!(FT_SIMTIME_U128),
             symbol!(FT_CQUEUE)
         );
-        println!("\u{23A2}  Executor := {}", this.future_event_set.descriptor());
         println!(
-            "\u{23A2}  Event limit := {}", this.core().limit);
+            "\u{23A2}  Executor := {}",
+            this.future_event_set.descriptor()
+        );
+        println!("\u{23A2}  Event limit := {}", this.core().limit);
         println!("\u{23A3}");
 
         A::at_sim_start(&mut this);
@@ -457,7 +457,7 @@ where
     ///         MyApp(),
     ///         RuntimeOptions::seeded(1).min_time(SimTime::from(10.0))
     ///     );
-    ///     runtime.add_event_in(MyEventSet::EventA, SimTime::from(12.0));
+    ///     runtime.add_event_in(MyEventSet::EventA, Duration::from(12.0));
     ///
     ///     match runtime.run() {
     ///         RuntimeResult::Finished { time, event_count, .. } => {
@@ -469,8 +469,8 @@ where
     /// }
     /// ```
     ///
-    pub fn add_event_in(&mut self, event: impl Into<A::EventSet>, duration: SimTime) {
-        self.add_event(event, self.sim_time() + duration)
+    pub fn add_event_in(&mut self, event: impl Into<A::EventSet>, duration: impl Into<Duration>) {
+        self.add_event(event, self.sim_time() + duration.into())
     }
 
     ///

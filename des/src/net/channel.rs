@@ -28,9 +28,9 @@ pub struct ChannelMetrics {
     /// The maximum throughput of the channel in bit/s
     pub bitrate: usize,
     /// The latency a message endures while transversing a channel.
-    pub latency: SimTime,
+    pub latency: Duration,
     /// The variance in latency.
-    pub jitter: SimTime,
+    pub jitter: Duration,
 
     /// A userdefined cost for the channel.
     pub cost: f64,
@@ -40,7 +40,7 @@ impl ChannelMetrics {
     ///
     /// Creates a new instance of channel metrics.
     ///
-    pub const fn new(bitrate: usize, latency: SimTime, jitter: SimTime) -> Self {
+    pub const fn new(bitrate: usize, latency: Duration, jitter: Duration) -> Self {
         Self::new_with_cost(bitrate, latency, jitter, 1.0)
     }
 
@@ -49,8 +49,8 @@ impl ChannelMetrics {
     ///
     pub const fn new_with_cost(
         bitrate: usize,
-        latency: SimTime,
-        jitter: SimTime,
+        latency: Duration,
+        jitter: Duration,
         cost: f64,
     ) -> Self {
         Self {
@@ -65,18 +65,18 @@ impl ChannelMetrics {
     /// Calcualtes the duration a message travels on a link.
     ///
     #[allow(clippy::if_same_then_else)]
-    pub fn calculate_duration(&self, msg: &Message, rng: &mut StdRng) -> SimTime {
+    pub fn calculate_duration(&self, msg: &Message, rng: &mut StdRng) -> Duration {
         if self.bitrate == 0 {
-            return SimTime::ZERO;
+            return Duration::ZERO;
         }
 
         let len = msg.bit_len;
-        let transmission_time = SimTime::from(len as f64 / self.bitrate as f64);
-        if self.jitter == SimTime::ZERO {
+        let transmission_time = Duration::from(len as f64 / self.bitrate as f64);
+        if self.jitter == Duration::ZERO {
             self.latency + transmission_time
         } else {
-            let perc = rng.sample(Uniform::new(0.0f64, f64::from(self.jitter)));
-            self.latency + transmission_time + SimTime::from(perc)
+            let perc = rng.sample(Uniform::new(0.0f64, self.jitter.as_secs_f64()));
+            self.latency + transmission_time + Duration::from(perc)
         }
     }
 
@@ -84,12 +84,12 @@ impl ChannelMetrics {
     /// Calculate the duration the channel is busy transmitting the
     /// message onto the channel.
     ///
-    pub fn calculate_busy(&self, msg: &Message) -> SimTime {
+    pub fn calculate_busy(&self, msg: &Message) -> Duration {
         if self.bitrate == 0 {
-            SimTime::ZERO
+            Duration::ZERO
         } else {
             let len = msg.bit_len;
-            SimTime::from(len as f64 / self.bitrate as f64)
+            Duration::from(len as f64 / self.bitrate as f64)
         }
     }
 }
@@ -192,7 +192,7 @@ impl Channel {
     /// underlying metric.
     ///
     #[inline(always)]
-    pub fn calculate_duration(&self, msg: &Message, rng: &mut StdRng) -> SimTime {
+    pub fn calculate_duration(&self, msg: &Message, rng: &mut StdRng) -> Duration {
         self.metrics.calculate_duration(msg, rng)
     }
 
@@ -201,7 +201,7 @@ impl Channel {
     /// the underlying metric.
     ///
     #[inline(always)]
-    pub fn calculate_busy(&self, msg: &Message) -> SimTime {
+    pub fn calculate_busy(&self, msg: &Message) -> Duration {
         self.metrics.calculate_busy(msg)
     }
 }

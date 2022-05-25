@@ -88,7 +88,7 @@ fn main() {
 
         events.push(boxed);
 
-        t += (rt.random::<f64>()).min(0.001);
+        t += (rt.random::<f64>()).min(0.001).into();
     }
 
     let mut dispatched = events.clone();

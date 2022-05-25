@@ -34,5 +34,5 @@ fn main() {
     assert_eq!(*MODULE_LEN.lock().unwrap(), 0);
 
     assert_eq!(event_count, 9);
-    assert_eq!(time, SimTime::from(0.28533015283430085))
+    assert_eq!(time, 0.285330151)
 }

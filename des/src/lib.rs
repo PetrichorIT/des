@@ -2,6 +2,7 @@
 #![feature(dispatch_from_dyn)]
 #![feature(coerce_unsized)]
 #![feature(arbitrary_self_types)]
+#![feature(const_option_ext)]
 
 //!
 //! A discrete event simulator.
@@ -14,7 +15,6 @@
 //! | net              | Adds a module oriented design-abstraction that provides its own events.  |
 //! | net-ipv6         | Configures the net module to use IPv6 addresses.                         |
 //! | cqueue           | Configures the runtime to use a calender queue for better performance.   |
-//! | simtime-u128     | Configures the runtime to use a high precsion time primitiv.             |
 //! | internal-metrics | Collects internal metrics about the runtime, to improve parametrization. |
 //!
 

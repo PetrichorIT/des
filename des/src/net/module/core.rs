@@ -7,7 +7,7 @@ use std::{
 use log::error;
 
 use crate::{
-    core::SimTime,
+    core::*,
     create_global_uid,
     net::{common::Optional, *},
     util::*,
@@ -36,7 +36,7 @@ pub struct ModuleCore {
     pub(crate) gates: Vec<GateRefMut>,
 
     /// A offset for the out_buffer,
-    pub(crate) processing_time_delay: SimTime,
+    pub(crate) processing_time_delay: Duration,
 
     /// A buffer of messages to be send out, after the current handle messsage terminates.
     pub(crate) out_buffer: Vec<(Message, GateRef, SimTime)>,
@@ -45,7 +45,7 @@ pub struct ModuleCore {
     pub(crate) loopback_buffer: Vec<(Message, SimTime)>,
 
     /// The period of the activity coroutine (if zero than there is no coroutine).
-    pub(crate) activity_period: SimTime,
+    pub(crate) activity_period: Duration,
 
     /// An indicator whether a valid activity timeout is existent.
     pub(crate) activity_active: bool,
@@ -163,10 +163,10 @@ impl ModuleCore {
             id: ModuleId::gen(),
             path,
             gates: Vec::new(),
-            processing_time_delay: SimTime::ZERO,
+            processing_time_delay: Duration::ZERO,
             out_buffer: Vec::new(),
             loopback_buffer: Vec::new(),
-            activity_period: SimTime::ZERO,
+            activity_period: Duration::ZERO,
             activity_active: false,
             parent: None,
             children: HashMap::new(),
@@ -186,10 +186,10 @@ impl ModuleCore {
             id: ModuleId::gen(),
             path,
             gates: Vec::new(),
-            processing_time_delay: SimTime::ZERO,
+            processing_time_delay: Duration::ZERO,
             out_buffer: Vec::new(),
             loopback_buffer: Vec::new(),
-            activity_period: SimTime::ZERO,
+            activity_period: Duration::ZERO,
             activity_active: false,
             parent: None,
             children: HashMap::new(),
@@ -216,7 +216,7 @@ impl ModuleCore {
     /// All messages send after this time will be delayed by the
     /// processing time delay.
     ///
-    pub fn processing_time(&mut self, duration: SimTime) {
+    pub fn processing_time(&mut self, duration: Duration) {
         self.processing_time_delay += duration;
     }
 
@@ -230,8 +230,11 @@ impl ModuleCore {
     {
         let gate = gate.into_gate(self);
         if let Some(gate) = gate {
-            self.out_buffer
-                .push((msg.into(), gate, self.processing_time_delay))
+            self.out_buffer.push((
+                msg.into(),
+                gate,
+                SimTime::now() + self.processing_time_delay,
+            ))
         } else {
             error!(target: self.str(),"Error: Could not find gate in current module");
         }
@@ -241,13 +244,15 @@ impl ModuleCore {
     /// Enqueues a event that will trigger the [Module::handle_message] function
     /// in duration seconds, shifted by the processing time delay.
     ///
-    pub fn schedule_in(&mut self, msg: impl Into<Message>, duration: SimTime) {
+    pub fn schedule_in(&mut self, msg: impl Into<Message>, duration: Duration) {
         assert!(
-            duration >= SimTime::ZERO,
+            duration >= Duration::ZERO,
             "While we could maybe do this, we should not timetravel yet!"
         );
-        self.loopback_buffer
-            .push((msg.into(), self.processing_time_delay + duration))
+        self.loopback_buffer.push((
+            msg.into(),
+            SimTime::now() + self.processing_time_delay + duration,
+        ))
     }
 
     ///
@@ -266,7 +271,7 @@ impl ModuleCore {
     /// Enables the activity corountine using the given period.
     /// This function should only be called from [Module::handle_message].
     ///
-    pub fn enable_activity(&mut self, period: SimTime) {
+    pub fn enable_activity(&mut self, period: Duration) {
         self.activity_period = period;
         self.activity_active = false;
     }
@@ -275,7 +280,7 @@ impl ModuleCore {
     /// Disables the activity coroutine cancelling the next call.
     ///
     pub fn disable_activity(&mut self) {
-        self.activity_period = SimTime::ZERO;
+        self.activity_period = Duration::ZERO;
         self.activity_active = false;
     }
 }

@@ -1,7 +1,7 @@
-use crate::TimeLike;
-use num_traits::One;
+use crate::Timespec;
 use std::collections::VecDeque;
 use std::fmt::Display;
+use std::ops::Rem;
 
 #[derive(Debug, Clone)]
 pub struct Node<T, E> {
@@ -48,12 +48,12 @@ pub struct CQueueOptions<T> {
 
 impl<T> Default for CQueueOptions<T>
 where
-    T: One,
+    T: Timespec,
 {
     fn default() -> Self {
         Self {
             num_buckets: 30,
-            bucket_timespan: T::one(),
+            bucket_timespan: T::ONE,
         }
     }
 }
@@ -63,6 +63,8 @@ pub struct CQueue<T, E> {
     // Parameters
     pub(crate) n: usize,
     pub(crate) t: T,
+
+    pub(crate) t_nanos: u128,
 
     // Buckets
     pub(crate) zero_event_bucket: VecDeque<Node<T, E>>,
@@ -74,7 +76,7 @@ pub struct CQueue<T, E> {
 
     pub(crate) t0: T,
     pub(crate) t1: T,
-    pub(crate) t_all: T,
+    pub(crate) t_all: u128,
 
     // Misc
     pub(crate) len: usize,
@@ -83,7 +85,7 @@ pub struct CQueue<T, E> {
 
 impl<T, E> CQueue<T, E>
 where
-    T: TimeLike,
+    T: Timespec,
 {
     pub fn descriptor(&self) -> String
     where
@@ -119,13 +121,11 @@ where
         } = options;
 
         // essentialy t*n
-        let mut t_all = t;
-        for _ in 1..n {
-            t_all = t_all + t;
-        }
+        let t_all = t.as_nanos() * n as u128;
 
         Self {
             n,
+            t_nanos: t.as_nanos(),
             t,
 
             zero_event_bucket: VecDeque::with_capacity(16),
@@ -134,9 +134,9 @@ where
                 .collect(),
             head: 0,
 
-            t_current: T::zero(),
+            t_current: T::ZERO,
 
-            t0: T::zero(),
+            t0: T::ZERO,
             t1: t,
 
             t_all,
@@ -157,7 +157,6 @@ where
         let node = Node {
             time,
             event,
-
             cookie: self.running_cookie,
         };
         self.running_cookie = self.running_cookie.wrapping_add(1);
@@ -170,10 +169,10 @@ where
 
         // delta time ?
 
-        let time_mod = time.rem(self.t_all);
+        let time_mod = time.as_nanos().rem(self.t_all);
 
-        let index = time_mod / self.t;
-        let index: usize = index.as_usize();
+        let index = time_mod / self.t_nanos;
+        let index: usize = index as usize;
         let index = index % self.n;
 
         // let index_mod = (index + self.head) % self.n;
@@ -261,45 +260,26 @@ where
     }
 }
 
-impl TimeLike for f32 {
-    fn as_usize(self) -> usize {
-        self as usize
-    }
-
-    fn min(self, other: Self) -> Self {
-        f32::min(self, other)
-    }
-}
-
-impl TimeLike for f64 {
-    fn as_usize(self) -> usize {
-        self as usize
-    }
-
-    fn min(self, other: Self) -> Self {
-        f64::min(self, other)
-    }
-}
-
 #[cfg(test)]
 mod tests {
 
     #[test]
     fn f64_test() {
         use super::*;
+        use std::time::Duration;
 
         let mut cqueue = CQueue::new(CQueueOptions {
             num_buckets: 10,
-            bucket_timespan: 1.0,
+            bucket_timespan: Duration::from_secs(1),
         });
-        cqueue.enqueue(12.62, "event");
+        cqueue.enqueue(Duration::from_millis(12_620), "event(12)");
 
-        cqueue.enqueue(6.62, "event");
+        cqueue.enqueue(Duration::from_millis(6_620), "event(6)");
 
         dbg!(cqueue.dequeue());
 
-        cqueue.enqueue(7.62, "event");
-        cqueue.enqueue(16.62, "event");
+        cqueue.enqueue(Duration::from_millis(9_620), "event(9)");
+        cqueue.enqueue(Duration::from_millis(16_620), "event(16)");
 
         dbg!(cqueue.dequeue());
         dbg!(cqueue.dequeue());
