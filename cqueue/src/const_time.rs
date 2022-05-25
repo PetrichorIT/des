@@ -203,7 +203,38 @@ where
 
     #[inline]
     pub fn fetch_next(&mut self) -> Node<T, E> {
-        self.dequeue().unwrap()
+        if self.len == 0 {
+            panic!("Cannot fetch from empty queue");
+        }
+
+        if let Some(node) = self.zero_event_bucket.pop_front() {
+            self.len -= 1;
+            return node;
+        }
+
+        loop {
+            // Move until full bucket is found.
+            while self.buckets[self.head].is_empty() {
+                self.head = (self.head + 1) % self.n;
+                self.t0 = self.t0 + self.t;
+                self.t1 = self.t1 + self.t;
+            }
+
+            // Bucket with > 0 elements found
+
+            let min = self.buckets[self.head].front().unwrap();
+            if min.time > self.t1 {
+                self.head = (self.head + 1) % self.n;
+                self.t0 = self.t0 + self.t;
+                self.t1 = self.t1 + self.t;
+                continue;
+            }
+
+            self.t_current = min.time;
+
+            self.len -= 1;
+            return self.buckets[self.head].pop_front().unwrap();
+        }
     }
 
     pub fn dequeue(&mut self) -> Option<Node<T, E>> {

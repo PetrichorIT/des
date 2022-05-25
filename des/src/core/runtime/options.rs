@@ -1,6 +1,6 @@
-use rand::{prelude::StdRng, SeedableRng};
 use crate::core::runtime::*;
 use crate::core::SimTime;
+use rand::{prelude::StdRng, SeedableRng};
 
 ///
 /// Options for specifing the behaviour of the core runtime
@@ -57,6 +57,21 @@ impl RuntimeOptions {
     }
 
     ///
+    /// Sets the cqueue options if this runtime uses a cqueue.
+    /// NOP otherwise.
+    ///
+    #[allow(unused)]
+    #[must_use]
+    pub fn cqueue_options(mut self, n: usize, t: SimTime) -> Self {
+        #[cfg(feature = "cqueue")]
+        {
+            self.cqueue_num_buckets = n;
+            self.cqueue_bucket_timespan = t;
+        }
+        self
+    }
+
+    ///
     /// Changes the maximum iteration number of a runtime.
     ///
     #[must_use]
@@ -83,8 +98,8 @@ impl RuntimeOptions {
         self
     }
 
-    /// 
-    /// Sets a custom limit to the end of the runtime, overwriting 
+    ///
+    /// Sets a custom limit to the end of the runtime, overwriting
     /// all max_itr and max_time options.
     ///
     #[must_use]
@@ -105,10 +120,10 @@ impl Default for RuntimeOptions {
             custom_limit: None,
 
             #[cfg(feature = "cqueue")]
-            cqueue_num_buckets: 20,
+            cqueue_num_buckets: 1028,
 
             #[cfg(feature = "cqueue")]
-            cqueue_bucket_timespan: crate::core::SimTime::from(0.1),
+            cqueue_bucket_timespan: crate::core::SimTime::from(0.0025),
         }
     }
 }

@@ -194,6 +194,7 @@ mod cqueue {
             }
         }
 
+        #[inline]
         pub fn fetch_next(
             &mut self,
             #[cfg(feature = "internal-metrics")] mut metrics: PtrMut<RuntimeMetrics>,
