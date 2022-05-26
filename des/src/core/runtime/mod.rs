@@ -227,6 +227,7 @@ where
                         ),
                     }
                 }),
+                options.quiet,
                 options
                     .rng
                     .unwrap_or(StdRng::from_rng(OsRng::default()).unwrap()),
@@ -380,21 +381,23 @@ where
         if self.future_event_set.is_empty() {
             let time = self.sim_time();
 
-            println!("\u{23A1}");
-            println!("\u{23A2} Simulation ended");
-            println!(
-                "\u{23A2}  Ended at event #{} after {}",
-                self.core().itr,
-                time
-            );
+            if !self.core().quiet {
+                println!("\u{23A1}");
+                println!("\u{23A2} Simulation ended");
+                println!(
+                    "\u{23A2}  Ended at event #{} after {}",
+                    self.core().itr,
+                    time
+                );
 
-            #[cfg(feature = "internal-metrics")]
-            {
-                println!("\u{23A2}");
-                self.metrics.finish()
+                #[cfg(feature = "internal-metrics")]
+                {
+                    println!("\u{23A2}");
+                    self.metrics.finish()
+                }
+
+                println!("\u{23A3}");
             }
-
-            println!("\u{23A3}");
 
             RuntimeResult::Finished {
                 event_count: self.core().itr,
@@ -404,22 +407,24 @@ where
         } else {
             let time = self.sim_time();
 
-            println!("\u{23A1}");
-            println!("\u{23A2} Simulation ended prematurly");
-            println!(
-                "\u{23A2}  Ended at event #{} with {} active events after {}",
-                self.core().itr,
-                self.future_event_set.len(),
-                time
-            );
+            if !self.core().quiet {
+                println!("\u{23A1}");
+                println!("\u{23A2} Simulation ended prematurly");
+                println!(
+                    "\u{23A2}  Ended at event #{} with {} active events after {}",
+                    self.core().itr,
+                    self.future_event_set.len(),
+                    time
+                );
 
-            #[cfg(feature = "internal-metrics")]
-            {
-                println!("\u{23A2}");
-                self.metrics.finish()
+                #[cfg(feature = "internal-metrics")]
+                {
+                    println!("\u{23A2}");
+                    self.metrics.finish()
+                }
+
+                println!("\u{23A3}");
             }
-
-            println!("\u{23A3}");
 
             RuntimeResult::PrematureAbort {
                 event_count: self.core().itr,

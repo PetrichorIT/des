@@ -284,5 +284,14 @@ impl PtrWeakMut<dyn Module> {
                 self.module_core().activity_period,
             )
         }
+
+        if !rt.app.globals.parameters.updates.borrow().is_empty() {
+            for update in rt.app.globals.parameters.updates.borrow_mut().drain(..) {
+                rt.app
+                    .module(|m| m.name() == update)
+                    .unwrap()
+                    .handle_par_change()
+            }
+        }
     }
 }

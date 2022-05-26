@@ -10,9 +10,7 @@ struct A();
 fn main() {
     let app: NetworkRuntime<A> = A().build_rt();
 
-    println!("{:?}", app.globals_weak().parameters);
-
-    let rt = Runtime::new_with(app, RuntimeOptions::seeded(0x123));
+    let rt = Runtime::new_with(app, RuntimeOptions::seeded(0x123).quiet());
     let (app, time, event_count) = rt.run().unwrap();
 
     let topo = &app.globals_weak().topology;

@@ -10,6 +10,7 @@ use std::ops::Deref;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Parameters {
     tree: RefCell<ParameterTree>,
+    pub(crate) updates: RefCell<Vec<String>>,
 }
 
 impl Parameters {
@@ -19,6 +20,7 @@ impl Parameters {
     pub fn new() -> Self {
         Self {
             tree: RefCell::new(ParameterTree::new()),
+            updates: RefCell::new(Vec::new()),
         }
     }
 
@@ -46,7 +48,7 @@ impl Parameters {
 
     pub(crate) fn get_handle<'a>(&'a self, path: &'a str, key: &'a str) -> ParHandle<'a, Optional> {
         ParHandle {
-            tree_ref: &self.tree,
+            tree_ref: &self,
             path,
             key,
 
@@ -90,7 +92,7 @@ pub struct ParHandle<'a, State>
 where
     State: private::ParHandleState,
 {
-    tree_ref: &'a RefCell<ParameterTree>,
+    tree_ref: &'a Parameters,
     path: &'a str,
     key: &'a str,
 
@@ -112,7 +114,7 @@ where
     /// Panics if the handle points to no existing value.
     ///
     pub fn unwrap(self) -> ParHandle<'a, Unwraped> {
-        if let Some(val) = self.tree_ref.borrow().get_value(self.path, self.key) {
+        if let Some(val) = self.tree_ref.tree.borrow().get_value(self.path, self.key) {
             ParHandle {
                 tree_ref: self.tree_ref,
                 path: self.path,
@@ -148,6 +150,7 @@ where
         self.value.is_some()
             || self
                 .tree_ref
+                .tree
                 .borrow()
                 .get_value(self.path, self.key)
                 .is_some()
@@ -169,6 +172,7 @@ where
             Some(value) => Some(value),
             None => self
                 .tree_ref
+                .tree
                 .borrow()
                 .get_value(self.path, self.key)
                 .map(str::to_string),
@@ -184,9 +188,14 @@ where
     {
         let str = value.to_string();
         self.tree_ref
+            .tree
             .borrow_mut()
             .insert(&format!("{}.{}", self.path, self.key), &str);
-        // (*self.tree_ref).insert(&self.path_and_key, &str);
+
+        self.tree_ref
+            .updates
+            .borrow_mut()
+            .push(self.path.to_string());
     }
 }
 

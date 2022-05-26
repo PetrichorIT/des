@@ -9,6 +9,11 @@ use rand::{prelude::StdRng, SeedableRng};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuntimeOptions {
     ///
+    /// Whether the simulation should output any values to stdout.
+    ///
+    pub quiet: bool,
+
+    ///
     /// The random number generator used internally.
     /// This can be seeded to ensure reproducability.
     /// Defaults to a [OsRng] which does NOT provide reproducability.
@@ -25,6 +30,10 @@ pub struct RuntimeOptions {
     ///
     pub min_sim_time: Option<SimTime>,
 
+    ///
+    /// A more complexe custom limit that determines the end of the simulation
+    /// overwriting 'max_itr' and 'max_sim_time' if set.
+    ///
     pub custom_limit: Option<RuntimeLimit>,
 
     ///
@@ -72,6 +81,15 @@ impl RuntimeOptions {
     }
 
     ///
+    /// Suppressed runtime messages from the simulation framework.
+    ///
+    #[must_use]
+    pub fn quiet(mut self) -> Self {
+        self.quiet = true;
+        self
+    }
+
+    ///
     /// Changes the maximum iteration number of a runtime.
     ///
     #[must_use]
@@ -112,6 +130,8 @@ impl RuntimeOptions {
 impl Default for RuntimeOptions {
     fn default() -> Self {
         Self {
+            quiet: false,
+
             rng: None,
             max_itr: None,
             min_sim_time: None,

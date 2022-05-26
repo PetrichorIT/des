@@ -147,6 +147,12 @@ pub trait Module: StaticModuleCore {
     /// All events emitted by this function will NOT be processed.
     ///
     fn at_sim_end(&mut self) {}
+
+    ///
+    /// A callback function that is called should a parameter belonging to
+    /// this module be changed.
+    ///
+    fn handle_par_change(&mut self) {}
 }
 
 ///

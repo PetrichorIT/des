@@ -61,6 +61,7 @@ pub(crate) struct RuntimeCore {
     pub itr: usize,
 
     // Misc
+    pub quiet: bool,
     pub rng: StdRng,
 }
 
@@ -70,15 +71,17 @@ impl RuntimeCore {
         event_id: EventId,
         itr: usize,
         limit: RuntimeLimit,
+        quiet: bool,
         rng: StdRng,
     ) -> PtrMut<Option<RuntimeCore>> {
         let rtc = Self {
             sim_time,
-            
+
             limit,
             event_id,
             itr,
 
+            quiet,
             rng,
         };
 
