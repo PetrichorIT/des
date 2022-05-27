@@ -1,5 +1,5 @@
-use crate::core::SimTime;
 use crate::metrics::Statistic;
+use crate::time::SimTime;
 use std::fmt::Display;
 
 ///

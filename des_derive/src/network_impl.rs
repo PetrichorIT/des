@@ -106,8 +106,8 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> Result<TokenStream> {
                         token_stream.extend(quote! {
                             let channel = ::des::net::Channel::new(::des::net::ChannelMetrics {
                                 bitrate: #bitrate,
-                                latency: ::des::core::Duration::from(#latency),
-                                jitter: ::des::core::Duration::from(#jitter),
+                                latency: ::des::time::Duration::from(#latency),
+                                jitter: ::des::time::Duration::from(#jitter),
                                 cost: #cost,
                             });
                             #from_ident.set_next_gate(#to_ident);
@@ -137,12 +137,12 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> Result<TokenStream> {
 
                 Ok(quote! {
                     impl #ident {
-                        pub fn run(self) -> ::des::core::RuntimeResult<Self> {
-                            self.run_with_options(::des::core::RuntimeOptions::default())
+                        pub fn run(self) -> ::des::runtime::RuntimeResult<Self> {
+                            self.run_with_options(::des::runtime::RuntimeOptions::default())
                         }
 
-                        pub fn run_with_options(self, options: ::des::core::RuntimeOptions) -> ::des::core::RuntimeResult<Self> {
-                            use ::des::core::Runtime;
+                        pub fn run_with_options(self, options: ::des::runtime::RuntimeOptions) -> ::des::runtime::RuntimeResult<Self> {
+                            use ::des::runtime::Runtime;
                             use ::des::net::NetworkRuntime;
 
                             let net_rt = self.build_rt();

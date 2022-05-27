@@ -1,8 +1,8 @@
 use std::any::Any;
 use std::rc::Rc;
 
-use crate::core::*;
 use crate::net::*;
+use crate::time::*;
 
 /// A address of a node in a IPv6 network.
 #[cfg(feature = "net-ipv6")]

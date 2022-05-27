@@ -255,8 +255,8 @@ fn generate_dynamic_builder(ident: Ident, attrs: &Attributes, out: &mut TokenStr
                         token_stream.extend(quote! {
                             let channel = ::des::net::Channel::new(::des::net::ChannelMetrics {
                                 bitrate: #bitrate,
-                                latency: ::des::core::Duration::from(#latency),
-                                jitter: ::des::core::Duration::from(#jitter),
+                                latency: ::des::time::Duration::from(#latency),
+                                jitter: ::des::time::Duration::from(#jitter),
                                 cost: #cost,
                             });
                             #from_ident.set_next_gate(#to_ident);

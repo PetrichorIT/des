@@ -1,5 +1,4 @@
-use crate::core::runtime::*;
-use crate::core::SimTime;
+use crate::runtime::*;
 use rand::{prelude::StdRng, SeedableRng};
 
 ///
@@ -51,7 +50,7 @@ pub struct RuntimeOptions {
     /// The time interval each bucket in the cqueue manages.
     ///
     #[cfg(feature = "cqueue")]
-    pub cqueue_bucket_timespan: crate::core::SimTime,
+    pub cqueue_bucket_timespan: crate::time::SimTime,
 }
 
 impl RuntimeOptions {
@@ -143,7 +142,7 @@ impl Default for RuntimeOptions {
             cqueue_num_buckets: 1028,
 
             #[cfg(feature = "cqueue")]
-            cqueue_bucket_timespan: crate::core::SimTime::from(0.0025),
+            cqueue_bucket_timespan: crate::time::SimTime::from(0.0025),
         }
     }
 }

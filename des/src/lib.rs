@@ -20,8 +20,9 @@
 
 pub mod prelude;
 
-pub mod core;
 pub mod metrics;
+pub mod runtime;
+pub mod time;
 pub mod util;
 
 #[cfg(feature = "net")]

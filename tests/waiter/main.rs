@@ -45,7 +45,7 @@ impl Application {
     }
 }
 
-impl des::core::Application for Application {
+impl des::runtime::Application for Application {
     type EventSet = Events;
 }
 
@@ -133,7 +133,7 @@ impl Event<Application> for CustomerArrival {
     }
 }
 
-fn expdist<A: des::core::Application>(rt: &mut Runtime<A>, p: f64) -> f64 {
+fn expdist<A: des::runtime::Application>(rt: &mut Runtime<A>, p: f64) -> f64 {
     let x: f64 = rt.rng_sample(Standard);
     x.ln() / -p
 }

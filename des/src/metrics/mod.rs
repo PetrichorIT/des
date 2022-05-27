@@ -2,7 +2,7 @@
 //! A set of structs that help with the collection of statistical data.
 //!
 
-use crate::core::SimTime;
+use crate::time::SimTime;
 use std::ops::RangeInclusive;
 
 #[cfg(feature = "internal-metrics")]

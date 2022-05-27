@@ -1,4 +1,5 @@
-use crate::core::{*, event::{Application,EventNode}};
+use super::event::{Application, EventNode};
+use crate::time::*;
 use std::fmt::Display;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -7,21 +8,28 @@ pub enum RuntimeLimit {
 
     EventCount(usize),
     SimTime(SimTime),
-    
+
     CombinedAnd(Box<RuntimeLimit>, Box<RuntimeLimit>),
     CombinedOr(Box<RuntimeLimit>, Box<RuntimeLimit>),
 }
 
 impl RuntimeLimit {
-    pub(crate) fn applies<A>(&self, itr_count: usize, node: &EventNode<A>) -> bool where A: Application {
+    pub(crate) fn applies<A>(&self, itr_count: usize, node: &EventNode<A>) -> bool
+    where
+        A: Application,
+    {
         match self {
             Self::None => false,
 
             Self::EventCount(e) => itr_count > *e,
             Self::SimTime(t) => node.time > *t,
 
-            Self::CombinedAnd(lhs, rhs) => lhs.applies(itr_count, node) && rhs.applies(itr_count, node),
-            Self::CombinedOr(lhs, rhs) => lhs.applies(itr_count, node) || rhs.applies(itr_count, node),
+            Self::CombinedAnd(lhs, rhs) => {
+                lhs.applies(itr_count, node) && rhs.applies(itr_count, node)
+            }
+            Self::CombinedOr(lhs, rhs) => {
+                lhs.applies(itr_count, node) || rhs.applies(itr_count, node)
+            }
         }
     }
 }

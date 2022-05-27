@@ -1,14 +1,7 @@
 #[cfg(not(feature = "cqueue"))]
-mod default {
+mod default_impl {
     #[allow(unused)]
-    use crate::{
-        core::{
-            event::{Application, EventNode},
-            RuntimeOptions, SimTime,
-        },
-        metrics::*,
-        util::*,
-    };
+    use crate::{metrics::*, runtime::*, time::SimTime, util::*};
     use std::collections::{BinaryHeap, VecDeque};
 
     pub(crate) struct FutureEventSet<A>
@@ -131,21 +124,16 @@ mod default {
 }
 
 #[cfg(not(feature = "cqueue"))]
-pub(crate) use default::*;
+pub(crate) use default_impl::*;
 
 #[cfg(feature = "cqueue")]
-mod cqueue {
+mod cqueue_impl {
+    #[allow(unused)]
+    use super::*;
     use std::marker::PhantomData;
 
     #[allow(unused)]
-    use crate::{
-        core::{
-            event::{Application, EventNode},
-            RuntimeOptions, SimTime,
-        },
-        metrics::*,
-        util::*,
-    };
+    use crate::{metrics::*, runtime::*, time::*, util::*};
     use cqueue::*;
 
     pub(crate) struct FutureEventSet<A>
@@ -265,4 +253,4 @@ mod cqueue {
 }
 
 #[cfg(feature = "cqueue")]
-pub(crate) use self::cqueue::*;
+pub(crate) use self::cqueue_impl::*;

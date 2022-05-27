@@ -1,6 +1,6 @@
 use crate::{
-    core::SimTime,
     metrics::{Statistic, StdDev},
+    time::SimTime,
 };
 use log::error;
 use std::{

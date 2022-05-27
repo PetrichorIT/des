@@ -1,7 +1,8 @@
-use crate::{
-    core::{event::Application, Duration, SimTime},
-    util::*,
-};
+//!
+//! Central primitives for running a discrete event simulation.
+//!
+
+use crate::{time::*, util::*};
 use log::warn;
 use rand::{
     distributions::Standard,
@@ -14,8 +15,8 @@ use std::{
     fmt::{Debug, Display},
 };
 
-mod future_event_set;
-use self::future_event_set::*;
+mod event;
+pub use self::event::*;
 
 mod options;
 pub use self::options::*;
@@ -25,6 +26,9 @@ pub use self::core::*;
 
 mod limit;
 pub use self::limit::*;
+
+mod logger;
+pub use self::logger::*;
 
 pub(crate) const FT_NET: bool = cfg!(feature = "net");
 pub(crate) const FT_CQUEUE: bool = cfg!(feature = "cqueue");
@@ -41,9 +45,9 @@ pub(crate) const FT_INTERNAL_METRICS: bool = cfg!(feature = "internal-metrics");
 ///
 /// - Create an 'App' struct that implements the trait [Application].
 /// This struct will hold the systems state and define the event set used in the simulation.
-/// - Create your events that handle the logic of you simulation. They must implement [Event](crate::core::Event) with the generic
+/// - Create your events that handle the logic of you simulation. They must implement [Event](crate::runtime::Event) with the generic
 /// parameter A, where A is your 'App' struct.
-/// - To bind those two together create a enum that implements [EventSet](crate::core::EventSet) that holds all your events.
+/// - To bind those two together create a enum that implements [EventSet](crate::runtime::EventSet) that holds all your events.
 /// This can be done via a macro. The use this event set as the associated event set in 'App'.
 ///
 /// # Usage with module system
@@ -157,7 +161,7 @@ where
 {
     ///
     /// Creates a new [Runtime] Instance using an application as core,
-    /// and accepting events of type [Event<A>](crate::core::Event).
+    /// and accepting events of type [Event<A>](crate::runtime::Event).
     ///
     /// # Examples
     ///
@@ -185,7 +189,7 @@ where
 
     ///
     /// Creates a new [Runtime] Instance using an application as core,
-    /// and accepting events of type [Event<A>](crate::core::Event), using a custom set of
+    /// and accepting events of type [Event<A>](crate::runtime::Event), using a custom set of
     /// [RuntimeOptions].
     ///
     /// # Examples
@@ -359,7 +363,7 @@ where
     ///
     pub fn run(mut self) -> RuntimeResult<A> {
         if self.future_event_set.is_empty() {
-            warn!(target: "des::core", "Running simulation without any events. Think about adding some inital events.");
+            warn!(target: "des::runtime", "Running simulation without any events. Think about adding some inital events.");
             return RuntimeResult::EmptySimulation { app: self.app };
         }
         while self.next() {}
@@ -695,7 +699,7 @@ impl<A> RuntimeResult<A> {
 #[cfg(feature = "net")]
 use crate::net::*;
 
-use super::event::EventNode;
+use event::EventNode;
 
 #[cfg(feature = "net")]
 impl<A> Runtime<NetworkRuntime<A>> {

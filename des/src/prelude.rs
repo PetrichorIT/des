@@ -6,20 +6,20 @@
 // # Generic core exports
 //
 
-pub use crate::core::Runtime;
-pub use crate::core::RuntimeOptions;
-pub use crate::core::RuntimeResult;
+pub use crate::runtime::Runtime;
+pub use crate::runtime::RuntimeOptions;
+pub use crate::runtime::RuntimeResult;
 
-pub use crate::core::Duration;
-pub use crate::core::SimTime;
+pub use crate::time::Duration;
+pub use crate::time::SimTime;
 
-pub use crate::core::Application;
-pub use crate::core::Event;
-pub use crate::core::EventSet;
+pub use crate::runtime::Application;
+pub use crate::runtime::Event;
+pub use crate::runtime::EventSet;
 
-pub use crate::core::rng;
-pub use crate::core::sample;
-pub use crate::core::sim_time;
+pub use crate::runtime::rng;
+pub use crate::runtime::sample;
+pub use crate::runtime::sim_time;
 
 //
 // # Metrics & Misc
