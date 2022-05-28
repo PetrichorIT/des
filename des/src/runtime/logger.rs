@@ -3,6 +3,7 @@ use std::io::Write;
 use termcolor::WriteColor;
 use termcolor::*;
 
+/// A logger instance for internal logs from [des].
 pub static LOGGER: StandardLogger = StandardLogger();
 
 // const MODULE_COLORS: [Color; 8] = [
@@ -25,6 +26,7 @@ pub static LOGGER: StandardLogger = StandardLogger();
 //     MODULE_COLORS[sum % 8]
 // }
 
+/// The logging implementation used by [des] internally.
 pub struct StandardLogger();
 
 impl StandardLogger {

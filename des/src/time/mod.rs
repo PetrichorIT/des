@@ -80,8 +80,11 @@ impl SimTime {
 
 // # Custom Additions
 impl SimTime {
+    /// The smallest instance of a [SimTime].
     pub const ZERO: SimTime = SimTime(Duration::ZERO);
+    /// The smallest valid instance of a [SimTime].
     pub const MIN: SimTime = SimTime(Duration::ZERO);
+    /// The greatest instance of a [SimTime].
     pub const MAX: SimTime = SimTime(Duration::MAX);
 }
 
