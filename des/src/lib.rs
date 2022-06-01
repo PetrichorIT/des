@@ -27,3 +27,6 @@ pub mod util;
 
 #[cfg(feature = "net")]
 pub mod net;
+
+#[cfg(feature = "async_sim")]
+pub mod async_sim;

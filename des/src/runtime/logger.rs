@@ -3,30 +3,10 @@ use std::io::Write;
 use termcolor::WriteColor;
 use termcolor::*;
 
-/// A logger instance for internal logs from [des].
+/// A logger instance for internal logs.
 pub static LOGGER: StandardLogger = StandardLogger();
 
-// const MODULE_COLORS: [Color; 8] = [
-//     Color::Rgb(0x2e, 0xcc, 0x71),
-//     Color::Rgb(0x29, 0x80, 0xb9),
-//     Color::Rgb(0x8e, 0x44, 0xad),
-//     Color::Rgb(0xf1, 0xc4, 0x0f),
-//     Color::Rgb(0xd3, 0x54, 0x00),
-//     Color::Rgb(0xe7, 0x4c, 0x3c),
-//     Color::Rgb(0x1a, 0xbc, 0x9c),
-//     Color::Rgb(0x34, 0x49, 0x5e),
-// ];
-
-// fn get_random_color(str: &str) -> Color {
-//     let mut sum = 0;
-//     for byte in str.chars() {
-//         sum += byte as usize;
-//     }
-
-//     MODULE_COLORS[sum % 8]
-// }
-
-/// The logging implementation used by [des] internally.
+/// The logging implementation used internally.
 pub struct StandardLogger();
 
 impl StandardLogger {

@@ -34,6 +34,9 @@ pub(crate) const FT_NET: bool = cfg!(feature = "net");
 pub(crate) const FT_CQUEUE: bool = cfg!(feature = "cqueue");
 pub(crate) const FT_INTERNAL_METRICS: bool = cfg!(feature = "internal-metrics");
 
+pub(crate) const SYM_CHECKMARK: char = '\u{2713}';
+pub(crate) const SYM_CROSSMARK: char = '\u{02df}';
+
 ///
 /// The central managment point for a generic
 /// instance of a discrete event based simulation.
@@ -245,9 +248,9 @@ where
         macro_rules! symbol {
             ($i:ident) => {
                 if $i {
-                    '\u{1F5F8}'
+                    SYM_CHECKMARK
                 } else {
-                    '\u{26CC}'
+                    SYM_CROSSMARK
                 }
             };
         }

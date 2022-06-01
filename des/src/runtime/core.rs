@@ -8,6 +8,7 @@ use rand::{
     prelude::{Distribution, StdRng},
     Rng,
 };
+
 lazy_static! {
     pub(crate) static ref RTC: SyncWrap<PtrMut<Option<RuntimeCore>>> =
         SyncWrap::new(PtrMut::new(None));
