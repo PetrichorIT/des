@@ -72,18 +72,18 @@
 //! within a Tokio runtime, however it is still not tied to one specific Tokio
 //! runtime, and the sender may be moved from one Tokio runtime to another.
 //!
-//! [`Sender`]: crate::async_sim::sync::mpsc::Sender
-//! [`Receiver`]: crate::async_sim::sync::mpsc::Receiver
-//! [bounded-send]: crate::async_sim::sync::mpsc::Sender::send()
-//! [bounded-recv]: crate::async_sim::sync::mpsc::Receiver::recv()
-//! [blocking-send]: crate::async_sim::sync::mpsc::Sender::blocking_send()
-//! [blocking-recv]: crate::async_sim::sync::mpsc::Receiver::blocking_recv()
-//! [`UnboundedSender`]: crate::async_sim::sync::mpsc::UnboundedSender
-//! [`UnboundedReceiver`]: crate::async_sim::sync::mpsc::UnboundedReceiver
+//! [`Sender`]: crate::sync::mpsc::Sender
+//! [`Receiver`]: crate::sync::mpsc::Receiver
+//! [bounded-send]: crate::sync::mpsc::Sender::send()
+//! [bounded-recv]: crate::sync::mpsc::Receiver::recv()
+//! [blocking-send]: crate::sync::mpsc::Sender::blocking_send()
+//! [blocking-recv]: crate::sync::mpsc::Receiver::blocking_recv()
+//! [`UnboundedSender`]: crate::sync::mpsc::UnboundedSender
+//! [`UnboundedReceiver`]: crate::sync::mpsc::UnboundedReceiver
 //! [`Handle::block_on`]: tokio::runtime::Handle::block_on()
 //! [std-unbounded]: std::sync::mpsc::channel
 //! [crossbeam-unbounded]: https://docs.rs/crossbeam/*/crossbeam/channel/fn.unbounded.html
-//! [`send_timeout`]: crate::async_sim::sync::mpsc::Sender::send_timeout
+//! [`send_timeout`]: crate::sync::mpsc::Sender::send_timeout
 
 use std::sync::{
     atomic::{AtomicUsize, Ordering},

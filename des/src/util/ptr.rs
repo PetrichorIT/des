@@ -5,8 +5,18 @@ use std::{
     hash::Hash,
     marker::{PhantomData, Unsize},
     ops::{CoerceUnsized, Deref, DerefMut, DispatchFromDyn},
-    rc::{Rc, Weak},
 };
+#[cfg(not(feature = "async"))]
+type Rc<T> = std::rc::Rc<T>;
+
+#[cfg(feature = "async")]
+type Rc<T> = std::sync::Arc<T>;
+
+#[cfg(not(feature = "async"))]
+type Weak<T> = std::rc::Weak<T>;
+
+#[cfg(feature = "async")]
+type Weak<T> = std::sync::Weak<T>;
 
 // TODO: Do with dyn Any
 #[allow(unused)]

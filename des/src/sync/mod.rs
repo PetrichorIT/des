@@ -34,7 +34,7 @@
 //! computation.
 //!
 //! ```
-//! use des::async_sim::sync::oneshot;
+//! use des::sync::oneshot;
 //!
 //! async fn some_computation() -> String {
 //!     "represents the result of the computation".to_string()
@@ -95,7 +95,7 @@
 //! of computations.
 //!
 //! ```
-//! use des::async_sim::sync::mpsc;
+//! use des::sync::mpsc;
 //!
 //! async fn some_computation(input: u32) -> String {
 //!     format!("the result of computation {}", input)
@@ -137,7 +137,7 @@
 //! ```no_run
 //! use tokio::io::{self, AsyncWriteExt};
 //! use tokio::net::TcpStream;
-//! use des::async_sim::sync::mpsc;
+//! use des::sync::mpsc;
 //!
 //! #[tokio::main]
 //! async fn main() -> io::Result<()> {
@@ -179,7 +179,7 @@
 //! sent over the provided `oneshot` channel.
 //!
 //! ```
-//! use des::async_sim::sync::{oneshot, mpsc};
+//! use des::sync::{oneshot, mpsc};
 //! use Command::Increment;
 //!
 //! enum Command {
@@ -244,7 +244,7 @@
 //! Basic usage
 //!
 //! ```
-//! use des::async_sim::sync::broadcast;
+//! use des::sync::broadcast;
 //!
 //! #[tokio::main]
 //! async fn main() {
@@ -266,7 +266,7 @@
 //! }
 //! ```
 //!
-//! [`broadcast` channel]: crate::async_sim::sync::broadcast
+//! [`broadcast` channel]: crate::sync::broadcast
 //!
 //! ## `watch` channel
 //!
@@ -286,7 +286,7 @@
 //! the file changes, the configuration changes are signalled to consumers.
 //!
 //! ```
-//! use des::async_sim::sync::watch;
+//! use des::sync::watch;
 //! use tokio::time::{self, Duration, Instant};
 //!
 //! use std::io;
@@ -395,8 +395,8 @@
 //! }
 //! ```
 //!
-//! [`watch` channel]: mod@crate::async_sim::sync::watch
-//! [`broadcast` channel]: mod@crate::async_sim::sync::broadcast
+//! [`watch` channel]: mod@crate::sync::watch
+//! [`broadcast` channel]: mod@crate::sync::broadcast
 //!
 //! # State synchronization
 //!

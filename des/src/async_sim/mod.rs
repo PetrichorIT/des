@@ -3,13 +3,11 @@ use tokio::sync::Notify;
 use crate::prelude::*;
 use tokio::runtime::Runtime;
 
-pub mod sync;
-
 pub const P_WAKEUP: MessageId = 1;
 pub const P_PACKET: MessageId = 2;
 
 pub struct AsyncCore {
-    to_worker: sync::mpsc::Sender<Packet>,
+    to_worker: crate::sync::mpsc::Sender<Packet>,
     notifier: Notify,
 
     runtime: Runtime,

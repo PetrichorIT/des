@@ -80,7 +80,7 @@ impl<T> UnboundedSender<T> {
     /// # Examples
     ///
     /// ```
-    /// use des::async_sim::sync::mpsc;
+    /// use des::sync::mpsc;
     ///
     /// #[tokio::main]
     /// async fn main() {
@@ -111,11 +111,11 @@ impl<T> UnboundedSender<T> {
     /// [`UnboundedReceiver`] is dropped, or when the
     /// [`UnboundedReceiver::close`] method is called.
     ///
-    /// [`UnboundedReceiver`]: crate::async_sim::sync::mpsc::UnboundedReceiver
-    /// [`UnboundedReceiver::close`]: crate::async_sim::sync::mpsc::UnboundedReceiver::close
+    /// [`UnboundedReceiver`]: crate::sync::mpsc::UnboundedReceiver
+    /// [`UnboundedReceiver::close`]: crate::sync::mpsc::UnboundedReceiver::close
     ///
     /// ```
-    /// use des::async_sim::sync::mpsc;
+    /// use des::sync::mpsc;
     ///
     /// let (tx, rx) = mpsc::unbounded_channel::<()>();
     /// assert!(!tx.is_closed());
@@ -136,7 +136,7 @@ impl<T> UnboundedSender<T> {
     /// # Examples
     ///
     /// ```
-    /// use des::async_sim::sync::mpsc;
+    /// use des::sync::mpsc;
     /// let (tx, rx) = mpsc::unbounded_channel::<()>();
     /// let  tx2 = tx.clone();
     /// assert!(tx.same_channel(&tx2));
@@ -229,7 +229,7 @@ impl<T> UnboundedReceiver<T> {
     /// # Examples
     ///
     /// ```
-    /// use des::async_sim::sync::mpsc;
+    /// use des::sync::mpsc;
     ///
     /// #[tokio::main]
     /// async fn main() {
@@ -247,7 +247,7 @@ impl<T> UnboundedReceiver<T> {
     /// Values are buffered:
     ///
     /// ```
-    /// use des::async_sim::sync::mpsc;
+    /// use des::sync::mpsc;
     ///
     /// #[tokio::main]
     /// async fn main() {
@@ -278,17 +278,17 @@ impl<T> UnboundedReceiver<T> {
     /// Unlike the [`poll_recv`] method, this method will never return an
     /// [`Empty`] error spuriously.
     ///
-    /// [`Empty`]: crate::async_sim::sync::mpsc::error::TryRecvError::Empty
-    /// [`Disconnected`]: crate::async_sim::sync::mpsc::error::TryRecvError::Disconnected
+    /// [`Empty`]: crate::sync::mpsc::error::TryRecvError::Empty
+    /// [`Disconnected`]: crate::sync::mpsc::error::TryRecvError::Disconnected
     /// [`poll_recv`]: Self::poll_recv
-    /// [senders]: crate::async_sim::sync::mpsc::Sender
-    /// [permits]: crate::async_sim::sync::mpsc::Permit
+    /// [senders]: crate::sync::mpsc::Sender
+    /// [permits]: crate::sync::mpsc::Permit
     ///
     /// # Examples
     ///
     /// ```
-    /// use des::async_sim::sync::mpsc;
-    /// use des::async_sim::sync::mpsc::error::TryRecvError;
+    /// use des::sync::mpsc;
+    /// use des::sync::mpsc::error::TryRecvError;
     ///
     /// #[tokio::main]
     /// async fn main() {
@@ -325,7 +325,7 @@ impl<T> UnboundedReceiver<T> {
     ///
     /// ```
     /// use std::thread;
-    /// use des::async_sim::sync::mpsc;
+    /// use des::sync::mpsc;
     ///
     /// #[tokio::main]
     /// async fn main() {

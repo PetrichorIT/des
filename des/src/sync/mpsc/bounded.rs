@@ -36,7 +36,7 @@ use crate::prelude::Duration;
 /// # Examples
 ///
 /// ```rust
-/// use des::async_sim::sync::mpsc;
+/// use des::sync::mpsc;
 ///
 /// #[tokio::main]
 /// async fn main() {
@@ -91,7 +91,7 @@ pub fn channel_watched<T>(buffer: usize, globals: Arc<Globals>) -> (Sender<T>, R
 /// # Examples
 ///
 /// ```rust
-/// use des::async_sim::sync::mpsc;
+/// use des::sync::mpsc;
 ///
 /// #[tokio::main]
 /// async fn main() {
@@ -149,7 +149,7 @@ impl<T> Sender<T> {
     /// # Examples
     ///
     /// ```
-    /// use des::async_sim::sync::mpsc;
+    /// use des::sync::mpsc;
     ///
     /// #[tokio::main]
     /// async fn main() {
@@ -180,11 +180,11 @@ impl<T> Sender<T> {
     /// [`Receiver`] is dropped, or when the [`Receiver::close`] method is
     /// called.
     ///
-    /// [`Receiver`]: crate::async_sim::sync::mpsc::Receiver
-    /// [`Receiver::close`]: crate::async_sim::sync::mpsc::Receiver::close
+    /// [`Receiver`]: crate::sync::mpsc::Receiver
+    /// [`Receiver::close`]: crate::sync::mpsc::Receiver::close
     ///
     /// ```
-    /// use des::async_sim::sync::mpsc;
+    /// use des::sync::mpsc;
     /// let (tx, rx) = mpsc::channel::<()>(42);
     /// assert!(!tx.is_closed());
     ///
@@ -204,7 +204,7 @@ impl<T> Sender<T> {
     /// # Examples
     ///
     /// ```
-    /// use des::async_sim::sync::mpsc;
+    /// use des::sync::mpsc;
     /// let (tx, rx) = mpsc::channel::<()>(1);
     /// let  tx2 = tx.clone();
     /// assert!(tx.same_channel(&tx2));
@@ -224,7 +224,7 @@ impl<T> Sender<T> {
     /// # Examples
     ///
     /// ```
-    /// use des::async_sim::sync::mpsc;
+    /// use des::sync::mpsc;
     ///
     /// #[tokio::main]
     /// async fn main() {
@@ -284,7 +284,7 @@ impl<T> Sender<T> {
     /// previously sent value was received.
     ///
     /// ```rust
-    /// use des::async_sim::sync::mpsc;
+    /// use des::sync::mpsc;
     ///
     /// #[tokio::main]
     /// async fn main() {
@@ -336,7 +336,7 @@ impl<T> Sender<T> {
     /// # Examples
     ///
     /// ```
-    /// use des::async_sim::sync::mpsc;
+    /// use des::sync::mpsc;
     ///
     /// #[tokio::main]
     /// async fn main() {
@@ -394,7 +394,7 @@ impl<T> Sender<T> {
     /// synchronous code to asynchronous code, and will work even if the
     /// receiver is not using [`blocking_recv`] to receive the message.
     ///
-    /// [`blocking_recv`]: fn@crate::async_sim::sync::mpsc::Receiver::blocking_recv
+    /// [`blocking_recv`]: fn@crate::sync::mpsc::Receiver::blocking_recv
     ///
     /// # Panics
     ///
@@ -406,7 +406,7 @@ impl<T> Sender<T> {
     /// ```
     /// use std::thread;
     /// use tokio::runtime::Runtime;
-    /// use des::async_sim::sync::mpsc;
+    /// use des::sync::mpsc;
     ///
     /// fn main() {
     ///     let (tx, mut rx) = mpsc::channel::<u8>(1);
@@ -453,7 +453,7 @@ impl<T> Sender<T> {
     /// # Examples
     ///
     /// ```
-    /// use des::async_sim::sync::mpsc;
+    /// use des::sync::mpsc;
     ///
     /// #[tokio::main]
     /// async fn main() {
@@ -507,7 +507,7 @@ impl<T> Sender<T> {
     /// # Examples
     /// Sending a message using an [`OwnedPermit`]:
     /// ```
-    /// use des::async_sim::sync::mpsc;
+    /// use des::sync::mpsc;
     ///
     /// #[tokio::main]
     /// async fn main() {
@@ -532,7 +532,7 @@ impl<T> Sender<T> {
     /// by value, it can be inexpensively cloned before calling `reserve_owned`:
     ///
     /// ```
-    /// use des::async_sim::sync::mpsc;
+    /// use des::sync::mpsc;
     ///
     /// #[tokio::main]
     /// async fn main() {
@@ -579,7 +579,7 @@ impl<T> Sender<T> {
     /// # Examples
     ///
     /// ```
-    /// use des::async_sim::sync::mpsc;
+    /// use des::sync::mpsc;
     ///
     /// #[tokio::main]
     /// async fn main() {
@@ -638,7 +638,7 @@ impl<T> Sender<T> {
     /// # Examples
     ///
     /// ```
-    /// use des::async_sim::sync::mpsc;
+    /// use des::sync::mpsc;
     ///
     /// #[tokio::main]
     /// async fn main() {
@@ -726,7 +726,7 @@ impl<T> Receiver<T> {
     /// # Examples
     ///
     /// ```
-    /// use des::async_sim::sync::mpsc;
+    /// use des::sync::mpsc;
     ///
     /// #[tokio::main]
     /// async fn main() {
@@ -774,12 +774,12 @@ impl<T> Receiver<T> {
     /// channel.
     ///
     /// [`close`]: Self::close
-    /// [`Permits`]: struct@crate::async_sim::sync::mpsc::Permit
+    /// [`Permits`]: struct@crate::sync::mpsc::Permit
     ///
     /// # Examples
     ///
     /// ```
-    /// use des::async_sim::sync::mpsc;
+    /// use des::sync::mpsc;
     ///
     /// #[tokio::main]
     /// async fn main() {
@@ -797,7 +797,7 @@ impl<T> Receiver<T> {
     /// Values are buffered:
     ///
     /// ```
-    /// use des::async_sim::sync::mpsc;
+    /// use des::sync::mpsc;
     ///
     /// #[tokio::main]
     /// async fn main() {
@@ -828,17 +828,17 @@ impl<T> Receiver<T> {
     /// Unlike the [`poll_recv`] method, this method will never return an
     /// [`Empty`] error spuriously.
     ///
-    /// [`Empty`]: crate::async_sim::sync::mpsc::error::TryRecvError::Empty
-    /// [`Disconnected`]: crate::async_sim::sync::mpsc::error::TryRecvError::Disconnected
+    /// [`Empty`]: crate::sync::mpsc::error::TryRecvError::Empty
+    /// [`Disconnected`]: crate::sync::mpsc::error::TryRecvError::Disconnected
     /// [`poll_recv`]: Self::poll_recv
-    /// [senders]: crate::async_sim::sync::mpsc::Sender
-    /// [permits]: crate::async_sim::sync::mpsc::Permit
+    /// [senders]: crate::sync::mpsc::Sender
+    /// [permits]: crate::sync::mpsc::Permit
     ///
     /// # Examples
     ///
     /// ```
-    /// use des::async_sim::sync::mpsc;
-    /// use des::async_sim::sync::mpsc::error::TryRecvError;
+    /// use des::sync::mpsc;
+    /// use des::sync::mpsc::error::TryRecvError;
     ///
     /// #[tokio::main]
     /// async fn main() {
@@ -884,8 +884,8 @@ impl<T> Receiver<T> {
     /// closed by `blocking_recv` until the permits are released.
     ///
     /// [`close`]: Self::close
-    /// [`Permits`]: struct@crate::async_sim::sync::mpsc::Permit
-    /// [`blocking_send`]: fn@crate::async_sim::sync::mpsc::Sender::blocking_send
+    /// [`Permits`]: struct@crate::sync::mpsc::Permit
+    /// [`blocking_send`]: fn@crate::sync::mpsc::Sender::blocking_send
     ///
     /// # Panics
     ///
@@ -897,7 +897,7 @@ impl<T> Receiver<T> {
     /// ```
     /// use std::thread;
     /// use tokio::runtime::Runtime;
-    /// use des::async_sim::sync::mpsc;
+    /// use des::sync::mpsc;
     ///
     /// fn main() {
     ///     let (tx, mut rx) = mpsc::channel::<u8>(10);

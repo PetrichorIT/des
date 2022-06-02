@@ -16,6 +16,7 @@
 //! | net-ipv6         | Configures the net module to use IPv6 addresses.                         |
 //! | cqueue           | Configures the runtime to use a calender queue for better performance.   |
 //! | internal-metrics | Collects internal metrics about the runtime, to improve parametrization. |
+//! | async            | Provides utilites and modifications for simulating asynchronous systems. |
 //!
 
 pub mod prelude;
@@ -28,5 +29,8 @@ pub mod util;
 #[cfg(feature = "net")]
 pub mod net;
 
-#[cfg(feature = "async_sim")]
+#[cfg(feature = "async")]
+pub mod sync;
+
+#[cfg(feature = "async")]
 pub mod async_sim;
