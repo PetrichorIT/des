@@ -238,6 +238,9 @@ impl Debug for Message {
     }
 }
 
+unsafe impl Send for Message {}
+unsafe impl Sync for Message {}
+
 ///
 /// A trait that allows a type to be mesured in bits / bytes.
 ///
@@ -486,3 +489,6 @@ impl Default for MessageBuilder {
         Self::new()
     }
 }
+
+unsafe impl Send for MessageBuilder {}
+unsafe impl Sync for MessageBuilder {}

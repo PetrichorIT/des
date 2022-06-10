@@ -9,7 +9,7 @@ struct AppA {
 impl Module for AppA {
     fn handle_message(&mut self, _msg: Message) {
         // println!("A: [{}] {:?}", SimTime::now(), _msg);
-        assert_eq!(SimTime::now(), 2.0);
+        assert_eq!(SimTime::now(), 1.0);
     }
 }
 
@@ -56,7 +56,7 @@ impl Module for MultiRunner {
             self.schedule_in(Message::new().kind(69).build(), 1.0f64.into());
         } else {
             // Send at 1.0 with processing 1.0 and delay 1.0
-            assert_eq!(SimTime::now(), 3.0);
+            assert_eq!(SimTime::now(), 2.0);
         }
     }
 }

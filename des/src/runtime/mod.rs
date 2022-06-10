@@ -33,6 +33,7 @@ pub use self::logger::*;
 pub(crate) const FT_NET: bool = cfg!(feature = "net");
 pub(crate) const FT_CQUEUE: bool = cfg!(feature = "cqueue");
 pub(crate) const FT_INTERNAL_METRICS: bool = cfg!(feature = "internal-metrics");
+pub(crate) const FT_ASYNC: bool = cfg!(feature = "async");
 
 pub(crate) const SYM_CHECKMARK: char = '\u{2713}';
 pub(crate) const SYM_CROSSMARK: char = '\u{02df}';
@@ -259,10 +260,11 @@ where
         println!("\u{23A1}");
         println!("\u{23A2} Simulation starting");
         println!(
-            "\u{23A2}  net [{}] metrics [{}] cqueue [{}]",
+            "\u{23A2}  net [{}] metrics [{}] cqueue [{}] async[{}]",
             symbol!(FT_NET),
             symbol!(FT_INTERNAL_METRICS),
-            symbol!(FT_CQUEUE)
+            symbol!(FT_CQUEUE),
+            symbol!(FT_ASYNC)
         );
         println!(
             "\u{23A2}  Executor := {}",

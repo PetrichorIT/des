@@ -10,3 +10,5 @@ members = [
   "tests",
   "des_derive",
 ]
+
+exclude = ["tests_async"]

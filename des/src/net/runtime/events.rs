@@ -234,7 +234,7 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
 
 impl PtrWeakMut<dyn Module> {
     fn prepare_buffers(&mut self) {
-        self.processing_time_delay = Duration::ZERO;
+        self.buffers.processing_time_delay = Duration::ZERO;
     }
 
     fn handle_buffers<A>(&mut self, rt: &mut Runtime<NetworkRuntime<A>>) {
@@ -246,8 +246,20 @@ impl PtrWeakMut<dyn Module> {
 
         let self_id = self.id();
 
+        // get drain
+        #[allow(unused_mut)]
+        let mut mut_ref = {
+            #[cfg(not(feature = "async"))]
+            {
+                &mut self.module_core_mut().buffers.out_buffer
+            }
+
+            #[cfg(feature = "async")]
+            self.module_core_mut().buffers.out_buffer.blocking_lock()
+        };
+
         // Send gate events from the 'send' method calls
-        for (mut message, gate, offset) in self.module_core_mut().out_buffer.drain(..) {
+        while let Some((mut message, gate, offset)) = mut_ref.pop() {
             assert!(
                 gate.service_type() != GateServiceType::Input,
                 "To send messages onto a gate it must have service type of 'Output' or 'Undefined'"
@@ -263,10 +275,27 @@ impl PtrWeakMut<dyn Module> {
             )
         }
 
+        drop(mut_ref);
+
         let mref = PtrWeakMut::clone(self);
 
+        // get drain
+        #[allow(unused_mut)]
+        let mut mut_ref = {
+            #[cfg(not(feature = "async"))]
+            {
+                &mut self.module_core_mut().buffers.loopback_buffer
+            }
+
+            #[cfg(feature = "async")]
+            self.module_core_mut()
+                .buffers
+                .loopback_buffer
+                .blocking_lock()
+        };
+
         // Send loopback events from 'scheduleAt'
-        for (message, time) in self.module_core_mut().loopback_buffer.drain(..) {
+        while let Some((message, time)) = mut_ref.pop() {
             rt.add_event(
                 NetEvents::HandleMessageEvent(HandleMessageEvent {
                     module: PtrWeakMut::clone(&mref),
@@ -275,6 +304,8 @@ impl PtrWeakMut<dyn Module> {
                 time,
             )
         }
+
+        drop(mut_ref);
 
         // initalily
         // call activity

@@ -89,7 +89,7 @@ pub struct Mut;
 impl private::MutabilityState for Mut {}
 
 ///
-/// A wrapper to a [Rc] that allows interior mutability
+/// A wrapper to a reference countet pointer that allows interior mutability
 /// in a uncontrolled manner.
 ///
 /// # Safty contract
@@ -325,10 +325,13 @@ where
     }
 }
 
+unsafe impl<T, S> Send for Ptr<T, S> where S: MutabilityState {}
+unsafe impl<T, S> Sync for Ptr<T, S> where S: MutabilityState {}
+
 // WEAK
 
 ///
-/// A wrapper to a [Weak] that allows interior mutability
+/// A wrapper to a non-owning rc pointer that allows interior mutability
 /// in a uncontrolled manner.
 ///
 /// # Safty contract
