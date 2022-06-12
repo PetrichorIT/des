@@ -33,6 +33,7 @@ impl Module for M {
         let (tx, mut rx) = channel_watched(32, self.globals.clone());
 
         let handle = self.rt.spawn(async move {
+            let out = out;
             while let Some(msg) = rx.recv().await {
                 handle
                     .send(Message::new().content(msg).build(), out.clone())

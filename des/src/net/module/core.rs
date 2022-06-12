@@ -28,7 +28,7 @@ use tokio::sync::Mutex;
 ///
 /// A managment struct for the senders.
 ///
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ModuleBuffer {
     #[cfg(not(feature = "async"))]
     pub(crate) out_buffer: Vec<(Message, GateRef, SimTime)>,
@@ -163,7 +163,6 @@ impl ModuleBuffer {
 ///
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-#[derive(Clone)]
 pub struct ModuleCore {
     id: ModuleId,
 

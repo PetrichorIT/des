@@ -3,6 +3,7 @@
 #![feature(coerce_unsized)]
 #![feature(arbitrary_self_types)]
 #![feature(const_option_ext)]
+#![feature(box_into_inner)]
 
 //!
 //! A discrete event simulator.

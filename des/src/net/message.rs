@@ -2,14 +2,11 @@ use std::{
     any::Any,
     collections::{LinkedList, VecDeque},
     fmt::Debug,
-    rc::Rc,
 };
 
 use crate::net::*;
 use crate::time::*;
 use crate::util::*;
-
-use log::warn;
 
 ///
 /// A ID that defines the meaning of the message in the simulation context.
@@ -61,7 +58,7 @@ pub struct MessageMetadata {
 }
 
 impl MessageMetadata {
-    fn clone_message(&self) -> Self {
+    fn dup(&self) -> Self {
         Self {
             id: self.id,
 
@@ -102,7 +99,7 @@ impl Default for MessageMetadata {
 pub struct Message {
     pub(crate) meta: MessageMetadata,
 
-    pub(crate) content: Option<Rc<dyn Any>>,
+    pub(crate) content: Option<Box<dyn Any>>,
     pub(crate) bit_len: usize,
     pub(crate) byte_len: usize,
 }
@@ -145,19 +142,13 @@ impl Message {
 
     pub fn try_cast<T: 'static + MessageBody>(self) -> Option<(T, MessageMetadata)> {
         let Message { meta, content, .. } = self;
-        let content = match content?.downcast::<T>() {
+        let content = content?;
+        let content = match content.downcast::<T>() {
             Ok(c) => c,
             Err(_) => return None,
         };
 
-        let content = match Rc::try_unwrap(content) {
-            Ok(c) => c,
-            //
-            Err(c) => {
-                warn!(target: "des", "Multiple messages refered to the same content: Cloned content at `try_cast`.");
-                (*c).clone()
-            }
-        };
+        let content = Box::into_inner(content);
 
         Some((content, meta))
     }
@@ -176,11 +167,12 @@ impl Message {
         // SAFTY:
         // This packet may contain a value that is used elsewhere,
         // but the metadate is used exclusivly.
-        let pkt = content.as_ref()?.downcast_ref::<Packet>().unwrap();
+        let pkt = content?.downcast::<Packet>().unwrap();
+        // let pkt = content.as_ref()?.downcast_ref::<Packet>().unwrap();
 
         // This packet holds a reference to the same packet content but to
         // use message metadata & packet metadata ecxlusivly, new packets is created.
-        let mut pkt: Packet = pkt.clone();
+        let mut pkt: Packet = Box::into_inner(pkt);
         pkt.message_meta = Some(meta);
 
         Some(pkt)
@@ -208,14 +200,52 @@ impl Message {
     }
 }
 
-impl Clone for Message {
-    fn clone(&self) -> Self {
-        Self {
-            meta: self.meta.clone_message(),
-            content: self.content.clone(),
-            bit_len: self.bit_len,
-            byte_len: self.byte_len,
-        }
+impl Message {
+    ///
+    /// Duplicates a message.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the contained value is not of type T.
+    ///
+    pub fn dup<T>(&self) -> Self
+    where
+        T: 'static + Clone,
+    {
+        self.try_dup::<T>().expect("Failed to duplicate a message")
+    }
+
+    ///
+    /// Tries to create a duplicate of the message, assuming its content is of type T.
+    ///
+    /// - If the messages body is of type T, the body will be cloned as specified by T
+    /// and the dup will succeed.
+    /// - If the message body is not of type T, this function will return `None`.
+    /// - If the message has no body it will succeed independent of T and clone only the
+    /// attached metadata.
+    ///
+    pub fn try_dup<T>(&self) -> Option<Self>
+    where
+        T: 'static + Clone,
+    {
+        let content: Option<Box<dyn Any>> = match &self.content {
+            None => None,
+            Some(boxed) => {
+                let rf = boxed.downcast_ref::<T>()?;
+                Some(Box::new(rf.clone()))
+            }
+        };
+
+        let meta = self.meta.dup();
+        let bit_len = self.bit_len;
+        let byte_len = self.byte_len;
+
+        Some(Self {
+            meta,
+            bit_len,
+            byte_len,
+            content,
+        })
     }
 }
 
@@ -239,7 +269,6 @@ impl Debug for Message {
 }
 
 unsafe impl Send for Message {}
-unsafe impl Sync for Message {}
 
 ///
 /// A trait that allows a type to be mesured in bits / bytes.
@@ -392,7 +421,7 @@ impl<T: MessageBody> MessageBody for &[T] {
 ///
 pub struct MessageBuilder {
     pub(crate) meta: MessageMetadata,
-    pub(crate) content: Option<(usize, usize, Rc<dyn Any>)>,
+    pub(crate) content: Option<(usize, usize, Box<dyn Any>)>,
 }
 
 impl MessageBuilder {
@@ -454,12 +483,12 @@ impl MessageBuilder {
     {
         let bit_len = content.bit_len();
         let byte_len = content.byte_len();
-        let interned = Rc::new(content);
+        let interned = Box::new(content);
         self.content = Some((bit_len, byte_len, interned));
         self
     }
 
-    pub fn content_boxed<T>(mut self, content: Rc<T>) -> Self
+    pub fn content_boxed<T>(mut self, content: Box<T>) -> Self
     where
         T: 'static + MessageBody,
     {
@@ -491,4 +520,3 @@ impl Default for MessageBuilder {
 }
 
 unsafe impl Send for MessageBuilder {}
-unsafe impl Sync for MessageBuilder {}

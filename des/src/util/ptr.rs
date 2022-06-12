@@ -325,8 +325,18 @@ where
     }
 }
 
-unsafe impl<T, S> Send for Ptr<T, S> where S: MutabilityState {}
-unsafe impl<T, S> Sync for Ptr<T, S> where S: MutabilityState {}
+unsafe impl<T, S> Send for Ptr<T, S>
+where
+    T: ?Sized + Send,
+    S: MutabilityState,
+{
+}
+unsafe impl<T, S> Sync for Ptr<T, S>
+where
+    T: ?Sized + Send,
+    S: MutabilityState,
+{
+}
 
 // WEAK
 
