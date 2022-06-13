@@ -2,6 +2,9 @@ mod build;
 mod core;
 mod ndl;
 
+#[cfg(feature = "async")]
+mod handle;
+
 #[cfg(test)]
 mod tests;
 
@@ -14,6 +17,9 @@ use std::ops::{Deref, DerefMut};
 pub use self::build::*;
 pub use self::core::*;
 pub use self::ndl::*;
+
+#[cfg(feature = "async")]
+pub use handle::*;
 
 ///
 /// A readonly reference to a module.

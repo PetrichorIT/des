@@ -313,42 +313,42 @@ impl Eq for Gate {}
 ///
 /// A trait for a type to refrence a module specific gate.
 ///
-pub trait IntoModuleGate: Sized {
+pub trait IntoModuleGate {
     ///
     /// Extracts a gate identifier from a module using the given
     /// value as implicit reference.
     ///
-    fn into_gate(self, _module: &ModuleCore) -> Option<GateRef> {
+    fn into_gate(&self, _module: &ModuleCore) -> Option<GateRef> {
         None
     }
 }
 
 impl IntoModuleGate for GateRef {
-    fn into_gate(self, _module: &ModuleCore) -> Option<GateRef> {
-        Some(self)
+    fn into_gate(&self, _module: &ModuleCore) -> Option<GateRef> {
+        Some(self.clone())
     }
 }
 
 impl IntoModuleGate for &GateRef {
-    fn into_gate(self, _module: &ModuleCore) -> Option<GateRef> {
+    fn into_gate(&self, _module: &ModuleCore) -> Option<GateRef> {
         Some(Ptr::clone(self))
     }
 }
 
 impl IntoModuleGate for GateRefMut {
-    fn into_gate(self, _module: &ModuleCore) -> Option<GateRef> {
-        Some(self.make_const())
+    fn into_gate(&self, _module: &ModuleCore) -> Option<GateRef> {
+        Some(self.clone().make_const())
     }
 }
 
 impl IntoModuleGate for &GateRefMut {
-    fn into_gate(self, _module: &ModuleCore) -> Option<GateRef> {
+    fn into_gate(&self, _module: &ModuleCore) -> Option<GateRef> {
         Some(Ptr::clone(self).make_const())
     }
 }
 
 impl IntoModuleGate for (&str, usize) {
-    fn into_gate(self, module: &ModuleCore) -> Option<GateRef> {
+    fn into_gate(&self, module: &ModuleCore) -> Option<GateRef> {
         let element = module
             .gates()
             .iter()
@@ -359,11 +359,11 @@ impl IntoModuleGate for (&str, usize) {
 }
 
 impl IntoModuleGate for &str {
-    fn into_gate(self, module: &ModuleCore) -> Option<GateRef> {
+    fn into_gate(&self, module: &ModuleCore) -> Option<GateRef> {
         let element = module
             .gates()
             .iter()
-            .find(|&g| g.name() == self && g.size() == 1)?;
+            .find(|&g| g.name() == *self && g.size() == 1)?;
 
         Some(Ptr::clone(element).make_const())
     }

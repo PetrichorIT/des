@@ -245,6 +245,56 @@ impl PtrWeakMut<dyn Module> {
         self.module_core_mut().activity_active = true;
 
         let self_id = self.id();
+        let mref = PtrWeakMut::clone(self);
+
+        // Drain the buffers from the async handle
+        #[cfg(feature = "async")]
+        {
+            use crate::net::module::*;
+
+            while let Ok(ev) = self.module_core_mut().async_buffers.try_recv() {
+                match ev {
+                    BufferEvent::Send {
+                        mut msg,
+                        time_offset,
+                        out,
+                    } => {
+                        let gate = out
+                            .into_gate(&self.module_core())
+                            .expect("Async buffers failed to resolve out parameter");
+
+                        assert!(
+                                gate.service_type() != GateServiceType::Input,
+                                "To send messages onto a gate it must have service type of 'Output' or 'Undefined'"
+                            );
+                        msg.meta.sender_module_id = self_id;
+                        rt.add_event(
+                            NetEvents::MessageAtGateEvent(MessageAtGateEvent {
+                                gate,
+                                message: msg,
+                            }),
+                            SimTime::now() + time_offset,
+                        )
+                    }
+
+                    BufferEvent::ScheduleIn { msg, time_offset } => rt.add_event(
+                        NetEvents::HandleMessageEvent(HandleMessageEvent {
+                            module: PtrWeakMut::clone(&mref),
+                            message: msg,
+                        }),
+                        SimTime::now() + time_offset,
+                    ),
+
+                    BufferEvent::ScheduleAt { msg, time } => rt.add_event(
+                        NetEvents::HandleMessageEvent(HandleMessageEvent {
+                            module: PtrWeakMut::clone(&mref),
+                            message: msg,
+                        }),
+                        time,
+                    ),
+                }
+            }
+        }
 
         // get drain
         let mut_ref = &mut self.module_core_mut().buffers.out_buffer;
@@ -265,10 +315,7 @@ impl PtrWeakMut<dyn Module> {
                 offset,
             )
         }
-
         drop(mut_ref);
-
-        let mref = PtrWeakMut::clone(self);
 
         // get drain
         let mut_ref = &mut self.module_core_mut().buffers.loopback_buffer;

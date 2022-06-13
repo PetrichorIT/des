@@ -92,6 +92,12 @@ pub struct ModuleCore {
     /// The buffers for processing messages
     pub(crate) buffers: ModuleBuffer,
 
+    #[cfg(feature = "async")]
+    pub(crate) async_buffers: tokio::sync::mpsc::UnboundedReceiver<super::handle::BufferEvent>,
+
+    #[cfg(feature = "async")]
+    pub(crate) async_handle: tokio::sync::mpsc::UnboundedSender<super::handle::BufferEvent>,
+
     /// The period of the activity coroutine (if zero than there is no coroutine).
     pub(crate) activity_period: Duration,
 
@@ -207,6 +213,9 @@ impl ModuleCore {
     /// of 'Self'.
     ///
     pub fn new_with(path: ModulePath, globals: PtrWeakConst<NetworkRuntimeGlobals>) -> Self {
+        #[cfg(feature = "async")]
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+
         Self {
             id: ModuleId::gen(),
             path,
@@ -218,6 +227,12 @@ impl ModuleCore {
             children: HashMap::new(),
             globals,
             self_ref: None,
+
+            #[cfg(feature = "async")]
+            async_buffers: rx,
+
+            #[cfg(feature = "async")]
+            async_handle: tx,
         }
     }
 
@@ -227,6 +242,8 @@ impl ModuleCore {
     ///
     pub fn child_of(name: &str, parent: &ModuleCore) -> Self {
         let path = ModulePath::new_with_parent(name, &parent.path);
+        #[cfg(feature = "async")]
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
 
         Self {
             id: ModuleId::gen(),
@@ -239,6 +256,12 @@ impl ModuleCore {
             children: HashMap::new(),
             globals: parent.globals.clone(),
             self_ref: None,
+
+            #[cfg(feature = "async")]
+            async_buffers: rx,
+
+            #[cfg(feature = "async")]
+            async_handle: tx,
         }
     }
 
@@ -255,6 +278,16 @@ impl ModuleCore {
 }
 
 impl ModuleCore {
+    #[cfg(feature = "async")]
+    pub fn async_handle(&self) -> super::handle::HandleSender {
+        let inner = self.async_handle.clone();
+
+        super::handle::HandleSender {
+            inner,
+            time_offset: self.buffers.processing_time_delay,
+        }
+    }
+
     ///
     /// Adds the duration to the processing time offset.
     /// All messages send after this time will be delayed by the
