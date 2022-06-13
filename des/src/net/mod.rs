@@ -73,9 +73,6 @@ pub use self::module::ModuleReferencingError;
 pub use self::module::NameableModule;
 pub use self::module::StaticModuleCore;
 
-#[cfg(feature = "async")]
-pub use self::module::ModuleBuffer;
-
 pub use self::module::__Buildable0;
 pub use self::module::__Buildable1;
 pub use self::module::__Buildable2;

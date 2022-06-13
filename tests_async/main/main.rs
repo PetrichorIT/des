@@ -2,60 +2,72 @@ use std::sync::Arc;
 
 use des::prelude::*;
 use des::sync::mpsc::*;
-use tokio::task::JoinHandle;
 
 #[derive(Debug, Module)]
 #[ndl_workspace = "main"]
 pub struct M {
     core: ModuleCore,
     rt: tokio::runtime::Runtime,
-    handles: Vec<JoinHandle<()>>,
-    sender: Option<des::sync::mpsc::Sender<u32>>,
     globals: Arc<Globals>,
+
+    to_async_sender: Sender<u32>,
+    to_async_receiver: Option<Receiver<u32>>,
+
+    from_async_sender: UnboundedSender<u32>,
+    from_async_receiver: UnboundedReceiver<u32>,
 }
 
 impl NameableModule for M {
     fn named(core: ModuleCore) -> Self {
+        let globals = Globals::new();
+        let (tx, rx) = des::sync::mpsc::channel_watched(32, globals.clone());
+        let (ty, ry) = des::sync::mpsc::unbounded_channel_unwatched();
+
         Self {
             core,
             rt: tokio::runtime::Runtime::new().unwrap(),
-            handles: Vec::new(),
-            sender: None,
-            globals: Globals::new(),
+            globals,
+
+            to_async_sender: tx,
+            to_async_receiver: Some(rx),
+
+            from_async_sender: ty,
+            from_async_receiver: ry,
         }
     }
 }
 
 impl Module for M {
     fn at_sim_start(&mut self, _stage: usize) {
-        let out = self.gate("out", 0).unwrap();
-        let handle = self.async_buffers();
-        let (tx, mut rx) = channel_watched(32, self.globals.clone());
+        let mut rx = self.to_async_receiver.take().unwrap();
+        let tx = self.from_async_sender.clone();
+        self.rt.spawn(async move {
+            let tx = &tx;
+            loop {
+                rx.scoped_recv(|v| async move {
+                    let v = v.unwrap();
+                    println!("got message {} ... sending {} and {}", v, v + 1, v + 2);
+                    tx.send(v + 1).unwrap();
+                    // tx.send(v + 2).await.unwrap(); do not send else busy channel
+                })
+                .await;
 
-        let handle = self.rt.spawn(async move {
-            let out = out;
-            while let Some(msg) = rx.recv().await {
-                handle
-                    .send(Message::new().content(msg).build(), out.clone())
-                    .await;
+                println!("Done with scoped");
             }
         });
-
-        self.sender = Some(tx);
-        self.handles.push(handle);
-
-        self.schedule_in(Message::new().content(1).build(), Duration::from_secs(1))
+        self.schedule_in(Message::new().content(1u32).build(), Duration::from_secs(1))
     }
 
-    fn handle_message(&mut self, _msg: Message) {
-        let sender = self.sender.as_ref().unwrap().clone();
-        self.rt.spawn(async move {
-            println!("notify");
-            sender.send(42).await.unwrap();
-        });
+    fn handle_message(&mut self, msg: Message) {
+        let (content, _meta) = msg.cast::<u32>();
+        self.to_async_sender.blocking_send(content).unwrap();
 
         self.rt.block_on(self.globals.notifed());
-        println!("Got Notified")
+        println!("Got Notified");
+
+        while let Ok(v) = self.from_async_receiver.try_recv() {
+            self.send(Message::new().content(v).build(), "out")
+        }
     }
 }
 

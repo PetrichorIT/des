@@ -140,7 +140,7 @@ impl Globals {
 
     fn decrement_count(&self) {
         if self.ref_cnt.fetch_sub(1, Ordering::AcqRel) == 1 {
-            self.notify.notify_one()
+            self.notify.notify_one();
         }
     }
 }

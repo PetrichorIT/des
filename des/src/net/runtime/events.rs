@@ -247,16 +247,7 @@ impl PtrWeakMut<dyn Module> {
         let self_id = self.id();
 
         // get drain
-        #[allow(unused_mut)]
-        let mut mut_ref = {
-            #[cfg(not(feature = "async"))]
-            {
-                &mut self.module_core_mut().buffers.out_buffer
-            }
-
-            #[cfg(feature = "async")]
-            self.module_core_mut().buffers.out_buffer.blocking_lock()
-        };
+        let mut_ref = &mut self.module_core_mut().buffers.out_buffer;
 
         // Send gate events from the 'send' method calls
         while let Some((mut message, gate, offset)) = mut_ref.pop() {
@@ -280,19 +271,7 @@ impl PtrWeakMut<dyn Module> {
         let mref = PtrWeakMut::clone(self);
 
         // get drain
-        #[allow(unused_mut)]
-        let mut mut_ref = {
-            #[cfg(not(feature = "async"))]
-            {
-                &mut self.module_core_mut().buffers.loopback_buffer
-            }
-
-            #[cfg(feature = "async")]
-            self.module_core_mut()
-                .buffers
-                .loopback_buffer
-                .blocking_lock()
-        };
+        let mut_ref = &mut self.module_core_mut().buffers.loopback_buffer;
 
         // Send loopback events from 'scheduleAt'
         while let Some((message, time)) = mut_ref.pop() {

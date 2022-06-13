@@ -20,9 +20,9 @@ create_global_uid!(
     pub ModuleId(u16) = MODULE_ID;
 );
 
-#[cfg(feature = "async")]
+#[cfg(feature = "async_bufhandle")]
 use std::sync::Arc;
-#[cfg(feature = "async")]
+#[cfg(feature = "async_bufhandle")]
 use tokio::sync::Mutex;
 
 ///
@@ -30,15 +30,8 @@ use tokio::sync::Mutex;
 ///
 #[derive(Debug)]
 pub struct ModuleBuffer {
-    #[cfg(not(feature = "async"))]
     pub(crate) out_buffer: Vec<(Message, GateRef, SimTime)>,
-    #[cfg(not(feature = "async"))]
     pub(crate) loopback_buffer: Vec<(Message, SimTime)>,
-
-    #[cfg(feature = "async")]
-    pub(crate) out_buffer: Arc<Mutex<Vec<(Message, GateRef, SimTime)>>>,
-    #[cfg(feature = "async")]
-    pub(crate) loopback_buffer: Arc<Mutex<Vec<(Message, SimTime)>>>,
 
     pub(crate) processing_time_delay: Duration,
 }
@@ -51,10 +44,7 @@ impl ModuleBuffer {
     pub fn processing_time(&mut self, duration: Duration) {
         self.processing_time_delay += duration
     }
-}
 
-#[cfg(not(feature = "async"))]
-impl ModuleBuffer {
     pub(crate) fn new() -> Self {
         Self {
             out_buffer: Vec::new(),
@@ -82,79 +72,6 @@ impl ModuleBuffer {
             "Sorry, you can not timetravel as well!"
         );
         self.loopback_buffer.push((msg.into(), time))
-    }
-}
-
-#[cfg(feature = "async")]
-impl ModuleBuffer {
-    pub(crate) fn new() -> Self {
-        Self {
-            out_buffer: Arc::new(Mutex::new(Vec::new())),
-            loopback_buffer: Arc::new(Mutex::new(Vec::new())),
-
-            processing_time_delay: Duration::ZERO,
-        }
-    }
-
-    ///
-    /// Sends a message to a buffer that will be forwared onto the given gate.
-    ///
-    pub async fn send(&self, msg: impl Into<Message>, gate: GateRef) {
-        self.out_buffer
-            .lock()
-            .await
-            .push((msg.into(), gate, SimTime::now()))
-    }
-
-    pub(crate) fn blocking_send(&self, msg: impl Into<Message>, gate: GateRef) {
-        self.out_buffer
-            .blocking_lock()
-            .push((msg.into(), gate, SimTime::now()))
-    }
-
-    ///
-    /// Sends a message to a buffer that will be forwared onto the looback interface.
-    ///
-    pub async fn schedule_in(&self, msg: impl Into<Message>, duration: Duration) {
-        assert!(
-            duration >= Duration::ZERO,
-            "While we could maybe do this, we should not timetravel yet!"
-        );
-        self.loopback_buffer
-            .lock()
-            .await
-            .push((msg.into(), SimTime::now() + duration))
-    }
-
-    pub(crate) fn blocking_schedule_in(&self, msg: impl Into<Message>, duration: Duration) {
-        assert!(
-            duration >= Duration::ZERO,
-            "While we could maybe do this, we should not timetravel yet!"
-        );
-        self.loopback_buffer
-            .blocking_lock()
-            .push((msg.into(), SimTime::now() + duration))
-    }
-
-    ///
-    /// Sends a message to a buffer that will be forwared onto the looback interface.
-    ///
-    pub async fn schedule_at(&self, msg: impl Into<Message>, time: SimTime) {
-        assert!(
-            time >= SimTime::now(),
-            "Sorry, you can not timetravel as well!"
-        );
-        self.loopback_buffer.lock().await.push((msg.into(), time))
-    }
-
-    pub(crate) fn blocking_schedule_at(&self, msg: impl Into<Message>, time: SimTime) {
-        assert!(
-            time >= SimTime::now(),
-            "Sorry, you can not timetravel as well!"
-        );
-        self.loopback_buffer
-            .blocking_lock()
-            .push((msg.into(), time))
     }
 }
 
@@ -348,37 +265,13 @@ impl ModuleCore {
     }
 
     ///
-    /// Returns a async buffer handle to send via threads.
-    /// This handle allows the user to asnchronisly push values
-    /// to the out_buffer or loopback_buffer.
-    ///
-    /// The module may empty its buffer while this handle is still alive.
-    /// This handle cannot gurantee that all messages send to this buffer
-    /// will be forwarded to the runtime in the execution cycle of the
-    /// current event.
-    ///
-    #[cfg(feature = "async")]
-    pub fn async_buffers(&self) -> ModuleBuffer {
-        ModuleBuffer {
-            out_buffer: Arc::clone(&self.buffers.out_buffer),
-            loopback_buffer: Arc::clone(&self.buffers.loopback_buffer),
-
-            processing_time_delay: self.buffers.processing_time_delay,
-        }
-    }
-
-    ///
     /// Sends a message onto a given gate. This operation will be performed after
     /// handle_message finished.
     ///
     pub fn send(&mut self, msg: impl Into<Message>, gate: impl IntoModuleGate) {
         let gate = gate.into_gate(self);
         if let Some(gate) = gate {
-            #[cfg(not(feature = "async"))]
             self.buffers.send(msg, gate);
-
-            #[cfg(feature = "async")]
-            self.buffers.blocking_send(msg, gate)
         } else {
             error!(target: self.str(),"Error: Could not find gate in current module");
         }
@@ -389,11 +282,7 @@ impl ModuleCore {
     /// in duration seconds, shifted by the processing time delay.
     ///
     pub fn schedule_in(&mut self, msg: impl Into<Message>, duration: Duration) {
-        #[cfg(not(feature = "async"))]
         self.buffers.schedule_in(msg, duration);
-
-        #[cfg(feature = "async")]
-        self.buffers.blocking_schedule_in(msg, duration);
     }
 
     ///
@@ -401,11 +290,7 @@ impl ModuleCore {
     /// at the given SimTime
     ///
     pub fn schedule_at(&mut self, msg: impl Into<Message>, time: SimTime) {
-        #[cfg(not(feature = "async"))]
         self.buffers.schedule_at(msg, time);
-
-        #[cfg(feature = "async")]
-        self.buffers.blocking_schedule_at(msg, time);
     }
 
     ///
