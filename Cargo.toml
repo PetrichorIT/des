@@ -9,6 +9,7 @@ members = [
   "ndl",
   "tests",
   "des_derive",
+  "des_tokio",
 ]
 
 exclude = ["tests_async"]

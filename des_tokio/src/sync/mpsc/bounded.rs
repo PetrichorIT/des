@@ -10,7 +10,6 @@ pub use tokio::sync::mpsc::OwnedPermit;
 pub use tokio::sync::mpsc::Permit;
 
 use super::Globals;
-use crate::prelude::Duration;
 
 /// Creates a bounded mpsc channel for communicating between asynchronous tasks
 /// with backpressure, reporing metrics to the given Global instance.
@@ -36,6 +35,7 @@ use crate::prelude::Duration;
 /// # Examples
 ///
 /// ```rust
+/// # use des_tokio as des;
 /// use des::sync::mpsc;
 ///
 /// #[tokio::main]
@@ -91,6 +91,7 @@ pub fn channel_watched<T>(buffer: usize, globals: Arc<Globals>) -> (Sender<T>, R
 /// # Examples
 ///
 /// ```rust
+/// # use des_tokio as des;
 /// use des::sync::mpsc;
 ///
 /// #[tokio::main]
@@ -149,6 +150,7 @@ impl<T> Sender<T> {
     /// # Examples
     ///
     /// ```
+    /// # use des_tokio as des;
     /// use des::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -184,6 +186,7 @@ impl<T> Sender<T> {
     /// [`Receiver::close`]: crate::sync::mpsc::Receiver::close
     ///
     /// ```
+    /// # use des_tokio as des;
     /// use des::sync::mpsc;
     /// let (tx, rx) = mpsc::channel::<()>(42);
     /// assert!(!tx.is_closed());
@@ -204,6 +207,7 @@ impl<T> Sender<T> {
     /// # Examples
     ///
     /// ```
+    /// # use des_tokio as des;
     /// use des::sync::mpsc;
     /// let (tx, rx) = mpsc::channel::<()>(1);
     /// let  tx2 = tx.clone();
@@ -224,6 +228,7 @@ impl<T> Sender<T> {
     /// # Examples
     ///
     /// ```
+    /// # use des_tokio as des;
     /// use des::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -284,6 +289,7 @@ impl<T> Sender<T> {
     /// previously sent value was received.
     ///
     /// ```rust
+    /// # use des_tokio as des;
     /// use des::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -336,6 +342,7 @@ impl<T> Sender<T> {
     /// # Examples
     ///
     /// ```
+    /// # use des_tokio as des;
     /// use des::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -383,7 +390,7 @@ impl<T> Sender<T> {
     pub async fn send_timeout(
         &self,
         _value: T,
-        _timeout: Duration,
+        _timeout: std::time::Duration,
     ) -> Result<(), error::SendTimeoutError<T>> {
         panic!("This function is not supported in a simulation context")
     }
@@ -404,6 +411,7 @@ impl<T> Sender<T> {
     /// # Examples
     ///
     /// ```
+    /// # use des_tokio as des;
     /// use std::thread;
     /// use tokio::runtime::Runtime;
     /// use des::sync::mpsc;
@@ -453,6 +461,7 @@ impl<T> Sender<T> {
     /// # Examples
     ///
     /// ```
+    /// # use des_tokio as des;
     /// use des::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -507,6 +516,7 @@ impl<T> Sender<T> {
     /// # Examples
     /// Sending a message using an [`OwnedPermit`]:
     /// ```
+    /// # use des_tokio as des;
     /// use des::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -532,6 +542,7 @@ impl<T> Sender<T> {
     /// by value, it can be inexpensively cloned before calling `reserve_owned`:
     ///
     /// ```
+    /// # use des_tokio as des;
     /// use des::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -579,6 +590,7 @@ impl<T> Sender<T> {
     /// # Examples
     ///
     /// ```
+    /// # use des_tokio as des;
     /// use des::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -638,6 +650,7 @@ impl<T> Sender<T> {
     /// # Examples
     ///
     /// ```
+    /// # use des_tokio as des;
     /// use des::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -726,6 +739,7 @@ impl<T> Receiver<T> {
     /// # Examples
     ///
     /// ```
+    /// # use des_tokio as des;
     /// use des::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -779,6 +793,7 @@ impl<T> Receiver<T> {
     /// # Examples
     ///
     /// ```
+    /// # use des_tokio as des;
     /// use des::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -797,6 +812,7 @@ impl<T> Receiver<T> {
     /// Values are buffered:
     ///
     /// ```
+    /// # use des_tokio as des;
     /// use des::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -837,6 +853,7 @@ impl<T> Receiver<T> {
     /// # Examples
     ///
     /// ```
+    /// # use des_tokio as des;
     /// use des::sync::mpsc;
     /// use des::sync::mpsc::error::TryRecvError;
     ///
@@ -895,6 +912,7 @@ impl<T> Receiver<T> {
     /// # Examples
     ///
     /// ```
+    /// # use des_tokio as des;
     /// use std::thread;
     /// use tokio::runtime::Runtime;
     /// use des::sync::mpsc;

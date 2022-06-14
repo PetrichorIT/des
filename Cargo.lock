@@ -202,17 +202,17 @@ dependencies = [
 
 [[package]]
 name = "des"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "cqueue",
  "des_derive",
+ "des_tokio",
  "futures",
  "lazy_static",
  "log",
  "num-traits",
  "rand",
  "termcolor",
- "tokio",
  "unic-emoji-char",
  "unicode-xid",
 ]
@@ -227,6 +227,14 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "des_tokio"
+version = "0.0.1"
+dependencies = [
+ "futures",
+ "tokio",
 ]
 
 [[package]]

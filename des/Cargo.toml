@@ -1,13 +1,12 @@
 [package]
 edition = "2021"
 name = "des"
-version = "0.2.3"
+version = "0.2.4"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-async = ["net", "dep:tokio"]
-async_bufhandle = ["async"]
+async = ["net", "dep:des_tokio"]
 internal-metrics = []
 net = ["dep:des_derive"]
 net-ipv6 = ["net"]
@@ -24,7 +23,7 @@ unicode-xid = "0.2.0"
 
 cqueue = {path = "../cqueue", features = ["optimized"], optional = true}
 des_derive = {path = "../des_derive", optional = true}
-tokio = {version = "1.18.2", features = ["full"], optional = true}
+des_tokio = {path = "../des_tokio", optional = true}
 
 [dev-dependencies]
 futures = "0.3.21"

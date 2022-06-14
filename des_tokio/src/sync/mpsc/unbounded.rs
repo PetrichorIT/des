@@ -80,6 +80,7 @@ impl<T> UnboundedSender<T> {
     /// # Examples
     ///
     /// ```
+    /// # use des_tokio as des;
     /// use des::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -115,6 +116,7 @@ impl<T> UnboundedSender<T> {
     /// [`UnboundedReceiver::close`]: crate::sync::mpsc::UnboundedReceiver::close
     ///
     /// ```
+    /// # use des_tokio as des;
     /// use des::sync::mpsc;
     ///
     /// let (tx, rx) = mpsc::unbounded_channel::<()>();
@@ -136,6 +138,7 @@ impl<T> UnboundedSender<T> {
     /// # Examples
     ///
     /// ```
+    /// # use des_tokio as des;
     /// use des::sync::mpsc;
     /// let (tx, rx) = mpsc::unbounded_channel::<()>();
     /// let  tx2 = tx.clone();
@@ -229,6 +232,7 @@ impl<T> UnboundedReceiver<T> {
     /// # Examples
     ///
     /// ```
+    /// # use des_tokio as des;
     /// use des::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -247,6 +251,7 @@ impl<T> UnboundedReceiver<T> {
     /// Values are buffered:
     ///
     /// ```
+    /// # use des_tokio as des;
     /// use des::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -287,6 +292,7 @@ impl<T> UnboundedReceiver<T> {
     /// # Examples
     ///
     /// ```
+    /// # use des_tokio as des;
     /// use des::sync::mpsc;
     /// use des::sync::mpsc::error::TryRecvError;
     ///
@@ -324,6 +330,7 @@ impl<T> UnboundedReceiver<T> {
     /// # Examples
     ///
     /// ```
+    /// # use des_tokio as des;
     /// use std::thread;
     /// use des::sync::mpsc;
     ///

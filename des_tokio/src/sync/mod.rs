@@ -34,17 +34,18 @@
 //! computation.
 //!
 //! ```
+//! # use des_tokio as des;
 //! use des::sync::oneshot;
 //!
 //! async fn some_computation() -> String {
 //!     "represents the result of the computation".to_string()
 //! }
 //!
-//! #[tokio::main]
+//! #[des::main]
 //! async fn main() {
 //!     let (tx, rx) = oneshot::channel();
 //!
-//!     tokio::spawn(async move {
+//!     des::spawn(async move {
 //!         let res = some_computation().await;
 //!         tx.send(res).unwrap();
 //!     });
@@ -57,22 +58,23 @@
 //! ```
 //!
 //! Note, if the task produces a computation result as its final
-//! action before terminating, the [`JoinHandle`](tokio::task::JoinHandle) can be used to
+//! action before terminating, the [`JoinHandle`](crate::task::JoinHandle) can be used to
 //! receive that value instead of allocating resources for the
-//! `oneshot` channel. Awaiting on [`JoinHandle`](tokio::task::JoinHandle) returns `Result`. If
+//! `oneshot` channel. Awaiting on [`JoinHandle`](crate::task::JoinHandle) returns `Result`. If
 //! the task panics, the `Joinhandle` yields `Err` with the panic
 //! cause.
 //!
 //! **Example:**
 //!
 //! ```
+//! # use des_tokio as des;
 //! async fn some_computation() -> String {
 //!     "the result of the computation".to_string()
 //! }
 //!
-//! #[tokio::main]
+//! #[des::main]
 //! async fn main() {
-//!     let join_handle = tokio::spawn(async move {
+//!     let join_handle = des::spawn(async move {
 //!         some_computation().await
 //!     });
 //!
@@ -95,17 +97,18 @@
 //! of computations.
 //!
 //! ```
+//! # use des_tokio as des;
 //! use des::sync::mpsc;
 //!
 //! async fn some_computation(input: u32) -> String {
 //!     format!("the result of computation {}", input)
 //! }
 //!
-//! #[tokio::main]
+//! #[des::main]
 //! async fn main() {
 //!     let (tx, mut rx) = mpsc::channel(100);
 //!
-//!     tokio::spawn(async move {
+//!     des::spawn(async move {
 //!         for i in 0..10 {
 //!             let res = some_computation(i).await;
 //!             tx.send(res).await.unwrap();
@@ -135,11 +138,13 @@
 //! passing.
 //!
 //! ```no_run
-//! use tokio::io::{self, AsyncWriteExt};
-//! use tokio::net::TcpStream;
+//! # use des_tokio as des;
+//! use des::io::{self, AsyncWriteExt};
 //! use des::sync::mpsc;
 //!
-//! #[tokio::main]
+//! use tokio::net::TcpStream;
+//!
+//! #[des::main]
 //! async fn main() -> io::Result<()> {
 //!     let mut socket = TcpStream::connect("www.example.com:1234").await?;
 //!     let (tx, mut rx) = mpsc::channel(100);
@@ -149,7 +154,7 @@
 //!         // original handle.
 //!         let tx = tx.clone();
 //!
-//!         tokio::spawn(async move {
+//!         des::spawn(async move {
 //!             tx.send(&b"data to write"[..]).await.unwrap();
 //!         });
 //!     }
@@ -179,6 +184,7 @@
 //! sent over the provided `oneshot` channel.
 //!
 //! ```
+//! # use des_tokio as des;
 //! use des::sync::{oneshot, mpsc};
 //! use Command::Increment;
 //!
@@ -187,12 +193,12 @@
 //!     // Other commands can be added here
 //! }
 //!
-//! #[tokio::main]
+//! #[des::main]
 //! async fn main() {
 //!     let (cmd_tx, mut cmd_rx) = mpsc::channel::<(Command, oneshot::Sender<u64>)>(100);
 //!
 //!     // Spawn a task to manage the counter
-//!     tokio::spawn(async move {
+//!     des::spawn(async move {
 //!         let mut counter: u64 = 0;
 //!
 //!         while let Some((cmd, response)) = cmd_rx.recv().await {
@@ -212,7 +218,7 @@
 //!     for _ in 0..10 {
 //!         let cmd_tx = cmd_tx.clone();
 //!
-//!         join_handles.push(tokio::spawn(async move {
+//!         join_handles.push(des::spawn(async move {
 //!             let (resp_tx, resp_rx) = oneshot::channel();
 //!
 //!             cmd_tx.send((Increment, resp_tx)).await.ok().unwrap();
@@ -244,19 +250,20 @@
 //! Basic usage
 //!
 //! ```
+//! # use des_tokio as des;
 //! use des::sync::broadcast;
 //!
-//! #[tokio::main]
+//! #[des::main]
 //! async fn main() {
 //!     let (tx, mut rx1) = broadcast::channel(16);
 //!     let mut rx2 = tx.subscribe();
 //!
-//!     tokio::spawn(async move {
+//!     des::spawn(async move {
 //!         assert_eq!(rx1.recv().await.unwrap(), 10);
 //!         assert_eq!(rx1.recv().await.unwrap(), 20);
 //!     });
 //!
-//!     tokio::spawn(async move {
+//!     des::spawn(async move {
 //!         assert_eq!(rx2.recv().await.unwrap(), 10);
 //!         assert_eq!(rx2.recv().await.unwrap(), 20);
 //!     });
@@ -286,6 +293,8 @@
 //! the file changes, the configuration changes are signalled to consumers.
 //!
 //! ```
+//! # use des_tokio as des;
+//!
 //! use des::sync::watch;
 //! use tokio::time::{self, Duration, Instant};
 //!
@@ -307,7 +316,7 @@
 //!     // Do something here
 //! }
 //!
-//! #[tokio::main]
+//! #[des::main]
 //! async fn main() {
 //!     // Load initial configuration value
 //!     let mut config = Config::load_from_file().await.unwrap();
@@ -316,7 +325,7 @@
 //!     let (tx, rx) = watch::channel(config.clone());
 //!
 //!     // Spawn a task to monitor the file.
-//!     tokio::spawn(async move {
+//!     des::spawn(async move {
 //!         loop {
 //!             // Wait 10 seconds between checks
 //!             time::sleep(Duration::from_secs(10)).await;
@@ -345,22 +354,22 @@
 //!         // Clone a config watch handle for use in this task
 //!         let mut rx = rx.clone();
 //!
-//!         let handle = tokio::spawn(async move {
+//!         let handle = des::spawn(async move {
 //!             // Start the initial operation and pin the future to the stack.
 //!             // Pinning to the stack is required to resume the operation
 //!             // across multiple calls to `select!`
 //!             let op = my_async_operation();
-//!             tokio::pin!(op);
+//!             des::pin!(op);
 //!
 //!             // Get the initial config value
 //!             let mut conf = rx.borrow().clone();
 //!
 //!             let mut op_start = Instant::now();
 //!             let sleep = time::sleep_until(op_start + conf.timeout);
-//!             tokio::pin!(sleep);
+//!             des::pin!(sleep);
 //!
 //!             loop {
-//!                 tokio::select! {
+//!                 des::select! {
 //!                     _ = &mut sleep => {
 //!                         // The operation elapsed. Restart it
 //!                         op.set(my_async_operation());
