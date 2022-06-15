@@ -55,8 +55,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
                         "Channels cannot start at a input node"
                     );
 
-                    let mut ptr = get_rtc_ptr();
-                    let rng_ref = &mut ptr.as_mut().unwrap().rng;
+                    let rng_ref = rng();
 
                     if channel.is_busy() {
                         warn!(

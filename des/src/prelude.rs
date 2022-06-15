@@ -17,7 +17,7 @@ pub use crate::runtime::Application;
 pub use crate::runtime::Event;
 pub use crate::runtime::EventSet;
 
-pub use crate::runtime::rng;
+pub use crate::runtime::random;
 pub use crate::runtime::sample;
 pub use crate::runtime::sim_time;
 

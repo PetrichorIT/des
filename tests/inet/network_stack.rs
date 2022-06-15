@@ -73,7 +73,7 @@ impl Module for NetworkStack {
             info!(target: "NetworkStack", "Routing random path");
 
             let out_size = self.gate("netOut", 0).unwrap().size();
-            let idx = rng::<usize>() % out_size;
+            let idx = random::<usize>() % out_size;
 
             let mut gate_id = self.gate("netOut", idx).unwrap();
             if gate_id == meta.last_gate.unwrap() {

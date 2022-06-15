@@ -208,13 +208,9 @@ dependencies = [
  "des_derive",
  "des_tokio",
  "futures",
- "lazy_static",
  "log",
- "num-traits",
  "rand",
  "termcolor",
- "unic-emoji-char",
- "unicode-xid",
 ]
 
 [[package]]

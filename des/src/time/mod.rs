@@ -2,8 +2,9 @@
 //! Time primitives mirroring [std::time] bound to the simulation time.
 //!
 
-use crate::runtime::sim_time;
+use crate::util::SyncWrap;
 
+use std::cell::Cell;
 use std::f64::EPSILON;
 use std::fmt::*;
 use std::ops::*;
@@ -12,6 +13,8 @@ mod duration;
 pub use duration::*;
 
 // Reexport
+
+pub(crate) static SIMTIME_NOW: SyncWrap<Cell<SimTime>> = SyncWrap::new(Cell::new(SimTime::ZERO));
 
 ///
 /// A specific point of time in the simulation.
@@ -31,7 +34,23 @@ impl SimTime {
     /// ```
     #[must_use]
     pub fn now() -> Self {
-        sim_time()
+        SIMTIME_NOW.get()
+    }
+
+    pub fn eq_approx(&self, other: SimTime) -> bool {
+        let dur = self.duration_diff(other);
+        dur < Duration::from_nanos(10)
+    }
+
+    /// Retursn the amount of time elapsed from the earlier of the two values
+    /// to the higher.
+    #[must_use]
+    pub fn duration_diff(&self, other: SimTime) -> Duration {
+        if *self > other {
+            self.duration_since(other)
+        } else {
+            other.duration_since(self.clone())
+        }
     }
 
     /// Returns the amount of time elapsed from another instant to this one,

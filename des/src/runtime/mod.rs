@@ -12,6 +12,7 @@ use rand::{
 };
 use std::{
     any::type_name,
+    cell::UnsafeCell,
     fmt::{Debug, Display},
 };
 
@@ -20,9 +21,6 @@ pub use self::event::*;
 
 mod options;
 pub use self::options::*;
-
-mod core;
-pub use self::core::*;
 
 mod limit;
 pub use self::limit::*;
@@ -37,6 +35,45 @@ pub(crate) const FT_ASYNC: bool = cfg!(feature = "async");
 
 pub(crate) const SYM_CHECKMARK: char = '\u{2713}';
 pub(crate) const SYM_CROSSMARK: char = '\u{02df}';
+
+pub(crate) static RNG: SyncWrap<UnsafeCell<Option<StdRng>>> = SyncWrap::new(UnsafeCell::new(None));
+
+///
+/// Returns the current simulation time of the currentlly active
+/// runtime session.
+///
+#[inline(always)]
+pub fn sim_time() -> SimTime {
+    crate::time::SIMTIME_NOW.get()
+}
+
+///
+/// Returns a reference to a given rng.
+///
+pub fn rng() -> &'static mut StdRng {
+    unsafe { &mut *RNG.get() }.as_mut().unwrap()
+}
+
+///
+/// Generates a random instance of type T with a Standard distribution.
+///
+pub fn random<T>() -> T
+where
+    Standard: Distribution<T>,
+{
+    rng().gen::<T>()
+}
+
+///
+/// Generates a random instance of type T with a distribution
+/// of type D.
+///
+pub fn sample<T, D>(distr: D) -> T
+where
+    D: Distribution<T>,
+{
+    rng().sample::<T, D>(distr)
+}
 
 ///
 /// The central managment point for a generic
@@ -69,7 +106,14 @@ where
     /// The contained runtime application, defining globals and the used event set.
     pub app: A,
 
-    core: PtrMut<Option<RuntimeCore>>,
+    // Rt limits
+    pub(crate) limit: RuntimeLimit,
+
+    pub(crate) event_id: EventId,
+    pub(crate) itr: usize,
+
+    // Misc
+    pub(crate) quiet: bool,
 
     future_event_set: FutureEventSet<A>,
 
@@ -81,14 +125,6 @@ impl<A> Runtime<A>
 where
     A: Application,
 {
-    fn core(&self) -> &RuntimeCore {
-        (*self.core).as_ref().unwrap()
-    }
-
-    fn core_mut(&mut self) -> &mut RuntimeCore {
-        self.core.as_mut().unwrap()
-    }
-
     ///
     /// Returns the current number of events on enqueud.
     ///
@@ -112,7 +148,7 @@ where
     ///
     #[inline(always)]
     pub fn num_events_dispatched(&self) -> usize {
-        self.core().event_id
+        self.event_id
     }
 
     ///
@@ -120,14 +156,14 @@ where
     ///
     #[inline(always)]
     pub fn num_events_received(&self) -> usize {
-        self.core().itr
+        self.itr
     }
 
     ///
     /// Returns the current simulation time.
     ///
     pub fn sim_time(&self) -> SimTime {
-        self.core().sim_time
+        SIMTIME_NOW.get()
     }
 
     ///
@@ -135,7 +171,7 @@ where
     ///
     #[allow(unused)]
     pub(crate) fn rng(&mut self) -> *mut StdRng {
-        &mut self.core_mut().rng
+        self::rng()
     }
 
     ///
@@ -145,17 +181,17 @@ where
     where
         Standard: Distribution<T>,
     {
-        self.core_mut().rng.gen()
+        self::random()
     }
 
     ///
     /// Returns the rng.
     ///
-    pub fn rng_sample<T, D>(&mut self, distribution: D) -> T
+    pub fn rng_sample<T, D>(&mut self, distr: D) -> T
     where
         D: Distribution<T>,
     {
-        self.core_mut().rng.sample(distribution)
+        self::sample(distr)
     }
 }
 
@@ -216,30 +252,38 @@ where
     /// let rt = Runtime::new_with(app, RuntimeOptions::seeded(42).max_itr(69));
     /// ```
     ///
-    pub fn new_with(app: A, options: RuntimeOptions) -> Self {
+    pub fn new_with(app: A, mut options: RuntimeOptions) -> Self {
+        // Set SimTime
+        let sim_time = options.min_sim_time.unwrap_or(SimTime::MIN);
+        SIMTIME_NOW.set(sim_time);
+
+        // Set RNG
+        let rng = options
+            .rng
+            .take()
+            .unwrap_or(StdRng::from_rng(OsRng::default()).unwrap());
+        *unsafe { &mut *RNG.get() } = Some(rng);
+
         let mut this = Self {
             future_event_set: FutureEventSet::new_with(&options),
 
-            core: RuntimeCore::new(
-                options.min_sim_time.unwrap_or(SimTime::MIN),
-                0,
-                0,
-                options.custom_limit.unwrap_or_else(|| {
-                    match (options.max_itr, options.max_sim_time) {
-                        (None, None) => RuntimeLimit::None,
-                        (Some(i), None) => RuntimeLimit::EventCount(i),
-                        (None, Some(t)) => RuntimeLimit::SimTime(t),
-                        (Some(i), Some(t)) => RuntimeLimit::CombinedOr(
-                            Box::new(RuntimeLimit::EventCount(i)),
-                            Box::new(RuntimeLimit::SimTime(t)),
-                        ),
-                    }
-                }),
-                options.quiet,
-                options
-                    .rng
-                    .unwrap_or(StdRng::from_rng(OsRng::default()).unwrap()),
-            ),
+            event_id: 0,
+            itr: 0,
+
+            limit: options.custom_limit.unwrap_or_else(|| {
+                match (options.max_itr, options.max_sim_time) {
+                    (None, None) => RuntimeLimit::None,
+                    (Some(i), None) => RuntimeLimit::EventCount(i),
+                    (None, Some(t)) => RuntimeLimit::SimTime(t),
+                    (Some(i), Some(t)) => RuntimeLimit::CombinedOr(
+                        Box::new(RuntimeLimit::EventCount(i)),
+                        Box::new(RuntimeLimit::SimTime(t)),
+                    ),
+                }
+            }),
+
+            quiet: options.quiet,
+
             app,
 
             #[cfg(feature = "internal-metrics")]
@@ -270,7 +314,7 @@ where
             "\u{23A2}  Executor := {}",
             this.future_event_set.descriptor()
         );
-        println!("\u{23A2}  Event limit := {}", this.core().limit);
+        println!("\u{23A2}  Event limit := {}", this.limit);
         println!("\u{23A3}");
 
         A::at_sim_start(&mut this);
@@ -293,7 +337,7 @@ where
             PtrMut::clone(&self.metrics),
         );
 
-        self.core_mut().itr += 1;
+        self.itr += 1;
 
         if self.check_break_condition(&node) {
             let EventNode { time, event, .. } = node;
@@ -307,7 +351,7 @@ where
         }
 
         // Let this be the only position where SimTime is changed
-        self.core_mut().sim_time = node.time;
+        SIMTIME_NOW.set(node.time);
 
         node.handle(self);
         !self.future_event_set.is_empty()
@@ -318,7 +362,7 @@ where
     ///
     #[inline]
     fn check_break_condition(&self, node: &EventNode<A>) -> bool {
-        self.core().limit.applies(self.core().itr, node)
+        self.limit.applies(self.itr, node)
     }
 
     ///
@@ -390,14 +434,10 @@ where
         if self.future_event_set.is_empty() {
             let time = self.sim_time();
 
-            if !self.core().quiet {
+            if !self.quiet {
                 println!("\u{23A1}");
                 println!("\u{23A2} Simulation ended");
-                println!(
-                    "\u{23A2}  Ended at event #{} after {}",
-                    self.core().itr,
-                    time
-                );
+                println!("\u{23A2}  Ended at event #{} after {}", self.itr, time);
 
                 #[cfg(feature = "internal-metrics")]
                 {
@@ -409,19 +449,19 @@ where
             }
 
             RuntimeResult::Finished {
-                event_count: self.core().itr,
+                event_count: self.itr,
                 app: self.app,
                 time,
             }
         } else {
             let time = self.sim_time();
 
-            if !self.core().quiet {
+            if !self.quiet {
                 println!("\u{23A1}");
                 println!("\u{23A2} Simulation ended prematurly");
                 println!(
                     "\u{23A2}  Ended at event #{} with {} active events after {}",
-                    self.core().itr,
+                    self.itr,
                     self.future_event_set.len(),
                     time
                 );
@@ -436,7 +476,7 @@ where
             }
 
             RuntimeResult::PrematureAbort {
-                event_count: self.core().itr,
+                event_count: self.itr,
                 active_events: self.future_event_set.len(),
                 app: self.app,
                 time,
@@ -754,7 +794,7 @@ where
             type_name::<A>(),
             self.sim_time(),
             self.num_events_received(),
-            self.core().limit,
+            self.limit,
             self.num_events_dispatched(),
             self.future_event_set.len()
         )
@@ -772,7 +812,7 @@ where
             type_name::<A>(),
             self.sim_time(),
             self.num_events_received(),
-            self.core().limit,
+            self.limit,
             self.num_events_dispatched(),
             self.future_event_set.len()
         )
