@@ -25,7 +25,7 @@ pub struct ParsingResult {
     /// A collection of all aliases refering to prototypes.
     pub aliases: Vec<AliasDef>,
     /// A collection of all unchecked network definitions.
-    pub networks: Vec<NetworkDef>,
+    pub subsystems: Vec<SubsystemDef>,
 
     /// A list of all parsing errors that were encountered.
     pub errors: Vec<Error>,
@@ -93,12 +93,18 @@ impl Display for ParsingResult {
 
         writeln!(f)?;
         writeln!(f, "    networks:")?;
-        for module in &self.networks {
+        for module in &self.subsystems {
             writeln!(f, "    - {} {{", module.name)?;
 
             writeln!(f, "      nodes:")?;
             for submodule in &module.nodes {
                 writeln!(f, "        {} {}", submodule.ty, submodule.desc)?;
+            }
+
+            writeln!(f)?;
+            writeln!(f, "      exports:")?;
+            for exp in &module.exports {
+                writeln!(f, "        {}", exp)?;
             }
 
             writeln!(f)?;

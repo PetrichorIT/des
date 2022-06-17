@@ -73,7 +73,7 @@ pub fn second_pass<'a>(
                 }
             }
 
-            let ChildModuleDef {
+            let ChildNodeDef {
                 loc,
                 ty,
                 desc,
@@ -101,7 +101,7 @@ pub fn second_pass<'a>(
             if let Some((from_id, to_id)) = desc.cluster_bounds {
                 // Desugar macro
                 for id in from_id..=to_id {
-                    module_spec.submodules.push(ChildModuleSpec {
+                    module_spec.submodules.push(ChildNodeSpec {
                         loc: *loc,
                         descriptor: format!("{}[{}]", desc.descriptor, id),
                         ty: TySpec::new(ty),
@@ -110,7 +110,7 @@ pub fn second_pass<'a>(
                 }
             } else {
                 // CopyPaste
-                module_spec.submodules.push(ChildModuleSpec {
+                module_spec.submodules.push(ChildNodeSpec {
                     loc: *loc,
                     descriptor: desc.descriptor.clone(),
                     ty: TySpec::new(ty),
@@ -212,14 +212,15 @@ pub fn second_pass<'a>(
     // === Network spec ===
     //
 
-    for network_def in &unit.networks {
-        let mut network_spec = NetworkSpec::new(network_def);
+    for subsys_def in &unit.subsystems {
+        let mut subsystem_spec = SubsystemSpec::new(subsys_def);
 
         // Issue (001)
         // Defines that tycheck should be done on unexpanded macros
 
+        // Namespace collission
         let occupied_namespaces = Vec::<&LocalDescriptorDef>::new();
-        for ChildModuleDef { desc, .. } in &network_def.nodes {
+        for ChildNodeDef { desc, .. } in &subsys_def.nodes {
             // check collisions.
             if let Some(col) = occupied_namespaces
                 .iter()
@@ -239,23 +240,35 @@ pub fn second_pass<'a>(
         }
 
         // Resolve ChildModuleDef to ChildModuleSpec
-        for child in &network_def.nodes {
-            // Issue (001)
-            // Added type checking in desugar to prevent redundand checks
-            // on expanded macro types.
-            let exists = validate_module_ty(
-                child,
-                &tyctx.modules,
-                &gtyctx,
-                &resolver.source_map,
-                &mut errors,
-            );
+        for child in &subsys_def.nodes {
+            let (exists, gty) = if !tyctx.modules.iter().any(|m| m.name == child.ty.inner()) {
+                // Ty missing
+                let global_ty = gtyctx.module(child.ty.inner()).map(|m| m.loc);
+
+                if !tyctx.subsystems.iter().any(|n| n.name == child.ty.inner()) {
+                    let global_ty2 = gtyctx.subsystem(child.ty.inner()).map(|m| m.loc);
+
+                    (false, global_ty.or(global_ty2))
+                } else {
+                    (true, None)
+                }
+            } else {
+                (true, None)
+            };
 
             if !exists {
+                errors.push(Error::new_ty_missing(
+                    TycNetworkSubmoduleInvalidTy,
+                    format!("No module with name '{}' exists in the scope.", child.ty,),
+                    child.loc,
+                    &resolver.source_map,
+                    gty,
+                ));
+
                 continue;
             }
 
-            let ChildModuleDef {
+            let ChildNodeDef {
                 loc,
                 ty,
                 desc,
@@ -273,7 +286,7 @@ pub fn second_pass<'a>(
             if let Some((from_id, to_id)) = desc.cluster_bounds {
                 // Desugar macro
                 for id in from_id..=to_id {
-                    network_spec.nodes.push(ChildModuleSpec {
+                    subsystem_spec.nodes.push(ChildNodeSpec {
                         loc: *loc,
                         descriptor: format!("{}[{}]", desc.descriptor, id),
                         ty: TySpec::new(ty),
@@ -282,7 +295,7 @@ pub fn second_pass<'a>(
                 }
             } else {
                 // CopyPaste
-                network_spec.nodes.push(ChildModuleSpec {
+                subsystem_spec.nodes.push(ChildNodeSpec {
                     loc: *loc,
                     descriptor: desc.descriptor.clone(),
                     ty: TySpec::new(ty),
@@ -294,7 +307,7 @@ pub fn second_pass<'a>(
         let vec_new = Vec::new();
 
         // Resolve connections
-        for connection in &network_def.connections {
+        for connection in &subsys_def.connections {
             let ConDef {
                 loc,
                 from,
@@ -305,7 +318,7 @@ pub fn second_pass<'a>(
             let (f_nodes_len, f_gate_size, from_idents) = match resolve_connection_ident(
                 from,
                 &vec_new,
-                &network_def.nodes,
+                &subsys_def.nodes,
                 &tyctx,
                 &gtyctx,
                 &mut errors,
@@ -317,7 +330,7 @@ pub fn second_pass<'a>(
             let (t_nodes_len, t_gate_size, to_idents) = match resolve_connection_ident(
                 to,
                 &vec_new,
-                &network_def.nodes,
+                &subsys_def.nodes,
                 &tyctx,
                 &gtyctx,
                 &mut errors,
@@ -367,7 +380,7 @@ pub fn second_pass<'a>(
             };
 
             for (source, target) in from_idents.into_iter().zip(to_idents.into_iter()) {
-                network_spec.connections.push(ConSpec {
+                subsystem_spec.connections.push(ConSpec {
                     loc: *loc,
 
                     source,
@@ -377,7 +390,77 @@ pub fn second_pass<'a>(
             }
         }
 
-        result.networks.push(network_spec);
+        // Resolve export interface
+
+        // for export in &subsys_def.exports {
+        //     let ExportDef { loc, module, gate } = export;
+
+        //     // First check gate name collision
+        //     if let Some(v) = subsystem_spec
+        //         .exports
+        //         .iter()
+        //         .find(|v| v.gate_ident.ident == *gate)
+        //     {
+        //         errors.push(Error::new(
+        //             DsgExportNamespaceCollision,
+        //             format!(
+        //                 "Gate naming collision. Export namespace '{}/{}' and '{}' collide.",
+        //                 v.node_ident, v.gate_ident.ident, export
+        //             ),
+        //             *loc,
+        //             false,
+        //         ));
+        //         continue;
+        //     }
+
+        //     // Ensure the module handle is correct.
+        //     // Note that cluster definitions are forbidden since this will lead to namespace collisions
+        //     // thereby this operation can be performed on the specs direcly.
+
+        //     // proto or non proto should no really matter
+
+        //     let mod_spec = subsystem_spec
+        //         .nodes
+        //         .iter()
+        //         .find(|n| n.descriptor == *module);
+
+        //     if let Some(mod_spec) = mod_spec {
+        //         // Get child ty (can be done via a gtyctx since the typcoherence is checked seperatoly)
+        //         // TODO: Support subsystem export as well (using poll based structure)
+        //         let mod_ty = gtyctx.module(&mod_spec.ty.inner());
+        //         if let Some(mod_ty) = mod_ty {
+        //             // Extract gate by name
+        //             // Firstly we will only support export of full clusters.
+        //             let gate_def = mod_ty.gates.iter().find(|g| g.name == *gate);
+        //             if let Some(gate_def) = gate_def {
+        //                 subsystem_spec.exports.push(ExportSpec {
+        //                     loc: *loc,
+        //                     node_ident: module.clone(),
+        //                     gate_ident: GateSpec::new(gate_def),
+        //                 });
+        //             } else {
+        //                 errors.push(Error::new(
+        //                     DsgExportInvalidGateIdent,
+        //                     format!(
+        //                         "Unknown gate ident '{}' referenced for export on module '{}'.",
+        //                         module, mod_ty.name
+        //                     ),
+        //                     *loc,
+        //                     false,
+        //                 ))
+        //             }
+        //         }
+        //     } else {
+        //         errors.push(Error::new(
+        //             DsgExportInvalidNodeIdent,
+        //             format!("Unknown module '{}' referenced for export.", module),
+        //             *loc,
+        //             false,
+        //         ))
+        //     }
+        // }
+
+        result.networks.push(subsystem_spec);
     }
 
     result.errors = errors;
@@ -386,7 +469,7 @@ pub fn second_pass<'a>(
 fn resolve_connection_ident(
     ident: &ConNodeIdent,
     local_gates: &[GateDef],
-    child_modules: &[ChildModuleDef],
+    child_modules: &[ChildNodeDef],
     tyctx: &ScndPassTyCtx<'_>,
     gtyctx: &ScndPassGlobalTyCtx<'_>,
     errors: &mut Vec<Error>,

@@ -514,12 +514,15 @@ pub enum ErrorCode {
     ParProtoImplExpectedEq,   // Tested
     ParProtoImplAtSomeDef,    // Tested
 
-    ParNetworkMissingIdentifer,         // Tested
-    ParNetworkMissingDefBlockOpen,      // Tested
-    ParNetworkMissingSectionIdentifier, // Tested
-    ParNetworkInvalidSectionIdentifer,  // Tested
-    ParNetworkInvalidSeperator,         // tested
-    ParNetworkDoesntAllowSome,          // Tested
+    ParSubsystemMissingIdentifer,          // Tested
+    ParSubsystemMissingDefBlockOpen,       // Tested
+    ParSubsystemkMissingSectionIdentifier, // Tested
+    ParSubsystemInvalidSectionIdentifer,   // Tested
+    ParSubsystemInvalidSeperator,          // tested
+    ParSubsystemDoesntAllowSome,           // Tested
+    ParSubsystemInvalidExportToken,
+    ParSubsystemExportsIncompleteToken,
+    ParSubsystemExportsInvalidSeperatorToken,
 
     ParExpectedIntLiteral,     // Missing Test Case
     ParLiteralIntParseError,   // Tested
@@ -528,6 +531,24 @@ pub enum ErrorCode {
 
     LexInvalidSouceToken,      // Tested
     LexInvalidSouceIdentifier, // Tested
+
+    DsgLinkNamespaceCollision,
+    DsgLinkInvalidJitter,
+    DsgLinkInvalidLatency,
+    DsgLinkInvalidBitrate,
+
+    DsgModuleNamespaceCollision,
+    DsgSubmoduleNamespaceCollision,
+    DsgSubmoduleInvalidBound,
+    DsgSubmoduleMissingTy,
+    DsgSubmoduleNestedProto,
+
+    DsgGateNamespaceCollision,
+    DsgGateNullSize,
+
+    DsgExportInvalidNodeIdent,
+    DsgExportInvalidGateIdent,
+    DsgExportNamespaceCollision,
 
     DsgIncludeInvalidAlias,      // Tested
     DsgDefNameCollision,         // Tested
@@ -546,7 +567,7 @@ pub enum ErrorCode {
     DsgProtoImlMissing,                          // Tested
 
     DsgGateConnectionViolatesAnnotation,    // Tested
-    DsgModuleSubmoduleFieldAlreadyDeclared, // Tesed
+    DsgModuleSubmoduleFieldAlreadyDeclared, // Tested
 
     TycDefNameCollission,                    // Obsolete ?
     TycModuleSubmoduleRecrusiveTyDefinition, // Tested

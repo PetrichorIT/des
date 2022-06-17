@@ -16,7 +16,7 @@ pub struct FstPassResult {
     pub includes: Vec<IncludeDef>,
     pub links: Vec<LinkDef>,
     pub modules: Vec<ModuleDef>,
-    pub networks: Vec<NetworkDef>,
+    pub subsystems: Vec<SubsystemDef>,
 
     pub prototypes: Vec<ModuleDef>,
 
@@ -45,7 +45,7 @@ pub fn first_pass(unit: &ParsingResult, resolver: &NdlResolver) -> FstPassResult
         includes,
         links,
         modules,
-        networks,
+        subsystems: networks,
 
         prototypes,
         aliases,
@@ -91,6 +91,7 @@ pub fn first_pass(unit: &ParsingResult, resolver: &NdlResolver) -> FstPassResult
             }
         }
     }
+
     //
     // Remove aliases from ctx.
     //
@@ -141,7 +142,7 @@ pub fn first_pass(unit: &ParsingResult, resolver: &NdlResolver) -> FstPassResult
         includes: includes.clone(),
         links: links.clone(),
         modules,
-        networks: networks.clone(),
+        subsystems: networks.clone(),
         prototypes: prototypes.clone(),
 
         errors,

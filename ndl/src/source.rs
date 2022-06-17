@@ -228,7 +228,7 @@ impl MappedAssetDescriptor {
 /// A descriptor of an asset based on it filepath (relative to WORK_DIR)
 /// and its internal alias.
 ///
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AssetDescriptor {
     /// The path to the given asset.
     pub path: PathBuf,

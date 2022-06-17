@@ -149,12 +149,12 @@ fn ndl_parser_test() {
     assert_eq!(result.modules[1].connections.len(), 2);
     assert_eq!(result.modules[1].connections[0].channel, None);
 
-    assert_eq!(result.networks.len(), 1);
-    assert_eq!(result.networks[0].name, "SimMain");
+    assert_eq!(result.subsystems.len(), 1);
+    assert_eq!(result.subsystems[0].name, "SimMain");
 
-    assert_eq!(result.networks[0].nodes.len(), 1);
-    assert_eq!(result.networks[0].nodes[0].desc.descriptor, "router");
-    assert_eq!(result.networks[0].nodes[0].ty.inner(), "Main");
+    assert_eq!(result.subsystems[0].nodes.len(), 1);
+    assert_eq!(result.subsystems[0].nodes[0].desc.descriptor, "router");
+    assert_eq!(result.subsystems[0].nodes[0].ty.inner(), "Main");
 }
 
 // #[test]

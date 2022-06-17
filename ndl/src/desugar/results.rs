@@ -18,7 +18,7 @@ pub struct DesugaredParsingResult {
     /// The defined modules of the asset.
     pub modules: Vec<ModuleSpec>, // Link specs are removed and link data is stored directly in connections.
     /// The defined networks of the asset.
-    pub networks: Vec<NetworkSpec>,
+    pub networks: Vec<SubsystemSpec>,
 }
 
 impl Display for DesugaredParsingResult {

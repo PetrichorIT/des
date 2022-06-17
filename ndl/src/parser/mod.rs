@@ -11,9 +11,9 @@ pub use result::*;
 mod defs;
 pub use defs::*;
 
-const GLOBAL_KEYWORDS: [&str; 5] = ["module", "network", "prototype", "alias", "link"];
+const GLOBAL_KEYWORDS: [&str; 6] = ["module", "network", "subsystem", "prototype", "alias", "link"];
 const MODULE_SUBSECTION_IDENT: [&str; 4] = ["gates", "submodules", "connections", "parameters"];
-const NETWORK_SUBSECTION_IDENT: [&str; 3] = ["nodes", "connections", "parameters"];
+const SUBSYS_SUBSECTION_IDENT: [&str; 4] = ["nodes", "connections", "parameters", "exports"];
 
 
 
@@ -35,7 +35,7 @@ pub fn parse(asset: Asset<'_>, tokens: TokenStream) -> ParsingResult {
         modules: Vec::new(),
         prototypes: Vec::new(),
         aliases: Vec::new(),
-        networks: Vec::new(),
+        subsystems: Vec::new(),
 
         errors: Vec::new(),
     };
@@ -72,9 +72,9 @@ pub fn parse(asset: Asset<'_>, tokens: TokenStream) -> ParsingResult {
                                 ectx.reset_transient();
                                 parser.parse_link(&mut ectx)?
                             },
-                            "network" => {
+                            "network" | "subsystem" => {
                                 ectx.reset_transient();
-                                parser.parse_network(&mut ectx)?
+                                parser.parse_subsystem(&mut ectx)?
                             },
                             _ => { 
                                 ectx.record(
@@ -130,13 +130,16 @@ impl<'a> Parser<'a> {
         }
     }
     
-    fn eat_while(&self, mut predicate: impl FnMut(&Token) -> bool) {
+    fn eat_while(&self, mut predicate: impl FnMut(&Token) -> bool) -> usize{
+        let mut c = 0;
         while self.tokens.peek().is_ok() && predicate(self.tokens.peek().unwrap()) {
            let _ = self.tokens.bump();
+           c += 1;
         }
+        c
     }
 
-    fn eat_whitespace(&self) {
+    fn eat_whitespace(&self) -> usize{
         self.eat_while(|t| t.kind == TokenKind::Whitespace)
     }
     
@@ -548,7 +551,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_childmodule_def(&mut self, is_network: bool, child_modules: &mut Vec<ChildModuleDef>, ectx: &mut ParsingErrorContext<'_>, escape_keywords: &[&str]) -> NdlResult<bool> {
+    fn parse_childmodule_def(&mut self, is_network: bool, child_modules: &mut Vec<ChildNodeDef>, ectx: &mut ParsingErrorContext<'_>, escape_keywords: &[&str]) -> NdlResult<bool> {
 
          loop {
             self.eat_whitespace();
@@ -678,7 +681,7 @@ impl<'a> Parser<'a> {
                     } else {
                         desc.loc = Loc::fromto(first_token_loc, token.loc);
                     }
-                   
+            
 
                     if escape_keywords.contains(&&desc.descriptor[..]) && desc.cluster_bounds.is_none() {
                         // new subsection ident
@@ -710,7 +713,7 @@ impl<'a> Parser<'a> {
                             if is_network {
 
                                 ectx.record(
-                                    ParNetworkDoesntAllowSome,
+                                    ParSubsystemDoesntAllowSome,
                                     "Unexpected keyword 'some'. This is not allowed on network definitions.".to_string(),
                                     second_token.loc
                                 )?;
@@ -761,7 +764,7 @@ impl<'a> Parser<'a> {
 
                             self.eat_optionally(|t| t.kind == TokenKind::Comma);
     
-                            child_modules.push(ChildModuleDef { 
+                            child_modules.push(ChildNodeDef { 
                                 loc: Loc::fromto(first_token_loc, second_token.loc), 
                                 ty: ty_def, 
                                 desc,
@@ -836,7 +839,7 @@ impl<'a> Parser<'a> {
                                 }
 
                                 self.eat_optionally(|t| t.kind == TokenKind::Comma);
-                                child_modules.push(ChildModuleDef { 
+                                child_modules.push(ChildNodeDef { 
                                     loc: Loc::fromto(first_token_loc, second_token.loc), 
                                     ty: ty_def, 
                                     desc,
@@ -846,7 +849,7 @@ impl<'a> Parser<'a> {
                                 // PROTO NONE
                                 self.eat_optionally(|t| t.kind == TokenKind::Comma);
     
-                                child_modules.push(ChildModuleDef { 
+                                child_modules.push(ChildNodeDef { 
                                     loc: Loc::fromto(first_token_loc, second_token.loc), 
                                     ty: ty_def, 
                                     desc,
@@ -1257,8 +1260,8 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    fn parse_network(&mut self, ectx: &mut ParsingErrorContext<'_>) -> NdlResult<()> {
-        
+    fn parse_subsystem(&mut self, ectx: &mut ParsingErrorContext<'_>) -> NdlResult<()> {
+
         ectx.reset_transient();
         self.eat_whitespace();
 
@@ -1267,7 +1270,7 @@ impl<'a> Parser<'a> {
         let id = String::from(id);
         if id_token.kind != TokenKind::Ident {
             ectx.record(
-                ParNetworkMissingIdentifer, 
+                ParSubsystemMissingIdentifer, 
                 format!("Invalid token '{}'. Expected network identifier.", id), 
                 id_token.loc
             )?;
@@ -1279,7 +1282,7 @@ impl<'a> Parser<'a> {
         let (token, _raw) = self.next_token()?;
         if token.kind != TokenKind::OpenBrace {
             ectx.record(
-                ParNetworkMissingDefBlockOpen, 
+                ParSubsystemMissingDefBlockOpen, 
                 format!("Invalid token '{}'. Expected network definition block (OpenBrace).", _raw), 
                 token.loc,
             )?;
@@ -1288,13 +1291,14 @@ impl<'a> Parser<'a> {
 
         // Contents reading
 
-        let mut network_def = NetworkDef {
+        let mut subsys_def = SubsystemDef {
             loc: Loc::new(0, 1, 1),
        
             name: id,
             nodes: Vec::new(),
             connections: Vec::new(),
             parameters: Vec::new(),
+            exports: Vec::new(),
         };
 
         loop {
@@ -1307,23 +1311,23 @@ impl<'a> Parser<'a> {
                 if subsec_token.kind == TokenKind::CloseBrace {
                     ectx.reset_transient();
 
-                    network_def.loc = Loc::fromto(id_token_loc, subsec_token.loc);
-                    self.result.networks.push(network_def);
+                    subsys_def.loc = Loc::fromto(id_token_loc, subsec_token.loc);
+                    self.result.subsystems.push(subsys_def);
                     return Ok(());
                 }
 
                 ectx.record(
-                    ParNetworkMissingSectionIdentifier, 
-                    format!("Invalid token '{}'. Expected identifier for subsection are {}.", subsection_id, NETWORK_SUBSECTION_IDENT.join(" / ")), 
+                    ParSubsystemkMissingSectionIdentifier, 
+                    format!("Invalid token '{}'. Expected identifier for subsection are {}.", subsection_id, SUBSYS_SUBSECTION_IDENT.join(" / ")), 
                     subsec_token.loc,
                 )?;
                 continue;
             }
 
-            if !NETWORK_SUBSECTION_IDENT.contains(&&subsection_id[..]) {
+            if !SUBSYS_SUBSECTION_IDENT.contains(&&subsection_id[..]) {
                 ectx.record(
-                    ParNetworkInvalidSectionIdentifer,
-                    format!("Invalid subsection identifier '{}'. Possibilities are {}.", subsection_id, NETWORK_SUBSECTION_IDENT.join(" / ")),
+                    ParSubsystemInvalidSectionIdentifer,
+                    format!("Invalid subsection identifier '{}'. Possibilities are {}.", subsection_id, SUBSYS_SUBSECTION_IDENT.join(" / ")),
                     subsec_token.loc,
                 )?;
                 continue;
@@ -1333,7 +1337,7 @@ impl<'a> Parser<'a> {
             let (token, _raw) = self.next_token()?;
             if token.kind != TokenKind::Colon {
                 ectx.record(
-                    ParNetworkInvalidSeperator,
+                    ParSubsystemInvalidSeperator,
                     format!("Unexpected token '{}'. Expected colon ':'.", _raw),
                     token.loc,
                 )?;
@@ -1345,9 +1349,10 @@ impl<'a> Parser<'a> {
             ectx.reset_transient();
 
             let done = match &subsection_id[..] {
-                "nodes" => self.parse_childmodule_def(true, &mut network_def.nodes, ectx, &NETWORK_SUBSECTION_IDENT)?,
-                "connections" => self.parse_node_connections(&mut network_def.connections, ectx, &NETWORK_SUBSECTION_IDENT)?,
-                "parameters" => self.parse_par(&mut network_def.parameters, ectx, &NETWORK_SUBSECTION_IDENT)?,
+                "nodes" => self.parse_childmodule_def(true, &mut subsys_def.nodes, ectx, &SUBSYS_SUBSECTION_IDENT)?,
+                "connections" => self.parse_node_connections(&mut subsys_def.connections, ectx, &SUBSYS_SUBSECTION_IDENT)?,
+                "parameters" => self.parse_par(&mut subsys_def.parameters, ectx, &SUBSYS_SUBSECTION_IDENT)?,
+                "exports" => self.parse_export(&mut subsys_def.exports, ectx, &SUBSYS_SUBSECTION_IDENT)?,
                 _ => unreachable!()
             };
 
@@ -1359,11 +1364,108 @@ impl<'a> Parser<'a> {
         let len = self.tokens.peek()
             .map(|t| t.loc.pos)
             .unwrap_or_else(|_| self.asset.end_pos()) - id_token_loc.pos;
-        network_def.loc = Loc::new(id_token_loc.pos, len, id_token_loc.line);
+        subsys_def.loc = Loc::new(id_token_loc.pos, len, id_token_loc.line);
 
-        self.result.networks.push(network_def);
+        self.result.subsystems.push(subsys_def);
 
         Ok(())
+    }
+
+    fn parse_export(&mut self, def: &mut Vec<ExportDef>, ectx: &mut ParsingErrorContext<'_>, escape_keywords: &[&str]) -> NdlResult<bool> {
+
+
+        loop {
+            self.eat_whitespace();
+            let (first_token, ident) = self.next_token()?;
+            let ident = ident.to_string();
+            let first_token_loc = first_token.loc;
+
+            match first_token.kind {
+                TokenKind::CloseBrace => {
+                    ectx.reset_transient();
+                    return Ok(true)
+                },
+                TokenKind::Ident => {
+                    ectx.reset_transient();
+                    // no whitespace allowed
+                    let eaten = self.eat_whitespace();
+                    let ( token, _raw) = self.next_token()?;
+                    if token.kind != TokenKind::Slash {
+                        if token.kind == TokenKind::CloseBrace {
+                            ectx.record(
+                                ParSubsystemExportsIncompleteToken, 
+                                format!("Unexpected end of subsystem definition. Expected exports entry [module]/[gate]"), 
+                                token.loc
+                            )?;
+                            ectx.reset_transient();
+                            return Ok(true);
+                        }
+
+                        if token.kind == TokenKind::Colon && escape_keywords.contains(&&ident[..]) {
+                            // All ok bump back 2 elements and return
+                            ectx.reset_transient();
+                            self.tokens.bump_back(2);
+                            return Ok(false);
+                        }
+
+                        // Asumme typo
+                        ectx.record(
+                            ParSubsystemExportsInvalidSeperatorToken, 
+                            format!("Unexpected token '{}'. Expected seperator '/'.", _raw), 
+                            token.loc
+                        )?;
+                        if token.kind == TokenKind::Ident && eaten >= 1 {
+                            // Interpret the given whitespace as a slash
+                            // to allow usefull dsg / tych
+                            
+                            // Make ident readable by next_token
+                            self.tokens.bump_back(1);
+                            /* NOP */
+                        } else {
+                            continue;
+                        }
+                    }
+
+                    // get gate def
+                    self.eat_whitespace();
+                    let (token, gate) = self.next_token()?;
+                    if token.kind != TokenKind::Ident {
+                        if token.kind == TokenKind::CloseBrace {
+                            ectx.record(
+                                ParSubsystemExportsIncompleteToken, 
+                                format!("Unexpected end of subsystem definition. Expected exports entry [module]/[gate]"), 
+                                token.loc
+                            )?;
+                            ectx.reset_transient();
+                            return Ok(true);
+                        }
+                        // Asumme typo
+                        ectx.record(
+                            ParSubsystemExportsInvalidSeperatorToken, 
+                            format!("Unexpected token {}. Expected seperator '/'.", _raw), 
+                            token.loc
+                        )?;
+                        continue;
+                    }
+
+                    ectx.reset_transient();
+                    def.push(ExportDef {
+                        loc: Loc::fromto(first_token_loc, token.loc),
+                        module: Ident::Direct { ident },
+                        gate: gate.to_string()
+                    })
+                },
+                _ => {
+                    ectx.record(
+                        ParSubsystemInvalidExportToken, 
+                        format!("Unexpected token '{}'. Expected module identifier.", ident), 
+                        first_token_loc
+                    )?;
+                    return Ok(false);
+                }
+            }
+        }
+
     }
 
     fn parse_link(&mut self, ectx: &mut ParsingErrorContext<'_>) -> NdlResult<()> {
@@ -1441,7 +1543,6 @@ impl<'a> Parser<'a> {
             if token.kind != TokenKind::Colon {
                 if key_token.kind == TokenKind::CloseBrace {
                     // Unfinished def. Add to stack anyway but print error
-                    println!("AAA");
                     self.tokens.bump_back(1);
                     break;
                 }

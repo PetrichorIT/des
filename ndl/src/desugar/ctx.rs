@@ -78,10 +78,10 @@ impl<'a> GlobalTyDefContext<'a> {
         None
     }
 
-    pub fn network(&self, ident: &str) -> Option<&NetworkDef> {
+    pub fn subsystem(&self, ident: &str) -> Option<&SubsystemDef> {
         for unit in self.resolver.units.values() {
-            match unit.networks.iter().find(|l| l.name == ident) {
-                Some(network) => return Some(network),
+            match unit.subsystems.iter().find(|l| l.name == ident) {
+                Some(sys) => return Some(sys),
                 None => continue,
             }
         }
@@ -104,7 +104,7 @@ pub struct TyDefContext<'a> {
     /// Proto
     pub prototypes: Vec<&'a ModuleDef>,
     /// A collection of all included network definitions.
-    pub networks: Vec<&'a NetworkDef>,
+    pub networks: Vec<&'a SubsystemDef>,
 }
 
 impl<'a> TyDefContext<'a> {
@@ -188,7 +188,7 @@ impl<'a> TyDefContext<'a> {
             self.prototypes.push(proto)
         }
 
-        for network in &unit.networks {
+        for network in &unit.subsystems {
             self.networks.push(network)
         }
 
@@ -247,6 +247,19 @@ impl<'a> ScndPassGlobalTyCtx<'a> {
         }
         None
     }
+
+    ///
+    /// REturns a module def with the given ident from the type context.
+    ///
+    pub fn subsystem(&self, ident: &str) -> Option<&SubsystemDef> {
+        for unit in self.all.values() {
+            match unit.subsystems.iter().find(|l| l.name == ident) {
+                Some(subsys) => return Some(subsys),
+                None => continue,
+            }
+        }
+        None
+    }
 }
 
 ///
@@ -262,7 +275,7 @@ pub struct ScndPassTyCtx<'a> {
     /// A collection of all included module definitions.
     pub modules: Vec<&'a ModuleDef>,
     /// A collection of all included network definitions.
-    pub networks: Vec<&'a NetworkDef>,
+    pub subsystems: Vec<&'a SubsystemDef>,
 
     pub prototypes: Vec<&'a ModuleDef>,
 }
@@ -277,7 +290,7 @@ impl<'a> ScndPassTyCtx<'a> {
 
             links: Vec::new(),
             modules: Vec::new(),
-            networks: Vec::new(),
+            subsystems: Vec::new(),
             prototypes: Vec::new(),
         }
     }
@@ -365,10 +378,10 @@ impl<'a> ScndPassTyCtx<'a> {
         }
 
         // check links
-        if self.networks.len() >= 2 {
-            for i in 0..(self.networks.len() - 1) {
-                let network = &self.networks[i];
-                let dup = self.networks[(i + 1)..]
+        if self.subsystems.len() >= 2 {
+            for i in 0..(self.subsystems.len() - 1) {
+                let network = &self.subsystems[i];
+                let dup = self.subsystems[(i + 1)..]
                     .iter()
                     .find(|n| n.name == network.name);
                 if let Some(dup) = dup {
@@ -407,8 +420,8 @@ impl<'a> ScndPassTyCtx<'a> {
             self.prototypes.push(proto)
         }
 
-        for network in &unit.networks {
-            self.networks.push(network)
+        for network in &unit.subsystems {
+            self.subsystems.push(network)
         }
 
         true

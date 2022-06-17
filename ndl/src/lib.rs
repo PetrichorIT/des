@@ -59,6 +59,8 @@ mod parser;
 mod resolver;
 mod tycheck;
 
+mod d2;
+
 // ### Exports ###
 
 // > Function exports
@@ -87,8 +89,8 @@ pub use source::SourceMap;
 
 // > Spec Exports.
 pub use desugar::{
-    ChannelSpec, ChildModuleSpec, ConSpec, ConSpecNodeIdent, GateSpec, IncludeSpec, ModuleSpec,
-    NetworkSpec, ParamSpec, TySpec,
+    ChannelSpec, ChildNodeSpec, ConSpec, ConSpecNodeIdent, ExportSpec, GateSpec, IncludeSpec,
+    ModuleSpec, ParamSpec, SubsystemSpec, TySpec,
 };
 pub use parser::GateAnnotation;
 

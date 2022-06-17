@@ -378,7 +378,7 @@ fn par_some_in_network() {
 
     check_err!(
         *errs[0] =>
-        ParNetworkDoesntAllowSome,
+        ParSubsystemDoesntAllowSome,
         "Unexpected keyword 'some'. This is not allowed on network definitions.",
         false,
         None

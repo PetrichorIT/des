@@ -42,7 +42,7 @@ impl<'a> GlobalTySpecContext<'a> {
     ///
     /// Returns a network sepc with the given ident from the type context.
     ///
-    pub fn network<T: PartialEq<String>>(&self, ident: T) -> Option<&NetworkSpec> {
+    pub fn network<T: PartialEq<String>>(&self, ident: T) -> Option<&SubsystemSpec> {
         for unit in self.all.values() {
             match unit.networks.iter().find(|l| ident == l.ident) {
                 Some(network) => return Some(network),
@@ -68,7 +68,7 @@ pub struct OwnedTySpecContext {
     /// A collection of all included module definitions.
     pub modules: Vec<ModuleSpec>,
     /// A collection of all included network definitions.
-    pub networks: Vec<NetworkSpec>,
+    pub networks: Vec<SubsystemSpec>,
 }
 
 impl OwnedTySpecContext {
@@ -101,7 +101,7 @@ impl OwnedTySpecContext {
     ///
     /// Returns a network sepc with the given ident from the type context.
     ///
-    pub fn network<T: PartialEq<String>>(&self, ident: T) -> Option<&NetworkSpec> {
+    pub fn network<T: PartialEq<String>>(&self, ident: T) -> Option<&SubsystemSpec> {
         self.networks.iter().find(|l| ident == l.ident)
     }
 }
@@ -118,7 +118,7 @@ pub struct TySpecContext<'a> {
     /// A collection of all included module definitions.
     pub modules: Vec<&'a ModuleSpec>,
     /// A collection of all included network definitions.
-    pub networks: Vec<&'a NetworkSpec>,
+    pub subsystems: Vec<&'a SubsystemSpec>,
 }
 
 impl<'a> TySpecContext<'a> {
@@ -130,7 +130,7 @@ impl<'a> TySpecContext<'a> {
             included: Vec::new(),
 
             modules: Vec::new(),
-            networks: Vec::new(),
+            subsystems: Vec::new(),
         }
     }
 
@@ -169,8 +169,8 @@ impl<'a> TySpecContext<'a> {
     pub fn check_name_collision(&self) -> Result<(), &'static str> {
         let dup_modules =
             (1..self.modules.len()).any(|i| self.modules[i..].contains(&self.modules[i - 1]));
-        let dup_networks =
-            (1..self.networks.len()).any(|i| self.networks[i..].contains(&self.networks[i - 1]));
+        let dup_networks = (1..self.subsystems.len())
+            .any(|i| self.subsystems[i..].contains(&self.subsystems[i - 1]));
 
         if dup_modules || dup_networks {
             Err("Found duplicated symbols")
@@ -195,7 +195,7 @@ impl<'a> TySpecContext<'a> {
         }
 
         for network in &unit.networks {
-            self.networks.push(network)
+            self.subsystems.push(network)
         }
 
         true

@@ -4,7 +4,7 @@ use crate::{
     common::{get_resolver, ident_from_conident, WrappedTokenStream},
 };
 use ndl::ChannelSpec;
-use ndl::ChildModuleSpec;
+use ndl::ChildNodeSpec;
 use ndl::ConSpec;
 use proc_macro2::Ident;
 use proc_macro_error::{Diagnostic, Level};
@@ -59,7 +59,7 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> Result<TokenStream> {
                 // Config nodes.
 
                 for node in &network.nodes {
-                    let ChildModuleSpec { descriptor, ty, .. } = node;
+                    let ChildNodeSpec { descriptor, ty, .. } = node;
                     let ident = ident!(format!("{}_child", descriptor));
                     let ty = ident!(ty.inner());
 
@@ -123,7 +123,7 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> Result<TokenStream> {
                 // Add nodes to rt.
 
                 for node in &network.nodes {
-                    let ChildModuleSpec { descriptor, .. } = node;
+                    let ChildNodeSpec { descriptor, .. } = node;
                     let ident = ident!(format!("{}_child", descriptor));
 
                     token_stream.extend::<proc_macro2::TokenStream>(quote! {

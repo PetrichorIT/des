@@ -1,0 +1,40 @@
+PreparedUnit {
+<< includes >>
+- Include { D2_NetInNet.ndl }
+<< modules >>
+module D2_NetInNet.ndl::M@module {
+	gates: 
+		one_in[1] @input
+		one_out[1] @output
+		cluster[5] 
+}
+module D2_NetInNet.ndl::SomeP@module like P {
+	gates: 
+		in[1] @input
+		out[1] @output
+}
+module D2_NetInNet.ndl::OtherP@module like P {
+	gates: 
+		in[1] @input
+		out[1] @output
+}
+prototype D2_NetInNet.ndl::P@module {
+	gates: 
+		in[1] @input
+		out[1] @output
+}
+<< networks >>
+network Sub {
+	nodes: 
+		a: M 
+		b: M 
+		c: M 
+}
+network Main {
+	nodes: 
+		sub: Sub 
+		m: M 
+}
+<< errors >>
+-> 0 errors
+}

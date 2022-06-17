@@ -32,3 +32,7 @@ The subsystem acts as a seperate component on the module path
 -   trait Subsystem {}
 -   trait TopLevelSubsystem: Subsystem {}
 -   #[derive(Subsystem)]
+
+# NDL Warnings
+
+e.g. mutiple import of the same subasset (in the same file+)

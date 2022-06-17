@@ -3,6 +3,37 @@ use ndl::ErrorCode::*;
 use ndl::*;
 
 #[test]
+fn par_exports() {
+    let path = "tests/network/P_Exports.ndl";
+    let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
+
+    r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 1);
+
+    assert!(!r.ectx.has_errors());
+}
+
+#[test]
+fn par_exports_no_sep() {
+    let path = "tests/network/P_ExportsNoSep.ndl";
+    let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
+
+    r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 1);
+
+    assert!(r.ectx.has_errors());
+    let errs = r.ectx.all().collect::<Vec<&Error>>();
+
+    check_err!(
+        *errs[0] =>
+        ParSubsystemExportsInvalidSeperatorToken,
+        "Unexpected token 'out'. Expected seperator '/'.",
+        false,
+        None
+    );
+}
+
+#[test]
 fn par_no_ident() {
     let path = "tests/network/P_NoIdent.ndl";
     let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
@@ -17,7 +48,7 @@ fn par_no_ident() {
 
     check_err!(
         *errs[0] =>
-        ParNetworkMissingIdentifer,
+        ParSubsystemMissingIdentifer,
         "Invalid token '{'. Expected network identifier.",
         false,
         None
@@ -43,7 +74,7 @@ fn par_missing_block_open() {
 
     check_err!(
         *errs[0] =>
-        ParNetworkMissingDefBlockOpen,
+        ParSubsystemMissingDefBlockOpen,
         "Invalid token 'nodes'. Expected network definition block (OpenBrace).",
         false,
         None
@@ -70,7 +101,7 @@ fn par_unexpected_subsection() {
 
     check_err!(
         *errs[0] =>
-        ParNetworkInvalidSectionIdentifer,
+        ParSubsystemInvalidSectionIdentifer,
         "Invalid subsection identifier 'colons'. Possibilities are nodes / connections / parameters.",
         false,
         None
@@ -78,7 +109,7 @@ fn par_unexpected_subsection() {
 
     check_err!(
         *errs[1] =>
-        ParNetworkMissingSectionIdentifier,
+        ParSubsystemkMissingSectionIdentifier,
         "Invalid token ':'. Expected identifier for subsection are nodes / connections / parameters.",
         true,
         None
@@ -86,7 +117,7 @@ fn par_unexpected_subsection() {
 
     check_err!(
         *errs[2] =>
-        ParNetworkMissingSectionIdentifier,
+        ParSubsystemkMissingSectionIdentifier,
         "Invalid token '123'. Expected identifier for subsection are nodes / connections / parameters.",
         true,
         None
@@ -94,7 +125,7 @@ fn par_unexpected_subsection() {
 
     check_err!(
         *errs[3] =>
-        ParNetworkMissingSectionIdentifier,
+        ParSubsystemkMissingSectionIdentifier,
         "Invalid token ':'. Expected identifier for subsection are nodes / connections / parameters.",
         true,
         None
@@ -102,7 +133,7 @@ fn par_unexpected_subsection() {
 
     check_err!(
         *errs[4] =>
-        ParNetworkInvalidSectionIdentifer,
+        ParSubsystemInvalidSectionIdentifer,
         "Invalid subsection identifier 'submodules'. Possibilities are nodes / connections / parameters.",
         true,
         None
@@ -110,7 +141,7 @@ fn par_unexpected_subsection() {
 
     check_err!(
         *errs[5] =>
-        ParNetworkMissingSectionIdentifier,
+        ParSubsystemkMissingSectionIdentifier,
         "Invalid token ':'. Expected identifier for subsection are nodes / connections / parameters.",
         true,
         None
@@ -132,13 +163,13 @@ fn par_subsection_no_colon() {
 
     check_err!(
         *errs[0] =>
-        ParNetworkInvalidSeperator,
+        ParSubsystemInvalidSeperator,
         "Unexpected token 'a'. Expected colon ':'.",
         false,
         None
     );
 
-    assert_eq!(r.gtyctx_def().network("A").unwrap().nodes.len(), 2);
+    assert_eq!(r.gtyctx_def().subsystem("A").unwrap().nodes.len(), 2);
 }
 
 #[test]
@@ -161,6 +192,27 @@ fn dsg1_name_collision() {
         false,
         Some(ErrorSolution::new("Try renaming this network".to_string(), Loc::new(60, 29, 8)))
     );
+}
+
+#[test]
+fn dsg2_netinnet() {
+    let path = "tests/network/D2_NetInNet.ndl";
+    let mut r = NdlResolver::new_with(
+        path,
+        NdlResolverOptions {
+            silent: false,
+            verbose: true,
+            verbose_output_dir: "tests/network/d2_netinnet/".into(),
+            desugar: true,
+            tychk: true,
+        },
+    )
+    .expect("Test case file does not seem to exist");
+
+    r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 1);
+
+    assert!(!r.ectx.has_errors());
 }
 
 #[test]

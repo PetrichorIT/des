@@ -16,6 +16,9 @@ mod ctx;
 pub use ctx::*;
 
 pub fn desugar(resolver: &mut NdlResolver) {
+    super::d2::desugar(resolver);
+    return;
+
     let mut fst_pass_results = HashMap::new();
 
     for (alias, unit) in &resolver.units {

@@ -65,7 +65,7 @@ pub struct ModuleDef {
     /// The identifier of the module.
     pub name: String,
     /// The local submodules defined for this module.
-    pub submodules: Vec<ChildModuleDef>,
+    pub submodules: Vec<ChildNodeDef>,
     /// The gates exposed on this module.
     pub gates: Vec<GateDef>,
     /// The connections defined by this module.
@@ -89,7 +89,7 @@ impl ModuleDef {
 /// A definition of a local submodule, in a modules definition.
 ///
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChildModuleDef {
+pub struct ChildNodeDef {
     /// The location of the source tokens.
     pub loc: Loc,
 
@@ -369,18 +369,20 @@ pub struct ParamDef {
 /// A definition of a Network.
 ///
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NetworkDef {
+pub struct SubsystemDef {
     /// The tokens location in the source asset.
     pub loc: Loc,
 
     /// The identifier of the network.
     pub name: String,
     /// The local submodules defined for this module.
-    pub nodes: Vec<ChildModuleDef>,
+    pub nodes: Vec<ChildNodeDef>,
     /// The connections defined by this module.
     pub connections: Vec<ConDef>,
     /// The parameters expected by this module.
     pub parameters: Vec<ParamDef>,
+    /// The exported interfaces
+    pub exports: Vec<ExportDef>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -392,4 +394,18 @@ pub struct AliasDef {
     pub name: String,
     /// The identifier of the network.
     pub prototype: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExportDef {
+    pub loc: Loc,
+
+    pub module: Ident,
+    pub gate: String,
+}
+
+impl Display for ExportDef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}/{}", self.module, self.gate)
+    }
 }

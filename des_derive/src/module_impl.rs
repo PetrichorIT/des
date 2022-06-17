@@ -2,7 +2,7 @@ use crate::{
     attributes::Attributes,
     common::{get_resolver, ident_from_conident, WrappedTokenStream},
 };
-use ndl::ChildModuleSpec;
+use ndl::ChildNodeSpec;
 use ndl::ConSpec;
 use ndl::GateAnnotation;
 use ndl::GateSpec;
@@ -195,7 +195,7 @@ fn generate_dynamic_builder(ident: Ident, attrs: &Attributes, out: &mut TokenStr
 
                 let mut proto_t_counter = 0;
                 for module in &module.submodules {
-                    let ChildModuleSpec { descriptor, ty, .. } = module;
+                    let ChildNodeSpec { descriptor, ty, .. } = module;
 
                     let ident = ident!(format!("{}_child", descriptor));
                     let ty = match ty {
@@ -272,7 +272,7 @@ fn generate_dynamic_builder(ident: Ident, attrs: &Attributes, out: &mut TokenStr
                 // Add submodule to rt
 
                 for module in &module.submodules {
-                    let ChildModuleSpec { descriptor, .. } = module;
+                    let ChildNodeSpec { descriptor, .. } = module;
                     let ident = ident!(format!("{}_child", descriptor));
 
                     token_stream.extend::<proc_macro2::TokenStream>(quote! {

@@ -266,10 +266,17 @@ impl NdlResolver {
 
         let mut file = match File::create(path) {
             Ok(file) => file,
-            Err(_) => return,
+            Err(e) => {
+                eprintln!("Tried to write verbose output: {}", e);
+                return;
+            }
         };
 
-        let _ = write!(file, "{}", object);
+        let r = write!(file, "{}", object);
+        match r {
+            Ok(()) => {}
+            Err(e) => eprintln!("Tried to write verbose output: {}", e),
+        }
     }
 }
 

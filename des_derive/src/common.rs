@@ -1,5 +1,5 @@
 use lazy_static::lazy_static;
-use ndl::ChildModuleSpec;
+use ndl::ChildNodeSpec;
 use ndl::{ConSpecNodeIdent, NdlResolver, OwnedTySpecContext};
 use proc_macro2::Ident;
 use proc_macro2::Span;
@@ -129,7 +129,7 @@ pub fn ident_from_conident(
 
 type TokenStream = proc_macro::TokenStream;
 
-pub fn build_impl_from(ident: Ident, wrapped: WrappedTokenStream, submodules: &[ChildModuleSpec], proto_t_counter: usize) -> TokenStream {
+pub fn build_impl_from(ident: Ident, wrapped: WrappedTokenStream, submodules: &[ChildNodeSpec], proto_t_counter: usize) -> TokenStream {
     
     let param_a = GenericParam::Type(TypeParam {
         attrs: Vec::new(),

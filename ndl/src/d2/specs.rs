@@ -1,8 +1,55 @@
 use crate::loc::Loc;
 use crate::parser::{
-    GateAnnotation, GateDef, LinkDef, ModuleDef, ParamDef, ProtoImplDef, SubsystemDef, TyDef,
+    GateAnnotation, GateDef, Ident, LinkDef, ModuleDef, ParamDef, ProtoImplDef, SubsystemDef, TyDef,
 };
+use crate::AssetDescriptor;
 use std::fmt::Display;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct OIdent {
+    typ: ObjectType,
+    asset: AssetDescriptor,
+    pub raw: String,
+}
+
+impl OIdent {
+    pub fn module(ident: String, asset: AssetDescriptor) -> OIdent {
+        Self {
+            typ: ObjectType::Module,
+            asset,
+            raw: ident,
+        }
+    }
+
+    pub fn subsystem(ident: String, asset: AssetDescriptor) -> OIdent {
+        Self {
+            typ: ObjectType::Subsystem,
+            asset,
+            raw: ident,
+        }
+    }
+}
+
+impl Display for OIdent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}::{}@{}", self.asset.alias, self.raw, self.typ)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ObjectType {
+    Module,
+    Subsystem,
+}
+
+impl Display for ObjectType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Module => write!(f, "module"),
+            Self::Subsystem => write!(f, "subsystem"),
+        }
+    }
+}
 
 ///
 /// A specification of a defined include.
@@ -13,12 +60,12 @@ pub struct IncludeSpec {
     pub loc: Loc,
 
     /// The alias of the included asset.
-    pub path: String,
+    pub path: AssetDescriptor,
 }
 
 impl Display for IncludeSpec {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Include {{ {} }}", self.path)
+        write!(f, "Include {{ {} }}", self.path.alias)
     }
 }
 
@@ -26,29 +73,32 @@ impl Display for IncludeSpec {
 /// A specificiation for the creation of a module.
 ///
 #[derive(Debug, Clone, PartialEq)]
-pub struct ModuleSpec {
+pub struct ModuleSpec<I: Display> {
     /// The tokens location in the [Source Map](crate::source::SourceMap).
     pub loc: Loc,
 
     /// The identifier in the module namespace.
-    pub ident: String,
+    pub ident: OIdent,
     /// A collection of child modules required by the this module.
     pub submodules: Vec<ChildNodeSpec>,
     /// A collection of connections between own gates and child gate.
-    pub connections: Vec<ConSpec>,
+    pub connections: Vec<ConSpec<I>>,
     /// A collection of gates defined on this module.
     pub gates: Vec<GateSpec>,
     /// A collection of parameters.
     pub params: Vec<ParamSpec>,
     /// Indicator whether the module was constructed from a prototype.
     pub derived_from: Option<String>,
+
+    pub(crate) is_prototype: bool,
 }
 
-impl ModuleSpec {
+impl<I: Display> ModuleSpec<I> {
     pub fn degrees_of_freedom(&self) -> impl Iterator<Item = (&String, &String)> {
         self.submodules.iter().filter_map(|c| {
             if let TySpec::Dynamic(ref s) = c.ty {
-                Some((&c.descriptor, s))
+                todo!()
+                // Some((&c.descriptor, s.as_ref().unwrap()))
             } else {
                 None
             }
@@ -60,30 +110,43 @@ impl ModuleSpec {
     /// This means 'loc', 'ident' and 'gates' will be initalized
     /// while 'submodules' and 'connections' must be desugard manually.
     ///
-    pub(crate) fn new(module_def: &ModuleDef) -> Self {
+    pub(crate) fn new(module_def: &ModuleDef, asset: AssetDescriptor) -> Self {
         // Do not use Vec::with_capacity()
         // since desugaring will increase the number of entries
         // significantly.
+
+        let ident = OIdent::module(module_def.name.clone(), asset);
+
         Self {
             loc: module_def.loc,
+            ident,
+            derived_from: module_def.derived_from.clone(),
+            is_prototype: module_def.is_prototype,
 
-            ident: module_def.name.clone(),
             submodules: Vec::new(),
             connections: Vec::new(),
-            gates: module_def.gates.iter().map(GateSpec::new).collect(),
-            params: module_def.parameters.iter().map(ParamSpec::new).collect(),
+            gates: Vec::new(),
 
-            derived_from: module_def.derived_from.clone(),
+            params: module_def.parameters.iter().map(ParamSpec::new).collect(),
         }
     }
 }
 
-impl Display for ModuleSpec {
+impl<I: Display> Display for ModuleSpec<I> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(derived_from) = &self.derived_from {
             writeln!(f, "module {} like {} {{", self.ident, derived_from)?;
         } else {
-            writeln!(f, "module {} {{", self.ident)?;
+            writeln!(
+                f,
+                "{} {} {{",
+                if self.is_prototype {
+                    "prototype"
+                } else {
+                    "module"
+                },
+                self.ident
+            )?;
         }
 
         if !self.submodules.is_empty() {
@@ -115,7 +178,7 @@ impl Display for ModuleSpec {
 /// A specification for the creation of a network.
 ///
 #[derive(Debug, Clone, PartialEq)]
-pub struct SubsystemSpec {
+pub struct SubsystemSpec<I: Display> {
     /// The tokens location in the [Source Map](crate::source::SourceMap).
     pub loc: Loc,
 
@@ -124,18 +187,19 @@ pub struct SubsystemSpec {
     /// The nodes that should be created for an instance of the network.
     pub nodes: Vec<ChildNodeSpec>,
     /// The connections between the nodes.
-    pub connections: Vec<ConSpec>,
+    pub connections: Vec<ConSpec<I>>,
     /// A collection of parameters.
     pub params: Vec<ParamSpec>,
     /// The exports
     pub exports: Vec<ExportSpec>,
 }
 
-impl SubsystemSpec {
+impl<I: Display> SubsystemSpec<I> {
     pub fn degrees_of_freedom(&self) -> impl Iterator<Item = (&String, &String)> {
         self.nodes.iter().filter_map(|c| {
             if let TySpec::Dynamic(ref s) = c.ty {
-                Some((&c.descriptor, s))
+                todo!()
+                // Some((&c.descriptor, s.as_ref().unwrap()))
             } else {
                 None
             }
@@ -153,17 +217,17 @@ impl SubsystemSpec {
         // significantly.
         Self {
             loc: subsys_def.loc,
-
             ident: subsys_def.name.clone(),
+            params: subsys_def.parameters.iter().map(ParamSpec::new).collect(),
+
             nodes: Vec::new(),
             connections: Vec::new(),
-            params: subsys_def.parameters.iter().map(ParamSpec::new).collect(),
             exports: Vec::new(),
         }
     }
 }
 
-impl Display for SubsystemSpec {
+impl<I: Display> Display for SubsystemSpec<I> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "network {} {{", self.ident)?;
 
@@ -195,7 +259,7 @@ impl Display for SubsystemSpec {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExportSpec {
     pub loc: Loc,
-    pub node_ident: String,
+    pub node_ident: Ident,
     pub gate_ident: GateSpec,
 }
 
@@ -303,27 +367,13 @@ impl ProtoImplSpec {
 ///
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TySpec {
-    Static(String),
-    Dynamic(String),
+    Static(TyPath),
+    Dynamic(TyPath),
 }
 
 impl TySpec {
     pub fn is_dynamic(&self) -> bool {
         matches!(self, Self::Dynamic(_))
-    }
-
-    pub fn inner(&self) -> &str {
-        match self {
-            Self::Static(ref s) => s,
-            Self::Dynamic(ref s) => s,
-        }
-    }
-
-    pub fn new(def: &TyDef) -> Self {
-        match def {
-            TyDef::Static(ref s) => Self::Static(s.to_string()),
-            TyDef::Dynamic(ref s) => Self::Dynamic(s.to_string()),
-        }
     }
 }
 
@@ -335,23 +385,54 @@ impl Display for TySpec {
         }
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TyPath {
+    InScope(String),
+    OutOfScope(String, Loc),
+    Invalid(String),
+}
+
+impl TyPath {
+    pub fn exists(&self) -> bool {
+        matches!(self, Self::InScope(_) | Self::OutOfScope(_, _))
+    }
+
+    pub fn inner(&self) -> &str {
+        match self {
+            Self::InScope(ref s) => s,
+            Self::OutOfScope(ref s, _) => s,
+            Self::Invalid(ref s) => s,
+        }
+    }
+}
+
+impl Display for TyPath {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InScope(ref s) => write!(f, "{}", s),
+            Self::OutOfScope(ref s, _) => write!(f, "global::{}", s),
+            Self::Invalid(ref s) => write!(f, "invalid::{}", s),
+        }
+    }
+}
 ///
 /// A connection specification in either a module or a network.
 ///
 #[derive(Debug, Clone, PartialEq)]
-pub struct ConSpec {
+pub struct ConSpec<I: Display> {
     /// The tokens location in the [Source Map](crate::source::SourceMap).
     pub loc: Loc,
 
     /// The source of the connection.
-    pub source: ConSpecNodeIdent,
+    pub source: I,
     /// The target of the connection.
-    pub target: ConSpecNodeIdent,
+    pub target: I,
     /// The delay characterisitcs of the channel.
     pub channel: Option<ChannelSpec>,
 }
 
-impl Display for ConSpec {
+impl<I: Display> Display for ConSpec<I> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(channel) = &self.channel {
             write!(f, "{} --> {} --> {}", self.source, channel, self.target)
@@ -438,6 +519,17 @@ pub struct ChannelSpec {
 }
 
 impl ChannelSpec {
+    pub(crate) fn dummy() -> Self {
+        Self {
+            loc: Loc::new(0, 0, 0),
+            ident: "DummyLink".to_string(),
+            bitrate: 1,
+            latency: 1.0,
+            jitter: 1.0,
+            cost: 1.0,
+        }
+    }
+
     ///
     /// Creates a fully initialized instance of Self
     /// using a [LinkDef] as reference point.

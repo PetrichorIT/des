@@ -5,7 +5,7 @@ use crate::*;
 use crate::desugar::first_pass::FstPassResult;
 use crate::desugar::{DesugaredParsingResult, ScndPassGlobalTyCtx};
 use crate::error::*;
-use crate::parser::{ChildModuleDef, ModuleDef, TyDef};
+use crate::parser::{ChildNodeDef, ModuleDef, TyDef};
 
 mod tyctx;
 
@@ -20,7 +20,7 @@ const PAR_TYPES: [&str; 15] = [
 /// Validates that the type exists, returning an indicator.
 ///
 pub fn validate_module_ty(
-    def: &ChildModuleDef,
+    def: &ChildNodeDef,
     tyctx: &[&ModuleDef],
     gtyctx: &ScndPassGlobalTyCtx,
     smap: &SourceMap,
@@ -149,22 +149,23 @@ pub fn check_proto_impl(
 
         for module in &unit.modules {
             for child in &module.submodules {
-                check_proto_impl_block(child, &tyctx, &gtyctx, errors)
+                check_proto_impl_block(child, &tyctx, &gtyctx, false, errors)
             }
         }
 
         for network in &unit.networks {
             for child in &network.nodes {
-                check_proto_impl_block(child, &tyctx, &gtyctx, errors)
+                check_proto_impl_block(child, &tyctx, &gtyctx, true, errors)
             }
         }
     }
 }
 
 fn check_proto_impl_block(
-    child: &ChildModuleSpec,
+    child: &ChildNodeSpec,
     tyctx: &TySpecContext,
     gtyctx: &GlobalTySpecContext,
+    is_subsystem: bool,
     errors: &mut Vec<Error>,
 ) {
     // PROTO IMPL
@@ -243,10 +244,22 @@ fn check_proto_impl_block(
             .modules
             .iter()
             .find(|m| m.ident == child.ty.inner())
+            .map(|module| module.degrees_of_freedom().count())
+            .or_else(|| {
+                if is_subsystem {
+                    tyctx
+                        .subsystems
+                        .iter()
+                        .find(|s| s.ident == child.ty.inner())
+                        .map(|subsys| subsys.degrees_of_freedom().count())
+                } else {
+                    None
+                }
+            })
             .expect("[desugar] This should have bee checked in the first pass");
 
         // all proto ty must have an impl
-        if ty.degrees_of_freedom().count() > 0 {
+        if ty > 0 {
             // err
             errors.push(Error::new(
                 DsgProtoImlMissing,

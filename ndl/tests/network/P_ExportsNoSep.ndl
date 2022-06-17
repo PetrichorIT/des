@@ -1,0 +1,18 @@
+module A {
+    gates:
+        in @input
+        out @output
+}
+
+subsystem S {
+    nodes:
+        modA: A
+        modB: A
+
+    exports:
+        modA/in
+        modB out
+
+    connections: 
+        modA/out --> modB/in
+}
