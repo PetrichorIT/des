@@ -182,10 +182,10 @@ fn generate_dynamic_builder(ident: Ident, attrs: &Attributes, out: &mut TokenStr
                     // TODO
                     // Not yet possible since ndl_ident was not yet added to attributes
                     // First implement mapping inside resolver.
-                    res.module(ident.to_string())
+                    res.module(ident)
                         .expect("#[derive(Module)] -- Failed to find NDL module with same name.")
                 } else {
-                    res.module(ident.clone())
+                    res.module(&ident.to_string())
                         .expect("#[derive(Module)] -- Failed to find NDL module with same name.")
                 };
 
@@ -199,7 +199,7 @@ fn generate_dynamic_builder(ident: Ident, attrs: &Attributes, out: &mut TokenStr
 
                     let ident = ident!(format!("{}_child", descriptor));
                     let ty = match ty {
-                        TySpec::Static(s) => ident!(s),
+                        TySpec::Static(s) => ident!(s.inner()),
                         TySpec::Dynamic(_) => {
                             let ident = ident!(format!("T{}", descriptor));
                             proto_t_counter += 1;

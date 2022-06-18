@@ -313,8 +313,8 @@ fn dsg1_name_collision() {
 
     check_err!(
         *errs[0] =>
-        DsgDefNameCollision,
-        "Cannot create two links with name 'A'.",
+        DsgLinkNamespaceCollision,
+        "Namespace collsion. Allready defined a link with name 'A'.",
         false,
         Some(ErrorSolution::new("Try renaming this link".to_string(), Loc::new(71, 60, 7)))
     );

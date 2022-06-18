@@ -52,7 +52,7 @@ impl Display for ParsingResult {
             writeln!(
                 f,
                 "    - {}{} {{",
-                module.name,
+                module.ident,
                 if module.is_prototype {
                     " @prototype"
                 } else {
@@ -88,13 +88,13 @@ impl Display for ParsingResult {
         writeln!(f)?;
         writeln!(f, "    aliases:")?;
         for alias in &self.aliases {
-            writeln!(f, "    - alias {} like {}", alias.name, alias.prototype)?
+            writeln!(f, "    - alias {} like {}", alias.ident, alias.prototype)?
         }
 
         writeln!(f)?;
         writeln!(f, "    networks:")?;
         for module in &self.subsystems {
-            writeln!(f, "    - {} {{", module.name)?;
+            writeln!(f, "    - {} {{", module.ident)?;
 
             writeln!(f, "      nodes:")?;
             for submodule in &module.nodes {

@@ -1,9 +1,9 @@
 use crate::*;
 
-use crate::desugar::{DesugaredParsingResult, GlobalTyDefContext};
+use crate::d2::ctx::GlobalTyDefContext;
+use crate::d2::expand::ExpandedUnit;
 use crate::error::*;
 use crate::parser::ParsingResult;
-use crate::tycheck::GlobalTySpecContext;
 
 use std::fmt::Display;
 use std::{
@@ -31,8 +31,11 @@ pub struct NdlResolver {
     pub source_map: SourceMap,
     /// A list of all lexed/parsed assets in the current workspace.
     pub units: HashMap<String, ParsingResult>,
-    /// A list of all lexed/parsed assets in the current workspace.
-    pub desugared_units: HashMap<String, DesugaredParsingResult>,
+
+    pub expanded_units: HashMap<String, ExpandedUnit>,
+
+    pub result: Option<DesugaredResult>,
+
     /// An error handler to record errors on the way.
     pub ectx: GlobalErrorContext,
 }
@@ -58,12 +61,19 @@ impl NdlResolver {
         )
     }
 
+    pub fn verbose(mut self, output: impl Into<PathBuf>) -> Self {
+        self.options.verbose = true;
+        self.options.verbose_output_dir = output.into();
+
+        self
+    }
+
     pub fn gtyctx_def(&self) -> GlobalTyDefContext<'_> {
         GlobalTyDefContext::new(self)
     }
 
-    pub fn gtyctx_spec(&self) -> GlobalTySpecContext<'_> {
-        GlobalTySpecContext::new(&self.desugared_units, &self.source_map)
+    pub fn gtyctx_spec(&self) -> &DesugaredResult {
+        self.result.as_ref().unwrap()
     }
 
     ///
@@ -84,7 +94,8 @@ impl NdlResolver {
             scopes: Vec::new(),
             par_files: Vec::new(),
             units: HashMap::new(),
-            desugared_units: HashMap::new(),
+            expanded_units: HashMap::new(),
+            result: None,
 
             ectx: GlobalErrorContext::new(),
         })
@@ -168,7 +179,7 @@ impl NdlResolver {
             return Ok(());
         }
 
-        desugar::desugar(self);
+        d2::desugar(self);
 
         // === TY CHECK ===
 
@@ -201,19 +212,16 @@ impl NdlResolver {
 
     pub fn run_cached(
         &mut self,
-    ) -> Result<
-        (
-            GlobalTySpecContext<'_>,
-            impl Iterator<Item = &Error>,
-            Vec<PathBuf>,
-        ),
-        &'static str,
-    > {
+    ) -> Result<(DesugaredResult, impl Iterator<Item = &Error>, Vec<PathBuf>), &'static str> {
         if self.state != NdlResolverState::Done {
             self.run()?;
         }
 
-        Ok((self.gtyctx_spec(), self.ectx.all(), self.par_files.clone()))
+        Ok((
+            self.gtyctx_spec().clone(),
+            self.ectx.all(),
+            self.par_files.clone(),
+        ))
     }
 
     ///

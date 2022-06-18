@@ -102,7 +102,7 @@ fn par_unexpected_subsection() {
     check_err!(
         *errs[0] =>
         ParSubsystemInvalidSectionIdentifer,
-        "Invalid subsection identifier 'colons'. Possibilities are nodes / connections / parameters.",
+        "Invalid subsection identifier 'colons'. Possibilities are nodes / connections / parameters / exports.",
         false,
         None
     );
@@ -110,7 +110,7 @@ fn par_unexpected_subsection() {
     check_err!(
         *errs[1] =>
         ParSubsystemkMissingSectionIdentifier,
-        "Invalid token ':'. Expected identifier for subsection are nodes / connections / parameters.",
+        "Invalid token ':'. Expected identifier for subsection are nodes / connections / parameters / exports.",
         true,
         None
     );
@@ -118,7 +118,7 @@ fn par_unexpected_subsection() {
     check_err!(
         *errs[2] =>
         ParSubsystemkMissingSectionIdentifier,
-        "Invalid token '123'. Expected identifier for subsection are nodes / connections / parameters.",
+        "Invalid token '123'. Expected identifier for subsection are nodes / connections / parameters / exports.",
         true,
         None
     );
@@ -126,7 +126,7 @@ fn par_unexpected_subsection() {
     check_err!(
         *errs[3] =>
         ParSubsystemkMissingSectionIdentifier,
-        "Invalid token ':'. Expected identifier for subsection are nodes / connections / parameters.",
+        "Invalid token ':'. Expected identifier for subsection are nodes / connections / parameters / exports.",
         true,
         None
     );
@@ -134,7 +134,7 @@ fn par_unexpected_subsection() {
     check_err!(
         *errs[4] =>
         ParSubsystemInvalidSectionIdentifer,
-        "Invalid subsection identifier 'submodules'. Possibilities are nodes / connections / parameters.",
+        "Invalid subsection identifier 'submodules'. Possibilities are nodes / connections / parameters / exports.",
         true,
         None
     );
@@ -142,7 +142,7 @@ fn par_unexpected_subsection() {
     check_err!(
         *errs[5] =>
         ParSubsystemkMissingSectionIdentifier,
-        "Invalid token ':'. Expected identifier for subsection are nodes / connections / parameters.",
+        "Invalid token ':'. Expected identifier for subsection are nodes / connections / parameters / exports.",
         true,
         None
     );
@@ -187,8 +187,8 @@ fn dsg1_name_collision() {
 
     check_err!(
         *errs[0] =>
-        DsgDefNameCollision,
-        "Cannot create two networks with name 'X'.",
+        DsgModuleNamespaceCollision,
+        "Namespace collsion. Allready defined a subsystem with name 'X'.",
         false,
         Some(ErrorSolution::new("Try renaming this network".to_string(), Loc::new(60, 29, 8)))
     );
@@ -200,7 +200,7 @@ fn dsg2_netinnet() {
     let mut r = NdlResolver::new_with(
         path,
         NdlResolverOptions {
-            silent: false,
+            silent: true,
             verbose: true,
             verbose_output_dir: "tests/network/d2_netinnet/".into(),
             desugar: true,
@@ -230,8 +230,8 @@ fn tychk_invalid_sub_ty() {
 
     check_err!(
         *errs[0] =>
-        TycNetworkSubmoduleInvalidTy,
-        "No module with name 'B' exists in the scope.",
+        DsgSubmoduleMissingTy,
+        "No module with name 'B' found in scope.",
         false,
         None
     );

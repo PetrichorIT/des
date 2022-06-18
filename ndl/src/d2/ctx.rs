@@ -1,8 +1,13 @@
 // use std::collections::HashMap;
 
+use std::collections::HashMap;
+
+use crate::common::OIdent;
 use crate::error::ErrorCode::*;
 use crate::parser::*;
 use crate::*;
+
+use super::expand::{ExpandedModule, ExpandedUnit};
 
 ///
 /// A global type context over the definitions stored in a resolver.
@@ -29,7 +34,7 @@ impl<'a> GlobalTyDefContext<'a> {
     ///
     pub fn link(&self, ident: &str) -> Option<&LinkDef> {
         for unit in self.resolver.units.values() {
-            match unit.links.iter().find(|l| l.name == ident) {
+            match unit.links.iter().find(|l| l.ident.raw() == ident) {
                 Some(link) => return Some(link),
                 None => continue,
             }
@@ -42,7 +47,7 @@ impl<'a> GlobalTyDefContext<'a> {
     ///
     pub fn prototype(&self, ident: &str) -> Option<&ModuleDef> {
         for unit in self.resolver.units.values() {
-            match unit.prototypes.iter().find(|l| l.name == ident) {
+            match unit.prototypes.iter().find(|l| l.ident.raw() == ident) {
                 Some(module) => return Some(module),
                 None => continue,
             }
@@ -55,7 +60,7 @@ impl<'a> GlobalTyDefContext<'a> {
     ///
     pub fn module(&self, ident: &str) -> Option<&ModuleDef> {
         for unit in self.resolver.units.values() {
-            match unit.modules.iter().find(|l| l.name == ident) {
+            match unit.modules.iter().find(|l| l.ident.raw() == ident) {
                 Some(module) => return Some(module),
                 None => continue,
             }
@@ -65,9 +70,9 @@ impl<'a> GlobalTyDefContext<'a> {
 
     pub fn module_or_alias_loc(&self, ident: &str) -> Option<Loc> {
         for unit in self.resolver.units.values() {
-            match unit.modules.iter().find(|l| l.name == ident) {
+            match unit.modules.iter().find(|l| l.ident.raw() == ident) {
                 Some(module) => return Some(module.loc),
-                None => match unit.aliases.iter().find(|a| a.name == ident) {
+                None => match unit.aliases.iter().find(|a| a.ident.raw() == ident) {
                     Some(alias) => return Some(alias.loc),
                     None => continue,
                 },
@@ -76,10 +81,10 @@ impl<'a> GlobalTyDefContext<'a> {
         None
     }
 
-    pub fn network(&self, ident: &str) -> Option<&SubsystemDef> {
+    pub fn subsystem(&self, ident: &str) -> Option<&SubsystemDef> {
         for unit in self.resolver.units.values() {
-            match unit.subsystems.iter().find(|l| l.name == ident) {
-                Some(network) => return Some(network),
+            match unit.subsystems.iter().find(|l| l.ident.raw() == ident) {
+                Some(subsystem) => return Some(subsystem),
                 None => continue,
             }
         }
@@ -117,6 +122,13 @@ impl<'a> TyDefContext<'a> {
             modules: Vec::new(),
             prototypes: Vec::new(),
             subsystems: Vec::new(),
+        }
+    }
+
+    pub fn module_or_proto(&self, ty: &TyDef) -> Option<&&ModuleDef> {
+        match ty {
+            TyDef::Static(ident) => self.modules.iter().find(|m| m.ident.raw() == *ident),
+            TyDef::Dynamic(ident) => self.prototypes.iter().find(|m| m.ident.raw() == *ident),
         }
     }
 
@@ -204,8 +216,36 @@ impl Default for TyDefContext<'_> {
 // Second pass
 //
 
-pub struct TyComposeContext {}
-pub struct GlobalTyComposeContext {}
+pub struct TyComposeContext<'a> {
+    data: &'a HashMap<String, ExpandedUnit>,
+    resolver: &'a NdlResolver,
+}
+
+impl<'a> TyComposeContext<'a> {
+    pub fn new(data: &'a HashMap<String, ExpandedUnit>, resolver: &'a NdlResolver) -> Self {
+        Self { data, resolver }
+    }
+
+    pub fn source_map(&self) -> &'a SourceMap {
+        &self.resolver.source_map
+    }
+
+    pub fn module(&self, ident: &OIdent) -> Option<&ExpandedModule> {
+        self.data
+            .iter()
+            .map(|(_, unit)| unit.modules.iter())
+            .flatten()
+            .find(|e| e.ident == *ident)
+    }
+
+    pub fn module_or_proto(&self, ident: &OIdent) -> Option<&ExpandedModule> {
+        self.data
+            .iter()
+            .map(|(_, unit)| unit.modules.iter().chain(&unit.prototypes))
+            .flatten()
+            .find(|e| e.ident == *ident)
+    }
+}
 
 // #[derive(Debug)]
 // pub struct ScndPassGlobalTyCtx<'a> {

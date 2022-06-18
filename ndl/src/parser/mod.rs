@@ -1,5 +1,6 @@
 use crate::*;
 
+use crate::common::{OIdent, OType};
 use crate::error::*;
 use crate::lexer::LiteralKind;
 
@@ -223,7 +224,7 @@ impl<'a> Parser<'a> {
         let mut module_def = ModuleDef {
             loc: Loc::new(0, 1, 1),
        
-            name: id,
+            ident: OIdent::new(if is_prototype { OType::Prototype } else { OType::Module }, self.asset.descriptor(), id),
             gates: Vec::new(),
             submodules: Vec::new(),
             connections: Vec::new(),
@@ -1253,7 +1254,7 @@ impl<'a> Parser<'a> {
         self.result.aliases.push(AliasDef {
             loc,
 
-            name,
+            ident: OIdent::new(OType::Alias, self.asset.descriptor(), name),
             prototype
         });
 
@@ -1294,7 +1295,7 @@ impl<'a> Parser<'a> {
         let mut subsys_def = SubsystemDef {
             loc: Loc::new(0, 1, 1),
        
-            name: id,
+            ident: OIdent::new(OType::Subsystem, self.asset.descriptor(), id),
             nodes: Vec::new(),
             connections: Vec::new(),
             parameters: Vec::new(),
@@ -1451,7 +1452,7 @@ impl<'a> Parser<'a> {
                     ectx.reset_transient();
                     def.push(ExportDef {
                         loc: Loc::fromto(first_token_loc, token.loc),
-                        module: Ident::Direct { ident },
+                        module: ident,
                         gate: gate.to_string()
                     })
                 },
@@ -1738,7 +1739,7 @@ impl<'a> Parser<'a> {
         self.result.links.push(LinkDef {
             loc: Loc::fromto(id_token_loc, token_loc),
             
-            name: identifier,
+            ident: OIdent::new(OType::Link, self.asset.descriptor(), identifier),
             bitrate: bitrate.unwrap_or(1_000),
             latency: latency.unwrap_or(0.1),
             jitter: jitter.unwrap_or(0.1),

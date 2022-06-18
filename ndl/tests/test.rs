@@ -112,7 +112,7 @@ fn ndl_parser_test() {
     assert_eq!(result.includes[1].path, "std/A");
 
     assert_eq!(result.links.len(), 1);
-    assert_eq!(result.links[0].name, "NewLink");
+    assert_eq!(result.links[0].ident.raw(), "NewLink");
     assert_eq!(
         (
             result.links[0].bitrate,
@@ -124,7 +124,7 @@ fn ndl_parser_test() {
 
     assert_eq!(result.modules.len(), 2);
 
-    assert_eq!(result.modules[0].name, "SubM");
+    assert_eq!(result.modules[0].ident.raw(), "SubM");
     assert_eq!(result.modules[0].gates.len(), 1);
     assert_eq!(result.modules[0].gates[0].name, "another");
     assert_eq!(result.modules[0].gates[0].size, 5);
@@ -133,7 +133,7 @@ fn ndl_parser_test() {
     assert_eq!(result.modules[0].parameters[0].ident, "addr");
     assert_eq!(result.modules[0].parameters[0].ty, "usize");
 
-    assert_eq!(result.modules[1].name, "Main");
+    assert_eq!(result.modules[1].ident.raw(), "Main");
     assert_eq!(result.modules[1].gates.len(), 3);
     assert_eq!(result.modules[1].gates[0].name, "some");
     assert_eq!(result.modules[1].gates[0].size, 5);
@@ -150,7 +150,7 @@ fn ndl_parser_test() {
     assert_eq!(result.modules[1].connections[0].channel, None);
 
     assert_eq!(result.subsystems.len(), 1);
-    assert_eq!(result.subsystems[0].name, "SimMain");
+    assert_eq!(result.subsystems[0].ident.raw(), "SimMain");
 
     assert_eq!(result.subsystems[0].nodes.len(), 1);
     assert_eq!(result.subsystems[0].nodes[0].desc.descriptor, "router");
@@ -172,25 +172,27 @@ fn ndl_parser_test() {
 //     println!("{}", desugared_unit);
 // }
 
-#[test]
-fn ndl_tycheck_test() {
-    use crate::*;
+// #[test]
+// fn ndl_tycheck_test() {
+//     use crate::*;
 
-    let mut resolver =
-        NdlResolver::new("./tests/TycTest").expect("Failed to create resovler with valid root.");
+//     let mut resolver =
+//         NdlResolver::new("./tests/TycTest").expect("Failed to create resovler with valid root.");
 
-    let _ = resolver.run();
+//     let _ = resolver.run();
 
-    println!("{}", resolver);
+//     println!("{}", resolver);
 
-    let unit = resolver.desugared_units.get("Main").unwrap();
+//     let unit = resolver.expanded_units.get("Main").unwrap();
 
-    let _res = validate(unit, &resolver);
-}
+//     let _res = validate(unit, &resolver);
+// }
 
 #[test]
 fn ndl_full_test() {
-    let mut resolver = NdlResolver::new("tests/full").expect("Failed to create resolver");
+    let mut resolver = NdlResolver::quiet("tests/full")
+        .expect("Failed to create resolver")
+        .verbose("tests/full/output/");
 
     println!("{}", resolver);
 
@@ -201,7 +203,7 @@ fn ndl_full_test() {
 
 #[test]
 fn ndl_protsim_test() {
-    let mut resolver = NdlResolver::new("tests/protsim").expect("Failed to create resolver");
+    let mut resolver = NdlResolver::quiet("tests/protsim").expect("Failed to create resolver");
 
     println!("{}", resolver);
 

@@ -6,7 +6,7 @@ use crate::check_err;
 #[test]
 fn base() {
     let mut resolver =
-        NdlResolver::new("tests/prototype/base").expect("Failed to create resolver.");
+        NdlResolver::quiet("tests/prototype/base").expect("Failed to create resolver.");
 
     println!("{}", resolver);
 
@@ -23,7 +23,7 @@ fn base() {
 #[test]
 fn par_proto_is_proto() {
     let path = "tests/prototype/P_Proto_IsProto.ndl";
-    let mut r = NdlResolver::new(path).expect("Test case file does not seem to exist");
+    let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
 
     r.run().expect("Failed run");
     assert_eq!(r.scopes.len(), 1);
@@ -226,24 +226,20 @@ fn par_pimpl_no_ident() {
     let errs = r.ectx.all().collect::<Vec<&Error>>();
     assert_eq!(errs.len(), 2);
 
-    assert_eq!(
-        *errs[0],
-        Error::new(
+    check_err!(
+        *errs[0] =>
             ParProtoImplInvalidIdent,
-            "Unexpected token '123'. Expected ident.".to_string(),
-            Loc::new(118, 3, 12),
+            "Unexpected token '123'. Expected ident.",
             false,
-        )
+            None
     );
 
-    assert_eq!(
-        *errs[1],
-        Error::new(
+    check_err!(
+        *errs[1] =>
             DsgProtoImplMissingField,
-            "Missing prototype impl field 'x'.".to_string(),
-            Loc::new(111, 4, 12),
+            "Missing prototype impl field 'x'.",
             false,
-        )
+            None
     );
 }
 
@@ -263,26 +259,23 @@ fn par_pimpl_no_eq() {
     let errs = r.ectx.all().collect::<Vec<&Error>>();
     assert_eq!(errs.len(), 3);
 
-    assert_eq!(
-        *errs[0],
-        Error::new(
+    check_err!(
+        *errs[0] =>
             ParProtoImplExpectedEq,
-            "Unexpected token 'is'. Expected '='.".to_string(),
-            Loc::new(140, 2, 13),
+            "Unexpected token 'is'. Expected '='.",
             false,
-        )
+            None
+
     );
 
     assert!(errs[1].transient);
 
-    assert_eq!(
-        *errs[2],
-        Error::new(
+    check_err!(
+        *errs[2] =>
             DsgProtoImplMissingField,
-            "Missing prototype impl field 'inner'.".to_string(),
-            Loc::new(115, 4, 12),
+            "Missing prototype impl field 'inner'.",
             false,
-        )
+            None
     );
 }
 
@@ -320,9 +313,9 @@ fn par_pimpl_no_ty_ident() {
         None
     );
 
-    assert_eq!(r.gtyctx_spec().network("Y").unwrap().nodes.len(), 2);
+    assert_eq!(r.gtyctx_spec().subsystem("Y").unwrap().nodes.len(), 2);
     assert_eq!(
-        r.gtyctx_spec().network("Y").unwrap().nodes[0]
+        r.gtyctx_spec().subsystem("Y").unwrap().nodes[0]
             .proto_impl
             .as_ref()
             .unwrap()
@@ -348,9 +341,9 @@ fn par_pimpl_no_ty_ident() {
         None
     );
 
-    assert_eq!(r.gtyctx_spec().network("Y2").unwrap().nodes.len(), 2);
+    assert_eq!(r.gtyctx_spec().subsystem("Y2").unwrap().nodes.len(), 2);
     assert_eq!(
-        r.gtyctx_spec().network("Y2").unwrap().nodes[0]
+        r.gtyctx_spec().subsystem("Y2").unwrap().nodes[0]
             .proto_impl
             .as_ref()
             .unwrap()
@@ -576,24 +569,20 @@ fn dsg3_impl_for_no_proto() {
     let errs = r.ectx.all().collect::<Vec<&Error>>();
     assert_eq!(errs.len(), 2);
 
-    assert_eq!(
-        *errs[0],
-        Error::new(
-            DsgProtoImplForNonProtoValue,
-            "Cannot at a prototype implmentation block to a child of type 'B' that has no prototype components.".to_string(),
-            Loc::new(98, 4, 11),
-            false,
-        )
+    check_err!(
+        *errs[0] =>
+        DsgProtoImplForNonProtoValue,
+        "Cannot at a prototype implmentation block to a child of type 'B' that has no prototype components.",
+        false,
+        None
     );
 
-    assert_eq!(
-        *errs[1],
-        Error::new(
-            DsgProtoImplForNonProtoValue,
-            "Cannot at a prototype implmentation block to a child of type 'B' that has no prototype components.".to_string(),
-            Loc::new(151, 4, 16),
-            false,
-        )
+    check_err!(
+        *errs[1] =>
+        DsgProtoImplForNonProtoValue,
+        "Cannot at a prototype implmentation block to a child of type 'B' that has no prototype components.",
+        false,
+        None
     );
 }
 
@@ -613,56 +602,52 @@ fn dsg3_impl_missing_field() {
     let errs = r.ectx.all().collect::<Vec<&Error>>();
     assert_eq!(errs.len(), 3 + 3);
 
-    assert_eq!(
-        *errs[0],
-        Error::new(
+    check_err!(
+        *errs[0] =>
+
             DsgProtoImplMissingField,
-            "Missing prototype impl field 'sub'.".to_string(),
-            Loc::new(141, 4, 13),
+            "Missing prototype impl field 'sub'.",
             false,
-        )
+            None
+
     );
 
-    assert_eq!(
-        *errs[1],
-        Error::new(
+    check_err!(
+        *errs[1] =>
+
             DsgProtoImplMissingField,
-            "Missing prototype impl field 'sub2'.".to_string(),
-            Loc::new(141, 4, 13),
+            "Missing prototype impl field 'sub2'.",
             false,
-        )
+            None
     );
 
-    assert_eq!(
-        *errs[2],
-        Error::new(
+    check_err!(
+        *errs[2] =>
+
             DsgProtoImplMissingField,
-            "Missing prototype impl field 'sub2'.".to_string(),
-            Loc::new(158, 4, 14),
+            "Missing prototype impl field 'sub2'.",
             false,
-        )
+            None
     );
 
     // NET
 
-    assert_eq!(
-        *errs[3],
-        Error::new(
+    check_err!(
+        *errs[3] =>
+
             DsgProtoImplMissingField,
-            "Missing prototype impl field 'sub'.".to_string(),
-            Loc::new(231, 4, 21),
+            "Missing prototype impl field 'sub'.",
             false,
-        )
+            None
     );
 
-    assert_eq!(
-        *errs[4],
-        Error::new(
+    check_err!(
+        *errs[4] =>
+
             DsgProtoImplMissingField,
-            "Missing prototype impl field 'sub2'.".to_string(),
-            Loc::new(231, 4, 21),
+            "Missing prototype impl field 'sub2'.",
             false,
-        )
+            None
     );
 
     check_err!(
@@ -801,7 +786,7 @@ fn par_alias_as_standalone() {
     // Error output sorting may reorder stdout
     //
     let path = "tests/prototype/D1_AliasAsStandalone.ndl";
-    let mut r = NdlResolver::new(path).expect("Test case file does not seem to exist");
+    let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
 
     r.run().expect("Failed run");
     assert_eq!(r.scopes.len(), 1);

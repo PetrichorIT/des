@@ -53,24 +53,26 @@ mod error;
 mod loc;
 mod source;
 
-mod desugar;
 mod lexer;
 mod parser;
 mod resolver;
 mod tycheck;
 
+mod common;
 mod d2;
 
 // ### Exports ###
 
+pub use d2::desugar;
+pub use d2::result::DesugaredResult;
+pub use d2::specs::*;
+
 // > Function exports
-pub use desugar::desugar;
 pub use lexer::tokenize;
 pub use lexer::tokenize_and_validate;
 pub use parser::parse;
 pub use tycheck::tychk;
 pub use tycheck::validate;
-pub use tycheck::validate_module_ty;
 
 // > Global primitivs
 pub use error::Error;
@@ -88,20 +90,12 @@ pub use source::AssetDescriptor;
 pub use source::SourceMap;
 
 // > Spec Exports.
-pub use desugar::{
-    ChannelSpec, ChildNodeSpec, ConSpec, ConSpecNodeIdent, ExportSpec, GateSpec, IncludeSpec,
-    ModuleSpec, ParamSpec, SubsystemSpec, TySpec,
-};
-pub use parser::GateAnnotation;
+pub use common::GateAnnotation;
 
 #[cfg(test)]
 pub use parser::TyDef;
 
 // > TyCtx
-
-pub use tycheck::GlobalTySpecContext;
-pub use tycheck::OwnedTySpecContext;
-pub use tycheck::TySpecContext;
 
 // > Resolver
 pub use resolver::NdlResolver;

@@ -39,9 +39,9 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> Result<TokenStream> {
                 // TODO
                 // Not yet possible since ndl_ident was not yet added to attributes
                 // First implement mapping inside resolver.
-                res.network(ident)
+                res.subsystem(&ident)
             } else {
-                res.network(ident.clone())
+                res.subsystem(&ident.to_string())
             };
 
             if let Some(network) = network {
@@ -61,7 +61,7 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> Result<TokenStream> {
                 for node in &network.nodes {
                     let ChildNodeSpec { descriptor, ty, .. } = node;
                     let ident = ident!(format!("{}_child", descriptor));
-                    let ty = ident!(ty.inner());
+                    let ty = ident!(ty.unwrap());
 
                     if let Some(ref proto) = node.proto_impl {
                         let mut p = Punctuated::<Ident, Comma>::new();

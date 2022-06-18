@@ -30,7 +30,7 @@ fn desugar_bench(c: &mut Criterion) {
             |b, _size| {
                 b.iter(|| {
                     desugar(&mut resolver);
-                    resolver.desugared_units.clear();
+                    resolver.result = None;
                     resolver.ectx.desugaring_errors.clear();
                 })
             },

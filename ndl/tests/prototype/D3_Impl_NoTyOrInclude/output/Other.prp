@@ -1,0 +1,10 @@
+PreparedUnit {
+<< includes >>
+- Include { Other }
+- Include { Main }
+<< modules >>
+module B<module@Other> like A {
+}
+<< errors >>
+-> 0 errors
+}

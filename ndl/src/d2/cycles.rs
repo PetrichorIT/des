@@ -1,24 +1,24 @@
-use super::prepare::PreparedUnit;
-use super::specs::{ModuleSpec, SubsystemSpec, TySpec};
+use super::expand::ExpandedUnit;
+use super::specs::{SubsystemSpec, TySpec};
 use crate::parser::ConNodeIdent;
 use crate::{error::*, NdlResolver};
 use std::collections::HashMap;
 
 /// Returns whether cycles were found.
 pub fn check_for_cycles(
-    units: &mut HashMap<String, PreparedUnit>,
+    units: &mut HashMap<String, ExpandedUnit>,
     resolver: &mut NdlResolver,
 ) -> bool {
     check_for_module_cycles(units, resolver) || check_for_subsystem_cycles(units, resolver)
 }
 
 fn check_for_module_cycles(
-    units: &mut HashMap<String, PreparedUnit>,
+    units: &mut HashMap<String, ExpandedUnit>,
     _resolver: &mut NdlResolver,
 ) -> bool {
     // Module, Asset, errors
     // (&ModuleSpec, &String, &mut Vec<Error>)
-    let modules_and_prototypes: Vec<(&ModuleSpec<ConNodeIdent>, &String)> = units
+    let modules_and_prototypes: Vec<_> = units
         .iter()
         .map(|(asset, unit)| {
             unit.modules
@@ -40,14 +40,12 @@ fn check_for_module_cycles(
             // Should there be a invalid type dsg will log this error
             // but we will only evaluate the valid part of the graph
             if let Some(idx) = match &child.ty {
-                TySpec::Static(ty) => modules_and_prototypes
-                    .iter()
-                    .enumerate()
-                    .find(|(_, m)| m.0.ident.raw == ty.inner() && ty.exists() && !m.0.is_prototype),
-                TySpec::Dynamic(ty) => modules_and_prototypes
-                    .iter()
-                    .enumerate()
-                    .find(|(_, m)| m.0.ident.raw == ty.inner() && ty.exists() && m.0.is_prototype),
+                TySpec::Static(ty) => modules_and_prototypes.iter().enumerate().find(|(_, m)| {
+                    m.0.ident.raw() == ty.inner() && ty.exists() && !m.0.is_prototype
+                }),
+                TySpec::Dynamic(ty) => modules_and_prototypes.iter().enumerate().find(|(_, m)| {
+                    m.0.ident.raw() == ty.inner() && ty.exists() && m.0.is_prototype
+                }),
             }
             .map(|t| t.0)
             {
@@ -99,7 +97,8 @@ fn check_for_module_cycles(
                 TycModuleSubmoduleRecrusiveTyDefinition,
                 format!(
                     "Cannot create cyclic definition for type '{}' via path '{}'.",
-                    module.0, path
+                    module.0.raw(),
+                    path
                 ),
                 module.1,
                 false,
@@ -110,7 +109,7 @@ fn check_for_module_cycles(
 }
 
 fn check_for_subsystem_cycles(
-    units: &mut HashMap<String, PreparedUnit>,
+    units: &mut HashMap<String, ExpandedUnit>,
     _resolver: &mut NdlResolver,
 ) -> bool {
     // Module, Asset, errors
@@ -134,7 +133,7 @@ fn check_for_subsystem_cycles(
                 TySpec::Static(ty) => subsystems
                     .iter()
                     .enumerate()
-                    .find(|(_, m)| m.0.ident == ty.inner() && ty.exists()),
+                    .find(|(_, m)| m.0.ident.raw() == ty.inner() && ty.exists()),
                 TySpec::Dynamic(_) => None,
             }
             .map(|t| t.0)
@@ -188,7 +187,8 @@ fn check_for_subsystem_cycles(
                 TycModuleSubmoduleRecrusiveTyDefinition,
                 format!(
                     "Cannot create cyclic definition for type '{}' via path '{}'.",
-                    module.0, path
+                    module.0.raw(),
+                    path
                 ),
                 module.1,
                 false,
@@ -198,6 +198,7 @@ fn check_for_subsystem_cycles(
 
     found
 }
+
 fn dfs(
     start: usize,
     edges: &[Vec<usize>],

@@ -193,8 +193,8 @@ fn dsg1_invalid_gate_size() {
 
     check_err!(
         *errs[0] =>
-        TycGateInvalidNullGate,
-        "Cannot create gate of size 0.",
+        DsgGateNullSize,
+        "Cannot create gate 'input' with size 0.",
         false,
         None
     );
@@ -215,9 +215,9 @@ fn tychk_name_collision() {
 
     check_err!(
         *errs[0] =>
-        TycGateFieldDuplication,
-        "Gate 'in' was allready defined.",
+        DsgGateNamespaceCollision,
+        "Namespace collision. Allready defined a gate with name 'in' on module 'A'.",
         false,
-        None
+        Some(ErrorSolution::new("Try renaming this gate".to_string(), Loc::new(41, 3, 4)))
     );
 }

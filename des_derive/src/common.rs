@@ -1,6 +1,6 @@
 use lazy_static::lazy_static;
-use ndl::ChildNodeSpec;
-use ndl::{ConSpecNodeIdent, NdlResolver, OwnedTySpecContext};
+use ndl::{ChildNodeSpec, DesugaredResult};
+use ndl::{ConSpecNodeIdent, NdlResolver};
 use proc_macro2::Ident;
 use proc_macro2::Span;
 use quote::quote;
@@ -28,7 +28,7 @@ lazy_static! {
 
 pub fn get_resolver(
     workspace: &str,
-) -> std::result::Result<(OwnedTySpecContext, bool, Vec<PathBuf>), &'static str> {
+) -> std::result::Result<(DesugaredResult, bool, Vec<PathBuf>), &'static str> {
     let mut resolvers = RESOLVERS.lock().unwrap();
 
     if !resolvers.contains_key(workspace) {

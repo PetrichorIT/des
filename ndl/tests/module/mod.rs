@@ -158,8 +158,8 @@ fn dsg1_name_collision() {
 
     check_err!(
         *errs[0] =>
-        DsgDefNameCollision,
-        "Cannot create two modules with name 'X'.",
+        DsgModuleNamespaceCollision,
+        "Namespace collsion. Allready defined a module with name 'X'.",
         false,
         Some(ErrorSolution::new("Try renaming this module".to_string(), Loc::new(20, 4, 3)))
     );
@@ -222,7 +222,7 @@ fn tychk_proto_cyclic() {
     assert!(r.ectx.has_errors());
 
     let errs = r.ectx.all().collect::<Vec<&Error>>();
-    assert_eq!(errs.len(), 2);
+    assert_eq!(errs.len(), 3);
 
     check_err!(
         *errs[0] =>
@@ -236,6 +236,14 @@ fn tychk_proto_cyclic() {
         *errs[1] =>
         TycModuleSubmoduleRecrusiveTyDefinition,
         "Cannot create cyclic definition for type 'A' via path 'b/a'.",
+        false,
+        None
+    );
+
+    check_err!(
+        *errs[2] =>
+        DsgProtoImlMissing,
+        "Missing prototype impl block for type 'B'.",
         false,
         None
     );

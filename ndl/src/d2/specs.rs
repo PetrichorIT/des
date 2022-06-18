@@ -1,55 +1,11 @@
+use crate::common::*;
 use crate::loc::Loc;
 use crate::parser::{
-    GateAnnotation, GateDef, Ident, LinkDef, ModuleDef, ParamDef, ProtoImplDef, SubsystemDef, TyDef,
+    ConNodeIdent, GateDef, LinkDef, ModuleDef, ParamDef, ProtoImplDef, SubsystemDef, TyDef,
 };
 use crate::AssetDescriptor;
 use std::fmt::Display;
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct OIdent {
-    typ: ObjectType,
-    asset: AssetDescriptor,
-    pub raw: String,
-}
-
-impl OIdent {
-    pub fn module(ident: String, asset: AssetDescriptor) -> OIdent {
-        Self {
-            typ: ObjectType::Module,
-            asset,
-            raw: ident,
-        }
-    }
-
-    pub fn subsystem(ident: String, asset: AssetDescriptor) -> OIdent {
-        Self {
-            typ: ObjectType::Subsystem,
-            asset,
-            raw: ident,
-        }
-    }
-}
-
-impl Display for OIdent {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}::{}@{}", self.asset.alias, self.raw, self.typ)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum ObjectType {
-    Module,
-    Subsystem,
-}
-
-impl Display for ObjectType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Module => write!(f, "module"),
-            Self::Subsystem => write!(f, "subsystem"),
-        }
-    }
-}
+use std::path::PathBuf;
 
 ///
 /// A specification of a defined include.
@@ -94,10 +50,11 @@ pub struct ModuleSpec<I: Display> {
 }
 
 impl<I: Display> ModuleSpec<I> {
-    pub fn degrees_of_freedom(&self) -> impl Iterator<Item = (&String, &String)> {
+    pub fn degrees_of_freedom(&self) -> impl Iterator<Item = (&str, &str)> {
         self.submodules.iter().filter_map(|c| {
             if let TySpec::Dynamic(ref s) = c.ty {
-                todo!()
+                Some((&c.descriptor[..], s.inner()))
+
                 // Some((&c.descriptor, s.as_ref().unwrap()))
             } else {
                 None
@@ -110,16 +67,14 @@ impl<I: Display> ModuleSpec<I> {
     /// This means 'loc', 'ident' and 'gates' will be initalized
     /// while 'submodules' and 'connections' must be desugard manually.
     ///
-    pub(crate) fn new(module_def: &ModuleDef, asset: AssetDescriptor) -> Self {
+    pub(crate) fn new(module_def: &ModuleDef) -> Self {
         // Do not use Vec::with_capacity()
         // since desugaring will increase the number of entries
         // significantly.
 
-        let ident = OIdent::module(module_def.name.clone(), asset);
-
         Self {
             loc: module_def.loc,
-            ident,
+            ident: module_def.ident.clone(),
             derived_from: module_def.derived_from.clone(),
             is_prototype: module_def.is_prototype,
 
@@ -183,7 +138,7 @@ pub struct SubsystemSpec<I: Display> {
     pub loc: Loc,
 
     /// The identifier in the network namespace.
-    pub ident: String,
+    pub ident: OIdent,
     /// The nodes that should be created for an instance of the network.
     pub nodes: Vec<ChildNodeSpec>,
     /// The connections between the nodes.
@@ -197,7 +152,7 @@ pub struct SubsystemSpec<I: Display> {
 impl<I: Display> SubsystemSpec<I> {
     pub fn degrees_of_freedom(&self) -> impl Iterator<Item = (&String, &String)> {
         self.nodes.iter().filter_map(|c| {
-            if let TySpec::Dynamic(ref s) = c.ty {
+            if let TySpec::Dynamic(ref _s) = c.ty {
                 todo!()
                 // Some((&c.descriptor, s.as_ref().unwrap()))
             } else {
@@ -215,12 +170,30 @@ impl<I: Display> SubsystemSpec<I> {
         // Do not use Vec::with_capacity()
         // since desugaring will increase the number of entries
         // significantly.
+
         Self {
             loc: subsys_def.loc,
-            ident: subsys_def.name.clone(),
+            ident: subsys_def.ident.clone(),
             params: subsys_def.parameters.iter().map(ParamSpec::new).collect(),
 
             nodes: Vec::new(),
+            connections: Vec::new(),
+            exports: Vec::new(),
+        }
+    }
+}
+
+impl SubsystemSpec<ConSpecNodeIdent> {
+    ///
+    /// Fills all expect connections and exports.
+    ///
+    pub fn from_spec(spec: &SubsystemSpec<ConNodeIdent>) -> Self {
+        Self {
+            loc: spec.loc,
+            ident: spec.ident.clone(),
+            params: spec.params.clone(),
+
+            nodes: spec.nodes.clone(),
             connections: Vec::new(),
             exports: Vec::new(),
         }
@@ -259,7 +232,8 @@ impl<I: Display> Display for SubsystemSpec<I> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExportSpec {
     pub loc: Loc,
-    pub node_ident: Ident,
+    pub node_ident: String,
+    pub node_ty: TySpec,
     pub gate_ident: GateSpec,
 }
 
@@ -372,8 +346,19 @@ pub enum TySpec {
 }
 
 impl TySpec {
+    pub fn unwrap(&self) -> &str {
+        self.valid_ident().unwrap().raw()
+    }
+
     pub fn is_dynamic(&self) -> bool {
         matches!(self, Self::Dynamic(_))
+    }
+
+    pub fn valid_ident(&self) -> Option<&OIdent> {
+        match self {
+            Self::Static(ref p) => p.valid_ident(),
+            Self::Dynamic(ref p) => p.valid_ident(),
+        }
     }
 }
 
@@ -388,20 +373,28 @@ impl Display for TySpec {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TyPath {
-    InScope(String),
-    OutOfScope(String, Loc),
+    InScope(OIdent),
+    OutOfScope(OIdent),
     Invalid(String),
 }
 
 impl TyPath {
     pub fn exists(&self) -> bool {
-        matches!(self, Self::InScope(_) | Self::OutOfScope(_, _))
+        matches!(self, Self::InScope(_) | Self::OutOfScope(_))
+    }
+
+    pub fn valid_ident(&self) -> Option<&OIdent> {
+        match self {
+            Self::InScope(ref i) => Some(i),
+            Self::OutOfScope(ref i) => Some(i),
+            _ => None,
+        }
     }
 
     pub fn inner(&self) -> &str {
         match self {
-            Self::InScope(ref s) => s,
-            Self::OutOfScope(ref s, _) => s,
+            Self::InScope(ref s) => s.raw(),
+            Self::OutOfScope(ref s) => s.raw(),
             Self::Invalid(ref s) => s,
         }
     }
@@ -411,7 +404,7 @@ impl Display for TyPath {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::InScope(ref s) => write!(f, "{}", s),
-            Self::OutOfScope(ref s, _) => write!(f, "global::{}", s),
+            Self::OutOfScope(ref s) => write!(f, "global::{}", s),
             Self::Invalid(ref s) => write!(f, "invalid::{}", s),
         }
     }
@@ -506,7 +499,7 @@ pub struct ChannelSpec {
     pub loc: Loc,
 
     /// A debug symbol for referencing the used NDL Link definition.
-    pub ident: String,
+    pub ident: OIdent,
 
     /// The bitrate of the given connection.
     pub bitrate: usize,
@@ -522,7 +515,11 @@ impl ChannelSpec {
     pub(crate) fn dummy() -> Self {
         Self {
             loc: Loc::new(0, 0, 0),
-            ident: "DummyLink".to_string(),
+            ident: OIdent::new(
+                OType::Link,
+                AssetDescriptor::new(PathBuf::new(), "Dummy".to_string()),
+                "DummyLink".to_string(),
+            ),
             bitrate: 1,
             latency: 1.0,
             jitter: 1.0,
@@ -538,7 +535,7 @@ impl ChannelSpec {
         Self {
             loc: link_def.loc,
 
-            ident: link_def.name.clone(),
+            ident: link_def.ident.clone(),
             bitrate: link_def.bitrate,
             latency: link_def.latency,
             jitter: link_def.jitter,

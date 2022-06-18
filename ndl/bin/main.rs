@@ -113,7 +113,7 @@ fn main() -> std::io::Result<()> {
                     println!("{}", module)
                 }
 
-                for network in g.networks {
+                for network in g.subsystems {
                     println!("{}", network)
                 }
             }

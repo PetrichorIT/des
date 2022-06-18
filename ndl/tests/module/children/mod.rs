@@ -129,8 +129,8 @@ fn dsg1_name_collision() {
 
     check_err!(
         *errs[0] =>
-        DsgModuleSubmoduleFieldAlreadyDeclared,
-        "Naming collision. Namespaces of 'a' and 'a' collide.",
+        DsgSubmoduleNamespaceCollision,
+        "Namespace collision. Allready defined a submodule with name 'a' on module 'Y'.",
         false,
         None
     );

@@ -1,4 +1,4 @@
-use crate::{Loc, SourceMap};
+use crate::{common::OIdent, GateAnnotation, Loc};
 use std::{collections::HashMap, fmt::Display};
 
 ///
@@ -27,7 +27,7 @@ pub struct LinkDef {
     pub loc: Loc,
 
     /// The identifier of the channel.
-    pub name: String,
+    pub ident: OIdent,
 
     /// The defining metric for the channel.
     pub bitrate: usize,
@@ -49,7 +49,7 @@ impl Display for LinkDef {
         write!(
             f,
             "{}(bitrate: {}, latency: {}, jitter: {})",
-            self.name, self.bitrate, self.latency, self.jitter
+            self.ident, self.bitrate, self.latency, self.jitter
         )
     }
 }
@@ -63,7 +63,7 @@ pub struct ModuleDef {
     pub loc: Loc,
 
     /// The identifier of the module.
-    pub name: String,
+    pub ident: OIdent,
     /// The local submodules defined for this module.
     pub submodules: Vec<ChildNodeDef>,
     /// The gates exposed on this module.
@@ -79,10 +79,10 @@ pub struct ModuleDef {
 }
 
 impl ModuleDef {
-    pub fn full_path<'a>(&self, smap: &'a SourceMap) -> (&str, &'a str) {
-        let asset = smap.get_asset_for_loc(self.loc);
-        (&self.name, &asset.alias)
-    }
+    // pub fn full_path<'a>(&self, smap: &'a SourceMap) -> (&str, &'a str) {
+    //     let asset = smap.get_asset_for_loc(self.loc);
+    //     (&self.ident, &asset.alias)
+    // }
 }
 
 ///
@@ -239,22 +239,6 @@ impl Display for GateDef {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum GateAnnotation {
-    Unknown,
-    Input,
-    Output,
-}
-
-impl Display for GateAnnotation {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Unknown => write!(f, ""),
-            Self::Input => write!(f, "@input"),
-            Self::Output => write!(f, "@output"),
-        }
-    }
-}
 ///
 /// A description of a connection, in a modules definition.
 ///
@@ -374,7 +358,7 @@ pub struct SubsystemDef {
     pub loc: Loc,
 
     /// The identifier of the network.
-    pub name: String,
+    pub ident: OIdent,
     /// The local submodules defined for this module.
     pub nodes: Vec<ChildNodeDef>,
     /// The connections defined by this module.
@@ -391,7 +375,7 @@ pub struct AliasDef {
     pub loc: Loc,
 
     /// The identifier of the alias.
-    pub name: String,
+    pub ident: OIdent,
     /// The identifier of the network.
     pub prototype: String,
 }
@@ -400,7 +384,7 @@ pub struct AliasDef {
 pub struct ExportDef {
     pub loc: Loc,
 
-    pub module: Ident,
+    pub module: String,
     pub gate: String,
 }
 

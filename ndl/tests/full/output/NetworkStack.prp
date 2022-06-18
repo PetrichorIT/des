@@ -1,0 +1,18 @@
+PreparedUnit {
+<< includes >>
+- Include { NetworkStack }
+<< modules >>
+module RoutingDamon<module@NetworkStack> {
+}
+module NetworkStack<module@NetworkStack> {
+	submodules: 
+		router: RoutingDamon<module@NetworkStack> 
+	gates: 
+		netOut[5] 
+		netIn[5] 
+		fromAppl[5] 
+		toAppl[5] 
+}
+<< errors >>
+-> 0 errors
+}
