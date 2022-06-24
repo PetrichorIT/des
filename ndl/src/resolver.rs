@@ -1,7 +1,7 @@
 use crate::*;
 
-use crate::d2::ctx::GlobalTyDefContext;
-use crate::d2::expand::ExpandedUnit;
+use crate::desugar::ctx::GlobalTyDefContext;
+use crate::desugar::expand::ExpandedUnit;
 use crate::error::*;
 use crate::parser::ParsingResult;
 
@@ -179,7 +179,7 @@ impl NdlResolver {
             return Ok(());
         }
 
-        d2::desugar(self);
+        desugar::desugar(self);
 
         // === TY CHECK ===
 

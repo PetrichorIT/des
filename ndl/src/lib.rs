@@ -59,13 +59,15 @@ mod resolver;
 mod tycheck;
 
 mod common;
-mod d2;
+mod desugar;
+
+pub(crate) mod utils;
 
 // ### Exports ###
 
-pub use d2::desugar;
-pub use d2::result::DesugaredResult;
-pub use d2::specs::*;
+pub use desugar::desugar;
+pub use desugar::result::DesugaredResult;
+pub use desugar::specs::*;
 
 // > Function exports
 pub use lexer::tokenize;

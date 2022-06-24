@@ -4,7 +4,7 @@ use ndl::*;
 
 #[test]
 fn par_exports() {
-    let path = "tests/network/P_Exports.ndl";
+    let path = "tests/subsystem/P_Exports.ndl";
     let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
 
     r.run().expect("Failed run");
@@ -15,7 +15,7 @@ fn par_exports() {
 
 #[test]
 fn par_exports_no_sep() {
-    let path = "tests/network/P_ExportsNoSep.ndl";
+    let path = "tests/subsystem/P_ExportsNoSep.ndl";
     let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
 
     r.run().expect("Failed run");
@@ -35,7 +35,7 @@ fn par_exports_no_sep() {
 
 #[test]
 fn par_no_ident() {
-    let path = "tests/network/P_NoIdent.ndl";
+    let path = "tests/subsystem/P_NoIdent.ndl";
     let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
 
     r.run().expect("Failed run");
@@ -61,7 +61,7 @@ fn par_no_ident() {
 
 #[test]
 fn par_missing_block_open() {
-    let path = "tests/network/P_MissingBlockOpen.ndl";
+    let path = "tests/subsystem/P_MissingBlockOpen.ndl";
     let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
 
     r.run().expect("Failed run");
@@ -88,7 +88,7 @@ fn par_missing_block_open() {
 
 #[test]
 fn par_unexpected_subsection() {
-    let path = "tests/network/P_UnexpectedSubsection.ndl";
+    let path = "tests/subsystem/P_UnexpectedSubsection.ndl";
     let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
 
     r.run().expect("Failed run");
@@ -150,7 +150,7 @@ fn par_unexpected_subsection() {
 
 #[test]
 fn par_subsection_no_colon() {
-    let path = "tests/network/P_SubsectionNoColon.ndl";
+    let path = "tests/subsystem/P_SubsectionNoColon.ndl";
     let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
 
     r.run().expect("Failed run");
@@ -174,7 +174,7 @@ fn par_subsection_no_colon() {
 
 #[test]
 fn dsg1_name_collision() {
-    let path = "tests/network/D1_NameCollision.ndl";
+    let path = "tests/subsystem/D1_NameCollision.ndl";
     let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
 
     r.run().expect("Failed run");
@@ -196,13 +196,13 @@ fn dsg1_name_collision() {
 
 #[test]
 fn dsg2_netinnet() {
-    let path = "tests/network/D2_NetInNet.ndl";
+    let path = "tests/subsystem/D2_NetInNet.ndl";
     let mut r = NdlResolver::new_with(
         path,
         NdlResolverOptions {
             silent: true,
             verbose: true,
-            verbose_output_dir: "tests/network/d2_netinnet/".into(),
+            verbose_output_dir: "tests/subsystem/d2_netinnet/".into(),
             desugar: true,
             tychk: true,
         },
@@ -216,8 +216,38 @@ fn dsg2_netinnet() {
 }
 
 #[test]
+fn dsg_nested_subysys() {
+    let path = "tests/subsystem/D_NestedSubsys.ndl";
+    let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
+
+    r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 1);
+
+    assert!(r.ectx.has_errors());
+
+    let errs = r.ectx.all().collect::<Vec<&Error>>();
+    assert_eq!(errs.len(), 2);
+
+    check_err!(
+        *errs[0] =>
+        DsgConInvalidField,
+        "Field 'error' was not defined on subsystem 'FieldError'.",
+        false,
+        None
+    );
+
+    check_err!(
+        *errs[1] =>
+        DsgConInvalidLocalGateIdent,
+        "No local gate cluster 'error' exists on subsystem 'Sub'.",
+        false,
+        None
+    );
+}
+
+#[test]
 fn tychk_invalid_sub_ty() {
-    let path = "tests/network/T_InvalidSubmodule.ndl";
+    let path = "tests/subsystem/T_InvalidSubmodule.ndl";
     let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
 
     r.run().expect("Failed run");
@@ -231,7 +261,7 @@ fn tychk_invalid_sub_ty() {
     check_err!(
         *errs[0] =>
         DsgSubmoduleMissingTy,
-        "No module with name 'B' found in scope.",
+        "No module or subsystem with name 'B' found in scope.",
         false,
         None
     );
@@ -239,7 +269,7 @@ fn tychk_invalid_sub_ty() {
 
 #[test]
 fn tychk_empty() {
-    let path = "tests/network/T_Empty.ndl";
+    let path = "tests/subsystem/T_Empty.ndl";
     let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
 
     r.run().expect("Failed run");

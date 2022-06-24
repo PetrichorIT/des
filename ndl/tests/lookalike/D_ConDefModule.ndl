@@ -1,0 +1,40 @@
+link MyLink {
+    jitter: 0.1
+    latency: 0.1
+    bitrate: 10000
+}
+
+module A {
+    gates:
+        in @input
+        out @output
+}
+
+module Test {
+    gates:
+        localIn @input
+        localOut @output
+
+    submodules:
+        router: A
+        logger: A
+        application: A
+        backup: A
+
+    connections:
+        // Valid connection
+        router/out --> MyLink --> logger/in
+
+        // Channel Errors
+        logger/out --> MyLank --> router/in
+
+        // Invalid local gates
+        backup/out --> locallyIn
+
+        // Invalid child ident
+        localOut --> beckup/in
+
+        // Invalid child gate
+        application/out --> application/inn
+
+}

@@ -230,9 +230,10 @@ mod module;
 ///
 /// Tests for all syntax & semantic errors concerning networks.
 ///
-mod network;
+mod subsystem;
 
 mod include;
+mod lookalike;
 
 #[macro_export]
 macro_rules! check_err {

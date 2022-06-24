@@ -4,7 +4,7 @@ use super::{
     specs::{ConSpec, ConSpecNodeIdent, ExportSpec, GateSpec, ModuleSpec, SubsystemSpec},
 };
 use crate::{common::OType, error::*, DesugaredResult, Error, GateAnnotation, NdlResolver};
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap};
 
 ///
 /// This function takes the global context and does the following:
@@ -17,7 +17,7 @@ pub fn compose(
     units: &mut HashMap<String, ExpandedUnit>,
     resolver: &mut NdlResolver,
 ) -> DesugaredResult {
-    let tyctx = TyComposeContext::new(units, resolver);
+    let mut tyctx = TyComposeContext::new(units, resolver);
     let mut errors = Vec::new();
 
     // TODO:
@@ -177,6 +177,9 @@ pub fn compose(
     }
 
     debug_assert!(done.iter().all(|v| v.is_some()));
+    let done = RefCell::new(done.into_iter().map(Option::unwrap).collect());
+
+    tyctx.attach(&done);
 
     // C check
     for i in 0..subsystems.len() {
@@ -195,6 +198,7 @@ pub fn compose(
                     from,
                     &subsys.nodes,
                     &tyctx,
+                    &subsys.ident,
                     &mut errors,
                     GateAnnotation::Output,
                 ) {
@@ -206,6 +210,7 @@ pub fn compose(
                     to,
                     &&subsys.nodes,
                     &tyctx,
+                    &subsys.ident,
                     &mut errors,
                     GateAnnotation::Input,
                 ) {
@@ -233,7 +238,7 @@ pub fn compose(
             // the reuse the same desc.
 
             for (source, target) in from_idents.into_iter().zip(to_idents.into_iter()) {
-                done[i].as_mut().unwrap().connections.push(ConSpec {
+                done.borrow_mut()[i].connections.push(ConSpec {
                     loc: *loc,
 
                     source,
@@ -251,7 +256,7 @@ pub fn compose(
             .flatten()
             .cloned()
             .collect::<Vec<_>>(),
-        subsystems: done.into_iter().flatten().collect::<Vec<_>>(),
+        subsystems: done.into_inner(),
         errors,
     }
 }

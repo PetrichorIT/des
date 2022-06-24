@@ -332,25 +332,28 @@ pub fn expand(unit: &ParsingResult, resolver: &NdlResolver) -> ExpandedUnit {
             let ty_spec = match ty {
                 // (6) Static types
                 TyDef::Static(ref s) => {
-                    let exists = tyctx.modules.iter().find(|m| &m.ident.raw() == s);
-                    if exists.is_none() {
-                        let gty = gtyctx.module(s);
+                    let module_def = tyctx.module(s);
 
-                        r.errors.push(Error::new_ty_missing(
-                            DsgSubmoduleMissingTy,
-                            format!("No module with type '{}' found in scope.", s),
-                            *submod_loc,
-                            &resolver.source_map,
-                            gty.map(|g| g.loc),
-                        ));
+                    match module_def {
+                        Ok(def) => TySpec::Static(TyPath::InScope(def.ident.clone())),
+                        Err(e) => {
+                            let gty = gtyctx.module(s);
 
-                        if let Some(gty) = gty {
-                            TySpec::Static(TyPath::OutOfScope(gty.ident.clone()))
-                        } else {
-                            TySpec::Static(TyPath::Invalid(s.clone()))
+                            r.errors.push(Error::new_ty_missing_or_lookalike(
+                                DsgSubmoduleMissingTy,
+                                format!("No module with type '{}' found in scope.", s),
+                                *submod_loc,
+                                &resolver.source_map,
+                                gty.map(|g| g.loc),
+                                e.lookalike().map(|m| (&m.0.ident, m.0.loc)),
+                            ));
+
+                            if let Some(gty) = gty {
+                                TySpec::Static(TyPath::OutOfScope(gty.ident.clone()))
+                            } else {
+                                TySpec::Static(TyPath::Invalid(s.clone()))
+                            }
                         }
-                    } else {
-                        TySpec::Static(TyPath::InScope(exists.unwrap().ident.clone()))
                     }
                 }
                 // (7) Dynamic types
@@ -367,35 +370,37 @@ pub fn expand(unit: &ParsingResult, resolver: &NdlResolver) -> ExpandedUnit {
                         continue;
                     }
 
-                    let exists = tyctx.prototypes.iter().find(|p| &p.ident.raw() == s);
-                    if exists.is_none() {
-                        let g_proto = gtyctx.prototype(s);
-                        let g_module = gtyctx.module(s).map(|m| m.loc).is_some();
+                    let proto_def = tyctx.prototype(s);
+                    match proto_def {
+                        Ok(def) => TySpec::Dynamic(TyPath::InScope(def.ident.clone())),
+                        Err(e) => {
+                            let g_proto = gtyctx.prototype(s);
+                            let g_module = gtyctx.module(s).map(|m| m.loc).is_some();
 
-                        let module_as_proto = g_module && g_proto.is_none();
+                            let module_as_proto = g_module && g_proto.is_none();
 
-                        r.errors.push(Error::new_ty_missing(
-                            DsgInvalidPrototypeAtSome,
-                            if module_as_proto {
-                                format!(
-                                    "No prototype called '{0}' found. Module '{0}' is no prototype.",
-                                    s
-                                )
+                            r.errors.push(Error::new_ty_missing_or_lookalike(
+                                DsgInvalidPrototypeAtSome,
+                                if module_as_proto {
+                                    format!(
+                                        "No prototype called '{0}' found. Module '{0}' is no prototype.",
+                                        s
+                                    )
+                                } else {
+                                    format!("No prototype called '{}' found.", s)
+                                },
+                                submodule.loc,
+                                &resolver.source_map,
+                                g_proto.map(|g| g.loc),
+                                e.lookalike().map(|p| (&p.0.ident, p.0.loc))
+                            ));
+
+                            if let Some(g_proto) = g_proto {
+                                TySpec::Dynamic(TyPath::OutOfScope(g_proto.ident.clone()))
                             } else {
-                                format!("No prototype called '{}' found.", s)
-                            },
-                            submodule.loc,
-                            &resolver.source_map,
-                            g_proto.map(|g| g.loc),
-                        ));
-
-                        if let Some(g_proto) = g_proto {
-                            TySpec::Dynamic(TyPath::OutOfScope(g_proto.ident.clone()))
-                        } else {
-                            TySpec::Dynamic(TyPath::Invalid(s.clone()))
+                                TySpec::Dynamic(TyPath::Invalid(s.clone()))
+                            }
                         }
-                    } else {
-                        TySpec::Dynamic(TyPath::InScope(exists.unwrap().ident.clone()))
                     }
                 }
             };
@@ -443,6 +448,7 @@ pub fn expand(unit: &ParsingResult, resolver: &NdlResolver) -> ExpandedUnit {
                     from,
                     &module.gates,
                     &module.submodules,
+                    name,
                     &tyctx,
                     &gtyctx,
                     &mut r.errors,
@@ -456,6 +462,7 @@ pub fn expand(unit: &ParsingResult, resolver: &NdlResolver) -> ExpandedUnit {
                     to,
                     &module.gates,
                     &module.submodules,
+                    name,
                     &tyctx,
                     &gtyctx,
                     &mut r.errors,
@@ -485,19 +492,16 @@ pub fn expand(unit: &ParsingResult, resolver: &NdlResolver) -> ExpandedUnit {
             // the reuse the same desc.
             let channel_spec = match channel {
                 Some(channel_ident) => {
-                    let link_def = match tyctx
-                        .links
-                        .iter()
-                        .find(|link| link.ident.raw() == *channel_ident)
-                    {
-                        Some(link_def) => link_def,
-                        None => {
-                            r.errors.push(Error::new_ty_missing(
+                    let link_def = match tyctx.link(channel_ident) {
+                        Ok(link_def) => link_def,
+                        Err(e) => {
+                            r.errors.push(Error::new_ty_missing_or_lookalike(
                                 DsgConInvalidChannel,
-                                format!("No link called '{}' found.", channel_ident),
+                                format!("Could not find link '{}' in scope.", channel_ident),
                                 connection.loc,
                                 &resolver.source_map,
                                 gtyctx.link(channel_ident).map(|link| link.loc),
+                                e.lookalike().map(|l| (&l.0.ident, l.0.loc)),
                             ));
 
                             continue;
@@ -614,21 +618,24 @@ pub fn expand(unit: &ParsingResult, resolver: &NdlResolver) -> ExpandedUnit {
             let ty_spec = match ty {
                 // (6) Static types
                 TyDef::Static(ref s) => {
-                    let exists_module = tyctx.modules.iter().find(|m| &m.ident.raw() == s);
-                    let exists_network = tyctx.subsystems.iter().find(|sys| &sys.ident.raw() == s);
+                    let module_def = tyctx.module(s);
+                    let subsys_def = tyctx.subsystem(s);
 
-                    if exists_module.is_none() && exists_network.is_none() {
+                    if let (Err(e1), Err(e2)) = (&module_def, &subsys_def) {
                         let gty = gtyctx
                             .module(s)
                             .map(|g| (g.loc, g.ident.clone()))
                             .or(gtyctx.subsystem(s).map(|s| (s.loc, s.ident.clone())));
 
-                        r.errors.push(Error::new_ty_missing(
+                        r.errors.push(Error::new_ty_missing_or_lookalike(
                             DsgSubmoduleMissingTy,
-                            format!("No module with name '{}' found in scope.", s),
+                            format!("No module or subsystem with name '{}' found in scope.", s),
                             *submod_loc,
                             &resolver.source_map,
                             gty.as_ref().map(|(l, _)| *l),
+                            e1.lookalike()
+                                .map(|m| (&m.0.ident, m.0.loc))
+                                .or(e2.lookalike().map(|s| (&s.0.ident, s.0.loc))),
                         ));
 
                         if let Some(gty) = gty {
@@ -638,49 +645,48 @@ pub fn expand(unit: &ParsingResult, resolver: &NdlResolver) -> ExpandedUnit {
                         }
                     } else {
                         TySpec::Static(TyPath::InScope(
-                            exists_module
+                            module_def
                                 .map(|m| m.ident.clone())
-                                .or(exists_network.map(|s| s.ident.clone()))
+                                .or(subsys_def.map(|s| s.ident.clone()))
                                 .unwrap(),
                         ))
                     }
                 }
                 // (7) Dynamic types
-                TyDef::Dynamic(ref s) => {
-                    // TODO:
-                    // Does is make sense to allow proto on subsystem
-                    // subsys A { nodes: some Watcher }
-                    // Could be unfunny bc derive.
-                    let exists = tyctx.prototypes.iter().find(|p| &p.ident.raw() == s);
-                    if exists.is_none() {
-                        let g_proto = gtyctx.prototype(s);
-                        let g_module = gtyctx.module(s).map(|m| m.loc).is_some();
+                TyDef::Dynamic(ref _s) => {
+                    panic!("Keyword some cannot appear in subystem --> error catched by parser")
+                    // let proto_def = tyctx.prototype(s);
+                    // match proto_def {
+                    //     Ok(def) => TySpec::Dynamic(TyPath::InScope(def.ident.clone())),
+                    //     Err(e) => {
+                    //         let g_proto = gtyctx.prototype(s);
+                    //         let g_module = gtyctx.module(s).map(|m| m.loc).is_some();
 
-                        let module_as_proto = g_module && g_proto.is_none();
+                    //         let module_as_proto = g_module && g_proto.is_none();
 
-                        r.errors.push(Error::new_ty_missing(
-                            DsgInvalidPrototypeAtSome,
-                            if module_as_proto {
-                                format!(
-                                    "No prototype called '{0}' found. Module '{0}' is no prototype.",
-                                    s
-                                )
-                            } else {
-                                format!("No prototype called '{}' found.", s)
-                            },
-                            node.loc,
-                            &resolver.source_map,
-                            g_proto.map(|g| g.loc),
-                        ));
+                    //         r.errors.push(Error::new_ty_missing_or_lookalike(
+                    //             DsgInvalidPrototypeAtSome,
+                    //             if module_as_proto {
+                    //                 format!(
+                    //                     "No prototype called '{0}' found. Module '{0}' is no prototype.",
+                    //                     s
+                    //                 )
+                    //             } else {
+                    //                 format!("No prototype called '{}' found.", s)
+                    //             },
+                    //             subsystem.loc,
+                    //             &resolver.source_map,
+                    //             g_proto.map(|g| g.loc),
+                    //             e.lookalike().map(|p| (&p.0.ident, p.0.loc))
+                    //         ));
 
-                        if let Some(g_proto) = g_proto {
-                            TySpec::Dynamic(TyPath::OutOfScope(g_proto.ident.clone()))
-                        } else {
-                            TySpec::Dynamic(TyPath::Invalid(s.clone()))
-                        }
-                    } else {
-                        TySpec::Dynamic(TyPath::InScope(exists.unwrap().ident.clone()))
-                    }
+                    //         if let Some(g_proto) = g_proto {
+                    //             TySpec::Dynamic(TyPath::OutOfScope(g_proto.ident.clone()))
+                    //         } else {
+                    //             TySpec::Dynamic(TyPath::Invalid(s.clone()))
+                    //         }
+                    //     }
+                    // }
                 }
             };
 
@@ -722,17 +728,18 @@ pub fn expand(unit: &ParsingResult, resolver: &NdlResolver) -> ExpandedUnit {
 
             // (8) Check channels
             let channel_spec = if let Some(ref channel) = channel {
-                match tyctx.links.iter().find(|l| *l.ident.raw() == *channel) {
-                    Some(link) => Some(ChannelSpec::new(link)),
-                    None => {
+                match tyctx.link(channel) {
+                    Ok(link) => Some(ChannelSpec::new(link)),
+                    Err(e) => {
                         // Emit error
                         let glink = gtyctx.link(channel).map(|l| l.loc);
-                        r.errors.push(Error::new_ty_missing(
+                        r.errors.push(Error::new_ty_missing_or_lookalike(
                             DsgConInvalidChannel,
                             format!("Could not find link '{}' in scope.", channel),
                             *loc,
                             &resolver.source_map,
                             glink,
+                            e.lookalike().map(|l| (&l.0.ident, l.0.loc)),
                         ));
                         Some(ChannelSpec::dummy())
                     }

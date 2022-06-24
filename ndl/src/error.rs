@@ -1,4 +1,4 @@
-use crate::*;
+use crate::{common::OIdent, *};
 
 use std::io::Write;
 use termcolor::*;
@@ -334,6 +334,26 @@ impl Error {
         }
     }
 
+    pub fn new_with_lookalike(
+        code: ErrorCode,
+        msg: String,
+        loc: Loc,
+        transient: bool,
+        lookalike: Option<(&str, Loc)>,
+    ) -> Self {
+        let solution = lookalike.map(|(lookalike, lloc)| {
+            ErrorSolution::new(format!("Do you mean '{}'?", lookalike), lloc)
+        });
+
+        Self {
+            code,
+            msg,
+            solution,
+            loc,
+            transient,
+        }
+    }
+
     pub fn new_with_solution(
         code: ErrorCode,
         msg: String,
@@ -384,6 +404,37 @@ impl Error {
                 Loc::new(0, 1, 1),
             )
         });
+
+        Self {
+            code,
+            msg,
+            solution,
+            loc,
+            transient: false,
+        }
+    }
+
+    pub fn new_ty_missing_or_lookalike(
+        code: ErrorCode,
+        msg: String,
+        loc: Loc,
+        source_map: &SourceMap,
+        gty_loc: Option<Loc>,
+        lookalike: Option<(&OIdent, Loc)>,
+    ) -> Self {
+        let solution = gty_loc
+            .map(|gty_loc| {
+                ErrorSolution::new(
+                    format!(
+                        "Try including '{}'",
+                        source_map.get_asset_for_loc(gty_loc).alias
+                    ),
+                    Loc::new(0, 1, 1),
+                )
+            })
+            .or(lookalike.map(|lookalike| {
+                ErrorSolution::new(format!("Do you mean '{}'?", lookalike.0.raw()), lookalike.1)
+            }));
 
         Self {
             code,

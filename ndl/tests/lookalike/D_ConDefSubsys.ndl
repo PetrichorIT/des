@@ -1,0 +1,33 @@
+link MyLink {
+    jitter: 0.1
+    latency: 0.1
+    bitrate: 10000
+}
+
+module A {
+    gates:
+        in @input
+        out @output
+}
+
+subsystem Testnet {
+    nodes:
+        router: A
+        logger: A
+        application: A
+        backup: A
+
+    connections:
+        // Valid connection
+        router/out --> MyLink --> logger/in
+
+        // Channel Errors
+        logger/out --> MyLank --> router/in
+
+        // Invalid child ident
+        backup/out --> beckup/in
+
+        // Invalid child gate
+        application/out --> application/inn
+
+}

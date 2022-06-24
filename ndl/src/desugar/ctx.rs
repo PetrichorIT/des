@@ -1,13 +1,17 @@
 // use std::collections::HashMap;
 
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap};
 
-use crate::common::OIdent;
 use crate::error::ErrorCode::*;
 use crate::parser::*;
+use crate::utils::{edit_distance, TyResolveError};
 use crate::*;
+use crate::{common::*, utils::TyResolveResult};
 
-use super::expand::{ExpandedModule, ExpandedUnit};
+use super::{
+    compose::ComposedSubsystem,
+    expand::{ExpandedModule, ExpandedUnit},
+};
 
 ///
 /// A global type context over the definitions stored in a resolver.
@@ -110,6 +114,8 @@ pub struct TyDefContext<'a> {
     pub subsystems: Vec<&'a SubsystemDef>,
 }
 
+pub const MAX_ERROR_EDIT_DISTANCE: usize = 3;
+
 impl<'a> TyDefContext<'a> {
     ///
     /// Creates a new empty type context.
@@ -122,6 +128,122 @@ impl<'a> TyDefContext<'a> {
             modules: Vec::new(),
             prototypes: Vec::new(),
             subsystems: Vec::new(),
+        }
+    }
+
+    // tyctx.prototypes.iter().find(|p| p.ident.raw() == prototype)
+
+    ///
+    /// Returns a prototype or an error.
+    ///
+    /// Returns a lookalike if another ty is found with an ident with less that MAX_ERROR_EDIT_DISTANCE
+    /// edit steps AND the number of edit steps does not exceed 50% of the total characters
+    ///
+    pub fn link(&self, raw_ident: &str) -> TyResolveResult<&LinkDef> {
+        match self.links.iter().find(|l| l.ident.raw() == raw_ident) {
+            Some(l) => Ok(l),
+            None => {
+                // Find best lookalike
+                let lookalike = self
+                    .links
+                    .iter()
+                    .map(|l| (l, edit_distance(l.ident.raw(), raw_ident)))
+                    .filter(|(l, d)| *d < MAX_ERROR_EDIT_DISTANCE && l.ident.raw().len() > 2 * d)
+                    .min_by(|lhs, rhs| lhs.1.cmp(&rhs.1));
+
+                match lookalike {
+                    Some((lookalike, distance)) => {
+                        Err(TyResolveError::FoundLookalike(*lookalike, distance))
+                    }
+                    None => Err(TyResolveError::NoneFound),
+                }
+            }
+        }
+    }
+
+    ///
+    /// Returns a prototype or an error.
+    ///
+    /// Returns a lookalike if another ty is found with an ident with less that MAX_ERROR_EDIT_DISTANCE
+    /// edit steps AND the number of edit steps does not exceed 50% of the total characters
+    ///
+    pub fn prototype(&self, raw_ident: &str) -> TyResolveResult<&ModuleDef> {
+        match self.prototypes.iter().find(|p| p.ident.raw() == raw_ident) {
+            Some(p) => Ok(p),
+            None => {
+                // Find best lookalike
+                let lookalike = self
+                    .prototypes
+                    .iter()
+                    .map(|p| (p, edit_distance(p.ident.raw(), raw_ident)))
+                    .filter(|(p, d)| *d < MAX_ERROR_EDIT_DISTANCE && p.ident.raw().len() > 2 * d)
+                    .min_by(|lhs, rhs| lhs.1.cmp(&rhs.1));
+
+                match lookalike {
+                    Some((lookalike, distance)) => {
+                        Err(TyResolveError::FoundLookalike(*lookalike, distance))
+                    }
+                    None => Err(TyResolveError::NoneFound),
+                }
+            }
+        }
+    }
+
+    // tyctx.modules.iter().find(|m| &m.ident.raw() == s)
+
+    ///
+    /// Returns the searched Module or an error.
+    ///
+    pub fn module(&self, raw_ident: &str) -> TyResolveResult<&ModuleDef> {
+        match self.modules.iter().find(|m| m.ident.raw() == raw_ident) {
+            Some(m) => Ok(m),
+            None => {
+                // Find best lookalike
+                let lookalike = self
+                    .modules
+                    .iter()
+                    .map(|m| (m, edit_distance(m.ident.raw(), raw_ident)))
+                    .filter(|(m, d)| *d < MAX_ERROR_EDIT_DISTANCE && m.ident.raw().len() > 2 * d)
+                    .min_by(|lhs, rhs| lhs.1.cmp(&rhs.1));
+
+                match lookalike {
+                    Some((lookalike, distance)) => {
+                        Err(TyResolveError::FoundLookalike(*lookalike, distance))
+                    }
+                    None => Err(TyResolveError::NoneFound),
+                }
+            }
+        }
+    }
+
+    ///
+    /// Returns the searched Module or an error.
+    ///
+    pub fn subsystem(&self, raw_ident: &str) -> TyResolveResult<&SubsystemDef> {
+        match self
+            .subsystems
+            .iter()
+            .find(|sys| sys.ident.raw() == raw_ident)
+        {
+            Some(sys) => Ok(sys),
+            None => {
+                // Find best lookalike
+                let lookalike = self
+                    .subsystems
+                    .iter()
+                    .map(|sys| (sys, edit_distance(sys.ident.raw(), raw_ident)))
+                    .filter(|(sys, d)| {
+                        *d < MAX_ERROR_EDIT_DISTANCE && sys.ident.raw().len() > 2 * d
+                    })
+                    .min_by(|lhs, rhs| lhs.1.cmp(&rhs.1));
+
+                match lookalike {
+                    Some((lookalike, distance)) => {
+                        Err(TyResolveError::FoundLookalike(*lookalike, distance))
+                    }
+                    None => Err(TyResolveError::NoneFound),
+                }
+            }
         }
     }
 
@@ -219,11 +341,16 @@ impl Default for TyDefContext<'_> {
 pub struct TyComposeContext<'a> {
     data: &'a HashMap<String, ExpandedUnit>,
     resolver: &'a NdlResolver,
+    done: Option<&'a RefCell<Vec<ComposedSubsystem>>>,
 }
 
 impl<'a> TyComposeContext<'a> {
     pub fn new(data: &'a HashMap<String, ExpandedUnit>, resolver: &'a NdlResolver) -> Self {
-        Self { data, resolver }
+        Self {
+            data,
+            resolver,
+            done: None,
+        }
     }
 
     pub fn source_map(&self) -> &'a SourceMap {
@@ -244,6 +371,37 @@ impl<'a> TyComposeContext<'a> {
             .map(|(_, unit)| unit.modules.iter().chain(&unit.prototypes))
             .flatten()
             .find(|e| e.ident == *ident)
+    }
+
+    pub fn attach(&mut self, done: &'a RefCell<Vec<ComposedSubsystem>>) {
+        self.done = Some(done)
+    }
+
+    pub fn composed_subsystem_gate(
+        &self,
+        ident: &OIdent,
+        gate: &Ident,
+    ) -> Option<Option<(GateSpec, Option<usize>)>> {
+        match self.done {
+            Some(done) => {
+                done.borrow()
+                    .iter()
+                    .find(|s| s.ident == *ident)
+                    .map(|subsys| match gate {
+                        Ident::Direct { ident } => subsys
+                            .exports
+                            .iter()
+                            .find(|g| g.gate_ident.ident == *ident)
+                            .map(|g| (g.gate_ident.clone(), None)),
+                        Ident::Clustered { ident, index } => subsys
+                            .exports
+                            .iter()
+                            .find(|g| g.gate_ident.ident == *ident)
+                            .map(|g| (g.gate_ident.clone(), Some(*index))),
+                    })
+            }
+            None => None,
+        }
     }
 }
 

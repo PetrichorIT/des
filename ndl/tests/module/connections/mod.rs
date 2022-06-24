@@ -209,7 +209,7 @@ fn dsg1_invalid_channel() {
     check_err!(
         *errs[0] =>
         DsgConInvalidChannel,
-        "No link called 'L' found.",
+        "Could not find link 'L' in scope.",
         false,
         Some(ErrorSolution::new("Try including 'Other'".to_string(), Loc::new(0,1,1)))
     );
@@ -217,7 +217,7 @@ fn dsg1_invalid_channel() {
     check_err!(
         *errs[1] =>
         DsgConInvalidChannel,
-        "No link called 'LL' found.",
+        "Could not find link 'LL' in scope.",
         false,
         None
     );
@@ -255,7 +255,7 @@ fn dsg1_invalid_con_ident() {
     check_err!(
         *errs[2] =>
         DsgConInvalidField,
-        "Invalid field 'err'.",
+        "Field 'err' was not defined on module 'X'.",
         false,
         None
     );

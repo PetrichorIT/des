@@ -439,24 +439,20 @@ fn dsg2_alias_chk_no_proto() {
     let errs = r.ectx.all().collect::<Vec<&Error>>();
     assert_eq!(errs.len(), 2);
 
-    assert_eq!(
-        *errs[0],
-        Error::new(
-            DsgInvalidPrototypeAtAlias,
-            "No prototype called 'B' found. Module 'B' is no prototype.".to_string(),
-            Loc::new(44, 5, 5),
-            false,
-        )
+    check_err!(
+        *errs[0] =>
+        DsgInvalidPrototypeAtAlias,
+        "No prototype called 'B' found for alias 'Y'. Module 'B' is no prototype.",
+        false,
+        None
     );
 
-    assert_eq!(
-        *errs[1],
-        Error::new(
-            DsgInvalidPrototypeAtAlias,
-            "No prototype called 'C' found.".to_string(),
-            Loc::new(59, 5, 6),
-            false,
-        )
+    check_err!(
+        *errs[1] =>
+        DsgInvalidPrototypeAtAlias,
+        "No prototype called 'C' found for alias 'Z'.",
+        false,
+        None
     );
 }
 
@@ -476,15 +472,12 @@ fn dsg2_alias_chk_need_include() {
     let errs = r.ectx.all().collect::<Vec<&Error>>();
     assert_eq!(errs.len(), 1);
 
-    assert_eq!(
-        *errs[0],
-        Error::new_with_solution(
-            DsgInvalidPrototypeAtAlias,
-            "No prototype called 'A' found.".to_string(),
-            Loc::new(0, 5, 1),
-            false,
-            ErrorSolution::new("Try including 'Other'".to_string(), Loc::new(0, 1, 1))
-        )
+    check_err!(
+        *errs[0] =>
+        DsgInvalidPrototypeAtAlias,
+        "No prototype called 'A' found for alias 'B'.",
+        false,
+        Some(ErrorSolution::new("Try including 'Other'".to_string(), Loc::new(0, 1, 1)))
     );
 }
 
