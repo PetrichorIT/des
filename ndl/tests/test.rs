@@ -157,37 +157,6 @@ fn ndl_parser_test() {
     assert_eq!(result.subsystems[0].nodes[0].ty.inner(), "Main");
 }
 
-// #[test]
-// fn ndl_desugar_test() {
-//     use crate::*;
-
-//     let mut resolver = NdlResolver::new("tests/TycTest").expect("Failed to load TcyTest");
-//     let _ = resolver.run();
-
-//     let unit = resolver.units.get("Main").unwrap();
-
-//     let desugared_unit = desugar_unit(unit, &resolver);
-
-//     println!("{}", unit);
-//     println!("{}", desugared_unit);
-// }
-
-// #[test]
-// fn ndl_tycheck_test() {
-//     use crate::*;
-
-//     let mut resolver =
-//         NdlResolver::new("./tests/TycTest").expect("Failed to create resovler with valid root.");
-
-//     let _ = resolver.run();
-
-//     println!("{}", resolver);
-
-//     let unit = resolver.expanded_units.get("Main").unwrap();
-
-//     let _res = validate(unit, &resolver);
-// }
-
 #[test]
 fn ndl_full_test() {
     let mut resolver = NdlResolver::quiet("tests/full")
@@ -237,10 +206,16 @@ mod lookalike;
 
 #[macro_export]
 macro_rules! check_err {
+    ($e:expr => $code:ident, $msg:literal, $transient:literal) => {
+        assert_eq!($e.code, $code);
+        assert_eq!($e.msg, $msg);
+        assert_eq!($e.transient, $transient);
+        assert!($e.solution.is_none())
+    };
     ($e:expr => $code:ident, $msg:literal, $transient:literal, $solution:expr) => {
         assert_eq!($e.code, $code);
         assert_eq!($e.msg, $msg);
         assert_eq!($e.transient, $transient);
-        assert_eq!($e.solution, $solution);
+        assert_eq!($e.solution.as_ref().unwrap().msg, $solution);
     };
 }

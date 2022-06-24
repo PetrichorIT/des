@@ -19,7 +19,6 @@ fn base() {
         *errs[0] =>
         DsgIncludeInvalidAlias,
         "Include 'Third' cannot be resolved. No such file exists.",
-        false,
-        None
+        false
     );
 }

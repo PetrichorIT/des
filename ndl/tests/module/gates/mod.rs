@@ -19,8 +19,7 @@ fn par_no_ident() {
         *errs[0] =>
         ParModuleGateInvalidIdentifierToken,
         "Invalid token '123'. Expected gate identifier.",
-        false,
-        None
+        false
     );
 
     assert_eq!(r.gtyctx_def().module("A").unwrap().gates.len(), 2);
@@ -43,8 +42,7 @@ fn par_unexpected_token() {
         *errs[0] =>
         ParModuleGateInvalidIdentifierToken,
         "Unexpected token '/'. Expected whitespace.",
-        false,
-        None
+        false
     );
 
     assert_eq!(r.gtyctx_def().module("A").unwrap().gates.len(), 2);
@@ -68,7 +66,7 @@ fn par_cluster_no_closing() {
         ParModuleGateMissingClosingBracket,
         "Unexpected token 'out'. Expected closing bracket.",
         false,
-        Some(ErrorSolution::new("Try adding ']'".to_string(), Loc::new(55, 0, 4)))
+        "Try adding ']'"
     );
 
     assert_eq!(r.gtyctx_def().module("A").unwrap().gates.len(), 2);
@@ -91,8 +89,7 @@ fn par_literal_parse_error() {
         *errs[0] =>
         ParLiteralIntParseError,
         "Failed to parse integer: invalid digit found in string.",
-        false,
-        None
+        false
     );
 
     assert_eq!(r.gtyctx_def().module("A").unwrap().gates.len(), 2);
@@ -115,8 +112,7 @@ fn par_literal_wrong_ty() {
         *errs[0] =>
         ParModuleGateInvalidGateSize,
         "Unexpected token '1.0'. Expected gate size (Int).",
-        false,
-        None
+        false
     );
 
     assert_eq!(r.gtyctx_def().module("A").unwrap().gates.len(), 2);
@@ -139,8 +135,7 @@ fn par_cluster_no_literal() {
         *errs[0] =>
         ParModuleGateInvalidGateSize,
         "Unexpected token 'ident'. Expected gate size (Int).",
-        false,
-        None
+        false
     );
 
     assert_eq!(r.gtyctx_def().module("A").unwrap().gates.len(), 2);
@@ -164,15 +159,14 @@ fn par_invalid_annotation() {
         ParModuleGateInvalidServiceAnnotation,
         "Invalid service annotation 'inputty'.",
         false,
-        Some(ErrorSolution::new("Remove or replace with 'input' or 'output'".to_string(), Loc::new(34, 7, 3)))
+        "Remove or replace with 'input' or 'output'"
     );
 
     check_err!(
         *errs[1] =>
         ParModuleGateInvalidServiceAnnotation,
         "Invalid token '123', expected ident.",
-        false,
-        None
+        false
     );
 
     assert_eq!(r.gtyctx_def().module("A").unwrap().gates.len(), 3);
@@ -195,8 +189,7 @@ fn dsg1_invalid_gate_size() {
         *errs[0] =>
         DsgGateNullSize,
         "Cannot create gate 'input' with size 0.",
-        false,
-        None
+        false
     );
 }
 
@@ -218,6 +211,6 @@ fn tychk_name_collision() {
         DsgGateNamespaceCollision,
         "Namespace collision. Allready defined a gate with name 'in' on module 'A'.",
         false,
-        Some(ErrorSolution::new("Try renaming this gate".to_string(), Loc::new(41, 3, 4)))
+        "Try renaming this gate"
     );
 }

@@ -230,16 +230,14 @@ fn par_pimpl_no_ident() {
         *errs[0] =>
             ParProtoImplInvalidIdent,
             "Unexpected token '123'. Expected ident.",
-            false,
-            None
+            false
     );
 
     check_err!(
         *errs[1] =>
             DsgProtoImplMissingField,
             "Missing prototype impl field 'x'.",
-            false,
-            None
+            false
     );
 }
 
@@ -263,8 +261,7 @@ fn par_pimpl_no_eq() {
         *errs[0] =>
             ParProtoImplExpectedEq,
             "Unexpected token 'is'. Expected '='.",
-            false,
-            None
+            false
 
     );
 
@@ -274,8 +271,7 @@ fn par_pimpl_no_eq() {
         *errs[2] =>
             DsgProtoImplMissingField,
             "Missing prototype impl field 'inner'.",
-            false,
-            None
+            false
     );
 }
 
@@ -301,16 +297,14 @@ fn par_pimpl_no_ty_ident() {
         *errs[0] =>
         ParProtoImplInvalidIdent,
         "Unexpected token '123'. Expected type ident.",
-        false,
-        None
+        false
     );
 
     check_err!(
         *errs[2] =>
         DsgProtoImplMissingField,
         "Missing prototype impl field 'inner'.",
-        false,
-        None
+        false
     );
 
     assert_eq!(r.gtyctx_spec().subsystem("Y").unwrap().nodes.len(), 2);
@@ -329,16 +323,14 @@ fn par_pimpl_no_ty_ident() {
         *errs[1] =>
         ParProtoImplInvalidIdent,
         "Unexpected token '}'. Expected type ident.",
-        false,
-        None
+        false
     );
 
     check_err!(
         *errs[3] =>
         DsgProtoImplMissingField,
         "Missing prototype impl field 'inner'.",
-        false,
-        None
+        false
     );
 
     assert_eq!(r.gtyctx_spec().subsystem("Y2").unwrap().nodes.len(), 2);
@@ -373,8 +365,7 @@ fn par_some_in_network() {
         *errs[0] =>
         ParSubsystemDoesntAllowSome,
         "Unexpected keyword 'some'. This is not allowed on network definitions.",
-        false,
-        None
+        false
     );
 
     assert!(errs[1].transient);
@@ -443,16 +434,14 @@ fn dsg2_alias_chk_no_proto() {
         *errs[0] =>
         DsgInvalidPrototypeAtAlias,
         "No prototype called 'B' found for alias 'Y'. Module 'B' is no prototype.",
-        false,
-        None
+        false
     );
 
     check_err!(
         *errs[1] =>
         DsgInvalidPrototypeAtAlias,
         "No prototype called 'C' found for alias 'Z'.",
-        false,
-        None
+        false
     );
 }
 
@@ -477,7 +466,7 @@ fn dsg2_alias_chk_need_include() {
         DsgInvalidPrototypeAtAlias,
         "No prototype called 'A' found for alias 'B'.",
         false,
-        Some(ErrorSolution::new("Try including 'Other'".to_string(), Loc::new(0, 1, 1)))
+        "Try including 'Other'"
     );
 }
 
@@ -566,16 +555,14 @@ fn dsg3_impl_for_no_proto() {
         *errs[0] =>
         DsgProtoImplForNonProtoValue,
         "Cannot at a prototype implmentation block to a child of type 'B' that has no prototype components.",
-        false,
-        None
+        false
     );
 
     check_err!(
         *errs[1] =>
         DsgProtoImplForNonProtoValue,
         "Cannot at a prototype implmentation block to a child of type 'B' that has no prototype components.",
-        false,
-        None
+        false
     );
 }
 
@@ -597,58 +584,46 @@ fn dsg3_impl_missing_field() {
 
     check_err!(
         *errs[0] =>
-
-            DsgProtoImplMissingField,
-            "Missing prototype impl field 'sub'.",
-            false,
-            None
-
+        DsgProtoImplMissingField,
+        "Missing prototype impl field 'sub'.",
+        false
     );
 
     check_err!(
         *errs[1] =>
-
-            DsgProtoImplMissingField,
-            "Missing prototype impl field 'sub2'.",
-            false,
-            None
+        DsgProtoImplMissingField,
+        "Missing prototype impl field 'sub2'.",
+        false
     );
 
     check_err!(
         *errs[2] =>
-
-            DsgProtoImplMissingField,
-            "Missing prototype impl field 'sub2'.",
-            false,
-            None
+        DsgProtoImplMissingField,
+        "Missing prototype impl field 'sub2'.",
+        false
     );
 
     // NET
 
     check_err!(
         *errs[3] =>
-
-            DsgProtoImplMissingField,
-            "Missing prototype impl field 'sub'.",
-            false,
-            None
+        DsgProtoImplMissingField,
+        "Missing prototype impl field 'sub'.",
+        false
     );
 
     check_err!(
         *errs[4] =>
-
-            DsgProtoImplMissingField,
-            "Missing prototype impl field 'sub2'.",
-            false,
-            None
+        DsgProtoImplMissingField,
+        "Missing prototype impl field 'sub2'.",
+        false
     );
 
     check_err!(
         *errs[5] =>
         DsgProtoImplMissingField,
         "Missing prototype impl field 'sub2'.",
-        false,
-        None
+        false
     );
 }
 
@@ -673,15 +648,14 @@ fn dsg3_impl_no_ty_or_include() {
         DsgProtoImplTyMissing,
         "Unknown type 'B'.",
         false,
-        Some(ErrorSolution::new("Try including 'Other'".to_string(), Loc::new(0, 1, 1)))
+        "Try including 'Other'"
     );
 
     check_err!(
         *errs[1] =>
         DsgProtoImplTyMissing,
         "Unknown type 'C'.",
-        false,
-        None
+        false
     );
 
     // Net
@@ -691,15 +665,14 @@ fn dsg3_impl_no_ty_or_include() {
         DsgProtoImplTyMissing,
         "Unknown type 'B'.",
         false,
-        Some(ErrorSolution::new("Try including 'Other'".to_string(), Loc::new(0, 1, 1)))
+        "Try including 'Other'"
     );
 
     check_err!(
         *errs[3] =>
         DsgProtoImplTyMissing,
         "Unknown type 'C'.",
-        false,
-        None
+        false
     );
 }
 
@@ -723,8 +696,7 @@ fn dsg3_impl_assoc_not_proto() {
         *errs[0] =>
         DsgProtoImplAssociatedTyNotDerivedFromProto,
         "Assigned type 'X' does not fulfill the prototype 'A'.",
-        false,
-        None
+        false
     );
 
     // Net
@@ -733,8 +705,7 @@ fn dsg3_impl_assoc_not_proto() {
         *errs[1] =>
         DsgProtoImplAssociatedTyNotDerivedFromProto,
         "Assigned type 'X' does not fulfill the prototype 'A'.",
-        false,
-        None
+        false
     );
 }
 
@@ -758,8 +729,7 @@ fn dsg3_impl_no_impl() {
         *errs[0] =>
         DsgProtoImlMissing,
         "Missing prototype impl block for type 'M'.",
-        false,
-        None
+        false
     );
 
     // Net
@@ -768,8 +738,7 @@ fn dsg3_impl_no_impl() {
         *errs[1] =>
         DsgProtoImlMissing,
         "Missing prototype impl block for type 'M'.",
-        false,
-        None
+        false
     );
 }
 

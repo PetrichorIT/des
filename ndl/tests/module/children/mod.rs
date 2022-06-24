@@ -19,16 +19,14 @@ fn par_cluster_invalid_dots() {
         *errs[0] =>
         ParModuleSubInvalidClusterDotChain,
         "Unexpected token '3'. Expected three dots.",
-        false,
-        None
+        false
     );
 
     check_err!(
         *errs[1] =>
         ParModuleSubInvalidClusterDotChain,
         "Unexpected token ']'. Expected three dots.",
-        false,
-        None
+        false
     );
 
     assert!(errs[2].transient);
@@ -54,7 +52,7 @@ fn par_cluster_no_closing() {
         ParModuleSubMissingClosingBracket,
         "Unexpected token ':'. Expected closing bracket.",
         false,
-        Some(ErrorSolution::new("Try adding ']'".to_string(), Loc::new(55, 1, 5)))
+        "Try adding ']'"
     );
 }
 
@@ -76,7 +74,7 @@ fn par_no_colon() {
         ParModuleSubInvalidSeperator,
         "Unexpected token 'X'. Expected colon ':'.",
         false,
-        Some(ErrorSolution::new("Try adding ':'".to_string(), Loc::new(57, 1, 5)))
+        "Try adding ':'"
     );
 
     check_err!(
@@ -84,7 +82,7 @@ fn par_no_colon() {
         ParModuleSubInvalidSeperator,
         "Unexpected token 'X'. Expected colon ':'.",
         false,
-        Some(ErrorSolution::new("Try adding ':'".to_string(), Loc::new(69, 1, 6)))
+        "Try adding ':'"
     );
 
     assert_eq!(r.gtyctx_def().module("A").unwrap().submodules.len(), 2)
@@ -107,8 +105,7 @@ fn par_no_ty() {
         *errs[0] =>
         ParModuleSubInvalidIdentiferToken,
         "Unexpected token ','. Expected type identifer.",
-        false,
-        None
+        false
     );
 
     assert_eq!(r.gtyctx_def().module("A").unwrap().submodules.len(), 1)
@@ -131,7 +128,6 @@ fn dsg1_name_collision() {
         *errs[0] =>
         DsgSubmoduleNamespaceCollision,
         "Namespace collision. Allready defined a submodule with name 'a' on module 'Y'.",
-        false,
-        None
+        false
     );
 }

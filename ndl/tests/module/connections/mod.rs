@@ -19,8 +19,7 @@ fn par_con_ident_no_ident() {
         *errs[0] =>
         ParModuleConInvalidIdentiferToken,
         "Unexpected token '-'. Expected identifer.",
-        false,
-        None
+        false
     );
 
     assert!(errs[1].transient);
@@ -47,7 +46,7 @@ fn par_cluster_ident_no_closing() {
         ParModuleConMissingClosingBracketForCLusterIdent,
         "Missing closing bracket for clustered ident.",
         false,
-        Some(ErrorSolution::new("Try adding ']'".to_string(), Loc::new(163, 0, 14)))
+        "Try adding ']'"
     );
 
     assert_eq!(r.gtyctx_def().module("A").unwrap().connections.len(), 1)
@@ -70,8 +69,7 @@ fn par_sub_no_ident() {
         *errs[0] =>
         ParModuleConInvalidIdentiferToken,
         "Unexpected token. Expected second part identifer.",
-        false,
-        None
+        false
     );
 
     assert_eq!(r.gtyctx_def().module("A").unwrap().connections.len(), 0)
@@ -95,14 +93,14 @@ fn par_clustered_gate_no_closing() {
         ParModuleConMissingClosingBracketForCLusterIdent,
         "Missing closing bracket for clustered gate ident.",
         false,
-        Some(ErrorSolution::new("Try adding ']'".to_string(), Loc::new(249, 0, 17)))
+        "Try adding ']'"
     );
     check_err!(
         *errs[1] =>
         ParModuleConMissingClosingBracketForCLusterIdent,
         "Missing closing bracket for clustered gate ident.",
         false,
-        Some(ErrorSolution::new("Try adding ']'".to_string(), Loc::new(281, 0, 18)))
+        "Try adding ']'"
     );
 
     assert_eq!(r.gtyctx_def().module("A").unwrap().connections.len(), 3)
@@ -125,8 +123,7 @@ fn par_no_slash_or_whitespace() {
         *errs[0] =>
         ParModuleConInvalidIdentiferToken,
         "Unexpected token '-'. Expected whitespace or slash.",
-        false,
-        None
+        false
     );
 
     assert!(errs[1].transient);
@@ -137,8 +134,7 @@ fn par_no_slash_or_whitespace() {
         *errs[4] =>
         ParModuleConInvalidIdentiferToken,
         "Unexpected token '-'. Expected whitespace or slash.",
-        false,
-        None
+        false
     );
 
     assert!(errs[5].transient);
@@ -164,8 +160,7 @@ fn par_arrow_direction_missmatch() {
         *errs[0] =>
         ParModuleConInvaldiChannelSyntax,
         "Invalid arrow syntax. Both arrows must match.",
-        false,
-        None
+        false
     );
 
     assert_eq!(r.gtyctx_def().module("A").unwrap().connections.len(), 0)
@@ -188,8 +183,7 @@ fn dsg1_gate_size_missmatch() {
         *errs[0] =>
         DsgConGateSizedToNotMatch,
         "Connection gate cluster sizes do not match (1*5 != 1*1).",
-        false,
-        None
+        false
     );
 }
 
@@ -211,15 +205,14 @@ fn dsg1_invalid_channel() {
         DsgConInvalidChannel,
         "Could not find link 'L' in scope.",
         false,
-        Some(ErrorSolution::new("Try including 'Other'".to_string(), Loc::new(0,1,1)))
+        "Try including 'Other'"
     );
 
     check_err!(
         *errs[1] =>
         DsgConInvalidChannel,
         "Could not find link 'LL' in scope.",
-        false,
-        None
+        false
     );
 }
 
@@ -240,24 +233,21 @@ fn dsg1_invalid_con_ident() {
         *errs[0] =>
         DsgConInvalidLocalGateIdent,
         "No local gate cluster 'a' exists on this module.",
-        false,
-        None
+        false
     );
 
     check_err!(
         *errs[1] =>
         DsgConInvalidLocalGateIdent,
         "No local gate cluster 'g' exists on module 'A'.",
-        false,
-        None
+        false
     );
 
     check_err!(
         *errs[2] =>
         DsgConInvalidField,
         "Field 'err' was not defined on module 'X'.",
-        false,
-        None
+        false
     );
 }
 
@@ -279,7 +269,7 @@ fn dsg1_annotation_conflict() {
         DsgGateConnectionViolatesAnnotation,
         "Gate 'out' cannot be used as start of a connection since it is defined as @input.",
         false,
-        Some(ErrorSolution::new("Define gate 'out' as @output".to_string(), Loc::new(146, 4, 13)))
+        "Define gate 'out' as @output"
     );
 
     check_err!(
@@ -287,6 +277,6 @@ fn dsg1_annotation_conflict() {
         DsgGateConnectionViolatesAnnotation,
         "Gate 'out' cannot be used as end of a connection since it is defined as @output.",
         false,
-        Some(ErrorSolution::new("Define gate 'out' as @input".to_string(), Loc::new(32, 4, 3)))
+        "Define gate 'out' as @input"
     );
 }

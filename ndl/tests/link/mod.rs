@@ -19,8 +19,7 @@ fn par_missing_ident() {
         *errs[0] =>
         ParLinkMissingIdentifier,
         "Unexpected token '{'. Expected identifer for link definition.",
-        false,
-        None
+        false
     );
 
     assert!(errs[1].transient);
@@ -45,8 +44,7 @@ fn par_missing_block_open() {
         *errs[0] =>
         ParLinkMissingDefBlockOpen,
         "Unexpected token 'latency'. Expected block for link definition.",
-        false,
-        None
+        false
     );
 
     assert!(errs[1].transient);
@@ -70,8 +68,7 @@ fn par_invalid_key() {
         *errs[0] =>
         ParLinkInvalidKeyToken,
         "Unexpected token '123'. Expected identifer for definition key.",
-        false,
-        None
+        false
     );
 
     assert!(errs[1].transient);
@@ -86,7 +83,7 @@ fn par_invalid_key() {
         ParLinkIncompleteDefinition,
         "Channel 'A' was missing some parameters.",
         true,
-        Some(ErrorSolution::new("Add parameters bitrate".to_string(), Loc::new(5, 1, 1)))
+        "Add parameters bitrate"
     );
 
     // Case 2
@@ -95,8 +92,7 @@ fn par_invalid_key() {
         *errs[4] =>
         ParLinkInvalidKey,
         "Invalid key 'byterate' in kv-pair. Valid keys are latency, bitrate or jitter.",
-        false,
-        None
+        false
     );
 
     assert!(errs[5].transient);
@@ -111,7 +107,7 @@ fn par_invalid_key() {
         ParLinkIncompleteDefinition,
         "Channel 'B' was missing some parameters.",
         true,
-        Some(ErrorSolution::new("Add parameters bitrate".to_string(), Loc::new(65, 1, 7)))
+        "Add parameters bitrate"
     );
 }
 
@@ -132,8 +128,7 @@ fn par_missing_seperator() {
         *errs[0] =>
         ParLinkInvalidKvSeperator,
         "Unexpected token '0.9'. Expected colon ':' between definition key and value.",
-        false,
-        None
+        false
     );
 
     check_err!(
@@ -141,7 +136,7 @@ fn par_missing_seperator() {
         ParLinkIncompleteDefinition,
         "Channel 'A' was missing some parameters.",
         true,
-        Some(ErrorSolution::new("Add parameters latency".to_string(), Loc::new(5, 1, 1)))
+        "Add parameters latency"
     );
 
     assert_eq!(r.gtyctx_def().link("A").unwrap().bitrate, 10_000);
@@ -166,8 +161,7 @@ fn par_no_literal() {
         *errs[0] =>
         ParLinkInvalidValueToken,
         "Unexpected token 'ident'. Expected literal.",
-        false,
-        None
+        false
     );
 
     check_err!(
@@ -175,7 +169,7 @@ fn par_no_literal() {
         ParLinkIncompleteDefinition,
         "Channel 'A' was missing some parameters.",
         true,
-        Some(ErrorSolution::new("Add parameters bitrate".to_string(), Loc::new(5, 1, 1)))
+        "Add parameters bitrate"
     );
 
     assert_eq!(r.gtyctx_def().link("A").unwrap().bitrate, 1_000);
@@ -200,8 +194,7 @@ fn par_invalid_literal_ty() {
         *errs[0] =>
         ParLinkInvalidValueType,
         "Invalid value type. Expected integer.",
-        false,
-        None
+        false
     );
 
     check_err!(
@@ -209,7 +202,7 @@ fn par_invalid_literal_ty() {
         ParLinkIncompleteDefinition,
         "Channel 'A' was missing some parameters.",
         true,
-        Some(ErrorSolution::new("Add parameters bitrate".to_string(), Loc::new(5, 1, 1)))
+        "Add parameters bitrate"
     );
 
     assert_eq!(r.gtyctx_def().link("A").unwrap().bitrate, 1_000);
@@ -222,8 +215,7 @@ fn par_invalid_literal_ty() {
         *errs[2] =>
         ParLinkInvalidValueType,
         "Invalid value type. Expected float.",
-        false,
-        None
+        false
     );
 
     check_err!(
@@ -231,7 +223,7 @@ fn par_invalid_literal_ty() {
         ParLinkIncompleteDefinition,
         "Channel 'B' was missing some parameters.",
         true,
-        Some(ErrorSolution::new("Add parameters latency".to_string(), Loc::new(68, 1, 7)))
+        "Add parameters latency"
     );
 
     assert_eq!(r.gtyctx_def().link("B").unwrap().bitrate, 10_000);
@@ -256,16 +248,14 @@ fn par_literal_parse_error() {
         *errs[0] =>
         ParLiteralFloatParseError,
         "Float parsing error: invalid float literal.",
-        false,
-        None
+        false
     );
 
     check_err!(
         *errs[1] =>
         ParLiteralIntParseError,
         "Int parsing error: invalid digit found in string.",
-        false,
-        None
+        false
     );
 
     check_err!(
@@ -273,7 +263,7 @@ fn par_literal_parse_error() {
         ParLinkIncompleteDefinition,
         "Channel 'A' was missing some parameters.",
         true,
-        Some(ErrorSolution::new("Add parameters bitrate + jitter".to_string(), Loc::new(5, 1, 1)))
+        "Add parameters bitrate + jitter"
     );
 
     assert_eq!(r.gtyctx_def().link("A").unwrap().bitrate, 1_000);
@@ -316,6 +306,6 @@ fn dsg1_name_collision() {
         DsgLinkNamespaceCollision,
         "Namespace collsion. Allready defined a link with name 'A'.",
         false,
-        Some(ErrorSolution::new("Try renaming this link".to_string(), Loc::new(71, 60, 7)))
+        "Try renaming this link"
     );
 }

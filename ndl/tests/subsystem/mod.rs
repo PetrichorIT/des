@@ -28,8 +28,7 @@ fn par_exports_no_sep() {
         *errs[0] =>
         ParSubsystemExportsInvalidSeperatorToken,
         "Unexpected token 'out'. Expected seperator '/'.",
-        false,
-        None
+        false
     );
 }
 
@@ -50,8 +49,7 @@ fn par_no_ident() {
         *errs[0] =>
         ParSubsystemMissingIdentifer,
         "Invalid token '{'. Expected network identifier.",
-        false,
-        None
+        false
     );
 
     assert!(errs[1].transient);
@@ -76,8 +74,7 @@ fn par_missing_block_open() {
         *errs[0] =>
         ParSubsystemMissingDefBlockOpen,
         "Invalid token 'nodes'. Expected network definition block (OpenBrace).",
-        false,
-        None
+        false
     );
 
     assert!(errs[1].transient);
@@ -103,48 +100,42 @@ fn par_unexpected_subsection() {
         *errs[0] =>
         ParSubsystemInvalidSectionIdentifer,
         "Invalid subsection identifier 'colons'. Possibilities are nodes / connections / parameters / exports.",
-        false,
-        None
+        false
     );
 
     check_err!(
         *errs[1] =>
         ParSubsystemkMissingSectionIdentifier,
         "Invalid token ':'. Expected identifier for subsection are nodes / connections / parameters / exports.",
-        true,
-        None
+        true
     );
 
     check_err!(
         *errs[2] =>
         ParSubsystemkMissingSectionIdentifier,
         "Invalid token '123'. Expected identifier for subsection are nodes / connections / parameters / exports.",
-        true,
-        None
+        true
     );
 
     check_err!(
         *errs[3] =>
         ParSubsystemkMissingSectionIdentifier,
         "Invalid token ':'. Expected identifier for subsection are nodes / connections / parameters / exports.",
-        true,
-        None
+        true
     );
 
     check_err!(
         *errs[4] =>
         ParSubsystemInvalidSectionIdentifer,
         "Invalid subsection identifier 'submodules'. Possibilities are nodes / connections / parameters / exports.",
-        true,
-        None
+        true
     );
 
     check_err!(
         *errs[5] =>
         ParSubsystemkMissingSectionIdentifier,
         "Invalid token ':'. Expected identifier for subsection are nodes / connections / parameters / exports.",
-        true,
-        None
+        true
     );
 }
 
@@ -165,8 +156,7 @@ fn par_subsection_no_colon() {
         *errs[0] =>
         ParSubsystemInvalidSeperator,
         "Unexpected token 'a'. Expected colon ':'.",
-        false,
-        None
+        false
     );
 
     assert_eq!(r.gtyctx_def().subsystem("A").unwrap().nodes.len(), 2);
@@ -190,7 +180,7 @@ fn dsg1_name_collision() {
         DsgModuleNamespaceCollision,
         "Namespace collsion. Allready defined a subsystem with name 'X'.",
         false,
-        Some(ErrorSolution::new("Try renaming this network".to_string(), Loc::new(60, 29, 8)))
+        "Try renaming this network"
     );
 }
 
@@ -232,16 +222,14 @@ fn dsg_nested_subysys() {
         *errs[0] =>
         DsgConInvalidField,
         "Field 'error' was not defined on subsystem 'FieldError'.",
-        false,
-        None
+        false
     );
 
     check_err!(
         *errs[1] =>
         DsgConInvalidLocalGateIdent,
         "No local gate cluster 'error' exists on subsystem 'Sub'.",
-        false,
-        None
+        false
     );
 }
 
@@ -262,8 +250,7 @@ fn tychk_invalid_sub_ty() {
         *errs[0] =>
         DsgSubmoduleMissingTy,
         "No module or subsystem with name 'B' found in scope.",
-        false,
-        None
+        false
     );
 }
 
@@ -284,7 +271,6 @@ fn tychk_empty() {
         *errs[0] =>
         TycNetworkEmptyNetwork,
         "Network 'A' does not contain any nodes.",
-        false,
-        None
+        false
     );
 }

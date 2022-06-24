@@ -19,8 +19,7 @@ fn par_no_ident() {
         *errs[0] =>
         ParModuleMissingIdentifer,
         "Invalid token '{'. Expected module identfier.",
-        false,
-        None
+        false
     );
 
     assert!(errs[1].transient);
@@ -47,8 +46,7 @@ fn par_missing_block_open() {
         *errs[0] =>
         ParModuleMissingDefBlockOpen,
         "Invalid token 'gates'. Expected module definition block (OpenBrace).",
-        false,
-        None
+        false
     );
 
     assert!(errs[1].transient);
@@ -74,48 +72,42 @@ fn par_unexpected_subsection() {
         *errs[0] =>
         ParModuleInvalidSectionIdentifer,
         "Invalid subsection identifier 'nodes'. Possibilities are gates / submodules / connections / parameters.",
-        false,
-        None
+        false
     );
 
     check_err!(
         *errs[1] =>
         ParModuleMissingSectionIdentifier,
         "Invalid token ':'. Expected identifier for subsection are gates / submodules / connections / parameters.",
-        true,
-        None
+        true
     );
 
     check_err!(
         *errs[2] =>
         ParModuleInvalidSectionIdentifer,
         "Invalid subsection identifier 'colons'. Possibilities are gates / submodules / connections / parameters.",
-        true,
-        None
+        true
     );
 
     check_err!(
         *errs[3] =>
         ParModuleMissingSectionIdentifier,
         "Invalid token ':'. Expected identifier for subsection are gates / submodules / connections / parameters.",
-        true,
-        None
+        true
     );
 
     check_err!(
         *errs[4] =>
         ParModuleMissingSectionIdentifier,
         "Invalid token '123'. Expected identifier for subsection are gates / submodules / connections / parameters.",
-        true,
-        None
+        true
     );
 
     check_err!(
         *errs[5] =>
         ParModuleMissingSectionIdentifier,
         "Invalid token ':'. Expected identifier for subsection are gates / submodules / connections / parameters.",
-        true,
-        None
+        true
     );
 }
 
@@ -136,8 +128,7 @@ fn par_subsection_no_colon() {
         *errs[0] =>
         ParModuleInvalidSeperator,
         "Unexpected token 'in'. Expected colon ':'.",
-        false,
-        None
+        false
     );
 
     assert_eq!(r.gtyctx_def().module("A").unwrap().gates.len(), 2);
@@ -161,7 +152,7 @@ fn dsg1_name_collision() {
         DsgModuleNamespaceCollision,
         "Namespace collsion. Allready defined a module with name 'X'.",
         false,
-        Some(ErrorSolution::new("Try renaming this module".to_string(), Loc::new(20, 4, 3)))
+        "Try renaming this module"
     );
 }
 
@@ -182,32 +173,28 @@ fn tychk_cyclic() {
         *errs[0] =>
         TycModuleSubmoduleRecrusiveTyDefinition,
         "Cannot create cyclic definition for type 'X' via path 'self'.",
-        false,
-        None
+        false
     );
 
     check_err!(
         *errs[1] =>
         TycModuleSubmoduleRecrusiveTyDefinition,
         "Cannot create cyclic definition for type 'A' via path 'b/c/a'.",
-        false,
-        None
+        false
     );
 
     check_err!(
         *errs[2] =>
         TycModuleSubmoduleRecrusiveTyDefinition,
         "Cannot create cyclic definition for type 'B' via path 'c/a/b'.",
-        false,
-        None
+        false
     );
 
     check_err!(
         *errs[3] =>
         TycModuleSubmoduleRecrusiveTyDefinition,
         "Cannot create cyclic definition for type 'C' via path 'a/b/c'.",
-        false,
-        None
+        false
     );
 }
 
@@ -228,24 +215,21 @@ fn tychk_proto_cyclic() {
         *errs[0] =>
         TycModuleSubmoduleRecrusiveTyDefinition,
         "Cannot create cyclic definition for type 'B' via path 'a/b'.",
-        false,
-        None
+        false
     );
 
     check_err!(
         *errs[1] =>
         TycModuleSubmoduleRecrusiveTyDefinition,
         "Cannot create cyclic definition for type 'A' via path 'b/a'.",
-        false,
-        None
+        false
     );
 
     check_err!(
         *errs[2] =>
         DsgProtoImlMissing,
         "Missing prototype impl block for type 'B'.",
-        false,
-        None
+        false
     );
 }
 

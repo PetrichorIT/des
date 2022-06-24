@@ -1,4 +1,4 @@
-use ndl::{Error, ErrorCode::*, ErrorSolution, Loc, NdlResolver};
+use ndl::{Error, ErrorCode::*, NdlResolver};
 
 use crate::check_err;
 
@@ -20,7 +20,7 @@ fn dsg_alias_proto_def() {
         DsgInvalidPrototypeAtAlias,
         "No prototype called 'someP' found for alias 'B'.",
         false,
-        Some(ErrorSolution::new("Do you mean 'SomeP'?".to_string(), Loc::new(10,62,1)))
+        "Do you mean 'SomeP'?"
     );
 
     check_err!(
@@ -28,15 +28,14 @@ fn dsg_alias_proto_def() {
         DsgInvalidPrototypeAtAlias,
         "No prototype called 'someb' found for alias 'C'.",
         false,
-        Some(ErrorSolution::new("Do you mean 'SomeP'?".to_string(), Loc::new(10,62,1)))
+        "Do you mean 'SomeP'?"
     );
 
     check_err!(
         *errs[2] =>
         DsgInvalidPrototypeAtAlias,
         "No prototype called 'sonbra' found for alias 'D'. Module 'sonbra' is no prototype.",
-        false,
-        None
+        false
     );
 }
 
@@ -58,7 +57,7 @@ fn dsg_child_node_spec() {
         DsgSubmoduleMissingTy,
         "No module with type 'Rauter' found in scope.",
         false,
-        Some(ErrorSolution::new("Do you mean 'Router'?".to_string(), Loc::new(7,9,1)))
+        "Do you mean 'Router'?"
     );
 
     check_err!(
@@ -66,7 +65,7 @@ fn dsg_child_node_spec() {
         DsgSubmoduleMissingTy,
         "No module with type 'Routers' found in scope.",
         false,
-        Some(ErrorSolution::new("Do you mean 'Router'?".to_string(), Loc::new(7,9,1)))
+        "Do you mean 'Router'?"
     );
 
     check_err!(
@@ -74,7 +73,7 @@ fn dsg_child_node_spec() {
         DsgSubmoduleMissingTy,
         "No module with type 'agger' found in scope.",
         false,
-        Some(ErrorSolution::new("Do you mean 'Logger'?".to_string(), Loc::new(25,9,2)))
+        "Do you mean 'Logger'?"
     );
 
     check_err!(
@@ -82,7 +81,7 @@ fn dsg_child_node_spec() {
         DsgInvalidPrototypeAtSome,
         "No prototype called 'Aplication' found.",
         false,
-        Some(ErrorSolution::new("Do you mean 'Application'?".to_string(), Loc::new(46,14,3)))
+        "Do you mean 'Application'?"
     );
 
     // SUBSYS
@@ -92,21 +91,21 @@ fn dsg_child_node_spec() {
         DsgSubmoduleMissingTy,
         "No module or subsystem with name 'Rauter' found in scope.",
         false,
-        Some(ErrorSolution::new("Do you mean 'Router'?".to_string(), Loc::new(7,9,1)))
+        "Do you mean 'Router'?"
     );
     check_err!(
         *errs[5] =>
         DsgSubmoduleMissingTy,
         "No module or subsystem with name 'Routers' found in scope.",
         false,
-        Some(ErrorSolution::new("Do you mean 'Router'?".to_string(), Loc::new(7,9,1)))
+        "Do you mean 'Router'?"
     );
     check_err!(
         *errs[6] =>
         DsgSubmoduleMissingTy,
         "No module or subsystem with name 'agger' found in scope.",
         false,
-        Some(ErrorSolution::new("Do you mean 'Logger'?".to_string(), Loc::new(25,9,2)))
+        "Do you mean 'Logger'?"
     );
 }
 
@@ -128,7 +127,7 @@ fn dsg_con_def_module() {
         DsgConInvalidChannel,
         "Could not find link 'MyLank' in scope.",
         false,
-        Some(ErrorSolution::new("Do you mean 'MyLink'?".to_string(), Loc::new(5,66,1)))
+        "Do you mean 'MyLink'?"
     );
 
     check_err!(
@@ -136,7 +135,7 @@ fn dsg_con_def_module() {
         DsgConInvalidLocalGateIdent,
         "No local gate cluster 'locallyIn' exists on this module.",
         false,
-        Some(ErrorSolution::new("Do you mean 'localIn'?".to_string(), Loc::new(179,8,15)))
+        "Do you mean 'localIn'?".to_string()
     );
 
     check_err!(
@@ -144,7 +143,7 @@ fn dsg_con_def_module() {
         DsgConInvalidField,
         "Field 'beckup' was not defined on module 'Test'.",
         false,
-        Some(ErrorSolution::new("Do you mean 'backup'?".to_string(), Loc::new(310, 9, 22)))
+        "Do you mean 'backup'?"
     );
 
     check_err!(
@@ -152,7 +151,7 @@ fn dsg_con_def_module() {
         DsgConInvalidLocalGateIdent,
         "No local gate cluster 'inn' exists on module 'A'.",
         false,
-        Some(ErrorSolution::new("Do you mean 'in'?".to_string(), Loc::new(107, 3, 9)))
+        "Do you mean 'in'?"
     );
 }
 
@@ -174,7 +173,7 @@ fn dsg_con_def_subsys() {
         DsgConInvalidChannel,
         "Could not find link 'MyLank' in scope.",
         false,
-        Some(ErrorSolution::new("Do you mean 'MyLink'?".to_string(), Loc::new(5,66,1)))
+        "Do you mean 'MyLink'?"
     );
 
     check_err!(
@@ -182,7 +181,7 @@ fn dsg_con_def_subsys() {
         DsgConInvalidField,
         "Field 'beckup' was not defined on subsystem 'Testnet'.",
         false,
-        Some(ErrorSolution::new("Do you mean 'backup'?".to_string(), Loc::new(154, 421, 13)))
+        "Do you mean 'backup'?"
     );
 
     check_err!(
@@ -190,6 +189,6 @@ fn dsg_con_def_subsys() {
         DsgConInvalidLocalGateIdent,
         "No local gate cluster 'inn' exists on module 'A'.",
         false,
-        Some(ErrorSolution::new("Do you mean 'in'?".to_string(), Loc::new(107, 3, 9)))
+        "Do you mean 'in'?"
     );
 }
