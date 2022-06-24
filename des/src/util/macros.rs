@@ -19,7 +19,7 @@ macro_rules! create_global_uid {
             #[repr(transparent)]
             $vis struct $ident($ty);
 
-            static mut $sident: $ty = 0xff;
+            static $sident: $crate::util::SyncWrap<::std::cell::Cell<$ty>> = $crate::util::SyncWrap::new(::std::cell::Cell::new(0xff));
 
             impl $ident {
                 ///
@@ -32,14 +32,9 @@ macro_rules! create_global_uid {
                 /// Generates a new unique id.
                 ///
                 pub fn gen() -> Self {
-                    // SAFTY:
-                    // Since uids should only be created over primitive data types
-                    // mutable usage of statics is save since no associated data is generated.
-                    unsafe {
-                        let a = $sident;
-                        $sident += 1;
-                        Self(a)
-                    }
+                    let a = $sident.get();
+                    $sident.set(a + 1);
+                    Self(a)
                 }
             }
 
