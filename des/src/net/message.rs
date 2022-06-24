@@ -140,7 +140,17 @@ impl Message {
     /// be freed until this function is called, and ownership is thereby moved..
     ///
 
-    pub fn try_cast<T: 'static + MessageBody>(self) -> Option<(T, MessageMetadata)> {
+    pub fn try_cast<T: 'static + MessageBody + Send>(self) -> Option<(T, MessageMetadata)> {
+        // SAFTY:
+        // Since T is 'Send' this is safe within the bounds of Messages safty contract
+        unsafe { self.try_cast_unsafe::<T>() }
+    }
+
+    pub fn cast<T: 'static + MessageBody + Send>(self) -> (T, MessageMetadata) {
+        self.try_cast().expect("Could not cast to type T")
+    }
+
+    pub unsafe fn try_cast_unsafe<T: 'static + MessageBody>(self) -> Option<(T, MessageMetadata)> {
         let Message { meta, content, .. } = self;
         let content = content?;
         let content = match content.downcast::<T>() {
@@ -153,8 +163,8 @@ impl Message {
         Some((content, meta))
     }
 
-    pub fn cast<T: 'static + MessageBody>(self) -> (T, MessageMetadata) {
-        self.try_cast().expect("Could not cast to type T")
+    pub unsafe fn cast_unsafe<T: 'static + MessageBody>(self) -> (T, MessageMetadata) {
+        self.try_cast_unsafe().expect("Could not cast to type T")
     }
 
     ///
@@ -268,6 +278,9 @@ impl Debug for Message {
     }
 }
 
+// SAFTY:
+// A message only contains primitve data, ptrs that are threadsafe
+// and a untyped contained value.
 unsafe impl Send for Message {}
 
 ///
@@ -275,7 +288,7 @@ unsafe impl Send for Message {}
 ///
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-pub trait MessageBody: Clone {
+pub trait MessageBody {
     ///
     /// The length of the message body in bytes.
     ///
@@ -479,7 +492,7 @@ impl MessageBuilder {
 
     pub fn content<T>(mut self, content: T) -> Self
     where
-        T: 'static + MessageBody,
+        T: 'static + MessageBody + Send,
     {
         let bit_len = content.bit_len();
         let byte_len = content.byte_len();
@@ -490,7 +503,7 @@ impl MessageBuilder {
 
     pub fn content_boxed<T>(mut self, content: Box<T>) -> Self
     where
-        T: 'static + MessageBody,
+        T: 'static + MessageBody + Send,
     {
         self.content = Some((content.bit_len(), content.byte_len(), content));
         self
@@ -519,4 +532,6 @@ impl Default for MessageBuilder {
     }
 }
 
+// SAFTY:
+// Dervived from safty invariants of [Message].
 unsafe impl Send for MessageBuilder {}

@@ -41,6 +41,11 @@ impl std::fmt::Debug for BufferEvent {
     }
 }
 
+// SAFTY:
+// Buffer events can be considered 'Send' since [Message]
+// is 'Send', [Duration] / [SimTime] are primitve and
+// [dyn IntoModuleGate] is either a gate isself or primitve
+// values describing the gate.
 unsafe impl Send for BufferEvent {}
 
 ///

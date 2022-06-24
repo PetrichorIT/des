@@ -310,10 +310,14 @@ impl PartialEq for Gate {
 }
 impl Eq for Gate {}
 
+mod private {
+    pub trait Sealed {}
+}
+
 ///
 /// A trait for a type to refrence a module specific gate.
 ///
-pub trait IntoModuleGate {
+pub trait IntoModuleGate: private::Sealed {
     ///
     /// Extracts a gate identifier from a module using the given
     /// value as implicit reference.
@@ -328,24 +332,28 @@ impl IntoModuleGate for GateRef {
         Some(self.clone())
     }
 }
+impl private::Sealed for GateRef {}
 
 impl IntoModuleGate for &GateRef {
     fn into_gate(&self, _module: &ModuleCore) -> Option<GateRef> {
         Some(Ptr::clone(self))
     }
 }
+impl private::Sealed for &GateRef {}
 
 impl IntoModuleGate for GateRefMut {
     fn into_gate(&self, _module: &ModuleCore) -> Option<GateRef> {
         Some(self.clone().make_const())
     }
 }
+impl private::Sealed for GateRefMut {}
 
 impl IntoModuleGate for &GateRefMut {
     fn into_gate(&self, _module: &ModuleCore) -> Option<GateRef> {
         Some(Ptr::clone(self).make_const())
     }
 }
+impl private::Sealed for &GateRefMut {}
 
 impl IntoModuleGate for (&str, usize) {
     fn into_gate(&self, module: &ModuleCore) -> Option<GateRef> {
@@ -357,6 +365,7 @@ impl IntoModuleGate for (&str, usize) {
         Some(Ptr::clone(element).make_const())
     }
 }
+impl private::Sealed for (&str, usize) {}
 
 impl IntoModuleGate for &str {
     fn into_gate(&self, module: &ModuleCore) -> Option<GateRef> {
@@ -368,3 +377,4 @@ impl IntoModuleGate for &str {
         Some(Ptr::clone(element).make_const())
     }
 }
+impl private::Sealed for &str {}

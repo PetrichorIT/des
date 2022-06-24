@@ -1,5 +1,4 @@
 use std::any::Any;
-use std::rc::Rc;
 
 use crate::net::*;
 use crate::time::*;
@@ -261,11 +260,11 @@ impl Default for PacketHeader {
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 #[allow(unused)]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Packet {
     pub(crate) header: PacketHeader,
     pub(crate) message_meta: Option<MessageMetadata>,
-    pub(crate) content: Option<Rc<dyn Any>>,
+    pub(crate) content: Option<Box<dyn Any>>,
 }
 
 impl Packet {
@@ -375,9 +374,8 @@ impl Packet {
     /// Returns [None] if the no content exists or the content is not of type T.
     ///
     pub fn try_content_mut<T: 'static + MessageBody>(&mut self) -> Option<&mut T> {
-        let mut_rc = self.content.as_mut()?;
-        let mut_any = Rc::get_mut(mut_rc)?;
-        Some(mut_any.downcast_mut())?
+        let mut_box = self.content.as_mut()?;
+        Some(mut_box.downcast_mut())?
     }
 
     ///
@@ -407,6 +405,10 @@ impl From<Packet> for Message {
     }
 }
 
+// SAFTY:
+// See [Message] contract its the same
+unsafe impl Send for Packet {}
+
 // impl From<TypedInternedValue<'static, Packet>> for Message {
 //     fn from(mut pkt: TypedInternedValue<'static, Packet>) -> Self {
 //         // Take the meta away to prevent old metadata after incorrect reconstruction of packet.
@@ -421,7 +423,7 @@ impl From<Packet> for Message {
 pub struct PacketBuilder {
     message_builder: MessageBuilder,
     header: PacketHeader,
-    content: Option<(usize, Rc<dyn Any>)>,
+    content: Option<(usize, Box<dyn Any>)>,
 }
 
 impl PacketBuilder {
@@ -478,12 +480,12 @@ impl PacketBuilder {
         T: 'static + MessageBody,
     {
         let byte_len = content.byte_len();
-        let interned = Rc::new(content);
+        let interned = Box::new(content);
         self.content = Some((byte_len, interned));
         self
     }
 
-    pub fn content_interned<T>(mut self, content: Rc<T>) -> Self
+    pub fn content_interned<T>(mut self, content: Box<T>) -> Self
     where
         T: 'static + MessageBody,
     {
