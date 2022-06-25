@@ -79,7 +79,7 @@ pub struct ModuleCore {
     id: ModuleId,
 
     /// A human readable identifier for the module.
-    pub(crate) path: ModulePath,
+    pub(crate) path: ObjectPath,
 
     /// A collection of all gates register to the current module
     pub(crate) gates: Vec<GateRefMut>,
@@ -124,7 +124,7 @@ impl ModuleCore {
     /// A runtime-unqiue (not enforced) identifier for this module, based on its
     /// place in the module tree.
     ///
-    pub fn path(&self) -> &ModulePath {
+    pub fn path(&self) -> &ObjectPath {
         &self.path
     }
 
@@ -207,7 +207,7 @@ impl ModuleCore {
     /// Creates a new optionally named instance
     /// of 'Self'.
     ///
-    pub fn new_with(path: ModulePath, globals: PtrWeakConst<NetworkRuntimeGlobals>) -> Self {
+    pub fn new_with(path: ObjectPath, globals: PtrWeakConst<NetworkRuntimeGlobals>) -> Self {
         #[cfg(feature = "async")]
         let (tx, rx) = crate::sync::mpsc::unbounded_channel_unwatched();
 
@@ -236,7 +236,7 @@ impl ModuleCore {
     /// using the name to extend the path.
     ///
     pub fn child_of(name: &str, parent: &ModuleCore) -> Self {
-        let path = ModulePath::new_with_parent(name, &parent.path);
+        let path = ObjectPath::module_with_parent(name, &parent.path);
         #[cfg(feature = "async")]
         let (tx, rx) = crate::sync::mpsc::unbounded_channel_unwatched();
 
@@ -266,7 +266,7 @@ impl ModuleCore {
     #[inline(always)]
     pub fn new() -> Self {
         Self::new_with(
-            ModulePath::root(String::from("unknown-module")),
+            ObjectPath::root_module(String::from("unknown-module")),
             PtrWeakConst::from_strong(&PtrConst::new(NetworkRuntimeGlobals::new())),
         )
     }

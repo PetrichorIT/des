@@ -13,7 +13,10 @@ pub struct RandomRoutingDeamon {
 impl RandomRoutingDeamon {
     pub fn new(globals: PtrWeakConst<NetworkRuntimeGlobals>) -> Self {
         Self {
-            core: ModuleCore::new_with(ModulePath::root("RoutingDaemon".to_string()), globals),
+            core: ModuleCore::new_with(
+                ObjectPath::root_module("RoutingDaemon".to_string()),
+                globals,
+            ),
             hop_counts: HashMap::new(),
         }
     }

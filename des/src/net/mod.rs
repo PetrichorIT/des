@@ -9,6 +9,8 @@ mod message;
 mod module;
 mod packet;
 mod runtime;
+#[allow(unused)]
+mod subsystem;
 mod topology;
 
 // pub(crate) use self::runtime::ChannelUnbusyNotif; <unused>
@@ -21,7 +23,7 @@ pub use self::runtime::NetworkRuntime;
 pub use self::runtime::NetworkRuntimeGlobals;
 
 //
-// # Channel definitions
+// # Channel definitions.
 //
 
 pub use self::channel::Channel;
@@ -82,7 +84,8 @@ pub use self::module::__Buildable5;
 pub use self::module::__Buildable6;
 pub use self::module::__Buildable7;
 
-pub use self::common::ModulePath;
+pub use self::common::ObjectPath;
+pub use self::common::ObjectPathParseError;
 pub use self::common::ParHandle;
 pub use self::common::Parameters;
 
@@ -92,3 +95,11 @@ pub use self::common::Parameters;
 
 pub use self::topology::NodeDefinition;
 pub use self::topology::Topology;
+
+//
+// # Subsystem
+//
+
+pub use self::subsystem::StaticSubsystemCore;
+pub use self::subsystem::SubsystemCore;
+pub use self::subsystem::SubsystemId;

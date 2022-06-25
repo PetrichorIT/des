@@ -61,7 +61,7 @@ impl Module for MultiRunner {
     }
 }
 
-#[derive(Debug, Network)]
+#[derive(Debug, Subsystem)]
 #[ndl_workspace = "tests/proto"]
 struct Main();
 fn main() {

@@ -3,7 +3,7 @@ use des::prelude::*;
 mod members;
 use members::*;
 
-#[derive(Network)]
+#[derive(Subsystem)]
 #[ndl_workspace = "tests/ndl"]
 struct A();
 

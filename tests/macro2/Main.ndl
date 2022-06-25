@@ -1,0 +1,11 @@
+module Alice {
+    gates:
+        in @input
+        out @output
+}
+
+subsystem TestNet {
+    nodes:
+        alice: Alice
+        bob: Alice
+}

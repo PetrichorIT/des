@@ -49,6 +49,10 @@ path = "proto/main.rs"
 name = "t-droptest"
 path = "droptest/main.rs"
 
+[[bin]]
+name = "t-macro2"
+path = "macro2/main.rs"
+
 [dependencies]
 des = {path = "../des", features = ["net", "cqueue"]}
 #  des_derive = {path = "../des_derive"}

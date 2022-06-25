@@ -14,9 +14,17 @@ use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use syn::punctuated::Punctuated;
 use syn::token::Comma;
+use syn::Data;
 
-pub fn derive_network_impl(ident: Ident, attrs: Attributes) -> Result<TokenStream> {
-    gen_network_main(ident, attrs)
+pub fn derive_subsystem_impl(ident: Ident, data: Data, attrs: Attributes) -> Result<TokenStream> {
+    let mut token_stream = TokenStream::new();
+
+    // TODO: We currently ignore erros issued here
+    // to allow backwards compatability
+    let _ = generate_deref_impl(ident.clone(), data, "SubsystemCore", &mut token_stream);
+    subsystem_main(ident, attrs, &mut token_stream)?;
+
+    Ok(token_stream)
 }
 
 macro_rules! ident {
@@ -28,7 +36,7 @@ macro_rules! ident {
     };
 }
 
-fn gen_network_main(ident: Ident, attrs: Attributes) -> Result<TokenStream> {
+fn subsystem_main(ident: Ident, attrs: Attributes, out: &mut TokenStream) -> Result<()> {
     match get_resolver(
         &attrs
             .workspace
@@ -135,7 +143,7 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> Result<TokenStream> {
 
                 let token_stream = WrappedTokenStream(token_stream);
 
-                Ok(quote! {
+                let ts = quote! {
                     impl #ident {
                         pub fn run(self) -> ::des::runtime::RuntimeResult<Self> {
                             self.run_with_options(::des::runtime::RuntimeOptions::default())
@@ -163,7 +171,10 @@ fn gen_network_main(ident: Ident, attrs: Attributes) -> Result<TokenStream> {
                             runtime
                         }
                     }
-                }.into())
+                };
+
+                out.extend::<TokenStream>(ts.into());
+                Ok(())
             } else {
                 return Err(Diagnostic::new(
                     Level::Error,

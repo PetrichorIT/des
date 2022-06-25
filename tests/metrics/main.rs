@@ -34,7 +34,7 @@ impl Module for Alice {
     fn handle_message(&mut self, _: Message) {}
 }
 
-#[derive(Debug, Network)]
+#[derive(Debug, Subsystem)]
 #[ndl_workspace = "tests/metrics"]
 struct Main {}
 

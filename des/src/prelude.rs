@@ -113,7 +113,14 @@ pub use crate::net::NameableModule;
 pub use crate::net::StaticModuleCore;
 
 #[cfg(feature = "net")]
-pub use crate::net::ModulePath;
+pub use crate::net::StaticSubsystemCore;
+#[cfg(feature = "net")]
+pub use crate::net::SubsystemCore;
+#[cfg(feature = "net")]
+pub use crate::net::SubsystemId;
+
+#[cfg(feature = "net")]
+pub use crate::net::ObjectPath;
 #[cfg(feature = "net")]
 pub use crate::net::Parameters;
 

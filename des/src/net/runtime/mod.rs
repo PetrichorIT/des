@@ -147,7 +147,7 @@ where
             .module_list
             .iter()
             .map(|m| m.path())
-            .collect::<Vec<&ModulePath>>();
+            .collect::<Vec<&ObjectPath>>();
 
         f.debug_struct("NetworkRuntime")
             .field("modules", &modules)

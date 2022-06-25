@@ -3,7 +3,7 @@ use des::prelude::*;
 mod modules;
 pub use modules::*;
 
-#[derive(Debug, Network)]
+#[derive(Debug, Subsystem)]
 #[ndl_workspace = "tests/ptrhell"]
 struct Main();
 

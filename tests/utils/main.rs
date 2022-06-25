@@ -1,9 +1,9 @@
-use des::prelude::*;
+use des::prelude::{Subsystem, *};
 
 mod members;
 use members::*;
 
-#[derive(Network)]
+#[derive(Subsystem)]
 #[ndl_workspace = "tests/utils"]
 struct A();
 

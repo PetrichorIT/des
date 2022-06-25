@@ -80,7 +80,7 @@ struct TestCase {
 impl TestCase {
     fn build() -> Self {
         let core = ModuleCore::new_with(
-            ModulePath::root("Root".into()),
+            ObjectPath::root_module("Root".into()),
             PtrWeakConst::from_strong(&PtrConst::new(NetworkRuntimeGlobals::new())),
         );
 

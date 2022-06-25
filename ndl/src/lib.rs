@@ -44,7 +44,7 @@
 //!
 //! ## The result of a run.
 //!
-//! What is returned is a [OwnedTySpecContext]. This type context contains all
+//! What is returned is a [DesugaredResult]. This type context contains all
 //! module / network specifications without checking for name collisions.
 //! From there you are free to do whatever you want with this definitions.
 //!

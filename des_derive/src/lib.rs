@@ -9,12 +9,15 @@
 mod attributes;
 mod common;
 mod module_impl;
-mod network_impl;
+mod subsystem_impl;
+
+mod module;
+mod subsystem;
 
 use attributes::*;
 use proc_macro::{self, TokenStream};
 use proc_macro_error::proc_macro_error;
-use syn::{parse_macro_input, DeriveInput};
+use syn::{parse_macro_input, AttributeArgs, DeriveInput};
 
 ///
 /// A macro for generating implementations for a Module based on
@@ -78,11 +81,58 @@ pub fn derive_module(input: TokenStream) -> TokenStream {
 
 #[proc_macro_derive(Network, attributes(ndl_workspace))]
 #[proc_macro_error]
+#[deprecated]
 pub fn derive_network(input: TokenStream) -> TokenStream {
-    let DeriveInput { ident, attrs, .. } = parse_macro_input!(input);
+    let DeriveInput {
+        ident, attrs, data, ..
+    } = parse_macro_input!(input);
     let attrs = Attributes::from_attr(attrs);
 
-    match network_impl::derive_network_impl(ident, attrs) {
+    match subsystem_impl::derive_subsystem_impl(ident, data, attrs) {
+        Ok(token_stream) => token_stream,
+        Err(e) => e.abort(),
+    }
+}
+
+#[proc_macro_derive(Subsystem, attributes(ndl_workspace))]
+#[proc_macro_error]
+pub fn derive_subsystem(input: TokenStream) -> TokenStream {
+    let DeriveInput {
+        ident, attrs, data, ..
+    } = parse_macro_input!(input);
+    let attrs = Attributes::from_attr(attrs);
+
+    match subsystem_impl::derive_subsystem_impl(ident, data, attrs) {
+        Ok(token_stream) => token_stream,
+        Err(e) => e.abort(),
+    }
+}
+
+#[proc_macro_attribute]
+#[allow(non_snake_case)]
+pub fn NdlModule(attr: TokenStream, item: TokenStream) -> TokenStream {
+    // PARSE ATTRIBUTES
+    let attrs = parse_macro_input!(attr as AttributeArgs);
+
+    // PARSE STRUCT DEFINITION
+    let inp = parse_macro_input!(item as DeriveInput);
+
+    match module::derive_impl(inp, attrs) {
+        Ok(token_stream) => token_stream,
+        Err(e) => e.abort(),
+    }
+}
+
+#[proc_macro_attribute]
+#[allow(non_snake_case)]
+pub fn NdlSubsystem(attr: TokenStream, item: TokenStream) -> TokenStream {
+    // PARSE ATTRIBUTES
+    let attrs = parse_macro_input!(attr as AttributeArgs);
+
+    // PARSE STRUCT DEFINITION
+    let inp = parse_macro_input!(item as DeriveInput);
+
+    match subsystem::derive_impl(inp, attrs) {
         Ok(token_stream) => token_stream,
         Err(e) => e.abort(),
     }

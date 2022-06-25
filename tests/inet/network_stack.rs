@@ -19,7 +19,7 @@ impl NetworkStack {
     pub fn new(name: &str, address: NodeAddress, router: RandomRoutingDeamon) -> PtrMut<Self> {
         let mut obj = PtrMut::new(Self {
             core: ModuleCore::new_with(
-                ModulePath::root(name.to_string()),
+                ObjectPath::new(name.to_string()).unwrap(),
                 router.module_core().globals(),
             ),
             address,

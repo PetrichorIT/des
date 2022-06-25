@@ -10,7 +10,7 @@ use std::{
 };
 
 #[cfg(feature = "net")]
-use crate::net::ModulePath;
+use crate::net::ObjectPath;
 
 ///
 /// A vector of values that will be written to a file.
@@ -19,7 +19,7 @@ use crate::net::ModulePath;
 pub struct OutVec {
     name: String,
     #[cfg(feature = "net")]
-    owner: Option<ModulePath>,
+    owner: Option<ObjectPath>,
     results_dir: String,
 
     buffered_values: Vec<(f64, f64)>,
@@ -41,7 +41,7 @@ impl OutVec {
         self.name.clone()
     }
 
-    pub fn new(name: String, #[cfg(feature = "net")] owner: Option<ModulePath>) -> Self {
+    pub fn new(name: String, #[cfg(feature = "net")] owner: Option<ObjectPath>) -> Self {
         Self {
             #[cfg(feature = "net")]
             owner,

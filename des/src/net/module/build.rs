@@ -1,5 +1,5 @@
 use crate::{
-    prelude::{Module, ModulePath, NetworkRuntime},
+    prelude::{Module, NetworkRuntime, ObjectPath},
     util::*,
 };
 
@@ -10,7 +10,7 @@ macro_rules! impl_buildable {
         fn build<A$(,$g: Module + NameableModule + __Buildable0)*>(this: PtrMut<Self>, rt: &mut NetworkRuntime<A>) -> PtrMut<Self>
             where Self: Sized;
 
-        fn build_named<A$(,$g: Module + NameableModule + __Buildable0)*>(path: ModulePath, rt: &mut NetworkRuntime<A>) -> PtrMut<Self>
+        fn build_named<A$(,$g: Module + NameableModule + __Buildable0)*>(path: ObjectPath, rt: &mut NetworkRuntime<A>) -> PtrMut<Self>
             where
                 Self: NameableModule + Sized,
         {
@@ -56,7 +56,7 @@ pub trait __Buildable0 {
         this
     }
 
-    fn build_named<A>(path: ModulePath, rt: &mut NetworkRuntime<A>) -> PtrMut<Self>
+    fn build_named<A>(path: ObjectPath, rt: &mut NetworkRuntime<A>) -> PtrMut<Self>
     where
         Self: NameableModule + Sized,
     {

@@ -1,6 +1,6 @@
 include NetworkNode
 
-network Main {
+subystem Main {
 
     nodes:
         node1: NetworkNode

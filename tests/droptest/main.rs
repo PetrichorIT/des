@@ -9,7 +9,7 @@ lazy_static! {
     static ref MODULE_LEN: Arc<Mutex<usize>> = Arc::new(Mutex::new(0));
 }
 
-#[derive(Debug, Network)]
+#[derive(Debug, Subsystem)]
 #[ndl_workspace = "tests/ptrhell"]
 struct Main();
 
