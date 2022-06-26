@@ -1,7 +1,7 @@
 use des::prelude::*;
 
-#[derive(Debug, Module)]
-#[ndl_workspace = "tests/metrics"]
+#[NdlModule("tests/metrics")]
+#[derive(Debug)]
 struct Alice {
     core: ModuleCore,
     outvec: OutVec,
@@ -34,12 +34,12 @@ impl Module for Alice {
     fn handle_message(&mut self, _: Message) {}
 }
 
-#[derive(Debug, Subsystem)]
-#[ndl_workspace = "tests/metrics"]
+#[NdlSubsystem("tests/metrics")]
+#[derive(Debug, Default)]
 struct Main {}
 
 fn main() {
-    Main {}.run_with_options(RuntimeOptions::seeded(123).max_itr(1000));
+    Main::default().run_with_options(RuntimeOptions::seeded(123).max_itr(1000));
 
     let contents =
         std::fs::read_to_string("tests/metrics/results/alice[1]_sample_vec.out").unwrap();

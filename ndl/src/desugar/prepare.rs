@@ -12,12 +12,14 @@ use super::ctx::TyDefContext;
 ///
 /// Resolves alias definitions:
 /// 
+#[allow(clippy::needless_collect)]
 pub fn prepare(resolver: &mut NdlResolver) -> Vec<Error> {
     // Move out
     let mut errors = Vec::new();
     let mut units: HashMap<String, ParsingResult> = resolver.units.clone();
 
-    for (_asset, unit) in &mut units {
+    for unit in units.values_mut() {
+        // [clippy] This is nessecary since unit is borrowed for the tyctx
         let aliases = unit.aliases.drain(..).collect::<Vec<_>>();
 
         let tyctx = TyDefContext::new_for(unit, resolver, &mut errors);
@@ -25,7 +27,7 @@ pub fn prepare(resolver: &mut NdlResolver) -> Vec<Error> {
 
         let mut aliases = aliases
             .into_iter()
-            .map(|alias| {
+            .filter_map(|alias| {
                 let AliasDef {
                     loc,
                     ident: name,
@@ -73,7 +75,6 @@ pub fn prepare(resolver: &mut NdlResolver) -> Vec<Error> {
                     }
                 }
             })
-            .flatten()
             .collect::<Vec<_>>();
 
         unit.modules.append(&mut aliases);

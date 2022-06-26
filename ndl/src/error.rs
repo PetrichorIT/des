@@ -432,9 +432,11 @@ impl Error {
                     Loc::new(0, 1, 1),
                 )
             })
-            .or(lookalike.map(|lookalike| {
-                ErrorSolution::new(format!("Do you mean '{}'?", lookalike.0.raw()), lookalike.1)
-            }));
+            .or_else(|| {
+                lookalike.map(|lookalike| {
+                    ErrorSolution::new(format!("Do you mean '{}'?", lookalike.0.raw()), lookalike.1)
+                })
+            });
 
         Self {
             code,

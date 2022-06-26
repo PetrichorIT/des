@@ -16,6 +16,7 @@ create_global_uid!(
     pub SubsystemId(u16) = MODULE_ID;
 );
 
+#[derive(Debug)]
 pub struct SubsystemCore {
     pub(crate) id: SubsystemId,
     pub(crate) path: ObjectPath,
@@ -80,6 +81,18 @@ impl SubsystemCore {
             parent: None,
             children: HashMap::new(),
             globals: parent.globals.clone(),
+        }
+    }
+}
+
+impl Default for SubsystemCore {
+    fn default() -> Self {
+        Self {
+            id: SubsystemId::gen(),
+            path: ObjectPath::root_subsystem("SIM".to_string()),
+            parent: None,
+            children: HashMap::new(),
+            globals: PtrWeakConst::new(),
         }
     }
 }

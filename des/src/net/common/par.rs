@@ -48,7 +48,7 @@ impl Parameters {
 
     pub(crate) fn get_handle<'a>(&'a self, path: &'a str, key: &'a str) -> ParHandle<'a, Optional> {
         ParHandle {
-            tree_ref: &self,
+            tree_ref: self,
             path,
             key,
 

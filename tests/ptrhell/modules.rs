@@ -1,6 +1,7 @@
 use des::prelude::*;
-#[derive(Debug, Module)]
-#[ndl_workspace = "tests/ptrhell"]
+
+#[derive(Debug)]
+#[NdlModule("tests/ptrhell")]
 pub struct Alice(ModuleCore);
 
 impl Module for Alice {
@@ -17,8 +18,8 @@ impl Module for Alice {
     }
 }
 
-#[derive(Debug, Module)]
-#[ndl_workspace = "tests/ptrhell"]
+#[derive(Debug)]
+#[NdlModule("tests/ptrhell")]
 pub struct Bob(ModuleCore);
 
 impl Module for Bob {
@@ -32,8 +33,8 @@ impl Module for Bob {
     }
 }
 
-#[derive(Debug, Module)]
-#[ndl_workspace = "tests/ptrhell"]
+#[derive(Debug)]
+#[NdlModule("tests/ptrhell")]
 pub struct Network(ModuleCore);
 
 impl Module for Network {

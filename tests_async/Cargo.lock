@@ -63,7 +63,7 @@ dependencies = [
 
 [[package]]
 name = "des"
-version = "0.2.4"
+version = "0.3.0"
 dependencies = [
  "des_derive",
  "des_tokio",
@@ -74,7 +74,7 @@ dependencies = [
 
 [[package]]
 name = "des_derive"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "lazy_static",
  "ndl",

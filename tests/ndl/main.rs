@@ -3,8 +3,8 @@ use des::prelude::*;
 mod members;
 use members::*;
 
-#[derive(Subsystem)]
-#[ndl_workspace = "tests/ndl"]
+#[NdlSubsystem("tests/ndl")]
+#[derive(Debug, Default)]
 struct A();
 
 fn main() {
@@ -17,7 +17,7 @@ fn main() {
         RuntimeOptions::seeded(0x123)
     };
 
-    let app: NetworkRuntime<A> = A().build_rt();
+    let app: NetworkRuntime<A> = A::default().build_rt();
 
     let ids: Vec<ModuleRefMut> = (1..=100)
         .map(|n| app.module(|m| m.name() == format!("bob[{}]", n)).unwrap())

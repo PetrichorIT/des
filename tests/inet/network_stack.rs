@@ -5,7 +5,7 @@ use log::info;
 
 use crate::routing_deamon::RandomRoutingDeamon;
 
-#[derive(Module)]
+#[NdlModule]
 pub struct NetworkStack {
     core: ModuleCore,
 

@@ -5,20 +5,13 @@ use proc_macro2::Ident;
 use proc_macro2::Span;
 use quote::quote;
 use quote::ToTokens;
-use syn::{Path, DataStruct, FieldsNamed, FieldsUnnamed, Data, Type, Visibility, Field, NestedMeta, Lit, AttributeArgs, TypePath};
-use syn::PathArguments;
-use syn::PathSegment;
-use syn::TraitBound;
-use syn::TraitBoundModifier;
-use syn::TypeParam;
-use syn::TypeParamBound;
+use syn::*;
 use syn::punctuated::Punctuated;
-use syn::token::{Comma, Colon2};
-use syn::GenericParam;
+use syn::token::{Comma, Colon2, Brace};
 use std::{collections::HashMap, path::PathBuf, sync::Mutex};
 
 use proc_macro2::TokenStream as TokenStream2;
-use proc_macro_error::{Diagnostic, Level};
+use proc_macro_error::{Diagnostic};
 
 pub type Result<T> = std::result::Result<T, Diagnostic>;
 
@@ -47,7 +40,7 @@ pub fn get_resolver(
             .run_cached()
             .map(|(gtyctx, errs, pars)| {
                 (
-                    gtyctx.to_owned(),
+                    gtyctx,
                     errs.cloned().collect::<Vec<ndl::Error>>(),
                     pars,
                 )
@@ -231,7 +224,6 @@ pub fn build_impl_from(ident: Ident, wrapped: WrappedTokenStream, submodules: &[
 
 
 pub fn gen_named_object(ident: Ident, data: &DataStruct) -> Result<TokenStream2> {
-
     match &data.fields {
         syn::Fields::Named(FieldsNamed { named, .. }) => {
             if named.len() == 1 {
@@ -264,158 +256,7 @@ pub fn gen_named_object(ident: Ident, data: &DataStruct) -> Result<TokenStream2>
     }
 }
 
-pub fn generate_deref_impl(
-    ident: Ident,
-    data: Data,
-    searched_ty: &str,
-    out: &mut TokenStream,
-) -> Result<()> {
-    let token_stream: TokenStream2;
 
-    let elem_ident = match &data {
-        syn::Data::Struct(s) => {
-            token_stream = gen_named_object(ident.clone(), s)?;
-
-            match &s.fields {
-                syn::Fields::Named(FieldsNamed { named, .. }) => named
-                    .iter()
-                    .find(|f| {
-                        if let Type::Path(ty) = &f.ty {
-                            ty.path.segments.last().unwrap().ident
-                                == Ident::new(
-                                    searched_ty,
-                                    ty.path.segments.last().unwrap().ident.span(),
-                                )
-                        } else {
-                            false
-                        }
-                    })
-                    .map(|field| (Some(field.ident.clone().unwrap()), 0)),
-                syn::Fields::Unnamed(FieldsUnnamed { unnamed, .. }) => unnamed
-                    .iter()
-                    .enumerate()
-                    .find(|(_, f)| {
-                        if let Type::Path(ty) = &f.ty {
-                            ty.path.segments.last().unwrap().ident
-                                == Ident::new(
-                                    searched_ty,
-                                    ty.path.segments.last().unwrap().ident.span(),
-                                )
-                        } else {
-                            false
-                        }
-                    })
-                    .map(|(idx, _)| (None, idx)),
-                syn::Fields::Unit => None,
-            }
-        }
-        _ => {
-            return Err(Diagnostic::new(
-                Level::Error,
-                "Modules are currently only supported on structs.".into(),
-            ))
-        }
-    };
-
-    if let Some((eident, idx)) = elem_ident {
-        out.extend::<TokenStream>(token_stream.into());
-
-        if let Some(eident) = eident {
-            out.extend::<TokenStream>(
-                quote! {
-                    impl ::std::ops::Deref for #ident {
-                        type Target = ::des::net::ModuleCore;
-                        fn deref(&self) -> &Self::Target {
-                            &self.#eident
-                        }
-                    }
-                    impl ::std::ops::DerefMut for #ident {
-                        fn deref_mut(&mut self) -> &mut Self::Target {
-                            &mut self.#eident
-                        }
-                    }
-                }
-                .into(),
-            );
-        } else {
-            let idx = syn::Index::from(idx);
-            out.extend::<TokenStream>(
-                quote! {
-                    impl ::std::ops::Deref for #ident {
-                        type Target = ::des::net::ModuleCore;
-                        fn deref(&self) -> &Self::Target {
-                            &self.#idx
-                        }
-                    }
-                    impl ::std::ops::DerefMut for #ident {
-                        fn deref_mut(&mut self) -> &mut Self::Target {
-                            &mut self.#idx
-                        }
-                    }
-                }
-                .into(),
-            );
-        }
-    } else {
-        return Err(Diagnostic::new(
-            Level::Error,
-            "Failed to find a field containing a module core.".to_string(),
-        )
-        .help(String::from("Try adding a module core to the struct.")));
-    }
-
-    Ok(())
-}
-
-pub fn resolve_attrs(attrs: AttributeArgs) -> Result<String> {
-    let workspace = match attrs.first() {
-        Some(v) => v,
-        None => {
-            return Err(Diagnostic::new(
-                Level::Error,
-                "Missing attribute 'workspace' at macro invokation.".to_string(),
-            ))
-        }
-    };
-    let workspace = match workspace {
-        NestedMeta::Lit(lit) => {
-            if let Lit::Str(lit) = lit {
-                lit.value()
-            } else {
-                return Err(Diagnostic::new(
-                    Level::Error,
-                    "Missing attribute 'workspace' at macro invokation. Must be a string."
-                        .to_string(),
-                ));
-            }
-        }
-        NestedMeta::Meta(_) => unimplemented!(),
-    };
-
-    Ok(workspace)
-}
-
-// macro_rules! typath {
-//     ($($ty:ident)::+) => {
-//         {
-//             let mut segments = Punctuated::new();
-//             $(
-//                 segments.push(PathSegment {
-//                     ident: Ident::new(stringify!($ty), Span::call_site()),
-//                     arguments: PathArguments::None,
-//                 });
-//             )+
-
-//             Type::Path(TypePath {
-//                 qself: None,
-//                 path: Path {
-//                     leading_colon: Some(Colon2::default()),
-//                     segments,
-//                 },
-//             })
-//         }
-//     }
-// }
 
 pub fn derive_deref(
     ident: Ident,
@@ -449,8 +290,6 @@ pub fn derive_deref(
     };
 
     let elem_ident = {
-        
-
         match &data.fields {
             syn::Fields::Named(FieldsNamed { named, .. }) => named
                 .iter()
@@ -501,12 +340,36 @@ pub fn derive_deref(
 
                 (Some(Ident::new("__core", Span::call_site())), 0)
             }
-            _ => todo!(),
+            syn::Fields::Unnamed(FieldsUnnamed { unnamed, ..}) => {
+                unnamed.insert(0, Field {
+                    attrs: Vec::new(),
+                    vis: Visibility::Inherited,
+                    ident: None,
+                    colon_token: None,
+                    ty: ty_path.clone(),
+                });
+
+                (None, 0)
+            },
+            syn::Fields::Unit => {
+                let mut named = Punctuated::new();
+                named.push(Field {
+                    attrs: Vec::new(),
+                    vis: Visibility::Inherited,
+                    ident: Some(Ident::new("__core", Span::call_site())),
+                    colon_token: None,
+                    ty: ty_path.clone(),
+                });
+
+                data.fields = Fields::Named(FieldsNamed { named, brace_token: Brace { span: Span::call_site()} });
+
+                (Some(Ident::new("__core", Span::call_site())), 0)
+            },
         },
     };
 
     if searched_ty == "ModuleCore" { 
-        token_stream = gen_named_object(ident.clone(), &data)?; 
+        token_stream = gen_named_object(ident.clone(), data)?; 
         out.extend::<TokenStream>(token_stream.into());
     }
     

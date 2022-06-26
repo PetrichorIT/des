@@ -9,12 +9,12 @@ lazy_static! {
     static ref MODULE_LEN: Arc<Mutex<usize>> = Arc::new(Mutex::new(0));
 }
 
-#[derive(Debug, Subsystem)]
-#[ndl_workspace = "tests/ptrhell"]
+#[NdlSubsystem("tests/droptest")]
+#[derive(Debug, Default)]
 struct Main();
 
 fn main() {
-    let app: NetworkRuntime<Main> = Main().build_rt();
+    let app: NetworkRuntime<Main> = Main::default().build_rt();
 
     let rt = Runtime::new_with(app, RuntimeOptions::seeded(0x123));
 

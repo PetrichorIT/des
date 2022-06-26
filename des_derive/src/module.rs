@@ -1,3 +1,4 @@
+use crate::attributes::Attr;
 use crate::common::*;
 use ndl::ChannelSpec;
 use ndl::ChildNodeSpec;
@@ -9,10 +10,11 @@ use proc_macro::TokenStream;
 use proc_macro2::Span;
 use proc_macro_error::{Diagnostic, Level};
 use quote::quote;
+use syn::Visibility;
 use syn::{AttributeArgs, Data, DeriveInput, Ident};
 
 pub fn derive_impl(mut input: DeriveInput, attrs: AttributeArgs) -> Result<TokenStream> {
-    let workspace = resolve_attrs(attrs)?;
+    let attr = Attr::from_args(attrs)?;
     let ident = input.ident.clone();
 
     // (0) Prepare token streams
@@ -32,7 +34,7 @@ pub fn derive_impl(mut input: DeriveInput, attrs: AttributeArgs) -> Result<Token
 
     // (2) Derive the deref impls / generate that approiated changes in the data struct.
     derive_deref(ident.clone(), data, &mut derive_stream, "ModuleCore")?;
-    generate_dynamic_builder(ident, workspace, &mut derive_stream)?;
+    generate_dynamic_builder(input.vis.clone(), ident, attr, &mut derive_stream)?;
 
     let mut structdef_stream: TokenStream = quote! {
         #input
@@ -52,18 +54,31 @@ macro_rules! ident {
     };
 }
 
-fn generate_dynamic_builder(ident: Ident, workspace: String, out: &mut TokenStream) -> Result<()> {
-    match get_resolver(&workspace) {
+fn generate_dynamic_builder(
+    vis: Visibility,
+    ident: Ident,
+    attr: Attr,
+    out: &mut TokenStream,
+) -> Result<()> {
+    let workspace = match &attr.workspace {
+        Some(ref w) => w,
+        None => return Ok(()),
+    };
+
+    match get_resolver(workspace) {
         Ok((res, _, _)) => {
-            let module = if let Some(ident) = None {
-                // TODO
-                // Not yet possible since ndl_ident was not yet added to attributes
-                // First implement mapping inside resolver.
-                res.module(ident)
-                    .expect("#[derive(Module)] -- Failed to find NDL module with same name.")
+            let (module, typalias) = if let Some(ident) = attr.overwrite_ident {
+                (
+                    res.module(&ident)
+                        .expect("#[derive(Module)] -- Failed to find NDL module with same name."),
+                    true,
+                )
             } else {
-                res.module(&ident.to_string())
-                    .expect("#[derive(Module)] -- Failed to find NDL module with same name.")
+                (
+                    res.module(&ident.to_string())
+                        .expect("#[derive(Module)] -- Failed to find NDL module with same name."),
+                    false,
+                )
             };
 
             let mut token_stream = proc_macro2::TokenStream::new();
@@ -162,11 +177,21 @@ fn generate_dynamic_builder(ident: Ident, workspace: String, out: &mut TokenStre
             let wrapped = WrappedTokenStream(token_stream);
 
             out.extend::<TokenStream>(build_impl_from(
-                ident,
+                ident.clone(),
                 wrapped,
                 &module.submodules,
                 proto_t_counter,
             ));
+
+            if typalias {
+                let alias = ident!(module.ident.raw());
+                out.extend::<TokenStream>(
+                    quote! {
+                        #vis type #alias = #ident;
+                    }
+                    .into(),
+                );
+            }
 
             Ok(())
         }

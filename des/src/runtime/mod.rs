@@ -261,7 +261,7 @@ where
         let rng = options
             .rng
             .take()
-            .unwrap_or(StdRng::from_rng(OsRng::default()).unwrap());
+            .unwrap_or_else(|| StdRng::from_rng(OsRng::default()).unwrap());
         *unsafe { &mut *RNG.get() } = Some(rng);
 
         let mut this = Self {

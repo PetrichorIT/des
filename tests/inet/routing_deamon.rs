@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use des::{net::NetworkRuntimeGlobals, prelude::*};
 use log::info;
 
-#[derive(Module)]
+#[NdlModule]
 pub struct RandomRoutingDeamon {
     core: ModuleCore,
 

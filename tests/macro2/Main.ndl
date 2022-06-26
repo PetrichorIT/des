@@ -9,3 +9,9 @@ subsystem TestNet {
         alice: Alice
         bob: Alice
 }
+
+subsystem MainNet {
+    nodes:
+        a: Alice
+        b: Alice
+}

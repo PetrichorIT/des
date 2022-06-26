@@ -259,7 +259,7 @@ impl PtrWeakMut<dyn Module> {
                         out,
                     } => {
                         let gate = out
-                            .into_gate(&self.module_core())
+                            .as_gate(&self.module_core())
                             .expect("Async buffers failed to resolve out parameter");
 
                         assert!(
@@ -314,7 +314,7 @@ impl PtrWeakMut<dyn Module> {
                 offset,
             )
         }
-        drop(mut_ref);
+        // drop(mut_ref);
 
         // get drain
         let mut_ref = &mut self.module_core_mut().buffers.loopback_buffer;
@@ -330,7 +330,7 @@ impl PtrWeakMut<dyn Module> {
             )
         }
 
-        drop(mut_ref);
+        // drop(mut_ref);
 
         // initalily
         // call activity

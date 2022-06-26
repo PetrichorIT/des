@@ -49,7 +49,7 @@ impl SimTime {
         if *self > other {
             self.duration_since(other)
         } else {
-            other.duration_since(self.clone())
+            other.duration_since(*self)
         }
     }
 

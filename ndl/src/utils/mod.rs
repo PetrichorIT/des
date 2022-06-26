@@ -45,8 +45,8 @@ pub fn edit_distance(lhs: &str, rhs: &str) -> usize {
     let mut current = vec![0; m + 1];
 
     // Build edit str
-    for i in 1..(m + 1) {
-        current[i] = i;
+    for (i, item) in current.iter_mut().enumerate().skip(1) {
+        *item = i;
     }
 
     // Main Loop

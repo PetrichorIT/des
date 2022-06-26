@@ -28,8 +28,7 @@ pub fn compose(
     // If the TyPath is invalid just ignore
     let subsystems = units
         .iter()
-        .map(|unit| unit.1.subsystems.iter())
-        .flatten()
+        .flat_map(|unit| unit.1.subsystems.iter())
         .collect::<Vec<_>>();
 
     // Build a AJL or the graph
@@ -182,8 +181,8 @@ pub fn compose(
     tyctx.attach(&done);
 
     // C check
-    for i in 0..subsystems.len() {
-        let subsys = subsystems[i];
+    for (i, subsys) in subsystems.iter().enumerate() {
+        // let subsys = subsystems[i];
         // Check connections
         for connection in &subsys.connections {
             let ConSpec {
@@ -208,7 +207,7 @@ pub fn compose(
             let (t_nodes_len, t_gate_size, to_idents) =
                 match super::connections::resolve_connection_ident_compose(
                     to,
-                    &&subsys.nodes,
+                    &subsys.nodes,
                     &tyctx,
                     &subsys.ident,
                     &mut errors,
@@ -252,8 +251,7 @@ pub fn compose(
     DesugaredResult {
         modules: units
             .iter()
-            .map(|u| u.1.modules.iter())
-            .flatten()
+            .flat_map(|u| u.1.modules.iter())
             .cloned()
             .collect::<Vec<_>>(),
         subsystems: done.into_inner(),

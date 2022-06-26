@@ -4,8 +4,8 @@ use des::prelude::*;
 
 use log::info;
 
-#[derive(Debug, Module)]
-#[ndl_workspace = "tests/utils"]
+#[derive(Debug)]
+#[NdlModule("tests/utils")]
 pub struct Alice(ModuleCore);
 
 impl Module for Alice {
@@ -31,8 +31,8 @@ impl Module for Alice {
     }
 }
 
-#[derive(Module, Debug)]
-#[ndl_workspace = "tests/utils"]
+#[derive(Debug)]
+#[NdlModule("tests/utils")]
 pub struct Bob(ModuleCore);
 
 impl Module for Bob {

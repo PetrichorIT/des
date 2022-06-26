@@ -3,8 +3,7 @@ use std::ops::Deref;
 use des::prelude::*;
 use log::info;
 
-#[derive(Debug, Module)]
-#[ndl_workspace = "tests/ndl"]
+#[NdlModule("tests/ndl")]
 pub struct Alice(ModuleCore);
 
 impl Module for Alice {
@@ -21,8 +20,7 @@ impl Module for Alice {
     }
 }
 
-#[derive(Module, Debug)]
-#[ndl_workspace = "tests/ndl"]
+#[NdlModule("tests/ndl")]
 pub struct Bob(ModuleCore);
 
 impl Module for Bob {

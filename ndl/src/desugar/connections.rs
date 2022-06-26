@@ -7,7 +7,7 @@ use crate::{
 };
 
 use super::{
-    ctx::{GlobalTyDefContext, TyComposeContext, TyDefContext, MAX_ERROR_EDIT_DISTANCE},
+    ctx::{TyComposeContext, TyDefContext, MAX_ERROR_EDIT_DISTANCE},
     specs::*,
 };
 
@@ -109,8 +109,8 @@ fn child_modules_from_set<'a>(
     }
 }
 
-pub fn gatespec_from_set_by_ident<'a>(
-    set: &'a [GateSpec],
+pub fn gatespec_from_set_by_ident(
+    set: &[GateSpec],
     ident: &Ident,
 ) -> TyResolveResult<(GateSpec, Option<usize>)> {
     match ident {
@@ -123,7 +123,7 @@ pub fn gatespec_from_set_by_ident<'a>(
     }
 }
 
-pub fn gatespec_from_set<'a>(set: &'a [GateSpec], raw_ident: &str) -> TyResolveResult<GateSpec> {
+pub fn gatespec_from_set(set: &[GateSpec], raw_ident: &str) -> TyResolveResult<GateSpec> {
     match set.iter().find(|g| g.ident == raw_ident) {
         Some(g) => Ok(g.clone()),
         None => {
@@ -215,7 +215,6 @@ pub(crate) fn resolve_connection_ident(
 
     supertype: &OIdent,
     tyctx: &TyDefContext<'_>,
-    _gtyctx: &GlobalTyDefContext<'_>,
     errors: &mut Vec<Error>,
     expected_type: GateAnnotation,
 ) -> Option<(usize, usize, Vec<ConSpecNodeIdent>)> {

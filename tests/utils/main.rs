@@ -1,14 +1,14 @@
-use des::prelude::{Subsystem, *};
+use des::prelude::*;
 
 mod members;
 use members::*;
 
-#[derive(Subsystem)]
-#[ndl_workspace = "tests/utils"]
+#[NdlSubsystem("tests/utils")]
+#[derive(Debug, Default)]
 struct A();
 
 fn main() {
-    let app: NetworkRuntime<A> = A().build_rt();
+    let app: NetworkRuntime<A> = A::default().build_rt();
 
     let rt = Runtime::new_with(app, RuntimeOptions::seeded(0x123).quiet());
     let (app, time, event_count) = rt.run().unwrap();

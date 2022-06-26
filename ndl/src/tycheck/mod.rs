@@ -17,7 +17,7 @@ pub fn check_proto_impl(result: &mut DesugaredResult, smap: &SourceMap) {
                 false,
                 smap,
                 &mut errors,
-                &module.ident.asset(),
+                module.ident.asset(),
             )
         }
     }
@@ -30,7 +30,7 @@ pub fn check_proto_impl(result: &mut DesugaredResult, smap: &SourceMap) {
                 true,
                 smap,
                 &mut errors,
-                &subsystem.ident.asset(),
+                subsystem.ident.asset(),
             )
         }
     }

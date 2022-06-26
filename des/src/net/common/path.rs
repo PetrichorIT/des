@@ -239,7 +239,7 @@ impl ObjectPath {
     /// ```
     ///
     pub fn root_subsystem(name: String) -> Self {
-        assert!(!name.contains("/") && !name.contains("."));
+        assert!(!name.contains('/') && !name.contains('.'));
 
         Self {
             module_offset: name.len(),
@@ -277,7 +277,7 @@ impl ObjectPath {
     /// ```
     ///
     pub fn root_module(name: String) -> Self {
-        assert!(!name.contains("/") && !name.contains("."));
+        assert!(!name.contains('/') && !name.contains('.'));
 
         Self {
             data: name,
@@ -317,7 +317,7 @@ impl ObjectPath {
     /// ```
     ///
     pub fn subsystem_with_parent(name: &str, parent: &ObjectPath) -> Self {
-        assert!(!name.contains("/") && !name.contains("."));
+        assert!(!name.contains('/') && !name.contains('.'));
 
         assert!(parent.is_subsystem());
         let data = format!("{}/{}", parent.data, name);
@@ -354,7 +354,7 @@ impl ObjectPath {
     /// seperator characters.
     ///
     pub fn module_with_parent(name: &str, parent: &ObjectPath) -> Self {
-        assert!(!name.contains("/") && !name.contains("."));
+        assert!(!name.contains('/') && !name.contains('.'));
 
         let data = format!("{}.{}", parent.data, name);
         let last_element_offset = parent.data.len() + 1;

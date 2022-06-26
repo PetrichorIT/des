@@ -360,16 +360,14 @@ impl<'a> TyComposeContext<'a> {
     pub fn module(&self, ident: &OIdent) -> Option<&ExpandedModule> {
         self.data
             .iter()
-            .map(|(_, unit)| unit.modules.iter())
-            .flatten()
+            .flat_map(|(_, unit)| unit.modules.iter())
             .find(|e| e.ident == *ident)
     }
 
     pub fn module_or_proto(&self, ident: &OIdent) -> Option<&ExpandedModule> {
         self.data
             .iter()
-            .map(|(_, unit)| unit.modules.iter().chain(&unit.prototypes))
-            .flatten()
+            .flat_map(|(_, unit)| unit.modules.iter().chain(&unit.prototypes))
             .find(|e| e.ident == *ident)
     }
 

@@ -1,3 +1,4 @@
+use crate::attributes::Attr;
 use crate::common::*;
 use ndl::ChannelSpec;
 use ndl::ChildNodeSpec;
@@ -9,10 +10,11 @@ use proc_macro_error::{Diagnostic, Level};
 use quote::quote;
 use syn::punctuated::Punctuated;
 use syn::token::Comma;
+use syn::Visibility;
 use syn::{AttributeArgs, Data, DeriveInput};
 
 pub fn derive_impl(mut input: DeriveInput, attrs: AttributeArgs) -> Result<TokenStream> {
-    let workspace = resolve_attrs(attrs)?;
+    let attr = Attr::from_args(attrs)?;
     let ident = input.ident.clone();
 
     // (0) Prepare token streams
@@ -32,7 +34,7 @@ pub fn derive_impl(mut input: DeriveInput, attrs: AttributeArgs) -> Result<Token
 
     // (2) Derive the deref impls / generate that approiated changes in the data struct.
     derive_deref(ident.clone(), data, &mut derive_stream, "SubsystemCore")?;
-    subsystem_main(ident, workspace, &mut derive_stream)?;
+    subsystem_main(input.vis.clone(), ident, attr, &mut derive_stream)?;
 
     let mut structdef_stream: TokenStream = quote! {
         #input
@@ -52,16 +54,20 @@ macro_rules! ident {
     };
 }
 
-fn subsystem_main(ident: Ident, workspace: String, out: &mut TokenStream) -> Result<()> {
-    match get_resolver(&workspace) {
+fn subsystem_main(vis: Visibility, ident: Ident, attr: Attr, out: &mut TokenStream) -> Result<()> {
+    let workspace = match &attr.workspace {
+        Some(ref w) => w,
+        None => return Ok(()),
+    };
+    match get_resolver(workspace) {
         Ok((res, _, par_files)) => {
-            let network = if let Some(ident) = None {
+            let (network, tyalias) = if let Some(ident) = attr.overwrite_ident {
                 // TODO
                 // Not yet possible since ndl_ident was not yet added to attributes
                 // First implement mapping inside resolver.
-                res.subsystem(ident)
+                (res.subsystem(&ident), true)
             } else {
-                res.subsystem(&ident.to_string())
+                (res.subsystem(&ident.to_string()), false)
             };
 
             if let Some(network) = network {
@@ -186,6 +192,16 @@ fn subsystem_main(ident: Ident, workspace: String, out: &mut TokenStream) -> Res
                 };
 
                 out.extend::<TokenStream>(ts.into());
+                if tyalias {
+                    let alias = ident!(network.ident.raw());
+                    out.extend::<TokenStream>(
+                        quote! {
+                            #vis type #alias = #ident;
+                        }
+                        .into(),
+                    );
+                }
+
                 Ok(())
             } else {
                 return Err(Diagnostic::new(

@@ -2,7 +2,7 @@ use des::prelude::*;
 
 use log::info;
 
-#[derive(Module)]
+#[NdlModule]
 pub struct Alice(pub ModuleCore);
 
 impl Module for Alice {

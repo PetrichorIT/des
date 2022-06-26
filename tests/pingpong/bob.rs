@@ -1,7 +1,7 @@
 use des::prelude::*;
 use log::info;
 
-#[derive(Module)]
+#[NdlModule]
 pub struct Bob(pub ModuleCore);
 
 impl Module for Bob {

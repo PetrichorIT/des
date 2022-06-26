@@ -450,7 +450,7 @@ pub fn expand(unit: &ParsingResult, resolver: &NdlResolver) -> ExpandedUnit {
                     &module.submodules,
                     name,
                     &tyctx,
-                    &gtyctx,
+                    // &gtyctx,
                     &mut r.errors,
                     GateAnnotation::Output,
                 ) {
@@ -464,7 +464,7 @@ pub fn expand(unit: &ParsingResult, resolver: &NdlResolver) -> ExpandedUnit {
                     &module.submodules,
                     name,
                     &tyctx,
-                    &gtyctx,
+                    // &gtyctx,
                     &mut r.errors,
                     GateAnnotation::Input,
                 ) {
@@ -525,11 +525,11 @@ pub fn expand(unit: &ParsingResult, resolver: &NdlResolver) -> ExpandedUnit {
         }
         // END
 
-        if *is_prototype {
-            r.modules.push(spec)
-        } else {
-            r.modules.push(spec)
-        }
+        // if *is_prototype {
+        r.modules.push(spec)
+        // } else {
+        //     r.modules.push(spec)
+        // }
     }
 
     // Iterate over the subsystems to fulfill (3)...(9)
@@ -625,7 +625,7 @@ pub fn expand(unit: &ParsingResult, resolver: &NdlResolver) -> ExpandedUnit {
                         let gty = gtyctx
                             .module(s)
                             .map(|g| (g.loc, g.ident.clone()))
-                            .or(gtyctx.subsystem(s).map(|s| (s.loc, s.ident.clone())));
+                            .or_else(|| gtyctx.subsystem(s).map(|s| (s.loc, s.ident.clone())));
 
                         r.errors.push(Error::new_ty_missing_or_lookalike(
                             DsgSubmoduleMissingTy,
@@ -635,7 +635,7 @@ pub fn expand(unit: &ParsingResult, resolver: &NdlResolver) -> ExpandedUnit {
                             gty.as_ref().map(|(l, _)| *l),
                             e1.lookalike()
                                 .map(|m| (&m.0.ident, m.0.loc))
-                                .or(e2.lookalike().map(|s| (&s.0.ident, s.0.loc))),
+                                .or_else(|| e2.lookalike().map(|s| (&s.0.ident, s.0.loc))),
                         ));
 
                         if let Some(gty) = gty {
@@ -647,7 +647,7 @@ pub fn expand(unit: &ParsingResult, resolver: &NdlResolver) -> ExpandedUnit {
                         TySpec::Static(TyPath::InScope(
                             module_def
                                 .map(|m| m.ident.clone())
-                                .or(subsys_def.map(|s| s.ident.clone()))
+                                .or_else(|_| subsys_def.map(|s| s.ident.clone()))
                                 .unwrap(),
                         ))
                     }

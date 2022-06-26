@@ -297,7 +297,7 @@ impl ModuleCore {
     /// handle_message finished.
     ///
     pub fn send(&mut self, msg: impl Into<Message>, gate: impl IntoModuleGate) {
-        let gate = gate.into_gate(self);
+        let gate = gate.as_gate(self);
         if let Some(gate) = gate {
             self.buffers.send(msg, gate);
         } else {

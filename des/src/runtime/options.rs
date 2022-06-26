@@ -126,6 +126,8 @@ impl RuntimeOptions {
     }
 }
 
+// PLEASE make clippy consider #[cfg(feature)]
+#[allow(clippy::derivable_impls)]
 impl Default for RuntimeOptions {
     fn default() -> Self {
         Self {

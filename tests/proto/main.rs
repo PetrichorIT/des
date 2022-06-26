@@ -1,7 +1,7 @@
 use des::prelude::*;
 
-#[derive(Debug, Module)]
-#[ndl_workspace = "tests/proto"]
+#[derive(Debug)]
+#[NdlModule("tests/proto")]
 struct AppA {
     core: ModuleCore,
 }
@@ -13,8 +13,8 @@ impl Module for AppA {
     }
 }
 
-#[derive(Debug, Module)]
-#[ndl_workspace = "tests/proto"]
+#[derive(Debug)]
+#[NdlModule("tests/proto")]
 struct AppB {
     core: ModuleCore,
 }
@@ -26,8 +26,8 @@ impl Module for AppB {
     }
 }
 
-#[derive(Debug, Module)]
-#[ndl_workspace = "tests/proto"]
+#[derive(Debug)]
+#[NdlModule("tests/proto")]
 struct Runner {
     core: ModuleCore,
 }
@@ -36,8 +36,8 @@ impl Module for Runner {
     fn handle_message(&mut self, _msg: Message) {}
 }
 
-#[derive(Debug, Module)]
-#[ndl_workspace = "tests/proto"]
+#[derive(Debug)]
+#[NdlModule("tests/proto")]
 struct MultiRunner {
     core: ModuleCore,
 }
@@ -61,11 +61,11 @@ impl Module for MultiRunner {
     }
 }
 
-#[derive(Debug, Subsystem)]
-#[ndl_workspace = "tests/proto"]
+#[NdlSubsystem("tests/proto")]
+#[derive(Debug, Default)]
 struct Main();
 fn main() {
-    let app: NetworkRuntime<Main> = Main().build_rt();
+    let app: NetworkRuntime<Main> = Main::default().build_rt();
 
     // println!("{:?}", app.globals().parameters);
 

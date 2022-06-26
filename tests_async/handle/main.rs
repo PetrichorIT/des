@@ -3,8 +3,7 @@ use std::sync::Arc;
 use des::prelude::*;
 use des::sync::mpsc::*;
 
-#[derive(Debug, Module)]
-#[ndl_workspace = "main"]
+#[NdlModule("main")]
 pub struct M {
     core: ModuleCore,
     rt: tokio::runtime::Runtime,
@@ -64,11 +63,11 @@ impl Module for M {
     }
 }
 
-#[derive(Debug, Network)]
-#[ndl_workspace = "main"]
+#[NdlSubsystem("main")]
+#[derive(Debug, Default)]
 pub struct N {}
 
 fn main() {
-    let n = N {};
+    let n = N::default();
     let _res = n.run_with_options(RuntimeOptions::seeded(1).max_time(10.0.into()));
 }

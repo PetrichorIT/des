@@ -1395,7 +1395,7 @@ impl<'a> Parser<'a> {
                         if token.kind == TokenKind::CloseBrace {
                             ectx.record(
                                 ParSubsystemExportsIncompleteToken, 
-                                format!("Unexpected end of subsystem definition. Expected exports entry [module]/[gate]"), 
+                                "Unexpected end of subsystem definition. Expected exports entry [module]/[gate]".to_string(), 
                                 token.loc
                             )?;
                             ectx.reset_transient();
@@ -1434,7 +1434,7 @@ impl<'a> Parser<'a> {
                         if token.kind == TokenKind::CloseBrace {
                             ectx.record(
                                 ParSubsystemExportsIncompleteToken, 
-                                format!("Unexpected end of subsystem definition. Expected exports entry [module]/[gate]"), 
+                                "Unexpected end of subsystem definition. Expected exports entry [module]/[gate]".to_string(), 
                                 token.loc
                             )?;
                             ectx.reset_transient();

@@ -3,12 +3,12 @@ use des::prelude::*;
 mod modules;
 pub use modules::*;
 
-#[derive(Debug, Subsystem)]
-#[ndl_workspace = "tests/ptrhell"]
+#[NdlSubsystem("tests/ptrhell")]
+#[derive(Debug, Default)]
 struct Main();
 
 fn main() {
-    let app: NetworkRuntime<Main> = Main().build_rt();
+    let app: NetworkRuntime<Main> = Main::default().build_rt();
 
     let rt = Runtime::new_with(app, RuntimeOptions::seeded(0x123));
 

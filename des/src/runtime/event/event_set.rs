@@ -19,7 +19,7 @@ mod default_impl {
         A: Application,
     {
         pub fn descriptor(&self) -> String {
-            format!("FutureEventSet::BinaryHeap()")
+            "FutureEventSet::BinaryHeap()".to_string()
         }
 
         pub fn len(&self) -> usize {
@@ -173,8 +173,6 @@ mod cqueue_impl {
             let cqueue_options = CQueueOptions {
                 num_buckets: options.cqueue_num_buckets,
                 bucket_timespan: options.cqueue_bucket_timespan,
-
-                ..Default::default()
             };
 
             Self {
@@ -226,7 +224,7 @@ mod cqueue_impl {
             EventNode {
                 time,
                 id: cookie,
-                event: event,
+                event,
 
                 _phantom: PhantomData,
             }

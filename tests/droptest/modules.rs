@@ -1,8 +1,7 @@
+use crate::MODULE_LEN;
 use des::prelude::*;
 
-use crate::MODULE_LEN;
-#[derive(Debug, Module)]
-#[ndl_workspace = "tests/ptrhell"]
+#[NdlModule("tests/droptest")]
 pub struct Alice(ModuleCore);
 
 impl Module for Alice {
@@ -26,8 +25,7 @@ impl Drop for Alice {
     }
 }
 
-#[derive(Debug, Module)]
-#[ndl_workspace = "tests/ptrhell"]
+#[NdlModule("tests/droptest")]
 pub struct Bob(ModuleCore);
 
 impl Module for Bob {
@@ -51,8 +49,7 @@ impl Drop for Bob {
     }
 }
 
-#[derive(Debug, Module)]
-#[ndl_workspace = "tests/ptrhell"]
+#[NdlModule("tests/droptest")]
 pub struct Network(ModuleCore);
 
 impl Module for Network {

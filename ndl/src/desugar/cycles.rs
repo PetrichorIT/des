@@ -20,7 +20,7 @@ fn check_for_module_cycles(
     // (&ModuleSpec, &String, &mut Vec<Error>)
     let modules_and_prototypes: Vec<_> = units
         .iter()
-        .map(|(asset, unit)| {
+        .flat_map(|(asset, unit)| {
             unit.modules
                 .iter()
                 // Filter out alias since they all behave the same
@@ -29,7 +29,6 @@ fn check_for_module_cycles(
                 .chain(unit.prototypes.iter())
                 .map(move |m| (m, asset))
         })
-        .flatten()
         .collect();
 
     let mut edges: Vec<Vec<usize>> = Vec::new();
@@ -116,8 +115,7 @@ fn check_for_subsystem_cycles(
     // (&ModuleSpec, &String, &mut Vec<Error>)
     let subsystems: Vec<(&SubsystemSpec<ConNodeIdent>, &String)> = units
         .iter()
-        .map(|(asset, unit)| unit.subsystems.iter().map(move |m| (m, asset)))
-        .flatten()
+        .flat_map(|(asset, unit)| unit.subsystems.iter().map(move |m| (m, asset)))
         .collect();
 
     let mut edges: Vec<Vec<usize>> = Vec::new();

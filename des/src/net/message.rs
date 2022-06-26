@@ -132,7 +132,7 @@ impl Message {
     /// Consumes the message casting the stored ptr
     /// into a Box of type T.
     ///
-    /// ## Safty
+    /// ## Safety
     ///
     /// The caller must ensure that the stored data is a valid instance
     /// of type T. If this cannot be guarnteed this is UB.
@@ -146,10 +146,26 @@ impl Message {
         unsafe { self.try_cast_unsafe::<T>() }
     }
 
+    ///
+    /// Performs a [try_cast] unwraping the result.
+    ///
     pub fn cast<T: 'static + MessageBody + Send>(self) -> (T, MessageMetadata) {
         self.try_cast().expect("Could not cast to type T")
     }
 
+    ///
+    /// Consumes the message casting the stored ptr
+    /// into a Box of type T.
+    ///
+    /// ## Safety
+    ///
+    /// The caller must ensure that the stored data is a valid instance
+    /// of type T. If this cannot be guarnteed this is UB.
+    /// Note that DES guarntees that the data refernced by ptr will not
+    /// be freed until this function is called, and ownership is thereby moved..
+    /// Note that this function allows T to be !Send. Be aware of safty problems arriving
+    /// from this.
+    ///
     pub unsafe fn try_cast_unsafe<T: 'static + MessageBody>(self) -> Option<(T, MessageMetadata)> {
         let Message { meta, content, .. } = self;
         let content = content?;
@@ -163,6 +179,12 @@ impl Message {
         Some((content, meta))
     }
 
+    ///
+    /// Performs a [try_cast_unsafe] unwraping the result.
+    ///
+    /// # Safety
+    ///
+    /// See [try_cast_unsafe]
     pub unsafe fn cast_unsafe<T: 'static + MessageBody>(self) -> (T, MessageMetadata) {
         self.try_cast_unsafe().expect("Could not cast to type T")
     }

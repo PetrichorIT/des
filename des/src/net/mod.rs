@@ -7,6 +7,7 @@ mod common;
 mod gate;
 mod message;
 mod module;
+mod ndl;
 mod packet;
 mod runtime;
 #[allow(unused)]
@@ -72,17 +73,17 @@ pub use self::module::ModuleId;
 pub use self::module::ModuleRef;
 pub use self::module::ModuleRefMut;
 pub use self::module::ModuleReferencingError;
-pub use self::module::NameableModule;
 pub use self::module::StaticModuleCore;
 
-pub use self::module::__Buildable0;
-pub use self::module::__Buildable1;
-pub use self::module::__Buildable2;
-pub use self::module::__Buildable3;
-pub use self::module::__Buildable4;
-pub use self::module::__Buildable5;
-pub use self::module::__Buildable6;
-pub use self::module::__Buildable7;
+pub use self::ndl::NameableModule;
+pub use self::ndl::__Buildable0;
+pub use self::ndl::__Buildable1;
+pub use self::ndl::__Buildable2;
+pub use self::ndl::__Buildable3;
+pub use self::ndl::__Buildable4;
+pub use self::ndl::__Buildable5;
+pub use self::ndl::__Buildable6;
+pub use self::ndl::__Buildable7;
 
 pub use self::common::ObjectPath;
 pub use self::common::ObjectPathParseError;
