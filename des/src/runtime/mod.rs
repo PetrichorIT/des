@@ -741,45 +741,43 @@ impl<A> RuntimeResult<A> {
     }
 }
 
-#[cfg(feature = "net")]
-use crate::net::*;
+cfg_net! {
+    use crate::net::*;
 
-use event::EventNode;
+    impl<A> Runtime<NetworkRuntime<A>> {
+        ///
+        /// Adds a message event into a [Runtime<NetworkRuntime<A>>] onto a gate.
+        ///
+        pub fn add_message_onto(
+            &mut self,
+            gate: GateRefMut,
+            message: impl Into<Message>,
+            time: SimTime,
+        ) {
+            let event = MessageAtGateEvent {
+                gate: gate.make_const(),
+                message: message.into(),
+            };
 
-#[cfg(feature = "net")]
-impl<A> Runtime<NetworkRuntime<A>> {
-    ///
-    /// Adds a message event into a [Runtime<NetworkRuntime<A>>] onto a gate.
-    ///
-    pub fn add_message_onto(
-        &mut self,
-        gate: GateRefMut,
-        message: impl Into<Message>,
-        time: SimTime,
-    ) {
-        let event = MessageAtGateEvent {
-            gate: gate.make_const(),
-            message: message.into(),
-        };
+            self.add_event(NetEvents::MessageAtGateEvent(event), time)
+        }
 
-        self.add_event(NetEvents::MessageAtGateEvent(event), time)
-    }
+        ///
+        /// Adds a message event into a [Runtime<NetworkRuntime<A>>] onto a module.
+        ///
+        pub fn handle_message_on(
+            &mut self,
+            module: impl Into<PtrWeakMut<dyn Module>>,
+            message: impl Into<Message>,
+            time: SimTime,
+        ) {
+            let event = HandleMessageEvent {
+                module: module.into(),
+                message: message.into(),
+            };
 
-    ///
-    /// Adds a message event into a [Runtime<NetworkRuntime<A>>] onto a module.
-    ///
-    pub fn handle_message_on(
-        &mut self,
-        module: impl Into<PtrWeakMut<dyn Module>>,
-        message: impl Into<Message>,
-        time: SimTime,
-    ) {
-        let event = HandleMessageEvent {
-            module: module.into(),
-            message: message.into(),
-        };
-
-        self.add_event(NetEvents::HandleMessageEvent(event), time)
+            self.add_event(NetEvents::HandleMessageEvent(event), time)
+        }
     }
 }
 

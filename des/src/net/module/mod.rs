@@ -1,21 +1,17 @@
-mod core;
+use crate::{net::*, util::*};
+use log::warn;
+use std::ops::{Deref, DerefMut};
 
-#[cfg(feature = "async")]
-mod handle;
+mod core;
+pub use self::core::*;
+
+cfg_async! {
+    mod handle;
+    pub use self::handle::*;
+}
 
 #[cfg(test)]
 mod tests;
-
-use log::warn;
-
-use crate::{net::*, util::*};
-
-use std::ops::{Deref, DerefMut};
-
-pub use self::core::*;
-
-#[cfg(feature = "async")]
-pub use handle::*;
 
 ///
 /// A readonly reference to a module.
@@ -41,9 +37,8 @@ pub trait Module: StaticModuleCore {
     ///
     /// ```
     /// use des::prelude::*;
-    /// use des_derive::Module;
     ///
-    /// #[derive(Module)]
+    /// #[NdlModule]
     /// struct MyModule {
     ///     core: ModuleCore,
     ///
@@ -68,10 +63,9 @@ pub trait Module: StaticModuleCore {
     ///
     /// ```
     /// use des::prelude::*;
-    /// use des_derive::Module;
     /// # fn is_good_packet<T>(_t: T) -> bool { true }
     ///
-    /// #[derive(Module)]
+    /// #[NdlModule]
     /// struct OurModule {
     ///     core: ModuleCore,
     ///
@@ -110,12 +104,11 @@ pub trait Module: StaticModuleCore {
     ///
     /// ```
     /// use des::prelude::*;
-    /// use des_derive::Module;
     /// # type Config = ();
     /// # type Record = u8;
     /// # fn fetch_config(s: &str, id: ModuleId) -> Config {}
     ///
-    /// #[derive(Module)]
+    /// #[NdlModule]
     /// struct SomeModule {
     ///     core: ModuleCore,
     ///

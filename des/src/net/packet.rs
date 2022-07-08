@@ -3,262 +3,237 @@ use std::any::Any;
 use crate::net::*;
 use crate::time::*;
 
-/// A address of a node in a IPv6 network.
-#[cfg(feature = "net-ipv6")]
-pub type NodeAddress = u128;
+cfg_net_v6! {
+    /// A address of a node in a IPv6 network.
+    pub type NodeAddress = u128;
 
-/// The broadcast address in a IPv6 network.
-#[cfg(feature = "net-ipv6")]
-pub const NODE_ADDR_BROADCAST: NodeAddress = u128::MAX;
+    /// The broadcast address in a IPv6 network.
+    pub const NODE_ADDR_BROADCAST: NodeAddress = u128::MAX;
 
-/// The loopback address in a IPv6 network.
-#[cfg(feature = "net-ipv6")]
-pub const NODE_ADDR_LOOPBACK: NodeAddress = 0xfe80;
+    /// The loopback address in a IPv6 network.
+    pub const NODE_ADDR_LOOPBACK: NodeAddress = 0xfe80;
 
-/// A address of a node in a IPv4 network.
-#[cfg(not(feature = "net-ipv6"))]
-pub type NodeAddress = u32;
+    ///
+    /// A application-addressed header in a network, similar to TCP/UDP.
+    #[derive(Debug, Clone)]
+    pub struct PacketHeader {
+        // # Ipv6 Header
+        pub src_node: NodeAddress,
+        pub dest_node: NodeAddress,
 
-/// The broadcast address in a IPv4 network.
-/// * This type is only available of DES is build with the `"net"` feature.*
-#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-#[cfg(not(feature = "net-ipv6"))]
-#[allow(unused)]
-pub const NODE_ADDR_BROADCAST: NodeAddress = u32::MAX;
+        pub version: u8,
+        pub traffic_class: u8,
+        pub flow_label: u32,
 
-/// The loopback address in a IPv4 network.
-/// * This type is only available of DES is build with the `"net"` feature.*
-#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-#[cfg(not(feature = "net-ipv6"))]
-#[allow(unused)]
-pub const NODE_ADDR_LOOPBACK: NodeAddress = 0x7f_00_00_01;
+        pub packet_length: u16,
+        pub next_header: u8,
+        pub ttl: u8,
+
+        // # TCP header
+        pub src_port: PortAddress,
+        pub dest_port: PortAddress,
+
+        pub seq_no: u32,
+        pub ack_no: u32,
+        pub data_offset: u8,
+
+        pub flag_ns: bool,
+        pub flag_cwr: bool,
+        pub flag_ece: bool,
+        pub flag_urg: bool,
+        pub flag_ack: bool,
+        pub flag_psh: bool,
+        pub flag_rst: bool,
+        pub flag_syn: bool,
+        pub flag_fin: bool,
+
+        pub window_size: u16,
+        pub tcp_checksum: u16,
+        pub urgent_ptr: u16,
+
+        //# Custom headers
+        pub hop_count: usize,
+        pub last_node: NodeAddress,
+    }
+
+    impl PacketHeader {
+        ///
+        /// Creates a new instance of `Self`.
+        ///
+        pub fn new(
+            src: (NodeAddress, PortAddress),
+            dest: (NodeAddress, PortAddress),
+            packet_length: u16,
+        ) -> Self {
+            Self {
+                // # IPv4 header
+                src_node: src.0,
+                dest_node: dest.0,
+                packet_length,
+
+                // # TCP header
+                src_port: src.1,
+                dest_port: dest.1,
+
+                ..Default::default()
+            }
+        }
+    }
+
+    impl MessageBody for PacketHeader {
+        fn bit_len(&self) -> usize {
+            480 + 128
+        }
+
+        fn byte_len(&self) -> usize {
+            60 + 20
+        }
+    }
+
+    impl Default for PacketHeader {
+        fn default() -> Self {
+            Self {
+                // # IPv4 header
+                src_node: 0,
+                dest_node: 0,
+
+                version: 4,
+                traffic_class: 0,
+                flow_label: 0,
+
+                packet_length: 0,
+                next_header: 0,
+                ttl: u8::MAX,
+
+                // # TCP header
+                src_port: 0,
+                dest_port: 0,
+
+                seq_no: 0,
+                ack_no: 0,
+                data_offset: 0,
+
+                flag_ns: false,
+                flag_cwr: false,
+                flag_ece: false,
+                flag_urg: false,
+                flag_ack: false,
+                flag_psh: false,
+                flag_rst: false,
+                flag_syn: false,
+                flag_fin: false,
+
+                window_size: 0,
+                tcp_checksum: 0,
+                urgent_ptr: 0,
+
+                hop_count: 0,
+                last_node: 0,
+            }
+        }
+    }
+}
+
+cfg_net_v4! {
+    /// A address of a node in a IPv4 network.
+    pub type NodeAddress = u32;
+
+    /// The broadcast address in a IPv4 network.
+    pub const NODE_ADDR_BROADCAST: NodeAddress = u32::MAX;
+
+    /// The loopback address in a IPv4 network.
+    pub const NODE_ADDR_LOOPBACK: NodeAddress = 0x7f_00_00_01;
+
+    ///
+    /// A application-addressed header in a network, similar to TCP/UDP.
+    ///
+    #[derive(Debug, Clone)]
+    pub struct PacketHeader {
+        // # IPv4 header
+        pub src_node: NodeAddress,
+        pub dest_node: NodeAddress,
+        pub tos: u8,
+        pub packet_length: u16,
+        pub ttl: u8,
+
+        // # TCP header
+        pub src_port: PortAddress,
+        pub dest_port: PortAddress,
+
+        pub seq_no: u32,
+        pub ack_no: u32,
+        pub window_size: u16,
+
+        //# Custom headers
+        pub hop_count: usize,
+        pub last_node: NodeAddress,
+    }
+
+    impl PacketHeader {
+        ///
+        /// Creates a new instance of `Self`.
+        ///
+        pub fn new(
+            src: (NodeAddress, PortAddress),
+            dest: (NodeAddress, PortAddress),
+            packet_length: u16,
+        ) -> Self {
+            Self {
+                // # IPv4 header
+                src_node: src.0,
+                dest_node: dest.0,
+                packet_length,
+
+                // # TCP header
+                src_port: src.1,
+                dest_port: dest.1,
+
+                ..Default::default()
+            }
+        }
+    }
+
+    impl MessageBody for PacketHeader {
+        fn bit_len(&self) -> usize {
+            160 + 128
+        }
+
+        fn byte_len(&self) -> usize {
+            20 + 20
+        }
+    }
+
+    impl Default for PacketHeader {
+        fn default() -> Self {
+            Self {
+                // # IPv4 header
+                src_node: 0,
+                dest_node: 0,
+
+                tos: 0,
+                packet_length: 0,
+
+                ttl: u8::MAX,
+
+                // # TCP header
+                src_port: 0,
+                dest_port: 0,
+                seq_no: 0,
+                ack_no: 0,
+                window_size: 0,
+                hop_count: 0,
+                last_node: 0,
+            }
+        }
+    }
+}
 
 /// A node-local address of an application.
-/// * This type is only available of DES is build with the `"net"` feature.*
-#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub type PortAddress = u16;
-
-///
-/// A application-addressed header in a network, similar to TCP/UDP.
-///
-/// * This type is only available of DES is build with the `"net"` feature.*
-#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-#[derive(Debug, Clone)]
-#[cfg(feature = "net-ipv6")]
-pub struct PacketHeader {
-    // # Ipv6 Header
-    pub src_node: NodeAddress,
-    pub dest_node: NodeAddress,
-
-    pub version: u8,
-    pub traffic_class: u8,
-    pub flow_label: u32,
-
-    pub packet_length: u16,
-    pub next_header: u8,
-    pub ttl: u8,
-
-    // # TCP header
-    pub src_port: PortAddress,
-    pub dest_port: PortAddress,
-
-    pub seq_no: u32,
-    pub ack_no: u32,
-    pub data_offset: u8,
-
-    pub flag_ns: bool,
-    pub flag_cwr: bool,
-    pub flag_ece: bool,
-    pub flag_urg: bool,
-    pub flag_ack: bool,
-    pub flag_psh: bool,
-    pub flag_rst: bool,
-    pub flag_syn: bool,
-    pub flag_fin: bool,
-
-    pub window_size: u16,
-    pub tcp_checksum: u16,
-    pub urgent_ptr: u16,
-
-    //# Custom headers
-    pub hop_count: usize,
-    pub last_node: NodeAddress,
-}
-
-#[cfg(feature = "net-ipv6")]
-impl PacketHeader {
-    ///
-    /// Creates a new instance of `Self`.
-    ///
-    pub fn new(
-        src: (NodeAddress, PortAddress),
-        dest: (NodeAddress, PortAddress),
-        packet_length: u16,
-    ) -> Self {
-        Self {
-            // # IPv4 header
-            src_node: src.0,
-            dest_node: dest.0,
-            packet_length,
-
-            // # TCP header
-            src_port: src.1,
-            dest_port: dest.1,
-
-            ..Default::default()
-        }
-    }
-}
-
-#[cfg(feature = "net-ipv6")]
-impl MessageBody for PacketHeader {
-    fn bit_len(&self) -> usize {
-        480 + 128
-    }
-
-    fn byte_len(&self) -> usize {
-        60 + 20
-    }
-}
-
-#[cfg(feature = "net-ipv6")]
-impl Default for PacketHeader {
-    fn default() -> Self {
-        Self {
-            // # IPv4 header
-            src_node: 0,
-            dest_node: 0,
-
-            version: 4,
-            traffic_class: 0,
-            flow_label: 0,
-
-            packet_length: 0,
-            next_header: 0,
-            ttl: u8::MAX,
-
-            // # TCP header
-            src_port: 0,
-            dest_port: 0,
-
-            seq_no: 0,
-            ack_no: 0,
-            data_offset: 0,
-
-            flag_ns: false,
-            flag_cwr: false,
-            flag_ece: false,
-            flag_urg: false,
-            flag_ack: false,
-            flag_psh: false,
-            flag_rst: false,
-            flag_syn: false,
-            flag_fin: false,
-
-            window_size: 0,
-            tcp_checksum: 0,
-            urgent_ptr: 0,
-
-            hop_count: 0,
-            last_node: 0,
-        }
-    }
-}
-
-///
-/// A application-addressed header in a network, similar to TCP/UDP.
-///
-/// * This type is only available of DES is build with the `"net"` feature.*
-#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-#[derive(Debug, Clone)]
-#[cfg(not(feature = "net-ipv6"))]
-pub struct PacketHeader {
-    // # IPv4 header
-    pub src_node: NodeAddress,
-    pub dest_node: NodeAddress,
-    pub tos: u8,
-    pub packet_length: u16,
-    pub ttl: u8,
-
-    // # TCP header
-    pub src_port: PortAddress,
-    pub dest_port: PortAddress,
-
-    pub seq_no: u32,
-    pub ack_no: u32,
-    pub window_size: u16,
-
-    //# Custom headers
-    pub hop_count: usize,
-    pub last_node: NodeAddress,
-}
-
-#[cfg(not(feature = "net-ipv6"))]
-impl PacketHeader {
-    ///
-    /// Creates a new instance of `Self`.
-    ///
-    pub fn new(
-        src: (NodeAddress, PortAddress),
-        dest: (NodeAddress, PortAddress),
-        packet_length: u16,
-    ) -> Self {
-        Self {
-            // # IPv4 header
-            src_node: src.0,
-            dest_node: dest.0,
-            packet_length,
-
-            // # TCP header
-            src_port: src.1,
-            dest_port: dest.1,
-
-            ..Default::default()
-        }
-    }
-}
-
-#[cfg(not(feature = "net-ipv6"))]
-impl MessageBody for PacketHeader {
-    fn bit_len(&self) -> usize {
-        160 + 128
-    }
-
-    fn byte_len(&self) -> usize {
-        20 + 20
-    }
-}
-
-#[cfg(not(feature = "net-ipv6"))]
-impl Default for PacketHeader {
-    fn default() -> Self {
-        Self {
-            // # IPv4 header
-            src_node: 0,
-            dest_node: 0,
-
-            tos: 0,
-            packet_length: 0,
-
-            ttl: u8::MAX,
-
-            // # TCP header
-            src_port: 0,
-            dest_port: 0,
-            seq_no: 0,
-            ack_no: 0,
-            window_size: 0,
-            hop_count: 0,
-            last_node: 0,
-        }
-    }
-}
 
 ///
 /// A application-addressed message in a network, similar to TCP/UDP.
 ///
-/// * This type is only available of DES is build with the `"net"` feature.*
-#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 #[allow(unused)]
 #[derive(Debug)]
 pub struct Packet {

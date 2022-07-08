@@ -6,17 +6,16 @@ use std::{
     marker::{PhantomData, Unsize},
     ops::{CoerceUnsized, Deref, DerefMut, DispatchFromDyn},
 };
-#[cfg(not(feature = "async"))]
-type Rc<T> = std::rc::Rc<T>;
 
-#[cfg(feature = "async")]
-type Rc<T> = std::sync::Arc<T>;
+cfg_async! {
+    type Rc<T> = std::sync::Arc<T>;
+    type Weak<T> = std::sync::Weak<T>;
+}
 
-#[cfg(not(feature = "async"))]
-type Weak<T> = std::rc::Weak<T>;
-
-#[cfg(feature = "async")]
-type Weak<T> = std::sync::Weak<T>;
+cfg_not_async! {
+    type Rc<T> = std::rc::Rc<T>;
+    type Weak<T> = std::rc::Weak<T>;
+}
 
 // TODO: Do with dyn Any
 #[allow(unused)]

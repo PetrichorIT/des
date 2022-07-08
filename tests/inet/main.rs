@@ -193,6 +193,6 @@ fn main() {
 
     let _ = app.globals_weak().topology.write_to_svg("tests/inet/graph");
 
-    assert_eq!(time, SimTime::from(0.200128));
+    assert_eq!(time, 0.200128);
     assert_eq!(event_count, 21);
 }

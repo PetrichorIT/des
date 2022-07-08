@@ -42,96 +42,58 @@ pub use crate::util::PtrWeakMut;
 // # feature = "net"
 //
 
-#[cfg(feature = "net")]
-pub use crate::net::NetworkRuntime;
-#[cfg(feature = "net")]
-pub use crate::net::NetworkRuntimeGlobals;
+cfg_net! {
+    pub use crate::net::NetworkRuntime;
+    pub use crate::net::NetworkRuntimeGlobals;
 
-#[cfg(feature = "net")]
-pub use crate::net::Channel;
-#[cfg(feature = "net")]
-pub use crate::net::ChannelMetrics;
-#[cfg(feature = "net")]
-pub use crate::net::ChannelRef;
-#[cfg(feature = "net")]
-pub use crate::net::ChannelRefMut;
+    pub use crate::net::Channel;
+    pub use crate::net::ChannelMetrics;
+    pub use crate::net::ChannelRef;
+    pub use crate::net::ChannelRefMut;
 
-#[cfg(feature = "net")]
-pub use crate::net::Gate;
-#[cfg(feature = "net")]
-pub use crate::net::GateDescription;
-#[cfg(feature = "net")]
-pub use crate::net::GateRef;
-#[cfg(feature = "net")]
-pub use crate::net::GateRefMut;
-#[cfg(feature = "net")]
-pub use crate::net::GateServiceType;
-#[cfg(feature = "net")]
-pub use crate::net::IntoModuleGate;
+    pub use crate::net::Gate;
+    pub use crate::net::GateDescription;
+    pub use crate::net::GateRef;
+    pub use crate::net::GateRefMut;
+    pub use crate::net::GateServiceType;
+    pub use crate::net::IntoModuleGate;
 
-#[cfg(feature = "net")]
-pub use crate::net::CustomSizeBody;
-#[cfg(feature = "net")]
-pub use crate::net::Message;
-#[cfg(feature = "net")]
-pub use crate::net::MessageBody;
-#[cfg(feature = "net")]
-pub use crate::net::MessageId;
-#[cfg(feature = "net")]
-pub use crate::net::MessageKind;
-#[cfg(feature = "net")]
-pub use crate::net::MessageMetadata;
+    pub use crate::net::CustomSizeBody;
+    pub use crate::net::Message;
+    pub use crate::net::MessageBody;
+    pub use crate::net::MessageId;
+    pub use crate::net::MessageKind;
+    pub use crate::net::MessageMetadata;
 
-#[cfg(feature = "net")]
-pub use crate::net::NodeAddress;
-#[cfg(feature = "net")]
-pub use crate::net::Packet;
-#[cfg(feature = "net")]
-pub use crate::net::PacketHeader;
-#[cfg(feature = "net")]
-pub use crate::net::PortAddress;
-#[cfg(feature = "net")]
-pub use crate::net::NODE_ADDR_BROADCAST;
-#[cfg(feature = "net")]
-pub use crate::net::NODE_ADDR_LOOPBACK;
+    pub use crate::net::NodeAddress;
+    pub use crate::net::Packet;
+    pub use crate::net::PacketHeader;
+    pub use crate::net::PortAddress;
+    pub use crate::net::NODE_ADDR_BROADCAST;
+    pub use crate::net::NODE_ADDR_LOOPBACK;
 
-#[cfg(feature = "net")]
-pub use crate::net::Module;
-#[cfg(feature = "net")]
-pub use crate::net::ModuleCore;
-#[cfg(feature = "net")]
-pub use crate::net::ModuleId;
-#[cfg(feature = "net")]
-pub use crate::net::ModuleRef;
-#[cfg(feature = "net")]
-pub use crate::net::ModuleRefMut;
-#[cfg(feature = "net")]
-pub use crate::net::ModuleReferencingError;
-#[cfg(feature = "net")]
-pub use crate::net::NameableModule;
-#[cfg(feature = "net")]
-pub use crate::net::StaticModuleCore;
+    pub use crate::net::Module;
+    pub use crate::net::ModuleCore;
+    pub use crate::net::ModuleId;
+    pub use crate::net::ModuleRef;
+    pub use crate::net::ModuleRefMut;
+    pub use crate::net::ModuleReferencingError;
+    pub use crate::net::NameableModule;
+    pub use crate::net::StaticModuleCore;
 
-#[cfg(feature = "net")]
-pub use crate::net::StaticSubsystemCore;
-#[cfg(feature = "net")]
-pub use crate::net::SubsystemCore;
-#[cfg(feature = "net")]
-pub use crate::net::SubsystemId;
+    pub use crate::net::StaticSubsystemCore;
+    pub use crate::net::SubsystemCore;
+    pub use crate::net::SubsystemId;
 
-#[cfg(feature = "net")]
-pub use crate::net::ObjectPath;
-#[cfg(feature = "net")]
-pub use crate::net::Parameters;
+    pub use crate::net::ObjectPath;
+    pub use crate::net::Parameters;
 
-#[cfg(feature = "net")]
-pub use crate::net::NodeDefinition;
-#[cfg(feature = "net")]
-pub use crate::net::Topology;
+    pub use crate::net::NodeDefinition;
+    pub use crate::net::Topology;
 
-//
-// Export the derives if net
-//
+    //
+    // Export the derives if net
+    //
 
-#[cfg(feature = "net")]
-pub use des_derive::*;
+    pub use des_derive::*;
+}

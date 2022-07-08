@@ -5,10 +5,10 @@
 use crate::time::SimTime;
 use std::ops::RangeInclusive;
 
-#[cfg(feature = "internal-metrics")]
-mod internal;
-#[cfg(feature = "internal-metrics")]
-pub use internal::*;
+cfg_metrics! {
+    mod internal;
+    pub use internal::*;
+}
 
 mod stddev;
 pub use stddev::*;

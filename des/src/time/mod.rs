@@ -199,23 +199,22 @@ impl From<f64> for SimTime {
 
 // TIMESPEC
 
-#[cfg(feature = "cqueue")]
-impl cqueue::AsNanosU128 for SimTime {
-    fn as_nanos(&self) -> u128 {
-        self.0.as_nanos()
+cfg_cqueue! {
+    impl cqueue::AsNanosU128 for SimTime {
+        fn as_nanos(&self) -> u128 {
+            self.0.as_nanos()
+        }
     }
-}
 
-#[cfg(feature = "cqueue")]
-impl cqueue::Timespec for SimTime {
-    const ZERO: Self = SimTime(Duration::ZERO);
-    const ONE: Self = SimTime(Duration::new(1, 0));
-}
+    impl cqueue::Timespec for SimTime {
+        const ZERO: Self = SimTime(Duration::ZERO);
+        const ONE: Self = SimTime(Duration::new(1, 0));
+    }
 
-#[cfg(feature = "cqueue")]
-impl Add<SimTime> for SimTime {
-    type Output = SimTime;
-    fn add(self, rhs: SimTime) -> SimTime {
-        Self(self.0 + rhs.0)
+    impl Add<SimTime> for SimTime {
+        type Output = SimTime;
+        fn add(self, rhs: SimTime) -> SimTime {
+            Self(self.0 + rhs.0)
+        }
     }
 }

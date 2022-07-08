@@ -22,3 +22,6 @@ des_tokio = {path = "../des_tokio", optional = true}
 
 [dev-dependencies]
 futures = "0.3.21"
+
+[package.metadata.docs.rs]
+all-features = true

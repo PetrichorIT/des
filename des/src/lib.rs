@@ -119,6 +119,10 @@
 //!
 //!
 
+#[macro_use]
+#[doc(hidden)]
+pub mod macros;
+
 pub mod prelude;
 
 pub mod metrics;
@@ -126,11 +130,13 @@ pub mod runtime;
 pub mod time;
 pub mod util;
 
-#[cfg(feature = "net")]
-pub mod net;
+cfg_net! {
+    pub mod net;
+}
 
-#[cfg(feature = "async")]
-pub use des_tokio::*;
+cfg_async! {
+    pub use des_tokio::*;
+}
 
 // # Features
 //
