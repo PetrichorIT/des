@@ -95,5 +95,5 @@ cfg_net! {
     // Export the derives if net
     //
 
-    pub use des_derive::*;
+    pub use des_macros::*;
 }

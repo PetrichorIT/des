@@ -55,9 +55,7 @@ path = "macro2/main.rs"
 
 [dependencies]
 des = {path = "../des", features = ["net", "cqueue"]}
-#  des_derive = {path = "../des_derive"}
+lazy_static = "*"
 log = {version = "*", features = ["max_level_warn", "release_max_level_warn"]}
 ndl = {path = "../ndl"}
-# log = "*"
-lazy_static = "*"
 rand = "*"

@@ -5,13 +5,13 @@
 
 cargo build -p ndl
 
-# 'des_derive' build
+# 'des_macros' build
 # ... dependent on target 'ndl'
 
-cargo build -p des_derive
+cargo build -p des_macros
 
 # 'des' build
-# ... dependent on target 'des_derive' with feature 'net'
+# ... dependent on target 'des_macros' with feature 'net'
 
 cargo build -p des
 cargo build -p des --features cqueue

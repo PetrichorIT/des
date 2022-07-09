@@ -3,14 +3,14 @@
 //! # Use Case
 //!
 //! NDL (NodeDescriptionLanguage) is a language for representing module and network structures
-//! of a DES simulation. This crate shall be used together with des_derive the codegen
+//! of a DES simulation. This crate shall be used together with des_macros the codegen
 //! unit of the "NDL compiler". The provided macros will generate code based on the given
 //! module / network description in the NDL files and attach that functionality to Structs
 //! that implement the Module trait (for networks thats not nessecary).
 //!
 //! # Usage
 //!
-//! In general this package should only be used in either the codegen macros of des_derive
+//! In general this package should only be used in either the codegen macros of des_macros
 //! or in a build script, not as standalone packet.
 //!
 //! Nonetheless if you want to interact with NDL directly here is a quick rundown:

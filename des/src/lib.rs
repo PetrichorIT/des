@@ -99,24 +99,18 @@
 //!
 //! While this feature activates smaller additions to the existing functionallity of
 //! [`net`](crate::net), it also contains a full reexport of [tokio](https://docs.rs/tokio) with modifications
-//! to fit the simulation context. For example the [signal](https://docs.rs/tokio/latest/tokio/signal/index.html)
-//! module is NOT reexported since awaiting signals will block the entire simulation and does serve
-//! not purpose since signals to the simulation process have nothing to do
-//! with signals to the async codebase.
+//! to fit the simulation context. This version of tokio is implicitly reexported with the
+//! newly added feature sim to integrate into a simulation context and thus does NOT
+//! provide access to the [`fs`](https://docs.rs/tokio/latest/tokio/fs/index.html),
+//! [`signal`](https://docs.rs/tokio/latest/tokio/signal/index.html) or
+//! [`net`](https://docs.rs/tokio/latest/tokio/fs/index.html) modules.
+//! Additionally this version only supports current-thread runtimes.
 //!
-//! However modules like [`fs`](crate::fs), [`io`](crate::io), [`process`](crate::process),
-//! [`task`](crate::task) and [`stream`](crate::stream) are reexported to
-//! make DES a swap in replacement for tokio, to minimize differences in the codebase
-//! between a prototype and a simulation-ready prototype.  It should be noted
-//! that neither the filesystem nor the process management should be used excessivly
-//! since they block the entire simulation. Thus they should only be used when absoloutly
-//! nessecary (e.g. when reading the config files at sim_start).
-//!
-//! The [`tokio::net`](https://docs.rs/tokio/latest/tokio/net/index.html) module however is
-//! NOT reexported since this communication layer is implemented by the simulation
-//! itself in its own [`net`](crate::net) module. However those two modules have nothing in common
-//! since DES is not designed for direct network access.
-//!
+//! However it supports all synchronisation primitives (excluding Barrier)
+//! through the [`sync`](tokio::sync) module, asynchronous green tasks
+//! through [`task`](tokio::task), custom runtimes through [`runtime`](tokio::rumtime)
+//! and simulation specific time primives through [`sim`](tokio::sim) replacing the
+//! standard [`time`](https://docs.rs/tokio/latest/tokio/time/index.html) module.
 //!
 
 #[macro_use]
@@ -135,7 +129,10 @@ cfg_net! {
 }
 
 cfg_async! {
-    pub use des_tokio::*;
+    ///
+    /// A modified version of tokio with added simulation support.
+    ///
+    pub use ::tokio as tokio;
 }
 
 // # Features

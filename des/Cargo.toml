@@ -1,24 +1,47 @@
 [package]
-edition = "2021"
 name = "des"
-version = "0.3.0"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+#
+# Other manifest items
+#
+authors = ["PetrichorIT <github.com/PetrichorIT>"]
+categories = ["simulation", "asynchronous", "network-programming"]
+description = """
+A simulation backend for discrete event simulations, supporting
+simulation of asynchronous systems via tokio.
+"""
+edition = "2021"
+keywords = ["async", "simulation", "tokio", "net"]
+license = "MIT"
+readme = "../README.md"
+repository = "https://github.com/PetrichorIT/des"
+version = "0.3.1"
 
 [features]
-async = ["net", "dep:des_tokio"]
+# Include nothing by default
+default = []
+
+# Include everything used for default test runs.
+# TODO: Include async in this list once its fully implemented 
+full = ["net", "cqueue"]
+
+async = ["net", "dep:tokio"]
 internal-metrics = []
-net = ["dep:des_derive"]
+net = ["dep:des_macros"]
 net-ipv6 = ["net"]
 
 [dependencies]
+# An internal logging impl can be very usefull. 
 log = "0.4.14"
-rand = {version = "*", features = ["std_rng"]}
 termcolor = "1.1.2"
 
+# Rand primives must be set since they are bound to the
+# runtime and sould be seedable by the user.
+rand = {version = "*", features = ["std_rng"]}
+
+# All other dependencies are optional
 cqueue = {path = "../cqueue", features = ["optimized"], optional = true}
-des_derive = {path = "../des_derive", optional = true}
-des_tokio = {path = "../des_tokio", optional = true}
+des_macros = {path = "../des_macros", optional = true}
+tokio = {git = "https://github.com/PetrichorIT/tokio_sim", features = ["sim"], optional = true}
 
 [dev-dependencies]
 futures = "0.3.21"

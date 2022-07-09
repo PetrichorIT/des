@@ -88,10 +88,10 @@ pub struct ModuleCore {
     pub(crate) buffers: ModuleBuffer,
 
     #[cfg(feature = "async")]
-    pub(crate) async_buffers: crate::sync::mpsc::UnboundedReceiver<super::handle::BufferEvent>,
+    pub(crate) async_buffers: tokio::sync::mpsc::UnboundedReceiver<super::handle::BufferEvent>,
 
     #[cfg(feature = "async")]
-    pub(crate) async_handle: crate::sync::mpsc::UnboundedSender<super::handle::BufferEvent>,
+    pub(crate) async_handle: tokio::sync::mpsc::UnboundedSender<super::handle::BufferEvent>,
 
     /// The period of the activity coroutine (if zero than there is no coroutine).
     pub(crate) activity_period: Duration,
@@ -209,7 +209,7 @@ impl ModuleCore {
     ///
     pub fn new_with(path: ObjectPath, globals: PtrWeakConst<NetworkRuntimeGlobals>) -> Self {
         #[cfg(feature = "async")]
-        let (tx, rx) = crate::sync::mpsc::unbounded_channel_unwatched();
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
 
         Self {
             id: ModuleId::gen(),
@@ -238,7 +238,7 @@ impl ModuleCore {
     pub fn child_of(name: &str, parent: &ModuleCore) -> Self {
         let path = ObjectPath::module_with_parent(name, &parent.path);
         #[cfg(feature = "async")]
-        let (tx, rx) = crate::sync::mpsc::unbounded_channel_unwatched();
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
 
         Self {
             id: ModuleId::gen(),
