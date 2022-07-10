@@ -10,9 +10,6 @@ cfg_async! {
     pub use self::async_mod::*;
 }
 
-#[cfg(test)]
-mod tests;
-
 ///
 /// A readonly reference to a module.
 ///

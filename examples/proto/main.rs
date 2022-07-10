@@ -1,7 +1,7 @@
 use des::prelude::*;
 
 #[derive(Debug)]
-#[NdlModule("tests/proto")]
+#[NdlModule("examples/proto")]
 struct AppA {
     core: ModuleCore,
 }
@@ -14,7 +14,7 @@ impl Module for AppA {
 }
 
 #[derive(Debug)]
-#[NdlModule("tests/proto")]
+#[NdlModule("examples/proto")]
 struct AppB {
     core: ModuleCore,
 }
@@ -27,7 +27,7 @@ impl Module for AppB {
 }
 
 #[derive(Debug)]
-#[NdlModule("tests/proto")]
+#[NdlModule("examples/proto")]
 struct Runner {
     core: ModuleCore,
 }
@@ -37,7 +37,7 @@ impl Module for Runner {
 }
 
 #[derive(Debug)]
-#[NdlModule("tests/proto")]
+#[NdlModule("examples/proto")]
 struct MultiRunner {
     core: ModuleCore,
 }
@@ -61,7 +61,7 @@ impl Module for MultiRunner {
     }
 }
 
-#[NdlSubsystem("tests/proto")]
+#[NdlSubsystem("examples/proto")]
 #[derive(Debug, Default)]
 struct Main();
 fn main() {
@@ -75,5 +75,5 @@ fn main() {
     let _ = app
         .globals_weak()
         .topology
-        .write_to_svg("tests/proto/graph");
+        .write_to_svg("examples/proto/graph");
 }

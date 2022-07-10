@@ -3,7 +3,7 @@ use des::prelude::*;
 mod members;
 use members::*;
 
-#[NdlSubsystem("tests/utils")]
+#[NdlSubsystem("examples/utils")]
 #[derive(Debug, Default)]
 struct A();
 
@@ -18,7 +18,7 @@ fn main() {
     assert_eq!(topo.nodes().count(), 4);
     assert_eq!(topo.edges().count(), 14);
 
-    let _ = topo.write_to_svg("tests/utils/graph");
+    let _ = topo.write_to_svg("examples/utils/graph");
 
     assert_eq!(event_count, 94);
     assert_eq!(time, SimTime::from(45.0))

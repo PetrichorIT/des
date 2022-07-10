@@ -3,7 +3,7 @@ use std::ops::Deref;
 use des::prelude::*;
 use log::info;
 
-#[NdlModule("tests/ndl")]
+#[NdlModule("examples/ndl")]
 pub struct Alice(ModuleCore);
 
 impl Module for Alice {
@@ -20,7 +20,7 @@ impl Module for Alice {
     }
 }
 
-#[NdlModule("tests/ndl")]
+#[NdlModule("examples/ndl")]
 pub struct Bob(ModuleCore);
 
 impl Module for Bob {

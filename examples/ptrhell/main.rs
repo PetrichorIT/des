@@ -3,7 +3,7 @@ use des::prelude::*;
 mod modules;
 pub use modules::*;
 
-#[NdlSubsystem("tests/ptrhell")]
+#[NdlSubsystem("examples/ptrhell")]
 #[derive(Debug, Default)]
 struct Main();
 

@@ -37,6 +37,11 @@ impl SimTime {
         SIMTIME_NOW.get()
     }
 
+    #[must_use]
+    pub const fn duration_since_zero(duration: Duration) -> Self {
+        Self(duration)
+    }
+
     pub fn eq_approx(&self, other: SimTime) -> bool {
         let dur = self.duration_diff(other);
         dur < Duration::from_nanos(10)

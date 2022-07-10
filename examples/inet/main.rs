@@ -191,7 +191,10 @@ fn main() {
 
     let (app, time, event_count) = rt.run().unwrap();
 
-    let _ = app.globals_weak().topology.write_to_svg("tests/inet/graph");
+    let _ = app
+        .globals_weak()
+        .topology
+        .write_to_svg("examples/inet/graph");
 
     assert_eq!(time, 0.200128);
     assert_eq!(event_count, 21);

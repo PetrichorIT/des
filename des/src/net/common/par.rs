@@ -40,13 +40,13 @@ impl Parameters {
         self.tree.borrow_mut().insert(key, value)
     }
 
-    pub(crate) fn get(&self, key: &str) -> HashMap<String, String> {
+    pub(crate) fn get_def_table(&self, key: &str) -> HashMap<String, String> {
         let mut map = HashMap::new();
         self.tree.borrow().get(key, &mut map);
         map
     }
 
-    pub(crate) fn get_handle<'a>(&'a self, path: &'a str, key: &'a str) -> ParHandle<'a, Optional> {
+    pub fn get_handle<'a>(&'a self, path: &'a str, key: &'a str) -> ParHandle<'a, Optional> {
         ParHandle {
             tree_ref: self,
             path,
@@ -196,6 +196,25 @@ where
             .updates
             .borrow_mut()
             .push(self.path.to_string());
+    }
+}
+
+impl<'a> ParHandle<'a, Unwraped> {
+    pub fn parse_string(&self) -> String {
+        let mut parsed = self.value.clone().unwrap();
+        // Trim marks
+        let mut chars = parsed.chars();
+        let mut is_marked = parsed.len() >= 2;
+        is_marked &= chars.next() == Some('"');
+        is_marked &= chars.next_back() == Some('"');
+
+        if is_marked {
+            parsed.pop();
+            parsed.remove(0);
+            parsed
+        } else {
+            parsed
+        }
     }
 }
 

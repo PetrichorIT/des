@@ -9,7 +9,7 @@ lazy_static! {
     static ref MODULE_LEN: Arc<Mutex<usize>> = Arc::new(Mutex::new(0));
 }
 
-#[NdlSubsystem("tests/droptest")]
+#[NdlSubsystem("examples/droptest")]
 #[derive(Debug, Default)]
 struct Main();
 

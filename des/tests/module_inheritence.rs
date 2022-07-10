@@ -1,6 +1,6 @@
-use std::any::TypeId;
+#![cfg(feature = "net")]
 
-use crate::{net::NetworkRuntimeGlobals, prelude::*, util::PtrMut};
+use des::{net::NetworkRuntimeGlobals, prelude::*, util::PtrMut};
 
 macro_rules! auto_impl_static {
     ($ident: ident) => {
@@ -118,11 +118,11 @@ fn test_case_build() {
 fn test_parent_ptr() {
     let case = TestCase::build();
 
-    println!("Parent: {:?}", TypeId::of::<Parent>());
-    println!("Child: {:?}", TypeId::of::<Child>());
-    println!("GrandChild: {:?}", TypeId::of::<GrandChild>());
+    // println!("Parent: {:?}", TypeId::of::<Parent>());
+    // println!("Child: {:?}", TypeId::of::<Child>());
+    // println!("GrandChild: {:?}", TypeId::of::<GrandChild>());
 
-    println!("{:?}", case.children[0]);
+    // println!("{:?}", case.children[0]);
 
     assert_eq!(
         case.children[0].parent_as::<Parent>().unwrap().id(),

@@ -1,6 +1,6 @@
 use des::prelude::*;
 
-#[NdlModule("tests/metrics")]
+#[NdlModule("examples/metrics")]
 #[derive(Debug)]
 struct Alice {
     core: ModuleCore,
@@ -12,7 +12,7 @@ impl NameableModule for Alice {
         Self {
             outvec: OutVec::new("sample_vec".to_string(), Some(core.path().clone()))
                 .buffer_max(100)
-                .result_dir(String::from("tests/metrics/results")),
+                .result_dir(String::from("examples/metrics/results")),
             core,
         }
     }
@@ -34,7 +34,7 @@ impl Module for Alice {
     fn handle_message(&mut self, _: Message) {}
 }
 
-#[NdlSubsystem("tests/metrics")]
+#[NdlSubsystem("examples/metrics")]
 #[derive(Debug, Default)]
 struct Main {}
 
@@ -42,7 +42,7 @@ fn main() {
     Main::default().run_with_options(RuntimeOptions::seeded(123).max_itr(1000));
 
     let contents =
-        std::fs::read_to_string("tests/metrics/results/alice[1]_sample_vec.out").unwrap();
+        std::fs::read_to_string("examples/metrics/results/alice[1]_sample_vec.out").unwrap();
 
     assert_eq!(contents.chars().filter(|c| *c == '#').count(), 2);
     assert_eq!(contents.lines().count(), 202)

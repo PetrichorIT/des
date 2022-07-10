@@ -8,7 +8,7 @@ members = [
   "des_macros",
   "cqueue",
   "ndl",
-  "tests",
+  "examples",
 ]
 
 exclude = ["tests_async"]

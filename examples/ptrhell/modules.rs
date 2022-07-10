@@ -1,7 +1,7 @@
-use crate::MODULE_LEN;
 use des::prelude::*;
 
-#[NdlModule("tests/droptest")]
+#[derive(Debug)]
+#[NdlModule("examples/ptrhell")]
 pub struct Alice(ModuleCore);
 
 impl Module for Alice {
@@ -10,7 +10,6 @@ impl Module for Alice {
         self.send(msg, ("netOut", 0));
 
         println!("SimStared");
-        *MODULE_LEN.lock().unwrap() += 1;
     }
 
     fn handle_message(&mut self, msg: Message) {
@@ -19,20 +18,11 @@ impl Module for Alice {
     }
 }
 
-impl Drop for Alice {
-    fn drop(&mut self) {
-        *MODULE_LEN.lock().unwrap() -= 1;
-    }
-}
-
-#[NdlModule("tests/droptest")]
+#[derive(Debug)]
+#[NdlModule("examples/ptrhell")]
 pub struct Bob(ModuleCore);
 
 impl Module for Bob {
-    fn at_sim_start(&mut self, _stage: usize) {
-        *MODULE_LEN.lock().unwrap() += 1;
-    }
-
     fn handle_message(&mut self, msg: Message) {
         let (msg, head) = msg.cast::<usize>();
 
@@ -43,27 +33,12 @@ impl Module for Bob {
     }
 }
 
-impl Drop for Bob {
-    fn drop(&mut self) {
-        *MODULE_LEN.lock().unwrap() -= 1;
-    }
-}
-
-#[NdlModule("tests/droptest")]
+#[derive(Debug)]
+#[NdlModule("examples/ptrhell")]
 pub struct Network(ModuleCore);
 
 impl Module for Network {
-    fn at_sim_start(&mut self, _: usize) {
-        *MODULE_LEN.lock().unwrap() += 1;
-    }
-
     fn handle_message(&mut self, _: Message) {
         unimplemented!()
-    }
-}
-
-impl Drop for Network {
-    fn drop(&mut self) {
-        *MODULE_LEN.lock().unwrap() -= 1;
     }
 }

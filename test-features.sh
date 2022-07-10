@@ -15,14 +15,8 @@
 # - time
 # - net (v4 or v6)
 
-# "runtime", "time"
-cargo test -p des
 # "runtime", "time", "net"
-cargo test -p des --features net
-# "runtime", "time", "net(v6)"
-cargo test -p des --features net --features net-ipv6
-# "runtime", "time", "net", "async" (not that v4/v6 does not matter to async)
-cargo test -p des --features net --features async
+cargo test -p des --features full
 
 # 'ndl' tests
 

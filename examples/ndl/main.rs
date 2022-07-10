@@ -3,7 +3,7 @@ use des::prelude::*;
 mod members;
 use members::*;
 
-#[NdlSubsystem("tests/ndl")]
+#[NdlSubsystem("examples/ndl")]
 #[derive(Debug, Default)]
 struct A();
 

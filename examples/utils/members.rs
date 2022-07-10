@@ -5,7 +5,7 @@ use des::prelude::*;
 use log::info;
 
 #[derive(Debug)]
-#[NdlModule("tests/utils")]
+#[NdlModule("examples/utils")]
 pub struct Alice(ModuleCore);
 
 impl Module for Alice {
@@ -32,7 +32,7 @@ impl Module for Alice {
 }
 
 #[derive(Debug)]
-#[NdlModule("tests/utils")]
+#[NdlModule("examples/utils")]
 pub struct Bob(ModuleCore);
 
 impl Module for Bob {

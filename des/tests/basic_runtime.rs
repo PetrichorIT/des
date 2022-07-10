@@ -1,32 +1,34 @@
 use des::prelude::*;
-use rand::prelude::SliceRandom;
+use rand::{distributions::Standard, prelude::SliceRandom, Rng};
 
 /// The Event ste
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 enum MyEventSet {
-    A(A),
+    RegisterToRtWithTime(RegisterToRtWithTime),
     B(B),
+    RepeatWithDelay(RepeatWithDelay),
 }
 
 impl EventSet<App> for MyEventSet {
     fn handle(self, rt: &mut Runtime<App>) {
         match self {
-            Self::A(a) => a.handle(rt),
+            Self::RegisterToRtWithTime(a) => a.handle(rt),
             Self::B(b) => b.handle(rt),
+            Self::RepeatWithDelay(rwd) => rwd.handle(rt),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-struct A {
+struct RegisterToRtWithTime {
     id: usize,
 }
 
-impl Event<App> for A {
+impl Event<App> for RegisterToRtWithTime {
     fn handle(self, rt: &mut Runtime<App>) {
         rt.app
             .event_list
-            .push((SimTime::now(), MyEventSet::A(self)))
+            .push((SimTime::now(), MyEventSet::RegisterToRtWithTime(self)))
     }
 }
 
@@ -52,6 +54,189 @@ impl Application for App {
     type EventSet = MyEventSet;
 }
 
+#[test]
+fn zero_event_runtime() {
+    let rt = Runtime::<App>::new(App {
+        event_list: Vec::new(),
+    });
+
+    let res = rt.run();
+    assert!(matches!(res, RuntimeResult::EmptySimulation { .. }))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+struct RepeatWithDelay {
+    delay: Duration,
+    repeat: usize,
+    repeat_limit: usize,
+}
+impl Event<App> for RepeatWithDelay {
+    fn handle(mut self, rt: &mut Runtime<App>) {
+        if self.repeat <= self.repeat_limit {
+            let delay = self.delay;
+            self.repeat += 1;
+            rt.add_event_in(MyEventSet::RepeatWithDelay(self), delay)
+        }
+    }
+}
+
+#[test]
+fn one_event_runtime() {
+    let mut rt = Runtime::<App>::new(App {
+        event_list: Vec::new(),
+    });
+    rt.add_event(
+        MyEventSet::RepeatWithDelay(RepeatWithDelay {
+            delay: 1.0.into(),
+            repeat: 0,
+            repeat_limit: 15,
+        }),
+        SimTime::ZERO,
+    );
+
+    // repeat i = i secs
+    // limit (<=) is at 15s thus time limit 16s
+    // this means 17 events
+
+    let res = rt.run();
+    match res {
+        RuntimeResult::Finished {
+            time, event_count, ..
+        } => {
+            assert_eq!(time, SimTime::duration_since_zero(Duration::new(16, 0)));
+            assert_eq!(event_count, 17);
+        }
+        _ => assert!(false, "Runtime should have finished"),
+    }
+}
+
+#[test]
+fn ensure_event_order() {
+    use rand::{rngs::StdRng, SeedableRng};
+
+    let mut id = 0;
+    let mut events = Vec::with_capacity(128);
+    let mut time = SimTime::ZERO;
+
+    let mut rng = StdRng::seed_from_u64(123);
+
+    for _i in 0..128 {
+        time += rng.sample::<f64, Standard>(Standard).into();
+        id += 1;
+
+        events.push((
+            MyEventSet::RegisterToRtWithTime(RegisterToRtWithTime { id }),
+            time,
+        ));
+    }
+
+    events.shuffle(&mut rng);
+
+    let mut rt: Runtime<App> = Runtime::new_with(
+        App {
+            event_list: Vec::with_capacity(128),
+        },
+        RuntimeOptions::seeded(123),
+    );
+
+    for (event, time) in events {
+        rt.add_event(event, time);
+    }
+
+    match rt.run() {
+        RuntimeResult::Finished {
+            app,
+            time: rt_fin_time,
+            event_count,
+        } => {
+            assert_eq!(rt_fin_time, time);
+            assert_eq!(event_count, 128);
+
+            let mut last_id = 0;
+            for (_, event) in app.event_list {
+                match event {
+                    MyEventSet::RegisterToRtWithTime(a) => {
+                        assert_eq!(last_id + 1, a.id);
+                        last_id += 1;
+                    }
+                    _ => assert!(false, "Unexpected event"),
+                }
+            }
+        }
+        _ => assert!(
+            false,
+            "Expected runtime to finish after fininte non-replicating event set"
+        ),
+    }
+}
+
+#[test]
+#[cfg(not(feature = "cqueue"))]
+fn ensure_event_order_same_time() {
+    let one = SimTime::duration_since_zero(Duration::new(1, 0));
+    let two = SimTime::duration_since_zero(Duration::new(2, 0));
+
+    let events = vec![
+        (
+            MyEventSet::RegisterToRtWithTime(RegisterToRtWithTime { id: 1 }),
+            SimTime::ZERO,
+        ),
+        (
+            MyEventSet::RegisterToRtWithTime(RegisterToRtWithTime { id: 2 }),
+            one,
+        ),
+        (
+            MyEventSet::RegisterToRtWithTime(RegisterToRtWithTime { id: 3 }),
+            one,
+        ),
+        (
+            MyEventSet::RegisterToRtWithTime(RegisterToRtWithTime { id: 4 }),
+            one,
+        ),
+        (
+            MyEventSet::RegisterToRtWithTime(RegisterToRtWithTime { id: 5 }),
+            two,
+        ),
+    ];
+
+    let mut rt: Runtime<App> = Runtime::new_with(
+        App {
+            event_list: Vec::with_capacity(32),
+        },
+        RuntimeOptions::seeded(123),
+    );
+
+    for (event, time) in events {
+        rt.add_event(event, time);
+    }
+
+    match rt.run() {
+        RuntimeResult::Finished {
+            app,
+            time: rt_fin_time,
+            event_count,
+        } => {
+            assert_eq!(rt_fin_time, two);
+            assert_eq!(event_count, 5);
+
+            let mut last_id = 0;
+            for (_, event) in app.event_list {
+                match event {
+                    MyEventSet::RegisterToRtWithTime(a) => {
+                        assert_eq!(last_id + 1, a.id);
+                        last_id += 1;
+                    }
+                    _ => assert!(false, "Unexpected event"),
+                }
+            }
+        }
+        _ => assert!(
+            false,
+            "Expected runtime to finish after fininte non-replicating event set"
+        ),
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EventBox {
     time: SimTime,
@@ -61,7 +246,7 @@ pub struct EventBox {
 const N: usize = 100_000;
 
 #[test]
-fn main() {
+fn full_test_n_100_000() {
     let mut rt: Runtime<App> = Runtime::new_with(
         App {
             event_list: Vec::with_capacity(N),
@@ -142,7 +327,7 @@ fn main() {
 
 fn random_event(rt: &mut Runtime<App>) -> MyEventSet {
     if rt.random::<bool>() {
-        MyEventSet::A(A {
+        MyEventSet::RegisterToRtWithTime(RegisterToRtWithTime {
             id: rt.random::<usize>(),
         })
     } else {

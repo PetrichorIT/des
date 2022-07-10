@@ -161,7 +161,7 @@ fn ndl_parser_test() {
 fn ndl_full_test() {
     let mut resolver = NdlResolver::quiet("tests/full")
         .expect("Failed to create resolver")
-        .verbose("tests/full/output/");
+        .verbose("examples/full/output/");
 
     println!("{}", resolver);
 

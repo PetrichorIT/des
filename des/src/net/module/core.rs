@@ -577,7 +577,7 @@ impl ModuleCoreInner {
     /// Returns the parameters for the current module.
     ///
     pub fn pars(&self) -> HashMap<String, String> {
-        self.globals.parameters.get(self.path.path())
+        self.globals.parameters.get_def_table(self.path.path())
     }
 
     ///

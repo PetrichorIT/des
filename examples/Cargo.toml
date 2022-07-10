@@ -1,13 +1,9 @@
 [package]
 edition = "2021"
-name = "tests"
+name = "examples"
 version = "0.1.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[[bin]]
-name = "t-events"
-path = "events/main.rs"
 
 [[bin]]
 name = "t-inet"
@@ -36,10 +32,6 @@ path = "utils/main.rs"
 [[bin]]
 name = "t-ptrhell"
 path = "ptrhell/main.rs"
-
-[[bin]]
-name = "t-par"
-path = "par/main.rs"
 
 [[bin]]
 name = "t-proto"

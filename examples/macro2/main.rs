@@ -1,6 +1,6 @@
 use des::prelude::*;
 
-#[NdlModule(workspace = "tests/macro2", ndl_ident = "Alice")]
+#[NdlModule(workspace = "examples/macro2", ndl_ident = "Alice")]
 struct AliceImpl {
     #[allow(dead_code)]
     some_state: usize,
@@ -20,13 +20,13 @@ impl Module for Alice {
     fn handle_message(&mut self, _msg: Message) {}
 }
 
-#[NdlSubsystem(workspace = "tests/macro2")]
+#[NdlSubsystem(workspace = "examples/macro2")]
 struct TestNet {
     #[allow(dead_code)]
     global_data: Vec<usize>,
 }
 
-#[NdlSubsystem("tests/macro2", "MainNet")]
+#[NdlSubsystem("examples/macro2", "MainNet")]
 struct MyNet;
 
 fn main() {}
