@@ -54,7 +54,7 @@ name = "t-macro2"
 path = "macro2/main.rs"
 
 [dependencies]
-des = {path = "../des", features = ["net", "cqueue"]}
+des = {path = "../des", features = ["full"]}
 lazy_static = "*"
 log = {version = "*", features = ["max_level_warn", "release_max_level_warn"]}
 ndl = {path = "../ndl"}

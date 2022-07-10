@@ -12,6 +12,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-trait"
+version = "0.1.56"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "96cf8829f67d2eab0b2dfa42c5d0ef737e0724e4a82b01b3e292456202b19716"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "atty"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -204,6 +215,7 @@ dependencies = [
 name = "des"
 version = "0.3.1"
 dependencies = [
+ "async-trait",
  "cqueue",
  "des_macros",
  "futures",
@@ -790,7 +802,7 @@ dependencies = [
 [[package]]
 name = "tokio"
 version = "1.19.2"
-source = "git+https://github.com/PetrichorIT/tokio_sim#b016510307d3aa903574365695e3c6eee488ce6a"
+source = "git+https://github.com/PetrichorIT/tokio_sim#d236aadf702f34939ce6729f634b657f2627e896"
 dependencies = [
  "autocfg",
  "once_cell",

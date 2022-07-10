@@ -21,10 +21,9 @@ version = "0.3.1"
 default = []
 
 # Include everything used for default test runs.
-# TODO: Include async in this list once its fully implemented 
-full = ["net", "cqueue"]
+full = ["net", "cqueue", "async"]
 
-async = ["net", "dep:tokio"]
+async = ["net", "dep:tokio", "dep:async-trait"]
 internal-metrics = []
 net = ["dep:des_macros"]
 net-ipv6 = ["net"]
@@ -39,6 +38,7 @@ termcolor = "1.1.2"
 rand = {version = "*", features = ["std_rng"]}
 
 # All other dependencies are optional
+async-trait = {version = "0.1.56", optional = true}
 cqueue = {path = "../cqueue", features = ["optimized"], optional = true}
 des_macros = {path = "../des_macros", optional = true}
 tokio = {git = "https://github.com/PetrichorIT/tokio_sim", features = ["sim"], optional = true}

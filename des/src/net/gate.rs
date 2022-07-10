@@ -3,6 +3,8 @@ use crate::util::*;
 use std::fmt::{Debug, Display};
 use std::marker::Unsize;
 
+use super::module::ModuleCoreInner;
+
 ///
 /// A readonly reference to a gate.
 ///
@@ -322,41 +324,41 @@ pub trait IntoModuleGate: private::Sealed {
     /// Extracts a gate identifier from a module using the given
     /// value as implicit reference.
     ///
-    fn as_gate(&self, _module: &ModuleCore) -> Option<GateRef> {
+    fn as_gate(&self, _module: &ModuleCoreInner) -> Option<GateRef> {
         None
     }
 }
 
 impl IntoModuleGate for GateRef {
-    fn as_gate(&self, _module: &ModuleCore) -> Option<GateRef> {
+    fn as_gate(&self, _module: &ModuleCoreInner) -> Option<GateRef> {
         Some(self.clone())
     }
 }
 impl private::Sealed for GateRef {}
 
 impl IntoModuleGate for &GateRef {
-    fn as_gate(&self, _module: &ModuleCore) -> Option<GateRef> {
+    fn as_gate(&self, _module: &ModuleCoreInner) -> Option<GateRef> {
         Some(Ptr::clone(self))
     }
 }
 impl private::Sealed for &GateRef {}
 
 impl IntoModuleGate for GateRefMut {
-    fn as_gate(&self, _module: &ModuleCore) -> Option<GateRef> {
+    fn as_gate(&self, _module: &ModuleCoreInner) -> Option<GateRef> {
         Some(self.clone().make_const())
     }
 }
 impl private::Sealed for GateRefMut {}
 
 impl IntoModuleGate for &GateRefMut {
-    fn as_gate(&self, _module: &ModuleCore) -> Option<GateRef> {
+    fn as_gate(&self, _module: &ModuleCoreInner) -> Option<GateRef> {
         Some(Ptr::clone(self).make_const())
     }
 }
 impl private::Sealed for &GateRefMut {}
 
 impl IntoModuleGate for (&str, usize) {
-    fn as_gate(&self, module: &ModuleCore) -> Option<GateRef> {
+    fn as_gate(&self, module: &ModuleCoreInner) -> Option<GateRef> {
         let element = module
             .gates()
             .iter()
@@ -368,7 +370,7 @@ impl IntoModuleGate for (&str, usize) {
 impl private::Sealed for (&str, usize) {}
 
 impl IntoModuleGate for &str {
-    fn as_gate(&self, module: &ModuleCore) -> Option<GateRef> {
+    fn as_gate(&self, module: &ModuleCoreInner) -> Option<GateRef> {
         let element = module
             .gates()
             .iter()

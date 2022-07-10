@@ -54,8 +54,8 @@ unsafe impl Send for BufferEvent {}
 /// from a module.
 ///
 pub struct HandleSender {
-    pub(super) inner: tokio::sync::mpsc::UnboundedSender<BufferEvent>,
-    pub(super) time_offset: Duration,
+    pub(crate) inner: tokio::sync::mpsc::UnboundedSender<BufferEvent>,
+    pub(crate) time_offset: Duration,
 }
 
 impl HandleSender {

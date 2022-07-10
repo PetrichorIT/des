@@ -91,6 +91,10 @@ cfg_net! {
     pub use crate::net::NodeDefinition;
     pub use crate::net::Topology;
 
+    cfg_async! {
+        pub use crate::net::AsyncModule;
+    }
+
     //
     // Export the derives if net
     //

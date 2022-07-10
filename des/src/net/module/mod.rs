@@ -6,8 +6,8 @@ mod core;
 pub use self::core::*;
 
 cfg_async! {
-    mod handle;
-    pub use self::handle::*;
+    mod async_mod;
+    pub use self::async_mod::*;
 }
 
 #[cfg(test)]

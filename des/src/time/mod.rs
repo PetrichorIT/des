@@ -218,3 +218,19 @@ cfg_cqueue! {
         }
     }
 }
+
+cfg_async! {
+    impl From<tokio::sim::SimTime> for SimTime {
+        fn from(tokio: tokio::sim::SimTime) -> Self {
+            let dur = *tokio.deref();
+            SimTime(Duration(dur))
+        }
+    }
+
+    impl From<SimTime> for tokio::sim::SimTime {
+        fn from(des: SimTime) -> Self {
+            let dur = des.0.0;
+            tokio::sim::SimTime::from_std(dur)
+        }
+    }
+}

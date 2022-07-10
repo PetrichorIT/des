@@ -8,7 +8,7 @@ use std::ops::*;
 ///
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 #[repr(transparent)]
-pub struct Duration(std::time::Duration);
+pub struct Duration(pub(super) std::time::Duration);
 
 impl Duration {
     /// A duration of zero time.

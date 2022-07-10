@@ -75,6 +75,10 @@ pub use self::module::ModuleRefMut;
 pub use self::module::ModuleReferencingError;
 pub use self::module::StaticModuleCore;
 
+cfg_async! {
+    pub use self::module::AsyncModule;
+}
+
 pub use self::ndl::NameableModule;
 pub use self::ndl::__Buildable0;
 pub use self::ndl::__Buildable1;
