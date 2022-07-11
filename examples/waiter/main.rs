@@ -31,17 +31,17 @@ impl Application {
             .wait_times
             .iter()
             .fold(Duration::ZERO, |acc, &i| acc + i)
-            / self.wait_times.len() as f64;
+            / self.wait_times.len() as u32;
 
         println!("=== Simulation finished ===");
         println!("l = {} \tm = {}", self.l, self.m);
         println!();
         println!("Finshed at t := {}", t);
         println!("Busy := {}", busy_perc);
-        println!("(avg) waittime := {}", avg_wait);
+        println!("(avg) waittime := {:?}", avg_wait);
 
         assert!((busy_perc - 0.4996535454771872).abs() < 0.01);
-        assert_eq!(avg_wait, Duration::from(1.0021351711438122f64))
+        assert_eq!(avg_wait, Duration::from_secs_f64(1.00213517))
     }
 }
 
@@ -110,7 +110,7 @@ impl Event<Application> for CustomerArrival {
 
         let customer = Customer {
             arrived: rt.sim_time(),
-            duration: duration.into(),
+            duration: Duration::from_secs_f64(duration),
         };
 
         if rt.app.busy {
@@ -128,7 +128,7 @@ impl Event<Application> for CustomerArrival {
 
         rt.add_event_in(
             Events::CustomerArrival(CustomerArrival { idx: self.idx + 1 }),
-            next,
+            Duration::from_secs_f64(next),
         );
     }
 }
@@ -157,7 +157,7 @@ fn main() {
 
     // Create first event
     let l = rt.app.l;
-    let dur = expdist(&mut rt, l);
+    let dur = Duration::from_secs_f64(expdist(&mut rt, l));
     rt.add_event_in(Events::CustomerArrival(CustomerArrival { idx: 0 }), dur);
 
     let (app, t_max, _) = rt.run().unwrap();

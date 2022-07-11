@@ -1,6 +1,10 @@
+use std::ops::{Add, AddAssign};
+
 use super::SimTime;
-use std::fmt::*;
-use std::ops::*;
+
+pub type Duration = std::time::Duration;
+
+/*
 
 ///
 /// An extended version of [std::time::Duration] designed to interact
@@ -412,20 +416,7 @@ impl DivAssign<u32> for Duration {
 
 // THIRD PARTY TYPES
 
-impl Add<Duration> for SimTime {
-    type Output = SimTime;
 
-    fn add(self, rhs: Duration) -> Self::Output {
-        self.checked_add(rhs)
-            .expect("Overflow when adding Duration to SimTime")
-    }
-}
-
-impl AddAssign<Duration> for SimTime {
-    fn add_assign(&mut self, rhs: Duration) {
-        self.0.add_assign(rhs)
-    }
-}
 
 // # Missing # Add<Duration> for SystemTime
 
@@ -473,5 +464,39 @@ impl From<f64> for Duration {
 impl From<Duration> for f64 {
     fn from(value: Duration) -> Self {
         value.as_secs_f64()
+    }
+}
+
+*/
+
+impl Add<Duration> for SimTime {
+    type Output = SimTime;
+
+    fn add(self, rhs: Duration) -> Self::Output {
+        self.checked_add(rhs)
+            .expect("Overflow when adding Duration to SimTime")
+    }
+}
+
+impl AddAssign<Duration> for SimTime {
+    fn add_assign(&mut self, rhs: Duration) {
+        self.0.add_assign(rhs)
+    }
+}
+
+// f64
+
+impl Add<f64> for SimTime {
+    type Output = SimTime;
+
+    fn add(self, rhs: f64) -> Self::Output {
+        self.checked_add(Duration::from_secs_f64(rhs))
+            .expect("Overflow when adding Duration to SimTime")
+    }
+}
+
+impl AddAssign<f64> for SimTime {
+    fn add_assign(&mut self, rhs: f64) {
+        self.0.add_assign(Duration::from_secs_f64(rhs))
     }
 }

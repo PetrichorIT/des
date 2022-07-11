@@ -511,7 +511,7 @@ where
     ///         MyApp(),
     ///         RuntimeOptions::seeded(1).min_time(SimTime::from(10.0))
     ///     );
-    ///     runtime.add_event_in(MyEventSet::EventA, Duration::from(12.0));
+    ///     runtime.add_event_in(MyEventSet::EventA, Duration::new(12, 0));
     ///
     ///     match runtime.run() {
     ///         RuntimeResult::Finished { time, event_count, .. } => {

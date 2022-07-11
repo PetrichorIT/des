@@ -42,9 +42,11 @@ async-trait = {version = "0.1.56", optional = true}
 cqueue = {path = "../cqueue", features = ["optimized"], optional = true}
 des_macros = {path = "../des_macros", optional = true}
 tokio = {git = "https://github.com/PetrichorIT/tokio_sim", features = ["sim"], optional = true}
+# tokio = {path = "../../tokio/tokio", features = ["sim"], optional = true}
 
 [dev-dependencies]
 futures = "0.3.21"
+serial_test = "0.8.0"
 
 [package.metadata.docs.rs]
 all-features = true

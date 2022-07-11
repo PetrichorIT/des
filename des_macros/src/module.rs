@@ -147,8 +147,8 @@ fn generate_dynamic_builder(
                     token_stream.extend(quote! {
                         let channel = ::des::net::Channel::new(::des::net::ChannelMetrics {
                             bitrate: #bitrate,
-                            latency: ::des::time::Duration::from(#latency),
-                            jitter: ::des::time::Duration::from(#jitter),
+                            latency: ::des::time::Duration::from_secs_f64(#latency),
+                            jitter: ::des::time::Duration::from_secs_f64(#jitter),
                             cost: #cost,
                         });
                         #from_ident.set_next_gate(#to_ident);

@@ -182,6 +182,15 @@ pub struct NetworkRuntimeGlobals {
     /// The topology of the network from a module viewpoint.
     ///
     pub topology: Topology,
+
+    ///
+    /// The runtime that executes all futures.
+    /// Note that the set of all futures within this runtime can be partitioned into
+    /// subsets required by each module. No future should be used by more than one module.
+    /// (Expect some global values for data collection)
+    ///
+    #[cfg(feature = "async")]
+    pub runtime: std::sync::Arc<tokio::runtime::Runtime>,
 }
 
 impl NetworkRuntimeGlobals {
@@ -192,6 +201,11 @@ impl NetworkRuntimeGlobals {
         Self {
             parameters: Parameters::new(),
             topology: Topology::new(),
+
+            #[cfg(feature = "async")]
+            runtime: std::sync::Arc::new(
+                tokio::runtime::Runtime::new().expect("Failed to create global runtime"),
+            ),
         }
     }
 }

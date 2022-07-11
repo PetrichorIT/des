@@ -132,8 +132,8 @@ fn subsystem_main(vis: Visibility, ident: Ident, attr: Attr, out: &mut TokenStre
                         token_stream.extend(quote! {
                             let channel = ::des::net::Channel::new(::des::net::ChannelMetrics {
                                 bitrate: #bitrate,
-                                latency: ::des::time::Duration::from(#latency),
-                                jitter: ::des::time::Duration::from(#jitter),
+                                latency: ::des::time::Duration::from_secs_f64(#latency),
+                                jitter: ::des::time::Duration::from_secs_f64(#jitter),
                                 cost: #cost,
                             });
                             #from_ident.set_next_gate(#to_ident);

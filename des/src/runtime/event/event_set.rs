@@ -115,7 +115,7 @@ cfg_not_cqueue! {
                     #[cfg(feature = "internal-metrics")]
                     metrics
                         .non_zero_event_wait_time
-                        .collect_at((time - SimTime::now()).into(), SimTime::now());
+                        .collect_at((time - SimTime::now()).as_secs_f64(), SimTime::now());
 
                     self.heap.push(node);
                 }
@@ -241,7 +241,7 @@ cfg_cqueue! {
                     if time > self.inner.time() {
                         metrics
                             .non_zero_event_wait_time
-                            .collect_at((time - SimTime::now()).into(), SimTime::now());
+                            .collect_at((time - SimTime::now()).as_secs_f64(), SimTime::now());
                     }
                 }
 

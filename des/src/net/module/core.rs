@@ -2,7 +2,6 @@ use std::{
     collections::HashMap,
     error::Error,
     fmt::{Debug, Display},
-    ops::{Deref, DerefMut},
 };
 
 use log::error;
@@ -71,61 +70,6 @@ impl ModuleBuffer {
     }
 }
 
-///
-/// The usecase independent core of a module.
-///
-/// * This type is only available of DES is build with the `"net"` feature.*
-#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-#[derive(Default, Debug)]
-pub struct ModuleCore {
-    inner: Box<ModuleCoreInner>,
-}
-
-impl ModuleCore {
-    ///
-    /// Creates a new optionally named instance
-    /// of 'Self'.
-    ///
-    pub fn new_with(path: ObjectPath, globals: PtrWeakConst<NetworkRuntimeGlobals>) -> Self {
-        Self {
-            inner: Box::new(ModuleCoreInner::new_with(path, globals)),
-        }
-    }
-
-    ///
-    /// Creates a new module core based on the parent
-    /// using the name to extend the path.
-    ///
-    pub fn child_of(name: &str, parent: &ModuleCoreInner) -> Self {
-        Self {
-            inner: Box::new(ModuleCoreInner::child_of(name, parent)),
-        }
-    }
-
-    ///
-    /// Creates  a not-named instance of 'Self'.
-    ///
-    #[inline(always)]
-    pub fn new() -> Self {
-        Self {
-            inner: Box::new(ModuleCoreInner::new()),
-        }
-    }
-}
-
-impl Deref for ModuleCore {
-    type Target = ModuleCoreInner;
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-impl DerefMut for ModuleCore {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
-    }
-}
-
 // SAFTEY:
 // Send can be implemented since Send is only used when using AsyncModule
 // which takes qusai-ownership of self. Additionally only the current thread is used
@@ -135,7 +79,7 @@ impl DerefMut for ModuleCore {
 unsafe impl Send for ModuleCore {}
 unsafe impl Sync for ModuleCore {}
 
-pub struct ModuleCoreInner {
+pub struct ModuleCore {
     id: ModuleId,
 
     /// A human readable identifier for the module.
@@ -156,6 +100,9 @@ pub struct ModuleCoreInner {
     #[cfg(feature = "async")]
     pub(crate) runtime: std::sync::Arc<tokio::runtime::Runtime>,
 
+    #[cfg(feature = "async")]
+    pub(crate) time_context: Option<tokio::sim::TimeContext>,
+
     /// The period of the activity coroutine (if zero than there is no coroutine).
     pub(crate) activity_period: Duration,
 
@@ -175,7 +122,7 @@ pub struct ModuleCoreInner {
     pub(crate) self_ref: Option<PtrWeakVoid>,
 }
 
-impl ModuleCoreInner {
+impl ModuleCore {
     ///
     /// A runtime-unqiue identifier for this module-core and by extension this module.
     ///
@@ -274,6 +221,9 @@ impl ModuleCoreInner {
         #[cfg(feature = "async")]
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
 
+        #[cfg(feature = "async")]
+        let tctx_ident = path.path().to_string();
+
         Self {
             id: ModuleId::gen(),
             path,
@@ -292,6 +242,9 @@ impl ModuleCoreInner {
             ),
 
             #[cfg(feature = "async")]
+            time_context: Some(tokio::sim::TimeContext::new(tctx_ident)),
+
+            #[cfg(feature = "async")]
             async_buffers: rx,
 
             #[cfg(feature = "async")]
@@ -303,10 +256,14 @@ impl ModuleCoreInner {
     /// Creates a new module core based on the parent
     /// using the name to extend the path.
     ///
-    pub fn child_of(name: &str, parent: &ModuleCoreInner) -> Self {
+    pub fn child_of(name: &str, parent: &ModuleCore) -> Self {
         let path = ObjectPath::module_with_parent(name, &parent.path);
+
         #[cfg(feature = "async")]
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+
+        #[cfg(feature = "async")]
+        let tctx_ident = path.path().to_string();
 
         Self {
             id: ModuleId::gen(),
@@ -324,6 +281,9 @@ impl ModuleCoreInner {
             runtime: std::sync::Arc::new(
                 tokio::runtime::Runtime::new().expect("Failed to create runtime"),
             ),
+
+            #[cfg(feature = "async")]
+            time_context: Some(tokio::sim::TimeContext::new(tctx_ident)),
 
             #[cfg(feature = "async")]
             async_buffers: rx,
@@ -345,7 +305,7 @@ impl ModuleCoreInner {
     }
 }
 
-impl ModuleCoreInner {
+impl ModuleCore {
     #[cfg(feature = "async")]
     pub fn async_handle(&self) -> super::HandleSender {
         let inner = self.async_handle.clone();
@@ -412,7 +372,7 @@ impl ModuleCoreInner {
     }
 }
 
-impl ModuleCoreInner {
+impl ModuleCore {
     ///
     /// Returns wether the moudule attached to this core is of type T.
     ///
@@ -572,7 +532,7 @@ impl ModuleCoreInner {
 /// # Parameter management
 ///
 
-impl ModuleCoreInner {
+impl ModuleCore {
     ///
     /// Returns the parameters for the current module.
     ///
@@ -596,13 +556,13 @@ impl ModuleCoreInner {
     }
 }
 
-impl Default for ModuleCoreInner {
+impl Default for ModuleCore {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Debug for ModuleCoreInner {
+impl Debug for ModuleCore {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // TODO: more exhaustive debug struct
         f.debug_struct("ModuleCore")
@@ -612,12 +572,6 @@ impl Debug for ModuleCoreInner {
             .finish()
     }
 }
-
-// SAFTEY:
-// Since this type is only referenced by ModuleCore it should also be Send/Sync
-// to cirumvent stupid edge cases with deref / derefmut
-unsafe impl Send for ModuleCoreInner {}
-unsafe impl Sync for ModuleCoreInner {}
 
 ///
 /// An error while resolving a reference to another module.

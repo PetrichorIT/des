@@ -123,6 +123,16 @@ where
             _phantom: PhantomData,
         }
     }
+
+    ///
+    /// Creates a weak ptr from a strong ptr
+    ///
+    pub fn downgrade(this: &Self) -> PtrWeak<T, S> {
+        PtrWeak {
+            inner: Rc::downgrade(&this.inner),
+            _phantom: PhantomData,
+        }
+    }
 }
 
 impl<T, S> Ptr<T, S>

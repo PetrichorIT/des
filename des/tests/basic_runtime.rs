@@ -87,7 +87,7 @@ fn one_event_runtime() {
     });
     rt.add_event(
         MyEventSet::RepeatWithDelay(RepeatWithDelay {
-            delay: 1.0.into(),
+            delay: Duration::new(1, 0),
             repeat: 0,
             repeat_limit: 15,
         }),
@@ -121,7 +121,7 @@ fn ensure_event_order() {
     let mut rng = StdRng::seed_from_u64(123);
 
     for _i in 0..128 {
-        time += rng.sample::<f64, Standard>(Standard).into();
+        time += rng.sample::<f64, Standard>(Standard);
         id += 1;
 
         events.push((
@@ -276,7 +276,7 @@ fn full_test_n_100_000() {
 
         events.push(boxed);
 
-        t += (rt.random::<f64>()).min(0.001).into();
+        t += (rt.random::<f64>()).min(0.001);
     }
 
     let mut dispatched = events.clone();

@@ -71,12 +71,12 @@ impl ChannelMetrics {
         }
 
         let len = msg.bit_len;
-        let transmission_time = Duration::from(len as f64 / self.bitrate as f64);
+        let transmission_time = Duration::from_secs_f64(len as f64 / self.bitrate as f64);
         if self.jitter == Duration::ZERO {
             self.latency + transmission_time
         } else {
             let perc = rng.sample(Uniform::new(0.0f64, self.jitter.as_secs_f64()));
-            self.latency + transmission_time + Duration::from(perc)
+            self.latency + transmission_time + Duration::from_secs_f64(perc)
         }
     }
 
@@ -89,7 +89,7 @@ impl ChannelMetrics {
             Duration::ZERO
         } else {
             let len = msg.bit_len;
-            Duration::from(len as f64 / self.bitrate as f64)
+            Duration::from_secs_f64(len as f64 / self.bitrate as f64)
         }
     }
 }

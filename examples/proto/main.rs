@@ -51,9 +51,9 @@ impl Module for MultiRunner {
         // println!("M: [{}] {:?}", SimTime::now(), msg);
         if msg.meta().kind == 42 {
             self.send(msg.dup::<()>(), ("toAppl", 1));
-            self.processing_time(1.0f64.into());
+            self.processing_time(Duration::new(1, 0));
             self.send(msg, ("toAppl", 2));
-            self.schedule_in(Message::new().kind(69).build(), 1.0f64.into());
+            self.schedule_in(Message::new().kind(69).build(), Duration::new(1, 0));
         } else {
             // Send at 1.0 with processing 1.0 and delay 1.0
             assert_eq!(SimTime::now(), 2.0);

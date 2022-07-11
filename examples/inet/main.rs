@@ -124,8 +124,8 @@ fn main() {
 
     let channel = Some(Channel::new(ChannelMetrics::new(
         5_000_000,
-        0.1.into(),
-        0.0.into(),
+        Duration::from_secs_f64(0.1),
+        Duration::from_secs_f64(0.0),
     )));
 
     let alice_in = node_alice.create_gate("channelIncoming", GateServiceType::Input, &mut app);
@@ -196,6 +196,6 @@ fn main() {
         .topology
         .write_to_svg("examples/inet/graph");
 
-    assert_eq!(time, 0.200128);
+    assert_eq!(time, 0.200127998);
     assert_eq!(event_count, 21);
 }

@@ -172,7 +172,7 @@ impl Debug for SimTime {
 
 impl Display for SimTime {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(&self.0, f)
+        Debug::fmt(&self.0, f)
     }
 }
 
@@ -192,7 +192,7 @@ impl From<SimTime> for f64 {
 
 impl From<f64> for SimTime {
     fn from(value: f64) -> Self {
-        SimTime(Duration::from(value))
+        SimTime(Duration::from_secs_f64(value))
     }
 }
 
@@ -228,13 +228,13 @@ cfg_async! {
     impl From<tokio::sim::SimTime> for SimTime {
         fn from(tokio: tokio::sim::SimTime) -> Self {
             let dur = *tokio.deref();
-            SimTime(Duration(dur))
+            SimTime(dur)
         }
     }
 
     impl From<SimTime> for tokio::sim::SimTime {
         fn from(des: SimTime) -> Self {
-            let dur = des.0.0;
+            let dur = des.0;
             tokio::sim::SimTime::from_std(dur)
         }
     }
