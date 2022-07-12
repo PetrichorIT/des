@@ -12,7 +12,7 @@ fn main() {
     let options = if args.len() == 3 {
         let n = args[1].parse().unwrap();
         let t = args[2].parse::<f64>().unwrap();
-        RuntimeOptions::seeded(0x123).cqueue_options(n, SimTime::from(t))
+        RuntimeOptions::seeded(0x123).cqueue_options(n, Duration::from_secs_f64(t))
     } else {
         RuntimeOptions::seeded(0x123)
     };

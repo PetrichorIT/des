@@ -4,6 +4,7 @@
 #![feature(arbitrary_self_types)]
 #![feature(const_option_ext)]
 #![feature(box_into_inner)]
+#![feature(linked_list_remove)]
 #![allow(rustdoc::broken_intra_doc_links)]
 #![allow(clippy::needless_doctest_main)]
 #![warn(missing_docs)]
@@ -125,6 +126,10 @@ pub mod metrics;
 pub mod runtime;
 pub mod time;
 pub mod util;
+
+cfg_cqueue! {
+    pub(crate) mod cqueue;
+}
 
 cfg_net! {
     pub mod net;

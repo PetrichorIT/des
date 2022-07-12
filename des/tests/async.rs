@@ -293,7 +293,7 @@ fn one_module_timers() {
     rt.add_message_onto(
         gate_a,
         Message::new().id(2).kind(2).build(),
-        SimTime::duration_since_zero(Duration::new(2, 0)),
+        SimTime::from_duration(Duration::new(2, 0)),
     );
 
     let result = rt.run();
@@ -345,7 +345,7 @@ fn one_module_delayed_recv() {
     rt.add_message_onto(
         gate_a,
         Message::new().id(2).kind(2).build(),
-        SimTime::duration_since_zero(Duration::new(2, 0)),
+        SimTime::from_duration(Duration::new(2, 0)),
     );
 
     let result = rt.run();
@@ -402,12 +402,12 @@ fn mutiple_module_delayed_recv() {
     rt.add_message_onto(
         gate_a.clone(),
         Message::new().id(1).kind(2).build(),
-        SimTime::duration_since_zero(Duration::new(1, 0)),
+        SimTime::from_duration(Duration::new(1, 0)),
     );
     rt.add_message_onto(
         gate_a,
         Message::new().id(2).kind(2).build(),
-        SimTime::duration_since_zero(Duration::new(2, 0)),
+        SimTime::from_duration(Duration::new(2, 0)),
     );
 
     // # Module 1
@@ -417,12 +417,12 @@ fn mutiple_module_delayed_recv() {
     rt.add_message_onto(
         gate_b.clone(),
         Message::new().id(10).kind(1).build(),
-        SimTime::duration_since_zero(Duration::new(1, 0)),
+        SimTime::from_duration(Duration::new(1, 0)),
     );
     rt.add_message_onto(
         gate_b,
         Message::new().id(20).kind(2).build(),
-        SimTime::duration_since_zero(Duration::new(2, 0)),
+        SimTime::from_duration(Duration::new(2, 0)),
     );
 
     let result = rt.run();
@@ -516,28 +516,28 @@ fn semaphore_in_waiting_task() {
     rt.add_message_onto(
         gate_a.clone(),
         Message::new().id(1).kind(2).build(),
-        SimTime::duration_since_zero(Duration::new(1, 0)),
+        SimTime::from_duration(Duration::new(1, 0)),
     );
     rt.add_message_onto(
         gate_a,
         Message::new().id(2).kind(3).build(),
-        SimTime::duration_since_zero(Duration::new(2, 0)),
+        SimTime::from_duration(Duration::new(2, 0)),
     );
 
     rt.add_message_onto(
         gate_b.clone(),
         Message::new().id(10).kind(2).build(),
-        SimTime::duration_since_zero(Duration::new(1, 0)),
+        SimTime::from_duration(Duration::new(1, 0)),
     );
     rt.add_message_onto(
         gate_b.clone(),
         Message::new().id(20).kind(2).build(),
-        SimTime::duration_since_zero(Duration::new(2, 0)),
+        SimTime::from_duration(Duration::new(2, 0)),
     );
     rt.add_message_onto(
         gate_b,
         Message::new().id(20).kind(1).build(),
-        SimTime::duration_since_zero(Duration::new(3, 0)),
+        SimTime::from_duration(Duration::new(3, 0)),
     );
 
     let result = rt.run();

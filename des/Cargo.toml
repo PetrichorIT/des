@@ -24,6 +24,7 @@ default = []
 full = ["net", "cqueue", "async"]
 
 async = ["net", "dep:tokio", "dep:async-trait"]
+cqueue = ["dep:num-traits"]
 internal-metrics = []
 net = ["dep:des_macros"]
 net-ipv6 = ["net"]
@@ -39,8 +40,8 @@ rand = {version = "*", features = ["std_rng"]}
 
 # All other dependencies are optional
 async-trait = {version = "0.1.56", optional = true}
-cqueue = {path = "../cqueue", features = ["optimized"], optional = true}
 des_macros = {path = "../des_macros", optional = true}
+num-traits = {version = "0.2.14", optional = true}
 tokio = {git = "https://github.com/PetrichorIT/tokio_sim", features = ["sim"], optional = true}
 # tokio = {path = "../../tokio/tokio", features = ["sim"], optional = true}
 

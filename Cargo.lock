@@ -216,10 +216,10 @@ name = "des"
 version = "0.3.1"
 dependencies = [
  "async-trait",
- "cqueue",
  "des_macros",
  "futures",
  "log",
+ "num-traits",
  "rand",
  "serial_test",
  "termcolor",
@@ -883,7 +883,7 @@ dependencies = [
 [[package]]
 name = "tokio"
 version = "1.19.2"
-source = "git+https://github.com/PetrichorIT/tokio_sim#28f01b85f0401fe3d1373f784f18d7bbbb4430d3"
+source = "git+https://github.com/PetrichorIT/tokio_sim#9afe4dd7a6551b9af14e47ba178ff048f5b59b44"
 dependencies = [
  "autocfg",
  "once_cell",

@@ -103,7 +103,7 @@ fn one_event_runtime() {
         RuntimeResult::Finished {
             time, event_count, ..
         } => {
-            assert_eq!(time, SimTime::duration_since_zero(Duration::new(16, 0)));
+            assert_eq!(time, SimTime::from_duration(Duration::new(16, 0)));
             assert_eq!(event_count, 17);
         }
         _ => assert!(false, "Runtime should have finished"),

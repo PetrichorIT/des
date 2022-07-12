@@ -50,7 +50,7 @@ pub struct RuntimeOptions {
     /// The time interval each bucket in the cqueue manages.
     ///
     #[cfg(feature = "cqueue")]
-    pub cqueue_bucket_timespan: crate::time::SimTime,
+    pub cqueue_bucket_timespan: crate::time::Duration,
 }
 
 impl RuntimeOptions {
@@ -70,7 +70,7 @@ impl RuntimeOptions {
     ///
     #[allow(unused)]
     #[must_use]
-    pub fn cqueue_options(mut self, n: usize, t: SimTime) -> Self {
+    pub fn cqueue_options(mut self, n: usize, t: Duration) -> Self {
         #[cfg(feature = "cqueue")]
         {
             self.cqueue_num_buckets = n;
@@ -144,7 +144,7 @@ impl Default for RuntimeOptions {
             cqueue_num_buckets: 1028,
 
             #[cfg(feature = "cqueue")]
-            cqueue_bucket_timespan: crate::time::SimTime::from(0.0025),
+            cqueue_bucket_timespan: crate::time::Duration::from_secs_f64(0.0025),
         }
     }
 }

@@ -134,13 +134,13 @@ cfg_cqueue! {
 
         #[allow(unused)]
         use crate::{metrics::*, runtime::*, time::*, util::*};
-        use cqueue::*;
+        use crate::cqueue::*;
 
         pub(crate) struct FutureEventSet<A>
         where
             A: Application,
         {
-            inner: CQueue<SimTime, A::EventSet>,
+            inner: CQueue<A::EventSet>,
         }
 
         impl<A> FutureEventSet<A>
@@ -173,6 +173,8 @@ cfg_cqueue! {
                 let cqueue_options = CQueueOptions {
                     num_buckets: options.cqueue_num_buckets,
                     bucket_timespan: options.cqueue_bucket_timespan,
+
+                    ..Default::default()
                 };
 
                 Self {
