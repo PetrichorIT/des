@@ -174,6 +174,15 @@ cfg_not_async! {
         }
     }
 
+    // DEREF
+
+    impl Deref for SimTime {
+        type Target = Duration;
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+
     // FMT
 
     impl Debug for SimTime {
@@ -201,49 +210,9 @@ cfg_not_async! {
             SimTime(Duration::from_secs_f64(value))
         }
     }
-
-    // TIMESPEC
-
-    cfg_cqueue! {
-        use crate::cqueue;
-
-        impl cqueue::AsNanosU128 for SimTime {
-            fn as_nanos(&self) -> u128 {
-                self.0.as_nanos()
-            }
-        }
-
-        impl cqueue::Timespec for SimTime {
-            const ZERO: Self = SimTime(Duration::ZERO);
-            const ONE: Self = SimTime(Duration::new(1, 0));
-        }
-
-        impl Add<SimTime> for SimTime {
-            type Output = SimTime;
-            fn add(self, rhs: SimTime) -> SimTime {
-                Self(self.0 + rhs.0)
-            }
-        }
-    }
-
 }
+
 cfg_async! {
     /// The simulation time, now the tokio implementaion
     pub type SimTime = tokio::sim::SimTime;
-
-    cfg_cqueue! {
-        use crate::cqueue;
-
-        impl cqueue::AsNanosU128 for SimTime {
-            fn as_nanos(&self) -> u128 {
-                let dur: &Duration = &**self;
-                dur.as_nanos()
-            }
-        }
-
-        impl cqueue::Timespec for SimTime {
-            const ZERO: Self = SimTime::from_duration(Duration::ZERO);
-            const ONE: Self = SimTime::from_duration(Duration::new(1, 0));
-        }
-    }
 }
