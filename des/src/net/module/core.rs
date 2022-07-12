@@ -13,7 +13,6 @@ use crate::{
     util::*,
 };
 
-use super::ext::AsyncCoreExt;
 
 create_global_uid!(
     /// A runtime-unqiue identifier for a module / submodule inheritence tree.
@@ -98,7 +97,7 @@ pub struct ModuleCore {
 
     /// Expensions for async
     #[cfg(feature = "async")]
-    pub(crate) async_ext: AsyncCoreExt,
+    pub(crate) async_ext: super::ext::AsyncCoreExt,
 
     /// The period of the activity coroutine (if zero than there is no coroutine).
     pub(crate) activity_period: Duration,
@@ -220,7 +219,7 @@ impl ModuleCore {
 
         Self {
             #[cfg(feature = "async")]
-            async_ext: AsyncCoreExt::new(tctx_ident),
+            async_ext: super::ext::AsyncCoreExt::new(tctx_ident),
 
             id: ModuleId::gen(),
             path,
@@ -258,7 +257,7 @@ impl ModuleCore {
             self_ref: None,
 
             #[cfg(feature = "async")]
-            async_ext: AsyncCoreExt::new(tctx_ident),
+            async_ext: super::ext::AsyncCoreExt::new(tctx_ident),
         }
     }
 

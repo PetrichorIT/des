@@ -44,7 +44,7 @@ pub(crate) static RNG: SyncWrap<UnsafeCell<Option<StdRng>>> = SyncWrap::new(Unsa
 ///
 #[inline(always)]
 pub fn sim_time() -> SimTime {
-    crate::time::SIMTIME_NOW.get()
+    SimTime::now()
 }
 
 ///
@@ -163,7 +163,7 @@ where
     /// Returns the current simulation time.
     ///
     pub fn sim_time(&self) -> SimTime {
-        SIMTIME_NOW.get()
+        SimTime::now()
     }
 
     ///
@@ -255,7 +255,7 @@ where
     pub fn new_with(app: A, mut options: RuntimeOptions) -> Self {
         // Set SimTime
         let sim_time = options.min_sim_time.unwrap_or(SimTime::MIN);
-        SIMTIME_NOW.set(sim_time);
+        SimTime::set_now(sim_time);
 
         // Set RNG
         let rng = options
@@ -351,7 +351,7 @@ where
         }
 
         // Let this be the only position where SimTime is changed
-        SIMTIME_NOW.set(node.time);
+        SimTime::set_now(node.time);
 
         node.handle(self);
         !self.future_event_set.is_empty()

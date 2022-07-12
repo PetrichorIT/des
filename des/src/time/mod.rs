@@ -2,8 +2,6 @@
 //! Time primitives mirroring [std::time] bound to the simulation time.
 //!
 
-use crate::util::SyncWrap;
-
 use std::cell::Cell;
 use std::f64::EPSILON;
 use std::fmt::*;
@@ -12,9 +10,9 @@ use std::ops::*;
 mod duration;
 pub use duration::*;
 
-// Reexport
-
-pub(crate) static SIMTIME_NOW: SyncWrap<Cell<SimTime>> = SyncWrap::new(Cell::new(SimTime::ZERO));
+thread_local! {
+    static SIMTIME: Cell<SimTime> = const { Cell::new(SimTime::ZERO) };
+}
 
 ///
 /// A specific point of time in the simulation.
@@ -34,7 +32,14 @@ impl SimTime {
     /// ```
     #[must_use]
     pub fn now() -> Self {
-        SIMTIME_NOW.get()
+        SIMTIME.with(|s| s.get())
+    }
+
+    ///
+    /// Sets the sim time
+    ///
+    pub(crate) fn set_now(time: SimTime) {
+        SIMTIME.with(|s| s.set(time))
     }
 
     ///
