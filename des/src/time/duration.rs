@@ -2,6 +2,7 @@ use std::ops::{Add, AddAssign};
 
 use super::SimTime;
 
+/// A Duration type to represent a span of time.
 pub type Duration = std::time::Duration;
 
 /*

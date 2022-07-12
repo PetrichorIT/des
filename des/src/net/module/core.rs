@@ -13,6 +13,8 @@ use crate::{
     util::*,
 };
 
+use super::ext::AsyncCoreExt;
+
 create_global_uid!(
     /// A runtime-unqiue identifier for a module / submodule inheritence tree.
     /// * This type is only available of DES is build with the `"net"` feature.*
@@ -79,6 +81,9 @@ impl ModuleBuffer {
 unsafe impl Send for ModuleCore {}
 unsafe impl Sync for ModuleCore {}
 
+///
+/// The core values provided on any module.
+///
 pub struct ModuleCore {
     id: ModuleId,
 
@@ -91,17 +96,9 @@ pub struct ModuleCore {
     /// The buffers for processing messages
     pub(crate) buffers: ModuleBuffer,
 
+    /// Expensions for async
     #[cfg(feature = "async")]
-    pub(crate) async_buffers: tokio::sync::mpsc::UnboundedReceiver<super::BufferEvent>,
-
-    #[cfg(feature = "async")]
-    pub(crate) async_handle: tokio::sync::mpsc::UnboundedSender<super::BufferEvent>,
-
-    #[cfg(feature = "async")]
-    pub(crate) runtime: std::sync::Arc<tokio::runtime::Runtime>,
-
-    #[cfg(feature = "async")]
-    pub(crate) time_context: Option<tokio::sim::TimeContext>,
+    pub(crate) async_ext: AsyncCoreExt,
 
     /// The period of the activity coroutine (if zero than there is no coroutine).
     pub(crate) activity_period: Duration,
@@ -219,12 +216,12 @@ impl ModuleCore {
     ///
     pub fn new_with(path: ObjectPath, globals: PtrWeakConst<NetworkRuntimeGlobals>) -> Self {
         #[cfg(feature = "async")]
-        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-
-        #[cfg(feature = "async")]
         let tctx_ident = path.path().to_string();
 
         Self {
+            #[cfg(feature = "async")]
+            async_ext: AsyncCoreExt::new(tctx_ident),
+
             id: ModuleId::gen(),
             path,
             gates: Vec::new(),
@@ -235,20 +232,6 @@ impl ModuleCore {
             children: HashMap::new(),
             globals,
             self_ref: None,
-
-            #[cfg(feature = "async")]
-            runtime: std::sync::Arc::new(
-                tokio::runtime::Runtime::new().expect("Failed to create runtime"),
-            ),
-
-            #[cfg(feature = "async")]
-            time_context: Some(tokio::sim::TimeContext::new(tctx_ident)),
-
-            #[cfg(feature = "async")]
-            async_buffers: rx,
-
-            #[cfg(feature = "async")]
-            async_handle: tx,
         }
     }
 
@@ -260,9 +243,6 @@ impl ModuleCore {
         let path = ObjectPath::module_with_parent(name, &parent.path);
 
         #[cfg(feature = "async")]
-        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-
-        #[cfg(feature = "async")]
         let tctx_ident = path.path().to_string();
 
         Self {
@@ -274,22 +254,11 @@ impl ModuleCore {
             activity_active: false,
             parent: None,
             children: HashMap::new(),
-            globals: parent.globals.clone(),
+            globals: parent.globals(),
             self_ref: None,
 
             #[cfg(feature = "async")]
-            runtime: std::sync::Arc::new(
-                tokio::runtime::Runtime::new().expect("Failed to create runtime"),
-            ),
-
-            #[cfg(feature = "async")]
-            time_context: Some(tokio::sim::TimeContext::new(tctx_ident)),
-
-            #[cfg(feature = "async")]
-            async_buffers: rx,
-
-            #[cfg(feature = "async")]
-            async_handle: tx,
+            async_ext: AsyncCoreExt::new(tctx_ident),
         }
     }
 
@@ -306,9 +275,12 @@ impl ModuleCore {
 }
 
 impl ModuleCore {
+    ///
+    /// Returns a sendable handle for sending message.
+    ///
     #[cfg(feature = "async")]
     pub fn async_handle(&self) -> super::HandleSender {
-        let inner = self.async_handle.clone();
+        let inner = self.async_ext.handle.clone();
 
         super::HandleSender {
             inner,
@@ -578,7 +550,9 @@ impl Debug for ModuleCore {
 ///
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ModuleReferencingError {
+    /// No reference exists.
     NoEntry(String),
+    /// The reference is not of the given type.
     TypeError(String),
 }
 

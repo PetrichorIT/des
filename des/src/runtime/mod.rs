@@ -582,18 +582,36 @@ where
 ///
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum RuntimeResult<A> {
+    /// The simulation has finished with an event count of `1`.
+    /// This ususally inidcates that some parameter was invalid,
+    /// or the user forgot to insert a startup event. However a
+    /// at_sim_start event has been called.
     EmptySimulation {
+        /// The application provided upon runtime creation, only changed through
+        /// the `at_sim_start` method of modules.
         app: A,
     },
+    /// The simulation has fully depleted its event pool with an event count
+    /// greater than `1`. The function `at_sim_end` has been called.
     Finished {
+        /// The application after the simulation was executed.
         app: A,
+        /// The time of the final event in the simulation.
         time: SimTime,
+        /// The number of events that were executed.
         event_count: usize,
     },
+    /// The simulation has not fully deleted its event pool. but a `RuntimeLimit`
+    /// has been reached.
     PrematureAbort {
+        /// The application in the intermediary state of premature abort,
+        /// but `at_sim_end` has been called.
         app: A,
+        /// The time of the last event valid withing the limits of the runtime.
         time: SimTime,
+        /// The number of events executed sofar.
         event_count: usize,
+        /// The size of the current event pool.
         active_events: usize,
     },
 }

@@ -387,10 +387,14 @@ impl FromStr for ObjectPath {
     }
 }
 
+/// An error that has occured upon parsing a String to a ObjectPath.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ObjectPathParseError {
+    /// The provided string is empty.
     EmptyPath,
+    /// The provided string contains a path element width width 0.
     EmptyPathElement,
+    /// The provided string does not contain a path in the form ([subsys]/+.)?[module].+
     UnorderedPath,
 }
 

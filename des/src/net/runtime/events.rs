@@ -224,6 +224,16 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
                 }
             }
         }
+
+        #[cfg(feature = "async")]
+        {
+            // Ensure all sim_start stages have finished
+
+            for i in 0..rt.app.modules().len() {
+                let mut module = PtrWeakMut::from_strong(&rt.app.modules()[i]);
+                module.finish_sim_start()
+            }
+        }
     }
 }
 
@@ -251,7 +261,7 @@ impl PtrWeakMut<dyn Module> {
         {
             use crate::net::module::*;
 
-            while let Ok(ev) = self.module_core_mut().async_buffers.try_recv() {
+            while let Ok(ev) = self.module_core_mut().async_ext.buffers.try_recv() {
                 match ev {
                     BufferEvent::Send {
                         mut msg,

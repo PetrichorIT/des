@@ -4,6 +4,9 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
+///
+/// A type that contains a SubmoduleCore.
+///
 pub trait StaticSubsystemCore:
     Deref<Target = SubsystemCore> + DerefMut<Target = SubsystemCore>
 {
@@ -16,6 +19,9 @@ create_global_uid!(
     pub SubsystemId(u16) = MODULE_ID;
 );
 
+///
+/// The core primitive found on every submodule.
+///
 #[derive(Debug)]
 pub struct SubsystemCore {
     pub(crate) id: SubsystemId,
@@ -28,6 +34,7 @@ pub struct SubsystemCore {
 }
 
 impl SubsystemCore {
+    /// The id of the submodule.
     pub fn id(&self) -> SubsystemId {
         self.id
     }

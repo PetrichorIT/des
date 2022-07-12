@@ -30,6 +30,9 @@ pub struct OutVec {
 }
 
 impl OutVec {
+    ///
+    /// Returns the path to the owner of this OutVec.
+    ///
     pub fn path(&self) -> String {
         #[cfg(feature = "net")]
         match &self.owner {
@@ -41,6 +44,9 @@ impl OutVec {
         self.name.clone()
     }
 
+    ///
+    /// Creates a new OutVec bound to a onwer.
+    ///
     pub fn new(name: String, #[cfg(feature = "net")] owner: Option<ObjectPath>) -> Self {
         Self {
             #[cfg(feature = "net")]
@@ -57,18 +63,27 @@ impl OutVec {
         }
     }
 
+    ///
+    /// Configures the max amount of buffered values.
+    ///
     #[must_use]
     pub fn buffer_max(mut self, max_buffered_values: usize) -> Self {
         self.max_buffered_values = max_buffered_values;
         self
     }
 
+    ///
+    /// Configures the directory the results will be written to
+    ///
     #[must_use]
     pub fn result_dir(mut self, dir: String) -> Self {
         self.results_dir = dir;
         self
     }
 
+    ///
+    /// Resets all values to their inital state.
+    ///
     pub fn clear(&mut self) {
         if self.output_allready_written {
             let path = format!("results/{}.out", self.path());
@@ -84,6 +99,9 @@ impl OutVec {
         self.output_allready_written = false
     }
 
+    ///
+    /// Finishes the OutVec, writing the data to the result file.
+    ///
     pub fn finish(&mut self) {
         self.try_write_to_file()
     }

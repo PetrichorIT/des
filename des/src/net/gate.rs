@@ -20,8 +20,11 @@ pub type GateRefMut = PtrMut<Gate>;
 ///
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GateServiceType {
+    /// A gate that can be connected to in NDL notation
     Input,
+    /// A gate that can be pointed to antoher gate in NDL notation.
     Output,
+    /// A gate without restrictions.
     Undefined,
 }
 
@@ -135,11 +138,6 @@ pub struct Gate {
 }
 
 impl Gate {
-    #[deprecated(since = "0.2.0", note = "GateIDs are no longer supported")]
-    pub fn id(&self) -> ! {
-        unimplemented!("GateIDs are no longer supported");
-    }
-
     ///
     /// The position index of the gate within the descriptor cluster.
     ///

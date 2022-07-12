@@ -14,6 +14,9 @@ pub trait NameableModule: 'static + StaticModuleCore {
     /// Never call direct
     fn named(core: ModuleCore) -> Self;
 
+    ///
+    /// Creates a named instance at the root.
+    ///
     fn named_root(core: ModuleCore) -> PtrMut<Self>
     where
         Self: Sized,

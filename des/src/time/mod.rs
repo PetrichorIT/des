@@ -37,11 +37,17 @@ impl SimTime {
         SIMTIME_NOW.get()
     }
 
+    ///
+    /// Constructs an instance of SimTime from a give duration since SimTime::ZERO.
+    ///
     #[must_use]
     pub const fn duration_since_zero(duration: Duration) -> Self {
         Self(duration)
     }
 
+    ///
+    /// Makes an equallity check with an error margin of 10ns.
+    ///
     pub fn eq_approx(&self, other: SimTime) -> bool {
         let dur = self.duration_diff(other);
         dur < Duration::from_nanos(10)

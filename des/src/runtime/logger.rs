@@ -10,6 +10,9 @@ pub static LOGGER: StandardLogger = StandardLogger();
 pub struct StandardLogger();
 
 impl StandardLogger {
+    ///
+    /// Creates a logger and registers it to the logging interface
+    ///
     pub fn setup() -> Result<(), SetLoggerError> {
         set_logger(&LOGGER).map(|()| set_max_level(LevelFilter::Trace))
     }

@@ -1,4 +1,5 @@
 cfg_not_cqueue! {
+    /// Metrics that sample the runtime
     pub type RuntimeMetrics = std::OptimizedBinaryHeapMetrics;
 
     mod std {
@@ -50,6 +51,7 @@ cfg_not_cqueue! {
 }
 
 cfg_cqueue! {
+    /// Metrics that sample the runtime
     pub type RuntimeMetrics = cqueue::CQueueMetrics;
 
     mod cqueue {

@@ -1,11 +1,13 @@
-mod handle;
-use std::sync::Arc;
-
-pub use handle::*;
-
 use crate::net::{Message, MessageKind, Module, StaticModuleCore};
 use crate::time::SimTime;
 use async_trait::async_trait;
+use std::sync::Arc;
+
+mod handle;
+pub use handle::*;
+
+pub(crate) mod ext;
+use ext::*;
 
 pub const RT_TIME_WAKEUP: MessageKind = 42;
 
@@ -91,6 +93,12 @@ pub trait AsyncModule: StaticModuleCore + Send {
     /// That means that all stage-0 calls for all modules happen before the first (if any) stage-1 calls.
     /// Generaly speaking, all stage-i calls finish before the first stage-i+1 call.
     ///
+    /// # Note
+    ///
+    /// The user must ensure that all calls of `at_sim_start` will terminate at last
+    /// once all stages of at_sim_start of all modules have been called.
+    /// The stages will be executed in order.
+    ///
     /// # Example
     ///
     /// ```rust
@@ -151,19 +159,20 @@ where
     fn handle_message(&mut self, msg: Message) {
         tokio::time::SimTime::set_now(SimTime::now().into());
 
+        // (1) Fetch the runtime and initial the time context.
         let rt = Arc::clone(&self.globals().runtime);
-        let guard = rt.enter_time_context(self.time_context.take().unwrap());
+        let guard = rt.enter_time_context(self.async_ext.time_context.take().unwrap());
 
+        // (2) Poll time time events before excuting
         rt.poll_time_events();
         if msg.meta().kind != RT_TIME_WAKEUP {
-            // SAFTEY: Think about it hard
-            let self_ptr: *mut T = self;
-            let self_ref: &'static mut T = unsafe { &mut *self_ptr };
-
-            let join = rt.spawn(async move {
-                <T as AsyncModule>::handle_message(self_ref, msg).await;
-            });
-            let _result = rt.block_or_idle_on(join);
+            self.async_ext
+                .wait_queue_tx
+                .send(WaitingMessage {
+                    msg,
+                    time: SimTime::now(),
+                })
+                .expect("Failed to send to unbounded channel");
         }
         rt.poll_until_idle();
 
@@ -174,14 +183,15 @@ where
             )
         }
 
-        self.time_context = Some(guard.leave());
+        // (1) Suspend the time context
+        self.async_ext.time_context = Some(guard.leave());
     }
 
     fn activity(&mut self) {
         tokio::time::SimTime::set_now(SimTime::now().into());
 
-        let rt = self.module_core().runtime.clone();
-        let guard = rt.enter_time_context(self.time_context.take().unwrap());
+        let rt = Arc::clone(&self.globals().runtime);
+        let guard = rt.enter_time_context(self.async_ext.time_context.take().unwrap());
 
         rt.poll_time_events();
         {
@@ -200,21 +210,78 @@ where
             )
         }
 
-        self.time_context = Some(guard.leave());
+        self.async_ext.time_context = Some(guard.leave());
     }
 
     fn at_sim_start(&mut self, stage: usize) {
         // time is 0
 
-        let rt = self.module_core().runtime.clone();
-        let guard = rt.enter_time_context(self.time_context.take().unwrap());
+        let rt = Arc::clone(&self.globals().runtime);
+        let guard = rt.enter_time_context(self.async_ext.time_context.take().unwrap());
         rt.poll_time_events();
         {
-            let self_ptr: *mut T = self;
-            let self_ref: &'static mut T = unsafe { &mut *self_ptr };
+            // # Setup message receive handle.
+            if stage == 0 {
+                // SAFTEY:
+                // We can guarntee the validity of the pointer:
+                // 1) The module is pinned while the simulation is running.
+                // 2) The module is not dropped while the simulation is running.
+                // 3) While we may create mutiple &mut T, handle_message is never run fully
+                //    async (current thread runtime) and mutiple calls of `handle_messsage`
+                //    wont overlap, since the queue rx synchronises and delays them.
+                // 4) References to at_sim_start have been droped since all futures of at_sim_start
+                //    must be resoved before event 1
+                //
+                // TODO: Sync with activity()
+                let self_ref: &'static mut T = {
+                    let ptr: *mut T = self;
+                    unsafe { &mut *ptr }
+                };
 
-            let join = rt.spawn(<T as AsyncModule>::at_sim_start(self_ref, stage));
-            let _result = rt.block_or_idle_on(join);
+                let mut rx = self
+                    .async_ext
+                    .wait_queue_rx
+                    .take()
+                    .expect("We have been robbed");
+
+                self.async_ext.wait_queue_join = Some(rt.spawn(async move {
+                    while let Some(wmsg) = rx.recv().await {
+                        let WaitingMessage { msg, .. } = wmsg;
+                        <T as AsyncModule>::handle_message(self_ref, msg).await
+                    }
+                }));
+            }
+
+            // # Setup Sim-Start Task
+            if stage == 0 {
+                // SAFTEY:
+                // SimStart will complete before event id 1. thus this is quasai sync
+                let self_ref: &'static mut T = {
+                    let ptr: *mut T = self;
+                    unsafe { &mut *ptr }
+                };
+
+                let mut srx = self
+                    .async_ext
+                    .sim_start_rx
+                    .take()
+                    .expect("We have been robbed at sim start");
+
+                self.async_ext.sim_start_join = Some(rt.spawn(async move {
+                    while let Some(stage) = srx.recv().await {
+                        if stage == usize::MAX {
+                            srx.close();
+                            break;
+                        }
+                        <T as AsyncModule>::at_sim_start(self_ref, stage).await;
+                    }
+                }));
+            }
+
+            self.async_ext
+                .sim_start_tx
+                .send(stage)
+                .expect("Failed to send to unbounded sender");
         }
         rt.poll_until_idle();
 
@@ -225,35 +292,76 @@ where
             )
         }
 
-        self.time_context = Some(guard.leave());
+        self.async_ext.time_context = Some(guard.leave());
+    }
+
+    fn finish_sim_start(&mut self) {
+        let rt = Arc::clone(&self.globals().runtime);
+        let guard = rt.enter_time_context(self.async_ext.time_context.take().unwrap());
+
+        rt.poll_time_events();
+        {
+            self.async_ext
+                .sim_start_tx
+                .send(usize::MAX)
+                .expect("Failed to send close signal to sim_start_task");
+        }
+        rt.poll_until_idle();
+
+        // The join must succeed else saftey invariant cannot be archived.
+        rt.block_or_idle_on(self.async_ext.sim_start_join.take().expect("Crime"))
+            .expect("Join Idle")
+            .expect("Join Error");
+
+        if let Some(next_time) = rt.next_time_poll() {
+            self.schedule_at(
+                Message::new().kind(RT_TIME_WAKEUP).build(),
+                next_time.into(),
+            )
+        }
+
+        self.async_ext.time_context = Some(guard.leave());
     }
 
     fn at_sim_end(&mut self) {
         tokio::time::SimTime::set_now(SimTime::now().into());
 
-        let rt = self.module_core().runtime.clone();
-        let guard = rt.enter_time_context(self.time_context.take().unwrap());
+        let rt = Arc::clone(&self.globals().runtime);
+        let guard = rt.enter_time_context(self.async_ext.time_context.take().unwrap());
         rt.poll_time_events();
         {
+            // SAFTEY:
+            // Sim end means only this function will be executed before drop
+            // thus 'static can be assumed.
             let self_ptr: *mut T = self;
             let self_ref: &'static mut T = unsafe { &mut *self_ptr };
 
-            let join = rt.spawn(<T as AsyncModule>::at_sim_end(self_ref));
-            let _result = rt.block_or_idle_on(join);
+            self.async_ext.sim_end_join = Some(rt.spawn(<T as AsyncModule>::at_sim_end(self_ref)));
         }
         rt.poll_until_idle();
 
-        // if let Some(next_time) = rt.next_time_poll() {
-        //     self.schedule_at(
-        //         Message::new().kind(RT_TIME_WAKEUP).build(),
-        //         next_time.into(),
-        //     )
-        // }
+        // No time event enqueue needed, wont be resolved either way
 
-        self.time_context = Some(guard.leave());
+        self.async_ext.time_context = Some(guard.leave());
+    }
+
+    fn finish_sim_end(&mut self) {
+        let rt = Arc::clone(&self.globals().runtime);
+        let guard = rt.enter_time_context(self.async_ext.time_context.take().unwrap());
+        rt.poll_time_events();
+        rt.poll_until_idle();
+
+        rt.block_or_idle_on(self.async_ext.sim_end_join.take().expect("Theif"))
+            .expect("Join Idle")
+            .expect("Join Error");
+
+        // No time event enqueue needed, wont be resolved either way
+
+        self.async_ext.time_context = Some(guard.leave());
     }
 
     fn num_sim_start_stages(&self) -> usize {
-        <T as AsyncModule>::num_sim_start_stages(self)
+        // Needs at least one sim_start stage to setup the recv handle
+        <T as AsyncModule>::num_sim_start_stages(self).min(1)
     }
 }

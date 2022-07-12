@@ -124,11 +124,6 @@ pub struct Channel {
 }
 
 impl Channel {
-    #[deprecated(since = "0.2.0", note = "Channel IDs are no longer supported.")]
-    pub fn id(&self) -> ! {
-        unimplemented!("Channel IDs have been removed");
-    }
-
     ///
     /// A description of the channels capabilities,
     /// independent from its current state.

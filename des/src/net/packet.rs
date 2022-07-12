@@ -16,6 +16,7 @@ cfg_net_v6! {
     ///
     /// A application-addressed header in a network, similar to TCP/UDP.
     #[derive(Debug, Clone)]
+    #[allow(missing_docs)]
     pub struct PacketHeader {
         // # Ipv6 Header
         pub src_node: NodeAddress,
@@ -148,6 +149,7 @@ cfg_net_v4! {
     /// A application-addressed header in a network, similar to TCP/UDP.
     ///
     #[derive(Debug, Clone)]
+    #[allow(missing_docs)]
     pub struct PacketHeader {
         // # IPv4 header
         pub src_node: NodeAddress,
@@ -243,11 +245,6 @@ pub struct Packet {
 }
 
 impl Packet {
-    #[deprecated(since = "0.2.0", note = "PacketIDs are no longer supported")]
-    pub fn id(&self) -> ! {
-        unimplemented!("PacketIDs are no longer supported")
-    }
-
     ///
     /// Returns the attached [MessageMetadata] of the attached [Message].
     ///
@@ -413,43 +410,51 @@ impl PacketBuilder {
         }
     }
 
+    /// Sets the field `src_node` and `src_port`.
     pub fn src(mut self, src_node: NodeAddress, src_port: PortAddress) -> Self {
         self.header.src_node = src_node;
         self.header.src_port = src_port;
         self
     }
 
+    /// Sets the field `src_node`.
     pub fn src_node(mut self, src_node: NodeAddress) -> Self {
         self.header.src_node = src_node;
         self
     }
 
+    /// Sets the field `src_port`.
     pub fn src_port(mut self, src_port: PortAddress) -> Self {
         self.header.src_port = src_port;
         self
     }
 
+    /// Sets the field `dest_node` and `dest_port`
     pub fn dest(mut self, dest_node: NodeAddress, dest_port: PortAddress) -> Self {
         self.header.dest_node = dest_node;
         self.header.dest_port = dest_port;
         self
     }
 
+    /// Sets the field `dest_node`.
     pub fn dest_node(mut self, dest_node: NodeAddress) -> Self {
         self.header.dest_node = dest_node;
         self
     }
 
+    /// Sets the field `dest_port`.
     pub fn dest_port(mut self, dest_port: PortAddress) -> Self {
         self.header.dest_port = dest_port;
         self
     }
 
+    /// Sets the field `seq_no`.
     pub fn seq_no(mut self, seq_no: u32) -> Self {
         self.header.seq_no = seq_no;
         self
     }
 
+    /// Sets the field `content`.
     pub fn content<T>(mut self, content: T) -> Self
     where
         T: 'static + MessageBody,
@@ -460,6 +465,7 @@ impl PacketBuilder {
         self
     }
 
+    /// Sets the field `content`.
     pub fn content_interned<T>(mut self, content: Box<T>) -> Self
     where
         T: 'static + MessageBody,
@@ -470,41 +476,49 @@ impl PacketBuilder {
 
     // MESSAGE BUILDER EXT
 
+    /// Sets the field `msg.id`.
     pub fn id(mut self, id: MessageId) -> Self {
         self.message_builder = self.message_builder.id(id);
         self
     }
 
+    /// Sets the field `msg.kind`.
     pub fn kind(mut self, kind: MessageKind) -> Self {
         self.message_builder = self.message_builder.kind(kind);
         self
     }
 
+    /// Sets the field `msg.timestamp`.
     pub fn timestamp(mut self, timestamp: SimTime) -> Self {
         self.message_builder = self.message_builder.timestamp(timestamp);
         self
     }
 
+    /// Sets the field `msg.receiver_module_id`.
     pub fn receiver_module_id(mut self, receiver_module_id: ModuleId) -> Self {
         self.message_builder = self.message_builder.receiver_module_id(receiver_module_id);
         self
     }
 
+    /// Sets the field `msg.sender_module_id`.
     pub fn sender_module_id(mut self, sender_module_id: ModuleId) -> Self {
         self.message_builder = self.message_builder.sender_module_id(sender_module_id);
         self
     }
 
+    /// Sets the field `msg.last_gate`.
     pub fn last_gate(mut self, last_gate: GateRef) -> Self {
         self.message_builder = self.message_builder.last_gate(last_gate);
         self
     }
 
+    /// Sets the field `msg.creation_time`.
     pub fn creation_time(mut self, creation_time: SimTime) -> Self {
         self.message_builder = self.message_builder.creation_time(creation_time);
         self
     }
 
+    /// Sets the field `msg.send_time`.
     pub fn send_time(mut self, send_time: SimTime) -> Self {
         self.message_builder = self.message_builder.send_time(send_time);
         self

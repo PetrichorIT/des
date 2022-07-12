@@ -259,10 +259,11 @@ impl NameableModule for TimeSleepModule {
 impl AsyncModule for TimeSleepModule {
     async fn handle_message(&mut self, msg: Message) {
         let wait_time = msg.meta().kind as u64;
-        println!("[{}] Waiting for timer", SimTime::now());
+        println!("<{}> [{}] Waiting for timer", self.name(), SimTime::now());
         tokio::time::sleep(Duration::from_secs(wait_time)).await;
         println!(
-            "[{}] Done waiting for id: {}",
+            "<{}> [{}] Done waiting for id: {}",
+            self.name(),
             SimTime::now(),
             msg.meta().id
         );
@@ -394,6 +395,10 @@ fn mutiple_module_delayed_recv() {
 
     let mut rt = Runtime::new(rt);
 
+    // # Module 1
+    //  |0  |1  |2  |3  |4  |5  |6
+    //       <ID=1_>
+    //          ....<ID=2_>
     rt.add_message_onto(
         gate_a.clone(),
         Message::new().id(1).kind(2).build(),
@@ -405,9 +410,13 @@ fn mutiple_module_delayed_recv() {
         SimTime::duration_since_zero(Duration::new(2, 0)),
     );
 
+    // # Module 1
+    //  |0  |1  |2  |3  |4  |5  |6
+    //      <ID>
+    //          <ID=20>
     rt.add_message_onto(
         gate_b.clone(),
-        Message::new().id(10).kind(2).build(),
+        Message::new().id(10).kind(1).build(),
         SimTime::duration_since_zero(Duration::new(1, 0)),
     );
     rt.add_message_onto(
@@ -423,9 +432,9 @@ fn mutiple_module_delayed_recv() {
             time,
             event_count,
         } => {
-            assert_eq!(time, 4.0);
+            assert_eq!(time, 5.0);
 
-            assert_eq!(event_count, 17);
+            assert_eq!(event_count, 16);
 
             let m1 = app
                 .module(|m| m.module_core().name() == "RootModule")
@@ -560,4 +569,33 @@ fn semaphore_in_waiting_task() {
         }
         _ => assert!(false, "Expected runtime to finish"),
     }
+}
+
+#[NdlModule]
+struct ShouldBlockSimStart {}
+
+#[async_trait]
+impl AsyncModule for ShouldBlockSimStart {
+    async fn handle_message(&mut self, _: Message) {}
+
+    async fn at_sim_start(&mut self, _: usize) {
+        let sem = Semaphore::new(0);
+        let _ = sem.acquire().await.expect("CRASH");
+    }
+}
+
+#[test]
+#[should_panic = "Join Idle: RuntimeIdle(())"]
+fn sim_start_deadlock() {
+    let mut rt = NetworkRuntime::new(());
+    let module_a = ShouldBlockSimStart::named_root(ModuleCore::new_with(
+        ObjectPath::root_module("RootModule".to_string()),
+        Ptr::downgrade(&rt.globals()),
+    ));
+
+    rt.create_module(module_a);
+
+    let rt = Runtime::new(rt);
+
+    let _result = rt.run();
 }

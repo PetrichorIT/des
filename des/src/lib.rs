@@ -6,6 +6,8 @@
 #![feature(box_into_inner)]
 #![allow(rustdoc::broken_intra_doc_links)]
 #![allow(clippy::needless_doctest_main)]
+#![warn(missing_docs)]
+
 //!
 //! A discrete event simulator.
 //!

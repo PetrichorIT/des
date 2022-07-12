@@ -210,6 +210,9 @@ impl Message {
         Some(pkt)
     }
 
+    ///
+    /// Casts a message into a packet preserving the messages metadata.
+    ///
     pub fn as_packet(self) -> Packet {
         self.try_as_packet().expect("Could not cast self to packet")
     }
@@ -460,6 +463,7 @@ pub struct MessageBuilder {
 }
 
 impl MessageBuilder {
+    /// Creates a new builder.
     pub fn new() -> Self {
         Self {
             meta: MessageMetadata::default(),
@@ -467,51 +471,61 @@ impl MessageBuilder {
         }
     }
 
+    /// Sets the field `meta`.
     pub fn meta(mut self, meta: MessageMetadata) -> Self {
         self.meta = meta;
         self
     }
 
+    /// Sets the field `meta.id`.
     pub fn id(mut self, id: MessageId) -> Self {
         self.meta.id = id;
         self
     }
 
+    /// Sets the field `meta.kind`.
     pub fn kind(mut self, kind: MessageKind) -> Self {
         self.meta.kind = kind;
         self
     }
 
+    /// Sets the field `meta.timestamp`.
     pub fn timestamp(mut self, timestamp: SimTime) -> Self {
         self.meta.timestamp = timestamp;
         self
     }
 
+    /// Sets the field `meta.receiver_module_id`.
     pub fn receiver_module_id(mut self, receiver_module_id: ModuleId) -> Self {
         self.meta.receiver_module_id = receiver_module_id;
         self
     }
 
+    /// Sets the field `meta.sender_module_id`.
     pub fn sender_module_id(mut self, sender_module_id: ModuleId) -> Self {
         self.meta.sender_module_id = sender_module_id;
         self
     }
 
+    /// Sets the field `meta.last_gate`.
     pub fn last_gate(mut self, last_gate: GateRef) -> Self {
         self.meta.last_gate = Some(last_gate);
         self
     }
 
+    /// Sets the field `meta`.creation_time.
     pub fn creation_time(mut self, creation_time: SimTime) -> Self {
         self.meta.creation_time = creation_time;
         self
     }
 
+    /// Sets the field `meta.send_time`.
     pub fn send_time(mut self, send_time: SimTime) -> Self {
         self.meta.send_time = send_time;
         self
     }
 
+    /// Sets the field `content`.
     pub fn content<T>(mut self, content: T) -> Self
     where
         T: 'static + MessageBody + Send,
@@ -523,6 +537,7 @@ impl MessageBuilder {
         self
     }
 
+    /// Sets the field `content`.
     pub fn content_boxed<T>(mut self, content: Box<T>) -> Self
     where
         T: 'static + MessageBody + Send,
@@ -531,6 +546,7 @@ impl MessageBuilder {
         self
     }
 
+    /// Builds a message from the builder.
     pub fn build(self) -> Message {
         let MessageBuilder { meta, content } = self;
 

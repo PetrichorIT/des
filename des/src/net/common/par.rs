@@ -46,6 +46,11 @@ impl Parameters {
         map
     }
 
+    ///
+    /// Creates a read-and-write handle to a specific key on a module.
+    ///
+    /// This handle can point to a nonexiting value if its only used for writing.
+    ///
     pub fn get_handle<'a>(&'a self, path: &'a str, key: &'a str) -> ParHandle<'a, Optional> {
         ParHandle {
             tree_ref: self,
@@ -200,6 +205,10 @@ where
 }
 
 impl<'a> ParHandle<'a, Unwraped> {
+    ///
+    /// Uses a custom string parser to parse a string, timming
+    /// quotation marks in the process.
+    ///
     pub fn parse_string(&self) -> String {
         let mut parsed = self.value.clone().unwrap();
         // Trim marks

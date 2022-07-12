@@ -56,19 +56,33 @@ pub trait Statistic {
         self.collect_weighted_at(value, 1.0, SimTime::now())
     }
 
-    /// # Collections statisitcs
-
+    /// Indicates whether the statistical object has received any datapoints.
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
+    /// Returns the number of datapoints used in the statistical object.
     fn len(&self) -> usize;
+
+    /// Returns the sum of all datapoints.
     fn sum(&self) -> Self::Value;
+
+    /// Returns the squared sum of all datapoints.
     fn sqrtsum(&self) -> Self::Value;
+
+    /// Returns the smalles datapoint.
     fn min(&self) -> Self::Value;
+
+    /// Returns the biggest datapoint.
     fn max(&self) -> Self::Value;
+
+    /// Retuns the mean of all datapoints.
     fn mean(&self) -> Self::Value;
+
+    /// Returns the standard derivation.
     fn std_derivation(&self) -> Self::Value;
+
+    /// Returns the variance of all datapoints.
     fn variance(&self) -> Self::Value;
 }
 

@@ -128,6 +128,13 @@ pub trait Module: StaticModuleCore {
     fn at_sim_start(&mut self, _stage: usize) {}
 
     ///
+    /// A function that is called when all sim_start stages of all modules
+    /// are done. Used to resolve all async sim_start_stages.
+    ///
+    #[cfg(feature = "async")]
+    fn finish_sim_start(&mut self) {}
+
+    ///
     /// The number of stages used for the module initalization.
     ///
     fn num_sim_start_stages(&self) -> usize {
@@ -139,6 +146,13 @@ pub trait Module: StaticModuleCore {
     /// All events emitted by this function will NOT be processed.
     ///
     fn at_sim_end(&mut self) {}
+
+    ///
+    /// A function that is called when all sim_end stages of all modules
+    /// are done. Used to resolve all async sim_end_stages.
+    ///
+    #[cfg(feature = "async")]
+    fn finish_sim_end(&mut self) {}
 
     ///
     /// A callback function that is called should a parameter belonging to

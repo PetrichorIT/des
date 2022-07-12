@@ -35,6 +35,9 @@ impl StdDev {
         }
     }
 
+    ///
+    /// Resets all values to their inital state.
+    ///
     pub fn clear(&mut self) {
         self.min = f64::INFINITY;
         self.max = f64::NEG_INFINITY;
