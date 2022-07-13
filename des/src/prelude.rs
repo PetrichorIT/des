@@ -25,10 +25,10 @@ pub use crate::runtime::sim_time;
 // # Metrics & Misc
 //
 
-pub use crate::metrics::OutVec;
+pub use crate::stats::OutVec;
 #[doc(hidden)]
-pub use crate::metrics::Statistic;
-pub use crate::metrics::StdDev;
+pub use crate::stats::Statistic;
+pub use crate::stats::StdDev;
 
 pub use crate::util::Ptr;
 pub use crate::util::PtrConst;

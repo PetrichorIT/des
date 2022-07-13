@@ -5,7 +5,7 @@ use std::sync::{
 };
 
 use async_trait::async_trait;
-use des::prelude::*;
+use des::{prelude::*, runtime::StandardLogger};
 use tokio::{
     sync::{
         mpsc::{channel, Sender},
@@ -45,6 +45,8 @@ impl AsyncModule for QuasaiSyncModule {
 #[test]
 #[serial]
 fn quasai_sync_non_blocking() {
+    StandardLogger::active(false);
+
     let mut rt = NetworkRuntime::new(());
     let mut module = QuasaiSyncModule::named_root(ModuleCore::new_with(
         ObjectPath::root_module("RootModule".to_string()),
@@ -199,6 +201,8 @@ impl AsyncModule for MutipleTasksModule {
 #[test]
 #[serial]
 fn mutiple_active_tasks() {
+    StandardLogger::active(false);
+
     let mut rt = NetworkRuntime::new(());
     let mut module_a = MutipleTasksModule::named_root(ModuleCore::new_with(
         ObjectPath::root_module("RootModule".to_string()),
@@ -274,6 +278,8 @@ impl AsyncModule for TimeSleepModule {
 #[test]
 #[serial]
 fn one_module_timers() {
+    StandardLogger::active(false);
+
     let mut rt = NetworkRuntime::new(());
     let mut module_a = TimeSleepModule::named_root(ModuleCore::new_with(
         ObjectPath::root_module("RootModule".to_string()),
@@ -326,6 +332,8 @@ fn one_module_timers() {
 #[test]
 #[serial]
 fn one_module_delayed_recv() {
+    StandardLogger::active(false);
+
     let mut rt = NetworkRuntime::new(());
     let mut module_a = TimeSleepModule::named_root(ModuleCore::new_with(
         ObjectPath::root_module("RootModule".to_string()),
@@ -377,6 +385,8 @@ fn one_module_delayed_recv() {
 #[test]
 #[serial]
 fn mutiple_module_delayed_recv() {
+    StandardLogger::active(false);
+
     let mut rt = NetworkRuntime::new(());
 
     let mut module_a = TimeSleepModule::named_root(ModuleCore::new_with(
@@ -495,6 +505,8 @@ impl AsyncModule for SemaphoreModule {
 #[test]
 #[serial]
 fn semaphore_in_waiting_task() {
+    StandardLogger::active(false);
+
     let mut rt = NetworkRuntime::new(());
 
     let mut module_a = SemaphoreModule::named_root(ModuleCore::new_with(
@@ -587,6 +599,8 @@ impl AsyncModule for ShouldBlockSimStart {
 #[test]
 #[should_panic = "Join Idle: RuntimeIdle(())"]
 fn sim_start_deadlock() {
+    StandardLogger::active(false);
+
     let mut rt = NetworkRuntime::new(());
     let module_a = ShouldBlockSimStart::named_root(ModuleCore::new_with(
         ObjectPath::root_module("RootModule".to_string()),

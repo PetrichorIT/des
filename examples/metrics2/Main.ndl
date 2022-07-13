@@ -1,0 +1,46 @@
+link LinkToBeTested {
+    bitrate: 1000000
+    latency: 0.05
+    jitter: 0.0
+}
+
+module HastyModule {
+    gates:
+        out @output
+}
+
+module Collector {
+    gates:
+        in1 
+        in2 
+        in3 
+
+        out 
+
+    connections:
+        in1 --> out
+        in2 --> out
+        in3 --> out
+}
+
+module Consumer {
+    gates:
+        in @input
+}
+
+subsystem TestCase {
+    nodes:
+        peak_early: HastyModule
+        peak_mid: HastyModule
+        peak_late: HastyModule
+
+        collector: Collector
+        consumer: Consumer
+
+    connections:
+        peak_early/out --> collector/in1
+        peak_mid/out --> collector/in2
+        peak_late/out --> collector/in3
+
+        collector/out --> LinkToBeTested --> consumer/in
+}

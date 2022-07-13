@@ -14,6 +14,11 @@ name = "t-metrics"
 path = "metrics/main.rs"
 
 [[bin]]
+name = "t-metrics2"
+path = "metrics2/main.rs"
+required-features = ["des/metrics"]
+
+[[bin]]
 name = "t-pingpong"
 path = "pingpong/main.rs"
 

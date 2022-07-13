@@ -7,7 +7,7 @@
 
 # 'des' tests
 #
-# *Features cqueue/internal-metrics has no test cases*
+# *Features cqueue/metrics has no test cases*
 #
 # There are the following test cases
 # - runtime

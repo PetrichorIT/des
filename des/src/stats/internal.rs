@@ -3,8 +3,8 @@ cfg_not_cqueue! {
     pub type RuntimeMetrics = std::OptimizedBinaryHeapMetrics;
 
     mod std {
-        use crate::metrics::CompressedStdDev;
-        use crate::metrics::StdDev;
+        use crate::stats::CompressedStdDev;
+        use crate::stats::StdDev;
 
         #[derive(Debug)]
         pub struct OptimizedBinaryHeapMetrics {
@@ -56,7 +56,7 @@ cfg_cqueue! {
     pub type RuntimeMetrics = cqueue::CQueueMetrics;
 
     mod cqueue {
-        use crate::metrics::{CompressedStdDev, StdDev};
+        use crate::stats::{CompressedStdDev, StdDev};
 
         #[derive(Debug)]
         pub struct CQueueMetrics {

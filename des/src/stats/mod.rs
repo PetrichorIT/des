@@ -8,6 +8,11 @@ use std::ops::RangeInclusive;
 cfg_metrics! {
     mod internal;
     pub use internal::*;
+
+    cfg_net! {
+        mod channel;
+        pub use channel::*;
+    }
 }
 
 mod stddev;
@@ -15,6 +20,9 @@ pub use stddev::*;
 
 mod outvec;
 pub use outvec::*;
+
+mod timeline;
+pub use timeline::*;
 
 ///
 /// A type that allows for statistical datacollection

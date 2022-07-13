@@ -1,4 +1,4 @@
-use log::{info, warn};
+use log::info;
 
 use crate::{create_event_set, net::*, runtime::*, time::*, util::*};
 
@@ -61,14 +61,27 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
                     let rng_ref = rng();
 
                     if channel.is_busy() {
-                        warn!(
+                        info!(
                             "Dropping message {} pushed onto busy channel #{:?}",
                             message.str(),
                             channel
                         );
+
+                        // Register message progress (DROP)
+                        #[cfg(feature = "metrics")]
+                        {
+                            channel.register_message_dropped(&message);
+                        }
+
                         drop(message);
                         log_scope!();
                         return;
+                    }
+
+                    // Register message progress (SUCC)
+                    #[cfg(feature = "metrics")]
+                    {
+                        channel.register_message_passed(&message);
                     }
 
                     let dur = channel.calculate_duration(&message, rng_ref);

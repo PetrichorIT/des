@@ -1,5 +1,6 @@
-use des::prelude::*;
+use des::{prelude::*, runtime::StandardLogger};
 use rand::{distributions::Standard, prelude::SliceRandom, Rng};
+use serial_test::serial;
 
 /// The Event ste
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -55,7 +56,10 @@ impl Application for App {
 }
 
 #[test]
+#[serial]
 fn zero_event_runtime() {
+    StandardLogger::active(false);
+
     let rt = Runtime::<App>::new(App {
         event_list: Vec::new(),
     });
@@ -81,7 +85,10 @@ impl Event<App> for RepeatWithDelay {
 }
 
 #[test]
+#[serial]
 fn one_event_runtime() {
+    StandardLogger::active(false);
+
     let mut rt = Runtime::<App>::new(App {
         event_list: Vec::new(),
     });
@@ -111,7 +118,10 @@ fn one_event_runtime() {
 }
 
 #[test]
+#[serial]
 fn ensure_event_order() {
+    StandardLogger::active(false);
+
     use rand::{rngs::StdRng, SeedableRng};
 
     let mut id = 0;
@@ -172,7 +182,10 @@ fn ensure_event_order() {
 
 #[test]
 #[cfg(not(feature = "cqueue"))]
+#[serial]
 fn ensure_event_order_same_time() {
+    StandardLogger::active(false);
+
     let one = SimTime::duration_since_zero(Duration::new(1, 0));
     let two = SimTime::duration_since_zero(Duration::new(2, 0));
 
@@ -246,7 +259,10 @@ pub struct EventBox {
 const N: usize = 100_000;
 
 #[test]
+#[serial]
 fn full_test_n_100_000() {
+    StandardLogger::active(false);
+
     let mut rt: Runtime<App> = Runtime::new_with(
         App {
             event_list: Vec::with_capacity(N),
@@ -282,12 +298,16 @@ fn full_test_n_100_000() {
     let mut dispatched = events.clone();
     dispatched.shuffle(&mut rand::thread_rng());
 
+    let mut c = 0;
     for eventbox in dispatched {
         let EventBox { time, events } = eventbox;
         for event in events {
-            rt.add_event(event, time)
+            rt.add_event(event, time);
+            c += 1;
         }
     }
+
+    println!("c := {}", c);
 
     let (App { event_list }, _, _) = rt.run().unwrap();
     let mut boxed_list = Vec::with_capacity(N);

@@ -20,7 +20,7 @@
 //!
 //! At its core DES provides the tools to easily and efficently build an event simulation
 //! with completely custom events. This can be done independent of features used,
-//! but usually only optimization features like `cqueue` or montioring tools like `internal-metrics`
+//! but usually only optimization features like `cqueue` or montioring tools like `metrics`
 //! are used in this context.
 //!
 //! ```
@@ -121,8 +121,8 @@ pub mod macros;
 
 pub mod prelude;
 
-pub mod metrics;
 pub mod runtime;
+pub mod stats;
 pub mod time;
 pub mod util;
 
@@ -148,6 +148,6 @@ cfg_async! {
 // | net              | Adds a module oriented design-abstraction that provides its own events.  |
 // | net-ipv6         | Configures the net module to use IPv6 addresses.                         |
 // | cqueue           | Configures the runtime to use a calender queue for better performance.   |
-// | internal-metrics | Collects internal metrics about the runtime, to improve parametrization. |
+// | metrics | Collects internal metrics about the runtime, to improve parametrization. |
 // | async            | Provides utilites and modifications for simulating asynchronous systems including a full reexport of safe tokio funtions. |
 //

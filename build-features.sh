@@ -19,41 +19,41 @@ cargo build -p des
 echo "[des] cqueue"
 cargo build -p des --features cqueue
 echo "[des] metrics"
-cargo build -p des --features internal-metrics
+cargo build -p des --features metrics
 echo "[des] cqueue + metrics"
-cargo build -p des --features cqueue --features internal-metrics
+cargo build -p des --features cqueue --features metrics
 echo "[des] net"
 cargo build -p des --features net
 echo "[des] net + cqueue"
 cargo build -p des --features net --features cqueue
 echo "[des] net + metrics"
-cargo build -p des --features net --features internal-metrics
+cargo build -p des --features net --features metrics
 echo "[des] net + cqueue + metrics"
-cargo build -p des --features net --features cqueue --features internal-metrics
+cargo build -p des --features net --features cqueue --features metrics
 echo "[des] net6"
 cargo build -p des --features net --features net-ipv6
 echo "[des] net6 + cqueue"
 cargo build -p des --features net --features net-ipv6 --features cqueue
 echo "[des] net6 + metrics"
-cargo build -p des --features net --features net-ipv6 --features internal-metrics
+cargo build -p des --features net --features net-ipv6 --features metrics
 echo "[des] net6 + cqueue + metrics"
-cargo build -p des --features net --features net-ipv6 --features cqueue --features internal-metrics
+cargo build -p des --features net --features net-ipv6 --features cqueue --features metrics
 echo "[des] net + async"
 cargo build -p des --features net --features async
 echo "[des] net + async + cqueue"
 cargo build -p des --features net --features cqueue --features async
 echo "[des] net + async + metrics"
-cargo build -p des --features net --features internal-metrics --features async
+cargo build -p des --features net --features metrics --features async
 echo "[des] net + async + cqueue + metrics"
-cargo build -p des --features net --features cqueue --features internal-metrics --features async
+cargo build -p des --features net --features cqueue --features metrics --features async
 echo "[des] net6 + async"
 cargo build -p des --features net --features net-ipv6 --features async
 echo "[des] net6 + async + cqueue"
 cargo build -p des --features net --features net-ipv6 --features cqueue --features async
 echo "[des] net6 + async + metrics"
-cargo build -p des --features net --features net-ipv6 --features internal-metrics --features async
+cargo build -p des --features net --features net-ipv6 --features metrics --features async
 echo "[des] net6 + async + cqueue + metrics"
-cargo build -p des --features net --features net-ipv6 --features cqueue --features internal-metrics --features async
+cargo build -p des --features net --features net-ipv6 --features cqueue --features metrics --features async
 
 
 # 'tests' build

@@ -25,7 +25,7 @@ full = ["net", "cqueue", "async"]
 
 async = ["net", "dep:tokio", "dep:async-trait"]
 cqueue = ["dep:num-traits"]
-internal-metrics = []
+metrics = []
 net = ["dep:des_macros"]
 net-ipv6 = ["net"]
 

@@ -1,5 +1,5 @@
 use crate::{
-    metrics::{Statistic, StdDev},
+    stats::{Statistic, StdDev},
     time::SimTime,
 };
 use log::error;

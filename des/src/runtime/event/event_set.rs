@@ -1,7 +1,7 @@
 cfg_not_cqueue! {
     mod default_impl {
         #[allow(unused)]
-        use crate::{metrics::*, runtime::*, time::SimTime, util::*};
+        use crate::{stats::*, runtime::*, time::SimTime, util::*};
         use std::collections::{BinaryHeap, VecDeque};
 
         pub(crate) struct FutureEventSet<A>
@@ -48,20 +48,20 @@ cfg_not_cqueue! {
             }
 
             //
-            // clippy::let_and_return occures on not(feature = "internal-metrics")
-            // but would produce invalid code with feature "internal-metrics"
+            // clippy::let_and_return occures on not(feature = "metrics")
+            // but would produce invalid code with feature "metrics"
             //
             #[allow(clippy::let_and_return)]
             pub(crate) fn fetch_next(
                 &mut self,
-                #[cfg(feature = "internal-metrics")] mut metrics: crate::util::PtrMut<
-                    crate::metrics::RuntimeMetrics,
+                #[cfg(feature = "metrics")] mut metrics: crate::util::PtrMut<
+                    crate::stats::RuntimeMetrics,
                 >,
             ) -> EventNode<A> {
                 // Internal runtime metrics
 
                 let event = if let Some(event) = self.zero_queue.pop_front() {
-                    #[cfg(feature = "internal-metrics")]
+                    #[cfg(feature = "metrics")]
                     {
                         metrics.zero_event_count += 1;
                     }
@@ -69,7 +69,7 @@ cfg_not_cqueue! {
                     self.last_event_simtime = event.time;
                     event
                 } else {
-                    #[cfg(feature = "internal-metrics")]
+                    #[cfg(feature = "metrics")]
                     {
                         metrics.non_zero_event_count += 1;
                     }
@@ -80,7 +80,7 @@ cfg_not_cqueue! {
                     event
                 };
 
-                #[cfg(feature = "internal-metrics")]
+                #[cfg(feature = "metrics")]
                 {
                     metrics
                         .heap_size
@@ -98,8 +98,8 @@ cfg_not_cqueue! {
                 &mut self,
                 time: SimTime,
                 event: impl Into<A::EventSet>,
-                #[cfg(feature = "internal-metrics")] mut metrics: crate::util::PtrMut<
-                    crate::metrics::RuntimeMetrics,
+                #[cfg(feature = "metrics")] mut metrics: crate::util::PtrMut<
+                    crate::stats::RuntimeMetrics,
                 >,
             ) {
                 assert!(
@@ -112,7 +112,7 @@ cfg_not_cqueue! {
                 if self.last_event_simtime == time {
                     self.zero_queue.push_back(node);
                 } else {
-                    #[cfg(feature = "internal-metrics")]
+                    #[cfg(feature = "metrics")]
                     metrics
                         .non_zero_event_wait_time
                         .collect_at((time - SimTime::now()).as_secs_f64(), SimTime::now());
@@ -133,7 +133,7 @@ cfg_cqueue! {
         use std::marker::PhantomData;
 
         #[allow(unused)]
-        use crate::{metrics::*, runtime::*, time::*, util::*};
+        use crate::{stats::*, runtime::*, time::*, util::*};
         use crate::cqueue::*;
 
         pub(crate) struct FutureEventSet<A>
@@ -183,9 +183,9 @@ cfg_cqueue! {
             #[inline]
             pub(crate) fn fetch_next(
                 &mut self,
-                #[cfg(feature = "internal-metrics")] mut metrics: PtrMut<RuntimeMetrics>,
+                #[cfg(feature = "metrics")] mut metrics: PtrMut<RuntimeMetrics>,
             ) -> EventNode<A> {
-                #[cfg(feature = "internal-metrics")]
+                #[cfg(feature = "metrics")]
                 {
                     use std::ops::AddAssign;
                     let is_zero_time = self.inner.len_zero() > 0;
@@ -203,7 +203,7 @@ cfg_cqueue! {
                     ..
                 } = self.inner.fetch_next();
 
-                #[cfg(feature = "internal-metrics")]
+                #[cfg(feature = "metrics")]
                 {
                     // metrics
                     //    .overflow_heap_size
@@ -234,9 +234,9 @@ cfg_cqueue! {
                 &mut self,
                 time: SimTime,
                 event: impl Into<A::EventSet>,
-                #[cfg(feature = "internal-metrics")] mut metrics: PtrMut<RuntimeMetrics>,
+                #[cfg(feature = "metrics")] mut metrics: PtrMut<RuntimeMetrics>,
             ) {
-                #[cfg(feature = "internal-metrics")]
+                #[cfg(feature = "metrics")]
                 {
                     if time > self.inner.time() {
                         metrics

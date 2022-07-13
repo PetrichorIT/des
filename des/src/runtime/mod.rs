@@ -30,7 +30,7 @@ pub use self::logger::*;
 
 pub(crate) const FT_NET: bool = cfg!(feature = "net");
 pub(crate) const FT_CQUEUE: bool = cfg!(feature = "cqueue");
-pub(crate) const FT_INTERNAL_METRICS: bool = cfg!(feature = "internal-metrics");
+pub(crate) const FT_INTERNAL_METRICS: bool = cfg!(feature = "metrics");
 pub(crate) const FT_ASYNC: bool = cfg!(feature = "async");
 
 pub(crate) const SYM_CHECKMARK: char = '\u{2713}';
@@ -117,8 +117,8 @@ where
 
     future_event_set: FutureEventSet<A>,
 
-    #[cfg(feature = "internal-metrics")]
-    metrics: PtrMut<crate::metrics::RuntimeMetrics>,
+    #[cfg(feature = "metrics")]
+    metrics: PtrMut<crate::stats::RuntimeMetrics>,
 }
 
 impl<A> Runtime<A>
@@ -289,8 +289,8 @@ where
 
             app,
 
-            #[cfg(feature = "internal-metrics")]
-            metrics: PtrMut::new(crate::metrics::RuntimeMetrics::new()),
+            #[cfg(feature = "metrics")]
+            metrics: PtrMut::new(crate::stats::RuntimeMetrics::new()),
         };
 
         macro_rules! symbol {
@@ -336,7 +336,7 @@ where
         debug_assert!(!self.future_event_set.is_empty());
 
         let node = self.future_event_set.fetch_next(
-            #[cfg(feature = "internal-metrics")]
+            #[cfg(feature = "metrics")]
             PtrMut::clone(&self.metrics),
         );
 
@@ -347,7 +347,7 @@ where
             self.future_event_set.add(
                 time,
                 event,
-                #[cfg(feature = "internal-metrics")]
+                #[cfg(feature = "metrics")]
                 PtrMut::clone(&self.metrics),
             );
             return false;
@@ -442,7 +442,7 @@ where
                 println!("\u{23A2} Simulation ended");
                 println!("\u{23A2}  Ended at event #{} after {}", self.itr, time);
 
-                #[cfg(feature = "internal-metrics")]
+                #[cfg(feature = "metrics")]
                 {
                     println!("\u{23A2}");
                     self.metrics.finish()
@@ -469,7 +469,7 @@ where
                     time
                 );
 
-                #[cfg(feature = "internal-metrics")]
+                #[cfg(feature = "metrics")]
                 {
                     println!("\u{23A2}");
                     self.metrics.finish()
@@ -574,7 +574,7 @@ where
         self.future_event_set.add(
             time,
             event,
-            #[cfg(feature = "internal-metrics")]
+            #[cfg(feature = "metrics")]
             PtrMut::clone(&self.metrics),
         )
     }

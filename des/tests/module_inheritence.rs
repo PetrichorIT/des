@@ -1,6 +1,6 @@
 #![cfg(feature = "net")]
 
-use des::{net::NetworkRuntimeGlobals, prelude::*, util::PtrMut};
+use des::{net::NetworkRuntimeGlobals, prelude::*, runtime::StandardLogger, util::PtrMut};
 
 macro_rules! auto_impl_static {
     ($ident: ident) => {
@@ -111,11 +111,15 @@ impl TestCase {
 
 #[test]
 fn test_case_build() {
+    StandardLogger::active(false);
+
     let _case = TestCase::build();
 }
 
 #[test]
 fn test_parent_ptr() {
+    StandardLogger::active(false);
+
     let case = TestCase::build();
 
     // println!("Parent: {:?}", TypeId::of::<Parent>());
@@ -150,6 +154,8 @@ fn test_parent_ptr() {
 
 #[test]
 fn test_parent_mut_ptr() {
+    StandardLogger::active(false);
+
     let mut case = TestCase::build();
 
     case.children[0].inc(1);

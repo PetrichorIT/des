@@ -1,4 +1,4 @@
-use crate::metrics::Statistic;
+use crate::stats::Statistic;
 use crate::time::SimTime;
 use std::fmt::Display;
 

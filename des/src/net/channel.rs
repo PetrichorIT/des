@@ -23,7 +23,7 @@ pub type ChannelRefMut = PtrMut<Channel>;
 ///
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ChannelMetrics {
     /// The maximum throughput of the channel in bit/s
     pub bitrate: usize,
@@ -116,6 +116,10 @@ pub struct Channel {
     /// The capabilities of the channel.
     metrics: ChannelMetrics,
 
+    /// The stats to track the channels activity.
+    #[cfg(feature = "metrics")]
+    stats: crate::stats::InProgressChannelStats,
+
     /// A indicator whether a channel is busy transmitting a packet.
     busy: bool,
 
@@ -179,7 +183,32 @@ impl Channel {
             metrics,
             busy: false,
             transmission_finish_time: SimTime::ZERO,
+
+            #[cfg(feature = "metrics")]
+            stats: crate::stats::InProgressChannelStats::new(
+                ObjectPath::root_module("chan".to_string()),
+                metrics,
+            ),
         })
+    }
+
+    ///
+    /// Calculates the stats for a given channel
+    ///
+    #[cfg(feature = "metrics")]
+    pub fn calculate_stats(&self) -> crate::stats::ChannelStats {
+        self.stats
+            .evaluate(SimTime::now().duration_since(SimTime::MIN))
+    }
+
+    #[cfg(feature = "metrics")]
+    pub(crate) fn register_message_passed(&mut self, msg: &Message) {
+        self.stats.register_message_passed(msg)
+    }
+
+    #[cfg(feature = "metrics")]
+    pub(crate) fn register_message_dropped(&mut self, msg: &Message) {
+        self.stats.register_message_dropped(msg)
     }
 
     ///

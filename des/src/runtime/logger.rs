@@ -9,6 +9,7 @@ use termcolor::*;
 thread_local! {
     static CURRENT_OBJECT: RefCell<Option<String>> = const { RefCell::new(None) };
 
+    static LOGGER_ACTIVE: Cell<bool> = const { Cell::new(true) };
     static LOGGER_PRIO_SCOPE: Cell<bool> = const { Cell::new(false) };
     static LOGGER_SHOW_NONPRIO_TARGET: Cell<bool> = const { Cell::new(true) };
 }
@@ -25,7 +26,10 @@ impl StandardLogger {
     /// Creates a logger and registers it to the logging interface
     ///
     pub fn setup() -> Result<(), SetLoggerError> {
-        set_logger(&LOGGER).map(|()| set_max_level(LevelFilter::Trace))
+        match set_logger(&LOGGER).map(|()| set_max_level(LevelFilter::Trace)) {
+            Ok(v) => Ok(v),
+            Err(_e) => Ok(()),
+        }
     }
 
     ///
@@ -42,6 +46,13 @@ impl StandardLogger {
     ///
     pub fn show_nonpriority_target(value: bool) {
         LOGGER_SHOW_NONPRIO_TARGET.with(|v| v.set(value))
+    }
+
+    ///
+    /// Manually overwrites the logger
+    ///
+    pub fn active(value: bool) {
+        LOGGER_ACTIVE.with(|v| v.set(value))
     }
 
     pub(crate) fn begin_scope(ident: &str) {
@@ -69,7 +80,7 @@ impl StandardLogger {
 
 impl Log for StandardLogger {
     fn enabled(&self, metadata: &log::Metadata) -> bool {
-        metadata.level() <= Level::Trace
+        metadata.level() <= Level::Trace && LOGGER_ACTIVE.with(|v| v.get())
     }
 
     fn log(&self, record: &log::Record) {

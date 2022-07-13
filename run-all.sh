@@ -2,6 +2,7 @@
 
 cargo run --release --bin t-inet
 cargo run --release --bin t-metrics
+cargo run --release --bin t-metrics2 --features des/metrics
 cargo run --release --bin t-ndl
 cargo run --release --bin t-pingpong
 cargo run --release --bin t-ptrhell

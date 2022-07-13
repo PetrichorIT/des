@@ -53,8 +53,8 @@ macro_rules! cfg_net_v6 {
 macro_rules! cfg_metrics {
     ($($item:item)*) => {
         $(
-            #[cfg(feature = "internal-metrics")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "internal-metrics")))]
+            #[cfg(feature = "metrics")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "metrics")))]
             $item
         )*
     }
