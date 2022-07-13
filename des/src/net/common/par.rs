@@ -79,12 +79,14 @@ mod private {
 /// whether data is contained or not. Useful for writing data
 /// to not yet initalized parameters.
 ///
+#[derive(Debug)]
 pub struct Optional;
 impl private::ParHandleState for Optional {}
 
 /// The state of a [ParHandle] where the contents are guaranteed
 /// to be there, thus allowing derefs on the handle.
 ///
+#[derive(Debug)]
 pub struct Unwraped;
 impl private::ParHandleState for Unwraped {}
 

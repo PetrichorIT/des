@@ -5,11 +5,11 @@ use std::collections::VecDeque;
 use std::ops::Rem;
 
 #[derive(Debug, Clone)]
-pub struct Node<E> {
-    pub time: SimTime,
-    pub event: E,
+pub(crate) struct Node<E> {
+    pub(crate) time: SimTime,
+    pub(crate) event: E,
 
-    pub cookie: usize,
+    pub(crate) cookie: usize,
 }
 
 impl<E> PartialEq for Node<E> {
@@ -20,15 +20,13 @@ impl<E> PartialEq for Node<E> {
 
 impl<E> Eq for Node<E> {}
 
-impl<E> PartialOrd for Node<E>
-{
+impl<E> PartialOrd for Node<E> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<E> Ord for Node<E>
-{
+impl<E> Ord for Node<E> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         // Reverse for min
         other
@@ -38,14 +36,12 @@ impl<E> Ord for Node<E>
     }
 }
 
-pub struct CQueueOptions {
-    pub num_buckets: usize,
-    pub bucket_timespan: Duration,
+pub(crate) struct CQueueOptions {
+    pub(crate) num_buckets: usize,
+    pub(crate) bucket_timespan: Duration,
 }
 
-impl Default for CQueueOptions
-
-{
+impl Default for CQueueOptions {
     fn default() -> Self {
         Self {
             num_buckets: 30,
@@ -55,7 +51,7 @@ impl Default for CQueueOptions
 }
 
 #[derive(Debug, Clone)]
-pub struct CQueue<E> {
+pub(crate) struct CQueue<E> {
     // Parameters
     pub(crate) n: usize,
     pub(crate) t: Duration,
@@ -79,34 +75,32 @@ pub struct CQueue<E> {
     pub(crate) running_cookie: usize,
 }
 
-impl<E> CQueue<E>
-{
-    pub fn descriptor(&self) -> String
-    {
+impl<E> CQueue<E> {
+    pub(crate) fn descriptor(&self) -> String {
         format!("CTimeVDeque({}, {:?})", self.n, self.t)
     }
 
-    pub fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.len
     }
 
-    pub fn len_zero(&self) -> usize {
+    pub(crate) fn len_zero(&self) -> usize {
         self.zero_event_bucket.len()
     }
 
-    pub fn len_nonzero(&self) -> usize {
+    pub(crate) fn len_nonzero(&self) -> usize {
         self.len() - self.len_zero()
     }
 
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.len == 0
     }
 
-    pub fn time(&self) -> SimTime {
+    pub(crate) fn time(&self) -> SimTime {
         self.t_current
     }
 
-    pub fn new(options: CQueueOptions) -> Self {
+    pub(crate) fn new(options: CQueueOptions) -> Self {
         let CQueueOptions {
             num_buckets: n,
             bucket_timespan: t,
@@ -139,11 +133,11 @@ impl<E> CQueue<E>
     }
 
     #[inline]
-    pub fn add(&mut self, time: SimTime, event: E) {
+    pub(crate) fn add(&mut self, time: SimTime, event: E) {
         self.enqueue(time, event)
     }
 
-    pub fn enqueue(&mut self, time: SimTime, event: E) {
+    pub(crate) fn enqueue(&mut self, time: SimTime, event: E) {
         assert!(time >= self.t_current);
 
         let node = Node {
@@ -194,7 +188,7 @@ impl<E> CQueue<E>
     }
 
     #[inline]
-    pub fn fetch_next(&mut self) -> Node<E> {
+    pub(crate) fn fetch_next(&mut self) -> Node<E> {
         if self.len == 0 {
             panic!("Cannot fetch from empty queue");
         }
@@ -208,8 +202,8 @@ impl<E> CQueue<E>
             // Move until full bucket is found.
             while self.buckets[self.head].is_empty() {
                 self.head = (self.head + 1) % self.n;
-                self.t0 = self.t0 + self.t;
-                self.t1 = self.t1 + self.t;
+                self.t0 += self.t;
+                self.t1 += self.t;
             }
 
             // Bucket with > 0 elements found
@@ -217,8 +211,8 @@ impl<E> CQueue<E>
             let min = self.buckets[self.head].front().unwrap();
             if min.time > self.t1 {
                 self.head = (self.head + 1) % self.n;
-                self.t0 = self.t0 + self.t;
-                self.t1 = self.t1 + self.t;
+                self.t0 += self.t;
+                self.t1 += self.t;
                 continue;
             }
 
@@ -229,7 +223,7 @@ impl<E> CQueue<E>
         }
     }
 
-    pub fn dequeue(&mut self) -> Option<Node<E>> {
+    pub(crate) fn dequeue(&mut self) -> Option<Node<E>> {
         if self.len == 0 {
             return None;
         }
@@ -243,8 +237,8 @@ impl<E> CQueue<E>
             // Move until full bucket is found.
             while self.buckets[self.head].is_empty() {
                 self.head = (self.head + 1) % self.n;
-                self.t0 = self.t0 + self.t;
-                self.t1 = self.t1 + self.t;
+                self.t0 += self.t;
+                self.t1 += self.t;
             }
 
             // Bucket with > 0 elements found
@@ -252,8 +246,8 @@ impl<E> CQueue<E>
             let min = self.buckets[self.head].front().unwrap();
             if min.time > self.t1 {
                 self.head = (self.head + 1) % self.n;
-                self.t0 = self.t0 + self.t;
-                self.t1 = self.t1 + self.t;
+                self.t0 += self.t;
+                self.t1 += self.t;
                 continue;
             }
 
@@ -263,23 +257,4 @@ impl<E> CQueue<E>
             return self.buckets[self.head].pop_front();
         }
     }
-
-    // pub fn clear(&mut self) {
-    //     self.zero_event_bucket.clear();
-    //     self.buckets.iter_mut().for_each(VecDeque::clear);
-    //     self.len = 0;
-    //     self.head = 0;
-    // }
-
-    // pub fn reset(&mut self, time: SimTime) {
-    //     self.clear();
-
-    //     self.t_current = time;
-    //     self.t0 = time;
-
-    //     self.t1 = time + self.t;
-    //     // t_all remains the same
-    //     self.running_cookie = 0;
-    // }
 }
-

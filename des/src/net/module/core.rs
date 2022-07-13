@@ -13,7 +13,6 @@ use crate::{
     util::*,
 };
 
-
 create_global_uid!(
     /// A runtime-unqiue identifier for a module / submodule inheritence tree.
     /// * This type is only available of DES is build with the `"net"` feature.*
@@ -25,7 +24,7 @@ create_global_uid!(
 /// A managment struct for the senders.
 ///
 #[derive(Debug)]
-pub struct ModuleBuffer {
+pub(crate) struct ModuleBuffer {
     pub(crate) out_buffer: Vec<(Message, GateRef, SimTime)>,
     pub(crate) loopback_buffer: Vec<(Message, SimTime)>,
 
@@ -37,7 +36,7 @@ impl ModuleBuffer {
     /// Adds the given duration to the processing time.
     /// Note that all buffer handles have their own processing time.
     ///
-    pub fn processing_time(&mut self, duration: Duration) {
+    pub(crate) fn processing_time(&mut self, duration: Duration) {
         self.processing_time_delay += duration
     }
 

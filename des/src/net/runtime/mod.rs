@@ -11,7 +11,7 @@ use std::{
 };
 
 mod events;
-pub use events::*;
+pub(crate) use events::*;
 
 ///
 /// A runtime application for a module/network oriantated simulation.

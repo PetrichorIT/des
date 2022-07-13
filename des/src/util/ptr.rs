@@ -27,7 +27,7 @@ pub(crate) struct PtrWeakVoid {
 
 #[allow(unused)]
 impl PtrWeakVoid {
-    pub fn new<T: 'static + Sized>(value: PtrWeak<T, Mut>) -> Self {
+    pub(crate) fn new<T: 'static + Sized>(value: PtrWeak<T, Mut>) -> Self {
         assert!(std::mem::size_of::<PtrWeak<T, Mut>>() == 8);
 
         // SAFTY:

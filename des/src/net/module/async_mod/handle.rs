@@ -53,6 +53,7 @@ unsafe impl Send for BufferEvent {}
 /// This can be Send via threads to enqueu messages
 /// from a module.
 ///
+#[derive(Debug)]
 pub struct HandleSender {
     pub(crate) inner: tokio::sync::mpsc::UnboundedSender<BufferEvent>,
     pub(crate) time_offset: Duration,
@@ -103,7 +104,7 @@ impl HandleSender {
         self.inner
             .send(BufferEvent::ScheduleAt {
                 msg: msg.into(),
-                time: time,
+                time,
             })
             .expect("Failed to send to unbounded channel. reciver must have died.");
     }

@@ -1,6 +1,29 @@
 //!
-//! Time primitives mirroring [std::time] bound to the simulation time.
+//! Temporal quantification in a simulation context.
 //!
+//! Note that the implementation of [SimTime] depends on the features that
+//! are active. If features "async" is active, tokio provides an implementation
+//! for [SimTime] based on its internal feature "sim". If not a drop-in replacement
+//! is provided by des.
+//!
+//! # Examples
+//!
+//! A [Duration] describes a span of time, either in the context of
+//! real [SystemTime](std::time::SystemTime) or provided [SimTime].
+//! There are mutiple ways to create a new [Duration].
+//!
+//! ```rust
+//! # use des::time::*;
+//! let five_seconds = Duration::from_secs(5);
+//! assert_eq!(five_seconds, Duration::from_millis(5_000));
+//! assert_eq!(five_seconds, Duration::from_micros(5_000_000));
+//! assert_eq!(five_seconds, Duration::from_nanos(5_000_000_000));
+//!
+//! let ten_seconds = Duration::from_secs(10);
+//! let seven_nanos = Duration::from_nanos(7);
+//! let total = ten_seconds + seven_nanos;
+//! assert_eq!(total, Duration::new(10, 7));
+//! ```
 
 mod duration;
 pub use duration::*;
@@ -214,5 +237,5 @@ cfg_not_async! {
 
 cfg_async! {
     /// The simulation time, now the tokio implementaion
-    pub type SimTime = tokio::sim::SimTime;
+    pub use tokio::sim::SimTime;
 }

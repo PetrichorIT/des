@@ -1,5 +1,5 @@
 /// A Duration type to represent a span of time.
-pub type Duration = std::time::Duration;
+pub use std::time::Duration;
 
 cfg_not_async! {
     use std::ops::{Add, AddAssign};

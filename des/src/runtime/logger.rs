@@ -7,6 +7,7 @@ use termcolor::*;
 pub static LOGGER: StandardLogger = StandardLogger();
 
 /// The logging implementation used internally.
+#[derive(Debug)]
 pub struct StandardLogger();
 
 impl StandardLogger {

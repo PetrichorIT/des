@@ -9,7 +9,7 @@ pub(crate) struct SyncWrap<T> {
 }
 
 impl<T> SyncWrap<T> {
-    pub const fn new(item: T) -> Self {
+    pub(crate) const fn new(item: T) -> Self {
         Self { inner: item }
     }
 }

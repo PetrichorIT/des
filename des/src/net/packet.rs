@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::fmt::Debug;
 
 use crate::net::*;
 use crate::time::*;
@@ -560,5 +561,11 @@ impl PacketBuilder {
 impl Default for PacketBuilder {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl Debug for PacketBuilder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "PacketBuilder")
     }
 }

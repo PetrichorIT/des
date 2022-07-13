@@ -2,13 +2,12 @@
 #![feature(dispatch_from_dyn)]
 #![feature(coerce_unsized)]
 #![feature(arbitrary_self_types)]
-#![feature(const_option_ext)]
 #![feature(box_into_inner)]
 #![feature(linked_list_remove)]
-#![allow(rustdoc::broken_intra_doc_links)]
-#![allow(clippy::needless_doctest_main)]
-#![warn(missing_docs)]
-
+// Lints
+#![allow(clippy::needless_doctest_main, rustdoc::broken_intra_doc_links)]
+#![warn(missing_docs, missing_debug_implementations, unreachable_pub)]
+#![deny(unused_must_use)]
 //!
 //! A discrete event simulator.
 //!

@@ -18,27 +18,27 @@ cfg_not_cqueue! {
         where
             A: Application,
         {
-            pub fn descriptor(&self) -> String {
+            pub(crate) fn descriptor(&self) -> String {
                 "FutureEventSet::BinaryHeap()".to_string()
             }
 
-            pub fn len(&self) -> usize {
+            pub(crate) fn len(&self) -> usize {
                 self.len_zero() + self.len_nonzero()
             }
 
-            pub fn is_empty(&self) -> bool {
+            pub(crate) fn is_empty(&self) -> bool {
                 self.heap.is_empty() && self.zero_queue.is_empty()
             }
 
-            pub fn len_zero(&self) -> usize {
+            pub(crate) fn len_zero(&self) -> usize {
                 self.zero_queue.len()
             }
 
-            pub fn len_nonzero(&self) -> usize {
+            pub(crate) fn len_nonzero(&self) -> usize {
                 self.heap.len()
             }
 
-            pub fn new_with(options: &RuntimeOptions) -> Self {
+            pub(crate) fn new_with(options: &RuntimeOptions) -> Self {
                 Self {
                     heap: BinaryHeap::with_capacity(64),
                     zero_queue: VecDeque::with_capacity(32),
@@ -52,7 +52,7 @@ cfg_not_cqueue! {
             // but would produce invalid code with feature "internal-metrics"
             //
             #[allow(clippy::let_and_return)]
-            pub fn fetch_next(
+            pub(crate) fn fetch_next(
                 &mut self,
                 #[cfg(feature = "internal-metrics")] mut metrics: crate::util::PtrMut<
                     crate::metrics::RuntimeMetrics,
@@ -94,7 +94,7 @@ cfg_not_cqueue! {
                 event
             }
 
-            pub fn add(
+            pub(crate) fn add(
                 &mut self,
                 time: SimTime,
                 event: impl Into<A::EventSet>,
@@ -147,34 +147,32 @@ cfg_cqueue! {
         where
             A: Application,
         {
-            pub fn descriptor(&self) -> String {
+            pub(crate) fn descriptor(&self) -> String {
                 format!("FutureEventSet::CQueue::{}", self.inner.descriptor())
             }
 
-            pub fn len(&self) -> usize {
+            pub(crate) fn len(&self) -> usize {
                 self.inner.len()
             }
 
-            pub fn len_nonzero(&self) -> usize {
+            pub(crate) fn len_nonzero(&self) -> usize {
                 // self.inner.len_nonzero()
                 todo!();
             }
 
-            pub fn len_zero(&self) -> usize {
+            pub(crate) fn len_zero(&self) -> usize {
                 // self.inner.len_zero()
                 todo!();
             }
 
-            pub fn is_empty(&self) -> bool {
+            pub(crate) fn is_empty(&self) -> bool {
                 self.inner.is_empty()
             }
 
-            pub fn new_with(options: &RuntimeOptions) -> Self {
+            pub(crate) fn new_with(options: &RuntimeOptions) -> Self {
                 let cqueue_options = CQueueOptions {
                     num_buckets: options.cqueue_num_buckets,
                     bucket_timespan: options.cqueue_bucket_timespan,
-
-                    ..Default::default()
                 };
 
                 Self {
@@ -183,7 +181,7 @@ cfg_cqueue! {
             }
 
             #[inline]
-            pub fn fetch_next(
+            pub(crate) fn fetch_next(
                 &mut self,
                 #[cfg(feature = "internal-metrics")] mut metrics: PtrMut<RuntimeMetrics>,
             ) -> EventNode<A> {
@@ -232,7 +230,7 @@ cfg_cqueue! {
                 }
             }
 
-            pub fn add(
+            pub(crate) fn add(
                 &mut self,
                 time: SimTime,
                 event: impl Into<A::EventSet>,

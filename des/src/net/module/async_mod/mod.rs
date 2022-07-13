@@ -4,12 +4,12 @@ use async_trait::async_trait;
 use std::sync::Arc;
 
 mod handle;
-pub use handle::*;
+pub(crate) use handle::*;
 
 pub(crate) mod ext;
 use ext::*;
 
-pub const RT_TIME_WAKEUP: MessageKind = 42;
+pub(crate) const RT_TIME_WAKEUP: MessageKind = 42;
 
 ///
 /// A set of user defined functions for customizing the behaviour
@@ -157,8 +157,6 @@ where
     T: 'static + AsyncModule,
 {
     fn handle_message(&mut self, msg: Message) {
-        tokio::time::SimTime::set_now(SimTime::now().into());
-
         // (1) Fetch the runtime and initial the time context.
         let rt = Arc::clone(&self.globals().runtime);
         let guard = rt.enter_time_context(self.async_ext.time_context.take().unwrap());
@@ -177,10 +175,7 @@ where
         rt.poll_until_idle();
 
         if let Some(next_time) = rt.next_time_poll() {
-            self.schedule_at(
-                Message::new().kind(RT_TIME_WAKEUP).build(),
-                next_time.into(),
-            )
+            self.schedule_at(Message::new().kind(RT_TIME_WAKEUP).build(), next_time)
         }
 
         // (1) Suspend the time context
@@ -188,8 +183,6 @@ where
     }
 
     fn activity(&mut self) {
-        tokio::time::SimTime::set_now(SimTime::now().into());
-
         let rt = Arc::clone(&self.globals().runtime);
         let guard = rt.enter_time_context(self.async_ext.time_context.take().unwrap());
 
@@ -204,10 +197,7 @@ where
         rt.poll_until_idle();
 
         if let Some(next_time) = rt.next_time_poll() {
-            self.schedule_at(
-                Message::new().kind(RT_TIME_WAKEUP).build(),
-                next_time.into(),
-            )
+            self.schedule_at(Message::new().kind(RT_TIME_WAKEUP).build(), next_time)
         }
 
         self.async_ext.time_context = Some(guard.leave());
@@ -286,10 +276,7 @@ where
         rt.poll_until_idle();
 
         if let Some(next_time) = rt.next_time_poll() {
-            self.schedule_at(
-                Message::new().kind(RT_TIME_WAKEUP).build(),
-                next_time.into(),
-            )
+            self.schedule_at(Message::new().kind(RT_TIME_WAKEUP).build(), next_time)
         }
 
         self.async_ext.time_context = Some(guard.leave());
@@ -314,18 +301,13 @@ where
             .expect("Join Error");
 
         if let Some(next_time) = rt.next_time_poll() {
-            self.schedule_at(
-                Message::new().kind(RT_TIME_WAKEUP).build(),
-                next_time.into(),
-            )
+            self.schedule_at(Message::new().kind(RT_TIME_WAKEUP).build(), next_time)
         }
 
         self.async_ext.time_context = Some(guard.leave());
     }
 
     fn at_sim_end(&mut self) {
-        tokio::time::SimTime::set_now(SimTime::now().into());
-
         let rt = Arc::clone(&self.globals().runtime);
         let guard = rt.enter_time_context(self.async_ext.time_context.take().unwrap());
         rt.poll_time_events();

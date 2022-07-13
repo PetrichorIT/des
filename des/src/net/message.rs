@@ -570,6 +570,12 @@ impl Default for MessageBuilder {
     }
 }
 
+impl Debug for MessageBuilder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "MessageBuilder")
+    }
+}
+
 // SAFTY:
 // Dervived from safty invariants of [Message].
 unsafe impl Send for MessageBuilder {}

@@ -153,12 +153,12 @@ where
     /// Delegation call to 'handle' on the event from the [EventSet].
     ///
     #[inline(always)]
-    pub fn handle(self, rt: &mut Runtime<A>) {
+    pub(crate) fn handle(self, rt: &mut Runtime<A>) {
         self.event.handle(rt)
     }
 
     #[allow(unused)]
-    pub fn create_no_id(event: A::EventSet, time: SimTime) -> Self {
+    pub(crate) fn create_no_id(event: A::EventSet, time: SimTime) -> Self {
         Self {
             id: 0,
             event,

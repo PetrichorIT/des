@@ -6,6 +6,7 @@ cfg_not_cqueue! {
         use crate::metrics::CompressedStdDev;
         use crate::metrics::StdDev;
 
+        #[derive(Debug)]
         pub struct OptimizedBinaryHeapMetrics {
             pub heap_size: StdDev,
 
@@ -57,6 +58,7 @@ cfg_cqueue! {
     mod cqueue {
         use crate::metrics::{CompressedStdDev, StdDev};
 
+        #[derive(Debug)]
         pub struct CQueueMetrics {
             pub overflow_heap_size: StdDev,
             pub queue_bucket_size: StdDev,

@@ -8,6 +8,7 @@ create_event_set!(
     ///
     /// * This type is only available of DES is build with the `"net"` feature.
     #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
+    #[derive(Debug)]
     pub enum NetEvents {
         type App = NetworkRuntime<A>;
 
@@ -19,9 +20,10 @@ create_event_set!(
     };
 );
 
+#[derive(Debug)]
 pub struct MessageAtGateEvent {
-    pub gate: GateRef,
-    pub message: Message,
+    pub(crate) gate: GateRef,
+    pub(crate) message: Message,
 }
 
 impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
@@ -127,9 +129,10 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
     }
 }
 
+#[derive(Debug)]
 pub struct HandleMessageEvent {
-    pub module: PtrWeakMut<dyn Module>,
-    pub message: Message,
+    pub(crate) module: PtrWeakMut<dyn Module>,
+    pub(crate) message: Message,
 }
 
 impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
@@ -151,6 +154,7 @@ impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
     }
 }
 
+#[derive(Debug)]
 pub struct CoroutineMessageEvent {
     module: PtrWeakMut<dyn Module>,
 }
@@ -186,6 +190,7 @@ impl<A> Event<NetworkRuntime<A>> for CoroutineMessageEvent {
     }
 }
 
+#[derive(Debug)]
 pub struct ChannelUnbusyNotif {
     channel: ChannelRefMut,
 }
@@ -196,6 +201,7 @@ impl<A> Event<NetworkRuntime<A>> for ChannelUnbusyNotif {
     }
 }
 
+#[derive(Debug)]
 pub struct SimStartNotif();
 
 impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
@@ -269,7 +275,7 @@ impl PtrWeakMut<dyn Module> {
                         out,
                     } => {
                         let gate = out
-                            .as_gate(&self.module_core())
+                            .as_gate(self.module_core())
                             .expect("Async buffers failed to resolve out parameter");
 
                         assert!(

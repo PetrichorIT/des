@@ -90,6 +90,7 @@ pub trait Statistic {
 /// A statistical metric that can be represented via a timeless
 /// histogramm.
 ///
+#[derive(Debug)]
 pub struct Histogramm {
     lower_bound: f64,
     upper_bound: f64,
