@@ -38,12 +38,13 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
         //
         let mut current_gate = &self.gate;
         while let Some(next_gate) = current_gate.next_gate() {
+            log_scope!(current_gate.name(), "Gate");
+
             // A next gate exists.
             // redirect to next channel
             message.meta.last_gate = Some(Ptr::clone(next_gate));
 
             info!(
-                target: &format!("Gate ({})", current_gate.name()),
                 "Forwarding message [{}] to next gate delayed: {}",
                 message.str(),
                 current_gate.channel().is_some()
@@ -61,12 +62,12 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
 
                     if channel.is_busy() {
                         warn!(
-                            target: &format!("Gate #{}", current_gate.name()),
                             "Dropping message {} pushed onto busy channel #{:?}",
                             message.str(),
                             channel
                         );
                         drop(message);
+                        log_scope!();
                         return;
                     }
 
@@ -94,6 +95,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
 
                     // must break iteration,
                     // but not perform on-module handling
+                    log_scope!();
                     return;
                 }
                 None => {
@@ -106,6 +108,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
 
         // No next gate exists.
         debug_assert!(current_gate.next_gate().is_none());
+        log_scope!(current_gate.name(), "Gate");
 
         assert!(
             current_gate.service_type() != GateServiceType::Output,
@@ -115,7 +118,6 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
         );
 
         info!(
-            target: &format!("Gate ({})", current_gate.name()),
             "Forwarding message [{}] to module #{}",
             message.str(),
             current_gate.owner().id()
@@ -126,6 +128,8 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
             NetEvents::HandleMessageEvent(HandleMessageEvent { module, message }),
             SimTime::now(),
         );
+
+        log_scope!();
     }
 }
 
@@ -137,20 +141,19 @@ pub struct HandleMessageEvent {
 
 impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
     fn handle(self, rt: &mut Runtime<NetworkRuntime<A>>) {
+        log_scope!(self.module.str(), "Module");
         let mut message = self.message;
         message.meta.receiver_module_id = self.module.id();
 
-        info!(
-            target: &format!("Module {}", self.module.str()),
-            "Handling message {:?}",
-            message.str()
-        );
+        info!("Handling message {:?}", message.str());
 
         let mut module = PtrWeakMut::clone(&self.module);
 
         module.prepare_buffers();
         module.handle_message(message);
         module.handle_buffers(rt);
+
+        log_scope!();
     }
 }
 
@@ -219,6 +222,8 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
             // Direct indexing since rt must be borrowed mutably in handle_buffers.
             for i in 0..rt.app.modules().len() {
                 let mut module = PtrWeakMut::from_strong(&rt.app.modules()[i]);
+                log_scope!(module.str(), "Module");
+
                 if stage < module.num_sim_start_stages() {
                     info!(
                         target: &format!("Module: {}", module.str()),
@@ -237,9 +242,12 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
 
             for i in 0..rt.app.modules().len() {
                 let mut module = PtrWeakMut::from_strong(&rt.app.modules()[i]);
+                log_scope!(module.str(), "Module");
                 module.finish_sim_start()
             }
         }
+
+        log_scope!();
     }
 }
 

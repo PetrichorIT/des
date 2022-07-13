@@ -1,7 +1,17 @@
+#![allow(dead_code)]
+
 use log::*;
+use std::cell::{Cell, RefCell};
 use std::io::Write;
 use termcolor::WriteColor;
 use termcolor::*;
+
+thread_local! {
+    static CURRENT_OBJECT: RefCell<Option<String>> = const { RefCell::new(None) };
+
+    static LOGGER_PRIO_SCOPE: Cell<bool> = const { Cell::new(false) };
+    static LOGGER_SHOW_NONPRIO_TARGET: Cell<bool> = const { Cell::new(true) };
+}
 
 /// A logger instance for internal logs.
 pub static LOGGER: StandardLogger = StandardLogger();
@@ -16,6 +26,34 @@ impl StandardLogger {
     ///
     pub fn setup() -> Result<(), SetLoggerError> {
         set_logger(&LOGGER).map(|()| set_max_level(LevelFilter::Trace))
+    }
+
+    ///
+    /// Configures the logger to prioritize either interal scopes
+    /// or manually provided targets
+    ///
+    pub fn prioritise_internal_scopes_as_target(value: bool) {
+        LOGGER_PRIO_SCOPE.with(|v| v.set(value))
+    }
+
+    ///
+    /// Configures the logger to also show non-prioritesed targets
+    /// in a appendix.
+    ///
+    pub fn show_nonpriority_target(value: bool) {
+        LOGGER_SHOW_NONPRIO_TARGET.with(|v| v.set(value))
+    }
+
+    pub(crate) fn begin_scope(ident: &str) {
+        CURRENT_OBJECT.with(|c| *c.borrow_mut() = Some(ident.to_string()))
+    }
+
+    pub(crate) fn begin_scope_with_suffix(ident: &str, suffix: &str) {
+        CURRENT_OBJECT.with(|c| *c.borrow_mut() = Some(format!("{}: {}", ident, suffix)))
+    }
+
+    pub(crate) fn end_scope() {
+        CURRENT_OBJECT.with(|c| *c.borrow_mut() = None)
     }
 
     fn get_level_color(level: Level) -> Color {
@@ -36,6 +74,22 @@ impl Log for StandardLogger {
 
     fn log(&self, record: &log::Record) {
         if self.enabled(record.metadata()) {
+            let (target, appx) = {
+                if let Some(v) = CURRENT_OBJECT.with(|v| v.borrow().clone()) {
+                    if v == record.target() || record.target().starts_with("des::") {
+                        (v, None)
+                    } else {
+                        if LOGGER_PRIO_SCOPE.with(|v| v.get()) {
+                            (v, Some(record.target().to_string()))
+                        } else {
+                            (record.target().to_string(), Some(v))
+                        }
+                    }
+                } else {
+                    (record.target().to_string(), None)
+                }
+            };
+
             let mut stream = match record.level() {
                 Level::Error => StandardStream::stderr(termcolor::ColorChoice::Always),
                 _ => StandardStream::stdout(termcolor::ColorChoice::Always),
@@ -53,7 +107,7 @@ impl Log for StandardLogger {
                 )
                 .expect("Failed to set termcolor");
 
-            write!(&mut stream, "{:>25}", record.target()).expect("Failed to write to stdout");
+            write!(&mut stream, "{:>25}", target).expect("Failed to write to stdout");
 
             stream
                 .set_color(ColorSpec::new().set_fg(Some(Color::Rgb(0x7f, 0x8c, 0x8d))))
@@ -63,7 +117,15 @@ impl Log for StandardLogger {
 
             stream.reset().expect("Failed to reset termcolor");
 
-            writeln!(&mut stream, "{}", record.args()).expect("Failed to write to stdout");
+            write!(&mut stream, "{}", record.args()).expect("Failed to write to stdout");
+
+            if LOGGER_SHOW_NONPRIO_TARGET.with(|v| v.get()) {
+                if let Some(appx) = appx {
+                    write!(&mut stream, " ({})", appx).expect("Failed to write to stdout");
+                }
+            }
+
+            writeln!(&mut stream).expect("Failed to write")
         }
     }
 

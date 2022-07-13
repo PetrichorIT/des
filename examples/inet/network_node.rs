@@ -26,7 +26,7 @@ impl Module for NetworkNode {
         let incoming = msg.meta().last_gate.as_ref().unwrap();
 
         let pos = incoming.pos();
-        info!(target: self.str(), "Node incoming at gate {:?}", incoming);
+        info!("Node incoming at gate {:?}", incoming);
         if incoming.name().eq("channelIncoming") {
             // From channel
             self.send(msg, ("toStack", pos))

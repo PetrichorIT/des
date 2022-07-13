@@ -25,7 +25,7 @@ pub use self::options::*;
 mod limit;
 pub use self::limit::*;
 
-mod logger;
+pub(crate) mod logger;
 pub use self::logger::*;
 
 pub(crate) const FT_NET: bool = cfg!(feature = "net");
@@ -253,6 +253,9 @@ where
     /// ```
     ///
     pub fn new_with(app: A, mut options: RuntimeOptions) -> Self {
+        // Log prep
+        StandardLogger::setup().expect("Failed to create logger");
+
         // Set SimTime
         let sim_time = options.min_sim_time.unwrap_or(SimTime::MIN);
         SimTime::set_now(sim_time);
@@ -412,7 +415,7 @@ where
     ///
     pub fn run(mut self) -> RuntimeResult<A> {
         if self.future_event_set.is_empty() {
-            warn!(target: "des::runtime", "Running simulation without any events. Think about adding some inital events.");
+            warn!("Running simulation without any events. Think about adding some inital events.");
             return RuntimeResult::EmptySimulation { app: self.app };
         }
         while self.next() {}

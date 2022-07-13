@@ -6,3 +6,6 @@ mod guid;
 
 #[macro_use]
 mod event_set;
+
+#[macro_use]
+mod log;
