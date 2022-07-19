@@ -34,7 +34,7 @@ pub struct NetworkRuntime<A> {
     ///
     /// A inner container for holding user defined global state.
     ///
-    pub inner: A,
+    pub inner: PtrMut<A>,
 }
 
 impl<A> NetworkRuntime<A> {
@@ -61,7 +61,7 @@ impl<A> NetworkRuntime<A> {
             module_list: Vec::new(),
             globals: PtrMut::new(NetworkRuntimeGlobals::new()),
 
-            inner,
+            inner: PtrMut::new(inner),
         }
     }
 
@@ -110,7 +110,7 @@ impl<A> NetworkRuntime<A> {
     /// Drops all modules and channels and only returns the inner value.
     ///
     pub fn finish(self) -> A {
-        self.inner
+        PtrMut::try_unwrap(self.inner).expect("HUH")
     }
 }
 

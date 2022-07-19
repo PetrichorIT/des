@@ -122,11 +122,14 @@ fn main() {
     // Application config
     //
 
-    let channel = Some(Channel::new(ChannelMetrics::new(
-        5_000_000,
-        Duration::from_secs_f64(0.1),
-        Duration::from_secs_f64(0.0),
-    )));
+    let channel = Some(Channel::new(
+        ObjectPath::new("inet#chan".to_string()).unwrap(),
+        ChannelMetrics::new(
+            5_000_000,
+            Duration::from_secs_f64(0.1),
+            Duration::from_secs_f64(0.0),
+        ),
+    ));
 
     let alice_in = node_alice.create_gate("channelIncoming", GateServiceType::Input, &mut app);
 

@@ -65,6 +65,9 @@ pub(crate) mod utils;
 
 // ### Exports ###
 
+pub use common::OIdent;
+pub use common::OType;
+
 pub use desugar::desugar;
 pub use desugar::result::DesugaredResult;
 pub use desugar::specs::*;

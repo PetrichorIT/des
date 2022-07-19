@@ -78,7 +78,7 @@ fn subsystem_main(vis: Visibility, ident: Ident, attr: Attr, out: &mut TokenStre
                 for par_file in par_files {
                     let string_literal = par_file.to_str().unwrap();
                     token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                        rt.include_par_file(#string_literal);
+                        ctx.include_par_file(#string_literal);
                     })
                 }
 
@@ -96,11 +96,11 @@ fn subsystem_main(vis: Visibility, ident: Ident, attr: Attr, out: &mut TokenStre
                         }
 
                         token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                            let mut #ident: ::des::util::PtrMut<#ty> = #ty::build_named::<Self, #p>(#descriptor.parse().unwrap(), rt);
+                            let mut #ident: ::des::util::PtrMut<#ty> = #ty::build_named::<Self, #p>(#descriptor.parse().unwrap(), ctx);
                         });
                     } else {
                         token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                            let mut #ident: ::des::util::PtrMut<#ty> = #ty::build_named(#descriptor.parse().unwrap(), rt);
+                            let mut #ident: ::des::util::PtrMut<#ty> = #ty::build_named(#descriptor.parse().unwrap(), ctx);
                         })
                     }
                 }
@@ -130,12 +130,18 @@ fn subsystem_main(vis: Visibility, ident: Ident, attr: Attr, out: &mut TokenStre
                         } = channel;
 
                         token_stream.extend(quote! {
-                            let channel = ::des::net::Channel::new(::des::net::ChannelMetrics {
-                                bitrate: #bitrate,
-                                latency: ::des::time::Duration::from_secs_f64(#latency),
-                                jitter: ::des::time::Duration::from_secs_f64(#jitter),
-                                cost: #cost,
-                            });
+                            let channel = ::des::net::Channel::new(
+                                ::des::net::ObjectPath::channel_with(
+                                    &format!("{}->{}", #from_ident.name(), #to_ident.name()),
+                                    &this_path
+                                ),
+                                ::des::net::ChannelMetrics {
+                                    bitrate: #bitrate,
+                                    latency: ::des::time::Duration::from_secs_f64(#latency),
+                                    jitter: ::des::time::Duration::from_secs_f64(#jitter),
+                                    cost: #cost,
+                                }
+                            );
                             #from_ident.set_next_gate(#to_ident);
                             #from_ident.set_channel(channel);
                         });
@@ -153,7 +159,7 @@ fn subsystem_main(vis: Visibility, ident: Ident, attr: Attr, out: &mut TokenStre
                     let ident = ident!(format!("{}_child", descriptor));
 
                     token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                        rt.create_module(#ident);
+                        ctx.create_module(#ident);
                     })
                 }
 
@@ -172,15 +178,21 @@ fn subsystem_main(vis: Visibility, ident: Ident, attr: Attr, out: &mut TokenStre
                             use ::des::net::NetworkRuntime;
 
                             let net_rt = self.build_rt();
-                            let rt = Runtime::<NetworkRuntime<Self>>::new_with(net_rt, options);
+                            let rt = Runtime::new_with(net_rt, options);
 
 
                             rt.run().map_app(|network_app| network_app.finish())
                         }
 
                         pub fn build_rt(self) -> ::des::net::NetworkRuntime<Self> {
-                            let mut runtime = ::des::net::NetworkRuntime::new(self);
-                            let rt: &mut ::des::net::NetworkRuntime<Self> = &mut runtime;
+                            let this = self;
+                            let this_path = this.path().clone();
+                            let mut runtime = ::des::net::NetworkRuntime::new(this);
+                            let inner = ::des::util::Ptr::clone(&runtime.inner);
+                            let mut builder = ::des::net::BuildContext::new(&mut runtime);
+                            builder.push_subsystem(inner);
+                            let ctx: &mut ::des::net::BuildContext<'_, Self> = &mut builder;
+
 
                             use ::des::net::*;
                             #token_stream

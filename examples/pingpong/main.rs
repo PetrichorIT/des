@@ -15,11 +15,10 @@ fn main() {
 
     let mut app = NetworkRuntime::new(Application());
 
-    let channel = Channel::new(ChannelMetrics::new(
-        5_000_000,
-        Duration::from_secs_f64(0.1),
-        Duration::new(0, 0),
-    ));
+    let channel = Channel::new(
+        ObjectPath::new("pingpong#chan".to_string()).unwrap(),
+        ChannelMetrics::new(5_000_000, Duration::from_secs_f64(0.1), Duration::new(0, 0)),
+    );
 
     let g1 = alice.create_gate("netIn", GateServiceType::Input, &mut app);
     let g4 = bob.create_gate_into(

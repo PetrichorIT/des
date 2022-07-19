@@ -4,7 +4,7 @@ use std::{error::Error, fmt::Display, str::FromStr};
 /// A unqiue identifier for a object, indicating its parental inheritance.
 ///
 /// The format is the following:
-/// subsys/subsys/subsys.module.module
+/// subsys/subsys/subsys.module.module#channel
 ///
 /// The storage format follows this convention.
 ///
@@ -12,19 +12,41 @@ use std::{error::Error, fmt::Display, str::FromStr};
 pub struct ObjectPath {
     data: String,
     module_offset: usize,
+    channel_offset: usize,
     last_element_offset: usize,
-    // If last_element_offset < module_offset
-    // the path points to a subsystem.
-    // If they are equal or greater that its a module
+    // There are three ptrs:
+    // module_offset, channel_offset, last_element_offset:
+    //
+    // Self is a subsystem IF:
+    // - last_element_offset < module_offset
+    // -> module_offset must be after the last element so module_offset == len()
+    //
+    // Self is a module IF:
+    // - module_offset <= last_element offset
+    //   and last_element_offset < channel_offset
+    //   since that means channel_offset is len()
+    //
+    // Self is channel IF
+    // channel_offset == last_element_offset
+    //
+    // NOTe channel_offset < last_element_offset is invalid.
 }
 
 impl ObjectPath {
+    ///
+    /// Indicates whether the pointee is a channel.
+    ///
+    pub fn is_channel(&self) -> bool {
+        self.last_element_offset == self.channel_offset
+    }
+
     ///
     /// Indicates whether the pointee to object is
     /// a subsystem.
     ///
     pub fn is_subsystem(&self) -> bool {
         self.last_element_offset < self.module_offset
+            && self.last_element_offset < self.channel_offset
     }
 
     ///
@@ -32,7 +54,7 @@ impl ObjectPath {
     /// a module.
     ///
     pub fn is_module(&self) -> bool {
-        !self.is_subsystem()
+        !self.is_subsystem() && !self.is_channel()
     }
 
     ///
@@ -85,6 +107,7 @@ impl ObjectPath {
                 let data = self.data[..(self.last_element_offset - 1)].to_string();
                 let last_element_offset = data.rfind('/').unwrap_or(0);
                 Some(ObjectPath {
+                    channel_offset: data.len(),
                     module_offset: data.len(),
                     last_element_offset,
                     data,
@@ -93,7 +116,7 @@ impl ObjectPath {
                 // Current element is root
                 None
             }
-        } else {
+        } else if self.is_module() {
             // Check edge case last module is deleted
             let next_delim = if self.module_offset == self.last_element_offset {
                 '/'
@@ -113,6 +136,34 @@ impl ObjectPath {
                 Some(ObjectPath {
                     module_offset,
                     last_element_offset,
+                    channel_offset: data.len(),
+                    data,
+                })
+            } else {
+                // Current element is root
+                None
+            }
+        } else {
+            // Self is a channel.
+            let next_delim = if self.module_offset >= self.last_element_offset {
+                '/'
+            } else {
+                '.'
+            };
+
+            if self.last_element_offset != 0 {
+                let data = self.data[..(self.last_element_offset - 1)].to_string();
+                let last_element_offset = data.rfind(next_delim).map(|v| v + 1).unwrap_or(0);
+                let module_offset = if next_delim == '/' {
+                    data.len()
+                } else {
+                    self.module_offset
+                };
+
+                Some(ObjectPath {
+                    module_offset,
+                    last_element_offset,
+                    channel_offset: data.len(),
                     data,
                 })
             } else {
@@ -173,8 +224,10 @@ impl ObjectPath {
         // let slash_left = data.find('/');
         let slash_right = data.rfind('/');
 
+        let shbang = data.rfind('#');
+
         let module_offset = dot_left.map(|v| v + 1).unwrap_or(data.len());
-        let last_element_offset = if dot_right.is_some() {
+        let mut last_element_offset = if dot_right.is_some() {
             dot_right.map(|v| v + 1).unwrap_or(0)
         } else {
             slash_right.map(|v| v + 1).unwrap_or(0)
@@ -205,7 +258,15 @@ impl ObjectPath {
             return Err(ObjectPathParseError::EmptyPathElement);
         }
 
+        let channel_offset = if let Some(shbang) = shbang {
+            last_element_offset = shbang + 1;
+            shbang + 1
+        } else {
+            data.len()
+        };
+
         Ok(ObjectPath {
+            channel_offset,
             data,
             module_offset,
             last_element_offset,
@@ -243,6 +304,7 @@ impl ObjectPath {
 
         Self {
             module_offset: name.len(),
+            channel_offset: name.len(),
             last_element_offset: 0,
             data: name,
         }
@@ -280,9 +342,27 @@ impl ObjectPath {
         assert!(!name.contains('/') && !name.contains('.'));
 
         Self {
+            channel_offset: name.len(),
             data: name,
             last_element_offset: 0,
             module_offset: 0,
+        }
+    }
+
+    ///
+    /// Creates a new channel ident.
+    ///
+    pub fn channel_with(channel: &str, parent: &ObjectPath) -> Self {
+        assert!(!parent.is_channel());
+
+        let data = format!("{}#{}", parent.data, channel);
+        let last_element_offset = parent.data.len() + 1;
+
+        Self {
+            data,
+            last_element_offset,
+            module_offset: parent.module_offset,
+            channel_offset: last_element_offset,
         }
     }
 
@@ -325,6 +405,7 @@ impl ObjectPath {
 
         Self {
             module_offset: data.len(),
+            channel_offset: data.len(),
             last_element_offset,
             data,
         }
@@ -355,6 +436,7 @@ impl ObjectPath {
     ///
     pub fn module_with_parent(name: &str, parent: &ObjectPath) -> Self {
         assert!(!name.contains('/') && !name.contains('.'));
+        assert!(!parent.is_channel());
 
         let data = format!("{}.{}", parent.data, name);
         let last_element_offset = parent.data.len() + 1;
@@ -366,6 +448,7 @@ impl ObjectPath {
         };
 
         Self {
+            channel_offset: data.len(),
             data,
             module_offset,
             last_element_offset,

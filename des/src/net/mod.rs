@@ -79,6 +79,7 @@ cfg_async! {
     pub use self::module::AsyncModule;
 }
 
+pub use self::ndl::BuildContext;
 pub use self::ndl::NameableModule;
 pub use self::ndl::__Buildable0;
 pub use self::ndl::__Buildable1;

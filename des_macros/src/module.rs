@@ -99,7 +99,7 @@ fn generate_dynamic_builder(
                     }
                 };
                 token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                        let mut #ident: ::des::util::PtrMut<#ty> = #ty::build_named_with_parent(#descriptor, &mut this, rt);
+                        let mut #ident: ::des::util::PtrMut<#ty> = #ty::build_named_with_parent(#descriptor, &mut this, ctx);
                     })
             }
 
@@ -116,7 +116,7 @@ fn generate_dynamic_builder(
                     Span::call_site(),
                 );
                 token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                        let _ = this.create_gate_cluster(#ident, #size, ::des::net::GateServiceType::#typ, rt);
+                        let _ = this.create_gate_cluster(#ident, #size, ::des::net::GateServiceType::#typ, ctx.rt());
                     })
             }
 
@@ -145,12 +145,19 @@ fn generate_dynamic_builder(
                     } = channel;
 
                     token_stream.extend(quote! {
-                        let channel = ::des::net::Channel::new(::des::net::ChannelMetrics {
-                            bitrate: #bitrate,
-                            latency: ::des::time::Duration::from_secs_f64(#latency),
-                            jitter: ::des::time::Duration::from_secs_f64(#jitter),
-                            cost: #cost,
-                        });
+                        let channel = ::des::net::Channel::new(
+                            ::des::net::ObjectPath::channel_with(
+                                &format!("{}->{}", #from_ident.name(), #to_ident.name()),
+                                this.path()
+                            ),
+                            ::des::net::ChannelMetrics {
+                                bitrate: #bitrate,
+                                latency: ::des::time::Duration::from_secs_f64(#latency),
+                                jitter: ::des::time::Duration::from_secs_f64(#jitter),
+                                cost: #cost,
+                            }
+                        );
+                        ctx.create_channel(channel.clone());
                         #from_ident.set_next_gate(#to_ident);
                         #from_ident.set_channel(channel);
                     });
@@ -168,7 +175,7 @@ fn generate_dynamic_builder(
                 let ident = ident!(format!("{}_child", descriptor));
 
                 token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                    rt.create_module(#ident);
+                    ctx.create_module(#ident);
                 })
             }
 

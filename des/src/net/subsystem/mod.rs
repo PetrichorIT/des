@@ -12,6 +12,11 @@ pub trait StaticSubsystemCore:
 {
 }
 
+impl<T> StaticSubsystemCore for T where
+    T: Deref<Target = SubsystemCore> + DerefMut<Target = SubsystemCore>
+{
+}
+
 create_global_uid!(
     /// A runtime-unqiue identifier for a module / submodule inheritence tree.
     /// * This type is only available of DES is build with the `"net"` feature.*
@@ -26,6 +31,8 @@ create_global_uid!(
 pub struct SubsystemCore {
     pub(crate) id: SubsystemId,
     pub(crate) path: ObjectPath,
+
+    pub(crate) channels: Vec<PtrMut<Channel>>,
 
     pub(crate) parent: Option<PtrWeakMut<dyn StaticSubsystemCore>>,
     pub(crate) children: HashMap<String, PtrWeakMut<dyn StaticSubsystemCore>>,
@@ -62,6 +69,13 @@ impl SubsystemCore {
     }
 
     ///
+    /// All channels managed by this subsystem.
+    ///
+    pub fn channels(&self) -> &[PtrMut<Channel>] {
+        &self.channels
+    }
+
+    ///
     /// Creates a new optionally named instance
     /// of 'Self'.
     ///
@@ -70,6 +84,7 @@ impl SubsystemCore {
             id: SubsystemId::gen(),
             path,
             parent: None,
+            channels: Vec::new(),
             children: HashMap::new(),
             globals,
         }
@@ -86,6 +101,7 @@ impl SubsystemCore {
             id: SubsystemId::gen(),
             path,
             parent: None,
+            channels: Vec::new(),
             children: HashMap::new(),
             globals: parent.globals.clone(),
         }
@@ -97,6 +113,7 @@ impl Default for SubsystemCore {
         Self {
             id: SubsystemId::gen(),
             path: ObjectPath::root_subsystem("SIM".to_string()),
+            channels: Vec::new(),
             parent: None,
             children: HashMap::new(),
             globals: PtrWeakConst::new(),

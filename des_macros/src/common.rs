@@ -210,7 +210,7 @@ pub fn build_impl_from(ident: Ident, wrapped: WrappedTokenStream, submodules: &[
 
     quote! {
         impl ::des::net::#build_trait for #ident {
-            fn build<#puntuated_a>(mut this: ::des::util::PtrMut<Self>, rt: &mut ::des::net::NetworkRuntime<A>) 
+            fn build<#puntuated_a>(mut this: ::des::util::PtrMut<Self>, ctx: &mut ::des::net::BuildContext<'_, A>) 
             -> ::des::util::PtrMut<Self> {
                 use des::net::*;
                 

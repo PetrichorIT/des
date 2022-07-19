@@ -113,6 +113,9 @@ impl Eq for ChannelMetrics {}
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Channel {
+    /// The path.
+    path: ObjectPath,
+
     /// The capabilities of the channel.
     metrics: ChannelMetrics,
 
@@ -178,8 +181,9 @@ impl Channel {
     /// Creates a new channel using the given metrics,
     /// with an initially unbusy state.
     ///
-    pub fn new(metrics: ChannelMetrics) -> ChannelRefMut {
+    pub fn new(path: ObjectPath, metrics: ChannelMetrics) -> ChannelRefMut {
         Ptr::new(Self {
+            path,
             metrics,
             busy: false,
             transmission_finish_time: SimTime::ZERO,

@@ -192,6 +192,23 @@ impl<T: ?Sized> Ptr<T, Mut> {
             _phantom: PhantomData,
         }
     }
+
+    ///
+    /// Returns the inner value, if the Arc has exactly one strong reference.
+    /// Otherwise, an Err is returned with the same Arc that was passed in.
+    /// This will succeed even if there are outstanding weak references.
+    ///
+    pub fn try_unwrap(this: Ptr<T, Mut>) -> Result<T, Self>
+    where
+        T: Sized,
+    {
+        Rc::try_unwrap(this.inner)
+            .map(|cell| cell.into_inner())
+            .map_err(|rc| PtrMut {
+                inner: rc,
+                _phantom: PhantomData,
+            })
+    }
 }
 
 impl<T: ?Sized> Ptr<T, Const> {
