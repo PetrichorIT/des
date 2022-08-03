@@ -54,12 +54,12 @@ impl Module for Collector {
     fn handle_message(&mut self, _: Message) {}
 
     fn at_sim_end(&mut self) {
-        let stats = self
+        let chan = self
             .gate("out", 0)
             .expect("Expected gate")
             .channel()
-            .expect("Expected chan")
-            .calculate_stats();
+            .expect("Expected chan");
+        let stats = chan.calculate_stats();
 
         stats.busy_hist.print();
     }

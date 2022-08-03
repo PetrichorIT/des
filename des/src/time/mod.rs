@@ -237,5 +237,5 @@ cfg_not_async! {
 
 cfg_async! {
     /// The simulation time, now the tokio implementaion
-    pub use tokio::sim::SimTime;
+    pub use tokio::time::SimTime;
 }

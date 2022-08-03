@@ -1,4 +1,4 @@
-use des::prelude::*;
+use des::{prelude::*, runtime::ScopedLogger};
 
 #[NdlModule("examples/metrics")]
 #[derive(Debug)]
@@ -24,7 +24,10 @@ impl Module for Alice {
     }
 
     fn activity(&mut self) {
-        self.outvec.collect(rand::random::<f64>())
+        self.outvec.collect(rand::random::<f64>());
+        if SimTime::now() == 42.0 {
+            log::warn!("Message");
+        }
     }
 
     fn at_sim_end(&mut self) {
@@ -39,6 +42,12 @@ impl Module for Alice {
 struct Main {}
 
 fn main() {
+    ScopedLogger::new()
+        .active(true)
+        .interal_max_log_level(log::LevelFilter::Warn)
+        .finish()
+        .expect("Failed to set logger");
+
     Main::default().run_with_options(RuntimeOptions::seeded(123).max_itr(1000));
 
     let contents =

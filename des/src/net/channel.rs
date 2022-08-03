@@ -132,6 +132,13 @@ pub struct Channel {
 
 impl Channel {
     ///
+    /// The object path of the channel.
+    ///
+    pub fn path(&self) -> &ObjectPath {
+        &self.path
+    }
+
+    ///
     /// A description of the channels capabilities,
     /// independent from its current state.
     ///

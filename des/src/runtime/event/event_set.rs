@@ -189,6 +189,9 @@ cfg_cqueue! {
                 {
                     use std::ops::AddAssign;
                     let is_zero_time = self.inner.len_zero() > 0;
+                    metrics.zero_queue_size.collect(self.inner.len_zero() as f64);
+                    metrics.bucket_queue_size.collect(self.inner.len_nonzero() as f64);
+
                     if is_zero_time {
                         metrics.zero_event_count.add_assign(1);
                     } else {

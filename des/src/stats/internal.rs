@@ -1,24 +1,24 @@
 cfg_not_cqueue! {
     /// Metrics that sample the runtime
-    pub type RuntimeMetrics = std::OptimizedBinaryHeapMetrics;
+    pub(crate) type RuntimeMetrics = std::OptimizedBinaryHeapMetrics;
 
     mod std {
         use crate::stats::CompressedStdDev;
         use crate::stats::StdDev;
 
         #[derive(Debug)]
-        pub struct OptimizedBinaryHeapMetrics {
-            pub heap_size: StdDev,
+        pub(crate) struct OptimizedBinaryHeapMetrics {
+            pub(crate) heap_size: StdDev,
 
-            pub non_zero_event_wait_time: CompressedStdDev,
-            pub zero_event_prec: CompressedStdDev,
+            pub(crate) non_zero_event_wait_time: CompressedStdDev,
+            pub(crate) zero_event_prec: CompressedStdDev,
 
-            pub zero_event_count: u64,
-            pub non_zero_event_count: u64,
+            pub(crate) zero_event_count: u64,
+            pub(crate) non_zero_event_count: u64,
         }
 
         impl OptimizedBinaryHeapMetrics {
-            pub fn new() -> Self {
+            pub(crate) fn new() -> Self {
                 Self {
                     heap_size: StdDev::new(),
 
@@ -30,7 +30,7 @@ cfg_not_cqueue! {
                 }
             }
 
-            pub fn finish(&mut self) {
+            pub(crate) fn finish(&mut self) {
                 self.non_zero_event_wait_time.flush();
                 self.zero_event_prec.flush();
 
@@ -53,61 +53,50 @@ cfg_not_cqueue! {
 
 cfg_cqueue! {
     /// Metrics that sample the runtime
-    pub type RuntimeMetrics = cqueue::CQueueMetrics;
+    pub(crate) type RuntimeMetrics = CQueueMetrics;
 
-    mod cqueue {
-        use crate::stats::{CompressedStdDev, StdDev};
+    use crate::stats::{CompressedStdDev, StdDev};
 
-        #[derive(Debug)]
-        pub struct CQueueMetrics {
-            pub overflow_heap_size: StdDev,
-            pub queue_bucket_size: StdDev,
-            pub avg_first_bucket_fill: StdDev,
-            pub avg_filled_buckets: StdDev,
+#[derive(Debug)]
+pub(crate) struct CQueueMetrics {
+    pub(crate) zero_queue_size: StdDev,
+    pub(crate) bucket_queue_size: StdDev,
 
-            pub non_zero_event_wait_time: CompressedStdDev,
+    pub(crate) non_zero_event_wait_time: CompressedStdDev,
 
-            pub zero_event_count: u64,
-            pub nonzero_event_count: u64,
-        }
+    pub(crate) zero_event_count: u64,
+    pub(crate) nonzero_event_count: u64,
+}
 
-        impl CQueueMetrics {
-            pub fn new() -> Self {
-                Self {
-                    overflow_heap_size: StdDev::new(),
-                    queue_bucket_size: StdDev::new(),
-                    avg_first_bucket_fill: StdDev::new(),
-                    avg_filled_buckets: StdDev::new(),
+impl CQueueMetrics {
+    pub(crate) fn new() -> Self {
+        Self {
+            zero_queue_size: StdDev::new(),
+            bucket_queue_size: StdDev::new(),
 
-                    non_zero_event_wait_time: CompressedStdDev::new(0xff_ff),
+            non_zero_event_wait_time: CompressedStdDev::new(0xff_ff),
 
-                    zero_event_count: 0,
-                    nonzero_event_count: 0,
-                }
-            }
-
-            pub fn finish(&mut self) {
-                self.non_zero_event_wait_time.flush();
-
-                println!("\u{23A2} Metrics");
-
-                println!("\u{23A2}  Bucket queue total: {}", self.queue_bucket_size);
-                println!(
-                    "\u{23A2}  Per bucket total:   {}",
-                    self.avg_first_bucket_fill
-                );
-                println!("\u{23A2}  Num filled buckets: {}", self.avg_filled_buckets);
-
-                println!("\u{23A2}  Overflow Heap size: {}", self.overflow_heap_size);
-                println!(
-                    "\u{23A2}  Event timespan:     {}",
-                    self.non_zero_event_wait_time
-                );
-
-                let total = self.zero_event_count + self.nonzero_event_count;
-                let perc = self.nonzero_event_count as f64 / total as f64;
-                println!("\u{23A2}  Instant event prec: {}", perc);
-            }
+            zero_event_count: 0,
+            nonzero_event_count: 0,
         }
     }
+
+    pub(crate) fn finish(&mut self) {
+        self.non_zero_event_wait_time.flush();
+
+        println!("\u{23A2} Metrics");
+
+        println!("\u{23A2}  Instant-queue size: {}", self.zero_queue_size);
+        println!("\u{23A2}  Bucket-queue size:  {}", self.bucket_queue_size);
+
+        println!(
+            "\u{23A2}  Event timespan:     {}",
+            self.non_zero_event_wait_time
+        );
+
+        let total = self.zero_event_count + self.nonzero_event_count;
+        let perc = self.nonzero_event_count as f64 / total as f64;
+        println!("\u{23A2}  Instant event prec: {}", perc);
+    }
+}
 }

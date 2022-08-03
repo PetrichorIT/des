@@ -3,9 +3,10 @@
 #![feature(coerce_unsized)]
 #![feature(arbitrary_self_types)]
 #![feature(box_into_inner)]
-#![feature(linked_list_remove)]
+#![feature(const_weak_new)]
 // Lints
 #![allow(clippy::needless_doctest_main, rustdoc::broken_intra_doc_links)]
+#![warn(clippy::pedantic)]
 #![warn(missing_docs, missing_debug_implementations, unreachable_pub)]
 #![deny(unused_must_use)]
 //!

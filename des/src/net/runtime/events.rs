@@ -38,14 +38,15 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
         //
         let mut current_gate = &self.gate;
         while let Some(next_gate) = current_gate.next_gate() {
-            log_scope!(current_gate.name(), "Gate");
+            log_scope!(current_gate.owner().path(), "Module");
 
             // A next gate exists.
             // redirect to next channel
             message.meta.last_gate = Some(Ptr::clone(next_gate));
 
             info!(
-                "Forwarding message [{}] to next gate delayed: {}",
+                "Gate '{}' forwarding message [{}] to next gate delayed: {}",
+                current_gate.name(),
                 message.str(),
                 current_gate.channel().is_some()
             );
@@ -62,7 +63,8 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
 
                     if channel.is_busy() {
                         info!(
-                            "Dropping message {} pushed onto busy channel #{:?}",
+                            "Gate '{}' dropping message [{}] pushed onto busy channel #{:?}",
+                            current_gate.name(),
                             message.str(),
                             channel
                         );
@@ -121,7 +123,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
 
         // No next gate exists.
         debug_assert!(current_gate.next_gate().is_none());
-        log_scope!(current_gate.name(), "Gate");
+        log_scope!(current_gate.owner().path(), "Module");
 
         assert!(
             current_gate.service_type() != GateServiceType::Output,
@@ -131,7 +133,8 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
         );
 
         info!(
-            "Forwarding message [{}] to module #{}",
+            "Gate '{}' forwarding message [{}] to module #{}",
+            current_gate.name(),
             message.str(),
             current_gate.owner().id()
         );
@@ -177,12 +180,14 @@ pub struct CoroutineMessageEvent {
 
 impl<A> Event<NetworkRuntime<A>> for CoroutineMessageEvent {
     fn handle(mut self, rt: &mut Runtime<NetworkRuntime<A>>) {
+        log_scope!(self.module.str(), "Module");
         let dur = self.module.module_core().activity_period;
         // This message can only occure *after* the activity is
         // fully initalized.
         // It can be the case that this is wrong .. if handle_message at invalidated activity
         // but a event still remains in queue.
         if dur != Duration::ZERO && self.module.module_core().activity_active {
+            info!("Handeling activity call");
             self.module.prepare_buffers();
             self.module.activity();
 
@@ -203,6 +208,8 @@ impl<A> Event<NetworkRuntime<A>> for CoroutineMessageEvent {
                 )
             }
         }
+
+        log_scope!()
     }
 }
 
@@ -235,11 +242,11 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
             // Direct indexing since rt must be borrowed mutably in handle_buffers.
             for i in 0..rt.app.modules().len() {
                 let mut module = PtrWeakMut::from_strong(&rt.app.modules()[i]);
-                log_scope!(module.str(), "Module");
+                log_scope!(module.path(), "Module");
 
                 if stage < module.num_sim_start_stages() {
                     info!(
-                        target: &format!("Module: {}", module.str()),
+                        target: &format!("{}: Module", module.path()),
                         "Calling at_sim_start({}).", stage
                     );
                     module.prepare_buffers();

@@ -7,7 +7,7 @@ use std::ops::RangeInclusive;
 
 cfg_metrics! {
     mod internal;
-    pub use internal::*;
+    pub(crate) use internal::*;
 
     cfg_net! {
         mod channel;

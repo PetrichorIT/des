@@ -53,6 +53,6 @@ path = "macro2/main.rs"
 [dependencies]
 des = {path = "../des", features = ["full"]}
 lazy_static = "*"
-log = {version = "*", features = ["max_level_warn", "release_max_level_warn"]}
+log = {version = "*", features = ["max_level_trace", "release_max_level_trace"]}
 ndl = {path = "../ndl"}
 rand = "*"

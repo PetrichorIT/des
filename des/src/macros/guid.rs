@@ -17,7 +17,7 @@ macro_rules! create_global_uid {
             $(#[$outer])*
             #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
             #[repr(transparent)]
-            $vis struct $ident($ty);
+            $vis struct $ident(pub $ty);
 
             static $sident: $crate::util::SyncWrap<::std::cell::Cell<$ty>> = $crate::util::SyncWrap::new(::std::cell::Cell::new(0xff));
 

@@ -254,7 +254,7 @@ where
     ///
     pub fn new_with(app: A, mut options: RuntimeOptions) -> Self {
         // Log prep
-        StandardLogger::setup().expect("Failed to create logger");
+        // StandardLogger::setup().expect("Failed to create logger");
 
         // Set SimTime
         let sim_time = options.min_sim_time.unwrap_or(SimTime::MIN);
