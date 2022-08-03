@@ -49,6 +49,6 @@ fn main() {
 
     let (_, time, event_count, _) = rt.run().unwrap_premature_abort();
 
-    assert!(time < SimTime::from(420.0));
+    assert_eq_time!(time, 419.926816);
     assert_eq!(event_count, 16760);
 }

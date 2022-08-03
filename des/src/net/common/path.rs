@@ -470,6 +470,12 @@ impl FromStr for ObjectPath {
     }
 }
 
+impl AsRef<str> for ObjectPath {
+    fn as_ref(&self) -> &str {
+        self.data.as_ref()
+    }
+}
+
 /// An error that has occured upon parsing a String to a ObjectPath.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ObjectPathParseError {

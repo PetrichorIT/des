@@ -129,10 +129,12 @@ impl<A> Application for NetworkRuntime<A> {
 
     fn at_sim_end(rt: &mut Runtime<Self>) {
         for module in rt.app.module_list.iter_mut() {
-            log_scope!(module.name(), "Module");
+            log_scope!(module.name());
             info!("Calling 'at_sim_end'");
             module.at_sim_end();
         }
+
+        log_scope!();
 
         #[cfg(feature = "async")]
         {

@@ -3,8 +3,10 @@ use std::{
     collections::{HashMap, LinkedList},
     fmt::Debug,
     io::Write,
+    sync::Arc,
 };
 
+use crate::time::SimTime;
 use log::{Level, LevelFilter, Log, SetLoggerError};
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
@@ -24,9 +26,32 @@ impl ScopedLoggerWrap {
         }
     }
 
-    fn set(&self, inner: ScopedLogger) {
+    fn reset(&self) {
         let old_inner = unsafe { &mut *self.inner.get() };
-        *old_inner = Some(inner);
+        *old_inner = None
+    }
+
+    fn reset_contents(&self, new: ScopedLogger) {
+        let old_inner = unsafe { &mut *self.inner.get() };
+        old_inner.as_mut().unwrap().reset_contents(new)
+    }
+
+    fn set(&self, inner: ScopedLogger) -> Option<ScopedLogger> {
+        let old_inner = unsafe { &mut *self.inner.get() };
+        old_inner.replace(inner)
+    }
+
+    fn yield_scopes(&self) -> HashMap<String, LoggerScope> {
+        let inner = unsafe { &mut *self.inner.get() };
+        let scopes = &inner
+            .as_mut()
+            .expect("Failed to yield logger scopes since no logger has been set")
+            .scopes;
+        let scopes = unsafe { &mut *scopes.get() };
+        let mut repacement = HashMap::new();
+        std::mem::swap(scopes, &mut repacement);
+
+        repacement
     }
 }
 
@@ -80,6 +105,19 @@ impl ScopedLogger {
         }
     }
 
+    /// A logger that does not forward logs to stdout or stderr
+    pub fn quiet() -> Self {
+        Self {
+            scopes: UnsafeCell::new(HashMap::new()),
+            active: true,
+
+            stdout_policy: Box::new(|_| false),
+            stderr_policy: Box::new(|_| false),
+
+            interal_max_level: LevelFilter::Trace,
+        }
+    }
+
     /// Begins a new scope, returning the currently active scope.
     #[doc(hidden)]
     pub fn begin_scope(ident: impl AsRef<str>) -> Option<String> {
@@ -91,6 +129,17 @@ impl ScopedLogger {
     #[doc(hidden)]
     pub fn end_scope() {
         CURRENT_SCOPE.with(|cell| cell.replace(None));
+    }
+
+    /// Yields all scopes.
+    pub fn yield_scopes() -> HashMap<String, LoggerScope> {
+        SCOPED_LOGGER.yield_scopes()
+    }
+
+    fn reset_contents(&mut self, new: Self) {
+        if self.active {
+            *self = new
+        }
     }
 
     /// Sets the loggers activity status.
@@ -119,8 +168,33 @@ impl ScopedLogger {
 
     /// Connects the logger to the logging framework.
     pub fn finish(self) -> Result<(), SetLoggerError> {
-        SCOPED_LOGGER.set(self);
-        log::set_logger(&SCOPED_LOGGER).map(|()| log::set_max_level(LevelFilter::Trace))
+        let old = SCOPED_LOGGER.set(self);
+        match log::set_logger(&SCOPED_LOGGER).map(|()| log::set_max_level(LevelFilter::Trace)) {
+            Ok(()) => {
+                assert!(
+                    old.is_none(),
+                    "No logger was initialized, but vacant logger was found."
+                );
+                Ok(())
+            }
+            Err(e) => {
+                // Since a logger was allready set it might either be a
+                // ScopedLogger or somthing elsewhere
+                // If SCOPED_LOGGER is Some that this logger is the set logger.
+                match old {
+                    Some(v) => {
+                        // Old was Scoped logger so keep the old logger and reset it.
+                        let recently_created = SCOPED_LOGGER.set(v);
+                        SCOPED_LOGGER.reset_contents(recently_created.unwrap());
+                        Ok(())
+                    }
+                    None => {
+                        SCOPED_LOGGER.reset();
+                        Err(e)
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -158,31 +232,27 @@ impl Log for ScopedLogger {
             if let Some(v) = CURRENT_SCOPE.with(|c| c.borrow().clone()) {
                 v
             } else {
-                // No target scope was given --- not scoped println.
-                let mut out = match record.level() {
-                    Level::Error | Level::Warn => StandardStream::stderr(ColorChoice::Always),
-                    _ => StandardStream::stdout(ColorChoice::Always),
+                let policy = match record.level() {
+                    Level::Error | Level::Warn => &self.stderr_policy,
+                    _ => &self.stdout_policy,
                 };
 
-                out.set_color(ColorSpec::new().set_fg(Some(PARENS_COLOR.clone())))
-                    .expect("Failed to set color on output stream");
+                if policy(record.target()) {
+                    // No target scope was given --- not scoped println.
+                    let out = match record.level() {
+                        Level::Error | Level::Warn => StandardStream::stderr(ColorChoice::Always),
+                        _ => StandardStream::stdout(ColorChoice::Always),
+                    };
 
-                write!(&mut out, "[ ").expect("Failed to write to output stream");
+                    let record = LoggerRecord {
+                        target: Arc::new(record.target().to_string()),
+                        level: record.level(),
+                        time: SimTime::now(),
+                        msg: format!("{}", record.args()),
+                    };
 
-                out.set_color(ColorSpec::new().set_fg(Some(get_level_color(record.level()))))
-                    .expect("Failed to set color on output stream");
-
-                write!(&mut out, "{:>25}", record.target())
-                    .expect("Failed to write to output stream");
-
-                out.set_color(ColorSpec::new().set_fg(Some(PARENS_COLOR.clone())))
-                    .expect("Failed to set color on output stream");
-
-                write!(&mut out, " ] ").expect("Failed to write to output stream");
-
-                out.reset().expect("Failed to reset output stream");
-
-                writeln!(&mut out, "{}", record.args()).expect("Failed to write to output stream");
+                    record.log(out);
+                }
                 return;
             }
         } else {
@@ -194,12 +264,13 @@ impl Log for ScopedLogger {
             let text = format!("{}", record.args());
             scope.log(text, record.level())
         } else {
+            println!("Creating logger scope '{}'", target);
             // TODO: Check target validity
             let stdout = &self.stdout_policy;
             let stderr = &self.stderr_policy;
 
             let mut new_scope = LoggerScope {
-                target,
+                target: Arc::new(target.clone()),
                 stream: LinkedList::new(),
                 fwd_stdout: stdout(record.target()),
                 fwd_stderr: stderr(record.target()),
@@ -208,7 +279,7 @@ impl Log for ScopedLogger {
             new_scope.log(format!("{}", record.args()), record.level());
 
             let scopes = unsafe { &mut *self.scopes.get() };
-            scopes.insert(record.target().to_string(), new_scope);
+            scopes.insert(target, new_scope);
         }
     }
 
@@ -219,7 +290,7 @@ impl Log for ScopedLogger {
 #[derive(Debug)]
 pub struct LoggerScope {
     /// The target identifier for the current logger.
-    pub target: String,
+    pub target: Arc<String>,
     /// The stream of logs.
     pub stream: LinkedList<LoggerRecord>,
     fwd_stdout: bool,
@@ -239,44 +310,60 @@ impl LoggerScope {
             }
             _ => None,
         };
-        if let Some(mut out) = out {
-            out.set_color(ColorSpec::new().set_fg(Some(PARENS_COLOR.clone())))
-                .expect("Failed to set color on output stream");
-
-            write!(&mut out, "[ ").expect("Failed to write to output stream");
-
-            out.set_color(ColorSpec::new().set_fg(Some(get_level_color(level))))
-                .expect("Failed to set color on output stream");
-
-            write!(&mut out, "{:>25}", self.target).expect("Failed to write to output stream");
-
-            out.set_color(ColorSpec::new().set_fg(Some(PARENS_COLOR.clone())))
-                .expect("Failed to set color on output stream");
-
-            write!(&mut out, " ] ").expect("Failed to write to output stream");
-
-            out.reset().expect("Failed to reset output stream");
-
-            writeln!(&mut out, "{}", msg).expect("Failed to write to output stream");
+        let record = LoggerRecord {
+            msg,
+            level,
+            time: SimTime::now(),
+            target: self.target.clone(),
+        };
+        if let Some(out) = out {
+            record.log(out)
         }
 
-        self.stream.push_back(LoggerRecord { msg, level });
+        self.stream.push_back(record);
     }
 }
 
 /// A logging record.
 #[derive(Debug)]
 pub struct LoggerRecord {
+    /// The target of the log message.
+    pub target: Arc<String>,
+    /// The temporal origin point.
+    pub time: SimTime,
     /// The message formated with the std formater
     pub msg: String,
     /// The original log level.
     pub level: Level,
 }
 
+impl LoggerRecord {
+    fn log(&self, mut out: StandardStream) {
+        out.set_color(ColorSpec::new().set_fg(Some(PARENS_COLOR.clone())))
+            .expect("Failed to set color on output stream");
+
+        write!(&mut out, "[ ").expect("Failed to write to output stream");
+
+        // [ time ... target ] max 10 max 14
+        let time = format!("{}", self.time);
+        write!(&mut out, "{:^5}", time).expect("Failed to write to output stream");
+        write!(&mut out, " ] ").expect("Failed to write to output stream");
+
+        out.set_color(ColorSpec::new().set_fg(Some(get_level_color(self.level))))
+            .expect("Failed to set color on output stream");
+
+        write!(&mut out, "{}: ", self.target).expect("Failed to write to output stream");
+
+        out.reset().expect("Failed to reset output stream");
+
+        writeln!(&mut out, "{}", self.msg).expect("Failed to write to output stream");
+    }
+}
+
 fn get_level_color(level: Level) -> Color {
     match level {
-        Level::Debug => Color::Cyan,
-        Level::Trace => Color::Magenta,
+        Level::Debug => Color::Magenta,
+        Level::Trace => Color::Cyan,
         Level::Info => Color::Green,
         Level::Warn => Color::Yellow,
         Level::Error => Color::Red,

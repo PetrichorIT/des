@@ -75,11 +75,11 @@ cfg_not_async! {
         }
 
         ///
-        /// Makes an equallity check with an error margin of 10ns.
+        /// Makes an equallity check with an error margin.
         ///
-        pub fn eq_approx(&self, other: SimTime) -> bool {
+        pub fn eq_approx(&self, other: SimTime, error: Duration) -> bool {
             let dur = self.duration_diff(other);
-            dur < Duration::from_nanos(10)
+            dur < error
         }
 
         /// Retursn the amount of time elapsed from the earlier of the two values

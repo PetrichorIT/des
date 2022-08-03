@@ -1,4 +1,4 @@
-use des::prelude::*;
+use des::{assert_eq_time, prelude::*};
 use network_node::NetworkNode;
 use network_stack::NetworkStack;
 use routing_deamon::RandomRoutingDeamon;
@@ -199,6 +199,6 @@ fn main() {
         .topology
         .write_to_svg("examples/inet/graph");
 
-    assert_eq!(time, 0.200127998);
+    assert_eq_time!(time, 0.200127998);
     assert_eq!(event_count, 21);
 }

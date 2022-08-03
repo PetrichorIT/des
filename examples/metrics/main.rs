@@ -26,7 +26,7 @@ impl Module for Alice {
     fn activity(&mut self) {
         self.outvec.collect(rand::random::<f64>());
         if SimTime::now() == 42.0 {
-            log::warn!("Message");
+            log::trace!("Message");
         }
     }
 

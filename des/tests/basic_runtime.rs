@@ -186,8 +186,8 @@ fn ensure_event_order() {
 fn ensure_event_order_same_time() {
     StandardLogger::active(false);
 
-    let one = SimTime::duration_since_zero(Duration::new(1, 0));
-    let two = SimTime::duration_since_zero(Duration::new(2, 0));
+    let one = SimTime::from_duration(Duration::new(1, 0));
+    let two = SimTime::from_duration(Duration::new(2, 0));
 
     let events = vec![
         (

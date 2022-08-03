@@ -9,3 +9,6 @@ mod event_set;
 
 #[macro_use]
 mod log;
+
+#[macro_use]
+mod time;

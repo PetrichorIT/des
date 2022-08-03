@@ -38,7 +38,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
         //
         let mut current_gate = &self.gate;
         while let Some(next_gate) = current_gate.next_gate() {
-            log_scope!(current_gate.owner().path(), "Module");
+            log_scope!(current_gate.owner().path());
 
             // A next gate exists.
             // redirect to next channel
@@ -123,7 +123,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
 
         // No next gate exists.
         debug_assert!(current_gate.next_gate().is_none());
-        log_scope!(current_gate.owner().path(), "Module");
+        log_scope!(current_gate.owner().path());
 
         assert!(
             current_gate.service_type() != GateServiceType::Output,
@@ -157,7 +157,7 @@ pub struct HandleMessageEvent {
 
 impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
     fn handle(self, rt: &mut Runtime<NetworkRuntime<A>>) {
-        log_scope!(self.module.str(), "Module");
+        log_scope!(self.module.str());
         let mut message = self.message;
         message.meta.receiver_module_id = self.module.id();
 
@@ -180,7 +180,7 @@ pub struct CoroutineMessageEvent {
 
 impl<A> Event<NetworkRuntime<A>> for CoroutineMessageEvent {
     fn handle(mut self, rt: &mut Runtime<NetworkRuntime<A>>) {
-        log_scope!(self.module.str(), "Module");
+        log_scope!(self.module.str());
         let dur = self.module.module_core().activity_period;
         // This message can only occure *after* the activity is
         // fully initalized.
@@ -242,11 +242,11 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
             // Direct indexing since rt must be borrowed mutably in handle_buffers.
             for i in 0..rt.app.modules().len() {
                 let mut module = PtrWeakMut::from_strong(&rt.app.modules()[i]);
-                log_scope!(module.path(), "Module");
+                log_scope!(module.path());
 
                 if stage < module.num_sim_start_stages() {
                     info!(
-                        target: &format!("{}: Module", module.path()),
+                        target: &format!("{}", module.path()),
                         "Calling at_sim_start({}).", stage
                     );
                     module.prepare_buffers();
@@ -262,7 +262,7 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
 
             for i in 0..rt.app.modules().len() {
                 let mut module = PtrWeakMut::from_strong(&rt.app.modules()[i]);
-                log_scope!(module.str(), "Module");
+                log_scope!(module.str());
                 module.finish_sim_start()
             }
         }
