@@ -1,4 +1,4 @@
-use crate::{net::*, util::*};
+use crate::{net::{ChannelRefMut, Gate, GateDescription, GateRefMut, GateServiceType, Message, NetworkRuntime}, util::{Ptr, PtrConst, PtrMut, PtrWeakMut, PtrWeakVoid}};
 use log::warn;
 use std::ops::{Deref, DerefMut};
 
@@ -172,14 +172,14 @@ pub trait StaticModuleCore: Deref<Target = ModuleCore> + DerefMut<Target = Modul
     /// A explicit deref to the Module Core.
     ///
     fn module_core(&self) -> &ModuleCore {
-        self.deref()
+        self
     }
 
     ///
-    /// A explicit deref_mut to the Module Core.
+    /// A explicit `deref_mut` to the Module Core.
     ///
     fn module_core_mut(&mut self) -> &mut ModuleCore {
-        self.deref_mut()
+        self
     }
 
     ///
@@ -238,7 +238,7 @@ pub trait StaticModuleCore: Deref<Target = ModuleCore> + DerefMut<Target = Modul
     ///
     /// # Panics
     ///
-    /// This function will panic should size != next_hops.len()
+    /// This function will panic should size != `next_hops.len`()
     ///
     fn create_gate_cluster_into<A>(
         self: &mut PtrMut<Self>,

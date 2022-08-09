@@ -1,8 +1,8 @@
 use super::common::Parameters;
-use crate::net::*;
-use crate::runtime::*;
-use crate::time::*;
-use crate::util::*;
+use crate::net::{Module, ObjectPath, Topology, __Buildable0, __Buildable1, __Buildable2, __Buildable3, __Buildable4, __Buildable5, __Buildable6, __Buildable7};
+use crate::runtime::{Application, Runtime};
+use crate::time::SimTime;
+use crate::util::{Ptr, PtrConst, PtrMut, PtrWeak, PtrWeakConst};
 use log::error;
 use log::info;
 use std::{
@@ -42,19 +42,19 @@ impl<A> NetworkRuntime<A> {
     /// Returns the globals (readonly) of the entire simulation.
     ///
     #[doc(hidden)]
-    pub fn globals_weak(&self) -> PtrWeakConst<NetworkRuntimeGlobals> {
+    #[must_use] pub fn globals_weak(&self) -> PtrWeakConst<NetworkRuntimeGlobals> {
         PtrWeak::from_strong(&self.globals).make_const()
     }
 
     ///
     /// Returns the globals (readonly) of the entire simulation.
     ///
-    pub fn globals(&self) -> PtrConst<NetworkRuntimeGlobals> {
+    #[must_use] pub fn globals(&self) -> PtrConst<NetworkRuntimeGlobals> {
         Ptr::clone(&self.globals).make_const()
     }
 
     ///
-    /// Creates a new instance by wrapping 'inner' into a empty NetworkRuntime<A>.
+    /// Creates a new instance by wrapping 'inner' into a empty `NetworkRuntime`<A>.
     ///
     #[must_use]
     pub fn new(inner: A) -> Self {
@@ -92,7 +92,7 @@ impl<A> NetworkRuntime<A> {
     ///
     /// Returns a reference to the list of all modules.
     ///
-    pub fn modules(&self) -> &Vec<PtrMut<dyn Module>> {
+    #[must_use] pub fn modules(&self) -> &Vec<PtrMut<dyn Module>> {
         &self.module_list
     }
 
@@ -130,7 +130,7 @@ impl<A> Application for NetworkRuntime<A> {
     }
 
     fn at_sim_end(rt: &mut Runtime<Self>) {
-        for module in rt.app.module_list.iter_mut() {
+        for module in &mut rt.app.module_list {
             log_scope!(module.name());
             info!("Calling 'at_sim_end'");
             module.at_sim_end();
@@ -177,7 +177,7 @@ where
 }
 
 ///
-/// The global parameters about a [NetworkRuntime] that are publicly
+/// The global parameters about a [`NetworkRuntime`] that are publicly
 /// exposed.
 ///
 #[derive(Debug)]

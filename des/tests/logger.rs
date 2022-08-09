@@ -98,7 +98,7 @@ fn module_auto_scopes() {
     let module_c = {
         let core = ModuleCore::new_with(
             ObjectPath::root_module("Module C".to_string()),
-            globals.clone(),
+            globals,
         );
 
         Ptr::new(SomeModule::named(core))

@@ -2,7 +2,7 @@
 
 use des::{net::Parameters, runtime::StandardLogger};
 
-const EXAMPLE_NETWORK: &'static str = "
+const EXAMPLE_NETWORK: &str = "
     netA.*.dnsServer = 1.1.1.1
     netA.s0.ip = 0.0.0.1
 
@@ -11,7 +11,7 @@ const EXAMPLE_NETWORK: &'static str = "
     netA.s1.ipv6 = fe80
 ";
 
-const EXAMPLE_TYPES: &'static str = "
+const EXAMPLE_TYPES: &str = "
     netA.*.text = \"My name\"
     netA.s0.usize = 123
 

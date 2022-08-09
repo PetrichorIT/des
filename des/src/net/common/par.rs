@@ -77,7 +77,7 @@ mod private {
 }
 
 ///
-/// The state of a [ParHandle] where its not decided
+/// The state of a [`ParHandle`] where its not decided
 /// whether data is contained or not. Useful for writing data
 /// to not yet initalized parameters.
 ///
@@ -85,7 +85,7 @@ mod private {
 pub struct Optional;
 impl private::ParHandleState for Optional {}
 
-/// The state of a [ParHandle] where the contents are guaranteed
+/// The state of a [`ParHandle`] where the contents are guaranteed
 /// to be there, thus allowing derefs on the handle.
 ///
 #[derive(Debug)]
@@ -122,7 +122,7 @@ where
     ///
     /// Panics if the handle points to no existing value.
     ///
-    pub fn unwrap(self) -> ParHandle<'a, Unwraped> {
+    #[must_use] pub fn unwrap(self) -> ParHandle<'a, Unwraped> {
         if let Some(val) = self.tree_ref.tree.borrow().get_value(self.path, self.key) {
             ParHandle {
                 tree_ref: self.tree_ref,
@@ -155,7 +155,7 @@ where
     ///
     /// Indicates whether the handle contains a value.
     ///
-    pub fn is_some(&self) -> bool {
+    #[must_use] pub fn is_some(&self) -> bool {
         self.value.is_some()
             || self
                 .tree_ref
@@ -168,7 +168,7 @@ where
     ///
     /// Indicates whether the handle contains a value.
     ///
-    pub fn is_none(&self) -> bool {
+    #[must_use] pub fn is_none(&self) -> bool {
         !self.is_some()
     }
 
@@ -176,7 +176,7 @@ where
     /// Returns the contained value optionally, thereby losing the
     /// ability to set the par.
     ///
-    pub fn as_optional(self) -> Option<String> {
+    #[must_use] pub fn as_optional(self) -> Option<String> {
         match self.value {
             Some(value) => Some(value),
             None => self
@@ -213,7 +213,7 @@ impl<'a> ParHandle<'a, Unwraped> {
     /// Uses a custom string parser to parse a string, timming
     /// quotation marks in the process.
     ///
-    pub fn parse_string(&self) -> String {
+    #[must_use] pub fn parse_string(&self) -> String {
         let mut parsed = self.value.clone().unwrap();
         // Trim marks
         let mut chars = parsed.chars();

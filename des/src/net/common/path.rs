@@ -36,7 +36,7 @@ impl ObjectPath {
     ///
     /// Indicates whether the pointee is a channel.
     ///
-    pub fn is_channel(&self) -> bool {
+    #[must_use] pub fn is_channel(&self) -> bool {
         self.last_element_offset == self.channel_offset
     }
 
@@ -44,7 +44,7 @@ impl ObjectPath {
     /// Indicates whether the pointee to object is
     /// a subsystem.
     ///
-    pub fn is_subsystem(&self) -> bool {
+    #[must_use] pub fn is_subsystem(&self) -> bool {
         self.last_element_offset < self.module_offset
             && self.last_element_offset < self.channel_offset
     }
@@ -53,7 +53,7 @@ impl ObjectPath {
     /// Indicates whether the pointee to object is
     /// a module.
     ///
-    pub fn is_module(&self) -> bool {
+    #[must_use] pub fn is_module(&self) -> bool {
         !self.is_subsystem() && !self.is_channel()
     }
 
@@ -61,14 +61,14 @@ impl ObjectPath {
     /// Returns the local name of the pointee,
     /// aka. the last path element.
     ///
-    pub fn name(&self) -> &str {
+    #[must_use] pub fn name(&self) -> &str {
         &self.data[self.last_element_offset..]
     }
 
     ///
     /// Returns the full path to the pointee.
     ///
-    pub fn path(&self) -> &str {
+    #[must_use] pub fn path(&self) -> &str {
         &self.data
     }
 
@@ -100,7 +100,7 @@ impl ObjectPath {
     /// );
     /// ```
     ///
-    pub fn parent(&self) -> Option<ObjectPath> {
+    #[must_use] pub fn parent(&self) -> Option<ObjectPath> {
         if self.is_subsystem() {
             // find last slash in the set
             if self.last_element_offset != 0 {
@@ -126,7 +126,7 @@ impl ObjectPath {
 
             if self.last_element_offset != 0 {
                 let data = self.data[..(self.last_element_offset - 1)].to_string();
-                let last_element_offset = data.rfind(next_delim).map(|v| v + 1).unwrap_or(0);
+                let last_element_offset = data.rfind(next_delim).map_or(0, |v| v + 1);
                 let module_offset = if next_delim == '/' {
                     data.len()
                 } else {
@@ -153,7 +153,7 @@ impl ObjectPath {
 
             if self.last_element_offset != 0 {
                 let data = self.data[..(self.last_element_offset - 1)].to_string();
-                let last_element_offset = data.rfind(next_delim).map(|v| v + 1).unwrap_or(0);
+                let last_element_offset = data.rfind(next_delim).map_or(0, |v| v + 1);
                 let module_offset = if next_delim == '/' {
                     data.len()
                 } else {
@@ -177,7 +177,7 @@ impl ObjectPath {
     /// Returns the part of the path that does not
     /// include the pointees name.
     ///
-    pub fn parent_path(&self) -> &str {
+    #[must_use] pub fn parent_path(&self) -> &str {
         if self.last_element_offset == 0 {
             &self.data[..0]
         } else {
@@ -227,11 +227,11 @@ impl ObjectPath {
 
         let shbang = data.rfind('#');
 
-        let module_offset = dot_left.map(|v| v + 1).unwrap_or(data.len());
+        let module_offset = dot_left.map_or(data.len(), |v| v + 1);
         let mut last_element_offset = if dot_right.is_some() {
-            dot_right.map(|v| v + 1).unwrap_or(0)
+            dot_right.map_or(0, |v| v + 1)
         } else {
-            slash_right.map(|v| v + 1).unwrap_or(0)
+            slash_right.map_or(0, |v| v + 1)
         };
 
         // Check interity
@@ -266,12 +266,7 @@ impl ObjectPath {
             data.len()
         };
 
-        Ok(ObjectPath {
-            channel_offset,
-            data,
-            module_offset,
-            last_element_offset,
-        })
+        Ok(ObjectPath { data, module_offset, channel_offset, last_element_offset })
     }
 
     ///
@@ -482,7 +477,7 @@ impl AsRef<str> for ObjectPath {
     }
 }
 
-/// An error that has occured upon parsing a String to a ObjectPath.
+/// An error that has occured upon parsing a String to a `ObjectPath`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ObjectPathParseError {
     /// The provided string is empty.

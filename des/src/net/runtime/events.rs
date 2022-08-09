@@ -1,6 +1,6 @@
 use log::info;
 
-use crate::{create_event_set, net::*, runtime::*, time::*, util::*};
+use crate::{create_event_set, net::{ChannelRefMut, GateRef, GateServiceType, Message, Module, NetworkRuntime, StaticModuleCore}, runtime::{Application, Event, EventSet, Runtime, rng}, time::{Duration, SimTime}, util::{Ptr, PtrWeakMut}};
 
 create_event_set!(
     ///

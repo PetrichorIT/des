@@ -1,8 +1,8 @@
 use std::any::Any;
 use std::fmt::Debug;
 
-use crate::net::*;
-use crate::time::*;
+use crate::net::{GateRef, Message, MessageBody, MessageBuilder, MessageId, MessageKind, MessageMetadata, ModuleId, __Buildable0, __Buildable1, __Buildable2, __Buildable3, __Buildable4, __Buildable5, __Buildable6, __Buildable7};
+use crate::time::SimTime;
 
 cfg_net_v6! {
     /// A address of a node in a IPv6 network.
@@ -249,16 +249,16 @@ pub struct Packet {
 
 impl Packet {
     ///
-    /// Returns the attached [MessageMetadata] of the attached [Message].
+    /// Returns the attached [`MessageMetadata`] of the attached [Message].
     ///
-    pub fn meta(&self) -> &MessageMetadata {
+    #[must_use] pub fn meta(&self) -> &MessageMetadata {
         self.message_meta.as_ref().unwrap()
     }
 
     ///
     /// Returns the header as a readonly ref.
     ///
-    pub fn header(&self) -> &PacketHeader {
+    #[must_use] pub fn header(&self) -> &PacketHeader {
         &self.header
     }
 
@@ -333,7 +333,7 @@ impl Packet {
     /// Trys to return the content by reference casted to the given type T.
     /// Returns [None] if the no content exists or the content is not of type T.
     ///
-    pub fn try_content<T: 'static + MessageBody>(&self) -> Option<&T> {
+    #[must_use] pub fn try_content<T: 'static + MessageBody>(&self) -> Option<&T> {
         Some(self.content.as_ref()?.downcast_ref::<T>())?
     }
 
@@ -341,7 +341,7 @@ impl Packet {
     /// Trys to return the content by reference casted to the given type T.
     /// Panics if the no content exists or the content is not of type T.
     ///
-    pub fn content<T: 'static + MessageBody>(&self) -> &T {
+    #[must_use] pub fn content<T: 'static + MessageBody>(&self) -> &T {
         self.try_content().expect("Failed to unwrap")
     }
 
@@ -404,7 +404,7 @@ pub struct PacketBuilder {
 
 impl PacketBuilder {
     ///
-    /// Creates a new [PacketBuilder].
+    /// Creates a new [`PacketBuilder`].
     ///
     #[must_use]
     pub fn new() -> Self {

@@ -1,11 +1,11 @@
-use crate::{create_global_uid, net::*, util::*};
+use crate::{create_global_uid, net::{Channel, NetworkRuntimeGlobals, ObjectPath}, util::{PtrMut, PtrWeakConst, PtrWeakMut}};
 use std::{
     collections::HashMap,
     ops::{Deref, DerefMut},
 };
 
 ///
-/// A type that contains a SubmoduleCore.
+/// A type that contains a `SubmoduleCore`.
 ///
 pub trait StaticSubsystemCore:
     Deref<Target = SubsystemCore> + DerefMut<Target = SubsystemCore>

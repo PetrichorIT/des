@@ -1,7 +1,7 @@
 use std::marker::Unsize;
 
 use crate::prelude::{Module, NetworkRuntime, ObjectPath};
-use crate::{net::module::*, util::*};
+use crate::{net::module::{ModuleCore, StaticModuleCore}, util::{Ptr, PtrMut, PtrWeak, PtrWeakConst, PtrWeakMut, PtrWeakVoid}};
 
 use super::{Channel, StaticSubsystemCore};
 
@@ -36,7 +36,7 @@ impl<'a, A> BuildContext<'a, A> {
     ///
     /// Returns the globals
     ///
-    pub fn globals_weak(&self) -> PtrWeakConst<super::NetworkRuntimeGlobals> {
+    #[must_use] pub fn globals_weak(&self) -> PtrWeakConst<super::NetworkRuntimeGlobals> {
         self.rt.globals_weak()
     }
 
@@ -53,7 +53,7 @@ impl<'a, A> BuildContext<'a, A> {
     /// Creates a channnel
     pub fn create_channel(&mut self, channel: PtrMut<Channel>) {
         if let Some(top) = self.sys_stack.last_mut() {
-            (**top).channels.push(channel)
+            top.channels.push(channel)
         }
     }
 
@@ -80,7 +80,7 @@ impl<'a, A> BuildContext<'a, A> {
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub trait NameableModule: 'static + StaticModuleCore {
     ///
-    /// Creates a named instance of the module with a provided [ModuleCore].
+    /// Creates a named instance of the module with a provided [`ModuleCore`].
     ///
     /// Never call direct
     fn named(core: ModuleCore) -> Self;
@@ -88,7 +88,7 @@ pub trait NameableModule: 'static + StaticModuleCore {
     ///
     /// Creates a named instance at the root.
     ///
-    fn named_root(core: ModuleCore) -> PtrMut<Self>
+    #[must_use] fn named_root(core: ModuleCore) -> PtrMut<Self>
     where
         Self: Sized,
     {

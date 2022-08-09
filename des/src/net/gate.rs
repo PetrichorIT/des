@@ -1,5 +1,5 @@
-use crate::net::*;
-use crate::util::*;
+use crate::net::{ChannelRef, ChannelRefMut, Module};
+use crate::util::{Ptr, PtrConst, PtrMut, PtrWeakMut};
 use std::fmt::{Debug, Display};
 use std::marker::Unsize;
 
@@ -61,7 +61,7 @@ impl GateDescription {
     /// or a single gate
     ///
     #[inline(always)]
-    pub fn is_cluster(&self) -> bool {
+    #[must_use] pub fn is_cluster(&self) -> bool {
         self.size != 1
     }
 
@@ -75,12 +75,7 @@ impl GateDescription {
     {
         let owner: PtrWeakMut<dyn Module> = owner;
         assert!(size >= 1, "Cannot create with a non-postive size");
-        Self {
-            name,
-            size,
-            owner,
-            typ,
-        }
+        Self { owner, name, size, typ }
     }
 }
 
@@ -143,7 +138,7 @@ impl Gate {
     /// The position index of the gate within the descriptor cluster.
     ///
     #[inline(always)]
-    pub fn pos(&self) -> usize {
+    #[must_use] pub fn pos(&self) -> usize {
         self.pos
     }
 
@@ -151,7 +146,7 @@ impl Gate {
     /// The size of the gate cluster.
     ///
     #[inline(always)]
-    pub fn size(&self) -> usize {
+    #[must_use] pub fn size(&self) -> usize {
         self.description.size
     }
 
@@ -159,21 +154,21 @@ impl Gate {
     /// The human-readable name for the allocated gate cluster.
     ///
     #[inline(always)]
-    pub fn name(&self) -> &str {
+    #[must_use] pub fn name(&self) -> &str {
         &self.description.name
     }
 
     ///
     /// Returns the serivce type of the gate cluster.
     ///
-    pub fn service_type(&self) -> GateServiceType {
+    #[must_use] pub fn service_type(&self) -> GateServiceType {
         self.description.typ
     }
 
     ///
     /// Returns a short identifcator that holds all nessecary information.
     ///
-    pub fn str(&self) -> String {
+    #[must_use] pub fn str(&self) -> String {
         match self.description.typ {
             GateServiceType::Input => format!("{} (input)", self.name()),
             GateServiceType::Output => format!("{} (output)", self.name()),
@@ -184,7 +179,7 @@ impl Gate {
     ///
     /// The full tree path of the gate.
     ///
-    pub fn path(&self) -> String {
+    #[must_use] pub fn path(&self) -> String {
         format!("{}:{}", self.description.owner.path(), self.name())
     }
 
@@ -192,7 +187,7 @@ impl Gate {
     /// The next gate in the gate chain by reference.
     ///
     #[inline(always)]
-    pub fn previous_gate(&self) -> Option<&GateRef> {
+    #[must_use] pub fn previous_gate(&self) -> Option<&GateRef> {
         self.previous_gate.as_ref()
     }
 
@@ -200,7 +195,7 @@ impl Gate {
     /// The next gate in the gate chain by reference.
     ///
     #[inline(always)]
-    pub fn next_gate(&self) -> Option<&GateRef> {
+    #[must_use] pub fn next_gate(&self) -> Option<&GateRef> {
         self.next_gate.as_ref()
     }
 
@@ -217,7 +212,7 @@ impl Gate {
     ///
     /// Returns the channel attached to this gate, if any exits.
     ///
-    pub fn channel(&self) -> Option<ChannelRef> {
+    #[must_use] pub fn channel(&self) -> Option<ChannelRef> {
         // only provide a read_only interface publicly
         Some(Ptr::clone(self.channel.as_ref()?).make_const())
     }
@@ -242,7 +237,7 @@ impl Gate {
     /// Follows the previous-gate references until a gate without a previous-gate
     /// was found.
     ///
-    pub fn path_start(&self) -> Option<GateRef> {
+    #[must_use] pub fn path_start(&self) -> Option<GateRef> {
         let mut current = self.previous_gate.as_ref()?;
         while let Some(previous_gate) = &current.previous_gate {
             current = previous_gate
@@ -255,7 +250,7 @@ impl Gate {
     /// Follows the next-gate references until a gate without a next-gate
     /// was found.
     ///
-    pub fn path_end(&self) -> Option<GateRef> {
+    #[must_use] pub fn path_end(&self) -> Option<GateRef> {
         let mut current = self.next_gate.as_ref()?;
         while let Some(next_gate) = &current.next_gate {
             current = next_gate
@@ -268,7 +263,7 @@ impl Gate {
     /// Returns the owner module by reference of this gate.
     ///
     #[inline(always)]
-    pub fn owner(&self) -> &PtrWeakMut<dyn Module> {
+    #[must_use] pub fn owner(&self) -> &PtrWeakMut<dyn Module> {
         &self.description.owner
     }
 

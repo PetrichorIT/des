@@ -8,9 +8,9 @@ use log::error;
 
 use crate::{
     create_global_uid,
-    net::{common::Optional, *},
-    time::*,
-    util::*,
+    net::{common::Optional, GateRef, GateRefMut, IntoModuleGate, Message, NetworkRuntimeGlobals, ObjectPath, ParHandle, StaticModuleCore},
+    time::{Duration, SimTime},
+    util::{Ptr, PtrConst, PtrWeakConst, PtrWeakMut, PtrWeakVoid},
 };
 
 create_global_uid!(
@@ -121,7 +121,7 @@ impl ModuleCore {
     ///
     /// A runtime-unqiue identifier for this module-core and by extension this module.
     ///
-    pub fn id(&self) -> ModuleId {
+    #[must_use] pub fn id(&self) -> ModuleId {
         self.id
     }
 
@@ -129,28 +129,28 @@ impl ModuleCore {
     /// A runtime-unqiue (not enforced) identifier for this module, based on its
     /// place in the module tree.
     ///
-    pub fn path(&self) -> &ObjectPath {
+    #[must_use] pub fn path(&self) -> &ObjectPath {
         &self.path
     }
 
     ///
     /// Returns a human readable representation of the modules identity.
     ///
-    pub fn str(&self) -> &str {
+    #[must_use] pub fn str(&self) -> &str {
         self.path.path()
     }
 
     ///
     /// Returns the name of the module instance.
     ///
-    pub fn name(&self) -> &str {
+    #[must_use] pub fn name(&self) -> &str {
         self.path.name()
     }
 
     ///
     /// Returns a ref unstructured list of all gates from the current module.
     ///
-    pub fn gates(&self) -> &Vec<GateRefMut> {
+    #[must_use] pub fn gates(&self) -> &Vec<GateRefMut> {
         &self.gates
     }
 
@@ -165,7 +165,7 @@ impl ModuleCore {
     /// Returns a ref to a gate of the current module dependent on its name and cluster position
     /// if possible.
     ///
-    pub fn gate_cluster(&self, name: &str) -> Vec<&GateRefMut> {
+    #[must_use] pub fn gate_cluster(&self, name: &str) -> Vec<&GateRefMut> {
         self.gates()
             .iter()
             .filter(|&gate| gate.name() == name)
@@ -187,7 +187,7 @@ impl ModuleCore {
     /// Returns a ref to a gate of the current module dependent on its name and cluster position
     /// if possible.
     ///
-    pub fn gate(&self, name: &str, pos: usize) -> Option<GateRef> {
+    #[must_use] pub fn gate(&self, name: &str, pos: usize) -> Option<GateRef> {
         Some(
             Ptr::clone(
                 self.gates()
@@ -300,7 +300,7 @@ impl ModuleCore {
 
     ///
     /// Sends a message onto a given gate. This operation will be performed after
-    /// handle_message finished.
+    /// `handle_message` finished.
     ///
     pub fn send(&mut self, msg: impl Into<Message>, gate: impl IntoModuleGate) {
         let gate = gate.as_gate(self);
@@ -312,7 +312,7 @@ impl ModuleCore {
     }
 
     ///
-    /// Enqueues a event that will trigger the [Module::handle_message] function
+    /// Enqueues a event that will trigger the [`Module::handle_message`] function
     /// in duration seconds, shifted by the processing time delay.
     ///
     pub fn schedule_in(&mut self, msg: impl Into<Message>, duration: Duration) {
@@ -320,8 +320,8 @@ impl ModuleCore {
     }
 
     ///
-    /// Enqueues a event that will trigger the [Module::handle_message] function
-    /// at the given SimTime
+    /// Enqueues a event that will trigger the [`Module::handle_message`] function
+    /// at the given `SimTime`
     ///
     pub fn schedule_at(&mut self, msg: impl Into<Message>, time: SimTime) {
         self.buffers.schedule_at(msg, time);
@@ -329,7 +329,7 @@ impl ModuleCore {
 
     ///
     /// Enables the activity corountine using the given period.
-    /// This function should only be called from [Module::handle_message].
+    /// This function should only be called from [`Module::handle_message`].
     ///
     pub fn enable_activity(&mut self, period: Duration) {
         self.activity_period = period;
@@ -349,20 +349,19 @@ impl ModuleCore {
     ///
     /// Returns wether the moudule attached to this core is of type T.
     ///
-    pub fn is<T>(&self) -> bool
+    #[must_use] pub fn is<T>(&self) -> bool
     where
         T: 'static + StaticModuleCore,
     {
         self.self_ref
             .as_ref()
-            .map(PtrWeakVoid::is::<T>)
-            .unwrap_or(false)
+            .map_or(false, PtrWeakVoid::is::<T>)
     }
 
     ///
     /// Returns wether the moudule attached to this core is of type T.
     ///
-    pub fn self_as<T>(&self) -> Option<PtrWeakMut<T>>
+    #[must_use] pub fn self_as<T>(&self) -> Option<PtrWeakMut<T>>
     where
         T: 'static + StaticModuleCore,
     {
@@ -375,7 +374,7 @@ impl ModuleCore {
     }
 
     ///
-    /// Returns the parent as a [PtrWeakConst].
+    /// Returns the parent as a [`PtrWeakConst`].
     ///
     pub fn parent(&self) -> Result<PtrWeakConst<dyn StaticModuleCore>, ModuleReferencingError> {
         match self.parent.as_ref() {
@@ -388,7 +387,7 @@ impl ModuleCore {
     }
 
     ///
-    /// Returns the parent as a [PtrWeakConst] casted to the given type T.
+    /// Returns the parent as a [`PtrWeakConst`] casted to the given type T.
     ///
     pub fn parent_as<T>(&self) -> Result<PtrWeakConst<T>, ModuleReferencingError>
     where
@@ -404,7 +403,7 @@ impl ModuleCore {
     }
 
     ///
-    /// Returns the parent as a [PtrWeakMut].
+    /// Returns the parent as a [`PtrWeakMut`].
     ///
     pub fn parent_mut(
         &mut self,
@@ -419,7 +418,7 @@ impl ModuleCore {
     }
 
     ///
-    /// Returns the parent as a [PtrWeakMut] casted to the type T.
+    /// Returns the parent as a [`PtrWeakMut`] casted to the type T.
     ///
     pub fn parent_mut_as<T>(&mut self) -> Result<PtrWeakMut<T>, ModuleReferencingError>
     where
@@ -435,7 +434,7 @@ impl ModuleCore {
     }
 
     ///
-    /// Returns the child with the given name if existent, as a [PtrWeakConst].
+    /// Returns the child with the given name if existent, as a [`PtrWeakConst`].
     ///
     pub fn child(
         &self,
@@ -451,7 +450,7 @@ impl ModuleCore {
     }
 
     ///
-    /// Returns the child with the given name if existent, as a [PtrWeakConst]
+    /// Returns the child with the given name if existent, as a [`PtrWeakConst`]
     /// casted to the type T.
     ///
     pub fn child_as<T>(&self, name: &str) -> Result<PtrWeakConst<T>, ModuleReferencingError>
@@ -468,7 +467,7 @@ impl ModuleCore {
     }
 
     ///
-    /// Returns the child with the given name if existent, as a [PtrWeakMut].
+    /// Returns the child with the given name if existent, as a [`PtrWeakMut`].
     ///
     pub fn child_mut(
         &mut self,
@@ -484,7 +483,7 @@ impl ModuleCore {
     }
 
     ///
-    /// Returns the child with the given name if existent, as a [PtrWeakMut]
+    /// Returns the child with the given name if existent, as a [`PtrWeakMut`]
     /// casted to the type T.
     ///
     pub fn child_mut_as<T>(&mut self, name: &str) -> Result<PtrWeakMut<T>, ModuleReferencingError>
@@ -509,14 +508,14 @@ impl ModuleCore {
     ///
     /// Returns the parameters for the current module.
     ///
-    pub fn pars(&self) -> HashMap<String, String> {
+    #[must_use] pub fn pars(&self) -> HashMap<String, String> {
         self.globals.parameters.get_def_table(self.path.path())
     }
 
     ///
     /// Returns a parameter by reference (not parsed).
     ///
-    pub fn par<'a>(&'a self, key: &'a str) -> ParHandle<'a, Optional> {
+    #[must_use] pub fn par<'a>(&'a self, key: &'a str) -> ParHandle<'a, Optional> {
         self.globals.parameters.get_handle(self.path.path(), key)
     }
 
@@ -524,7 +523,7 @@ impl ModuleCore {
     /// Returns a reference to the parameter store, used for constructing
     /// custom instances of modules.
     ///
-    pub fn globals(&self) -> PtrWeakConst<NetworkRuntimeGlobals> {
+    #[must_use] pub fn globals(&self) -> PtrWeakConst<NetworkRuntimeGlobals> {
         PtrWeakConst::clone(&self.globals)
     }
 }

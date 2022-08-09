@@ -4,9 +4,9 @@ use rand::distributions::Uniform;
 use rand::prelude::StdRng;
 use rand::Rng;
 
-use crate::net::*;
-use crate::time::*;
-use crate::util::*;
+use crate::net::{Message, MessageBody, ObjectPath};
+use crate::time::{Duration, SimTime};
+use crate::util::{Ptr, PtrConst, PtrMut};
 
 ///
 /// A readonly reference to a channel.
@@ -86,7 +86,7 @@ impl ChannelMetrics {
     /// Calculate the duration the channel is busy transmitting the
     /// message onto the channel.
     ///
-    pub fn calculate_busy(&self, msg: &Message) -> Duration {
+    #[must_use] pub fn calculate_busy(&self, msg: &Message) -> Duration {
         if self.bitrate == 0 {
             Duration::ZERO
         } else {
@@ -136,7 +136,7 @@ impl Channel {
     ///
     /// The object path of the channel.
     ///
-    pub fn path(&self) -> &ObjectPath {
+    #[must_use] pub fn path(&self) -> &ObjectPath {
         &self.path
     }
 
@@ -145,7 +145,7 @@ impl Channel {
     /// independent from its current state.
     ///
     #[inline(always)]
-    pub fn metrics(&self) -> &ChannelMetrics {
+    #[must_use] pub fn metrics(&self) -> &ChannelMetrics {
         &self.metrics
     }
 
@@ -157,13 +157,13 @@ impl Channel {
     /// it just means that all bits have been put onto the medium.
     ///
     #[inline(always)]
-    pub fn is_busy(&self) -> bool {
+    #[must_use] pub fn is_busy(&self) -> bool {
         self.busy
     }
 
     ///
     /// Sets the channel busy, announcing that the message will be trabńsmitted
-    /// in 'sim_time' time units.
+    /// in '`sim_time`' time units.
     ///
     pub(crate) fn set_busy_until(&mut self, sim_time: SimTime) {
         self.busy = true;
@@ -180,9 +180,9 @@ impl Channel {
 
     ///
     /// Returns the time when the packet currently being transmitted onto the medium
-    /// has been fully transmitted, or [SimTime::ZERO] if no packet is currently being transmitted.
+    /// has been fully transmitted, or [`SimTime::ZERO`] if no packet is currently being transmitted.
     ///
-    pub fn transmission_finish_time(&self) -> SimTime {
+    #[must_use] pub fn transmission_finish_time(&self) -> SimTime {
         self.transmission_finish_time
     }
 
@@ -239,7 +239,7 @@ impl Channel {
     /// the underlying metric.
     ///
     #[inline(always)]
-    pub fn calculate_busy(&self, msg: &Message) -> Duration {
+    #[must_use] pub fn calculate_busy(&self, msg: &Message) -> Duration {
         self.metrics.calculate_busy(msg)
     }
 }

@@ -4,9 +4,9 @@ use std::{
     fmt::Debug,
 };
 
-use crate::net::*;
-use crate::time::*;
-use crate::util::*;
+use crate::net::{GateRef, ModuleId, Packet};
+use crate::time::SimTime;
+use crate::util::Ptr;
 
 ///
 /// A ID that defines the meaning of the message in the simulation context.
@@ -109,14 +109,14 @@ impl Message {
     /// The metadata attached to the message.
     ///
     #[inline(always)]
-    pub fn meta(&self) -> &MessageMetadata {
+    #[must_use] pub fn meta(&self) -> &MessageMetadata {
         &self.meta
     }
 
     ///
     /// A strinification function that reduces it to its identifering pars.
     ///
-    pub fn str(&self) -> String {
+    #[must_use] pub fn str(&self) -> String {
         format!("#{} {} bits", self.meta.id, self.bit_len)
     }
 
@@ -148,7 +148,7 @@ impl Message {
     }
 
     ///
-    /// Performs a [try_cast] unwraping the result.
+    /// Performs a [`try_cast`] unwraping the result.
     ///
     #[must_use]
     pub fn cast<T: 'static + MessageBody + Send>(self) -> (T, MessageMetadata) {
@@ -183,11 +183,11 @@ impl Message {
     }
 
     ///
-    /// Performs a [try_cast_unsafe] unwraping the result.
+    /// Performs a [`try_cast_unsafe`] unwraping the result.
     ///
     /// # Safety
     ///
-    /// See [try_cast_unsafe]
+    /// See [`try_cast_unsafe`]
     #[must_use]
     pub unsafe fn cast_unsafe<T: 'static + MessageBody>(self) -> (T, MessageMetadata) {
         self.try_cast_unsafe().expect("Could not cast to type T")
@@ -235,8 +235,8 @@ impl Message {
     /// of 'T'.
     ///
     #[inline(always)]
-    pub fn can_cast<T: 'static + MessageBody>(&self) -> bool {
-        self.content.as_ref().map(|v| v.is::<T>()).unwrap_or(false)
+    #[must_use] pub fn can_cast<T: 'static + MessageBody>(&self) -> bool {
+        self.content.as_ref().map_or(false, |v| v.is::<T>())
     }
 }
 
@@ -248,7 +248,7 @@ impl Message {
     ///
     /// Panics if the contained value is not of type T.
     ///
-    pub fn dup<T>(&self) -> Self
+    #[must_use] pub fn dup<T>(&self) -> Self
     where
         T: 'static + Clone,
     {
@@ -264,7 +264,7 @@ impl Message {
     /// - If the message has no body it will succeed independent of T and clone only the
     /// attached metadata.
     ///
-    pub fn try_dup<T>(&self) -> Option<Self>
+    #[must_use] pub fn try_dup<T>(&self) -> Option<Self>
     where
         T: 'static + Clone,
     {
@@ -280,12 +280,7 @@ impl Message {
         let bit_len = self.bit_len;
         let byte_len = self.byte_len;
 
-        Some(Self {
-            meta,
-            bit_len,
-            byte_len,
-            content,
-        })
+        Some(Self { meta, content, bit_len, byte_len })
     }
 }
 
@@ -528,7 +523,7 @@ impl MessageBuilder {
         self
     }
 
-    /// Sets the field `meta`.creation_time.
+    /// Sets the field `meta`.`creation_time`.
     #[must_use]
     pub fn creation_time(mut self, creation_time: SimTime) -> Self {
         self.meta.creation_time = creation_time;
@@ -575,12 +570,7 @@ impl MessageBuilder {
             None => (0, 0, None),
         };
 
-        Message {
-            meta,
-            bit_len,
-            byte_len,
-            content,
-        }
+        Message { meta, content, bit_len, byte_len }
     }
 }
 

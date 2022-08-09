@@ -788,7 +788,7 @@ impl<A> RuntimeResult<A> {
 }
 
 cfg_net! {
-    use crate::net::*;
+    use crate::net::{GateRefMut, HandleMessageEvent, Message, MessageAtGateEvent, Module, NetEvents, NetworkRuntime};
     use crate::util::PtrWeakMut;
 
     impl<A> Runtime<NetworkRuntime<A>> {
