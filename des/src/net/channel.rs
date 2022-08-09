@@ -1,8 +1,9 @@
-use std::fmt::Display;
+#![allow(clippy::cast_precision_loss)]
 
 use rand::distributions::Uniform;
 use rand::prelude::StdRng;
 use rand::Rng;
+use std::fmt::Display;
 
 use crate::net::{Message, ObjectPath};
 use crate::time::{Duration, SimTime};
@@ -146,7 +147,6 @@ impl Channel {
     /// A description of the channels capabilities,
     /// independent from its current state.
     ///
-    #[inline(always)]
     #[must_use]
     pub fn metrics(&self) -> &ChannelMetrics {
         &self.metrics
@@ -159,7 +159,6 @@ impl Channel {
     /// Note that being non-busy does not mean that no packet is currently on the medium
     /// it just means that all bits have been put onto the medium.
     ///
-    #[inline(always)]
     #[must_use]
     pub fn is_busy(&self) -> bool {
         self.busy
@@ -234,7 +233,6 @@ impl Channel {
     /// Calcualtes the packet travel duration using the
     /// underlying metric.
     ///
-    #[inline(always)]
     pub fn calculate_duration(&self, msg: &Message, rng: &mut StdRng) -> Duration {
         self.metrics.calculate_duration(msg, rng)
     }
@@ -243,7 +241,6 @@ impl Channel {
     /// Calcualtes the busy time of the channel using
     /// the underlying metric.
     ///
-    #[inline(always)]
     #[must_use]
     pub fn calculate_busy(&self, msg: &Message) -> Duration {
         self.metrics.calculate_busy(msg)

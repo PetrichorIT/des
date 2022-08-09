@@ -99,7 +99,7 @@ fn quasai_sync_non_blocking() {
 
             assert_eq!(m2.counter, 1 + 2 + 3)
         }
-        _ => assert!(false, "Expected runtime to finish"),
+        _ => panic!("Expected runtime to finish"),
     }
 }
 
@@ -237,7 +237,7 @@ fn mutiple_active_tasks() {
 
             assert_eq!(m1.result.load(std::sync::atomic::Ordering::SeqCst), 100 + 3);
         }
-        _ => assert!(false, "Expected runtime to finish"),
+        _ => panic!("Expected runtime to finish"),
     }
 }
 
@@ -321,7 +321,7 @@ fn one_module_timers() {
 
             assert_eq!(m1.counter, 3);
         }
-        _ => assert!(false, "Expected runtime to finish"),
+        _ => panic!("Expected runtime to finish"),
     }
 }
 
@@ -375,7 +375,7 @@ fn one_module_delayed_recv() {
 
             assert_eq!(m1.counter, 3);
         }
-        _ => assert!(false, "Expected runtime to finish"),
+        _ => panic!("Expected runtime to finish"),
     }
 }
 
@@ -462,7 +462,7 @@ fn mutiple_module_delayed_recv() {
 
             assert_eq!(m2.counter, 30);
         }
-        _ => assert!(false, "Expected runtime to finish"),
+        _ => panic!("Expected runtime to finish"),
     }
 }
 
@@ -579,7 +579,7 @@ fn semaphore_in_waiting_task() {
 
             assert!(m2.result.load(std::sync::atomic::Ordering::SeqCst));
         }
-        _ => assert!(false, "Expected runtime to finish"),
+        _ => panic!("Expected runtime to finish"),
     }
 }
 

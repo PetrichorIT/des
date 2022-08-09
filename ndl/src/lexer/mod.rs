@@ -428,7 +428,7 @@ impl Cursor<'_> {
                 // with a number
                 self.bump();
                 let mut empty_exp = false;
-                if self.first().is_digit(10) {
+                if self.first().is_ascii_digit() {
                     self.eat_decimal_digits();
                     match self.first() {
                         'e' | 'E' => {

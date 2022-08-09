@@ -36,7 +36,8 @@ impl ObjectPath {
     ///
     /// Indicates whether the pointee is a channel.
     ///
-    #[must_use] pub fn is_channel(&self) -> bool {
+    #[must_use]
+    pub fn is_channel(&self) -> bool {
         self.last_element_offset == self.channel_offset
     }
 
@@ -44,7 +45,8 @@ impl ObjectPath {
     /// Indicates whether the pointee to object is
     /// a subsystem.
     ///
-    #[must_use] pub fn is_subsystem(&self) -> bool {
+    #[must_use]
+    pub fn is_subsystem(&self) -> bool {
         self.last_element_offset < self.module_offset
             && self.last_element_offset < self.channel_offset
     }
@@ -53,7 +55,8 @@ impl ObjectPath {
     /// Indicates whether the pointee to object is
     /// a module.
     ///
-    #[must_use] pub fn is_module(&self) -> bool {
+    #[must_use]
+    pub fn is_module(&self) -> bool {
         !self.is_subsystem() && !self.is_channel()
     }
 
@@ -61,14 +64,16 @@ impl ObjectPath {
     /// Returns the local name of the pointee,
     /// aka. the last path element.
     ///
-    #[must_use] pub fn name(&self) -> &str {
+    #[must_use]
+    pub fn name(&self) -> &str {
         &self.data[self.last_element_offset..]
     }
 
     ///
     /// Returns the full path to the pointee.
     ///
-    #[must_use] pub fn path(&self) -> &str {
+    #[must_use]
+    pub fn path(&self) -> &str {
         &self.data
     }
 
@@ -100,10 +105,14 @@ impl ObjectPath {
     /// );
     /// ```
     ///
-    #[must_use] pub fn parent(&self) -> Option<ObjectPath> {
+    #[must_use]
+    pub fn parent(&self) -> Option<ObjectPath> {
         if self.is_subsystem() {
             // find last slash in the set
-            if self.last_element_offset != 0 {
+            if self.last_element_offset == 0 {
+                // Current element is root
+                None
+            } else {
                 let data = self.data[..(self.last_element_offset - 1)].to_string();
                 let last_element_offset = data.rfind('/').unwrap_or(0);
                 Some(ObjectPath {
@@ -112,9 +121,6 @@ impl ObjectPath {
                     last_element_offset,
                     data,
                 })
-            } else {
-                // Current element is root
-                None
             }
         } else if self.is_module() {
             // Check edge case last module is deleted
@@ -124,7 +130,10 @@ impl ObjectPath {
                 '.'
             };
 
-            if self.last_element_offset != 0 {
+            if self.last_element_offset == 0 {
+                // Current element is root
+                None
+            } else {
                 let data = self.data[..(self.last_element_offset - 1)].to_string();
                 let last_element_offset = data.rfind(next_delim).map_or(0, |v| v + 1);
                 let module_offset = if next_delim == '/' {
@@ -139,9 +148,6 @@ impl ObjectPath {
                     channel_offset: data.len(),
                     data,
                 })
-            } else {
-                // Current element is root
-                None
             }
         } else {
             // Self is a channel.
@@ -151,7 +157,10 @@ impl ObjectPath {
                 '.'
             };
 
-            if self.last_element_offset != 0 {
+            if self.last_element_offset == 0 {
+                // is root
+                None
+            } else {
                 let data = self.data[..(self.last_element_offset - 1)].to_string();
                 let last_element_offset = data.rfind(next_delim).map_or(0, |v| v + 1);
                 let module_offset = if next_delim == '/' {
@@ -166,9 +175,6 @@ impl ObjectPath {
                     channel_offset: data.len(),
                     data,
                 })
-            } else {
-                // Current element is root
-                None
             }
         }
     }
@@ -177,7 +183,8 @@ impl ObjectPath {
     /// Returns the part of the path that does not
     /// include the pointees name.
     ///
-    #[must_use] pub fn parent_path(&self) -> &str {
+    #[must_use]
+    pub fn parent_path(&self) -> &str {
         if self.last_element_offset == 0 {
             &self.data[..0]
         } else {
@@ -188,6 +195,8 @@ impl ObjectPath {
     ///
     /// Creates a new pointer given a raw string description of
     /// the pointer.
+    ///
+    /// # Errors
     ///
     /// This operation may fail if:
     /// - the provided string is empty
@@ -214,7 +223,6 @@ impl ObjectPath {
     /// let unordered = ObjectPath::new("Main.Subystem/Subsystem.Module".to_string());
     /// assert!(unordered.is_err());
     /// ```
-    #[must_use]
     pub fn new(data: String) -> Result<Self, ObjectPathParseError> {
         if data.is_empty() {
             return Err(ObjectPathParseError::EmptyPath);
@@ -266,7 +274,12 @@ impl ObjectPath {
             data.len()
         };
 
-        Ok(ObjectPath { data, module_offset, channel_offset, last_element_offset })
+        Ok(ObjectPath {
+            data,
+            module_offset,
+            channel_offset,
+            last_element_offset,
+        })
     }
 
     ///
@@ -349,6 +362,10 @@ impl ObjectPath {
 
     ///
     /// Creates a new channel ident.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the parent is a channel.
     ///
     #[must_use]
     pub fn channel_with(channel: &str, parent: &ObjectPath) -> Self {

@@ -7,7 +7,7 @@ mod handle;
 pub(crate) use handle::*;
 
 pub(crate) mod ext;
-use ext::*;
+use ext::WaitingMessage;
 
 pub(crate) const RT_TIME_WAKEUP: MessageKind = 42;
 
@@ -175,7 +175,7 @@ where
         rt.poll_until_idle();
 
         if let Some(next_time) = rt.next_time_poll() {
-            self.schedule_at(Message::new().kind(RT_TIME_WAKEUP).build(), next_time)
+            self.schedule_at(Message::new().kind(RT_TIME_WAKEUP).build(), next_time);
         }
 
         // (1) Suspend the time context
@@ -197,7 +197,7 @@ where
         rt.poll_until_idle();
 
         if let Some(next_time) = rt.next_time_poll() {
-            self.schedule_at(Message::new().kind(RT_TIME_WAKEUP).build(), next_time)
+            self.schedule_at(Message::new().kind(RT_TIME_WAKEUP).build(), next_time);
         }
 
         self.async_ext.time_context = Some(guard.leave());
@@ -237,7 +237,7 @@ where
                 self.async_ext.wait_queue_join = Some(rt.spawn(async move {
                     while let Some(wmsg) = rx.recv().await {
                         let WaitingMessage { msg, .. } = wmsg;
-                        <T as AsyncModule>::handle_message(self_ref, msg).await
+                        <T as AsyncModule>::handle_message(self_ref, msg).await;
                     }
                 }));
             }
@@ -276,7 +276,7 @@ where
         rt.poll_until_idle();
 
         if let Some(next_time) = rt.next_time_poll() {
-            self.schedule_at(Message::new().kind(RT_TIME_WAKEUP).build(), next_time)
+            self.schedule_at(Message::new().kind(RT_TIME_WAKEUP).build(), next_time);
         }
 
         self.async_ext.time_context = Some(guard.leave());
@@ -301,7 +301,7 @@ where
             .expect("Join Error");
 
         if let Some(next_time) = rt.next_time_poll() {
-            self.schedule_at(Message::new().kind(RT_TIME_WAKEUP).build(), next_time)
+            self.schedule_at(Message::new().kind(RT_TIME_WAKEUP).build(), next_time);
         }
 
         self.async_ext.time_context = Some(guard.leave());

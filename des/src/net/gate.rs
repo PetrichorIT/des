@@ -60,13 +60,18 @@ impl GateDescription {
     /// Indicator whether a descriptor describes a cluster
     /// or a single gate
     ///
-    #[inline(always)]
-    #[must_use] pub fn is_cluster(&self) -> bool {
+
+    #[must_use]
+    pub fn is_cluster(&self) -> bool {
         self.size != 1
     }
 
     ///
     /// Creates a new descriptor using explicit values and a service type.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the size is 0.
     ///
     #[must_use]
     pub fn new<T>(name: String, size: usize, owner: PtrWeakMut<T>, typ: GateServiceType) -> Self
@@ -75,7 +80,12 @@ impl GateDescription {
     {
         let owner: PtrWeakMut<dyn Module> = owner;
         assert!(size >= 1, "Cannot create with a non-postive size");
-        Self { owner, name, size, typ }
+        Self {
+            owner,
+            name,
+            size,
+            typ,
+        }
     }
 }
 
@@ -137,65 +147,68 @@ impl Gate {
     ///
     /// The position index of the gate within the descriptor cluster.
     ///
-    #[inline(always)]
-    #[must_use] pub fn pos(&self) -> usize {
+    #[must_use]
+    pub fn pos(&self) -> usize {
         self.pos
     }
 
     ///
     /// The size of the gate cluster.
     ///
-    #[inline(always)]
-    #[must_use] pub fn size(&self) -> usize {
+    #[must_use]
+    pub fn size(&self) -> usize {
         self.description.size
     }
 
     ///
     /// The human-readable name for the allocated gate cluster.
     ///
-    #[inline(always)]
-    #[must_use] pub fn name(&self) -> &str {
+    #[must_use]
+    pub fn name(&self) -> &str {
         &self.description.name
     }
 
     ///
     /// Returns the serivce type of the gate cluster.
     ///
-    #[must_use] pub fn service_type(&self) -> GateServiceType {
+    #[must_use]
+    pub fn service_type(&self) -> GateServiceType {
         self.description.typ
     }
 
     ///
     /// Returns a short identifcator that holds all nessecary information.
     ///
-    #[must_use] pub fn str(&self) -> String {
+    #[must_use]
+    pub fn str(&self) -> String {
         match self.description.typ {
             GateServiceType::Input => format!("{} (input)", self.name()),
             GateServiceType::Output => format!("{} (output)", self.name()),
-            _ => self.name().to_string(),
+            GateServiceType::Undefined => self.name().to_string(),
         }
     }
 
     ///
     /// The full tree path of the gate.
     ///
-    #[must_use] pub fn path(&self) -> String {
+    #[must_use]
+    pub fn path(&self) -> String {
         format!("{}:{}", self.description.owner.path(), self.name())
     }
 
     ///
     /// The next gate in the gate chain by reference.
     ///
-    #[inline(always)]
-    #[must_use] pub fn previous_gate(&self) -> Option<&GateRef> {
+    #[must_use]
+    pub fn previous_gate(&self) -> Option<&GateRef> {
         self.previous_gate.as_ref()
     }
 
     ///
     /// The next gate in the gate chain by reference.
     ///
-    #[inline(always)]
-    #[must_use] pub fn next_gate(&self) -> Option<&GateRef> {
+    #[must_use]
+    pub fn next_gate(&self) -> Option<&GateRef> {
         self.next_gate.as_ref()
     }
 
@@ -203,7 +216,6 @@ impl Gate {
     /// A function to link the next gate in the gate chain, by referencing
     /// its identifier.
     ///
-    #[inline(always)]
     pub fn set_next_gate(self: &mut PtrMut<Self>, mut next_gate: GateRefMut) {
         self.next_gate = Some(PtrMut::clone(&next_gate).make_const());
         next_gate.previous_gate = Some(self.clone().make_const());
@@ -212,7 +224,8 @@ impl Gate {
     ///
     /// Returns the channel attached to this gate, if any exits.
     ///
-    #[must_use] pub fn channel(&self) -> Option<ChannelRef> {
+    #[must_use]
+    pub fn channel(&self) -> Option<ChannelRef> {
         // only provide a read_only interface publicly
         Some(Ptr::clone(self.channel.as_ref()?).make_const())
     }
@@ -228,19 +241,19 @@ impl Gate {
     ///
     /// Sets the channel attached to this gate.
     ///
-    #[inline(always)]
     pub fn set_channel(&mut self, channel: ChannelRefMut) {
-        self.channel = Some(channel)
+        self.channel = Some(channel);
     }
 
     ///
     /// Follows the previous-gate references until a gate without a previous-gate
     /// was found.
     ///
-    #[must_use] pub fn path_start(&self) -> Option<GateRef> {
+    #[must_use]
+    pub fn path_start(&self) -> Option<GateRef> {
         let mut current = self.previous_gate.as_ref()?;
         while let Some(previous_gate) = &current.previous_gate {
-            current = previous_gate
+            current = previous_gate;
         }
 
         Some(PtrConst::clone(current))
@@ -250,10 +263,11 @@ impl Gate {
     /// Follows the next-gate references until a gate without a next-gate
     /// was found.
     ///
-    #[must_use] pub fn path_end(&self) -> Option<GateRef> {
+    #[must_use]
+    pub fn path_end(&self) -> Option<GateRef> {
         let mut current = self.next_gate.as_ref()?;
         while let Some(next_gate) = &current.next_gate {
-            current = next_gate
+            current = next_gate;
         }
 
         Some(PtrConst::clone(current))
@@ -262,8 +276,9 @@ impl Gate {
     ///
     /// Returns the owner module by reference of this gate.
     ///
-    #[inline(always)]
-    #[must_use] pub fn owner(&self) -> &PtrWeakMut<dyn Module> {
+
+    #[must_use]
+    pub fn owner(&self) -> &PtrWeakMut<dyn Module> {
         &self.description.owner
     }
 

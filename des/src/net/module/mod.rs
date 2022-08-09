@@ -1,4 +1,9 @@
-use crate::{net::{ChannelRefMut, Gate, GateDescription, GateRefMut, GateServiceType, Message, NetworkRuntime}, util::{Ptr, PtrConst, PtrMut, PtrWeakMut, PtrWeakVoid}};
+use crate::{
+    net::{
+        ChannelRefMut, Gate, GateDescription, GateRefMut, GateServiceType, Message, NetworkRuntime,
+    },
+    util::{Ptr, PtrConst, PtrMut, PtrWeakMut, PtrWeakVoid},
+};
 use log::warn;
 use std::ops::{Deref, DerefMut};
 
@@ -128,8 +133,8 @@ pub trait Module: StaticModuleCore {
     fn at_sim_start(&mut self, _stage: usize) {}
 
     ///
-    /// A function that is called when all sim_start stages of all modules
-    /// are done. Used to resolve all async sim_start_stages.
+    /// A function that is called when all `sim_start` stages of all modules
+    /// are done. Used to resolve all async `sim_start_stages`.
     ///
     #[cfg(feature = "async")]
     fn finish_sim_start(&mut self) {}
@@ -148,8 +153,8 @@ pub trait Module: StaticModuleCore {
     fn at_sim_end(&mut self) {}
 
     ///
-    /// A function that is called when all sim_end stages of all modules
-    /// are done. Used to resolve all async sim_end_stages.
+    /// A function that is called when all `sim_end` stages of all modules
+    /// are done. Used to resolve all async `sim_end_stages`.
     ///
     #[cfg(feature = "async")]
     fn finish_sim_end(&mut self) {}
@@ -283,12 +288,12 @@ pub trait StaticModuleCore: Deref<Target = ModuleCore> + DerefMut<Target = Modul
         // Self refs mus be set
         if self.module_core_mut().self_ref.is_none() {
             warn!(target: self.str(), "Setting self_ref at child assignal (self = parent)");
-            self.module_core_mut().self_ref = Some(PtrWeakVoid::new(PtrWeakMut::from_strong(self)))
+            self.module_core_mut().self_ref = Some(PtrWeakVoid::new(PtrWeakMut::from_strong(self)));
         }
         if child.module_core_mut().self_ref.is_none() {
             warn!(target: child.str(), "Setting self_ref at child assignal (self = child)");
             child.module_core_mut().self_ref =
-                Some(PtrWeakVoid::new(PtrWeakMut::from_strong(child)))
+                Some(PtrWeakVoid::new(PtrWeakMut::from_strong(child)));
         }
 
         let self_clone = PtrWeakMut::from_strong(self);

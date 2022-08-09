@@ -140,10 +140,7 @@ pub fn expand(unit: &ParsingResult, resolver: &NdlResolver) -> ExpandedUnit {
     // (2) All links have valid names an no name collisions
     let mut local_link_namespace: Vec<&LinkDef> = Vec::with_capacity(links.len());
     for link in links {
-        if let Some(other) = local_link_namespace
-            .iter()
-            .find(|l| (*l).ident == link.ident)
-        {
+        if let Some(other) = local_link_namespace.iter().find(|l| l.ident == link.ident) {
             r.errors.push(Error::new_with_solution(
                 DsgLinkNamespaceCollision,
                 format!(
@@ -215,7 +212,7 @@ pub fn expand(unit: &ParsingResult, resolver: &NdlResolver) -> ExpandedUnit {
         };
 
         // (3) Check collison.
-        if let Some(other) = namespace.iter().find(|m| (*m).ident == module.ident) {
+        if let Some(other) = namespace.iter().find(|m| m.ident == module.ident) {
             r.errors.push(Error::new_with_solution(
                 DsgModuleNamespaceCollision,
                 format!(
@@ -247,7 +244,7 @@ pub fn expand(unit: &ParsingResult, resolver: &NdlResolver) -> ExpandedUnit {
         // (4) Check that gates make sense
         let mut local_gate_namespace: Vec<&GateDef> = Vec::new();
         for gate in gates {
-            if let Some(other) = local_gate_namespace.iter().find(|g| (*g).name == gate.name) {
+            if let Some(other) = local_gate_namespace.iter().find(|g| g.name == gate.name) {
                 r.errors.push(Error::new_with_solution(
                     DsgGateNamespaceCollision,
                     format!(
@@ -286,7 +283,7 @@ pub fn expand(unit: &ParsingResult, resolver: &NdlResolver) -> ExpandedUnit {
         for submodule in submodules {
             // (5) Namespace checks
             if let Some(other) = local_submod_namespace.iter().find(|s| {
-                (*s).desc.descriptor == submodule.desc.descriptor
+                s.desc.descriptor == submodule.desc.descriptor
                     && s.desc.cluster_bounds_overlap(&submodule.desc)
             }) {
                 r.errors.push(Error::new(
@@ -539,7 +536,7 @@ pub fn expand(unit: &ParsingResult, resolver: &NdlResolver) -> ExpandedUnit {
         let namespace = &mut local_subsystem_namespace;
 
         // (3) Check collison.
-        if let Some(other) = namespace.iter().find(|s| (*s).ident == subsystem.ident) {
+        if let Some(other) = namespace.iter().find(|s| s.ident == subsystem.ident) {
             r.errors.push(Error::new_with_solution(
                 DsgModuleNamespaceCollision,
                 format!(
@@ -572,7 +569,7 @@ pub fn expand(unit: &ParsingResult, resolver: &NdlResolver) -> ExpandedUnit {
         for node in nodes {
             // (5) Namespace checks
             if let Some(other) = local_nodes_namespace.iter().find(|s| {
-                (*s).desc.descriptor == node.desc.descriptor
+                s.desc.descriptor == node.desc.descriptor
                     && s.desc.cluster_bounds_overlap(&node.desc)
             }) {
                 r.errors.push(Error::new(

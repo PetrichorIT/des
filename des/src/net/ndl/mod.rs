@@ -1,7 +1,10 @@
 use std::marker::Unsize;
 
 use crate::prelude::{Module, NetworkRuntime, ObjectPath};
-use crate::{net::module::{ModuleCore, StaticModuleCore}, util::{Ptr, PtrMut, PtrWeak, PtrWeakConst, PtrWeakMut, PtrWeakVoid}};
+use crate::{
+    net::module::{ModuleCore, StaticModuleCore},
+    util::{Ptr, PtrMut, PtrWeak, PtrWeakConst, PtrWeakMut, PtrWeakVoid},
+};
 
 use super::{Channel, StaticSubsystemCore};
 
@@ -16,6 +19,7 @@ impl<'a, A> BuildContext<'a, A> {
     ///
     /// Creates a new instance of self.
     ///
+    #[must_use]
     pub fn new(rt: &'a mut NetworkRuntime<A>) -> Self {
         Self {
             rt,
@@ -30,13 +34,14 @@ impl<'a, A> BuildContext<'a, A> {
 
     /// Includes the par file
     pub fn include_par_file(&mut self, file: &str) {
-        self.rt.include_par_file(file)
+        self.rt.include_par_file(file);
     }
 
     ///
     /// Returns the globals
     ///
-    #[must_use] pub fn globals_weak(&self) -> PtrWeakConst<super::NetworkRuntimeGlobals> {
+    #[must_use]
+    pub fn globals_weak(&self) -> PtrWeakConst<super::NetworkRuntimeGlobals> {
         self.rt.globals_weak()
     }
 
@@ -47,13 +52,13 @@ impl<'a, A> BuildContext<'a, A> {
     where
         T: Module + Unsize<dyn Module>,
     {
-        self.rt.create_module(module)
+        self.rt.create_module(module);
     }
 
     /// Creates a channnel
     pub fn create_channel(&mut self, channel: PtrMut<Channel>) {
         if let Some(top) = self.sys_stack.last_mut() {
-            top.channels.push(channel)
+            top.channels.push(channel);
         }
     }
 
@@ -63,7 +68,7 @@ impl<'a, A> BuildContext<'a, A> {
         T: StaticSubsystemCore + Unsize<dyn StaticSubsystemCore>,
     {
         let dyned: PtrMut<dyn StaticSubsystemCore> = subsystem;
-        self.sys_stack.push(dyned)
+        self.sys_stack.push(dyned);
     }
 
     /// Pops a value.
@@ -88,7 +93,8 @@ pub trait NameableModule: 'static + StaticModuleCore {
     ///
     /// Creates a named instance at the root.
     ///
-    #[must_use] fn named_root(core: ModuleCore) -> PtrMut<Self>
+    #[must_use]
+    fn named_root(core: ModuleCore) -> PtrMut<Self>
     where
         Self: Sized,
     {

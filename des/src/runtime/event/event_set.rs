@@ -138,7 +138,7 @@ cfg_cqueue! {
 
         #[allow(unused)]
         use crate::{stats::Statistic, runtime::{Application, EventNode, RuntimeOptions}, time::{Duration, SimTime}, util::*};
-        use crate::cqueue::*;
+        use crate::cqueue::{CQueue, CQueueOptions, Node};
 
         #[cfg(feature = "metrics")]
         use crate::stats::RuntimeMetrics;
@@ -166,12 +166,12 @@ cfg_cqueue! {
 
             pub(crate) fn len_nonzero(&self) -> usize {
                 // self.inner.len_nonzero()
-                todo!();
+                self.inner.len_nonzero()
             }
 
             pub(crate) fn len_zero(&self) -> usize {
                 // self.inner.len_zero()
-                todo!();
+                self.inner.len_zero()
             }
 
             pub(crate) fn is_empty(&self) -> bool {
@@ -257,7 +257,7 @@ cfg_cqueue! {
                     }
                 }
 
-                self.inner.add(time, event.into())
+                self.inner.add(time, event.into());
             }
         }
     }

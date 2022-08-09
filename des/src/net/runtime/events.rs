@@ -211,11 +211,11 @@ impl<A> Event<NetworkRuntime<A>> for CoroutineMessageEvent {
                         module: self.module,
                     }),
                     dur,
-                )
+                );
             }
         }
 
-        log_scope!()
+        log_scope!();
     }
 }
 
@@ -226,7 +226,7 @@ pub struct ChannelUnbusyNotif {
 
 impl<A> Event<NetworkRuntime<A>> for ChannelUnbusyNotif {
     fn handle(mut self, _rt: &mut Runtime<NetworkRuntime<A>>) {
-        self.channel.unbusy()
+        self.channel.unbusy();
     }
 }
 
@@ -269,7 +269,7 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
             for i in 0..rt.app.modules().len() {
                 let mut module = PtrWeakMut::from_strong(&rt.app.modules()[i]);
                 log_scope!(module.str());
-                module.finish_sim_start()
+                module.finish_sim_start();
             }
         }
 
@@ -299,7 +299,7 @@ impl PtrWeakMut<dyn Module> {
         // Drain the buffers from the async handle
         #[cfg(feature = "async")]
         {
-            use crate::net::module::*;
+            use crate::net::module::BufferEvent;
 
             while let Ok(ev) = self.module_core_mut().async_ext.buffers.try_recv() {
                 match ev {
@@ -323,7 +323,7 @@ impl PtrWeakMut<dyn Module> {
                                 message: msg,
                             }),
                             SimTime::now() + time_offset,
-                        )
+                        );
                     }
 
                     BufferEvent::ScheduleIn { msg, time_offset } => rt.add_event(
@@ -362,7 +362,7 @@ impl PtrWeakMut<dyn Module> {
                     message,
                 }),
                 offset,
-            )
+            );
         }
         // drop(mut_ref);
 
@@ -377,7 +377,7 @@ impl PtrWeakMut<dyn Module> {
                     message,
                 }),
                 time,
-            )
+            );
         }
 
         // drop(mut_ref);
@@ -388,7 +388,7 @@ impl PtrWeakMut<dyn Module> {
             rt.add_event_in(
                 NetEvents::CoroutineMessageEvent(CoroutineMessageEvent { module: mref }),
                 self.module_core().activity_period,
-            )
+            );
         }
 
         if !rt.app.globals.parameters.updates.borrow().is_empty() {
@@ -396,7 +396,7 @@ impl PtrWeakMut<dyn Module> {
                 rt.app
                     .module(|m| m.name() == update)
                     .unwrap()
-                    .handle_par_change()
+                    .handle_par_change();
             }
         }
     }

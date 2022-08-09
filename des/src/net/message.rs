@@ -108,15 +108,17 @@ impl Message {
     ///
     /// The metadata attached to the message.
     ///
-    #[inline(always)]
-    #[must_use] pub fn meta(&self) -> &MessageMetadata {
+    #[inline]
+    #[must_use]
+    pub fn meta(&self) -> &MessageMetadata {
         &self.meta
     }
 
     ///
     /// A strinification function that reduces it to its identifering pars.
     ///
-    #[must_use] pub fn str(&self) -> String {
+    #[must_use]
+    pub fn str(&self) -> String {
         format!("#{} {} bits", self.meta.id, self.bit_len)
     }
 
@@ -196,22 +198,53 @@ impl Message {
     ///
     /// A special cast for casting values that are packets.
     ///
+    /// # Errors
     ///
-    #[must_use]
-    pub fn try_as_packet(self) -> Option<Packet> {
-        let Message { meta, content, .. } = self;
+    /// Returns itself if the convertion to a packet fails.
+    ///
+    #[allow(clippy::redundant_closure_for_method_calls)]
+    pub fn try_as_packet(self) -> Result<Packet, Self> {
+        let Message {
+            meta,
+            content,
+            bit_len,
+            byte_len,
+        } = self;
         // SAFTY:
         // This packet may contain a value that is used elsewhere,
         // but the metadate is used exclusivly.
-        let pkt = content?.downcast::<Packet>().unwrap();
+        let pkt = content.map(|v| v.downcast::<Packet>());
         // let pkt = content.as_ref()?.downcast_ref::<Packet>().unwrap();
+
+        let pkt = if let Some(pkt) = pkt {
+            pkt
+        } else {
+            return Err(Message {
+                meta,
+                content: None,
+                bit_len,
+                byte_len,
+            });
+        };
+
+        let pkt = match pkt {
+            Ok(pkt) => pkt,
+            Err(any) => {
+                return Err(Message {
+                    content: Some(any),
+                    meta,
+                    bit_len,
+                    byte_len,
+                })
+            }
+        };
 
         // This packet holds a reference to the same packet content but to
         // use message metadata & packet metadata ecxlusivly, new packets is created.
         let mut pkt: Packet = Box::into_inner(pkt);
         pkt.message_meta = Some(meta);
 
-        Some(pkt)
+        Ok(pkt)
     }
 
     ///
@@ -234,8 +267,9 @@ impl Message {
     /// which does not gurantee that this is a internally valid instance
     /// of 'T'.
     ///
-    #[inline(always)]
-    #[must_use] pub fn can_cast<T: 'static + MessageBody>(&self) -> bool {
+    #[inline]
+    #[must_use]
+    pub fn can_cast<T: 'static + MessageBody>(&self) -> bool {
         self.content.as_ref().map_or(false, |v| v.is::<T>())
     }
 }
@@ -248,7 +282,8 @@ impl Message {
     ///
     /// Panics if the contained value is not of type T.
     ///
-    #[must_use] pub fn dup<T>(&self) -> Self
+    #[must_use]
+    pub fn dup<T>(&self) -> Self
     where
         T: 'static + Clone,
     {
@@ -264,7 +299,8 @@ impl Message {
     /// - If the message has no body it will succeed independent of T and clone only the
     /// attached metadata.
     ///
-    #[must_use] pub fn try_dup<T>(&self) -> Option<Self>
+    #[must_use]
+    pub fn try_dup<T>(&self) -> Option<Self>
     where
         T: 'static + Clone,
     {
@@ -280,7 +316,12 @@ impl Message {
         let bit_len = self.bit_len;
         let byte_len = self.byte_len;
 
-        Some(Self { meta, content, bit_len, byte_len })
+        Some(Self {
+            meta,
+            content,
+            bit_len,
+            byte_len,
+        })
     }
 }
 
@@ -373,7 +414,7 @@ impl<T> CustomSizeBody<T> {
     }
 
     ///
-    /// Returns the body, consuming `self``.
+    /// Returns the body, consuming `self`.
     ///
     #[must_use]
     pub fn into_inner(self) -> T {
@@ -570,7 +611,12 @@ impl MessageBuilder {
             None => (0, 0, None),
         };
 
-        Message { meta, content, bit_len, byte_len }
+        Message {
+            meta,
+            content,
+            bit_len,
+            byte_len,
+        }
     }
 }
 

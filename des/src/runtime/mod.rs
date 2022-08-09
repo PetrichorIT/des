@@ -806,7 +806,7 @@ cfg_net! {
                 message: message.into(),
             };
 
-            self.add_event(NetEvents::MessageAtGateEvent(event), time)
+            self.add_event(NetEvents::MessageAtGateEvent(event), time);
         }
 
         ///
@@ -823,7 +823,7 @@ cfg_net! {
                 message: message.into(),
             };
 
-            self.add_event(NetEvents::HandleMessageEvent(event), time)
+            self.add_event(NetEvents::HandleMessageEvent(event), time);
         }
     }
 }

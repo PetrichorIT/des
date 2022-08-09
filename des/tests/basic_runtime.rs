@@ -113,7 +113,7 @@ fn one_event_runtime() {
             assert_eq!(time, SimTime::from_duration(Duration::new(16, 0)));
             assert_eq!(event_count, 17);
         }
-        _ => assert!(false, "Runtime should have finished"),
+        _ => panic!("Runtime should have finished"),
     }
 }
 
@@ -169,14 +169,11 @@ fn ensure_event_order() {
                         assert_eq!(last_id + 1, a.id);
                         last_id += 1;
                     }
-                    _ => assert!(false, "Unexpected event"),
+                    _ => panic!("Unexpected event"),
                 }
             }
         }
-        _ => assert!(
-            false,
-            "Expected runtime to finish after fininte non-replicating event set"
-        ),
+        _ => panic!("Expected runtime to finish after fininte non-replicating event set"),
     }
 }
 
@@ -239,14 +236,11 @@ fn ensure_event_order_same_time() {
                         assert_eq!(last_id + 1, a.id);
                         last_id += 1;
                     }
-                    _ => assert!(false, "Unexpected event"),
+                    _ => panic!("Unexpected event"),
                 }
             }
         }
-        _ => assert!(
-            false,
-            "Expected runtime to finish after fininte non-replicating event set"
-        ),
+        _ => panic!("Expected runtime to finish after fininte non-replicating event set"),
     }
 }
 

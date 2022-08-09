@@ -1,5 +1,5 @@
-use crate::net::*;
-use crate::time::*;
+use crate::net::{IntoModuleGate, Message};
+use crate::time::{Duration, SimTime};
 
 pub(crate) enum BufferEvent {
     Send {
@@ -71,7 +71,7 @@ impl HandleSender {
 
     ///
     /// Sends a message onto a given gate. This operation will be performed after
-    /// handle_message finished.
+    /// `handle_message` finished.
     ///
     pub fn send(&self, msg: impl Into<Message>, gate: impl IntoModuleGate + 'static) {
         self.inner
@@ -84,7 +84,7 @@ impl HandleSender {
     }
 
     ///
-    /// Enqueues a event that will trigger the [Module::handle_message] function
+    /// Enqueues a event that will trigger the [`Module::handle_message`] function
     /// in duration seconds, shifted by the processing time delay.
     ///
     pub fn schedule_in(&self, msg: impl Into<Message>, duration: Duration) {
@@ -97,8 +97,8 @@ impl HandleSender {
     }
 
     ///
-    /// Enqueues a event that will trigger the [Module::handle_message] function
-    /// at the given SimTime
+    /// Enqueues a event that will trigger the [`Module::handle_message`] function
+    /// at the given `SimTime`
     ///
     pub fn schedule_at(&self, msg: impl Into<Message>, time: SimTime) {
         self.inner

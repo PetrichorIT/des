@@ -38,7 +38,7 @@ impl Parameters {
     }
 
     pub(crate) fn insert(&mut self, key: &str, value: &str) {
-        self.tree.borrow_mut().insert(key, value)
+        self.tree.borrow_mut().insert(key, value);
     }
 
     pub(crate) fn get_def_table(&self, key: &str) -> HashMap<String, String> {
@@ -122,7 +122,8 @@ where
     ///
     /// Panics if the handle points to no existing value.
     ///
-    #[must_use] pub fn unwrap(self) -> ParHandle<'a, Unwraped> {
+    #[must_use]
+    pub fn unwrap(self) -> ParHandle<'a, Unwraped> {
         if let Some(val) = self.tree_ref.tree.borrow().get_value(self.path, self.key) {
             ParHandle {
                 tree_ref: self.tree_ref,
@@ -155,7 +156,8 @@ where
     ///
     /// Indicates whether the handle contains a value.
     ///
-    #[must_use] pub fn is_some(&self) -> bool {
+    #[must_use]
+    pub fn is_some(&self) -> bool {
         self.value.is_some()
             || self
                 .tree_ref
@@ -168,7 +170,8 @@ where
     ///
     /// Indicates whether the handle contains a value.
     ///
-    #[must_use] pub fn is_none(&self) -> bool {
+    #[must_use]
+    pub fn is_none(&self) -> bool {
         !self.is_some()
     }
 
@@ -176,7 +179,8 @@ where
     /// Returns the contained value optionally, thereby losing the
     /// ability to set the par.
     ///
-    #[must_use] pub fn as_optional(self) -> Option<String> {
+    #[must_use]
+    pub fn as_optional(self) -> Option<String> {
         match self.value {
             Some(value) => Some(value),
             None => self
@@ -191,6 +195,7 @@ where
     ///
     /// Sets the parameter to the given value.
     ///
+    #[allow(clippy::needless_pass_by_value)]
     pub fn set<T>(self, value: T)
     where
         T: ToString,
@@ -213,7 +218,9 @@ impl<'a> ParHandle<'a, Unwraped> {
     /// Uses a custom string parser to parse a string, timming
     /// quotation marks in the process.
     ///
-    #[must_use] pub fn parse_string(&self) -> String {
+    #[allow(clippy::missing_panics_doc)]
+    #[must_use]
+    pub fn parse_string(&self) -> String {
         let mut parsed = self.value.clone().unwrap();
         // Trim marks
         let mut chars = parsed.chars();
@@ -254,8 +261,7 @@ impl ParameterTreeBranch {
 
     fn tree_mut(&mut self) -> &mut ParameterTree {
         match self {
-            Self::Path(_, tree) => tree,
-            Self::Asterix(tree) => tree,
+            Self::Asterix(tree) | Self::Path(_, tree) => tree,
         }
     }
 }
@@ -276,19 +282,20 @@ impl ParameterTree {
 
     fn insert(&mut self, key: &str, value: &str) {
         match key.split_once('.') {
-            Some((ele, rem)) => match self.branches.iter_mut().find(|b| b.matches(ele)) {
-                Some(branch) => branch.tree_mut().insert(rem, value),
-                None => {
+            Some((ele, rem)) => {
+                if let Some(branch) = self.branches.iter_mut().find(|b| b.matches(ele)) {
+                    branch.tree_mut().insert(rem, value);
+                } else {
                     let mut node = ParameterTree::new();
                     node.insert(rem, value);
                     if ele == "*" {
-                        self.branches.push(ParameterTreeBranch::Asterix(node))
+                        self.branches.push(ParameterTreeBranch::Asterix(node));
                     } else {
                         self.branches
-                            .push(ParameterTreeBranch::Path(ele.to_string(), node))
+                            .push(ParameterTreeBranch::Path(ele.to_string(), node));
                     }
                 }
-            },
+            }
             None => {
                 self.pars.insert(key.to_string(), value.to_string());
             }
@@ -298,8 +305,8 @@ impl ParameterTree {
     fn get(&self, key: &str, map: &mut HashMap<String, String>) {
         if key.is_empty() {
             self.pars.iter().for_each(|(key, value)| {
-                let _ = map.insert(key.to_string(), value.to_string());
-            })
+                map.insert(key.to_string(), value.to_string());
+            });
         }
         let (ele, rem) = key.split_once('.').unwrap_or((key, ""));
 
@@ -308,7 +315,7 @@ impl ParameterTree {
                 ParameterTreeBranch::Asterix(subtree) => subtree.get(rem, map),
                 ParameterTreeBranch::Path(path, subtree) => {
                     if path == ele {
-                        subtree.get(rem, map)
+                        subtree.get(rem, map);
                     }
                 }
             }
@@ -322,7 +329,7 @@ impl ParameterTree {
         } else {
             let (ele, rem) = path.split_once('.').unwrap_or((path, ""));
             // Go via exact branch if possible;
-            let ret = self.branches.iter().find_map(|b| {
+            let ret_val = self.branches.iter().find_map(|b| {
                 if let ParameterTreeBranch::Path(path, subtree) = b {
                     if path == ele {
                         return subtree.get_value(rem, key);
@@ -331,8 +338,8 @@ impl ParameterTree {
                 None
             });
 
-            if ret.is_some() {
-                return ret;
+            if ret_val.is_some() {
+                return ret_val;
             }
 
             // Asterix search

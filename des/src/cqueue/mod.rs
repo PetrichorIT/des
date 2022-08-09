@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-use crate::time::*;
+use crate::time::{Duration, SimTime};
 use std::collections::VecDeque;
 use std::ops::Rem;
 
@@ -100,6 +100,7 @@ impl<E> CQueue<E> {
         self.t_current
     }
 
+    #[allow(clippy::needless_pass_by_value)]
     pub(crate) fn new(options: CQueueOptions) -> Self {
         let CQueueOptions {
             num_buckets: n,
@@ -134,7 +135,7 @@ impl<E> CQueue<E> {
 
     #[inline]
     pub(crate) fn add(&mut self, time: SimTime, event: E) {
-        self.enqueue(time, event)
+        self.enqueue(time, event);
     }
 
     pub(crate) fn enqueue(&mut self, time: SimTime, event: E) {
@@ -189,9 +190,7 @@ impl<E> CQueue<E> {
 
     #[inline]
     pub(crate) fn fetch_next(&mut self) -> Node<E> {
-        if self.len == 0 {
-            panic!("Cannot fetch from empty queue");
-        }
+        assert!(self.len != 0, "Cannot fetch from empty queue");
 
         if let Some(node) = self.zero_event_bucket.pop_front() {
             self.len -= 1;

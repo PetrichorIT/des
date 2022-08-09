@@ -144,8 +144,8 @@ impl<A> Application for NetworkRuntime<A> {
         #[cfg(feature = "async")]
         {
             // Ensure all sim_start stages have finished
-            for module in rt.app.module_list.iter_mut() {
-                module.finish_sim_end()
+            for module in &mut rt.app.module_list {
+                module.finish_sim_end();
             }
         }
     }

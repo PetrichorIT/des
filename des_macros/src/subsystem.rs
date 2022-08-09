@@ -216,13 +216,13 @@ fn subsystem_main(vis: Visibility, ident: Ident, attr: Attr, out: &mut TokenStre
 
                 Ok(())
             } else {
-                return Err(Diagnostic::new(
+                Err(Diagnostic::new(
                     Level::Error,
                     format!(
                         "#[derive(Network)] NDL resolver failed to find network called '{}'",
                         ident,
                     ),
-                ));
+                ))
             }
         }
         Err(e) => Err(Diagnostic::new(

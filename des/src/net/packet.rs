@@ -254,6 +254,10 @@ impl Packet {
     ///
     /// Returns the attached [`MessageMetadata`] of the attached [Message].
     ///
+    /// # Panics
+    ///
+    /// Panics if no message metadata was attached.
+    ///
     #[must_use]
     pub fn meta(&self) -> &MessageMetadata {
         self.message_meta.as_ref().unwrap()
@@ -271,35 +275,35 @@ impl Packet {
     /// Sets the source node of the packet.
     ///
     pub fn set_source_node(&mut self, node: NodeAddress) {
-        self.header.src_node = node
+        self.header.src_node = node;
     }
 
     ///
     /// Sets the source port of the packet.
     ///
     pub fn set_source_port(&mut self, port: PortAddress) {
-        self.header.src_port = port
+        self.header.src_port = port;
     }
 
     ///
     /// Sets the destintation node of the packet.
     ///
     pub fn set_dest_node(&mut self, node: NodeAddress) {
-        self.header.dest_node = node
+        self.header.dest_node = node;
     }
 
     ///
     /// Sets the destintation port of the packet.
     ///
     pub fn set_dest_port(&mut self, port: PortAddress) {
-        self.header.dest_port = port
+        self.header.dest_port = port;
     }
 
     ///
     /// Sets the packets time to live.
     ///
     pub fn set_ttl(&mut self, ttl: u8) {
-        self.header.ttl = ttl
+        self.header.ttl = ttl;
     }
 
     ///
@@ -315,14 +319,14 @@ impl Packet {
     /// Sets the sequence number of the packet.
     ///
     pub fn set_seq_no(&mut self, seq_no: u32) {
-        self.header.seq_no = seq_no
+        self.header.seq_no = seq_no;
     }
 
     ///
     /// Set s the last node to the packet header.
     ///
     pub fn set_last_node(&mut self, last_node: NodeAddress) {
-        self.header.last_node = last_node
+        self.header.last_node = last_node;
     }
 
     ///
@@ -558,7 +562,12 @@ impl PacketBuilder {
     ///
     /// Builds a [Packet] from the values given in the builder.
     ///
+    /// # Panics
+    ///
+    /// Panics if the contained message metadate points
+    /// to content that is not this packet.
     #[must_use]
+    #[allow(clippy::cast_possible_truncation)]
     pub fn build(self) -> Packet {
         // Packet { header: PacketHeader::new(src, dest, packet_length), content: () }}
         let PacketBuilder {
