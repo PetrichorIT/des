@@ -62,6 +62,7 @@ cfg_net_v6! {
         ///
         /// Creates a new instance of `Self`.
         ///
+        #[must_use]
         pub fn new(
             src: (NodeAddress, PortAddress),
             dest: (NodeAddress, PortAddress),
@@ -176,7 +177,8 @@ cfg_net_v4! {
         ///
         /// Creates a new instance of `Self`.
         ///
-        pub fn new(
+        #[must_use]
+    pub fn new(
             src: (NodeAddress, PortAddress),
             dest: (NodeAddress, PortAddress),
             packet_length: u16,
@@ -322,6 +324,7 @@ impl Packet {
     /// Creates a new instance of self through a builder.
     ///
     #[allow(clippy::new_ret_no_self)]
+    #[must_use]
     pub fn new() -> PacketBuilder {
         PacketBuilder::new()
     }
@@ -403,6 +406,7 @@ impl PacketBuilder {
     ///
     /// Creates a new [PacketBuilder].
     ///
+    #[must_use]
     pub fn new() -> Self {
         Self {
             message_builder: MessageBuilder::new(),
@@ -412,6 +416,7 @@ impl PacketBuilder {
     }
 
     /// Sets the field `src_node` and `src_port`.
+    #[must_use]
     pub fn src(mut self, src_node: NodeAddress, src_port: PortAddress) -> Self {
         self.header.src_node = src_node;
         self.header.src_port = src_port;
@@ -419,18 +424,21 @@ impl PacketBuilder {
     }
 
     /// Sets the field `src_node`.
+    #[must_use]
     pub fn src_node(mut self, src_node: NodeAddress) -> Self {
         self.header.src_node = src_node;
         self
     }
 
     /// Sets the field `src_port`.
+    #[must_use]
     pub fn src_port(mut self, src_port: PortAddress) -> Self {
         self.header.src_port = src_port;
         self
     }
 
     /// Sets the field `dest_node` and `dest_port`
+    #[must_use]
     pub fn dest(mut self, dest_node: NodeAddress, dest_port: PortAddress) -> Self {
         self.header.dest_node = dest_node;
         self.header.dest_port = dest_port;
@@ -438,24 +446,28 @@ impl PacketBuilder {
     }
 
     /// Sets the field `dest_node`.
+    #[must_use]
     pub fn dest_node(mut self, dest_node: NodeAddress) -> Self {
         self.header.dest_node = dest_node;
         self
     }
 
     /// Sets the field `dest_port`.
+    #[must_use]
     pub fn dest_port(mut self, dest_port: PortAddress) -> Self {
         self.header.dest_port = dest_port;
         self
     }
 
     /// Sets the field `seq_no`.
+    #[must_use]
     pub fn seq_no(mut self, seq_no: u32) -> Self {
         self.header.seq_no = seq_no;
         self
     }
 
     /// Sets the field `content`.
+    #[must_use]
     pub fn content<T>(mut self, content: T) -> Self
     where
         T: 'static + MessageBody,
@@ -467,7 +479,8 @@ impl PacketBuilder {
     }
 
     /// Sets the field `content`.
-    pub fn content_interned<T>(mut self, content: Box<T>) -> Self
+    #[must_use]
+    pub fn content_boxed<T>(mut self, content: Box<T>) -> Self
     where
         T: 'static + MessageBody,
     {
@@ -478,48 +491,56 @@ impl PacketBuilder {
     // MESSAGE BUILDER EXT
 
     /// Sets the field `msg.id`.
+    #[must_use]
     pub fn id(mut self, id: MessageId) -> Self {
         self.message_builder = self.message_builder.id(id);
         self
     }
 
     /// Sets the field `msg.kind`.
+    #[must_use]
     pub fn kind(mut self, kind: MessageKind) -> Self {
         self.message_builder = self.message_builder.kind(kind);
         self
     }
 
     /// Sets the field `msg.timestamp`.
+    #[must_use]
     pub fn timestamp(mut self, timestamp: SimTime) -> Self {
         self.message_builder = self.message_builder.timestamp(timestamp);
         self
     }
 
     /// Sets the field `msg.receiver_module_id`.
+    #[must_use]
     pub fn receiver_module_id(mut self, receiver_module_id: ModuleId) -> Self {
         self.message_builder = self.message_builder.receiver_module_id(receiver_module_id);
         self
     }
 
     /// Sets the field `msg.sender_module_id`.
+    #[must_use]
     pub fn sender_module_id(mut self, sender_module_id: ModuleId) -> Self {
         self.message_builder = self.message_builder.sender_module_id(sender_module_id);
         self
     }
 
     /// Sets the field `msg.last_gate`.
+    #[must_use]
     pub fn last_gate(mut self, last_gate: GateRef) -> Self {
         self.message_builder = self.message_builder.last_gate(last_gate);
         self
     }
 
     /// Sets the field `msg.creation_time`.
+    #[must_use]
     pub fn creation_time(mut self, creation_time: SimTime) -> Self {
         self.message_builder = self.message_builder.creation_time(creation_time);
         self
     }
 
     /// Sets the field `msg.send_time`.
+    #[must_use]
     pub fn send_time(mut self, send_time: SimTime) -> Self {
         self.message_builder = self.message_builder.send_time(send_time);
         self
@@ -530,6 +551,7 @@ impl PacketBuilder {
     ///
     /// Builds a [Packet] from the values given in the builder.
     ///
+    #[must_use]
     pub fn build(self) -> Packet {
         // Packet { header: PacketHeader::new(src, dest, packet_length), content: () }}
         let PacketBuilder {

@@ -56,6 +56,7 @@ impl<A> NetworkRuntime<A> {
     ///
     /// Creates a new instance by wrapping 'inner' into a empty NetworkRuntime<A>.
     ///
+    #[must_use]
     pub fn new(inner: A) -> Self {
         Self {
             module_list: Vec::new(),
@@ -109,6 +110,7 @@ impl<A> NetworkRuntime<A> {
     ///
     /// Drops all modules and channels and only returns the inner value.
     ///
+    #[must_use]
     pub fn finish(self) -> A {
         PtrMut::try_unwrap(self.inner).expect("HUH")
     }
@@ -205,6 +207,7 @@ impl NetworkRuntimeGlobals {
     ///
     /// Creates a new instance of Self.
     ///
+    #[must_use]
     pub fn new() -> Self {
         Self {
             parameters: Parameters::new(),

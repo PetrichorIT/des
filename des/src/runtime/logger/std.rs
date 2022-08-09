@@ -15,7 +15,7 @@ thread_local! {
 }
 
 /// A logger instance for internal logs.
-pub static LOGGER: StandardLogger = StandardLogger();
+pub(crate) static LOGGER: StandardLogger = StandardLogger();
 
 /// The logging implementation used internally.
 #[derive(Debug)]

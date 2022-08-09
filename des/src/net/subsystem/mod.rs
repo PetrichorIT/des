@@ -79,6 +79,7 @@ impl SubsystemCore {
     /// Creates a new optionally named instance
     /// of 'Self'.
     ///
+    #[must_use]
     pub fn new_with(path: ObjectPath, globals: PtrWeakConst<NetworkRuntimeGlobals>) -> Self {
         Self {
             id: SubsystemId::gen(),
@@ -94,6 +95,7 @@ impl SubsystemCore {
     /// Creates a new module core based on the parent
     /// using the name to extend the path.
     ///
+    #[must_use]
     pub fn child_of(name: &str, parent: &SubsystemCore) -> Self {
         let path = ObjectPath::module_with_parent(name, &parent.path);
 

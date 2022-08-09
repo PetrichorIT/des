@@ -212,6 +212,7 @@ impl ModuleCore {
     /// Creates a new optionally named instance
     /// of 'Self'.
     ///
+    #[must_use]
     pub fn new_with(path: ObjectPath, globals: PtrWeakConst<NetworkRuntimeGlobals>) -> Self {
         #[cfg(feature = "async")]
         let tctx_ident = path.path().to_string();
@@ -237,6 +238,7 @@ impl ModuleCore {
     /// Creates a new module core based on the parent
     /// using the name to extend the path.
     ///
+    #[must_use]
     pub fn child_of(name: &str, parent: &ModuleCore) -> Self {
         let path = ObjectPath::module_with_parent(name, &parent.path);
 
@@ -264,6 +266,7 @@ impl ModuleCore {
     /// Creates  a not-named instance of 'Self'.
     ///
     #[inline(always)]
+    #[must_use]
     pub fn new() -> Self {
         Self::new_with(
             ObjectPath::root_module(String::from("unknown-module")),

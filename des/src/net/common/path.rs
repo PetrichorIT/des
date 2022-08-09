@@ -214,6 +214,7 @@ impl ObjectPath {
     /// let unordered = ObjectPath::new("Main.Subystem/Subsystem.Module".to_string());
     /// assert!(unordered.is_err());
     /// ```
+    #[must_use]
     pub fn new(data: String) -> Result<Self, ObjectPathParseError> {
         if data.is_empty() {
             return Err(ObjectPathParseError::EmptyPath);
@@ -299,6 +300,7 @@ impl ObjectPath {
     /// let path = ObjectPath::root_subsystem("MyNetwork/Subnet.Module".to_string());
     /// ```
     ///
+    #[must_use]
     pub fn root_subsystem(name: String) -> Self {
         assert!(!name.contains('/') && !name.contains('.'));
 
@@ -338,6 +340,7 @@ impl ObjectPath {
     /// let path = ObjectPath::root_module("MyModule.SubModule".to_string());
     /// ```
     ///
+    #[must_use]
     pub fn root_module(name: String) -> Self {
         assert!(!name.contains('/') && !name.contains('.'));
 
@@ -352,6 +355,7 @@ impl ObjectPath {
     ///
     /// Creates a new channel ident.
     ///
+    #[must_use]
     pub fn channel_with(channel: &str, parent: &ObjectPath) -> Self {
         assert!(!parent.is_channel());
 
@@ -396,6 +400,7 @@ impl ObjectPath {
     /// let child = ObjectPath::subsystem_with_parent("Subnet", &parent);
     /// ```
     ///
+    #[must_use]
     pub fn subsystem_with_parent(name: &str, parent: &ObjectPath) -> Self {
         assert!(!name.contains('/') && !name.contains('.'));
 
@@ -434,6 +439,7 @@ impl ObjectPath {
     /// This functions panics should the provided name contain
     /// seperator characters.
     ///
+    #[must_use]
     pub fn module_with_parent(name: &str, parent: &ObjectPath) -> Self {
         assert!(!name.contains('/') && !name.contains('.'));
         assert!(!parent.is_channel());

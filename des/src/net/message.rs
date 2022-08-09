@@ -124,6 +124,7 @@ impl Message {
     /// Creates a new instance of self through a builder.
     ///
     #[allow(clippy::new_ret_no_self)]
+    #[must_use]
     pub fn new() -> MessageBuilder {
         MessageBuilder::new()
     }
@@ -139,7 +140,7 @@ impl Message {
     /// Note that DES guarntees that the data refernced by ptr will not
     /// be freed until this function is called, and ownership is thereby moved..
     ///
-
+    #[must_use]
     pub fn try_cast<T: 'static + MessageBody + Send>(self) -> Option<(T, MessageMetadata)> {
         // SAFTY:
         // Since T is 'Send' this is safe within the bounds of Messages safty contract
@@ -149,6 +150,7 @@ impl Message {
     ///
     /// Performs a [try_cast] unwraping the result.
     ///
+    #[must_use]
     pub fn cast<T: 'static + MessageBody + Send>(self) -> (T, MessageMetadata) {
         self.try_cast().expect("Could not cast to type T")
     }
@@ -166,6 +168,7 @@ impl Message {
     /// Note that this function allows T to be !Send. Be aware of safty problems arriving
     /// from this.
     ///
+    #[must_use]
     pub unsafe fn try_cast_unsafe<T: 'static + MessageBody>(self) -> Option<(T, MessageMetadata)> {
         let Message { meta, content, .. } = self;
         let content = content?;
@@ -185,6 +188,7 @@ impl Message {
     /// # Safety
     ///
     /// See [try_cast_unsafe]
+    #[must_use]
     pub unsafe fn cast_unsafe<T: 'static + MessageBody>(self) -> (T, MessageMetadata) {
         self.try_cast_unsafe().expect("Could not cast to type T")
     }
@@ -193,7 +197,7 @@ impl Message {
     /// A special cast for casting values that are packets.
     ///
     ///
-
+    #[must_use]
     pub fn try_as_packet(self) -> Option<Packet> {
         let Message { meta, content, .. } = self;
         // SAFTY:
@@ -213,6 +217,7 @@ impl Message {
     ///
     /// Casts a message into a packet preserving the messages metadata.
     ///
+    #[must_use]
     pub fn as_packet(self) -> Packet {
         self.try_as_packet().expect("Could not cast self to packet")
     }
@@ -353,6 +358,7 @@ impl<T> CustomSizeBody<T> {
     ///
     /// Creates a new instance of `Self`.
     ///
+    #[must_use]
     pub fn new(bit_len: usize, inner: T) -> Self {
         Self { bit_len, inner }
     }
@@ -374,6 +380,7 @@ impl<T> CustomSizeBody<T> {
     ///
     /// Returns the body, consuming `self``.
     ///
+    #[must_use]
     pub fn into_inner(self) -> T {
         self.inner
     }
@@ -464,6 +471,7 @@ pub struct MessageBuilder {
 
 impl MessageBuilder {
     /// Creates a new builder.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             meta: MessageMetadata::default(),
@@ -472,60 +480,70 @@ impl MessageBuilder {
     }
 
     /// Sets the field `meta`.
+    #[must_use]
     pub fn meta(mut self, meta: MessageMetadata) -> Self {
         self.meta = meta;
         self
     }
 
     /// Sets the field `meta.id`.
+    #[must_use]
     pub fn id(mut self, id: MessageId) -> Self {
         self.meta.id = id;
         self
     }
 
     /// Sets the field `meta.kind`.
+    #[must_use]
     pub fn kind(mut self, kind: MessageKind) -> Self {
         self.meta.kind = kind;
         self
     }
 
     /// Sets the field `meta.timestamp`.
+    #[must_use]
     pub fn timestamp(mut self, timestamp: SimTime) -> Self {
         self.meta.timestamp = timestamp;
         self
     }
 
     /// Sets the field `meta.receiver_module_id`.
+    #[must_use]
     pub fn receiver_module_id(mut self, receiver_module_id: ModuleId) -> Self {
         self.meta.receiver_module_id = receiver_module_id;
         self
     }
 
     /// Sets the field `meta.sender_module_id`.
+    #[must_use]
     pub fn sender_module_id(mut self, sender_module_id: ModuleId) -> Self {
         self.meta.sender_module_id = sender_module_id;
         self
     }
 
     /// Sets the field `meta.last_gate`.
+    #[must_use]
     pub fn last_gate(mut self, last_gate: GateRef) -> Self {
         self.meta.last_gate = Some(last_gate);
         self
     }
 
     /// Sets the field `meta`.creation_time.
+    #[must_use]
     pub fn creation_time(mut self, creation_time: SimTime) -> Self {
         self.meta.creation_time = creation_time;
         self
     }
 
     /// Sets the field `meta.send_time`.
+    #[must_use]
     pub fn send_time(mut self, send_time: SimTime) -> Self {
         self.meta.send_time = send_time;
         self
     }
 
     /// Sets the field `content`.
+    #[must_use]
     pub fn content<T>(mut self, content: T) -> Self
     where
         T: 'static + MessageBody + Send,
@@ -538,6 +556,7 @@ impl MessageBuilder {
     }
 
     /// Sets the field `content`.
+    #[must_use]
     pub fn content_boxed<T>(mut self, content: Box<T>) -> Self
     where
         T: 'static + MessageBody + Send,
@@ -547,6 +566,7 @@ impl MessageBuilder {
     }
 
     /// Builds a message from the builder.
+    #[must_use]
     pub fn build(self) -> Message {
         let MessageBuilder { meta, content } = self;
 

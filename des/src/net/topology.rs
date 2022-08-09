@@ -65,6 +65,7 @@ impl Topology {
     ///
     /// Creates a new empty instance of topology.
     ///
+    #[must_use]
     pub fn new() -> Self {
         Self { nodes: Vec::new() }
     }

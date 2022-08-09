@@ -223,6 +223,7 @@ where
     /// let rt = Runtime::new(app);
     /// ```
     ///
+    #[must_use]
     pub fn new(app: A) -> Self {
         Self::new_with(app, RuntimeOptions::default())
     }
@@ -252,6 +253,7 @@ where
     /// let rt = Runtime::new_with(app, RuntimeOptions::seeded(42).max_itr(69));
     /// ```
     ///
+    #[must_use]
     pub fn new_with(app: A, mut options: RuntimeOptions) -> Self {
         // Log prep
         // StandardLogger::setup().expect("Failed to create logger");
@@ -413,6 +415,7 @@ where
     ///
     /// ```
     ///
+    #[must_use]
     pub fn run(mut self) -> RuntimeResult<A> {
         if self.future_event_set.is_empty() {
             warn!("Running simulation without any events. Think about adding some inital events.");
@@ -430,6 +433,7 @@ where
     /// to [next](Runtime::next).
     ///
     #[allow(unused_mut)]
+    #[must_use]
     pub fn finish(mut self) -> RuntimeResult<A> {
         // Call the fin-handler on the allocated application
         A::at_sim_end(&mut self);

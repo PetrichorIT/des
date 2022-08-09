@@ -40,6 +40,7 @@ impl ChannelMetrics {
     ///
     /// Creates a new instance of channel metrics.
     ///
+    #[must_use]
     pub const fn new(bitrate: usize, latency: Duration, jitter: Duration) -> Self {
         Self::new_with_cost(bitrate, latency, jitter, 1.0)
     }
@@ -47,6 +48,7 @@ impl ChannelMetrics {
     ///
     /// Creates a new instance of channel metrics.
     ///
+    #[must_use]
     pub const fn new_with_cost(
         bitrate: usize,
         latency: Duration,
@@ -188,6 +190,7 @@ impl Channel {
     /// Creates a new channel using the given metrics,
     /// with an initially unbusy state.
     ///
+    #[must_use]
     pub fn new(path: ObjectPath, metrics: ChannelMetrics) -> ChannelRefMut {
         Ptr::new(Self {
             path,

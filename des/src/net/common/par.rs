@@ -17,6 +17,7 @@ impl Parameters {
     ///
     /// Creates a new empty parameter tree.
     ///
+    #[must_use]
     pub fn new() -> Self {
         Self {
             tree: RefCell::new(ParameterTree::new()),
@@ -51,6 +52,7 @@ impl Parameters {
     ///
     /// This handle can point to a nonexiting value if its only used for writing.
     ///
+    #[must_use]
     pub fn get_handle<'a>(&'a self, path: &'a str, key: &'a str) -> ParHandle<'a, Optional> {
         ParHandle {
             tree_ref: self,

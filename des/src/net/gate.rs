@@ -68,6 +68,7 @@ impl GateDescription {
     ///
     /// Creates a new descriptor using explicit values and a service type.
     ///
+    #[must_use]
     pub fn new<T>(name: String, size: usize, owner: PtrWeakMut<T>, typ: GateServiceType) -> Self
     where
         T: Module + Unsize<dyn Module>,
@@ -274,6 +275,7 @@ impl Gate {
     ///
     /// Creats a new gate using the given values.
     ///
+    #[must_use]
     pub fn new(
         description: GateDescription,
         pos: usize,

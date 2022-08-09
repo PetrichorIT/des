@@ -57,6 +57,7 @@ impl RuntimeOptions {
     ///
     /// Creates a seeded runtime for reproducable runs.
     ///
+    #[must_use]
     pub fn seeded(state: u64) -> Self {
         Self {
             rng: Some(StdRng::seed_from_u64(state)),
