@@ -1,10 +1,10 @@
 #![allow(dead_code)]
 
-use log::*;
+use log::{set_logger, set_max_level, Level, LevelFilter, Log, SetLoggerError};
 use std::cell::{Cell, RefCell};
 use std::io::Write;
 use termcolor::WriteColor;
-use termcolor::*;
+use termcolor::{Color, ColorSpec, StandardStream};
 
 thread_local! {
     static CURRENT_OBJECT: RefCell<Option<String>> = const { RefCell::new(None) };
@@ -25,6 +25,9 @@ impl StandardLogger {
     ///
     /// Creates a logger and registers it to the logging interface
     ///
+    /// # Errors
+    ///
+    /// If the logger was allready set, this will return an `SetLoggerError`.
     pub fn setup() -> Result<(), SetLoggerError> {
         match set_logger(&LOGGER).map(|()| set_max_level(LevelFilter::Trace)) {
             Ok(v) => Ok(v),
@@ -37,7 +40,7 @@ impl StandardLogger {
     /// or manually provided targets
     ///
     pub fn prioritise_internal_scopes_as_target(value: bool) {
-        LOGGER_PRIO_SCOPE.with(|v| v.set(value))
+        LOGGER_PRIO_SCOPE.with(|v| v.set(value));
     }
 
     ///
@@ -45,26 +48,26 @@ impl StandardLogger {
     /// in a appendix.
     ///
     pub fn show_nonpriority_target(value: bool) {
-        LOGGER_SHOW_NONPRIO_TARGET.with(|v| v.set(value))
+        LOGGER_SHOW_NONPRIO_TARGET.with(|v| v.set(value));
     }
 
     ///
     /// Manually overwrites the logger
     ///
     pub fn active(value: bool) {
-        LOGGER_ACTIVE.with(|v| v.set(value))
+        LOGGER_ACTIVE.with(|v| v.set(value));
     }
 
     pub(crate) fn begin_scope(ident: &str) {
-        CURRENT_OBJECT.with(|c| *c.borrow_mut() = Some(ident.to_string()))
+        CURRENT_OBJECT.with(|c| *c.borrow_mut() = Some(ident.to_string()));
     }
 
     pub(crate) fn begin_scope_with_suffix(ident: &str, suffix: &str) {
-        CURRENT_OBJECT.with(|c| *c.borrow_mut() = Some(format!("{}: {}", ident, suffix)))
+        CURRENT_OBJECT.with(|c| *c.borrow_mut() = Some(format!("{}: {}", ident, suffix)));
     }
 
     pub(crate) fn end_scope() {
-        CURRENT_OBJECT.with(|c| *c.borrow_mut() = None)
+        CURRENT_OBJECT.with(|c| *c.borrow_mut() = None);
     }
 
     fn get_level_color(level: Level) -> Color {
@@ -80,7 +83,7 @@ impl StandardLogger {
 
 impl Log for StandardLogger {
     fn enabled(&self, metadata: &log::Metadata) -> bool {
-        metadata.level() <= Level::Trace && LOGGER_ACTIVE.with(|v| v.get())
+        metadata.level() <= Level::Trace && LOGGER_ACTIVE.with(std::cell::Cell::get)
     }
 
     fn log(&self, record: &log::Record) {
@@ -89,12 +92,10 @@ impl Log for StandardLogger {
                 if let Some(v) = CURRENT_OBJECT.with(|v| v.borrow().clone()) {
                     if v == record.target() || record.target().starts_with("des::") {
                         (v, None)
+                    } else if LOGGER_PRIO_SCOPE.with(std::cell::Cell::get) {
+                        (v, Some(record.target().to_string()))
                     } else {
-                        if LOGGER_PRIO_SCOPE.with(|v| v.get()) {
-                            (v, Some(record.target().to_string()))
-                        } else {
-                            (record.target().to_string(), Some(v))
-                        }
+                        (record.target().to_string(), Some(v))
                     }
                 } else {
                     (record.target().to_string(), None)
@@ -130,13 +131,13 @@ impl Log for StandardLogger {
 
             write!(&mut stream, "{}", record.args()).expect("Failed to write to stdout");
 
-            if LOGGER_SHOW_NONPRIO_TARGET.with(|v| v.get()) {
+            if LOGGER_SHOW_NONPRIO_TARGET.with(std::cell::Cell::get) {
                 if let Some(appx) = appx {
                     write!(&mut stream, " ({})", appx).expect("Failed to write to stdout");
                 }
             }
 
-            writeln!(&mut stream).expect("Failed to write")
+            writeln!(&mut stream).expect("Failed to write");
         }
     }
 

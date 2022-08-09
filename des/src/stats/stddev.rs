@@ -20,8 +20,9 @@ pub struct StdDev {
 
 impl StdDev {
     ///
-    /// Creates  a new instance of StdDev.
+    /// Creates  a new instance of `StdDev`.
     ///
+    #[must_use]
     pub fn new() -> Self {
         Self {
             min: f64::INFINITY,
@@ -96,6 +97,7 @@ impl Statistic for StdDev {
         self.max
     }
 
+    #[allow(clippy::cast_precision_loss)]
     fn mean(&self) -> Self::Value {
         self.sum / (self.num_values as f64)
     }
@@ -136,7 +138,7 @@ impl Display for StdDev {
 ///
 /// The type to collect a accumulated value, provinding
 /// standartised metrics like e.g. standart derivation.
-/// Compresses a normal StdDev in a two-dimensional structure.
+/// Compresses a normal  [`StdDev`] in a two-dimensional structure.
 ///
 #[derive(Debug, Clone, PartialEq)]
 pub struct CompressedStdDev {
@@ -156,9 +158,10 @@ pub struct CompressedStdDev {
 
 impl CompressedStdDev {
     ///
-    /// Creates  a new instance of CompressedStdDev.
+    /// Creates  a new instance of [`CompressedStdDev`].
     ///
     #[allow(unused)]
+    #[must_use]
     pub fn new(bound: usize) -> Self {
         Self {
             current_collector: StdDev::new(),
@@ -210,7 +213,7 @@ impl Statistic for CompressedStdDev {
             .collect_weighted_at(value, weight, sim_time);
         // check for flush
         if self.current_collector.len() > self.bound {
-            self.flush()
+            self.flush();
         }
     }
 

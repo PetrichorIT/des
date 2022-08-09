@@ -31,8 +31,9 @@ pub struct OutVec {
 
 impl OutVec {
     ///
-    /// Returns the path to the owner of this OutVec.
+    /// Returns the path to the owner of this `OutVec`.
     ///
+    #[must_use]
     pub fn path(&self) -> String {
         #[cfg(feature = "net")]
         match &self.owner {
@@ -45,8 +46,9 @@ impl OutVec {
     }
 
     ///
-    /// Creates a new OutVec bound to a onwer.
+    /// Creates a new `OutVec` bound to a onwer.
     ///
+    #[must_use]
     pub fn new(name: String, #[cfg(feature = "net")] owner: Option<ObjectPath>) -> Self {
         Self {
             #[cfg(feature = "net")]
@@ -96,14 +98,14 @@ impl OutVec {
         }
 
         self.buffered_values.clear();
-        self.output_allready_written = false
+        self.output_allready_written = false;
     }
 
     ///
-    /// Finishes the OutVec, writing the data to the result file.
+    /// Finishes the `OutVec`, writing the data to the result file.
     ///
     pub fn finish(&mut self) {
-        self.try_write_to_file()
+        self.try_write_to_file();
     }
 
     fn try_write_to_file(&mut self) {
@@ -140,13 +142,16 @@ impl Statistic for OutVec {
     type Value = f64;
 
     fn collect_weighted_at(&mut self, value: Self::Value, weight: f64, sim_time: SimTime) {
-        assert_eq!(weight, 1.0, "OutVec cannot function using specific weights");
+        assert!(
+            (weight - 1.0).abs() < f64::EPSILON,
+            "OutVec cannot function using specific weights"
+        );
         self.stddev.collect_weighted_at(value, weight, sim_time);
         self.buffered_values.push((sim_time.into(), value));
 
         // check for output
         if self.buffered_values.len() > self.max_buffered_values {
-            self.try_write_to_file()
+            self.try_write_to_file();
         }
     }
 
@@ -183,15 +188,15 @@ impl Statistic for OutVec {
     }
 
     fn collect_weighted(&mut self, value: Self::Value, weight: f64) {
-        self.collect_weighted_at(value, weight, SimTime::now())
+        self.collect_weighted_at(value, weight, SimTime::now());
     }
 
     fn collect_at(&mut self, value: Self::Value, sim_time: SimTime) {
-        self.collect_weighted_at(value, 1.0, sim_time)
+        self.collect_weighted_at(value, 1.0, sim_time);
     }
 
     fn collect(&mut self, value: Self::Value) {
-        self.collect_weighted_at(value, 1.0, SimTime::now())
+        self.collect_weighted_at(value, 1.0, SimTime::now());
     }
 
     fn is_empty(&self) -> bool {

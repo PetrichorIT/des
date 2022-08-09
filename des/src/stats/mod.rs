@@ -1,6 +1,9 @@
 //!
 //! A set of structs that help with the collection of statistical data.
 //!
+#![allow(clippy::cast_precision_loss)]
+#![allow(clippy::cast_sign_loss)]
+#![allow(clippy::cast_possible_truncation)]
 
 use crate::time::SimTime;
 use std::ops::RangeInclusive;
@@ -47,21 +50,21 @@ pub trait Statistic {
     /// Collects a weighted datapoint at the current simulation time.
     ///
     fn collect_weighted(&mut self, value: Self::Value, weight: f64) {
-        self.collect_weighted_at(value, weight, SimTime::now())
+        self.collect_weighted_at(value, weight, SimTime::now());
     }
 
     ///
     /// Collects a non-weighted (w=1) datapoint at a given time.
     ///
     fn collect_at(&mut self, value: Self::Value, sim_time: SimTime) {
-        self.collect_weighted_at(value, 1.0, sim_time)
+        self.collect_weighted_at(value, 1.0, sim_time);
     }
 
     ///
     /// Collects a non.weighted datapoint at the current time.
     ///
     fn collect(&mut self, value: Self::Value) {
-        self.collect_weighted_at(value, 1.0, SimTime::now())
+        self.collect_weighted_at(value, 1.0, SimTime::now());
     }
 
     /// Indicates whether the statistical object has received any datapoints.
@@ -115,6 +118,7 @@ impl Histogramm {
     /// Creates a new historgramm with equidistant bins.
     ///
     #[allow(unused)]
+    #[must_use]
     pub fn new(range: RangeInclusive<f64>, bins: usize) -> Self {
         Self {
             lower_bound: *range.start(),

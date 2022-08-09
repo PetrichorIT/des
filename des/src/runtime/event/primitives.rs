@@ -1,6 +1,6 @@
-use crate::runtime::*;
+use crate::runtime::{Runtime, SimTime};
 use std::{
-    cmp::*,
+    cmp,
     fmt::{Debug, Display},
     marker::PhantomData,
 };
@@ -127,7 +127,7 @@ pub(crate) type EventId = usize;
 /// This node does not contain nested heap allocations by default,
 /// only if the generic event itself requires heap allocations.
 /// Nonetheless this node will be stored on the heap as it is
-/// only used inside a [std::collections::BinaryHeap].
+/// only used inside a [`std::collections::BinaryHeap`].
 ///
 pub(crate) struct EventNode<A>
 where
@@ -150,13 +150,13 @@ where
     A: Application,
 {
     ///
-    /// Delegation call to 'handle' on the event from the [EventSet].
+    /// Delegation call to 'handle' on the event from the [`EventSet`].
     ///
-    #[inline(always)]
     pub(crate) fn handle(self, rt: &mut Runtime<A>) {
-        self.event.handle(rt)
+        self.event.handle(rt);
     }
 
+    #[must_use]
     #[allow(unused)]
     pub(crate) fn create_no_id(event: A::EventSet, time: SimTime) -> Self {
         Self {
@@ -169,7 +169,7 @@ where
     }
 }
 
-impl<A> PartialEq for EventNode<A>
+impl<A> cmp::PartialEq for EventNode<A>
 where
     A: Application,
 {
@@ -178,13 +178,13 @@ where
     }
 }
 
-impl<A> Eq for EventNode<A> where A: Application {}
+impl<A> cmp::Eq for EventNode<A> where A: Application {}
 
-impl<A> PartialOrd for EventNode<A>
+impl<A> cmp::PartialOrd for EventNode<A>
 where
     A: Application,
 {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         Some(self.cmp(other))
     }
 
@@ -205,11 +205,11 @@ where
     }
 }
 
-impl<A> Ord for EventNode<A>
+impl<A> cmp::Ord for EventNode<A>
 where
     A: Application,
 {
-    fn cmp(&self, other: &Self) -> Ordering {
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
         // Inverted call should act as reverse
         other.time.cmp(&self.time)
     }

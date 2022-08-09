@@ -1,8 +1,11 @@
 cfg_not_cqueue! {
     mod default_impl {
         #[allow(unused)]
-        use crate::{stats::*, runtime::*, time::SimTime, util::*};
+        use crate::{stats::Statistic, runtime::{Application, EventNode, RuntimeOptions}, time::SimTime, util::*};
         use std::collections::{BinaryHeap, VecDeque};
+
+        #[cfg(feature = "metrics")]
+        use crate::stats::RuntimeMetrics;
 
         pub(crate) struct FutureEventSet<A>
         where
@@ -18,6 +21,7 @@ cfg_not_cqueue! {
         where
             A: Application,
         {
+            #[allow(clippy::unused_self)]
             pub(crate) fn descriptor(&self) -> String {
                 "FutureEventSet::BinaryHeap()".to_string()
             }
@@ -55,7 +59,7 @@ cfg_not_cqueue! {
             pub(crate) fn fetch_next(
                 &mut self,
                 #[cfg(feature = "metrics")] mut metrics: crate::util::PtrMut<
-                    crate::stats::RuntimeMetrics,
+                    RuntimeMetrics,
                 >,
             ) -> EventNode<A> {
                 // Internal runtime metrics
@@ -99,7 +103,7 @@ cfg_not_cqueue! {
                 time: SimTime,
                 event: impl Into<A::EventSet>,
                 #[cfg(feature = "metrics")] mut metrics: crate::util::PtrMut<
-                    crate::stats::RuntimeMetrics,
+                    RuntimeMetrics,
                 >,
             ) {
                 assert!(
@@ -133,8 +137,12 @@ cfg_cqueue! {
         use std::marker::PhantomData;
 
         #[allow(unused)]
-        use crate::{stats::*, runtime::*, time::*, util::*};
+        use crate::{stats::Statistic, runtime::{Application, EventNode, RuntimeOptions}, time::{Duration, SimTime}, util::*};
         use crate::cqueue::*;
+
+        #[cfg(feature = "metrics")]
+        use crate::stats::RuntimeMetrics;
+
 
         pub(crate) struct FutureEventSet<A>
         where
@@ -147,6 +155,7 @@ cfg_cqueue! {
         where
             A: Application,
         {
+            #[allow(clippy::unused_self)]
             pub(crate) fn descriptor(&self) -> String {
                 format!("FutureEventSet::CQueue::{}", self.inner.descriptor())
             }

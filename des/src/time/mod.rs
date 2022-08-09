@@ -1,16 +1,16 @@
 //!
 //! Temporal quantification in a simulation context.
 //!
-//! Note that the implementation of [SimTime] depends on the features that
+//! Note that the implementation of [`SimTime`] depends on the features that
 //! are active. If features "async" is active, tokio provides an implementation
-//! for [SimTime] based on its internal feature "sim". If not a drop-in replacement
+//! for [`SimTime`] based on its internal feature "sim". If not a drop-in replacement
 //! is provided by des.
 //!
 //! # Examples
 //!
-//! A [Duration] describes a span of time, either in the context of
-//! real [SystemTime](std::time::SystemTime) or provided [SimTime].
-//! There are mutiple ways to create a new [Duration].
+//! A [`Duration`] describes a span of time, either in the context of
+//! real [`SystemTime`](std::time::SystemTime) or provided [`SimTime`].
+//! There are mutiple ways to create a new [`Duration`].
 //!
 //! ```rust
 //! # use des::time::*;
@@ -31,8 +31,8 @@ pub use duration::*;
 cfg_not_async! {
     use std::cell::Cell;
     use std::f64::EPSILON;
-    use std::fmt::*;
-    use std::ops::*;
+    use std::fmt::{Debug, Display};
+    use std::ops::{Deref, Div, Sub, SubAssign};
 
     thread_local! {
         static SIMTIME: Cell<SimTime> = const { Cell::new(SimTime::ZERO) };
@@ -56,14 +56,14 @@ cfg_not_async! {
         /// ```
         #[must_use]
         pub fn now() -> Self {
-            SIMTIME.with(|s| s.get())
+            SIMTIME.with(Cell::get)
         }
 
         ///
         /// Sets the sim time
         ///
         pub(crate) fn set_now(time: SimTime) {
-            SIMTIME.with(|s| s.set(time))
+            SIMTIME.with(|s| s.set(time));
         }
 
         ///
@@ -77,6 +77,7 @@ cfg_not_async! {
         ///
         /// Makes an equallity check with an error margin.
         ///
+        #[must_use]
         pub fn eq_approx(&self, other: SimTime, error: Duration) -> bool {
             let dur = self.duration_diff(other);
             dur < error
@@ -139,11 +140,11 @@ cfg_not_async! {
 
     // # Custom Additions
     impl SimTime {
-        /// The smallest instance of a [SimTime].
+        /// The smallest instance of a [`SimTime`].
         pub const ZERO: SimTime = SimTime(Duration::ZERO);
-        /// The smallest valid instance of a [SimTime].
+        /// The smallest valid instance of a [`SimTime`].
         pub const MIN: SimTime = SimTime(Duration::ZERO);
-        /// The greatest instance of a [SimTime].
+        /// The greatest instance of a [`SimTime`].
         pub const MAX: SimTime = SimTime(Duration::MAX);
     }
 
@@ -169,7 +170,7 @@ cfg_not_async! {
 
     impl SubAssign<Duration> for SimTime {
         fn sub_assign(&mut self, rhs: Duration) {
-            *self = *self - rhs
+            *self = *self - rhs;
         }
     }
 

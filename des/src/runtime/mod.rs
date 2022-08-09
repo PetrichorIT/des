@@ -2,7 +2,10 @@
 //! Central primitives for running a discrete event simulation.
 //!
 
-use crate::{time::*, util::*};
+use crate::{
+    time::{Duration, SimTime},
+    util::SyncWrap,
+};
 use log::warn;
 use rand::{
     distributions::Standard,
@@ -15,6 +18,9 @@ use std::{
     cell::UnsafeCell,
     fmt::{Debug, Display},
 };
+
+#[cfg(feature = "metrics")]
+use crate::util::PtrMut;
 
 mod event;
 pub use self::event::*;
@@ -42,7 +48,8 @@ pub(crate) static RNG: SyncWrap<UnsafeCell<Option<StdRng>>> = SyncWrap::new(Unsa
 /// Returns the current simulation time of the currentlly active
 /// runtime session.
 ///
-#[inline(always)]
+#[inline]
+#[must_use]
 pub fn sim_time() -> SimTime {
     SimTime::now()
 }
@@ -50,13 +57,22 @@ pub fn sim_time() -> SimTime {
 ///
 /// Returns a reference to a given rng.
 ///
+/// # Panics
+///
+/// This function will panic if the RNG has not been initalized.
+/// This will be done once the `Runtime` was created.
+///
+#[must_use]
 pub fn rng() -> &'static mut StdRng {
-    unsafe { &mut *RNG.get() }.as_mut().unwrap()
+    unsafe { &mut *RNG.get() }
+        .as_mut()
+        .expect("RNG not yet initalized")
 }
 
 ///
 /// Generates a random instance of type T with a Standard distribution.
 ///
+#[must_use]
 pub fn random<T>() -> T
 where
     Standard: Distribution<T>,
@@ -84,19 +100,19 @@ where
 /// If you want to create a generic simulation you are requied to provide a 'app'
 /// parameter with an associated event set yourself. To do this follow this steps:
 ///
-/// - Create an 'App' struct that implements the trait [Application].
+/// - Create an 'App' struct that implements the trait [`Application`].
 /// This struct will hold the systems state and define the event set used in the simulation.
-/// - Create your events that handle the logic of you simulation. They must implement [Event](crate::runtime::Event) with the generic
+/// - Create your events that handle the logic of you simulation. They must implement [`Event`](crate::runtime::Event) with the generic
 /// parameter A, where A is your 'App' struct.
-/// - To bind those two together create a enum that implements [EventSet](crate::runtime::EventSet) that holds all your events.
+/// - To bind those two together create a enum that implements [`EventSet`](crate::runtime::EventSet) that holds all your events.
 /// This can be done via a macro. The use this event set as the associated event set in 'App'.
 ///
 /// # Usage with module system
 ///
 /// If you want to use the module system for network-like simulations
-/// than you must create a NetworkRuntime<A> as app parameter for the core [Runtime].
+/// than you must create a [`NetworkRuntime<A>`] as app parameter for the core [`Runtime`].
 /// This network runtime comes preconfigured with an event set and all managment
-/// event nessecary for the simulation. All you have to do is to pass the app into [Runtime::new]
+/// event nessecary for the simulation. All you have to do is to pass the app into [`Runtime::new`]
 /// to create a runnable instance and the run it.
 ///
 pub struct Runtime<A>
@@ -128,7 +144,6 @@ where
     ///
     /// Returns the current number of events on enqueud.
     ///
-    #[inline(always)]
     #[allow(unused)]
     pub(crate) fn num_non_zero_events_queued(&self) -> usize {
         self.future_event_set.len_nonzero()
@@ -137,24 +152,22 @@ where
     ///
     /// Returns the current number of events on enqueud.
     ///
-    #[inline(always)]
     #[allow(unused)]
     pub(crate) fn num_zero_events_queued(&self) -> usize {
         self.future_event_set.len_zero()
     }
 
     ///
-    /// Returns the number of events that were dispatched on this [Runtime] instance.
+    /// Returns the number of events that were dispatched on this [`Runtime`] instance.
     ///
-    #[inline(always)]
+    #[inline]
     pub fn num_events_dispatched(&self) -> usize {
         self.event_id
     }
 
     ///
-    /// Returns the number of events that were recieved & handled on this [Runtime] instance.
+    /// Returns the number of events that were recieved & handled on this [`Runtime`] instance.
     ///
-    #[inline(always)]
     pub fn num_events_received(&self) -> usize {
         self.itr
     }
@@ -162,6 +175,7 @@ where
     ///
     /// Returns the current simulation time.
     ///
+    #[allow(clippy::unused_self)]
     pub fn sim_time(&self) -> SimTime {
         SimTime::now()
     }
@@ -170,6 +184,7 @@ where
     /// Returns the random number generator by mutable refernce
     ///
     #[allow(unused)]
+    #[allow(clippy::unused_self)]
     pub(crate) fn rng(&mut self) -> *mut StdRng {
         self::rng()
     }
@@ -177,6 +192,7 @@ where
     ///
     /// Returns the rng.
     ///
+    #[allow(clippy::unused_self)]
     pub fn random<T>(&mut self) -> T
     where
         Standard: Distribution<T>,
@@ -187,6 +203,7 @@ where
     ///
     /// Returns the rng.
     ///
+    #[allow(clippy::unused_self)]
     pub fn rng_sample<T, D>(&mut self, distr: D) -> T
     where
         D: Distribution<T>,
@@ -200,8 +217,8 @@ where
     A: Application,
 {
     ///
-    /// Creates a new [Runtime] Instance using an application as core,
-    /// and accepting events of type [Event<A>](crate::runtime::Event).
+    /// Creates a new [`Runtime`] Instance using an application as core,
+    /// and accepting events of type [`Event<A>`](crate::runtime::Event).
     ///
     /// # Examples
     ///
@@ -229,9 +246,9 @@ where
     }
 
     ///
-    /// Creates a new [Runtime] Instance using an application as core,
-    /// and accepting events of type [Event<A>](crate::runtime::Event), using a custom set of
-    /// [RuntimeOptions].
+    /// Creates a new [`Runtime`] Instance using an application as core,
+    /// and accepting events of type [`Event<A>`](crate::runtime::Event), using a custom set of
+    /// [`RuntimeOptions`].
     ///
     /// # Examples
     ///
@@ -252,6 +269,10 @@ where
     /// let app = App(42, String::from("Hello there!"));
     /// let rt = Runtime::new_with(app, RuntimeOptions::seeded(42).max_itr(69));
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if no RNG can be created from the OS-RNG.
     ///
     #[must_use]
     pub fn new_with(app: A, mut options: RuntimeOptions) -> Self {
@@ -427,10 +448,10 @@ where
     }
 
     ///
-    /// Decontructs the runtime and returns the application and the final sim_time.
+    /// Decontructs the runtime and returns the application and the final `sim_time`.
     ///
     /// This funtions should only be used when running the simulation with manual calls
-    /// to [next](Runtime::next).
+    /// to [`next`](Runtime::next).
     ///
     #[allow(unused_mut)]
     #[must_use]
@@ -531,12 +552,12 @@ where
     /// ```
     ///
     pub fn add_event_in(&mut self, event: impl Into<A::EventSet>, duration: impl Into<Duration>) {
-        self.add_event(event, self.sim_time() + duration.into())
+        self.add_event(event, self.sim_time() + duration.into());
     }
 
     ///
     /// Adds and event to the furtue event heap that will be handled at the given time.
-    /// Note that this time must be in the future i.e. greated that sim_time, or this
+    /// Note that this time must be in the future i.e. greated that `sim_time`, or this
     /// function will panic.
     ///
     /// # Examples
@@ -580,7 +601,7 @@ where
             event,
             #[cfg(feature = "metrics")]
             PtrMut::clone(&self.metrics),
-        )
+        );
     }
 }
 
@@ -683,7 +704,7 @@ impl<A> RuntimeResult<A> {
     /// the provided default.
     ///
     /// The argument `default` is eagerly evaulated, for lazy evaluation use
-    /// [unwrap_or_else](Self::unwrap_or_else).
+    /// [`unwrap_or_else`](Self::unwrap_or_else).
     ///
     pub fn unwrap_or(self, default: (A, SimTime, usize)) -> (A, SimTime, usize) {
         match self {
@@ -768,6 +789,7 @@ impl<A> RuntimeResult<A> {
 
 cfg_net! {
     use crate::net::*;
+    use crate::util::PtrWeakMut;
 
     impl<A> Runtime<NetworkRuntime<A>> {
         ///

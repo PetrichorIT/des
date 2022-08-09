@@ -1,4 +1,4 @@
-use crate::time::*;
+use crate::time::{Duration, SimTime};
 
 ///
 /// A timeline that compresses values, and is infinite
@@ -15,6 +15,7 @@ impl SlottedActivityTimeline {
     ///
     /// Creates a new instance of [Self].
     ///
+    #[must_use]
     pub fn new(slot_size: Duration) -> Self {
         Self {
             slot_size,
@@ -38,7 +39,7 @@ impl SlottedActivityTimeline {
             std::mem::swap(&mut new_datapoint, &mut self.last_slot);
             let datapoint = new_datapoint.into_datapoint();
 
-            self.datapoints.push(datapoint)
+            self.datapoints.push(datapoint);
         }
     }
 
@@ -52,12 +53,17 @@ impl SlottedActivityTimeline {
         std::mem::swap(&mut new_datapoint, &mut self.last_slot);
         let datapoint = new_datapoint.into_datapoint();
 
-        self.datapoints.push(datapoint)
+        self.datapoints.push(datapoint);
     }
 
     /// Outputs the results
+    ///
+    /// # Panics
+    ///
+    /// Panics if the collected datapoints are missformatted.
+    ///
     pub fn print(&self) {
-        for datapoint in self.datapoints.iter() {
+        for datapoint in &self.datapoints {
             assert_eq!(datapoint.duration, self.slot_size);
             println!("{}: {}", datapoint.time, datapoint.magnitude);
         }
@@ -83,6 +89,7 @@ impl ActivityTimeline {
     ///
     /// Creates a new instance of [Self].
     ///
+    #[must_use]
     pub fn new(t0: SimTime, dur: Duration) -> Self {
         Self {
             t0,
@@ -118,7 +125,7 @@ impl ActivityTimeline {
             //  t0                 t1
             //             time            time+duration
             let dur_doable = self.t1() - *time;
-            *duration = *duration - dur_doable;
+            *duration -= dur_doable;
             *time = self.t1();
 
             self.datapoints.push(ActivityDatapoint {

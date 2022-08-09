@@ -1,5 +1,5 @@
 use super::event::{Application, EventNode};
-use crate::time::*;
+use crate::time::SimTime;
 use std::fmt::Display;
 
 ///

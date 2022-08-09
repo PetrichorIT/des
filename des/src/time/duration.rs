@@ -16,7 +16,7 @@ cfg_not_async! {
 
     impl AddAssign<Duration> for SimTime {
         fn add_assign(&mut self, rhs: Duration) {
-            self.0.add_assign(rhs)
+            self.0.add_assign(rhs);
         }
     }
 
@@ -33,7 +33,7 @@ cfg_not_async! {
 
     impl AddAssign<f64> for SimTime {
         fn add_assign(&mut self, rhs: f64) {
-            self.0.add_assign(Duration::from_secs_f64(rhs))
+            self.0.add_assign(Duration::from_secs_f64(rhs));
         }
     }
 

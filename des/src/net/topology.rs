@@ -1,5 +1,5 @@
-use crate::net::*;
-use crate::util::*;
+use crate::net::{GateRef, Module, ModuleId, ModuleRefMut};
+use crate::util::{Ptr, PtrMut};
 use std::fmt::Debug;
 
 ///
@@ -15,6 +15,7 @@ impl Topology {
     ///
     /// Returns the number of nodes in the topology.
     ///
+    #[must_use]
     pub fn len(&self) -> usize {
         self.nodes.len()
     }
@@ -22,6 +23,7 @@ impl Topology {
     ///
     /// Indicates wether the topology is empty.
     ///
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.nodes.is_empty()
     }
@@ -44,6 +46,7 @@ impl Topology {
     /// Returns the set of edges starting at the given node,
     /// or `None` if the nodes does not exist.
     ///
+    #[must_use]
     pub fn edges_for(&self, node: &ModuleRefMut) -> Option<&Vec<Edge>> {
         self.nodes
             .iter()
@@ -55,6 +58,7 @@ impl Topology {
     /// Returns the set of edges starting at the given node,
     /// or `None` if the nodes does not exist.
     ///
+    #[must_use]
     pub fn edges_mut_for(&mut self, node: &ModuleRefMut) -> Option<&mut Vec<Edge>> {
         self.nodes
             .iter_mut()
@@ -111,7 +115,7 @@ impl Topology {
                         src_gate: Ptr::clone(start).make_const(),
                         target_gate: current,
                         cost,
-                    })
+                    });
                 }
             }
 
@@ -140,13 +144,8 @@ impl Topology {
 
         for node in &mut nodes {
             // let node = &mut nodes[m];
-
-            node.edges = node
-                .edges
-                .iter()
-                .filter(|edge| ids.contains(&edge.target_gate.owner().id()))
-                .cloned()
-                .collect();
+            node.edges
+                .retain(|edge| ids.contains(&edge.target_gate.owner().id()));
         }
 
         Self { nodes }
@@ -164,13 +163,7 @@ impl Topology {
         let mut nodes = self.nodes.clone();
         for def in &mut nodes {
             // let def = &mut nodes[m];
-
-            def.edges = def
-                .edges
-                .iter()
-                .filter(|edge| predicate(&def.node, edge))
-                .cloned()
-                .collect();
+            def.edges.retain(|edge| predicate(&def.node, edge));
         }
 
         Self { nodes }
@@ -179,14 +172,15 @@ impl Topology {
     ///
     /// Creates a .dot output for visualizing the module graph.
     ///
+    #[must_use]
     pub fn dot_output(&self) -> String {
         let mut nodes_out = String::new();
-        for def in self.nodes.iter() {
-            nodes_out.push_str(&format!("    \"{}\" [shape=box]\n", def.node.str()))
+        for def in &self.nodes {
+            nodes_out.push_str(&format!("    \"{}\" [shape=box]\n", def.node.str()));
         }
 
         let mut edges_out = String::new();
-        for NodeDefinition { node, edges } in self.nodes.iter() {
+        for NodeDefinition { node, edges } in &self.nodes {
             let from_node = node.str();
             for Edge {
                 cost,
@@ -221,6 +215,12 @@ impl Topology {
     ///
     /// Be aware that this command relies on the 'dot' command line
     /// programm to generate the svg.
+    ///
+    /// # Errors
+    ///
+    /// This operation will return an IO Error if
+    /// either the file cannot be created or the operations
+    /// using the dot engine wont work.
     ///
     pub fn write_to_svg(&self, path: &str) -> std::io::Result<()> {
         use std::fs::File;

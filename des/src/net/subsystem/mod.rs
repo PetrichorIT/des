@@ -42,6 +42,7 @@ pub struct SubsystemCore {
 
 impl SubsystemCore {
     /// The id of the submodule.
+    #[must_use]
     pub fn id(&self) -> SubsystemId {
         self.id
     }
@@ -50,6 +51,7 @@ impl SubsystemCore {
     /// A runtime-unqiue (not enforced) identifier for this module, based on its
     /// place in the module tree.
     ///
+    #[must_use]
     pub fn path(&self) -> &ObjectPath {
         &self.path
     }
@@ -57,6 +59,7 @@ impl SubsystemCore {
     ///
     /// Returns a human readable representation of the modules identity.
     ///
+    #[must_use]
     pub fn str(&self) -> &str {
         self.path.path()
     }
@@ -64,6 +67,7 @@ impl SubsystemCore {
     ///
     /// Returns the name of the module instance.
     ///
+    #[must_use]
     pub fn name(&self) -> &str {
         self.path.name()
     }
@@ -71,6 +75,7 @@ impl SubsystemCore {
     ///
     /// All channels managed by this subsystem.
     ///
+    #[must_use]
     pub fn channels(&self) -> &[PtrMut<Channel>] {
         &self.channels
     }

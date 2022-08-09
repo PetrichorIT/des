@@ -28,12 +28,12 @@ impl ScopedLoggerWrap {
 
     fn reset(&self) {
         let old_inner = unsafe { &mut *self.inner.get() };
-        *old_inner = None
+        *old_inner = None;
     }
 
     fn reset_contents(&self, new: ScopedLogger) {
         let old_inner = unsafe { &mut *self.inner.get() };
-        old_inner.as_mut().unwrap().reset_contents(new)
+        old_inner.as_mut().unwrap().reset_contents(new);
     }
 
     fn set(&self, inner: ScopedLogger) -> Option<ScopedLogger> {
@@ -66,14 +66,14 @@ impl Log for ScopedLoggerWrap {
     fn log(&self, record: &log::Record) {
         unsafe {
             let inner = &*self.inner.get();
-            inner.as_ref().unwrap_unchecked().log(record)
+            inner.as_ref().unwrap_unchecked().log(record);
         }
     }
 
     fn flush(&self) {
         unsafe {
             let inner = &*self.inner.get();
-            inner.as_ref().unwrap_unchecked().flush()
+            inner.as_ref().unwrap_unchecked().flush();
         }
     }
 }
@@ -93,6 +93,7 @@ pub struct ScopedLogger {
 #[allow(unused)]
 impl ScopedLogger {
     /// Creates a new Logger (builder).
+    #[must_use]
     pub fn new() -> Self {
         Self {
             scopes: UnsafeCell::new(HashMap::new()),
@@ -106,6 +107,7 @@ impl ScopedLogger {
     }
 
     /// A logger that does not forward logs to stdout or stderr
+    #[must_use]
     pub fn quiet() -> Self {
         Self {
             scopes: UnsafeCell::new(HashMap::new()),
@@ -138,60 +140,74 @@ impl ScopedLogger {
 
     fn reset_contents(&mut self, new: Self) {
         if self.active {
-            *self = new
+            *self = new;
         }
     }
 
     /// Sets the loggers activity status.
+    #[must_use]
     pub fn active(mut self, is_active: bool) -> Self {
         self.active = is_active;
         self
     }
 
     /// Set the policy that dicates whether to forward messages to stdout
+    #[must_use]
     pub fn stdout_policy(mut self, predicate: &'static dyn Fn(&str) -> bool) -> Self {
         self.stdout_policy = Box::new(predicate);
         self
     }
 
     /// Set the policy that dicates whether to forward messages to stderr
+    #[must_use]
     pub fn stderr_policy(mut self, predicate: &'static dyn Fn(&str) -> bool) -> Self {
         self.stderr_policy = Box::new(predicate);
         self
     }
 
     /// Sets the internal max level for all log message coming from internals
+    #[must_use]
     pub fn interal_max_log_level(mut self, level: LevelFilter) -> Self {
         self.interal_max_level = level;
         self
     }
 
     /// Connects the logger to the logging framework.
+    ///
+    /// # Errors
+    ///
+    /// This will fail if another logger is allready set,
+    /// that is not of this type. If the other logger is of this type,
+    /// it will be replaced.
+    ///
+    /// # Panics
+    ///
+    /// Panics if somebody steals the logger from the static registry
+    /// in a race condition.
+    ///
     pub fn finish(self) -> Result<(), SetLoggerError> {
         let old = SCOPED_LOGGER.set(self);
         match log::set_logger(&SCOPED_LOGGER).map(|()| log::set_max_level(LevelFilter::Trace)) {
             Ok(()) => {
-                assert!(
-                    old.is_none(),
-                    "No logger was initialized, but vacant logger was found."
-                );
+                // assert!(
+                //     old.is_none(),
+                //     "No logger was initialized, but vacant logger was found."
+                // );
                 Ok(())
             }
             Err(e) => {
                 // Since a logger was allready set it might either be a
                 // ScopedLogger or somthing elsewhere
                 // If SCOPED_LOGGER is Some that this logger is the set logger.
-                match old {
-                    Some(v) => {
-                        // Old was Scoped logger so keep the old logger and reset it.
-                        let recently_created = SCOPED_LOGGER.set(v);
-                        SCOPED_LOGGER.reset_contents(recently_created.unwrap());
-                        Ok(())
-                    }
-                    None => {
-                        SCOPED_LOGGER.reset();
-                        Err(e)
-                    }
+
+                if let Some(v) = old {
+                    // Old was Scoped logger so keep the old logger and reset it.
+                    let recently_created = SCOPED_LOGGER.set(v);
+                    SCOPED_LOGGER.reset_contents(recently_created.unwrap());
+                    Ok(())
+                } else {
+                    SCOPED_LOGGER.reset();
+                    Err(e)
                 }
             }
         }
@@ -207,6 +223,12 @@ impl Debug for ScopedLogger {
     }
 }
 
+impl Default for ScopedLogger {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Log for ScopedLogger {
     fn enabled(&self, metadata: &log::Metadata) -> bool {
         self.active && metadata.level() <= LevelFilter::Trace
@@ -217,10 +239,7 @@ impl Log for ScopedLogger {
             return;
         }
 
-        let source_is_internal = record
-            .module_path()
-            .map(|s| s.starts_with("des"))
-            .unwrap_or(false);
+        let source_is_internal = record.module_path().map_or(false, |s| s.starts_with("des"));
         if source_is_internal && record.level() > self.interal_max_level {
             return;
         }
@@ -262,7 +281,7 @@ impl Log for ScopedLogger {
         let scope = scopes.get_mut(&target);
         if let Some(scope) = scope {
             let text = format!("{}", record.args());
-            scope.log(text, record.level())
+            scope.log(text, record.level());
         } else {
             println!("Creating logger scope '{}'", target);
             // TODO: Check target validity
@@ -317,7 +336,7 @@ impl LoggerScope {
             target: self.target.clone(),
         };
         if let Some(out) = out {
-            record.log(out)
+            record.log(out);
         }
 
         self.stream.push_back(record);
@@ -339,7 +358,7 @@ pub struct LoggerRecord {
 
 impl LoggerRecord {
     fn log(&self, mut out: StandardStream) {
-        out.set_color(ColorSpec::new().set_fg(Some(PARENS_COLOR.clone())))
+        out.set_color(ColorSpec::new().set_fg(Some(PARENS_COLOR)))
             .expect("Failed to set color on output stream");
 
         write!(&mut out, "[ ").expect("Failed to write to output stream");

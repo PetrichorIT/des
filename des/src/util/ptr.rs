@@ -62,17 +62,17 @@ mod private {
     pub trait MutabilityState {}
 }
 
-/// A [Ptr] that does not support mutation ([Const]).
+/// A [`Ptr`] that does not support mutation ([`Const`]).
 pub type PtrConst<T> = Ptr<T, Const>;
-/// A [Ptr] that does support mutation ([Mut]).
+/// A [`Ptr`] that does support mutation ([`Mut`]).
 pub type PtrMut<T> = Ptr<T, Mut>;
-/// A [PtrWeak] that does not support mutation ([Const]).
+/// A [`PtrWeak`] that does not support mutation ([`Const`]).
 pub type PtrWeakConst<T> = PtrWeak<T, Const>;
-/// A [PtrWeak] that does support mutation ([Mut]).
+/// A [`PtrWeak`] that does support mutation ([`Mut`]).
 pub type PtrWeakMut<T> = PtrWeak<T, Mut>;
 
 ///
-/// An annotation type that indicates a [Ptr] or a [PtrWeak]
+/// An annotation type that indicates a [Ptr] or a [`PtrWeak`]
 /// does not support mutation.
 ///
 #[derive(Debug)]
@@ -80,7 +80,7 @@ pub struct Const;
 impl private::MutabilityState for Const {}
 
 ///
-/// An annotation type that indicates a [Ptr] or a [PtrWeak]
+/// An annotation type that indicates a [Ptr] or a [`PtrWeak`]
 /// does support mutation.
 ///
 #[derive(Debug)]
@@ -99,7 +99,7 @@ impl private::MutabilityState for Mut {}
 /// can not be guranteed.
 ///
 /// As a quick rule of thumb do not store the references
-/// returned by [Deref] or [DerefMut] anywhere.
+/// returned by [`Deref`] or [`DerefMut`] anywhere.
 ///
 pub struct Ptr<T, S>
 where
@@ -117,6 +117,7 @@ where
     ///
     /// Constructs a new [Ptr<T>].
     ///
+    #[must_use]
     pub fn new(value: T) -> Self {
         Self {
             inner: Rc::new(UnsafeCell::new(value)),
@@ -127,6 +128,7 @@ where
     ///
     /// Creates a weak ptr from a strong ptr
     ///
+    #[must_use]
     pub fn downgrade(this: &Self) -> PtrWeak<T, S> {
         PtrWeak {
             inner: Rc::downgrade(&this.inner),
@@ -156,12 +158,13 @@ where
     /// # drop(the_solution);
     /// # drop(_copy_cat);
     /// ```
+    #[must_use]
     pub fn strong_count(this: &Self) -> usize {
         Rc::strong_count(&this.inner)
     }
 
     ///
-    /// Gets the number of weak ([PtrWeak])
+    /// Gets the number of weak ([`PtrWeak`])
     /// pointer to the underlying allocation.
     ///
     /// # Examples
@@ -177,6 +180,7 @@ where
     /// # drop(pw);
     /// # drop(_weak);
     /// ```
+    #[must_use]
     pub fn weak_count(this: &Self) -> usize {
         Rc::weak_count(&this.inner)
     }
@@ -186,6 +190,7 @@ impl<T: ?Sized> Ptr<T, Mut> {
     ///
     /// Declares a reference as read-only. Not reversable.
     ///
+    #[must_use]
     pub fn make_const(self) -> Ptr<T, Const> {
         Ptr {
             inner: self.inner,
@@ -194,16 +199,21 @@ impl<T: ?Sized> Ptr<T, Mut> {
     }
 
     ///
-    /// Returns the inner value, if the Arc has exactly one strong reference.
-    /// Otherwise, an Err is returned with the same Arc that was passed in.
+    /// Returns the inner value, if the Ptr has exactly one strong reference.
+    /// Otherwise, an Err is returned with the same Ptr that was passed in.
     /// This will succeed even if there are outstanding weak references.
+    ///
+    /// # Errors
+    ///
+    /// If the current Ptr is not the only strong reference,
+    /// the Ptr itself is returned.
     ///
     pub fn try_unwrap(this: Ptr<T, Mut>) -> Result<T, Self>
     where
         T: Sized,
     {
         Rc::try_unwrap(this.inner)
-            .map(|cell| cell.into_inner())
+            .map(UnsafeCell::into_inner)
             .map_err(|rc| PtrMut {
                 inner: rc,
                 _phantom: PhantomData,
@@ -310,7 +320,7 @@ where
     S: MutabilityState,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.deref().eq(other.deref())
+        self.deref().eq(&**other)
     }
 }
 
@@ -327,7 +337,7 @@ where
     S: MutabilityState,
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.deref().hash(state)
+        self.deref().hash(state);
     }
 }
 
@@ -337,7 +347,7 @@ where
     S: MutabilityState,
 {
     fn partial_cmp(&self, rhs: &Self) -> Option<std::cmp::Ordering> {
-        self.deref().partial_cmp(rhs.deref())
+        self.deref().partial_cmp(&**rhs)
     }
 }
 
@@ -347,7 +357,7 @@ where
     S: MutabilityState,
 {
     fn cmp(&self, rhs: &Self) -> std::cmp::Ordering {
-        self.deref().cmp(rhs.deref())
+        self.deref().cmp(&**rhs)
     }
 }
 
@@ -378,7 +388,7 @@ where
 /// can not be guranteed.
 ///
 /// As a quick rule of thumb do not store the references
-/// returned by [Deref] or [DerefMut] anywhere.
+/// returned by [`Deref`] or [`DerefMut`] anywhere.
 ///
 pub struct PtrWeak<T, S>
 where
@@ -395,8 +405,9 @@ where
     S: MutabilityState,
 {
     ///
-    /// Creates a new empty instance of [PtrWeak].
+    /// Creates a new empty instance of [`PtrWeak`].
     ///
+    #[must_use]
     pub fn new() -> Self
     where
         T: Sized,
@@ -408,8 +419,9 @@ where
     }
 
     ///
-    /// Constructs a new [PtrWeak<T>] from a [Ptr<T>].
+    /// Constructs a new [`PtrWeak<T>`] from a [`Ptr<T>`].
     ///
+    #[must_use]
     pub fn from_strong(ptr: &Ptr<T, S>) -> Self {
         Self {
             inner: Rc::downgrade(&ptr.inner),
@@ -418,19 +430,21 @@ where
     }
 
     ///
-    /// Gets the number of strong ([Ptr]) pointers pointing to this allocation.
+    /// Gets the number of strong ([`Ptr`]) pointers pointing to this allocation.
     ///
-    /// If self was created using [PtrWeak::new], this will return 0.
+    /// If self was created using [`PtrWeak::new`], this will return 0.
     ///
+    #[must_use]
     pub fn strong_count(&self) -> usize {
         self.inner.strong_count()
     }
 
     ///
-    /// Gets the number of [PtrWeak] pointers pointing to this allocation.
+    /// Gets the number of [`PtrWeak`] pointers pointing to this allocation.
     ///
     /// If no strong pointers remain, this will return zero.
     ///
+    #[must_use]
     pub fn weak_count(&self) -> usize {
         self.inner.weak_count()
     }
@@ -440,6 +454,7 @@ impl<T: ?Sized> PtrWeak<T, Mut> {
     ///
     /// Declares a reference as read-only. Not reversable.
     ///
+    #[must_use]
     pub fn make_const(self) -> PtrWeak<T, Const> {
         PtrWeak {
             inner: self.inner,
@@ -563,7 +578,7 @@ where
     S: MutabilityState,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.deref().eq(other.deref())
+        self.deref().eq(&**other)
     }
 }
 
@@ -580,7 +595,7 @@ where
     S: MutabilityState,
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.deref().hash(state)
+        self.deref().hash(state);
     }
 }
 
@@ -590,7 +605,7 @@ where
     S: MutabilityState,
 {
     fn partial_cmp(&self, rhs: &Self) -> Option<std::cmp::Ordering> {
-        self.deref().partial_cmp(rhs.deref())
+        self.deref().partial_cmp(&**rhs)
     }
 }
 
@@ -600,7 +615,7 @@ where
     S: MutabilityState,
 {
     fn cmp(&self, rhs: &Self) -> std::cmp::Ordering {
-        self.deref().cmp(rhs.deref())
+        self.deref().cmp(&**rhs)
     }
 }
 

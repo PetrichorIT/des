@@ -1,6 +1,8 @@
-use crate::runtime::*;
+use crate::{
+    runtime::RuntimeLimit,
+    time::{Duration, SimTime},
+};
 use rand::{prelude::StdRng, SeedableRng};
-
 ///
 /// Options for specifing the behaviour of the core runtime
 /// independent of the app logic.
@@ -118,7 +120,7 @@ impl RuntimeOptions {
 
     ///
     /// Sets a custom limit to the end of the runtime, overwriting
-    /// all max_itr and max_time options.
+    /// all `max_itr` and `max_time` options.
     ///
     #[must_use]
     pub fn limit(mut self, limit: RuntimeLimit) -> Self {
