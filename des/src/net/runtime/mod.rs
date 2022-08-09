@@ -1,5 +1,5 @@
 use super::common::Parameters;
-use crate::net::{Module, ObjectPath, Topology, __Buildable0, __Buildable1, __Buildable2, __Buildable3, __Buildable4, __Buildable5, __Buildable6, __Buildable7};
+use crate::net::{Module, ObjectPath, Topology};
 use crate::runtime::{Application, Runtime};
 use crate::time::SimTime;
 use crate::util::{Ptr, PtrConst, PtrMut, PtrWeak, PtrWeakConst};
@@ -42,14 +42,16 @@ impl<A> NetworkRuntime<A> {
     /// Returns the globals (readonly) of the entire simulation.
     ///
     #[doc(hidden)]
-    #[must_use] pub fn globals_weak(&self) -> PtrWeakConst<NetworkRuntimeGlobals> {
+    #[must_use]
+    pub fn globals_weak(&self) -> PtrWeakConst<NetworkRuntimeGlobals> {
         PtrWeak::from_strong(&self.globals).make_const()
     }
 
     ///
     /// Returns the globals (readonly) of the entire simulation.
     ///
-    #[must_use] pub fn globals(&self) -> PtrConst<NetworkRuntimeGlobals> {
+    #[must_use]
+    pub fn globals(&self) -> PtrConst<NetworkRuntimeGlobals> {
         Ptr::clone(&self.globals).make_const()
     }
 
@@ -92,7 +94,8 @@ impl<A> NetworkRuntime<A> {
     ///
     /// Returns a reference to the list of all modules.
     ///
-    #[must_use] pub fn modules(&self) -> &Vec<PtrMut<dyn Module>> {
+    #[must_use]
+    pub fn modules(&self) -> &Vec<PtrMut<dyn Module>> {
         &self.module_list
     }
 
