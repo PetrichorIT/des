@@ -283,7 +283,6 @@ impl Log for ScopedLogger {
             let text = format!("{}", record.args());
             scope.log(text, record.level());
         } else {
-            println!("Creating logger scope '{}'", target);
             // TODO: Check target validity
             let stdout = &self.stdout_policy;
             let stderr = &self.stderr_policy;

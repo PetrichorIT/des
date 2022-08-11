@@ -473,6 +473,13 @@ impl ModuleCore {
     }
 
     ///
+    /// Returns an iterator over all children idents.
+    ///
+    pub fn children(&self) -> impl Iterator<Item = &String> {
+        self.children.keys()
+    }
+
+    ///
     /// Returns the child with the given name if existent, as a [`PtrWeakConst`].
     ///
     /// # Errors

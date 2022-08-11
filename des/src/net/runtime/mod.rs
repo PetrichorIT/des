@@ -134,20 +134,21 @@ impl<A> Application for NetworkRuntime<A> {
 
     fn at_sim_end(rt: &mut Runtime<Self>) {
         for module in &mut rt.app.module_list {
-            log_scope!(module.name());
+            log_scope!(module.path());
             info!("Calling 'at_sim_end'");
             module.at_sim_end();
         }
-
-        log_scope!();
 
         #[cfg(feature = "async")]
         {
             // Ensure all sim_start stages have finished
             for module in &mut rt.app.module_list {
+                log_scope!(module.path());
                 module.finish_sim_end();
             }
         }
+
+        log_scope!();
     }
 }
 
