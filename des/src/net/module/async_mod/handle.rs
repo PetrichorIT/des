@@ -54,12 +54,12 @@ unsafe impl Send for BufferEvent {}
 /// from a module.
 ///
 #[derive(Debug)]
-pub struct HandleSender {
+pub struct SenderHandle {
     pub(crate) inner: tokio::sync::mpsc::UnboundedSender<BufferEvent>,
     pub(crate) time_offset: Duration,
 }
 
-impl HandleSender {
+impl SenderHandle {
     ///
     /// Adds the duration to the processing time offset.
     /// All messages send after this time will be delayed by the
@@ -110,7 +110,7 @@ impl HandleSender {
     }
 }
 
-impl Clone for HandleSender {
+impl Clone for SenderHandle {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),

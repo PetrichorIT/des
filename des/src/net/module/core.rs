@@ -290,10 +290,10 @@ impl ModuleCore {
     ///
     #[cfg(feature = "async")]
     #[must_use]
-    pub fn async_handle(&self) -> super::HandleSender {
+    pub fn async_handle(&self) -> super::SenderHandle {
         let inner = self.async_ext.handle.clone();
 
-        super::HandleSender {
+        super::SenderHandle {
             inner,
             time_offset: self.buffers.processing_time_delay,
         }

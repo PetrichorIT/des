@@ -77,6 +77,7 @@ pub use self::module::StaticModuleCore;
 
 cfg_async! {
     pub use self::module::AsyncModule;
+    pub use self::module::SenderHandle;
 }
 
 pub use self::ndl::BuildContext;

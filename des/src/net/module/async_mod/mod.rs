@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use std::sync::Arc;
 
 mod handle;
-pub(crate) use handle::*;
+pub use handle::*;
 
 pub(crate) mod ext;
 use ext::WaitingMessage;
