@@ -1,8 +1,4 @@
-use std::{
-    any::Any,
-    collections::{LinkedList, VecDeque},
-    fmt::Debug,
-};
+use std::{any::Any, fmt::Debug};
 
 use crate::net::{GateRef, ModuleId, Packet};
 use crate::time::SimTime;
@@ -370,6 +366,8 @@ pub trait MessageBody {
     }
 }
 
+// # Primitives
+
 macro_rules! msg_body_primitiv {
     ($t: ty) => {
         impl MessageBody for $t {
@@ -379,6 +377,254 @@ macro_rules! msg_body_primitiv {
         }
     };
 }
+
+msg_body_primitiv!(());
+
+msg_body_primitiv!(u8);
+msg_body_primitiv!(u16);
+msg_body_primitiv!(u32);
+msg_body_primitiv!(u64);
+msg_body_primitiv!(u128);
+msg_body_primitiv!(usize);
+
+msg_body_primitiv!(i8);
+msg_body_primitiv!(i16);
+msg_body_primitiv!(i32);
+msg_body_primitiv!(i64);
+msg_body_primitiv!(i128);
+msg_body_primitiv!(isize);
+
+msg_body_primitiv!(f64);
+msg_body_primitiv!(f32);
+
+msg_body_primitiv!(bool);
+msg_body_primitiv!(char);
+
+macro_rules! msg_body_lenable {
+    ($t: ty) => {
+        impl MessageBody for $t {
+            fn byte_len(&self) -> usize {
+                self.len()
+            }
+        }
+    };
+}
+
+msg_body_lenable!(String);
+
+// # Basic types
+
+impl<T: MessageBody> MessageBody for Box<T> {
+    fn byte_len(&self) -> usize {
+        use std::ops::Deref;
+
+        self.deref().byte_len()
+    }
+}
+
+impl<T: MessageBody> MessageBody for Option<T> {
+    fn byte_len(&self) -> usize {
+        match self {
+            Some(ref content) => content.byte_len(),
+            None => 0,
+        }
+    }
+}
+
+impl<T: MessageBody, E: MessageBody> MessageBody for Result<T, E> {
+    fn byte_len(&self) -> usize {
+        match self {
+            Ok(ref val) => val.byte_len(),
+            Err(ref err) => err.byte_len(),
+        }
+    }
+}
+
+// # Cells
+use std::cell::{Cell, RefCell, UnsafeCell};
+
+impl<T: MessageBody> MessageBody for Cell<T> {
+    fn byte_len(&self) -> usize {
+        // SAFTY: Since this is only used in this place, read only
+        // this can be considered safe
+        let val = unsafe { &*self.as_ptr() };
+        val.bit_len()
+    }
+}
+
+impl<T: MessageBody> MessageBody for RefCell<T> {
+    fn byte_len(&self) -> usize {
+        self.borrow().byte_len()
+    }
+}
+
+impl<T: MessageBody> MessageBody for UnsafeCell<T> {
+    fn byte_len(&self) -> usize {
+        // SAFTY: Only used locally, read-only
+        let val = unsafe { &*self.get() };
+        val.byte_len()
+    }
+}
+
+// # Collections
+use std::collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, LinkedList, VecDeque};
+
+impl<T: MessageBody> MessageBody for Vec<T> {
+    fn byte_len(&self) -> usize {
+        self.iter().fold(0, |acc, v| acc + v.byte_len())
+    }
+}
+
+impl<T: MessageBody> MessageBody for VecDeque<T> {
+    fn byte_len(&self) -> usize {
+        self.iter().fold(0, |acc, v| acc + v.byte_len())
+    }
+}
+
+impl<T: MessageBody> MessageBody for LinkedList<T> {
+    fn byte_len(&self) -> usize {
+        self.iter().fold(0, |acc, v| acc + v.byte_len())
+    }
+}
+
+impl<T: MessageBody, const N: usize> MessageBody for [T; N] {
+    fn byte_len(&self) -> usize {
+        let mut sum = 0;
+        for element in self {
+            sum += element.byte_len();
+        }
+        sum
+    }
+}
+
+impl<T: MessageBody> MessageBody for &[T] {
+    fn byte_len(&self) -> usize {
+        self.iter().fold(0, |acc, v| acc + v.byte_len())
+    }
+}
+
+impl<K: MessageBody, V: MessageBody> MessageBody for HashMap<K, V> {
+    fn byte_len(&self) -> usize {
+        let mut sum = 0;
+        for (k, v) in self.iter() {
+            sum += k.byte_len() + v.byte_len()
+        }
+        sum
+    }
+}
+
+impl<K: MessageBody, V: MessageBody> MessageBody for BTreeMap<K, V> {
+    fn byte_len(&self) -> usize {
+        let mut sum = 0;
+        for (k, v) in self.iter() {
+            sum += k.byte_len() + v.byte_len()
+        }
+        sum
+    }
+}
+
+impl<T: MessageBody> MessageBody for HashSet<T> {
+    fn byte_len(&self) -> usize {
+        let mut sum = 0;
+        for v in self.iter() {
+            sum += v.byte_len()
+        }
+        sum
+    }
+}
+
+impl<T: MessageBody> MessageBody for BTreeSet<T> {
+    fn byte_len(&self) -> usize {
+        let mut sum = 0;
+        for v in self.iter() {
+            sum += v.byte_len()
+        }
+        sum
+    }
+}
+
+impl<T: MessageBody> MessageBody for BinaryHeap<T> {
+    fn byte_len(&self) -> usize {
+        let mut sum = 0;
+        for v in self.iter() {
+            sum += v.byte_len()
+        }
+        sum
+    }
+}
+
+// # Tuples
+
+impl<A, B> MessageBody for (A, B)
+where
+    A: MessageBody,
+    B: MessageBody,
+{
+    fn byte_len(&self) -> usize {
+        self.0.byte_len() + self.1.byte_len()
+    }
+}
+
+impl<A, B, C> MessageBody for (A, B, C)
+where
+    A: MessageBody,
+    B: MessageBody,
+    C: MessageBody,
+{
+    fn byte_len(&self) -> usize {
+        self.0.byte_len() + self.1.byte_len() + self.2.byte_len()
+    }
+}
+
+impl<A, B, C, D> MessageBody for (A, B, C, D)
+where
+    A: MessageBody,
+    B: MessageBody,
+    C: MessageBody,
+    D: MessageBody,
+{
+    fn byte_len(&self) -> usize {
+        self.0.byte_len() + self.1.byte_len() + self.2.byte_len() + self.3.byte_len()
+    }
+}
+
+impl<A, B, C, D, E> MessageBody for (A, B, C, D, E)
+where
+    A: MessageBody,
+    B: MessageBody,
+    C: MessageBody,
+    D: MessageBody,
+    E: MessageBody,
+{
+    fn byte_len(&self) -> usize {
+        self.0.byte_len()
+            + self.1.byte_len()
+            + self.2.byte_len()
+            + self.3.byte_len()
+            + self.4.byte_len()
+    }
+}
+
+impl<A, B, C, D, E, F> MessageBody for (A, B, C, D, E, F)
+where
+    A: MessageBody,
+    B: MessageBody,
+    C: MessageBody,
+    D: MessageBody,
+    E: MessageBody,
+    F: MessageBody,
+{
+    fn byte_len(&self) -> usize {
+        self.0.byte_len()
+            + self.1.byte_len()
+            + self.2.byte_len()
+            + self.3.byte_len()
+            + self.4.byte_len()
+            + self.5.byte_len()
+    }
+}
+
+// # Custom
 
 ///
 /// A message body that does mimics a custom size
@@ -432,68 +678,6 @@ where
 
     fn bit_len(&self) -> usize {
         self.bit_len
-    }
-}
-
-msg_body_primitiv!(());
-
-msg_body_primitiv!(u8);
-msg_body_primitiv!(u16);
-msg_body_primitiv!(u32);
-msg_body_primitiv!(u64);
-msg_body_primitiv!(u128);
-msg_body_primitiv!(usize);
-
-msg_body_primitiv!(i8);
-msg_body_primitiv!(i16);
-msg_body_primitiv!(i32);
-msg_body_primitiv!(i64);
-msg_body_primitiv!(i128);
-msg_body_primitiv!(isize);
-
-msg_body_primitiv!(f64);
-msg_body_primitiv!(f32);
-
-msg_body_primitiv!(bool);
-msg_body_primitiv!(char);
-
-macro_rules! msg_body_lenable {
-    ($t: ty) => {
-        impl MessageBody for $t {
-            fn byte_len(&self) -> usize {
-                self.len()
-            }
-        }
-    };
-}
-
-msg_body_lenable!(String);
-
-// std::collections
-
-impl<T: MessageBody> MessageBody for Vec<T> {
-    fn byte_len(&self) -> usize {
-        self.iter().fold(0, |acc, v| acc + v.byte_len())
-    }
-}
-
-impl<T: MessageBody> MessageBody for VecDeque<T> {
-    fn byte_len(&self) -> usize {
-        self.iter().fold(0, |acc, v| acc + v.byte_len())
-    }
-}
-
-impl<T: MessageBody> MessageBody for LinkedList<T> {
-    fn byte_len(&self) -> usize {
-        self.iter().fold(0, |acc, v| acc + v.byte_len())
-    }
-}
-
-// [T]
-
-impl<T: MessageBody> MessageBody for &[T] {
-    fn byte_len(&self) -> usize {
-        self.iter().fold(0, |acc, v| acc + v.byte_len())
     }
 }
 

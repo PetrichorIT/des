@@ -1,4 +1,3 @@
-#![allow(deprecated)]
 #![feature(track_path)]
 //!
 //! A crate for extending a DES simulation with NDL definitions.
@@ -10,12 +9,29 @@
 mod attributes;
 mod common;
 
+mod message_body;
 mod module;
 mod subsystem;
 
 use proc_macro::{self, TokenStream};
 use proc_macro_error::proc_macro_error;
 use syn::{parse_macro_input, AttributeArgs, DeriveInput};
+
+///
+/// A macro for deriving the `MessageBody` trait.
+///
+/// This macro requires that all subtypes of the applied type
+/// implement `MessageBody` themselfs.
+#[proc_macro_derive(MessageBody)]
+#[proc_macro_error]
+pub fn derive_message_body(input: TokenStream) -> TokenStream {
+    let DeriveInput { ident, data, .. } = parse_macro_input!(input);
+
+    match message_body::derive_message_body(ident, data) {
+        Ok(ts) => ts,
+        Err(e) => e.abort(),
+    }
+}
 
 ///
 /// A macro for generating module specific code based on static
