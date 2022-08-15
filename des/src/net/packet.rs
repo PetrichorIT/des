@@ -7,15 +7,15 @@ use crate::net::{
 };
 use crate::time::SimTime;
 
-cfg_net_v6! {
+cfg_net_std! {
     /// A address of a node in a IPv6 network.
-    pub type NodeAddress = u128;
+    pub type NodeAddress = std::net::IpAddr;
 
     /// The broadcast address in a IPv6 network.
-    pub const NODE_ADDR_BROADCAST: NodeAddress = u128::MAX;
+    pub const NODE_ADDR_BROADCAST: NodeAddress = std::net::IpAddr::V4(std::net::Ipv4Addr::BROADCAST);
 
     /// The loopback address in a IPv6 network.
-    pub const NODE_ADDR_LOOPBACK: NodeAddress = 0xfe80;
+    pub const NODE_ADDR_LOOPBACK: NodeAddress = std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST);
 
     ///
     /// A application-addressed header in a network, similar to TCP/UDP.
@@ -100,8 +100,8 @@ cfg_net_v6! {
         fn default() -> Self {
             Self {
                 // # IPv4 header
-                src_node: 0,
-                dest_node: 0,
+                src_node: std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED),
+                dest_node: std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED),
 
                 version: 4,
                 traffic_class: 0,
@@ -134,13 +134,13 @@ cfg_net_v6! {
                 urgent_ptr: 0,
 
                 hop_count: 0,
-                last_node: 0,
+                last_node: std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED),
             }
         }
     }
 }
 
-cfg_net_v4! {
+cfg_net_default! {
     /// A address of a node in a IPv4 network.
     pub type NodeAddress = u32;
 

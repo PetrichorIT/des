@@ -30,14 +30,14 @@ echo "[des] net + metrics"
 cargo build -p des --features net --features metrics
 echo "[des] net + cqueue + metrics"
 cargo build -p des --features net --features cqueue --features metrics
-echo "[des] net6"
-cargo build -p des --features net --features net-ipv6
-echo "[des] net6 + cqueue"
-cargo build -p des --features net --features net-ipv6 --features cqueue
-echo "[des] net6 + metrics"
-cargo build -p des --features net --features net-ipv6 --features metrics
-echo "[des] net6 + cqueue + metrics"
-cargo build -p des --features net --features net-ipv6 --features cqueue --features metrics
+echo "[des] net-std"
+cargo build -p des --features net --features std-net
+echo "[des] net-std + cqueue"
+cargo build -p des --features net --features std-net --features cqueue
+echo "[des] net-std + metrics"
+cargo build -p des --features net --features std-net --features metrics
+echo "[des] net-std + cqueue + metrics"
+cargo build -p des --features net --features std-net --features cqueue --features metrics
 echo "[des] net + async"
 cargo build -p des --features net --features async
 echo "[des] net + async + cqueue"
@@ -46,14 +46,14 @@ echo "[des] net + async + metrics"
 cargo build -p des --features net --features metrics --features async
 echo "[des] net + async + cqueue + metrics"
 cargo build -p des --features net --features cqueue --features metrics --features async
-echo "[des] net6 + async"
-cargo build -p des --features net --features net-ipv6 --features async
-echo "[des] net6 + async + cqueue"
-cargo build -p des --features net --features net-ipv6 --features cqueue --features async
-echo "[des] net6 + async + metrics"
-cargo build -p des --features net --features net-ipv6 --features metrics --features async
-echo "[des] net6 + async + cqueue + metrics"
-cargo build -p des --features net --features net-ipv6 --features cqueue --features metrics --features async
+echo "[des] net-std + async"
+cargo build -p des --features net --features std-net --features async
+echo "[des] net-std + async + cqueue"
+cargo build -p des --features net --features std-net --features cqueue --features async
+echo "[des] net-std + async + metrics"
+cargo build -p des --features net --features std-net --features metrics --features async
+echo "[des] net-std + async + cqueue + metrics"
+cargo build -p des --features net --features std-net --features cqueue --features metrics --features async
 
 
 # 'tests' build

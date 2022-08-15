@@ -88,7 +88,7 @@
 //! [`child(...)`](crate::net::ModuleCore::child).
 //!
 //! These tools are available in the [`net`](crate::net) module
-//! when the feature `net` or `net-ipv6` is active.
+//! when the feature `net` or `std-net` is active.
 //!
 //! ```toml
 //! des = { version = "*", features = [ "net" ] }
@@ -152,7 +152,7 @@ cfg_async! {
 // | Feature          | Description                                                              |
 // |------------------|--------------------------------------------------------------------------|
 // | net              | Adds a module oriented design-abstraction that provides its own events.  |
-// | net-ipv6         | Configures the net module to use IPv6 addresses.                         |
+// | std-net          | Configures the net module to use [std] addresses.                         |
 // | cqueue           | Configures the runtime to use a calender queue for better performance.   |
 // | metrics | Collects internal metrics about the runtime, to improve parametrization. |
 // | async            | Provides utilites and modifications for simulating asynchronous systems including a full reexport of safe tokio funtions. |

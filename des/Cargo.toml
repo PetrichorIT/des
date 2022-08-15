@@ -27,7 +27,7 @@ async = ["net", "dep:tokio", "dep:async-trait"]
 cqueue = ["dep:num-traits"]
 metrics = []
 net = ["dep:des_macros"]
-net-ipv6 = ["net"]
+std-net = ["net"]
 
 [dependencies]
 # An internal logging impl can be very usefull. 
