@@ -503,7 +503,7 @@ impl<T: MessageBody> MessageBody for &[T] {
     }
 }
 
-impl<K: MessageBody, V: MessageBody> MessageBody for HashMap<K, V> {
+impl<K: MessageBody, V: MessageBody, S> MessageBody for HashMap<K, V, S> {
     fn byte_len(&self) -> usize {
         let mut sum = 0;
         for (k, v) in self.iter() {
@@ -523,7 +523,7 @@ impl<K: MessageBody, V: MessageBody> MessageBody for BTreeMap<K, V> {
     }
 }
 
-impl<T: MessageBody> MessageBody for HashSet<T> {
+impl<T: MessageBody, S> MessageBody for HashSet<T, S> {
     fn byte_len(&self) -> usize {
         let mut sum = 0;
         for v in self.iter() {
