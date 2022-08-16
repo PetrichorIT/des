@@ -31,10 +31,14 @@ pub use self::options::*;
 mod limit;
 pub use self::limit::*;
 
+mod bench;
+pub use bench::*;
+
 pub(crate) mod logger;
 pub use self::logger::*;
 
 pub(crate) const FT_NET: bool = cfg!(feature = "net");
+pub(crate) const FT_STD_NET: bool = cfg!(feature = "std-net");
 pub(crate) const FT_CQUEUE: bool = cfg!(feature = "cqueue");
 pub(crate) const FT_INTERNAL_METRICS: bool = cfg!(feature = "metrics");
 pub(crate) const FT_ASYNC: bool = cfg!(feature = "async");
@@ -123,13 +127,14 @@ where
     pub app: A,
 
     // Rt limits
-    pub(crate) limit: RuntimeLimit,
+    limit: RuntimeLimit,
 
-    pub(crate) event_id: EventId,
-    pub(crate) itr: usize,
+    event_id: EventId,
+    itr: usize,
 
     // Misc
-    pub(crate) quiet: bool,
+    quiet: bool,
+    profiler: Profiler,
 
     future_event_set: FutureEventSet<A>,
 
@@ -309,6 +314,7 @@ where
             }),
 
             quiet: options.quiet,
+            profiler: Profiler::default(),
 
             app,
 
@@ -438,6 +444,8 @@ where
     ///
     #[must_use]
     pub fn run(mut self) -> RuntimeResult<A> {
+        self.profiler.start();
+
         if self.future_event_set.is_empty() {
             warn!("Running simulation without any events. Think about adding some inital events.");
             return RuntimeResult::EmptySimulation { app: self.app };
@@ -458,6 +466,7 @@ where
     pub fn finish(mut self) -> RuntimeResult<A> {
         // Call the fin-handler on the allocated application
         A::at_sim_end(&mut self);
+        self.profiler.finish(self.itr);
 
         if self.future_event_set.is_empty() {
             let time = self.sim_time();
@@ -477,8 +486,8 @@ where
             }
 
             RuntimeResult::Finished {
-                event_count: self.itr,
                 app: self.app,
+                profiler: self.profiler,
                 time,
             }
         } else {
@@ -504,7 +513,7 @@ where
             }
 
             RuntimeResult::PrematureAbort {
-                event_count: self.itr,
+                profiler: self.profiler,
                 active_events: self.future_event_set.len(),
                 app: self.app,
                 time,
@@ -626,8 +635,8 @@ pub enum RuntimeResult<A> {
         app: A,
         /// The time of the final event in the simulation.
         time: SimTime,
-        /// The number of events that were executed.
-        event_count: usize,
+        /// The runtime profile of the simulation
+        profiler: Profiler,
     },
     /// The simulation has not fully deleted its event pool. but a `RuntimeLimit`
     /// has been reached.
@@ -637,10 +646,10 @@ pub enum RuntimeResult<A> {
         app: A,
         /// The time of the last event valid withing the limits of the runtime.
         time: SimTime,
-        /// The number of events executed sofar.
-        event_count: usize,
         /// The size of the current event pool.
         active_events: usize,
+        /// The runtime profile of the simulation
+        profiler: Profiler,
     },
 }
 
@@ -653,9 +662,9 @@ impl<A> RuntimeResult<A> {
     ///
     /// This function panics if self contains another variant that [`PrematureAbort`](Self::PrematureAbort).
     ///
-    pub fn unwrap_premature_abort(self) -> (A, SimTime, usize, usize) {
+    pub fn unwrap_premature_abort(self) -> (A, SimTime, Profiler, usize) {
         match self {
-            Self::PrematureAbort { app, time, event_count, active_events} => (app, time, event_count, active_events),
+            Self::PrematureAbort { app, time,profiler, active_events} => (app, time, profiler, active_events),
             _ => panic!("called `RuntimeResult::unwrap_premature_abort` on a value that is not `PrematureAbort`")
         }
     }
@@ -688,13 +697,13 @@ impl<A> RuntimeResult<A> {
     /// result.unwrap();
     /// # }
     /// ```
-    pub fn unwrap(self) -> (A, SimTime, usize) {
+    pub fn unwrap(self) -> (A, SimTime, Profiler) {
         match self {
             Self::Finished {
                 app,
                 time,
-                event_count,
-            } => (app, time, event_count),
+                profiler,
+            } => (app, time, profiler),
             _ => panic!("called `RuntimeResult::unwrap` on value that is not 'Finished'"),
         }
     }
@@ -706,13 +715,13 @@ impl<A> RuntimeResult<A> {
     /// The argument `default` is eagerly evaulated, for lazy evaluation use
     /// [`unwrap_or_else`](Self::unwrap_or_else).
     ///
-    pub fn unwrap_or(self, default: (A, SimTime, usize)) -> (A, SimTime, usize) {
+    pub fn unwrap_or(self, default: (A, SimTime, Profiler)) -> (A, SimTime, Profiler) {
         match self {
             Self::Finished {
                 app,
                 time,
-                event_count,
-            } => (app, time, event_count),
+                profiler,
+            } => (app, time, profiler),
             _ => default,
         }
     }
@@ -721,16 +730,16 @@ impl<A> RuntimeResult<A> {
     /// Returns the contained [`Finished`](Self::Finished) variant or lazily
     /// computes a fallback value from the given closure.
     ///
-    pub fn unwrap_or_else<F>(self, f: F) -> (A, SimTime, usize)
+    pub fn unwrap_or_else<F>(self, f: F) -> (A, SimTime, Profiler)
     where
-        F: FnOnce() -> (A, SimTime, usize),
+        F: FnOnce() -> (A, SimTime, Profiler),
     {
         match self {
             Self::Finished {
                 app,
                 time,
-                event_count,
-            } => (app, time, event_count),
+                profiler,
+            } => (app, time, profiler),
             _ => f(),
         }
     }
@@ -766,21 +775,21 @@ impl<A> RuntimeResult<A> {
             Self::Finished {
                 app,
                 time,
-                event_count,
+                profiler,
             } => RuntimeResult::Finished {
                 app: f(app),
                 time,
-                event_count,
+                profiler,
             },
             Self::PrematureAbort {
                 app,
                 time,
-                event_count,
+                profiler,
                 active_events,
             } => RuntimeResult::PrematureAbort {
                 app: f(app),
                 time,
-                event_count,
+                profiler,
                 active_events,
             },
         }

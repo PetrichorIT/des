@@ -36,9 +36,13 @@ fn main() {
         rt.handle_message_on(id, msg, arr_time);
     }
 
-    let (_, time, event_count) = rt.run().unwrap();
+    let (_, time, profile) = rt.run().unwrap();
 
     // assert_eq!(tie, 18224.956482853);
     assert_eq_time!(time, 18225.684235387);
-    assert_eq!(event_count, 40_001_301);
+    assert_eq!(profile.event_count, 40_001_301);
+
+    profile
+        .write_to("examples/ndl/bench")
+        .expect("Failed to write bench")
 }

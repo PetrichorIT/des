@@ -107,11 +107,9 @@ fn one_event_runtime() {
 
     let res = rt.run();
     match res {
-        RuntimeResult::Finished {
-            time, event_count, ..
-        } => {
+        RuntimeResult::Finished { time, profiler, .. } => {
             assert_eq!(time, SimTime::from_duration(Duration::new(16, 0)));
-            assert_eq!(event_count, 17);
+            assert_eq!(profiler.event_count, 17);
         }
         _ => panic!("Runtime should have finished"),
     }
@@ -157,10 +155,10 @@ fn ensure_event_order() {
         RuntimeResult::Finished {
             app,
             time: rt_fin_time,
-            event_count,
+            profiler,
         } => {
             assert_eq!(rt_fin_time, time);
-            assert_eq!(event_count, 128);
+            assert_eq!(profiler.event_count, 128);
 
             let mut last_id = 0;
             for (_, event) in app.event_list {

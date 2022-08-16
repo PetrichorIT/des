@@ -78,10 +78,10 @@ fn quasai_sync_non_blocking() {
         RuntimeResult::Finished {
             app,
             time,
-            event_count,
+            profiler,
         } => {
             assert_eq!(time, SimTime::ZERO);
-            assert_eq!(event_count, 11);
+            assert_eq!(profiler.event_count, 11);
 
             let m1 = app
                 .module(|m| dbg!(m.module_core().name()) == "RootModule")
@@ -222,12 +222,12 @@ fn mutiple_active_tasks() {
         RuntimeResult::Finished {
             app,
             time,
-            event_count,
+            profiler,
         } => {
             assert_eq!(time, SimTime::ZERO);
 
             // SimStart + 2 * (Gate + HandleMessage)
-            assert_eq!(event_count, 5);
+            assert_eq!(profiler.event_count, 5);
 
             let m1 = app
                 .module(|m| m.module_core().name() == "RootModule")
@@ -307,11 +307,11 @@ fn one_module_timers() {
         RuntimeResult::Finished {
             app,
             time,
-            event_count,
+            profiler,
         } => {
             assert_eq!(time, 4.0);
 
-            assert_eq!(event_count, 7);
+            assert_eq!(profiler.event_count, 7);
 
             let m1 = app
                 .module(|m| m.module_core().name() == "RootModule")
@@ -361,11 +361,11 @@ fn one_module_delayed_recv() {
         RuntimeResult::Finished {
             app,
             time,
-            event_count,
+            profiler,
         } => {
             assert_eq!(time, 4.0);
 
-            assert_eq!(event_count, 7);
+            assert_eq!(profiler.event_count, 7);
 
             let m1 = app
                 .module(|m| m.module_core().name() == "RootModule")
@@ -440,11 +440,11 @@ fn mutiple_module_delayed_recv() {
         RuntimeResult::Finished {
             app,
             time,
-            event_count,
+            profiler,
         } => {
             assert_eq!(time, 5.0);
 
-            assert_eq!(event_count, 16);
+            assert_eq!(profiler.event_count, 16);
 
             let m1 = app
                 .module(|m| m.module_core().name() == "RootModule")
@@ -557,11 +557,11 @@ fn semaphore_in_waiting_task() {
         RuntimeResult::Finished {
             app,
             time,
-            event_count,
+            profiler,
         } => {
             assert_eq!(time, 3.0);
 
-            assert_eq!(event_count, 11);
+            assert_eq!(profiler.event_count, 11);
 
             let m1 = app
                 .module(|m| m.module_core().name() == "RootModule")

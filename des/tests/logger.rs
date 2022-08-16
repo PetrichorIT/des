@@ -96,10 +96,7 @@ fn module_auto_scopes() {
     rt.create_module(module_b);
 
     let module_c = {
-        let core = ModuleCore::new_with(
-            ObjectPath::root_module("Module C".to_string()),
-            globals,
-        );
+        let core = ModuleCore::new_with(ObjectPath::root_module("Module C".to_string()), globals);
 
         Ptr::new(SomeModule::named(core))
     };
@@ -107,15 +104,13 @@ fn module_auto_scopes() {
 
     let runtime = Runtime::new(rt);
     match runtime.run() {
-        RuntimeResult::Finished {
-            time, event_count, ..
-        } => {
+        RuntimeResult::Finished { time, profiler, .. } => {
             // Event Count
             // 1 SimStart
             // 3 x 1Activity
             // 3 x 1HandleMessage
             // == 7
-            assert_eq!(event_count, 7);
+            assert_eq!(profiler.event_count, 7);
 
             // Time
             // Delay 2s until activity + 2 until handle_message

@@ -192,7 +192,7 @@ fn main() {
 
     rt.add_message_onto(alice_in, msg, 0.0.into());
 
-    let (app, time, event_count) = rt.run().unwrap();
+    let (app, time, p) = rt.run().unwrap();
 
     let _ = app
         .globals_weak()
@@ -200,5 +200,5 @@ fn main() {
         .write_to_svg("examples/inet/graph");
 
     assert_eq_time!(time, 0.200127998);
-    assert_eq!(event_count, 21);
+    assert_eq!(p.event_count, 21);
 }

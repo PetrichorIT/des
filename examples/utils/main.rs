@@ -11,7 +11,7 @@ fn main() {
     let app: NetworkRuntime<A> = A::default().build_rt();
 
     let rt = Runtime::new_with(app, RuntimeOptions::seeded(0x123).quiet());
-    let (app, time, event_count) = rt.run().unwrap();
+    let (app, time, p) = rt.run().unwrap();
 
     let topo = &app.globals_weak().topology;
 
@@ -20,6 +20,6 @@ fn main() {
 
     let _ = topo.write_to_svg("examples/utils/graph");
 
-    assert_eq!(event_count, 94);
+    assert_eq!(p.event_count, 94);
     assert_eq_time!(time, 45.0)
 }

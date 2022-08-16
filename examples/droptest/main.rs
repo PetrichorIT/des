@@ -18,7 +18,7 @@ fn main() {
 
     let rt = Runtime::new_with(app, RuntimeOptions::seeded(0x123));
 
-    let (app, time, event_count) = rt.run().unwrap();
+    let (app, time, p) = rt.run().unwrap();
     let globals = app.globals();
 
     drop(app);
@@ -33,6 +33,6 @@ fn main() {
     // Assume full drop.
     assert_eq!(*MODULE_LEN.lock().unwrap(), 0);
 
-    assert_eq!(event_count, 9);
+    assert_eq!(p.event_count, 9);
     assert_eq_time!(time, 0.285330151)
 }

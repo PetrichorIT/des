@@ -47,8 +47,8 @@ fn main() {
 
     rt.add_message_onto(g4, msg, 1.0.into());
 
-    let (_, time, event_count, _) = rt.run().unwrap_premature_abort();
+    let (_, time, p, _) = rt.run().unwrap_premature_abort();
 
     assert_eq_time!(time, 419.926816);
-    assert_eq!(event_count, 16760);
+    assert_eq!(p.event_count, 16760);
 }
