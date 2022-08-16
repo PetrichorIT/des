@@ -448,13 +448,17 @@ impl<T: MessageBody> MessageBody for Cell<T> {
         // SAFTY: Since this is only used in this place, read only
         // this can be considered safe
         let val = unsafe { &*self.as_ptr() };
-        val.bit_len()
+        val.byte_len()
     }
 }
 
 impl<T: MessageBody> MessageBody for RefCell<T> {
     fn byte_len(&self) -> usize {
-        self.borrow().byte_len()
+        // SAFTY: Since this is only used in this place, read only
+        // this can be considered safe.
+        // This is nessecary to prevent a deadlock via an unknown borrow.
+        let val = unsafe { &*self.as_ptr() };
+        val.byte_len()
     }
 }
 

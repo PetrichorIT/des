@@ -37,7 +37,7 @@ pub fn derive_message_body(ident: Ident, data: Data) -> crate::common::Result<To
 
                 for (i, field) in unnamed_fields.unnamed.into_iter().enumerate() {
                     let ty = field.ty;
-                    let fident = Ident::new(&format!("{}", i), Span2::call_site());
+                    let fident = Index::from(i);
 
                     ts.extend(quote! {
                         <#ty as des::net::MessageBody>::byte_len(&self.#fident) +
@@ -104,7 +104,7 @@ pub fn derive_message_body(ident: Ident, data: Data) -> crate::common::Result<To
                             let ty = field.ty;
                             let fident = Ident::new(&format!("v{}", i), Span2::call_site());
 
-                            pts.extend(quote! {ref #fident,  });
+                            pts.extend(quote! { #fident,  });
                             ts.extend(quote! {
                                 <#ty as des::net::MessageBody>::byte_len(#fident) +
                             });
@@ -115,7 +115,7 @@ pub fn derive_message_body(ident: Ident, data: Data) -> crate::common::Result<To
                     }
                     Fields::Unit => {
                         quote! {
-                            0
+                            #ident::#vident => 0
                         }
                     }
                 };
