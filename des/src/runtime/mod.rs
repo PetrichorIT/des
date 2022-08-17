@@ -137,9 +137,6 @@ where
     profiler: Profiler,
 
     future_event_set: FutureEventSet<A>,
-
-    #[cfg(feature = "metrics")]
-    metrics: PtrMut<crate::stats::RuntimeMetrics>,
 }
 
 impl<A> Runtime<A>
@@ -317,9 +314,6 @@ where
             profiler: Profiler::default(),
 
             app,
-
-            #[cfg(feature = "metrics")]
-            metrics: PtrMut::new(crate::stats::RuntimeMetrics::new()),
         };
 
         macro_rules! symbol {
@@ -366,7 +360,7 @@ where
 
         let node = self.future_event_set.fetch_next(
             #[cfg(feature = "metrics")]
-            PtrMut::clone(&self.metrics),
+            PtrMut::clone(&self.profiler.metrics),
         );
 
         self.itr += 1;
@@ -377,7 +371,7 @@ where
                 time,
                 event,
                 #[cfg(feature = "metrics")]
-                PtrMut::clone(&self.metrics),
+                PtrMut::clone(&self.profiler.metrics),
             );
             return false;
         }
@@ -433,9 +427,9 @@ where
     /// let result = runtime.run();
     ///
     /// match result {
-    ///     RuntimeResult::Finished { time, event_count, .. } => {
+    ///     RuntimeResult::Finished { time, profiler, .. } => {
     ///         assert_eq!(time, SimTime::from(3.0));
-    ///         assert_eq!(event_count, 3);
+    ///         assert_eq!(profiler.event_count, 3);
     ///     },
     ///     _ => panic!("They can't do that! Shoot them or something!")
     /// }
@@ -479,7 +473,7 @@ where
                 #[cfg(feature = "metrics")]
                 {
                     println!("\u{23A2}");
-                    self.metrics.finish()
+                    self.profiler.metrics.finish()
                 }
 
                 println!("\u{23A3}");
@@ -506,7 +500,7 @@ where
                 #[cfg(feature = "metrics")]
                 {
                     println!("\u{23A2}");
-                    self.metrics.finish()
+                    self.profiler.metrics.finish()
                 }
 
                 println!("\u{23A3}");
@@ -551,9 +545,9 @@ where
     ///     runtime.add_event_in(MyEventSet::EventA, Duration::new(12, 0));
     ///
     ///     match runtime.run() {
-    ///         RuntimeResult::Finished { time, event_count, .. } => {
+    ///         RuntimeResult::Finished { time, profiler, .. } => {
     ///             assert_eq!(time, SimTime::from(22.0));
-    ///             assert_eq!(event_count, 1);
+    ///             assert_eq!(profiler.event_count, 1);
     ///         },
     ///         _ => panic!("They can't do that! Shoot them or something!")
     ///     }
@@ -595,9 +589,9 @@ where
     ///     runtime.add_event(MyEventSet::EventA, SimTime::from(12.0));
     ///
     ///     match runtime.run() {
-    ///         RuntimeResult::Finished { time, event_count, .. } => {
+    ///         RuntimeResult::Finished { time, profiler, .. } => {
     ///             assert_eq!(time, SimTime::from(12.0)); // 12 not 10+12 = 22
-    ///             assert_eq!(event_count, 1);
+    ///             assert_eq!(profiler.event_count, 1);
     ///         },
     ///         _ => panic!("They can't do that! Shoot them or something!")
     ///     }
@@ -609,7 +603,7 @@ where
             time,
             event,
             #[cfg(feature = "metrics")]
-            PtrMut::clone(&self.metrics),
+            PtrMut::clone(&self.profiler.metrics),
         );
     }
 }
@@ -680,11 +674,13 @@ impl<A> RuntimeResult<A> {
     ///
     /// ```
     /// # use des::prelude::*;
+    /// # use des::runtime::Profiler;
     /// # #[derive(Debug, PartialEq, Eq)]
     /// # struct MyApp;
     /// # fn main() {
-    /// let result = RuntimeResult::Finished { app: MyApp, time: 1.0.into(), event_count: 1 };
-    /// assert_eq!(result.unwrap(), (MyApp, SimTime::from(1.0), 1));
+    /// let p = Profiler::default();
+    /// let result = RuntimeResult::Finished { app: MyApp, time: 1.0.into(), profiler: p.clone() };
+    /// assert_eq!(result.unwrap(), (MyApp, SimTime::from(1.0), p));
     /// # }
     /// ```
     ///

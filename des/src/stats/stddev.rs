@@ -135,6 +135,8 @@ impl Display for StdDev {
     }
 }
 
+impl Eq for StdDev {}
+
 ///
 /// The type to collect a accumulated value, provinding
 /// standartised metrics like e.g. standart derivation.
@@ -264,3 +266,5 @@ impl Display for CompressedStdDev {
         )
     }
 }
+
+impl Eq for CompressedStdDev {}

@@ -33,6 +33,10 @@ pub struct Profiler {
     pub event_count: usize,
     /// The active features.
     pub features: Vec<String>,
+
+    /// Internal metrics
+    #[cfg(feature = "metrics")]
+    pub metrics: crate::util::PtrMut<crate::stats::RuntimeMetrics>,
 }
 
 impl Profiler {
@@ -135,7 +139,7 @@ impl Default for Profiler {
             features.push("async".into());
         }
         if FT_INTERNAL_METRICS {
-            features.push("internal-metrics".into());
+            features.push("metrics".into());
         }
 
         Self {
@@ -151,6 +155,9 @@ impl Default for Profiler {
 
             event_count: 0,
             features,
+
+            #[cfg(feature = "metrics")]
+            metrics: crate::util::PtrMut::new(crate::stats::RuntimeMetrics::new()),
         }
     }
 }
