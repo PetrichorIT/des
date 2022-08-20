@@ -1,3 +1,5 @@
+use std::io::Write;
+
 cfg_not_cqueue! {
     /// Metrics that sample the runtime
     pub type RuntimeMetrics = OptimizedBinaryHeapMetrics;
@@ -28,6 +30,21 @@ cfg_not_cqueue! {
                 zero_event_count: 0,
                 non_zero_event_count: 0,
             }
+        }
+
+        pub(crate) fn write_to(&self, f: &mut impl Write) -> std::io::Result<()> {
+            writeln!(f, "\theap_size: {}", self.heap_size)?;
+            writeln!(f,
+                "\tevent_timespan: {}",
+                self.non_zero_event_wait_time
+            )?;
+            writeln!(f, "\tinstant_event_prec: {}", self.zero_event_prec)?;
+
+            let total = self.zero_event_count + self.non_zero_event_count;
+            let perc = self.non_zero_event_count as f64 / total as f64;
+            writeln!(f, "\ttinstant_event_prec: {}", perc)?;
+
+            Ok(())
         }
 
         pub(crate) fn finish(&mut self) {
@@ -80,6 +97,23 @@ cfg_cqueue! {
                 zero_event_count: 0,
                 nonzero_event_count: 0,
             }
+        }
+
+        pub(crate) fn write_to(&self, f: &mut impl Write) -> std::io::Result<()> {
+
+            writeln!(f, "\tinstant_queue_size: {}", self.zero_queue_size)?;
+            writeln!(f, "\tbucket_queue_size: {}", self.bucket_queue_size)?;
+
+            writeln!(f,
+                "\tevent_timespan: {}",
+                self.non_zero_event_wait_time
+            )?;
+
+            let total = self.zero_event_count + self.nonzero_event_count;
+            let perc = self.nonzero_event_count as f64 / total as f64;
+            writeln!(f, "\tinstant_event_prec: {}", perc)?;
+
+            Ok(())
         }
 
         pub(crate) fn finish(&mut self) {

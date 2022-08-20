@@ -88,13 +88,26 @@ impl Profiler {
         self.env.write_to(&mut f)?;
         writeln!(f)?;
 
+        #[cfg(feature = "metrics")]
+        {
+            self.metrics.write_to(&mut f)?;
+            writeln!(f)?;
+        }
+
+        let throughput = self.event_count as f64 / self.duration.as_secs_f64();
+
         writeln!(
             f,
-            "\t{} events with features <{}>",
+            "\t{} ({} events/s) events ",
             self.event_count,
-            self.features.join(", ")
+            throughput.floor() as usize
         )?;
-        writeln!(f, "\tin {:?}", self.duration)?;
+        writeln!(
+            f,
+            "\twith features <{}> in {:?}",
+            self.features.join(", "),
+            self.duration
+        )?;
         writeln!(f, "}}")?;
 
         Ok(())
