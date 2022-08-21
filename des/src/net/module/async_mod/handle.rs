@@ -60,6 +60,17 @@ pub struct SenderHandle {
 }
 
 impl SenderHandle {
+    /// Creates a new handle that points to no module.
+    /// Only fo debuhhing
+    pub fn empty() -> Self {
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+        drop(rx);
+        Self {
+            inner: tx,
+            time_offset: Duration::ZERO,
+        }
+    }
+
     ///
     /// Adds the duration to the processing time offset.
     /// All messages send after this time will be delayed by the
