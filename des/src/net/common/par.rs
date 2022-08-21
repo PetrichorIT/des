@@ -135,7 +135,10 @@ where
                 _phantom: PhantomData,
             }
         } else {
-            panic!("Unwraped par handle that did point to data")
+            panic!(
+                "Unwraped par handle that did not point to data: {} / {}",
+                self.path, self.key
+            )
         }
     }
 

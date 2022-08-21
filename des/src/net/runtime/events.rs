@@ -68,11 +68,11 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
                     let rng_ref = rng();
 
                     if channel.is_busy() {
-                        info!(
-                            "Gate '{}' dropping message [{}] pushed onto busy channel #{:?}",
+                        log::warn!(
+                            "Gate '{}' dropping message [{}] pushed onto busy channel {}",
                             current_gate.name(),
                             message.str(),
-                            channel
+                            channel.path()
                         );
 
                         // Register message progress (DROP)

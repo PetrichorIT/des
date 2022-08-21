@@ -219,11 +219,11 @@ pub fn compose(
 
             // Gurantee that count(from) <= count(to)
             // This allows partial targeting of later gates.
-            if from_idents.len() != to_idents.len() {
+            if from_idents.len() > to_idents.len() {
                 errors.push(Error::new(
                     DsgConGateSizedToNotMatch,
                     format!(
-                        "Connection gate cluster sizes do not match ({}*{} != {}*{}).",
+                        "Connection gate cluster sizes do not match ({}*{} > {}*{}).",
                         f_nodes_len, f_gate_size, t_nodes_len, t_gate_size
                     ),
                     *loc,

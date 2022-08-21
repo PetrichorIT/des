@@ -182,7 +182,7 @@ fn dsg1_gate_size_missmatch() {
     check_err!(
         *errs[0] =>
         DsgConGateSizedToNotMatch,
-        "Connection gate cluster sizes do not match (1*5 != 1*1).",
+        "Connection gate cluster sizes do not match (1*5 > 1*1).",
         false
     );
 }
