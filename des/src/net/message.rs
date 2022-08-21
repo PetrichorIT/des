@@ -557,6 +557,51 @@ impl<T: MessageBody> MessageBody for BinaryHeap<T> {
     }
 }
 
+// # std::net
+use std::net;
+
+impl MessageBody for net::Ipv4Addr {
+    fn byte_len(&self) -> usize {
+        4
+    }
+}
+
+impl MessageBody for net::Ipv6Addr {
+    fn byte_len(&self) -> usize {
+        16
+    }
+}
+
+impl MessageBody for net::IpAddr {
+    fn byte_len(&self) -> usize {
+        match self {
+            Self::V4(v4) => v4.byte_len(),
+            Self::V6(v6) => v6.byte_len(),
+        }
+    }
+}
+
+impl MessageBody for net::SocketAddrV4 {
+    fn byte_len(&self) -> usize {
+        4 + 2
+    }
+}
+
+impl MessageBody for net::SocketAddrV6 {
+    fn byte_len(&self) -> usize {
+        16 + 2
+    }
+}
+
+impl MessageBody for net::SocketAddr {
+    fn byte_len(&self) -> usize {
+        match self {
+            Self::V4(v4) => v4.byte_len(),
+            Self::V6(v6) => v6.byte_len(),
+        }
+    }
+}
+
 // # Tuples
 
 impl<A, B> MessageBody for (A, B)
