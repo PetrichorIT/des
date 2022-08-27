@@ -10,6 +10,10 @@ pub(crate) mod ext;
 use ext::WaitingMessage;
 
 pub(crate) const RT_TIME_WAKEUP: MessageKind = 42;
+pub(crate) const RT_UDP: MessageKind = 43;
+pub(crate) const RT_TCP_CONNECT: MessageKind = 44;
+pub(crate) const RT_TCP_CONNECT_TIMEOUT: MessageKind = 45;
+pub(crate) const RT_TCP_PACKET: MessageKind = 46;
 
 ///
 /// A set of user defined functions for customizing the behaviour
@@ -159,32 +163,96 @@ where
     fn handle_message(&mut self, msg: Message) {
         // (1) Fetch the runtime and initial the time context.
         let rt = Arc::clone(&self.globals().runtime);
-        let guard = rt.enter_time_context(self.async_ext.time_context.take().unwrap());
+        let guard = rt.enter_context(self.async_ext.ctx.take().unwrap());
 
         // (2) Poll time time events before excuting
         rt.poll_time_events();
-        if msg.meta().kind != RT_TIME_WAKEUP {
-            self.async_ext
-                .wait_queue_tx
-                .send(WaitingMessage {
-                    msg,
-                    time: SimTime::now(),
-                })
-                .expect("Failed to send to unbounded channel");
+
+        match msg.meta().kind {
+            RT_TIME_WAKEUP => {}
+            RT_UDP => {
+                use tokio::sim::net::UdpMessage;
+                let (msg, _) = msg.cast::<UdpMessage>();
+
+                rt.process_udp(msg);
+            }
+            RT_TCP_CONNECT => {
+                use tokio::sim::net::TcpConnectMessage;
+                let (msg, _) = msg.cast::<TcpConnectMessage>();
+
+                rt.process_tcp_connect(msg);
+            }
+            RT_TCP_CONNECT_TIMEOUT => {
+                use tokio::sim::net::TcpConnectMessage;
+                let (msg, _) = msg.cast::<TcpConnectMessage>();
+
+                rt.process_tcp_connect_timeout(msg);
+            }
+            RT_TCP_PACKET => {
+                use tokio::sim::net::TcpMessage;
+                let (msg, _) = msg.cast::<TcpMessage>();
+
+                rt.process_tcp_packet(msg);
+            }
+            _ => {
+                self.async_ext
+                    .wait_queue_tx
+                    .send(WaitingMessage {
+                        msg,
+                        time: SimTime::now(),
+                    })
+                    .expect("Failed to send to unbounded channel");
+            }
         }
+
         rt.poll_until_idle();
 
         if let Some(next_time) = rt.next_time_poll() {
             self.schedule_at(Message::new().kind(RT_TIME_WAKEUP).build(), next_time);
         }
 
+        for intent in rt.yield_intents() {
+            use tokio::sim::net::IOIntent;
+            match intent {
+                IOIntent::UdpSendPacket(pkt) => {
+                    log::info!("Sending captured UDP packet: {:?}", pkt);
+                    self.send(Message::new().kind(RT_UDP).content(pkt).build(), "out");
+                }
+                IOIntent::TcpConnect(pkt) => {
+                    log::info!("Sending captured TCP connect: {:?}", pkt);
+                    self.send(
+                        Message::new().kind(RT_TCP_CONNECT).content(pkt).build(),
+                        "out",
+                    )
+                }
+                IOIntent::TcpConnectTimeout(pkt, timeout) => {
+                    log::info!("Scheduling TCP Connect Timeout: {:?} in {:?}", pkt, timeout);
+                    self.schedule_in(
+                        Message::new()
+                            .kind(RT_TCP_CONNECT_TIMEOUT)
+                            .content(pkt)
+                            .build(),
+                        timeout,
+                    )
+                }
+                IOIntent::TcpSendPacket(pkt) => {
+                    log::info!("Sending captured TCP packet: {:?}", pkt);
+                    self.send(
+                        Message::new().kind(RT_TCP_PACKET).content(pkt).build(),
+                        "out",
+                    )
+                }
+                _ => {}
+            }
+        }
+
         // (1) Suspend the time context
-        self.async_ext.time_context = Some(guard.leave());
+        self.async_ext.ctx = Some(guard.leave());
     }
 
     fn activity(&mut self) {
         let rt = Arc::clone(&self.globals().runtime);
-        let guard = rt.enter_time_context(self.async_ext.time_context.take().unwrap());
+        let guard = rt.enter_context(self.async_ext.ctx.take().unwrap());
 
         rt.poll_time_events();
         {
@@ -200,14 +268,49 @@ where
             self.schedule_at(Message::new().kind(RT_TIME_WAKEUP).build(), next_time);
         }
 
-        self.async_ext.time_context = Some(guard.leave());
+        for intent in rt.yield_intents() {
+            use tokio::sim::net::IOIntent;
+            match intent {
+                IOIntent::UdpSendPacket(pkt) => {
+                    log::info!("Sending captured UDP packet: {:?}", pkt);
+                    self.send(Message::new().kind(RT_UDP).content(pkt).build(), "out");
+                }
+                IOIntent::TcpConnect(pkt) => {
+                    log::info!("Sending captured TCP connect: {:?}", pkt);
+                    self.send(
+                        Message::new().kind(RT_TCP_CONNECT).content(pkt).build(),
+                        "out",
+                    )
+                }
+                IOIntent::TcpConnectTimeout(pkt, timeout) => {
+                    log::info!("Scheduling TCP Connect Timeout: {:?} in {:?}", pkt, timeout);
+                    self.schedule_in(
+                        Message::new()
+                            .kind(RT_TCP_CONNECT_TIMEOUT)
+                            .content(pkt)
+                            .build(),
+                        timeout,
+                    )
+                }
+                IOIntent::TcpSendPacket(pkt) => {
+                    log::info!("Sending captured TCP packet: {:?}", pkt);
+                    self.send(
+                        Message::new().kind(RT_TCP_PACKET).content(pkt).build(),
+                        "out",
+                    )
+                }
+                _ => {}
+            }
+        }
+
+        self.async_ext.ctx = Some(guard.leave());
     }
 
     fn at_sim_start(&mut self, stage: usize) {
         // time is 0
 
         let rt = Arc::clone(&self.globals().runtime);
-        let guard = rt.enter_time_context(self.async_ext.time_context.take().unwrap());
+        let guard = rt.enter_context(self.async_ext.ctx.take().unwrap());
         rt.poll_time_events();
         {
             // # Setup message receive handle.
@@ -276,15 +379,50 @@ where
         rt.poll_until_idle();
 
         if let Some(next_time) = rt.next_time_poll() {
+            log::warn!("Sending wakeup for  {}", next_time);
             self.schedule_at(Message::new().kind(RT_TIME_WAKEUP).build(), next_time);
         }
+        for intent in rt.yield_intents() {
+            use tokio::sim::net::IOIntent;
+            match intent {
+                IOIntent::UdpSendPacket(pkt) => {
+                    log::info!("Sending captured UDP packet: {:?}", pkt);
+                    self.send(Message::new().kind(RT_UDP).content(pkt).build(), "out");
+                }
+                IOIntent::TcpConnect(pkt) => {
+                    log::info!("Sending captured TCP connect: {:?}", pkt);
+                    self.send(
+                        Message::new().kind(RT_TCP_CONNECT).content(pkt).build(),
+                        "out",
+                    )
+                }
+                IOIntent::TcpConnectTimeout(pkt, timeout) => {
+                    log::info!("Scheduling TCP Connect Timeout: {:?} in {:?}", pkt, timeout);
+                    self.schedule_in(
+                        Message::new()
+                            .kind(RT_TCP_CONNECT_TIMEOUT)
+                            .content(pkt)
+                            .build(),
+                        timeout,
+                    )
+                }
+                IOIntent::TcpSendPacket(pkt) => {
+                    log::info!("Sending captured TCP packet: {:?}", pkt);
+                    self.send(
+                        Message::new().kind(RT_TCP_PACKET).content(pkt).build(),
+                        "out",
+                    )
+                }
+                _ => {}
+            }
+        }
 
-        self.async_ext.time_context = Some(guard.leave());
+        self.async_ext.ctx = Some(guard.leave());
     }
 
     fn finish_sim_start(&mut self) {
         let rt = Arc::clone(&self.globals().runtime);
-        let guard = rt.enter_time_context(self.async_ext.time_context.take().unwrap());
+        let guard = rt.enter_context(self.async_ext.ctx.take().unwrap());
 
         rt.poll_time_events();
         {
@@ -303,13 +441,47 @@ where
         if let Some(next_time) = rt.next_time_poll() {
             self.schedule_at(Message::new().kind(RT_TIME_WAKEUP).build(), next_time);
         }
+        for intent in rt.yield_intents() {
+            use tokio::sim::net::IOIntent;
+            match intent {
+                IOIntent::UdpSendPacket(pkt) => {
+                    log::info!("Sending captured UDP packet: {:?}", pkt);
+                    self.send(Message::new().kind(RT_UDP).content(pkt).build(), "out");
+                }
+                IOIntent::TcpConnect(pkt) => {
+                    log::info!("Sending captured TCP connect: {:?}", pkt);
+                    self.send(
+                        Message::new().kind(RT_TCP_CONNECT).content(pkt).build(),
+                        "out",
+                    )
+                }
+                IOIntent::TcpConnectTimeout(pkt, timeout) => {
+                    log::info!("Scheduling TCP Connect Timeout: {:?} in {:?}", pkt, timeout);
+                    self.schedule_in(
+                        Message::new()
+                            .kind(RT_TCP_CONNECT_TIMEOUT)
+                            .content(pkt)
+                            .build(),
+                        timeout,
+                    )
+                }
+                IOIntent::TcpSendPacket(pkt) => {
+                    log::info!("Sending captured TCP packet: {:?}", pkt);
+                    self.send(
+                        Message::new().kind(RT_TCP_PACKET).content(pkt).build(),
+                        "out",
+                    )
+                }
+                _ => {}
+            }
+        }
 
-        self.async_ext.time_context = Some(guard.leave());
+        self.async_ext.ctx = Some(guard.leave());
     }
 
     fn at_sim_end(&mut self) {
         let rt = Arc::clone(&self.globals().runtime);
-        let guard = rt.enter_time_context(self.async_ext.time_context.take().unwrap());
+        let guard = rt.enter_context(self.async_ext.ctx.take().unwrap());
         rt.poll_time_events();
         {
             // SAFTEY:
@@ -324,12 +496,12 @@ where
 
         // No time event enqueue needed, wont be resolved either way
 
-        self.async_ext.time_context = Some(guard.leave());
+        self.async_ext.ctx = Some(guard.leave());
     }
 
     fn finish_sim_end(&mut self) {
         let rt = Arc::clone(&self.globals().runtime);
-        let guard = rt.enter_time_context(self.async_ext.time_context.take().unwrap());
+        let guard = rt.enter_context(self.async_ext.ctx.take().unwrap());
         rt.poll_time_events();
         rt.poll_until_idle();
 
@@ -339,7 +511,7 @@ where
 
         // No time event enqueue needed, wont be resolved either way
 
-        self.async_ext.time_context = Some(guard.leave());
+        self.async_ext.ctx = Some(guard.leave());
     }
 
     fn num_sim_start_stages(&self) -> usize {

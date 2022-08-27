@@ -1,10 +1,15 @@
 use crate::{net::Message, time::SimTime};
-use tokio::{sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel}, task::JoinHandle, time::TimeContext};
+use tokio::{
+    sim::ctx::SimContext,
+    sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
+    task::JoinHandle,
+};
 
 pub(crate) struct AsyncCoreExt {
     pub(crate) buffers: UnboundedReceiver<super::BufferEvent>,
     pub(crate) handle: UnboundedSender<super::BufferEvent>,
-    pub(crate) time_context: Option<TimeContext>,
+
+    pub(crate) ctx: Option<SimContext>,
 
     pub(crate) wait_queue_tx: UnboundedSender<WaitingMessage>,
     pub(crate) wait_queue_rx: Option<UnboundedReceiver<WaitingMessage>>,
@@ -27,7 +32,7 @@ impl AsyncCoreExt {
             buffers: rx,
             handle: tx,
 
-            time_context: Some(TimeContext::new(ident)),
+            ctx: Some(SimContext::empty().with_io().with_time(ident)),
 
             wait_queue_tx: wtx,
             wait_queue_rx: Some(wrx),

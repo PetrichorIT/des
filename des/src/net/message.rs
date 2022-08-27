@@ -602,6 +602,20 @@ impl MessageBody for net::SocketAddr {
     }
 }
 
+// # Time
+
+impl MessageBody for crate::time::Duration {
+    fn byte_len(&self) -> usize {
+        16
+    }
+}
+
+impl MessageBody for crate::time::SimTime {
+    fn byte_len(&self) -> usize {
+        16
+    }
+}
+
 // # Tuples
 
 impl<A, B> MessageBody for (A, B)
@@ -674,6 +688,27 @@ where
 }
 
 // # Custom
+
+cfg_async! {
+    impl MessageBody for tokio::sim::net::UdpMessage {
+        fn byte_len(&self) -> usize {
+            // TODO
+            self.content.len() + 16
+        }
+    }
+
+    impl MessageBody for tokio::sim::net::TcpConnectMessage {
+        fn byte_len(&self) -> usize {
+            16
+        }
+    }
+
+    impl MessageBody for tokio::sim::net::TcpMessage {
+        fn byte_len(&self) -> usize {
+            16 + self.content.len()
+        }
+    }
+}
 
 ///
 /// A message body that does mimics a custom size
