@@ -23,7 +23,7 @@ default = []
 # Include everything used for default test runs.
 full = ["net", "cqueue", "async"]
 
-async = ["net", "dep:tokio", "dep:async-trait"]
+async = ["net", "std-net", "dep:tokio", "dep:async-trait"]
 cqueue = ["dep:num-traits"]
 metrics = []
 net = ["dep:des_macros"]

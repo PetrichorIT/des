@@ -88,6 +88,7 @@ pub struct ScopedLogger {
     stdout_policy: Box<dyn Fn(&str) -> bool>,
     stderr_policy: Box<dyn Fn(&str) -> bool>,
     interal_max_level: LevelFilter,
+    ignore_custom_target: bool,
 }
 
 #[allow(unused)]
@@ -103,6 +104,7 @@ impl ScopedLogger {
             stderr_policy: Box::new(|_| true),
 
             interal_max_level: LevelFilter::Trace,
+            ignore_custom_target: false,
         }
     }
 
@@ -117,6 +119,7 @@ impl ScopedLogger {
             stderr_policy: Box::new(|_| false),
 
             interal_max_level: LevelFilter::Trace,
+            ignore_custom_target: false,
         }
     }
 
@@ -169,6 +172,12 @@ impl ScopedLogger {
     #[must_use]
     pub fn interal_max_log_level(mut self, level: LevelFilter) -> Self {
         self.interal_max_level = level;
+        self
+    }
+
+    /// Sets the logger to ignore arguments for custom log targets
+    pub fn ignore_custom_target(mut self, ingore: bool) -> Self {
+        self.ignore_custom_target = ingore;
         self
     }
 
@@ -247,9 +256,9 @@ impl Log for ScopedLogger {
         let scopes = unsafe { &mut *self.scopes.get() };
 
         let target_is_module_path = Some(record.metadata().target()) == record.module_path();
-        let target = if target_is_module_path {
+        let (target, appendix) = if target_is_module_path {
             if let Some(v) = CURRENT_SCOPE.with(|c| c.borrow().clone()) {
-                v
+                (v, String::new())
             } else {
                 let policy = match record.level() {
                     Level::Error | Level::Warn => &self.stderr_policy,
@@ -275,12 +284,20 @@ impl Log for ScopedLogger {
                 return;
             }
         } else {
-            record.target().to_string()
+            if self.ignore_custom_target {
+                if let Some(v) = CURRENT_SCOPE.with(|c| c.borrow().clone()) {
+                    (v, format!("{}: ", record.target().to_string()))
+                } else {
+                    (record.target().to_string(), String::new())
+                }
+            } else {
+                (record.target().to_string(), String::new())
+            }
         };
 
         let scope = scopes.get_mut(&target);
         if let Some(scope) = scope {
-            let text = format!("{}", record.args());
+            let text = format!("{}{}", appendix, record.args());
             scope.log(text, record.level());
         } else {
             // TODO: Check target validity
@@ -294,7 +311,7 @@ impl Log for ScopedLogger {
                 fwd_stderr: stderr(record.target()),
             };
 
-            new_scope.log(format!("{}", record.args()), record.level());
+            new_scope.log(format!("{}{}", appendix, record.args()), record.level());
 
             let scopes = unsafe { &mut *self.scopes.get() };
             scopes.insert(target, new_scope);

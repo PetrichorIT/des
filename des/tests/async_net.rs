@@ -350,7 +350,7 @@ impl AsyncModule for TcpFullPong {
 
             sock.write_all(b"Hello World").await.unwrap();
             // Sleep is nessecary to prevent over-busy channels
-            tokio::sim::time::sleep(Duration::from_millis(500)).await;
+            tokio::sim::time::sleep(Duration::from_millis(900)).await;
             sock.write_all(b"AA").await.unwrap();
         }));
     }
@@ -401,14 +401,15 @@ struct TcpFullRouter {}
 impl Module for TcpFullRouter {
     fn handle_message(&mut self, msg: Message) {
         if msg.meta().kind == 44 {
+            let msg = msg.as_packet();
             let (pkt, _) = msg.cast::<tokio::sim::net::TcpConnectMessage>();
             let dest = pkt.dest();
             match dest.ip() {
                 IpAddr::V4(ip) if ip == Ipv4Addr::new(192, 168, 2, 110) => {
-                    self.send(Message::new().kind(44).content(pkt).build(), "out1")
+                    self.send(Packet::new().kind(44).content(pkt).build(), "out1")
                 }
                 IpAddr::V4(ip) if ip == Ipv4Addr::new(192, 168, 2, 112) => {
-                    self.send(Message::new().kind(44).content(pkt).build(), "out2")
+                    self.send(Packet::new().kind(44).content(pkt).build(), "out2")
                 }
                 _ => unreachable!(),
             }
@@ -427,7 +428,10 @@ Pang - Client
 #[test]
 #[serial]
 fn tcp_full_test() {
-    // ScopedLogger::new().finish().unwrap();
+    // ScopedLogger::new()
+    //     // .interal_max_log_level(log::LevelFilter::Warn)
+    //     .finish()
+    //     .unwrap();
 
     let mut rt = NetworkRuntime::new(());
     let mut ping = TcpFullPing::named_root(ModuleCore::new_with(

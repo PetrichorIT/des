@@ -338,6 +338,76 @@ impl Packet {
         PacketBuilder::new()
     }
 
+    // ' INSERT BEGIN
+
+    ///
+    /// Consumes the message casting the stored ptr
+    /// into a Box of type T.
+    ///
+    /// ## Safety
+    ///
+    /// The caller must ensure that the stored data is a valid instance
+    /// of type T. If this cannot be guarnteed this is UB.
+    /// Note that DES guarntees that the data refernced by ptr will not
+    /// be freed until this function is called, and ownership is thereby moved..
+    ///
+    #[must_use]
+    pub fn try_cast<T: 'static + MessageBody + Send>(self) -> Option<(T, PacketHeader)> {
+        // SAFTY:
+        // Since T is 'Send' this is safe within the bounds of Messages safty contract
+        unsafe { self.try_cast_unsafe::<T>() }
+    }
+
+    ///
+    /// Performs a [`try_cast`] unwraping the result.
+    ///
+    #[must_use]
+    pub fn cast<T: 'static + MessageBody + Send>(self) -> (T, PacketHeader) {
+        self.try_cast().expect("Could not cast to type T")
+    }
+
+    ///
+    /// Consumes the message casting the stored ptr
+    /// into a Box of type T.
+    ///
+    /// ## Safety
+    ///
+    /// The caller must ensure that the stored data is a valid instance
+    /// of type T. If this cannot be guarnteed this is UB.
+    /// Note that DES guarntees that the data refernced by ptr will not
+    /// be freed until this function is called, and ownership is thereby moved..
+    /// Note that this function allows T to be !Send. Be aware of safty problems arriving
+    /// from this.
+    ///
+    #[must_use]
+    pub unsafe fn try_cast_unsafe<T: 'static + MessageBody>(self) -> Option<(T, PacketHeader)> {
+        let Packet {
+            header, content, ..
+        } = self;
+        let content = content?;
+        let content = match content.downcast::<T>() {
+            Ok(c) => c,
+            Err(_) => return None,
+        };
+
+        let content = Box::into_inner(content);
+
+        Some((content, header))
+    }
+
+    ///
+    /// Performs a [`try_cast_unsafe`] unwraping the result.
+    ///
+    /// # Safety
+    ///
+    /// See [`try_cast_unsafe`]
+    #[must_use]
+    pub unsafe fn cast_unsafe<T: 'static + MessageBody>(self) -> (T, PacketHeader) {
+        self.try_cast_unsafe().expect("Could not cast to type T")
+    }
+
+    // ' INSERT END
+
     ///
     /// Trys to return the content by reference casted to the given type T.
     /// Returns [None] if the no content exists or the content is not of type T.
@@ -453,6 +523,15 @@ impl PacketBuilder {
     pub fn dest(mut self, dest_node: NodeAddress, dest_port: PortAddress) -> Self {
         self.header.dest_node = dest_node;
         self.header.dest_port = dest_port;
+        self
+    }
+
+    /// Sets the field `dest_node` and `dest_port`
+    #[must_use]
+    #[cfg(feature = "std-net")]
+    pub fn dest_addr(mut self, dest: std::net::SocketAddr) -> Self {
+        self.header.dest_node = dest.ip();
+        self.header.dest_port = dest.port();
         self
     }
 

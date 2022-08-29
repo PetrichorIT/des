@@ -47,8 +47,8 @@ impl Module for Bob {
                 self.send(
                     Packet::new()
                         .kind(1)
-                        .src(0x7f_00_00_01, 80)
-                        .dest(0x7f_00_00_02, 80)
+                        // .src(0x7f_00_00_01, 80)
+                        // .dest(0x7f_00_00_02, 80)
                         .content("Ping".to_string())
                         .build(),
                     ("netOut", 2),

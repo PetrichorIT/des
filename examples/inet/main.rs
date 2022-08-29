@@ -1,3 +1,5 @@
+use std::net::{IpAddr, Ipv4Addr};
+
 use des::{assert_eq_time, prelude::*};
 use network_node::NetworkNode;
 use network_stack::NetworkStack;
@@ -25,7 +27,7 @@ fn main() {
     let mut node_alice = PtrMut::new(NetworkNode::named("Alice", app.globals_weak()));
     let mut stack_alice = NetworkStack::new(
         "Alice.NetworkStack",
-        0x00_00_00_ff,
+        IpAddr::V4(Ipv4Addr::new(127, 0, 0, 120)),
         RandomRoutingDeamon::new(app.globals_weak()),
     );
     node_alice.add_child(&mut stack_alice);
@@ -56,7 +58,7 @@ fn main() {
     let mut node_bob = PtrMut::new(NetworkNode::named("Bob", app.globals_weak()));
     let mut stack_bob = NetworkStack::new(
         "Bob.NetworkStack",
-        0x00_00_00_ee,
+        IpAddr::V4(Ipv4Addr::new(127, 0, 0, 100)),
         RandomRoutingDeamon::new(app.globals_weak()),
     );
 
@@ -89,7 +91,7 @@ fn main() {
     let mut node_eve = PtrMut::new(NetworkNode::named("Eve", app.globals_weak()));
     let mut stack_eve = NetworkStack::new(
         "Eve.NetworkStack",
-        0x00_00_00_dd,
+        IpAddr::V4(Ipv4Addr::new(127, 0, 0, 110)),
         RandomRoutingDeamon::new(app.globals_weak()),
     );
 
@@ -174,8 +176,8 @@ fn main() {
     let mut rt = Runtime::new_with(app, RuntimeOptions::seeded(0x123));
 
     let msg = Packet::new()
-        .src(0x_00_00_00_ff, 0x00_fe)
-        .dest(0x00_00_00_ee, 0x00_fe)
+        // .src(0x_00_00_00_ff, 0x00_fe)
+        // .dest(0x00_00_00_ee, 0x00_fe)
         .content("PING".to_string())
         .kind(2)
         .build();

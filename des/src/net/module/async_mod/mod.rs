@@ -1,4 +1,4 @@
-use crate::net::{Message, MessageKind, Module, StaticModuleCore};
+use crate::net::{Message, MessageKind, Module, Packet, StaticModuleCore};
 use crate::time::SimTime;
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -154,6 +154,62 @@ pub trait AsyncModule: StaticModuleCore + Send {
     fn num_sim_start_stages(&self) -> usize {
         1
     }
+
+    #[doc(hidden)]
+    fn __manage_intents(&mut self, intents: Vec<tokio::sim::net::IOIntent>) {
+        for intent in intents {
+            use tokio::sim::net::IOIntent;
+            match intent {
+                IOIntent::UdpSendPacket(pkt) => {
+                    log::info!("Sending captured UDP packet: {:?}", pkt);
+                    self.send(
+                        Packet::new()
+                            .kind(RT_UDP)
+                            .dest_addr(pkt.dest_addr)
+                            .content(pkt)
+                            .build(),
+                        "out",
+                    );
+                }
+                IOIntent::TcpConnect(pkt) => {
+                    log::info!("Sending captured TCP connect: {:?}", pkt);
+                    self.send(
+                        Packet::new()
+                            .kind(RT_TCP_CONNECT)
+                            .dest_addr(pkt.dest())
+                            .content(pkt)
+                            .build(),
+                        "out",
+                    )
+                }
+                IOIntent::TcpConnectTimeout(pkt, timeout) => {
+                    log::info!("Scheduling TCP Connect Timeout: {:?} in {:?}", pkt, timeout);
+                    self.schedule_in(
+                        Packet::new()
+                            .kind(RT_TCP_CONNECT_TIMEOUT)
+                            // .dest_addr(pkt.)
+                            .content(pkt)
+                            .build(),
+                        timeout,
+                    )
+                }
+                IOIntent::TcpSendPacket(pkt) => {
+                    log::info!("Sending captured TCP packet: {:?}", pkt);
+                    self.send(
+                        Packet::new()
+                            .kind(RT_TCP_PACKET)
+                            .dest_addr(pkt.dest_addr)
+                            .content(pkt)
+                            .build(),
+                        "out",
+                    )
+                }
+                _ => {
+                    log::warn!("Unkown Intent")
+                }
+            }
+        }
+    }
 }
 
 impl<T> Module for T
@@ -172,24 +228,28 @@ where
             RT_TIME_WAKEUP => {}
             RT_UDP => {
                 use tokio::sim::net::UdpMessage;
+                let msg = msg.as_packet();
                 let (msg, _) = msg.cast::<UdpMessage>();
 
                 rt.process_udp(msg);
             }
             RT_TCP_CONNECT => {
                 use tokio::sim::net::TcpConnectMessage;
+                let msg = msg.as_packet();
                 let (msg, _) = msg.cast::<TcpConnectMessage>();
 
                 rt.process_tcp_connect(msg);
             }
             RT_TCP_CONNECT_TIMEOUT => {
                 use tokio::sim::net::TcpConnectMessage;
+                let msg = msg.as_packet();
                 let (msg, _) = msg.cast::<TcpConnectMessage>();
 
                 rt.process_tcp_connect_timeout(msg);
             }
             RT_TCP_PACKET => {
                 use tokio::sim::net::TcpMessage;
+                let msg = msg.as_packet();
                 let (msg, _) = msg.cast::<TcpMessage>();
 
                 rt.process_tcp_packet(msg);
@@ -211,40 +271,7 @@ where
             self.schedule_at(Message::new().kind(RT_TIME_WAKEUP).build(), next_time);
         }
 
-        for intent in rt.yield_intents() {
-            use tokio::sim::net::IOIntent;
-            match intent {
-                IOIntent::UdpSendPacket(pkt) => {
-                    log::info!("Sending captured UDP packet: {:?}", pkt);
-                    self.send(Message::new().kind(RT_UDP).content(pkt).build(), "out");
-                }
-                IOIntent::TcpConnect(pkt) => {
-                    log::info!("Sending captured TCP connect: {:?}", pkt);
-                    self.send(
-                        Message::new().kind(RT_TCP_CONNECT).content(pkt).build(),
-                        "out",
-                    )
-                }
-                IOIntent::TcpConnectTimeout(pkt, timeout) => {
-                    log::info!("Scheduling TCP Connect Timeout: {:?} in {:?}", pkt, timeout);
-                    self.schedule_in(
-                        Message::new()
-                            .kind(RT_TCP_CONNECT_TIMEOUT)
-                            .content(pkt)
-                            .build(),
-                        timeout,
-                    )
-                }
-                IOIntent::TcpSendPacket(pkt) => {
-                    log::info!("Sending captured TCP packet: {:?}", pkt);
-                    self.send(
-                        Message::new().kind(RT_TCP_PACKET).content(pkt).build(),
-                        "out",
-                    )
-                }
-                _ => {}
-            }
-        }
+        self.__manage_intents(rt.yield_intents());
 
         // (1) Suspend the time context
         self.async_ext.ctx = Some(guard.leave());
@@ -268,40 +295,7 @@ where
             self.schedule_at(Message::new().kind(RT_TIME_WAKEUP).build(), next_time);
         }
 
-        for intent in rt.yield_intents() {
-            use tokio::sim::net::IOIntent;
-            match intent {
-                IOIntent::UdpSendPacket(pkt) => {
-                    log::info!("Sending captured UDP packet: {:?}", pkt);
-                    self.send(Message::new().kind(RT_UDP).content(pkt).build(), "out");
-                }
-                IOIntent::TcpConnect(pkt) => {
-                    log::info!("Sending captured TCP connect: {:?}", pkt);
-                    self.send(
-                        Message::new().kind(RT_TCP_CONNECT).content(pkt).build(),
-                        "out",
-                    )
-                }
-                IOIntent::TcpConnectTimeout(pkt, timeout) => {
-                    log::info!("Scheduling TCP Connect Timeout: {:?} in {:?}", pkt, timeout);
-                    self.schedule_in(
-                        Message::new()
-                            .kind(RT_TCP_CONNECT_TIMEOUT)
-                            .content(pkt)
-                            .build(),
-                        timeout,
-                    )
-                }
-                IOIntent::TcpSendPacket(pkt) => {
-                    log::info!("Sending captured TCP packet: {:?}", pkt);
-                    self.send(
-                        Message::new().kind(RT_TCP_PACKET).content(pkt).build(),
-                        "out",
-                    )
-                }
-                _ => {}
-            }
-        }
+        self.__manage_intents(rt.yield_intents());
 
         self.async_ext.ctx = Some(guard.leave());
     }
@@ -379,43 +373,9 @@ where
         rt.poll_until_idle();
 
         if let Some(next_time) = rt.next_time_poll() {
-            log::warn!("Sending wakeup for  {}", next_time);
             self.schedule_at(Message::new().kind(RT_TIME_WAKEUP).build(), next_time);
         }
-        for intent in rt.yield_intents() {
-            use tokio::sim::net::IOIntent;
-            match intent {
-                IOIntent::UdpSendPacket(pkt) => {
-                    log::info!("Sending captured UDP packet: {:?}", pkt);
-                    self.send(Message::new().kind(RT_UDP).content(pkt).build(), "out");
-                }
-                IOIntent::TcpConnect(pkt) => {
-                    log::info!("Sending captured TCP connect: {:?}", pkt);
-                    self.send(
-                        Message::new().kind(RT_TCP_CONNECT).content(pkt).build(),
-                        "out",
-                    )
-                }
-                IOIntent::TcpConnectTimeout(pkt, timeout) => {
-                    log::info!("Scheduling TCP Connect Timeout: {:?} in {:?}", pkt, timeout);
-                    self.schedule_in(
-                        Message::new()
-                            .kind(RT_TCP_CONNECT_TIMEOUT)
-                            .content(pkt)
-                            .build(),
-                        timeout,
-                    )
-                }
-                IOIntent::TcpSendPacket(pkt) => {
-                    log::info!("Sending captured TCP packet: {:?}", pkt);
-                    self.send(
-                        Message::new().kind(RT_TCP_PACKET).content(pkt).build(),
-                        "out",
-                    )
-                }
-                _ => {}
-            }
-        }
+        self.__manage_intents(rt.yield_intents());
 
         self.async_ext.ctx = Some(guard.leave());
     }
@@ -441,40 +401,7 @@ where
         if let Some(next_time) = rt.next_time_poll() {
             self.schedule_at(Message::new().kind(RT_TIME_WAKEUP).build(), next_time);
         }
-        for intent in rt.yield_intents() {
-            use tokio::sim::net::IOIntent;
-            match intent {
-                IOIntent::UdpSendPacket(pkt) => {
-                    log::info!("Sending captured UDP packet: {:?}", pkt);
-                    self.send(Message::new().kind(RT_UDP).content(pkt).build(), "out");
-                }
-                IOIntent::TcpConnect(pkt) => {
-                    log::info!("Sending captured TCP connect: {:?}", pkt);
-                    self.send(
-                        Message::new().kind(RT_TCP_CONNECT).content(pkt).build(),
-                        "out",
-                    )
-                }
-                IOIntent::TcpConnectTimeout(pkt, timeout) => {
-                    log::info!("Scheduling TCP Connect Timeout: {:?} in {:?}", pkt, timeout);
-                    self.schedule_in(
-                        Message::new()
-                            .kind(RT_TCP_CONNECT_TIMEOUT)
-                            .content(pkt)
-                            .build(),
-                        timeout,
-                    )
-                }
-                IOIntent::TcpSendPacket(pkt) => {
-                    log::info!("Sending captured TCP packet: {:?}", pkt);
-                    self.send(
-                        Message::new().kind(RT_TCP_PACKET).content(pkt).build(),
-                        "out",
-                    )
-                }
-                _ => {}
-            }
-        }
+        self.__manage_intents(rt.yield_intents());
 
         self.async_ext.ctx = Some(guard.leave());
     }
