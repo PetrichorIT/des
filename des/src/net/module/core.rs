@@ -55,6 +55,11 @@ impl ModuleBuffer {
         self.out_buffer.push((msg.into(), gate, SimTime::now()));
     }
 
+    pub(crate) fn send_in(&mut self, msg: impl Into<Message>, gate: GateRef, delay: Duration) {
+        self.out_buffer
+            .push((msg.into(), gate, SimTime::now() + delay));
+    }
+
     pub(crate) fn schedule_in(&mut self, msg: impl Into<Message>, duration: Duration) {
         assert!(
             duration >= Duration::ZERO,
@@ -317,6 +322,20 @@ impl ModuleCore {
         let gate = gate.as_gate(self);
         if let Some(gate) = gate {
             self.buffers.send(msg, gate);
+        } else {
+            error!(target: self.str(),"Error: Could not find gate in current module");
+        }
+    }
+
+    ///
+    /// Sends a message onto a given gate with a delay. This operation will be performed after
+    /// `handle_message` finished.
+    ///
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn send_in(&mut self, msg: impl Into<Message>, gate: impl IntoModuleGate, delay: Duration) {
+        let gate = gate.as_gate(self);
+        if let Some(gate) = gate {
+            self.buffers.send_in(msg, gate, delay);
         } else {
             error!(target: self.str(),"Error: Could not find gate in current module");
         }
