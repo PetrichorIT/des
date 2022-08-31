@@ -6,6 +6,9 @@ use tokio::{
 };
 
 pub(crate) struct AsyncCoreExt {
+    #[cfg(not(feature = "async-sharedrt"))]
+    pub(crate) rt: Option<std::sync::Arc<tokio::runtime::Runtime>>,
+
     pub(crate) buffers: UnboundedReceiver<super::BufferEvent>,
     pub(crate) handle: UnboundedSender<super::BufferEvent>,
 
@@ -29,6 +32,9 @@ impl AsyncCoreExt {
         let (stx, srx) = unbounded_channel();
 
         Self {
+            #[cfg(not(feature = "async-sharedrt"))]
+            rt: Some(std::sync::Arc::new(tokio::runtime::Runtime::new().unwrap())),
+
             buffers: rx,
             handle: tx,
 

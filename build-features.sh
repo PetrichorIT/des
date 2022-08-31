@@ -38,22 +38,23 @@ echo "[des] net-std + metrics"
 cargo build -p des --features net --features std-net --features metrics
 echo "[des] net-std + cqueue + metrics"
 cargo build -p des --features net --features std-net --features cqueue --features metrics
-echo "[des] net + async"
+echo "[des] net + std-net + async"
 cargo build -p des --features net --features async
-echo "[des] net + async + cqueue"
+echo "[des] net + std-net + async + cqueue"
 cargo build -p des --features net --features cqueue --features async
-echo "[des] net + async + metrics"
+echo "[des] net + std-net + async + metrics"
 cargo build -p des --features net --features metrics --features async
-echo "[des] net + async + cqueue + metrics"
+echo "[des] net + std-net + async + cqueue + metrics"
 cargo build -p des --features net --features cqueue --features metrics --features async
-echo "[des] net-std + async"
-cargo build -p des --features net --features std-net --features async
-echo "[des] net-std + async + cqueue"
-cargo build -p des --features net --features std-net --features cqueue --features async
-echo "[des] net-std + async + metrics"
-cargo build -p des --features net --features std-net --features metrics --features async
-echo "[des] net-std + async + cqueue + metrics"
-cargo build -p des --features net --features std-net --features cqueue --features metrics --features async
+echo "[des] net + std-net + async + async-sharedrt"
+cargo build -p des --features net --features async --features async-sharedrt
+echo "[des] net + std-net + async + async-sharedrt + cqueue"
+cargo build -p des --features net --features async --features async-sharedrt --features cqueue
+echo "[des] net + std-net + async + async-sharedrt + metrics"
+cargo build -p des --features net --features async --features async-sharedrt --features metrics 
+echo "[des] net + std-net + async + async-sharedrt + cqueue + metrics"
+cargo build -p des --features net --features async --features async-sharedrt --features cqueue --features metrics
+
 
 
 # 'tests' build

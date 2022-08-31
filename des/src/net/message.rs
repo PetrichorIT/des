@@ -18,6 +18,11 @@ pub type MessageId = u16;
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub type MessageKind = u16;
 
+#[allow(unused)]
+pub(crate) const TYP_RESTART: u8 = 10;
+#[allow(unused)]
+pub(crate) const TYP_WAKEUP: u8 = 11;
+
 ///
 /// The metadata attachted to a message, independent of its contents.
 ///
@@ -27,6 +32,9 @@ pub type MessageKind = u16;
 pub struct MessageMetadata {
     /// A unqiue identifier for this instance of a message.
     pub id: MessageId,
+
+    /// A internal typ used only for internal metrics.
+    pub(crate) typ: u8,
 
     /// The type of message to be handled.
     pub kind: MessageKind,
@@ -57,6 +65,7 @@ impl MessageMetadata {
     fn dup(&self) -> Self {
         Self {
             id: self.id,
+            typ: self.typ,
 
             kind: self.kind,
             timestamp: self.timestamp,
@@ -77,6 +86,7 @@ impl Default for MessageMetadata {
         Self {
             id: 0,
             kind: 0,
+            typ: 0,
             timestamp: SimTime::MIN,
             sender_module_id: ModuleId::NULL,
             receiver_module_id: ModuleId::NULL,
@@ -781,6 +791,13 @@ impl MessageBuilder {
             meta: MessageMetadata::default(),
             content: None,
         }
+    }
+
+    /// Only internal use
+    #[allow(unused)]
+    pub(crate) fn typ(mut self, typ: u8) -> Self {
+        self.meta.typ = typ;
+        self
     }
 
     /// Sets the field `meta`.

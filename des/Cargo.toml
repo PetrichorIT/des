@@ -24,6 +24,7 @@ default = []
 full = ["net", "cqueue", "async"]
 
 async = ["net", "std-net", "dep:tokio", "dep:async-trait"]
+async-sharedrt = ["async"]
 cqueue = ["dep:num-traits"]
 metrics = []
 net = ["dep:des_macros"]

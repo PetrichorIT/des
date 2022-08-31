@@ -204,6 +204,7 @@ pub struct NetworkRuntimeGlobals {
     /// (Expect some global values for data collection)
     ///
     #[cfg(feature = "async")]
+    #[cfg(feature = "async-sharedrt")]
     pub runtime: std::sync::Arc<tokio::runtime::Runtime>,
 }
 
@@ -218,6 +219,7 @@ impl NetworkRuntimeGlobals {
             topology: Topology::new(),
 
             #[cfg(feature = "async")]
+            #[cfg(feature = "async-sharedrt")]
             runtime: std::sync::Arc::new(
                 tokio::runtime::Runtime::new().expect("Failed to create global runtime"),
             ),
