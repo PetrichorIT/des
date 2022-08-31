@@ -49,7 +49,7 @@ pub trait AsyncModule: StaticModuleCore + Send {
     ///     }
     /// }
     /// ```
-    async fn handle_message(&mut self, msg: Message);
+    async fn handle_message(&mut self, _msg: Message) {}
 
     ///
     /// A periodic activity manager that is activated if [ModuleCore::enable_activity] is
