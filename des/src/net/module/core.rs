@@ -381,14 +381,7 @@ impl ModuleCore {
     #[cfg(feature = "async")]
     #[cfg(not(feature = "async-sharedrt"))]
     pub fn shutdown(&mut self, restart_at: Option<SimTime>) {
-        assert!(restart_at.unwrap_or(SimTime::MAX) > SimTime::now());
-        self.async_ext.rt.take();
-        if let Some(restart_at) = restart_at {
-            self.schedule_at(
-                Message::new().typ(crate::net::message::TYP_RESTART).build(),
-                restart_at,
-            )
-        }
+        self.async_handle().shutdown(restart_at);
     }
 }
 

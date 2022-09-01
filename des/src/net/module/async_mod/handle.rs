@@ -15,6 +15,10 @@ pub(crate) enum BufferEvent {
         msg: Message,
         time: SimTime,
     },
+    #[cfg(not(feature = "async-sharedrt"))]
+    Shutdown {
+        restart_at: Option<SimTime>,
+    },
 }
 
 impl std::fmt::Debug for BufferEvent {
@@ -36,6 +40,11 @@ impl std::fmt::Debug for BufferEvent {
                 .debug_struct("BufferEvent::ScheduleAt")
                 .field("msg", msg)
                 .field("time", time)
+                .finish(),
+            #[cfg(not(feature = "async-sharedrt"))]
+            Self::Shutdown { restart_at } => f
+                .debug_struct("BufferEvent::Shutdown")
+                .field("restart_at", restart_at)
                 .finish(),
         }
     }
@@ -118,6 +127,19 @@ impl SenderHandle {
                 time,
             })
             .expect("Failed to send to unbounded channel. reciver must have died.");
+    }
+
+    ///
+    /// Shuts down all activity for the module.
+    /// Restarts the module at the given time.
+    ///
+    #[cfg(not(feature = "async-sharedrt"))]
+    pub fn shutdown(&self, restart_at: Option<SimTime>) {
+        assert!(restart_at.unwrap_or(SimTime::MAX) > SimTime::now());
+
+        self.inner
+            .send(BufferEvent::Shutdown { restart_at })
+            .expect("Failed to send to unbounded channel. reciver must have died.")
     }
 }
 

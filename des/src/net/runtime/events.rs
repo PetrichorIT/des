@@ -341,6 +341,23 @@ impl PtrWeakMut<dyn Module> {
                         }),
                         time,
                     ),
+
+                    #[cfg(not(feature = "async-sharedrt"))]
+                    BufferEvent::Shutdown { restart_at } => {
+                        use crate::net::message::TYP_RESTART;
+                        // Delete the runtimes
+                        let _ = self.module_core_mut().async_ext.rt.take();
+                        // Send restart packet if nessecary
+                        if let Some(restart_at) = restart_at {
+                            rt.add_event(
+                                NetEvents::HandleMessageEvent(HandleMessageEvent {
+                                    module: PtrWeakMut::clone(&mref),
+                                    message: Message::new().typ(TYP_RESTART).build(),
+                                }),
+                                restart_at,
+                            )
+                        }
+                    }
                 }
             }
         }

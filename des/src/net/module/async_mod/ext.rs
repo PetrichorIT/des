@@ -51,6 +51,30 @@ impl AsyncCoreExt {
             sim_end_join: None,
         }
     }
+
+    #[cfg(not(feature = "async-sharedrt"))]
+    pub(crate) fn reset(&mut self) {
+        self.rt = Some(std::sync::Arc::new(tokio::runtime::Runtime::new().unwrap()));
+
+        self.ctx.as_mut().map(|ctx| ctx.reset());
+
+        let (tx, rx) = unbounded_channel();
+        let (wtx, wrx) = unbounded_channel();
+        let (stx, srx) = unbounded_channel();
+
+        self.buffers = rx;
+        self.handle = tx;
+
+        self.wait_queue_tx = wtx;
+        self.wait_queue_rx = Some(wrx);
+        self.wait_queue_join = None;
+
+        self.sim_start_tx = stx;
+        self.sim_start_rx = Some(srx);
+        self.sim_start_join = None;
+
+        self.sim_end_join = None;
+    }
 }
 
 #[derive(Debug)]

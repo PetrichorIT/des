@@ -143,7 +143,7 @@ pub trait AsyncModule: StaticModuleCore + Send {
     #[deprecated(
         note = "Module shutdown and restart is not supported with the feature 'asnyc-sharedrt'"
     )]
-    async fn at_restart(&mut self) {}
+    fn at_restart(&mut self) {}
 
     ///
     /// A function that is called once the module restarts,
@@ -151,10 +151,10 @@ pub trait AsyncModule: StaticModuleCore + Send {
     /// This means that all async elements have been pruged,
     /// but the local state of `self` is not yet reset.
     ///
-    /// Use this function analogous to [at_sim_start].
+    /// Use this function to reset the local state of nessecary.
     ///
     #[cfg(not(feature = "async-sharedrt"))]
-    async fn at_restart(&mut self) {}
+    fn at_restart(&mut self) {}
 
     ///
     /// A function that is called once the simulation has terminated.
@@ -253,8 +253,15 @@ where
         // (0) Check meta messaeg
         #[cfg(not(feature = "async-sharedrt"))]
         if msg.meta().typ == TYP_RESTART {
-            self.async_ext.rt = Some(Arc::new(Runtime::new().unwrap()));
-            self.async_ext.ctx.as_mut().map(|ctx| ctx.reset());
+            self.async_ext.reset();
+            self.at_restart();
+
+            // Do sim start procedure
+            let stages = <Self as Module>::num_sim_start_stages(self);
+            for stage in 0..stages {
+                <Self as Module>::at_sim_start(self, stage);
+            }
+            <Self as Module>::finish_sim_start(self);
         }
 
         // (1) Fetch the runtime and initial the time context.
@@ -305,10 +312,8 @@ where
                     }
                 },
                 TYP_WAKEUP => {}
-                TYP_RESTART =>
-                {
-                    #[cfg(not(feature = "async-sharedrt"))]
-                    rt.block_on(self.at_restart())
+                TYP_RESTART => {
+                    log::trace!("Module restart complete")
                 }
                 _ => unimplemented!(""),
             }
