@@ -55,6 +55,9 @@ pub use self::message::MessageId;
 pub use self::message::MessageKind;
 pub use self::message::MessageMetadata;
 
+#[cfg(feature = "async")]
+pub use self::message::MessageType;
+
 pub use self::packet::NodeAddress;
 pub use self::packet::Packet;
 pub use self::packet::PacketBuilder;

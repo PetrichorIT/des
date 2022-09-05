@@ -98,6 +98,7 @@ cfg_net! {
 
     cfg_async! {
         pub use crate::net::AsyncModule;
+        pub use crate::net::MessageType;
     }
 
     //

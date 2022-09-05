@@ -46,7 +46,7 @@ async-trait = {version = "0.1", optional = true}
 des_macros = {path = "../des_macros", optional = true}
 num-traits = {version = "0.2.14", optional = true}
 # tokio = {git = "https://github.com/PetrichorIT/tokio_sim", features = ["sim"], optional = true}
-tokio = {path = "../../tokio_sim/tokio", features = ["sim", "net", "macros"], optional = true}
+tokio = {path = "../../tokio_sim/tokio", features = ["sim"], optional = true}
 
 [dev-dependencies]
 futures = "0.3.21"

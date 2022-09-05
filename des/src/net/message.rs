@@ -22,6 +22,14 @@ pub type MessageKind = u16;
 pub(crate) const TYP_RESTART: u8 = 10;
 #[allow(unused)]
 pub(crate) const TYP_WAKEUP: u8 = 11;
+#[allow(unused)]
+pub(crate) const TYP_UDP_PACKET: u8 = 100;
+#[allow(unused)]
+pub(crate) const TYP_TCP_CONNECT: u8 = 101;
+#[allow(unused)]
+pub(crate) const TYP_TCP_CONNECT_TIMEOUT: u8 = 102;
+#[allow(unused)]
+pub(crate) const TYP_TCP_PACKET: u8 = 103;
 
 ///
 /// The metadata attachted to a message, independent of its contents.
@@ -34,6 +42,7 @@ pub struct MessageMetadata {
     pub id: MessageId,
 
     /// A internal typ used only for internal metrics.
+    #[allow(unused)]
     pub(crate) typ: u8,
 
     /// The type of message to be handled.
@@ -61,8 +70,41 @@ pub struct MessageMetadata {
     pub send_time: SimTime,
 }
 
+cfg_async! {
+    /// The internal typ of the message set by the des not the user.
+    #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+    #[allow(unused)]
+    pub enum MessageType {
+        /// A internal TCP message that will be consumed by the IOContext
+        /// if possible.
+        Tcp,
+        /// A internal UDP message that will be consumed by the IOContext
+        /// if possible.
+        Udp,
+        /// A custom internal message. Those should never appear in 'handle_message'.
+        Internal,
+        /// A user defined message.
+        #[default]
+        UserDefined
+    }
+
+    impl MessageMetadata {
+        /// Returns the type of the message
+        #[allow(unused)]
+        pub fn typ(&self) -> MessageType {
+            match self.typ {
+                0 => MessageType::UserDefined,
+                TYP_WAKEUP | TYP_RESTART => MessageType::Internal,
+                TYP_TCP_CONNECT | TYP_TCP_CONNECT_TIMEOUT | TYP_TCP_PACKET => MessageType::Tcp,
+                TYP_UDP_PACKET => MessageType::Udp,
+                _ => unreachable!()
+            }
+        }
+    }
+}
+
 impl MessageMetadata {
-    fn dup(&self) -> Self {
+    pub(super) fn dup(&self) -> Self {
         Self {
             id: self.id,
             typ: self.typ,
@@ -336,7 +378,17 @@ impl Debug for Message {
         f.debug_struct("Message")
             .field("id", &self.meta.id)
             .field("kind", &self.meta.kind)
-            .field("last_gate", &self.meta.last_gate)
+            .field(
+                "last_gate",
+                &format!(
+                    "{}",
+                    if let Some(ref g) = self.meta.last_gate {
+                        g.name()
+                    } else {
+                        ""
+                    }
+                ),
+            )
             .field("sender_module_id", &self.meta.sender_module_id)
             .field("target_module_id", &self.meta.receiver_module_id)
             .field(

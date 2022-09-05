@@ -338,6 +338,53 @@ impl Packet {
         PacketBuilder::new()
     }
 
+    ///
+    /// Duplicates a message.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the contained value is not of type T.
+    ///
+    #[must_use]
+    pub fn dup<T>(&self) -> Self
+    where
+        T: 'static + Clone,
+    {
+        self.try_dup::<T>().expect("Failed to duplicate a message")
+    }
+
+    ///
+    /// Tries to create a duplicate of the message, assuming its content is of type T.
+    ///
+    /// - If the messages body is of type T, the body will be cloned as specified by T
+    /// and the dup will succeed.
+    /// - If the message body is not of type T, this function will return `None`.
+    /// - If the message has no body it will succeed independent of T and clone only the
+    /// attached metadata.
+    ///
+    #[must_use]
+    pub fn try_dup<T>(&self) -> Option<Self>
+    where
+        T: 'static + Clone,
+    {
+        let content: Option<Box<dyn Any>> = match &self.content {
+            None => None,
+            Some(boxed) => {
+                let rf = boxed.downcast_ref::<T>()?;
+                Some(Box::new(rf.clone()))
+            }
+        };
+
+        let message_meta = self.message_meta.as_ref().map(|m| m.dup());
+        let header = self.header.clone();
+
+        Some(Self {
+            message_meta,
+            content,
+            header,
+        })
+    }
+
     // ' INSERT BEGIN
 
     ///
@@ -494,6 +541,24 @@ impl PacketBuilder {
             header: PacketHeader::default(),
             content: None,
         }
+    }
+
+    #[allow(unused)]
+    pub(crate) fn typ(mut self, typ: u8) -> Self {
+        self.message_builder = self.message_builder.typ(typ);
+        self
+    }
+
+    #[allow(unused)]
+    pub(crate) fn meta(mut self, meta: MessageMetadata) -> Self {
+        self.message_builder = self.message_builder.meta(meta);
+        self
+    }
+
+    #[allow(unused)]
+    pub(crate) fn header(mut self, header: PacketHeader) -> Self {
+        self.header = header;
+        self
     }
 
     /// Sets the field `src_node` and `src_port`.

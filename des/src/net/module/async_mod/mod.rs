@@ -1,5 +1,8 @@
-use crate::net::message::{TYP_RESTART, TYP_WAKEUP};
-use crate::net::{Message, MessageKind, Module, Packet, StaticModuleCore};
+use crate::net::message::{
+    TYP_RESTART, TYP_TCP_CONNECT, TYP_TCP_CONNECT_TIMEOUT, TYP_TCP_PACKET, TYP_UDP_PACKET,
+    TYP_WAKEUP,
+};
+use crate::net::{Message, Module, Packet, StaticModuleCore};
 use crate::time::SimTime;
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -11,10 +14,10 @@ pub use handle::*;
 pub(crate) mod ext;
 use ext::WaitingMessage;
 
-pub(crate) const RT_UDP: MessageKind = 43;
-pub(crate) const RT_TCP_CONNECT: MessageKind = 44;
-pub(crate) const RT_TCP_CONNECT_TIMEOUT: MessageKind = 45;
-pub(crate) const RT_TCP_PACKET: MessageKind = 46;
+// pub(crate) const RT_UDP: MessageKind = 43;
+// pub(crate) const RT_TCP_CONNECT: MessageKind = 44;
+// pub(crate) const RT_TCP_CONNECT_TIMEOUT: MessageKind = 45;
+// pub(crate) const RT_TCP_PACKET: MessageKind = 46;
 
 ///
 /// A set of user defined functions for customizing the behaviour
@@ -197,7 +200,8 @@ pub trait AsyncModule: StaticModuleCore + Send {
                     log::info!("Sending captured UDP packet: {:?}", pkt);
                     self.send(
                         Packet::new()
-                            .kind(RT_UDP)
+                            // .kind(RT_UDP)
+                            .typ(TYP_UDP_PACKET)
                             .dest_addr(pkt.dest_addr)
                             .content(pkt)
                             .build(),
@@ -208,7 +212,8 @@ pub trait AsyncModule: StaticModuleCore + Send {
                     log::info!("Sending captured TCP connect: {:?}", pkt);
                     self.send(
                         Packet::new()
-                            .kind(RT_TCP_CONNECT)
+                            // .kind(RT_TCP_CONNECT)
+                            .typ(TYP_TCP_CONNECT)
                             .dest_addr(pkt.dest())
                             .content(pkt)
                             .build(),
@@ -219,7 +224,8 @@ pub trait AsyncModule: StaticModuleCore + Send {
                     log::info!("Scheduling TCP Connect Timeout: {:?} in {:?}", pkt, timeout);
                     self.schedule_in(
                         Packet::new()
-                            .kind(RT_TCP_CONNECT_TIMEOUT)
+                            // .kind(RT_TCP_CONNECT_TIMEOUT)
+                            .typ(TYP_TCP_CONNECT_TIMEOUT)
                             // .dest_addr(pkt.)
                             .content(pkt)
                             .build(),
@@ -230,7 +236,8 @@ pub trait AsyncModule: StaticModuleCore + Send {
                     log::info!("Sending captured TCP packet: {:?}", pkt);
                     self.send(
                         Packet::new()
-                            .kind(RT_TCP_PACKET)
+                            // .kind(RT_TCP_PACKET)
+                            .typ(TYP_TCP_PACKET)
                             .dest_addr(pkt.dest_addr)
                             .content(pkt)
                             .build(),
@@ -271,51 +278,97 @@ where
             // (2) Poll time time events before excuting
             rt.poll_time_events();
 
-            match msg.meta().typ {
-                0 => match msg.meta().kind {
-                    RT_UDP => {
-                        use tokio::sim::net::UdpMessage;
-                        let msg = msg.as_packet();
-                        let (msg, _) = msg.cast::<UdpMessage>();
-
-                        rt.process_udp(msg);
-                    }
-                    RT_TCP_CONNECT => {
-                        use tokio::sim::net::TcpConnectMessage;
-                        let msg = msg.as_packet();
-                        let (msg, _) = msg.cast::<TcpConnectMessage>();
-
-                        rt.process_tcp_connect(msg);
-                    }
-                    RT_TCP_CONNECT_TIMEOUT => {
-                        use tokio::sim::net::TcpConnectMessage;
-                        let msg = msg.as_packet();
-                        let (msg, _) = msg.cast::<TcpConnectMessage>();
-
-                        rt.process_tcp_connect_timeout(msg);
-                    }
-                    RT_TCP_PACKET => {
-                        use tokio::sim::net::TcpMessage;
-                        let msg = msg.as_packet();
-                        let (msg, _) = msg.cast::<TcpMessage>();
-
-                        rt.process_tcp_packet(msg);
-                    }
-                    _ => {
-                        self.async_ext
-                            .wait_queue_tx
-                            .send(WaitingMessage {
-                                msg,
-                                time: SimTime::now(),
-                            })
-                            .expect("Failed to send to unbounded channel");
-                    }
-                },
-                TYP_WAKEUP => {}
+            let typ_processed = match msg.meta().typ {
+                TYP_WAKEUP => Ok(()),
                 TYP_RESTART => {
-                    log::trace!("Module restart complete")
+                    log::trace!("Module restart complete");
+                    Ok(())
                 }
-                _ => unimplemented!(""),
+                TYP_UDP_PACKET => {
+                    use tokio::sim::net::UdpMessage;
+                    let msg = msg.as_packet();
+                    let meta = msg.meta().clone();
+                    let (msg, header) = msg.cast::<UdpMessage>();
+
+                    rt.process_udp(msg).map_err(|msg| {
+                        Packet::new()
+                            .content(msg)
+                            .meta(meta)
+                            .header(header)
+                            .build()
+                            .into()
+                    })
+                }
+                TYP_TCP_CONNECT => {
+                    use tokio::sim::net::TcpConnectMessage;
+                    let msg = msg.as_packet();
+                    let meta = msg.meta().clone();
+                    let (msg, header) = msg.cast::<TcpConnectMessage>();
+
+                    rt.process_tcp_connect(msg).map_err(|msg| {
+                        Packet::new()
+                            .content(msg)
+                            .meta(meta)
+                            .header(header)
+                            .build()
+                            .into()
+                    })
+                }
+                TYP_TCP_CONNECT_TIMEOUT => {
+                    use tokio::sim::net::TcpConnectMessage;
+                    let msg = msg.as_packet();
+                    let meta = msg.meta().clone();
+                    let (msg, header) = msg.cast::<TcpConnectMessage>();
+
+                    rt.process_tcp_connect_timeout(msg).map_err(|msg| {
+                        Packet::new()
+                            .content(msg)
+                            .meta(meta)
+                            .header(header)
+                            .build()
+                            .into()
+                    })
+                }
+                TYP_TCP_PACKET => {
+                    use tokio::sim::net::TcpMessage;
+                    let msg = msg.as_packet();
+                    let meta = msg.meta().clone();
+                    let (msg, header) = msg.cast::<TcpMessage>();
+
+                    rt.process_tcp_packet(msg).map_err(|msg| {
+                        Packet::new()
+                            .content(msg)
+                            .meta(meta)
+                            .header(header)
+                            .build()
+                            .into()
+                    })
+                }
+                _ => Err(msg), /*match msg.meta().kind {
+                                   RT_UDP => {}
+                                   RT_TCP_CONNECT => {}
+                                   RT_TCP_CONNECT_TIMEOUT => {}
+                                   RT_TCP_PACKET => {}
+                                   _ => {
+                                       self.async_ext
+                                           .wait_queue_tx
+                                           .send(WaitingMessage {
+                                               msg,
+                                               time: SimTime::now(),
+                                           })
+                                           .expect("Failed to send to unbounded channel");
+                                   }
+                               },*/
+            };
+
+            if let Err(msg) = typ_processed {
+                self.async_ext
+                    .wait_queue_tx
+                    .send(WaitingMessage {
+                        msg,
+                        time: SimTime::now(),
+                    })
+                    .expect("Failed to forward message to 'handle_message'")
             }
 
             rt.poll_until_idle();

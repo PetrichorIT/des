@@ -400,17 +400,11 @@ struct TcpFullRouter {}
 
 impl Module for TcpFullRouter {
     fn handle_message(&mut self, msg: Message) {
-        if msg.meta().kind == 44 {
+        if msg.meta().typ() == MessageType::Tcp {
             let msg = msg.as_packet();
-            let (pkt, _) = msg.cast::<tokio::sim::net::TcpConnectMessage>();
-            let dest = pkt.dest();
-            match dest.ip() {
-                IpAddr::V4(ip) if ip == Ipv4Addr::new(192, 168, 2, 110) => {
-                    self.send(Packet::new().kind(44).content(pkt).build(), "out1")
-                }
-                IpAddr::V4(ip) if ip == Ipv4Addr::new(192, 168, 2, 112) => {
-                    self.send(Packet::new().kind(44).content(pkt).build(), "out2")
-                }
+            match msg.header().dest_node {
+                IpAddr::V4(ip) if ip == Ipv4Addr::new(192, 168, 2, 110) => self.send(msg, "out1"),
+                IpAddr::V4(ip) if ip == Ipv4Addr::new(192, 168, 2, 112) => self.send(msg, "out2"),
                 _ => unreachable!(),
             }
         } else {
