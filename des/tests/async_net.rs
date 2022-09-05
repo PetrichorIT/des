@@ -4,6 +4,7 @@ use des::tokio::sim::net::*;
 use serial_test::serial;
 use std::io::ErrorKind;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::str::FromStr;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::task::JoinHandle;
 
@@ -502,6 +503,145 @@ fn tcp_full_test() {
     rt.create_module(ping);
     rt.create_module(pong);
     rt.create_module(pang);
+
+    let rt = Runtime::new(rt);
+    let _ = rt.run();
+}
+
+#[NdlModule]
+struct IoDelayReceiver {}
+
+#[async_trait::async_trait]
+impl AsyncModule for IoDelayReceiver {
+    async fn at_sim_start(&mut self, _: usize) {
+        IOContext::new([1, 2, 3, 4, 5, 6], Ipv4Addr::new(192, 168, 2, 10)).set();
+
+        tokio::spawn(async {
+            let sock = TcpListener::bind("0.0.0.0:8000").await.unwrap();
+            while let Ok((mut stream, _)) = sock.accept().await {
+                // NOP
+                loop {
+                    let mut buf = [0u8; 512];
+                    stream.read(&mut buf).await.unwrap();
+                }
+            }
+        });
+    }
+}
+
+#[NdlModule]
+struct IoDelaySender {
+    handle: Option<JoinHandle<()>>,
+}
+
+impl NameableModule for IoDelaySender {
+    fn named(core: ModuleCore) -> Self {
+        Self {
+            __core: core,
+            handle: None,
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl AsyncModule for IoDelaySender {
+    async fn at_sim_start(&mut self, _: usize) {
+        IOContext::new([1, 2, 3, 4, 5, 6], Ipv4Addr::new(192, 168, 2, 9)).set();
+
+        self.handle = Some(tokio::spawn(async {
+            let sock = TcpSocket::new_v4().unwrap();
+            sock.set_send_buffer_size(2048).unwrap(); // 2 packets
+
+            let mut sock = sock
+                .connect(SocketAddr::from_str("192.168.2.10:8000").unwrap())
+                .await
+                .unwrap();
+
+            let p512 = [42u8; 512];
+
+            // write 3 packets of 512 bytes
+            let t0 = SimTime::now();
+
+            sock.write_all(&p512).await.unwrap();
+            sock.write_all(&p512).await.unwrap();
+            sock.write_all(&p512).await.unwrap();
+
+            let t1 = SimTime::now();
+
+            assert_eq!(t0, t1);
+
+            // skip to clean all buffers / time
+            tokio::time::sleep(Duration::from_secs(1)).await;
+
+            // write 5 packets
+            let t0 = SimTime::now();
+
+            sock.write_all(&p512).await.unwrap();
+            sock.write_all(&p512).await.unwrap();
+            sock.write_all(&p512).await.unwrap();
+            sock.write_all(&p512).await.unwrap();
+            let t1 = SimTime::now();
+
+            sock.write_all(&p512).await.unwrap();
+
+            let t2 = SimTime::now();
+            assert_eq!(t0, t1);
+
+            assert_ne!(t1, t2);
+            assert_eq!(t1 + Duration::from_millis(10), t2); // 2 packtes delay of 5ms
+
+            // skip to clean all buffers / time
+            tokio::time::sleep(Duration::from_secs(1)).await;
+
+            // write partial packets
+            let p1024 = [69u8; 1024];
+
+            let t0 = SimTime::now();
+
+            sock.write_all(&p512).await.unwrap();
+            sock.write_all(&p1024).await.unwrap();
+            let t1 = SimTime::now();
+            sock.write_all(&p1024).await.unwrap();
+
+            let t2 = SimTime::now();
+            assert_eq!(t0, t1);
+
+            assert_ne!(t1, t2);
+            assert_eq!(t1 + Duration::from_millis(10), t2);
+            // 2 packtes delay of 5ms
+        }));
+    }
+
+    async fn at_sim_end(&mut self) {
+        self.handle.take().unwrap().await.unwrap();
+    }
+}
+
+#[test]
+#[serial]
+fn delayed_write() {
+    let mut rt = NetworkRuntime::new(());
+    let mut rx = IoDelayReceiver::named_root(ModuleCore::new_with(
+        ObjectPath::root_module("receiver".to_string()),
+        Ptr::downgrade(&rt.globals()),
+    ));
+
+    let rx_in = rx.create_gate("in", GateServiceType::Input, &mut rt);
+    let mut rx_out = rx.create_gate("out", GateServiceType::Output, &mut rt);
+
+    let mut tx = IoDelaySender::named_root(ModuleCore::new_with(
+        ObjectPath::root_module("sender".to_string()),
+        Ptr::downgrade(&rt.globals()),
+    ));
+
+    let tx_in = tx.create_gate("in", GateServiceType::Input, &mut rt);
+    let mut tx_out = tx.create_gate("out", GateServiceType::Output, &mut rt);
+
+    rx_out.set_next_gate(tx_in);
+    tx_out.set_next_gate(rx_in);
+
+    rt.create_module(rx);
+    rt.create_module(tx);
 
     let rt = Runtime::new(rt);
     let _ = rt.run();

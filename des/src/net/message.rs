@@ -23,6 +23,8 @@ pub(crate) const TYP_RESTART: u8 = 10;
 #[allow(unused)]
 pub(crate) const TYP_WAKEUP: u8 = 11;
 #[allow(unused)]
+pub(crate) const TYP_IO_TICK: u8 = 12;
+#[allow(unused)]
 pub(crate) const TYP_UDP_PACKET: u8 = 100;
 #[allow(unused)]
 pub(crate) const TYP_TCP_CONNECT: u8 = 101;

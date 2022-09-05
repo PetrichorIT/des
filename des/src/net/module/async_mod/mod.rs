@@ -1,11 +1,12 @@
 use crate::net::message::{
-    TYP_RESTART, TYP_TCP_CONNECT, TYP_TCP_CONNECT_TIMEOUT, TYP_TCP_PACKET, TYP_UDP_PACKET,
-    TYP_WAKEUP,
+    TYP_IO_TICK, TYP_RESTART, TYP_TCP_CONNECT, TYP_TCP_CONNECT_TIMEOUT, TYP_TCP_PACKET,
+    TYP_UDP_PACKET, TYP_WAKEUP,
 };
 use crate::net::{Message, Module, Packet, StaticModuleCore};
 use crate::time::SimTime;
 use async_trait::async_trait;
 use std::sync::Arc;
+
 use tokio::runtime::Runtime;
 
 mod handle;
@@ -218,7 +219,20 @@ pub trait AsyncModule: StaticModuleCore + Send {
                             .content(pkt)
                             .build(),
                         "out",
-                    )
+                    );
+                }
+                IOIntent::TcpSendPacket(pkt, delay) => {
+                    log::info!("Sending captured TCP packet: {:?}", pkt);
+                    self.send_in(
+                        Packet::new()
+                            // .kind(RT_TCP_PACKET)
+                            .typ(TYP_TCP_PACKET)
+                            .dest_addr(pkt.dest_addr)
+                            .content(pkt)
+                            .build(),
+                        "out",
+                        delay,
+                    );
                 }
                 IOIntent::TcpConnectTimeout(pkt, timeout) => {
                     log::info!("Scheduling TCP Connect Timeout: {:?} in {:?}", pkt, timeout);
@@ -232,17 +246,9 @@ pub trait AsyncModule: StaticModuleCore + Send {
                         timeout,
                     )
                 }
-                IOIntent::TcpSendPacket(pkt) => {
-                    log::info!("Sending captured TCP packet: {:?}", pkt);
-                    self.send(
-                        Packet::new()
-                            // .kind(RT_TCP_PACKET)
-                            .typ(TYP_TCP_PACKET)
-                            .dest_addr(pkt.dest_addr)
-                            .content(pkt)
-                            .build(),
-                        "out",
-                    )
+                IOIntent::IoTick(wakeup_time) => {
+                    log::info!("Scheduling IO Tick at {}", wakeup_time.as_millis());
+                    self.schedule_at(Packet::new().typ(TYP_IO_TICK).build(), wakeup_time)
                 }
                 _ => {
                     log::warn!("Unkown Intent")
@@ -279,9 +285,17 @@ where
             rt.poll_time_events();
 
             let typ_processed = match msg.meta().typ {
-                TYP_WAKEUP => Ok(()),
+                TYP_WAKEUP => {
+                    log::trace!("Wakeup received");
+                    Ok(())
+                }
                 TYP_RESTART => {
                     log::trace!("Module restart complete");
+                    Ok(())
+                }
+                TYP_IO_TICK => {
+                    log::trace!("IO tick received");
+                    rt.io_tick();
                     Ok(())
                 }
                 TYP_UDP_PACKET => {
