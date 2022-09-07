@@ -273,7 +273,7 @@ impl Channel {
                 // Register message progress (DROP)
                 #[cfg(feature = "metrics")]
                 {
-                    channel.register_message_dropped(&message);
+                    self.register_message_dropped(&msg);
                 }
 
                 drop(msg);
@@ -291,7 +291,7 @@ impl Channel {
             // Register message progress (SUCC)
             #[cfg(feature = "metrics")]
             {
-                self.register_message_passed(&message);
+                self.register_message_passed(&msg);
             }
 
             let dur = self.calculate_duration(&msg, rng_ref);

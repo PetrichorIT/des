@@ -152,6 +152,9 @@ pub struct Message {
     pub(crate) content: Option<Box<dyn Any>>,
     pub(crate) bit_len: usize,
     pub(crate) byte_len: usize,
+
+    #[cfg(debug_assertions)]
+    pub(crate) content_ty: Option<&'static str>,
 }
 
 impl Message {
@@ -168,8 +171,22 @@ impl Message {
     /// A strinification function that reduces it to its identifering pars.
     ///
     #[must_use]
+    #[cfg(not(debug_assertions))]
     pub fn str(&self) -> String {
-        format!("#{} {} bits", self.meta.id, self.bit_len)
+        format!("Message {{ {} bytes }}", self.byte_len)
+    }
+
+    ///
+    /// A strinification function that reduces it to its identifering pars.
+    ///
+    #[must_use]
+    #[cfg(debug_assertions)]
+    pub fn str(&self) -> String {
+        format!(
+            "Message {{ {} bytes ({}) }}",
+            self.byte_len,
+            self.content_ty.unwrap_or("no content")
+        )
     }
 
     ///
@@ -259,6 +276,8 @@ impl Message {
             content,
             bit_len,
             byte_len,
+            #[cfg(debug_assertions)]
+            content_ty,
         } = self;
         // SAFTY:
         // This packet may contain a value that is used elsewhere,
@@ -274,6 +293,8 @@ impl Message {
                 content: None,
                 bit_len,
                 byte_len,
+                #[cfg(debug_assertions)]
+                content_ty,
             });
         };
 
@@ -285,6 +306,8 @@ impl Message {
                     meta,
                     bit_len,
                     byte_len,
+                    #[cfg(debug_assertions)]
+                    content_ty,
                 })
             }
         };
@@ -366,11 +389,16 @@ impl Message {
         let bit_len = self.bit_len;
         let byte_len = self.byte_len;
 
+        #[cfg(debug_assertions)]
+        let content_ty = self.content_ty;
+
         Some(Self {
             meta,
             content,
             bit_len,
             byte_len,
+            #[cfg(debug_assertions)]
+            content_ty,
         })
     }
 }
@@ -835,6 +863,8 @@ where
 pub struct MessageBuilder {
     pub(crate) meta: MessageMetadata,
     pub(crate) content: Option<(usize, usize, Box<dyn Any>)>,
+    #[cfg(debug_assertions)]
+    content_ty: Option<&'static str>,
 }
 
 impl MessageBuilder {
@@ -844,6 +874,8 @@ impl MessageBuilder {
         Self {
             meta: MessageMetadata::default(),
             content: None,
+            #[cfg(debug_assertions)]
+            content_ty: None,
         }
     }
 
@@ -927,6 +959,10 @@ impl MessageBuilder {
         let byte_len = content.byte_len();
         let interned = Box::new(content);
         self.content = Some((bit_len, byte_len, interned));
+        #[cfg(debug_assertions)]
+        {
+            self.content_ty = Some(std::any::type_name::<T>());
+        }
         self
     }
 
@@ -937,13 +973,22 @@ impl MessageBuilder {
         T: 'static + MessageBody + Send,
     {
         self.content = Some((content.bit_len(), content.byte_len(), content));
+        #[cfg(debug_assertions)]
+        {
+            self.content_ty = Some(std::any::type_name::<T>());
+        }
         self
     }
 
     /// Builds a message from the builder.
     #[must_use]
     pub fn build(self) -> Message {
-        let MessageBuilder { meta, content } = self;
+        let MessageBuilder {
+            meta,
+            content,
+            #[cfg(debug_assertions)]
+            content_ty,
+        } = self;
 
         let (bit_len, byte_len, content) = match content {
             Some((bit_len, byte_len, content)) => (bit_len, byte_len, Some(content)),
@@ -955,6 +1000,8 @@ impl MessageBuilder {
             content,
             bit_len,
             byte_len,
+            #[cfg(debug_assertions)]
+            content_ty,
         }
     }
 }
