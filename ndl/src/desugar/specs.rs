@@ -509,6 +509,8 @@ pub struct ChannelSpec {
     pub jitter: f64,
     /// The cost of the link.
     pub cost: f64,
+    /// The size of the queue.
+    pub queuesize: usize,
 }
 
 impl ChannelSpec {
@@ -524,6 +526,7 @@ impl ChannelSpec {
             latency: 1.0,
             jitter: 1.0,
             cost: 1.0,
+            queuesize: 0,
         }
     }
 
@@ -540,6 +543,7 @@ impl ChannelSpec {
             latency: link_def.latency,
             jitter: link_def.jitter,
             cost: link_def.cost,
+            queuesize: link_def.queuesize,
         }
     }
 }

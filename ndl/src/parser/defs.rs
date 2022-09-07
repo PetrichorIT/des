@@ -40,6 +40,9 @@ pub struct LinkDef {
 
     /// The cost of the link.
     pub cost: f64,
+
+    /// The size of the buffer in bytes
+    pub queuesize: usize,
 }
 
 impl Eq for LinkDef {}

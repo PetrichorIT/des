@@ -126,6 +126,7 @@ fn subsystem_main(vis: Visibility, ident: Ident, attr: Attr, out: &mut TokenStre
                             latency,
                             jitter,
                             cost,
+                            queuesize,
                             ..
                         } = channel;
 
@@ -140,6 +141,7 @@ fn subsystem_main(vis: Visibility, ident: Ident, attr: Attr, out: &mut TokenStre
                                     latency: ::des::time::Duration::from_secs_f64(#latency),
                                     jitter: ::des::time::Duration::from_secs_f64(#jitter),
                                     cost: #cost,
+                                    queuesize: #queuesize,
                                 }
                             );
                             #from_ident.set_next_gate(#to_ident);

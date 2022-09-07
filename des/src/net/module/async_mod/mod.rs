@@ -33,6 +33,13 @@ pub trait AsyncModule: StaticModuleCore + Send {
     ///
     /// A message handler for receiving events, user defined.
     ///
+    /// # Note
+    ///
+    /// The function may block beyond the evaluation of the current event.
+    /// If that happens, other messages that will be received will be queued
+    /// until the evaluation of this event has concluded. For non-blocking
+    /// event execution use [tokio::spawn].
+    ///
     /// # Example
     ///
     /// ```rust

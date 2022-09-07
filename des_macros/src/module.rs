@@ -141,6 +141,7 @@ fn generate_dynamic_builder(
                         latency,
                         jitter,
                         cost,
+                        queuesize,
                         ..
                     } = channel;
 
@@ -155,6 +156,7 @@ fn generate_dynamic_builder(
                                 latency: ::des::time::Duration::from_secs_f64(#latency),
                                 jitter: ::des::time::Duration::from_secs_f64(#jitter),
                                 cost: #cost,
+                                queuesize: #queuesize,
                             }
                         );
                         ctx.create_channel(channel.clone());

@@ -222,7 +222,6 @@ dependencies = [
  "des_macros",
  "futures",
  "log",
- "num-traits",
  "rand",
  "serial_test",
  "sysinfo",

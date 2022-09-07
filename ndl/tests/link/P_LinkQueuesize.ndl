@@ -1,0 +1,6 @@
+link FastLink {
+    bitrate: 1000
+    jitter: 0.0
+    latency: 0.1
+    queuesize: 1024
+}

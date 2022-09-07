@@ -3,11 +3,16 @@
 use rand::distributions::Uniform;
 use rand::prelude::StdRng;
 use rand::Rng;
+use std::collections::VecDeque;
 use std::fmt::Display;
 
-use crate::net::{Message, ObjectPath};
+use crate::net::runtime::ChannelUnbusyNotif;
+use crate::net::{Message, MessageAtGateEvent, NetEvents, ObjectPath};
+use crate::runtime::{rng, Runtime};
 use crate::time::{Duration, SimTime};
 use crate::util::{Ptr, PtrConst, PtrMut};
+
+use super::{GateRef, NetworkRuntime};
 
 ///
 /// A readonly reference to a channel.
@@ -32,6 +37,8 @@ pub struct ChannelMetrics {
     pub latency: Duration,
     /// The variance in latency.
     pub jitter: Duration,
+    /// The size of the channels queue in bytes.
+    pub queuesize: usize,
 
     /// A userdefined cost for the channel.
     pub cost: f64,
@@ -43,7 +50,7 @@ impl ChannelMetrics {
     ///
     #[must_use]
     pub const fn new(bitrate: usize, latency: Duration, jitter: Duration) -> Self {
-        Self::new_with_cost(bitrate, latency, jitter, 1.0)
+        Self::new_with_cost(bitrate, latency, jitter, 1.0, 0)
     }
 
     ///
@@ -55,12 +62,14 @@ impl ChannelMetrics {
         latency: Duration,
         jitter: Duration,
         cost: f64,
+        queuesize: usize,
     ) -> Self {
         Self {
             bitrate,
             latency,
             jitter,
             cost,
+            queuesize,
         }
     }
 
@@ -115,7 +124,7 @@ impl Eq for ChannelMetrics {}
 ///
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct Channel {
     /// The path.
     path: ObjectPath,
@@ -132,6 +141,9 @@ pub struct Channel {
 
     /// The time the current packet is fully transmitted onto the channel.
     transmission_finish_time: SimTime,
+
+    buffer: VecDeque<(Message, GateRef)>,
+    buffer_len: usize,
 }
 
 impl Channel {
@@ -174,14 +186,6 @@ impl Channel {
     }
 
     ///
-    /// Resets the busy state of a channel.
-    ///
-    pub(crate) fn unbusy(&mut self) {
-        self.busy = false;
-        self.transmission_finish_time = SimTime::ZERO;
-    }
-
-    ///
     /// Returns the time when the packet currently being transmitted onto the medium
     /// has been fully transmitted, or [`SimTime::ZERO`] if no packet is currently being transmitted.
     ///
@@ -201,6 +205,8 @@ impl Channel {
             metrics,
             busy: false,
             transmission_finish_time: SimTime::ZERO,
+            buffer: VecDeque::new(),
+            buffer_len: 0,
 
             #[cfg(feature = "metrics")]
             stats: crate::stats::InProgressChannelStats::new(
@@ -244,5 +250,90 @@ impl Channel {
     #[must_use]
     pub fn calculate_busy(&self, msg: &Message) -> Duration {
         self.metrics.calculate_busy(msg)
+    }
+
+    pub(super) fn send_message<A>(
+        mut self: PtrMut<Self>,
+        msg: Message,
+        next_gate: &GateRef,
+        rt: &mut Runtime<NetworkRuntime<A>>,
+    ) {
+        let rng_ref = rng();
+
+        if self.is_busy() {
+            let msg_size = msg.byte_len;
+            if self.buffer_len + msg_size > self.metrics.queuesize {
+                log::warn!(
+                    "Gate '{}' dropping message [{}] pushed onto busy channel {}",
+                    next_gate.previous_gate().unwrap().name(),
+                    msg.str(),
+                    self.path()
+                );
+
+                // Register message progress (DROP)
+                #[cfg(feature = "metrics")]
+                {
+                    channel.register_message_dropped(&message);
+                }
+
+                drop(msg);
+                log_scope!()
+            } else {
+                log::trace!(
+                    "Gate '{}' added message [{}] to queue",
+                    next_gate.previous_gate().unwrap().name(),
+                    msg.str()
+                );
+                self.buffer_len += msg.byte_len;
+                self.buffer.push_back((msg, Ptr::clone(next_gate)));
+            }
+        } else {
+            // Register message progress (SUCC)
+            #[cfg(feature = "metrics")]
+            {
+                self.register_message_passed(&message);
+            }
+
+            let dur = self.calculate_duration(&msg, rng_ref);
+            let busy = self.calculate_busy(&msg);
+
+            let transmissin_finish = SimTime::now() + busy;
+
+            self.set_busy_until(transmissin_finish);
+
+            rt.add_event(
+                NetEvents::ChannelUnbusyNotif(ChannelUnbusyNotif {
+                    channel: self.clone(),
+                }),
+                transmissin_finish,
+            );
+
+            let next_event_time = SimTime::now() + dur;
+
+            rt.add_event(
+                NetEvents::MessageAtGateEvent(MessageAtGateEvent {
+                    gate: Ptr::clone(next_gate),
+                    message: msg,
+                }),
+                next_event_time,
+            );
+
+            // must break iteration,
+            // but not perform on-module handling
+            log_scope!();
+        }
+    }
+
+    ///
+    /// Resets the busy state of a channel.
+    ///
+    pub(crate) fn unbusy<A>(mut self: PtrMut<Self>, rt: &mut Runtime<NetworkRuntime<A>>) {
+        self.busy = false;
+        self.transmission_finish_time = SimTime::ZERO;
+
+        if let Some((msg, next_gate)) = self.buffer.pop_front() {
+            self.buffer_len -= msg.byte_len;
+            self.send_message(msg, &next_gate, rt)
+        }
     }
 }

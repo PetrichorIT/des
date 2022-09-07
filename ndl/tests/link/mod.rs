@@ -28,6 +28,19 @@ fn par_missing_ident() {
 }
 
 #[test]
+fn par_queuesize() {
+    let path = "tests/link/P_LinkQueuesize.ndl";
+    let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");
+
+    r.run().expect("Failed run");
+    assert_eq!(r.scopes.len(), 1);
+
+    let ctx = r.gtyctx_def();
+    let v = ctx.link("FastLink").unwrap();
+    assert_eq!(v.queuesize, 1024);
+}
+
+#[test]
 fn par_missing_block_open() {
     let path = "tests/link/P_MissingBlockOpen.ndl";
     let mut r = NdlResolver::quiet(path).expect("Test case file does not seem to exist");

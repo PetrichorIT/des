@@ -3,7 +3,7 @@ use log::info;
 use crate::{
     create_event_set,
     net::{ChannelRefMut, GateRef, GateServiceType, Message, Module, NetworkRuntime},
-    runtime::{rng, Event, EventSet, Runtime},
+    runtime::{Event, EventSet, Runtime},
     time::{Duration, SimTime},
     util::{Ptr, PtrWeakMut},
 };
@@ -58,65 +58,14 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
             );
 
             match current_gate.channel_mut() {
-                Some(mut channel) => {
+                Some(channel) => {
                     // Channel delayed connection
                     assert!(
                         current_gate.service_type() != GateServiceType::Input,
                         "Channels cannot start at a input node"
                     );
 
-                    let rng_ref = rng();
-
-                    if channel.is_busy() {
-                        log::warn!(
-                            "Gate '{}' dropping message [{}] pushed onto busy channel {}",
-                            current_gate.name(),
-                            message.str(),
-                            channel.path()
-                        );
-
-                        // Register message progress (DROP)
-                        #[cfg(feature = "metrics")]
-                        {
-                            channel.register_message_dropped(&message);
-                        }
-
-                        drop(message);
-                        log_scope!();
-                        return;
-                    }
-
-                    // Register message progress (SUCC)
-                    #[cfg(feature = "metrics")]
-                    {
-                        channel.register_message_passed(&message);
-                    }
-
-                    let dur = channel.calculate_duration(&message, rng_ref);
-                    let busy = channel.calculate_busy(&message);
-
-                    let transmissin_finish = SimTime::now() + busy;
-
-                    channel.set_busy_until(transmissin_finish);
-
-                    rt.add_event(
-                        NetEvents::ChannelUnbusyNotif(ChannelUnbusyNotif { channel }),
-                        transmissin_finish,
-                    );
-
-                    let next_event_time = SimTime::now() + dur;
-
-                    rt.add_event(
-                        NetEvents::MessageAtGateEvent(MessageAtGateEvent {
-                            gate: Ptr::clone(next_gate),
-                            message,
-                        }),
-                        next_event_time,
-                    );
-
-                    // must break iteration,
-                    // but not perform on-module handling
-                    log_scope!();
+                    channel.send_message(message, next_gate, rt);
                     return;
                 }
                 None => {
@@ -221,12 +170,12 @@ impl<A> Event<NetworkRuntime<A>> for CoroutineMessageEvent {
 
 #[derive(Debug)]
 pub struct ChannelUnbusyNotif {
-    channel: ChannelRefMut,
+    pub(crate) channel: ChannelRefMut,
 }
 
 impl<A> Event<NetworkRuntime<A>> for ChannelUnbusyNotif {
-    fn handle(mut self, _rt: &mut Runtime<NetworkRuntime<A>>) {
-        self.channel.unbusy();
+    fn handle(self, rt: &mut Runtime<NetworkRuntime<A>>) {
+        self.channel.unbusy(rt);
     }
 }
 

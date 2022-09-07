@@ -1501,10 +1501,11 @@ impl<'a> Parser<'a> {
         let mut jitter: Option<f64> = None;
         let mut latency: Option<f64> = None;
         let mut cost: Option<f64> = None;
+        let mut queuesize: Option<usize> = None;
 
         let mut errornous = false;
 
-        while bitrate.is_none() || jitter.is_none() || latency.is_none() || cost.is_none() {
+        while bitrate.is_none() || jitter.is_none() || latency.is_none() || cost.is_none() || queuesize.is_none() {
             self.eat_whitespace();
 
             let (key_token, raw) = self.next_token()?;
@@ -1525,7 +1526,7 @@ impl<'a> Parser<'a> {
                 continue;
             } 
 
-            if !["latency", "bitrate", "jitter", "cost"].contains(&raw) {
+            if !["latency", "bitrate", "jitter", "cost", "queuesize"].contains(&raw) {
                 errornous = true;
                 ectx.record(
                     ParLinkInvalidKey, 
@@ -1591,7 +1592,34 @@ impl<'a> Parser<'a> {
                             )?;
                             continue
                         }
-                    }
+                    },
+                    "queuesize" => {
+                        self.eat_whitespace();
+                        self.eat_optionally(|t| t.kind == TokenKind::Comma);
+
+                        if let LiteralKind::Int { base, .. } = kind {
+                            match usize::from_str_radix(raw, base.radix()) {
+                                Ok(value) => queuesize = Some(value),
+                                Err(e) => {
+                                    errornous = true;
+                                    ectx.record(
+                                        ParLiteralIntParseError,
+                                        format!("Int parsing error: {}.", e), 
+                                        token.loc,
+                                    )?;
+                                    continue
+                                }
+                            }
+                        } else {
+                            errornous = true;
+                            ectx.record(
+                                ParLinkInvalidValueType, 
+                                String::from("Invalid value type. Expected integer."), 
+                                token.loc,
+                            )?;
+                            continue
+                        }
+                    },
 
                     "latency" => {
                         use std::str::FromStr;
@@ -1743,7 +1771,8 @@ impl<'a> Parser<'a> {
             bitrate: bitrate.unwrap_or(1_000),
             latency: latency.unwrap_or(0.1),
             jitter: jitter.unwrap_or(0.1),
-            cost: cost.unwrap_or(1.0)
+            cost: cost.unwrap_or(1.0),
+            queuesize: queuesize.unwrap_or(0),
         });
 
         ectx.reset_transient();
