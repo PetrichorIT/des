@@ -125,6 +125,8 @@
 //! [`net`](https://docs.rs/tokio/latest/tokio/net/index.html) module.
 //!
 
+pub mod doc;
+
 #[macro_use]
 #[doc(hidden)]
 pub mod macros;
