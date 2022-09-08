@@ -1,8 +1,8 @@
-use std::{any::Any, fmt::Debug};
+use std::fmt::Debug;
 
 use crate::net::{GateRef, ModuleId, Packet};
 use crate::time::SimTime;
-use crate::util::Ptr;
+use crate::util::{AnyBox, Ptr};
 
 ///
 /// A ID that defines the meaning of the message in the simulation context.
@@ -149,12 +149,9 @@ impl Default for MessageMetadata {
 pub struct Message {
     pub(crate) meta: MessageMetadata,
 
-    pub(crate) content: Option<Box<dyn Any>>,
+    pub(crate) content: Option<AnyBox>,
     pub(crate) bit_len: usize,
     pub(crate) byte_len: usize,
-
-    #[cfg(debug_assertions)]
-    pub(crate) content_ty: Option<&'static str>,
 }
 
 impl Message {
@@ -185,7 +182,10 @@ impl Message {
         format!(
             "Message {{ {} bytes ({}) }}",
             self.byte_len,
-            self.content_ty.unwrap_or("no content")
+            self.content
+                .as_ref()
+                .map(|v| v.ty())
+                .unwrap_or("no content")
         )
     }
 
@@ -210,7 +210,7 @@ impl Message {
     /// be freed until this function is called, and ownership is thereby moved..
     ///
     #[must_use]
-    pub fn try_cast<T: 'static + MessageBody + Send>(self) -> Option<(T, MessageMetadata)> {
+    pub fn try_cast<T: 'static + MessageBody + Send>(self) -> Result<(T, MessageMetadata), Self> {
         // SAFTY:
         // Since T is 'Send' this is safe within the bounds of Messages safty contract
         unsafe { self.try_cast_unsafe::<T>() }
@@ -238,17 +238,36 @@ impl Message {
     /// from this.
     ///
     #[must_use]
-    pub unsafe fn try_cast_unsafe<T: 'static + MessageBody>(self) -> Option<(T, MessageMetadata)> {
-        let Message { meta, content, .. } = self;
-        let content = content?;
-        let content = match content.downcast::<T>() {
-            Ok(c) => c,
-            Err(_) => return None,
+    pub unsafe fn try_cast_unsafe<T: 'static + MessageBody>(
+        self,
+    ) -> Result<(T, MessageMetadata), Self> {
+        let Message {
+            meta,
+            content,
+            bit_len,
+            byte_len,
+        } = self;
+        let content = match content.map(|c| c.try_cast_unsafe::<T>()) {
+            Some(Ok(c)) => c,
+            Some(Err(content)) => {
+                return Err(Self {
+                    meta,
+                    content: Some(content),
+                    bit_len,
+                    byte_len,
+                })
+            }
+            None => {
+                return Err(Self {
+                    meta,
+                    content: None,
+                    bit_len,
+                    byte_len,
+                })
+            }
         };
 
-        let content = Box::into_inner(content);
-
-        Some((content, meta))
+        Ok((content, meta))
     }
 
     ///
@@ -276,13 +295,11 @@ impl Message {
             content,
             bit_len,
             byte_len,
-            #[cfg(debug_assertions)]
-            content_ty,
         } = self;
         // SAFTY:
         // This packet may contain a value that is used elsewhere,
         // but the metadate is used exclusivly.
-        let pkt = content.map(|v| v.downcast::<Packet>());
+        let pkt = content.map(|v| v.try_cast::<Packet>());
         // let pkt = content.as_ref()?.downcast_ref::<Packet>().unwrap();
 
         let pkt = if let Some(pkt) = pkt {
@@ -293,12 +310,10 @@ impl Message {
                 content: None,
                 bit_len,
                 byte_len,
-                #[cfg(debug_assertions)]
-                content_ty,
             });
         };
 
-        let pkt = match pkt {
+        let mut pkt = match pkt {
             Ok(pkt) => pkt,
             Err(any) => {
                 return Err(Message {
@@ -306,15 +321,12 @@ impl Message {
                     meta,
                     bit_len,
                     byte_len,
-                    #[cfg(debug_assertions)]
-                    content_ty,
                 })
             }
         };
 
         // This packet holds a reference to the same packet content but to
         // use message metadata & packet metadata ecxlusivly, new packets is created.
-        let mut pkt: Packet = Box::into_inner(pkt);
         pkt.message_meta = Some(meta);
 
         Ok(pkt)
@@ -343,7 +355,7 @@ impl Message {
     #[inline]
     #[must_use]
     pub fn can_cast<T: 'static + MessageBody>(&self) -> bool {
-        self.content.as_ref().map_or(false, |v| v.is::<T>())
+        self.content.as_ref().map_or(false, |v| v.can_cast::<T>())
     }
 }
 
@@ -377,28 +389,21 @@ impl Message {
     where
         T: 'static + Clone,
     {
-        let content: Option<Box<dyn Any>> = match &self.content {
-            None => None,
-            Some(boxed) => {
-                let rf = boxed.downcast_ref::<T>()?;
-                Some(Box::new(rf.clone()))
-            }
+        let content: Option<AnyBox> = if let Some(ref content) = self.content {
+            Some(content.try_dup::<T>()?)
+        } else {
+            None
         };
 
         let meta = self.meta.dup();
         let bit_len = self.bit_len;
         let byte_len = self.byte_len;
 
-        #[cfg(debug_assertions)]
-        let content_ty = self.content_ty;
-
         Some(Self {
             meta,
             content,
             bit_len,
             byte_len,
-            #[cfg(debug_assertions)]
-            content_ty,
         })
     }
 }
@@ -862,9 +867,7 @@ where
 ///
 pub struct MessageBuilder {
     pub(crate) meta: MessageMetadata,
-    pub(crate) content: Option<(usize, usize, Box<dyn Any>)>,
-    #[cfg(debug_assertions)]
-    content_ty: Option<&'static str>,
+    pub(crate) content: Option<(usize, usize, AnyBox)>,
 }
 
 impl MessageBuilder {
@@ -874,8 +877,6 @@ impl MessageBuilder {
         Self {
             meta: MessageMetadata::default(),
             content: None,
-            #[cfg(debug_assertions)]
-            content_ty: None,
         }
     }
 
@@ -957,12 +958,8 @@ impl MessageBuilder {
     {
         let bit_len = content.bit_len();
         let byte_len = content.byte_len();
-        let interned = Box::new(content);
+        let interned = AnyBox::new(content);
         self.content = Some((bit_len, byte_len, interned));
-        #[cfg(debug_assertions)]
-        {
-            self.content_ty = Some(std::any::type_name::<T>());
-        }
         self
     }
 
@@ -972,23 +969,18 @@ impl MessageBuilder {
     where
         T: 'static + MessageBody + Send,
     {
-        self.content = Some((content.bit_len(), content.byte_len(), content));
-        #[cfg(debug_assertions)]
-        {
-            self.content_ty = Some(std::any::type_name::<T>());
-        }
+        self.content = Some((
+            content.bit_len(),
+            content.byte_len(),
+            AnyBox::new(Box::into_inner(content)),
+        ));
         self
     }
 
     /// Builds a message from the builder.
     #[must_use]
     pub fn build(self) -> Message {
-        let MessageBuilder {
-            meta,
-            content,
-            #[cfg(debug_assertions)]
-            content_ty,
-        } = self;
+        let MessageBuilder { meta, content } = self;
 
         let (bit_len, byte_len, content) = match content {
             Some((bit_len, byte_len, content)) => (bit_len, byte_len, Some(content)),
@@ -1000,8 +992,6 @@ impl MessageBuilder {
             content,
             bit_len,
             byte_len,
-            #[cfg(debug_assertions)]
-            content_ty,
         }
     }
 }

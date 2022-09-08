@@ -1,11 +1,10 @@
-use std::any::Any;
-use std::fmt::Debug;
-
 use crate::net::{
     GateRef, Message, MessageBody, MessageBuilder, MessageId, MessageKind, MessageMetadata,
     ModuleId,
 };
 use crate::time::SimTime;
+use crate::util::AnyBox;
+use std::fmt::Debug;
 
 cfg_net_std! {
     /// A address of a node in a IPv6 network.
@@ -247,7 +246,7 @@ pub type PortAddress = u16;
 pub struct Packet {
     pub(crate) header: PacketHeader,
     pub(crate) message_meta: Option<MessageMetadata>,
-    pub(crate) content: Option<Box<dyn Any>>,
+    pub(crate) content: Option<AnyBox>,
 }
 
 impl Packet {
@@ -367,12 +366,10 @@ impl Packet {
     where
         T: 'static + Clone,
     {
-        let content: Option<Box<dyn Any>> = match &self.content {
-            None => None,
-            Some(boxed) => {
-                let rf = boxed.downcast_ref::<T>()?;
-                Some(Box::new(rf.clone()))
-            }
+        let content: Option<AnyBox> = if let Some(ref content) = self.content {
+            Some(content.try_dup::<T>()?)
+        } else {
+            None
         };
 
         let message_meta = self.message_meta.as_ref().map(|m| m.dup());
@@ -399,7 +396,7 @@ impl Packet {
     /// be freed until this function is called, and ownership is thereby moved..
     ///
     #[must_use]
-    pub fn try_cast<T: 'static + MessageBody + Send>(self) -> Option<(T, PacketHeader)> {
+    pub fn try_cast<T: 'static + MessageBody + Send>(self) -> Result<(T, PacketHeader), Self> {
         // SAFTY:
         // Since T is 'Send' this is safe within the bounds of Messages safty contract
         unsafe { self.try_cast_unsafe::<T>() }
@@ -427,19 +424,33 @@ impl Packet {
     /// from this.
     ///
     #[must_use]
-    pub unsafe fn try_cast_unsafe<T: 'static + MessageBody>(self) -> Option<(T, PacketHeader)> {
+    pub unsafe fn try_cast_unsafe<T: 'static + MessageBody>(
+        self,
+    ) -> Result<(T, PacketHeader), Self> {
         let Packet {
-            header, content, ..
+            header,
+            content,
+            message_meta,
         } = self;
-        let content = content?;
-        let content = match content.downcast::<T>() {
-            Ok(c) => c,
-            Err(_) => return None,
+        let content = match content.map(|c| c.try_cast_unsafe::<T>()) {
+            Some(Ok(c)) => c,
+            Some(Err(content)) => {
+                return Err(Self {
+                    content: Some(content),
+                    header,
+                    message_meta,
+                })
+            }
+            None => {
+                return Err(Self {
+                    content: None,
+                    header,
+                    message_meta,
+                })
+            }
         };
 
-        let content = Box::into_inner(content);
-
-        Some((content, header))
+        Ok((content, header))
     }
 
     ///
@@ -461,7 +472,7 @@ impl Packet {
     ///
     #[must_use]
     pub fn try_content<T: 'static + MessageBody>(&self) -> Option<&T> {
-        Some(self.content.as_ref()?.downcast_ref::<T>())?
+        Some(self.content.as_ref()?.try_cast_ref::<T>())?
     }
 
     ///
@@ -478,8 +489,7 @@ impl Packet {
     /// Returns [None] if the no content exists or the content is not of type T.
     ///
     pub fn try_content_mut<T: 'static + MessageBody>(&mut self) -> Option<&mut T> {
-        let mut_box = self.content.as_mut()?;
-        Some(mut_box.downcast_mut())?
+        Some(self.content.as_mut()?.try_cast_mut())?
     }
 
     ///
@@ -527,7 +537,7 @@ unsafe impl Send for Packet {}
 pub struct PacketBuilder {
     message_builder: MessageBuilder,
     header: PacketHeader,
-    content: Option<(usize, Box<dyn Any>)>,
+    content: Option<(usize, AnyBox)>,
 }
 
 impl PacketBuilder {
@@ -628,7 +638,7 @@ impl PacketBuilder {
         T: 'static + MessageBody,
     {
         let byte_len = content.byte_len();
-        let interned = Box::new(content);
+        let interned = AnyBox::new(content);
         self.content = Some((byte_len, interned));
         self
     }
@@ -639,7 +649,7 @@ impl PacketBuilder {
     where
         T: 'static + MessageBody,
     {
-        self.content = Some((content.byte_len(), content));
+        self.content = Some((content.byte_len(), AnyBox::new(Box::into_inner(content))));
         self
     }
 
