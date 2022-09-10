@@ -133,6 +133,7 @@ impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
         {
             let elapsed = Instant::now().duration_since(t0);
             module.module_core_mut().elapsed += elapsed;
+            rt.app.globals.time_elapsed += elapsed;
         }
 
         log_scope!();
@@ -175,6 +176,7 @@ impl<A> Event<NetworkRuntime<A>> for CoroutineMessageEvent {
             {
                 let elapsed = Instant::now().duration_since(t0);
                 self.module.module_core_mut().elapsed += elapsed;
+                rt.app.globals.time_elapsed += elapsed;
             }
 
             if still_active {
@@ -241,6 +243,7 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
                     {
                         let elapsed = Instant::now().duration_since(t0);
                         module.module_core_mut().elapsed += elapsed;
+                        rt.app.globals.time_elapsed += elapsed;
                     }
                 }
             }

@@ -198,6 +198,12 @@ pub struct NetworkRuntimeGlobals {
     pub topology: Topology,
 
     ///
+    /// The total duration spend in the module specific handlers.
+    ///
+    #[cfg(feature = "metrics-module-time")]
+    pub time_elapsed: std::time::Duration,
+
+    ///
     /// The runtime that executes all futures.
     /// Note that the set of all futures within this runtime can be partitioned into
     /// subsets required by each module. No future should be used by more than one module.
@@ -217,6 +223,9 @@ impl NetworkRuntimeGlobals {
         Self {
             parameters: Parameters::new(),
             topology: Topology::new(),
+
+            #[cfg(feature = "metrics-module-time")]
+            time_elapsed: std::time::Duration::ZERO,
 
             #[cfg(feature = "async")]
             #[cfg(feature = "async-sharedrt")]
