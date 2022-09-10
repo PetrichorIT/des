@@ -26,9 +26,13 @@ full = ["net", "cqueue", "async"]
 async = ["net", "std-net", "dep:tokio", "dep:async-trait"]
 async-sharedrt = ["async"]
 cqueue = []
-metrics = []
+
 net = ["dep:des_macros"]
 std-net = ["net"]
+
+# Different metrics features
+metrics = ["metrics-module-time"]
+metrics-module-time = []
 
 [dependencies]
 # An internal logging impl can be very usefull. 

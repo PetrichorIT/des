@@ -120,9 +120,20 @@ impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
 
         let mut module = PtrWeakMut::clone(&self.module);
 
+        #[cfg(feature = "metrics-module-time")]
+        use std::time::Instant;
+        #[cfg(feature = "metrics-module-time")]
+        let t0 = Instant::now();
+
         module.prepare_buffers();
         module.handle_message(message);
         module.handle_buffers(rt);
+
+        #[cfg(feature = "metrics-module-time")]
+        {
+            let elapsed = Instant::now().duration_since(t0);
+            module.module_core_mut().elapsed += elapsed;
+        }
 
         log_scope!();
     }
@@ -143,6 +154,12 @@ impl<A> Event<NetworkRuntime<A>> for CoroutineMessageEvent {
         // but a event still remains in queue.
         if dur != Duration::ZERO && self.module.module_core().activity_active {
             info!("Handeling activity call");
+
+            #[cfg(feature = "metrics-module-time")]
+            use std::time::Instant;
+            #[cfg(feature = "metrics-module-time")]
+            let t0 = Instant::now();
+
             self.module.prepare_buffers();
             self.module.activity();
 
@@ -153,6 +170,12 @@ impl<A> Event<NetworkRuntime<A>> for CoroutineMessageEvent {
             // - state remains stable since allready init
             // - activity deactivated.
             PtrWeakMut::clone(&self.module).handle_buffers(rt);
+
+            #[cfg(feature = "metrics-module-time")]
+            {
+                let elapsed = Instant::now().duration_since(t0);
+                self.module.module_core_mut().elapsed += elapsed;
+            }
 
             if still_active {
                 rt.add_event_in(
@@ -204,9 +227,21 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
                         target: &format!("{}", module.path()),
                         "Calling at_sim_start({}).", stage
                     );
+
+                    #[cfg(feature = "metrics-module-time")]
+                    use std::time::Instant;
+                    #[cfg(feature = "metrics-module-time")]
+                    let t0 = Instant::now();
+
                     module.prepare_buffers();
                     module.at_sim_start(stage);
                     module.handle_buffers(rt);
+
+                    #[cfg(feature = "metrics-module-time")]
+                    {
+                        let elapsed = Instant::now().duration_since(t0);
+                        module.module_core_mut().elapsed += elapsed;
+                    }
                 }
             }
         }

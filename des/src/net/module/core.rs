@@ -106,6 +106,10 @@ pub struct ModuleCore {
     #[cfg(feature = "async")]
     pub(crate) async_ext: super::ext::AsyncCoreExt,
 
+    /// The real time spend managing this module.
+    #[cfg(feature = "metrics-module-time")]
+    pub(crate) elapsed: Duration,
+
     /// The period of the activity coroutine (if zero than there is no coroutine).
     pub(crate) activity_period: Duration,
 
@@ -236,6 +240,9 @@ impl ModuleCore {
             #[cfg(feature = "async")]
             async_ext: super::ext::AsyncCoreExt::new(tctx_ident),
 
+            #[cfg(feature = "metrics-module-time")]
+            elapsed: Duration::ZERO,
+
             id: ModuleId::gen(),
             path,
             gates: Vec::new(),
@@ -274,6 +281,9 @@ impl ModuleCore {
 
             #[cfg(feature = "async")]
             async_ext: super::ext::AsyncCoreExt::new(tctx_ident),
+
+            #[cfg(feature = "metrics-module-time")]
+            elapsed: Duration::ZERO,
         }
     }
 
@@ -302,6 +312,12 @@ impl ModuleCore {
             inner,
             time_offset: self.buffers.processing_time_delay,
         }
+    }
+
+    /// Returns the duration that this module spend executing.
+    #[cfg(feature = "metrics-module-time")]
+    pub fn total_cpu_time_elpased(&self) {
+        self.elapsed;
     }
 
     ///

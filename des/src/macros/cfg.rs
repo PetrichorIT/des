@@ -60,6 +60,16 @@ macro_rules! cfg_metrics {
     }
 }
 
+macro_rules! cfg_metrics_module_time {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "metrics-module-time")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "metrics-module-time")))]
+            $item
+        )*
+    }
+}
+
 macro_rules! cfg_cqueue {
     ($($item:item)*) => {
         $(

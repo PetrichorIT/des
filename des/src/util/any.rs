@@ -1,7 +1,4 @@
-use std::{
-    any::{type_name, Any},
-    fmt::Debug,
-};
+use std::{any::*, fmt::Debug};
 
 #[derive(Debug)]
 pub(crate) struct AnyBox {
@@ -21,6 +18,7 @@ impl AnyBox {
         }
     }
 
+    #[cfg(debug_assertions)]
     pub(crate) fn ty(&self) -> &'static str {
         self.ty_info
     }
