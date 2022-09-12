@@ -37,9 +37,14 @@ The subsystem acts as a seperate component on the module path
 
 e.g. mutiple import of the same subasset (in the same file+)
 
-# Tokio investigate
+# Hooks
 
-18446744073709551615.999999999s
+A hook is a Fn(&mut Self, Message) -> Result<(), Message>.
+Hooks will be executed when a message arrives at a node.
+Hooks can be prioritized with a usize.
+If a Hook retuns Ok() the message was consumed.
+If not use the Err(\_) Variant to invoke the next hook.
+If no hooks match, use the handle_message as the default hook.
 
-
-Ptr - make debug variatn with atmoic ref c
+SimContext handlers are hooks.
+Shutdown is invoked using a hook.
