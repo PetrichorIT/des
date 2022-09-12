@@ -9,13 +9,8 @@ use crate::time::SimTime;
 use std::ops::RangeInclusive;
 
 cfg_metrics! {
-    mod internal;
-    pub use internal::*;
-
-    cfg_net! {
-        mod channel;
-        pub use channel::*;
-    }
+    mod runtime;
+    pub use runtime::*;
 }
 
 mod stddev;

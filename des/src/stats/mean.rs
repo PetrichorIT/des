@@ -1,31 +1,29 @@
-use std::{fs::File, io::BufWriter, path::Path};
+use crate::time::{Duration, SimTime};
 
-use crate::time::SimTime;
-
-use super::Statistic;
+use super::{Statistic, StdDev};
 
 /// Collects vallues in a vectors, combining all elements in
 /// a given time slot into a mean value, returning a vectors of means.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MeanVec {
-    slot_size: SimTime,
+    slot_size: Duration,
 
     current_slot_end: SimTime,
-    current_slot_buffer: Vec<f64>,
+    current_slot_buffer: StdDev,
 
-    /// (MEAN, MIN, MAX);
-    results: Vec<(f64, f64, f64)>,
+    /// (END: MEAN, MIN, MAX; STDDEV);
+    pub(super) results: Vec<(SimTime, f64, f64, f64, f64)>,
 }
 
 impl MeanVec {
     /// Creates a new instance with the given slot size.
     #[must_use]
-    pub fn new(slot_size: SimTime) -> Self {
+    pub fn new(slot_size: Duration) -> Self {
         Self {
             slot_size,
 
-            current_slot_end: slot_size,
-            current_slot_buffer: Vec::new(),
+            current_slot_end: SimTime::ZERO + slot_size,
+            current_slot_buffer: StdDev::new(),
 
             results: Vec::new(),
         }
@@ -34,22 +32,21 @@ impl MeanVec {
     fn mean_step(&mut self) {
         if self.current_slot_buffer.is_empty() {
             self.results
-                .push(self.results.last().map(|v| *v).unwrap_or((0.0, 0.0, 0.0)));
+                .push(self.results.last().map(|v| *v).unwrap_or((
+                    self.current_slot_end,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                )));
         } else {
-            let mut min = f64::INFINITY;
-            let mut max = f64::NEG_INFINITY;
-            let mut sum = 0.0;
-            for v in &self.current_slot_buffer {
-                sum += *v;
-                if *v < min {
-                    min = *v
-                }
-                if *v > max {
-                    max = *v;
-                }
-            }
-            self.results
-                .push((sum / self.current_slot_buffer.len() as f64, min, max));
+            self.results.push((
+                self.current_slot_end,
+                self.current_slot_buffer.mean(),
+                self.current_slot_buffer.min(),
+                self.current_slot_buffer.max(),
+                self.current_slot_buffer.std_derivation(),
+            ));
         }
 
         self.current_slot_end += self.slot_size;
@@ -59,21 +56,6 @@ impl MeanVec {
     /// Finishes th last computation
     pub fn finish(&mut self) {
         self.mean_step()
-    }
-
-    /// Writes the results as json to the output
-    pub fn try_write_to(&self, path: impl AsRef<Path>) -> std::io::Result<()> {
-        let f = File::create(path)?;
-        let mut f = BufWriter::new(f);
-
-        use std::io::Write;
-        write!(f, "{{ \"results\": [ ")?;
-        for (mean, min, max) in &self.results {
-            write!(f, "{{ \"command\": \"mean-vec\", \"mean\": {}, \"min\": {}, \"max\": {}, \"parameters\": {{ \"time\": {} }} }}", mean, min, max, SimTime::now().as_secs_f64().ceil())?
-        }
-        write!(f, "] }}")?;
-
-        Ok(())
     }
 }
 
@@ -92,12 +74,13 @@ impl Statistic for MeanVec {
         todo!()
     }
 
-    fn collect_weighted_at(&mut self, value: Self::Value, _weight: f64, sim_time: SimTime) {
+    fn collect_weighted_at(&mut self, value: Self::Value, weight: f64, sim_time: SimTime) {
         while sim_time > self.current_slot_end {
             self.mean_step();
         }
 
-        self.current_slot_buffer.push(value);
+        self.current_slot_buffer
+            .collect_weighted_at(value, weight, sim_time);
     }
 
     fn min(&self) -> Self::Value {
@@ -120,3 +103,5 @@ impl Statistic for MeanVec {
         todo!()
     }
 }
+
+impl Eq for MeanVec {}

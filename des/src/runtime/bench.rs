@@ -1,12 +1,13 @@
 use std::{
-    fs::OpenOptions,
-    io::{BufWriter, Write},
-    path::{Path, PathBuf},
+    io::Write,
+    path::PathBuf,
     sync::Arc,
     time::{Duration, Instant, SystemTime},
 };
 
 use sysinfo::{CpuExt, SystemExt};
+
+use crate::stats::ProfilerOutputTarget;
 
 use super::{FT_ASYNC, FT_CQUEUE, FT_INTERNAL_METRICS, FT_NET, FT_STD_NET};
 
@@ -62,55 +63,45 @@ impl Profiler {
     }
 
     /// Writes into a benchmark folder.
-    pub fn write_to(&self, path: impl AsRef<Path>) -> std::io::Result<()> {
-        let path = path.as_ref();
-        let f = if path.is_dir() {
-            // Find right file for target or create it
-            let mut path = path.to_owned();
-            path.push(&self.exec);
+    #[cfg(feature = "metrics")]
+    pub fn write_to(&self, target: impl Into<ProfilerOutputTarget>) -> std::io::Result<()> {
+        let target = target.into();
+        target.run(&self.metrics)
+        // writeln!(f, "[{}] {{", self.exec)?;
+        // writeln!(
+        //     f,
+        //     "\tT: {:?} @ {:?}",
+        //     self.simulation_start
+        //         .duration_since(SystemTime::UNIX_EPOCH)
+        //         .expect("HUH"),
+        //     self.target
+        // )?;
+        // self.env.write_to(&mut f)?;
+        // writeln!(f)?;
 
-            OpenOptions::new().append(true).open(path)?
-        } else {
-            OpenOptions::new().append(true).open(path)?
-        };
+        // #[cfg(feature = "metrics")]
+        // {
+        //     self.metrics.write_to(&mut f)?;
+        //     writeln!(f)?;
+        // }
 
-        let mut f = BufWriter::new(f);
+        // let throughput = self.event_count as f64 / self.duration.as_secs_f64();
 
-        writeln!(f, "[{}] {{", self.exec)?;
-        writeln!(
-            f,
-            "\tT: {:?} @ {:?}",
-            self.simulation_start
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .expect("HUH"),
-            self.target
-        )?;
-        self.env.write_to(&mut f)?;
-        writeln!(f)?;
+        // writeln!(
+        //     f,
+        //     "\t{} ({} events/s) events ",
+        //     self.event_count,
+        //     throughput.floor() as usize
+        // )?;
+        // writeln!(
+        //     f,
+        //     "\twith features <{}> in {:?}",
+        //     self.features.join(", "),
+        //     self.duration
+        // )?;
+        // writeln!(f, "}}")?;
 
-        #[cfg(feature = "metrics")]
-        {
-            self.metrics.write_to(&mut f)?;
-            writeln!(f)?;
-        }
-
-        let throughput = self.event_count as f64 / self.duration.as_secs_f64();
-
-        writeln!(
-            f,
-            "\t{} ({} events/s) events ",
-            self.event_count,
-            throughput.floor() as usize
-        )?;
-        writeln!(
-            f,
-            "\twith features <{}> in {:?}",
-            self.features.join(", "),
-            self.duration
-        )?;
-        writeln!(f, "}}")?;
-
-        Ok(())
+        // Ok(())
     }
 }
 
@@ -185,10 +176,12 @@ pub struct ProfilerEnv {
     /// The target os family.
     pub os_family: String,
 
+    #[allow(unused)]
     system: Arc<sysinfo::System>,
 }
 
 impl ProfilerEnv {
+    #[allow(unused)]
     fn write_to(&self, f: &mut impl Write) -> std::io::Result<()> {
         writeln!(
             f,

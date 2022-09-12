@@ -31,8 +31,9 @@ net = ["dep:des_macros"]
 std-net = ["net"]
 
 # Different metrics features
-metrics = ["metrics-module-time"]
-metrics-module-time = []
+metrics = []
+metrics-module-time = ["metrics"]
+metrics-rt-full = ["metrics"]
 
 [dependencies]
 # An internal logging impl can be very usefull. 

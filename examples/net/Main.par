@@ -1,0 +1,7 @@
+root.clients[1].ip = 192.168.2.100
+root.clients[2].ip = 192.168.2.110
+root.clients[3].ip = 192.168.2.120
+root.clients[4].ip = 192.168.2.130
+root.clients[5].ip = 192.168.2.140
+
+root.server.ip = 212.71.90.69

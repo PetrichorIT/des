@@ -50,8 +50,13 @@ path = "droptest/main.rs"
 name = "t-macro2"
 path = "macro2/main.rs"
 
+[[bin]]
+name = "t-net"
+path = "net/main.rs"
+
 [dependencies]
-des = {path = "../des", features = ["full"]}
+async-trait = "*"
+des = {path = "../des", features = ["full", "metrics-rt-full"]}
 lazy_static = "*"
 log = {version = "*", features = ["max_level_trace", "release_max_level_trace"]}
 ndl = {path = "../ndl"}

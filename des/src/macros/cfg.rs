@@ -60,6 +60,16 @@ macro_rules! cfg_metrics {
     }
 }
 
+macro_rules! cfg_metrics_rt_full {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "metrics-rt-full")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "metrics-rt-full")))]
+            $item
+        )*
+    }
+}
+
 macro_rules! cfg_metrics_module_time {
     ($($item:item)*) => {
         $(
