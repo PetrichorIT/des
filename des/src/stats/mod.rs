@@ -27,6 +27,9 @@ pub use outvec::*;
 mod timeline;
 pub use timeline::*;
 
+mod mean;
+pub use mean::*;
+
 ///
 /// A type that allows for statistical datacollection
 /// inside a given runtime.

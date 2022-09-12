@@ -72,11 +72,13 @@ cfg_cqueue! {
     /// Metrics that sample the runtime
     pub type RuntimeMetrics = CQueueMetrics;
 
-    use crate::stats::{CompressedStdDev, StdDev};
+    use crate::stats::{CompressedStdDev, StdDev, MeanVec};
 
     /// Metrics specific to a cqueue.
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub struct CQueueMetrics {
+        pub(crate) event_count: MeanVec,
+
         pub(crate) zero_queue_size: StdDev,
         pub(crate) bucket_queue_size: StdDev,
 

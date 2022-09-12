@@ -206,6 +206,8 @@ cfg_cqueue! {
                     } else {
                         metrics.nonzero_event_count.add_assign(1);
                     }
+
+                    metrics.event_count.collect(self.len() as f64);
                 }
 
                 let Node {

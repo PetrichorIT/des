@@ -40,3 +40,6 @@ e.g. mutiple import of the same subasset (in the same file+)
 # Tokio investigate
 
 18446744073709551615.999999999s
+
+
+Ptr - make debug variatn with atmoic ref c
