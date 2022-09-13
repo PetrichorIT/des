@@ -311,6 +311,8 @@ impl ModuleCore {
         super::SenderHandle {
             inner,
             time_offset: self.buffers.processing_time_delay,
+            path: self.path.clone(),
+            globals: self.globals.clone(),
         }
     }
 

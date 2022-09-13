@@ -5,6 +5,7 @@ use crate::net::{
 use crate::time::SimTime;
 use crate::util::AnyBox;
 use std::fmt::Debug;
+use std::net::SocketAddr;
 
 cfg_net_std! {
     /// A address of a node in a IPv6 network.
@@ -18,7 +19,7 @@ cfg_net_std! {
 
     ///
     /// A application-addressed header in a network, similar to TCP/UDP.
-    #[derive(Debug, Clone)]
+    #[derive( Clone)]
     #[allow(missing_docs)]
     pub struct PacketHeader {
         // # Ipv6 Header
@@ -83,6 +84,21 @@ cfg_net_std! {
                 ..Default::default()
             }
         }
+
+        fn flags(&self) -> String {
+            let mut r = 0u16;
+            if self.flag_ns { r |= 0b1 }
+            if self.flag_cwr { r |= 0b10 }
+            if self.flag_ece { r |= 0b100 }
+            if self.flag_urg { r |= 0b1000 }
+            if self.flag_ack { r |= 0b10000 }
+            if self.flag_psh { r |= 0b100000 }
+            if self.flag_rst { r |= 0b1000000 }
+            if self.flag_syn { r |= 0b10000000 }
+            if self.flag_fin { r |= 0b100000000 }
+
+            format!("{:0>9b}", r)
+        }
     }
 
     impl MessageBody for PacketHeader {
@@ -92,6 +108,25 @@ cfg_net_std! {
 
         fn byte_len(&self) -> usize {
             60 + 20
+        }
+    }
+
+    impl Debug for PacketHeader {
+        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            f.debug_struct("PacketHeader")
+                .field("src", &SocketAddr::new(self.src_node, self.src_port))
+                .field("dest", &SocketAddr::new(self.dest_node, self.dest_port))
+                .field("version", &self.version)
+                .field("traffic_class", &self.traffic_class)
+                .field("flow_label", &self.flow_label)
+                .field("length", &self.packet_length)
+                .field("next_header", &self.next_header)
+                .field("ttl", &self.ttl)
+                .field("seq_no", &self.seq_no)
+                .field("ack_no", &self.ack_no)
+                .field("last_node", &self.last_node)
+                .field("flags", &self.flags())
+                .finish()
         }
     }
 
@@ -522,14 +557,6 @@ impl From<Packet> for Message {
 // SAFTY:
 // See [Message] contract its the same
 unsafe impl Send for Packet {}
-
-// impl From<TypedInternedValue<'static, Packet>> for Message {
-//     fn from(mut pkt: TypedInternedValue<'static, Packet>) -> Self {
-//         // Take the meta away to prevent old metadata after incorrect reconstruction of packet.
-//         let meta = pkt.message_meta.take().unwrap_or_default();
-//         Message::new().meta(meta).content_interned(pkt).build()
-//     }
-// }
 
 ///
 /// A intermediary type for constructing packets.

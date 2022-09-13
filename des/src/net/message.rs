@@ -38,7 +38,7 @@ pub(crate) const TYP_TCP_PACKET: u8 = 103;
 ///
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct MessageMetadata {
     /// A unqiue identifier for this instance of a message.
     pub id: MessageId,
@@ -122,6 +122,22 @@ impl MessageMetadata {
             creation_time: SimTime::now(),
             send_time: SimTime::MAX,
         }
+    }
+}
+
+impl Debug for MessageMetadata {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MessageMetadata")
+            .field("id", &self.id)
+            .field("kind", &self.kind)
+            .field("typ", &self.typ)
+            .field("timestamp", &self.timestamp)
+            .field("sender_module_id", &self.sender_module_id)
+            .field("receiver_module_id", &self.receiver_module_id)
+            .field("last_gate", &self.last_gate.as_ref().map(|v| v.path()))
+            .field("creation_time", &self.creation_time)
+            .field("send_time", &self.send_time)
+            .finish()
     }
 }
 

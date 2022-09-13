@@ -1,4 +1,8 @@
-use crate::net::{IntoModuleGate, Message};
+use std::collections::HashMap;
+
+use crate::net::common::Optional;
+use crate::net::{IntoModuleGate, Message, ParHandle};
+use crate::prelude::{NetworkRuntimeGlobals, ObjectPath, PtrWeakConst};
 use crate::time::{Duration, SimTime};
 
 pub(crate) enum BufferEvent {
@@ -66,7 +70,11 @@ unsafe impl Send for BufferEvent {}
 pub struct SenderHandle {
     pub(crate) inner: tokio::sync::mpsc::UnboundedSender<BufferEvent>,
     pub(crate) time_offset: Duration,
+    pub(crate) globals: PtrWeakConst<NetworkRuntimeGlobals>,
+    pub(crate) path: ObjectPath,
 }
+
+unsafe impl Send for SenderHandle {}
 
 impl SenderHandle {
     /// Creates a new handle that points to no module.
@@ -77,6 +85,8 @@ impl SenderHandle {
         Self {
             inner: tx,
             time_offset: Duration::ZERO,
+            globals: PtrWeakConst::new(),
+            path: ObjectPath::root_module("empty".to_string()),
         }
     }
 
@@ -141,6 +151,31 @@ impl SenderHandle {
             .send(BufferEvent::Shutdown { restart_at })
             .expect("Failed to send to unbounded channel. reciver must have died.")
     }
+
+    ///
+    /// Returns the parameters for the current module.
+    ///
+    #[must_use]
+    pub fn pars(&self) -> HashMap<String, String> {
+        self.globals.parameters.get_def_table(self.path.path())
+    }
+
+    ///
+    /// Returns a parameter by reference (not parsed).
+    ///
+    #[must_use]
+    pub fn par<'a>(&'a self, key: &'a str) -> ParHandle<'a, Optional> {
+        self.globals.parameters.get_handle(self.path.path(), key)
+    }
+
+    ///
+    /// Returns a reference to the parameter store, used for constructing
+    /// custom instances of modules.
+    ///
+    #[must_use]
+    pub fn globals(&self) -> PtrWeakConst<NetworkRuntimeGlobals> {
+        PtrWeakConst::clone(&self.globals)
+    }
 }
 
 impl Clone for SenderHandle {
@@ -148,6 +183,8 @@ impl Clone for SenderHandle {
         Self {
             inner: self.inner.clone(),
             time_offset: self.time_offset,
+            path: self.path.clone(),
+            globals: self.globals.clone(),
         }
     }
 }

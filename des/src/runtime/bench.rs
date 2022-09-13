@@ -7,6 +7,7 @@ use std::{
 
 use sysinfo::{CpuExt, SystemExt};
 
+#[cfg(feature = "metrics")]
 use crate::stats::ProfilerOutputTarget;
 
 use super::{FT_ASYNC, FT_CQUEUE, FT_INTERNAL_METRICS, FT_NET, FT_STD_NET};

@@ -1,6 +1,5 @@
 use std::{any::*, fmt::Debug};
 
-#[derive(Debug)]
 pub(crate) struct AnyBox {
     inner: Box<dyn Any>,
 
@@ -71,5 +70,14 @@ impl AnyBox {
 
     pub(crate) fn try_cast_mut<T: 'static>(&mut self) -> Option<&mut T> {
         self.inner.downcast_mut::<T>()
+    }
+}
+
+impl Debug for AnyBox {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        #[cfg(not(debug_assertions))]
+        return write!(f, "AnyBox");
+        #[cfg(debug_assertions)]
+        return write!(f, "AnyBox {{ {} }}", self.ty_info);
     }
 }

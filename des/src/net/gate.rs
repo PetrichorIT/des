@@ -168,6 +168,14 @@ impl Gate {
         &self.description.name
     }
 
+    fn name_with_pos(&self) -> String {
+        if self.description.is_cluster() {
+            format!("{}[{}]", self.name(), self.pos())
+        } else {
+            self.name().to_string()
+        }
+    }
+
     ///
     /// Returns the serivce type of the gate cluster.
     ///
@@ -182,9 +190,9 @@ impl Gate {
     #[must_use]
     pub fn str(&self) -> String {
         match self.description.typ {
-            GateServiceType::Input => format!("{} (input)", self.name()),
-            GateServiceType::Output => format!("{} (output)", self.name()),
-            GateServiceType::Undefined => self.name().to_string(),
+            GateServiceType::Input => format!("{} (input)", self.name_with_pos()),
+            GateServiceType::Output => format!("{} (output)", self.name_with_pos()),
+            GateServiceType::Undefined => self.name_with_pos(),
         }
     }
 
@@ -193,7 +201,7 @@ impl Gate {
     ///
     #[must_use]
     pub fn path(&self) -> String {
-        format!("{}:{}", self.description.owner.path(), self.name())
+        format!("{}:{}", self.description.owner.path(), self.name_with_pos())
     }
 
     ///
