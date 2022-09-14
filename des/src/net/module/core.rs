@@ -110,12 +110,6 @@ pub struct ModuleCore {
     #[cfg(feature = "metrics-module-time")]
     pub(crate) elapsed: Duration,
 
-    /// The period of the activity coroutine (if zero than there is no coroutine).
-    pub(crate) activity_period: Duration,
-
-    /// An indicator whether a valid activity timeout is existent.
-    pub(crate) activity_active: bool,
-
     /// The reference for the parent module.
     pub(crate) parent: Option<PtrWeakMut<dyn StaticModuleCore>>,
 
@@ -247,8 +241,6 @@ impl ModuleCore {
             path,
             gates: Vec::new(),
             buffers: ModuleBuffer::new(),
-            activity_period: Duration::ZERO,
-            activity_active: false,
             parent: None,
             children: HashMap::new(),
             globals,
@@ -272,8 +264,6 @@ impl ModuleCore {
             path,
             gates: Vec::new(),
             buffers: ModuleBuffer::new(),
-            activity_period: Duration::ZERO,
-            activity_active: false,
             parent: None,
             children: HashMap::new(),
             globals: parent.globals(),
@@ -373,23 +363,6 @@ impl ModuleCore {
     ///
     pub fn schedule_at(&mut self, msg: impl Into<Message>, time: SimTime) {
         self.buffers.schedule_at(msg, time);
-    }
-
-    ///
-    /// Enables the activity corountine using the given period.
-    /// This function should only be called from [`Module::handle_message`].
-    ///
-    pub fn enable_activity(&mut self, period: Duration) {
-        self.activity_period = period;
-        self.activity_active = false;
-    }
-
-    ///
-    /// Disables the activity coroutine cancelling the next call.
-    ///
-    pub fn disable_activity(&mut self) {
-        self.activity_period = Duration::ZERO;
-        self.activity_active = false;
     }
 
     ///

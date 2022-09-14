@@ -20,21 +20,20 @@ impl NameableModule for Alice {
 
 impl Module for Alice {
     fn at_sim_start(&mut self, _: usize) {
-        self.enable_activity(Duration::from_secs_f64(1.0))
-    }
-
-    fn activity(&mut self) {
-        self.outvec.collect(rand::random::<f64>());
-        if SimTime::now() == 42.0 {
-            log::trace!("Message");
-        }
+        self.schedule_in(Message::new().build(), Duration::from_secs_f64(1.0))
     }
 
     fn at_sim_end(&mut self) {
         self.outvec.finish()
     }
 
-    fn handle_message(&mut self, _: Message) {}
+    fn handle_message(&mut self, _: Message) {
+        self.outvec.collect(rand::random::<f64>());
+        if SimTime::now() == 42.0 {
+            log::trace!("Message");
+        }
+        self.schedule_in(Message::new().build(), Duration::from_secs_f64(1.0))
+    }
 }
 
 #[NdlSubsystem("examples/metrics")]

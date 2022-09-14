@@ -20,7 +20,6 @@ create_event_set!(
 
         MessageAtGateEvent(MessageAtGateEvent),
         HandleMessageEvent(HandleMessageEvent),
-        CoroutineMessageEvent(CoroutineMessageEvent),
         ChannelUnbusyNotif(ChannelUnbusyNotif),
         SimStartNotif(SimStartNotif),
     };
@@ -141,59 +140,6 @@ impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
 }
 
 #[derive(Debug)]
-pub struct CoroutineMessageEvent {
-    module: PtrWeakMut<dyn Module>,
-}
-
-impl<A> Event<NetworkRuntime<A>> for CoroutineMessageEvent {
-    fn handle(mut self, rt: &mut Runtime<NetworkRuntime<A>>) {
-        log_scope!(self.module.str());
-        let dur = self.module.module_core().activity_period;
-        // This message can only occure *after* the activity is
-        // fully initalized.
-        // It can be the case that this is wrong .. if handle_message at invalidated activity
-        // but a event still remains in queue.
-        if dur != Duration::ZERO && self.module.module_core().activity_active {
-            info!("Handeling activity call");
-
-            #[cfg(feature = "metrics-module-time")]
-            use std::time::Instant;
-            #[cfg(feature = "metrics-module-time")]
-            let t0 = Instant::now();
-
-            self.module.prepare_buffers();
-            self.module.activity();
-
-            let still_active = self.module.module_core().activity_active;
-
-            // This call will only use up out buffers and loopback buffers
-            // not schedule a new Coroutine since either:
-            // - state remains stable since allready init
-            // - activity deactivated.
-            PtrWeakMut::clone(&self.module).handle_buffers(rt);
-
-            #[cfg(feature = "metrics-module-time")]
-            {
-                let elapsed = Instant::now().duration_since(t0);
-                self.module.module_core_mut().elapsed += elapsed;
-                rt.app.globals.time_elapsed += elapsed;
-            }
-
-            if still_active {
-                rt.add_event_in(
-                    NetEvents::CoroutineMessageEvent(CoroutineMessageEvent {
-                        module: self.module,
-                    }),
-                    dur,
-                );
-            }
-        }
-
-        log_scope!();
-    }
-}
-
-#[derive(Debug)]
 pub struct ChannelUnbusyNotif {
     pub(crate) channel: ChannelRefMut,
 }
@@ -274,12 +220,6 @@ impl PtrWeakMut<dyn Module> {
     }
 
     fn handle_buffers<A>(&mut self, rt: &mut Runtime<NetworkRuntime<A>>) {
-        // Check whether a new activity cycle must be initated
-        let enqueue_actitivy_msg = self.module_core().activity_period != Duration::ZERO
-            && !self.module_core().activity_active;
-
-        self.module_core_mut().activity_active = true;
-
         let self_id = self.id();
         let mref = PtrWeakMut::clone(self);
 
@@ -368,7 +308,6 @@ impl PtrWeakMut<dyn Module> {
                 offset,
             );
         }
-        // drop(mut_ref);
 
         // get drain
         let mut_ref = &mut self.module_core_mut().buffers.loopback_buffer;
@@ -381,17 +320,6 @@ impl PtrWeakMut<dyn Module> {
                     message,
                 }),
                 time,
-            );
-        }
-
-        // drop(mut_ref);
-
-        // initalily
-        // call activity
-        if enqueue_actitivy_msg {
-            rt.add_event_in(
-                NetEvents::CoroutineMessageEvent(CoroutineMessageEvent { module: mref }),
-                self.module_core().activity_period,
             );
         }
 

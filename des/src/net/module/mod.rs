@@ -58,42 +58,6 @@ pub trait Module: StaticModuleCore {
     fn handle_message(&mut self, msg: Message);
 
     ///
-    /// A periodic activity handler.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use des::prelude::*;
-    /// # fn is_good_packet<T>(_t: T) -> bool { true }
-    ///
-    /// #[NdlModule]
-    /// struct OurModule {
-    ///     core: ModuleCore,
-    ///
-    ///     good_packets: f64,
-    ///     bad_packets: f64,
-    ///
-    ///     records: Vec<f64>,
-    /// };
-    ///
-    /// impl Module for OurModule {
-    ///     fn handle_message(&mut self, msg: Message) {
-    ///         if is_good_packet(msg) {
-    ///             self.good_packets += 1.0;
-    ///         } else {
-    ///             self.bad_packets += 1.0;
-    ///         }
-    ///     }
-    ///
-    ///     fn activity(&mut self) {
-    ///         // Record accummulated percentage over time
-    ///         self.records.push(self.good_packets / self.bad_packets);
-    ///     }
-    /// }
-    /// ```
-    fn activity(&mut self) {}
-
-    ///
     /// A function that is run at the start of each simulation,
     /// for each module. The order in which modules are called is not guranteed
     /// but the stage numbers are. That means that all stage-0 calls for all modules

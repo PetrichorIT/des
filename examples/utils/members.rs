@@ -15,19 +15,10 @@ impl Module for Alice {
 
         if pkt.header().hop_count > self.par("limit").unwrap().parse::<usize>().unwrap() {
             // TERMINATE
-            self.disable_activity()
         } else {
             pkt.register_hop();
             self.send(pkt, ("netOut", 0))
         }
-    }
-
-    fn at_sim_start(&mut self, _: usize) {
-        self.enable_activity(Duration::new(3, 0));
-    }
-
-    fn activity(&mut self) {
-        info!(target: self.str(), "ACTIVITY");
     }
 }
 

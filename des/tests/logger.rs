@@ -41,18 +41,12 @@ impl Module for SomeModule {
     fn at_sim_start(&mut self, stage: usize) {
         info!("at_sim_start_{}", stage);
         if stage == 1 {
-            self.enable_activity(Duration::from_secs(2));
+            self.schedule_in(Message::new().build(), Duration::from_secs(2));
         }
     }
 
     fn num_sim_start_stages(&self) -> usize {
         2
-    }
-
-    fn activity(&mut self) {
-        info!("activity");
-        self.disable_activity();
-        self.schedule_in(Message::new().build(), Duration::from_secs(2));
     }
 
     fn handle_message(&mut self, _msg: Message) {
@@ -107,20 +101,20 @@ fn module_auto_scopes() {
         RuntimeResult::Finished { time, profiler, .. } => {
             // Event Count
             // 1 SimStart
-            // 3 x 1Activity
+            // no 3 x 1Activity
             // 3 x 1HandleMessage
             // == 7
-            assert_eq!(profiler.event_count, 7);
+            assert_eq!(profiler.event_count, 4);
 
             // Time
-            // Delay 2s until activity + 2 until handle_message
-            assert_eq_time!(time, 4.0);
+            // Delay  2s until handle_message
+            assert_eq_time!(time, 2.0);
 
             let scopes = ScopedLogger::yield_scopes();
             assert_eq!(scopes.len(), 3);
             for (trg, scope) in scopes {
                 assert_eq!(trg, *scope.target);
-                assert_eq!(scope.stream.len(), 5);
+                assert_eq!(scope.stream.len(), 4);
 
                 assert!(["Module A", "Module B", "Module C"].contains(&&trg[..]));
 

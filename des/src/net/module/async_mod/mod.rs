@@ -371,30 +371,6 @@ where
         }
     }
 
-    fn activity(&mut self) {
-        if let Some(rt) = self.__get_rt() {
-            let guard = rt.enter_context(self.async_ext.ctx.take().unwrap());
-
-            rt.poll_time_events();
-            {
-                let self_ptr: *mut T = self;
-                let self_ref: &'static mut T = unsafe { &mut *self_ptr };
-
-                let join = rt.spawn(<T as AsyncModule>::activity(self_ref));
-                let _result = rt.block_or_idle_on(join);
-            }
-            rt.poll_until_idle();
-
-            if let Some(next_time) = rt.next_time_poll() {
-                self.schedule_at(Message::new().typ(TYP_WAKEUP).build(), next_time);
-            }
-
-            self.__manage_intents(rt.yield_intents());
-
-            self.async_ext.ctx = Some(guard.leave());
-        }
-    }
-
     fn at_sim_start(&mut self, stage: usize) {
         // time is 0
         if let Some(rt) = self.__get_rt() {
