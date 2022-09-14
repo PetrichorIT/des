@@ -2,10 +2,10 @@
 
 use crate::net::{GateRef, ModuleId};
 use crate::time::SimTime;
-use crate::util::Ptr;
 
 use std::fmt::Debug;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::sync::Arc;
 
 use super::MessageBody;
 
@@ -88,7 +88,7 @@ impl MessageHeader {
 
             sender_module_id: self.sender_module_id,
             receiver_module_id: self.receiver_module_id,
-            last_gate: self.last_gate.as_ref().map(Ptr::clone),
+            last_gate: self.last_gate.as_ref().map(Arc::clone),
 
             src_addr: self.src_addr,
             dest_addr: self.dest_addr,

@@ -2,10 +2,10 @@ use log::info;
 
 use crate::{
     create_event_set,
-    net::{ChannelRefMut, GateRef, GateServiceType, Message, Module, NetworkRuntime},
+    net::{runtime::buf_process, GateRef, GateServiceType, Message, NetworkRuntime},
+    prelude::{ChannelRef, ModuleRef},
     runtime::{Event, EventSet, Runtime},
-    time::{Duration, SimTime},
-    util::{Ptr, PtrWeakMut},
+    time::SimTime,
 };
 
 create_event_set!(
@@ -34,20 +34,20 @@ pub struct MessageAtGateEvent {
 impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
     fn handle(self, rt: &mut Runtime<NetworkRuntime<A>>) {
         let mut message = self.message;
-        message.header.last_gate = Some(Ptr::clone(&self.gate));
+        message.header.last_gate = Some(GateRef::clone(&self.gate));
 
         //
         // Iterate through gates until:
         // a) a final gate with no next_gate was found, indicating a handle_module_call
         // b) a delay gate was found, apply the delay and recall in a new event.
         //
-        let mut current_gate = &self.gate;
+        let mut current_gate = self.gate;
         while let Some(next_gate) = current_gate.next_gate() {
-            log_scope!(current_gate.owner().path());
+            log_scope!(current_gate.owner().ctx.path.path());
 
             // A next gate exists.
             // redirect to next channel
-            message.header.last_gate = Some(Ptr::clone(next_gate));
+            message.header.last_gate = Some(GateRef::clone(&next_gate));
 
             info!(
                 "Gate '{}' forwarding message [{}] to next gate delayed: {}",
@@ -64,7 +64,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
                         "Channels cannot start at a input node"
                     );
 
-                    channel.send_message(message, next_gate, rt);
+                    channel.send_message(message, &next_gate, rt);
                     return;
                 }
                 None => {
@@ -77,7 +77,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
 
         // No next gate exists.
         debug_assert!(current_gate.next_gate().is_none());
-        log_scope!(current_gate.owner().path());
+        log_scope!(current_gate.owner().ctx.path.path());
 
         assert!(
             current_gate.service_type() != GateServiceType::Output,
@@ -90,10 +90,10 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
             "Gate '{}' forwarding message [{}] to module #{}",
             current_gate.name(),
             message.str(),
-            current_gate.owner().id()
+            current_gate.owner().ctx.id
         );
 
-        let module = PtrWeakMut::clone(current_gate.owner());
+        let module = current_gate.owner().clone();
         rt.add_event(
             NetEvents::HandleMessageEvent(HandleMessageEvent { module, message }),
             SimTime::now(),
@@ -105,7 +105,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
 
 #[derive(Debug)]
 pub struct HandleMessageEvent {
-    pub(crate) module: PtrWeakMut<dyn Module>,
+    pub(crate) module: ModuleRef,
     pub(crate) message: Message,
 }
 
@@ -113,20 +113,22 @@ impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
     fn handle(self, rt: &mut Runtime<NetworkRuntime<A>>) {
         log_scope!(self.module.str());
         let mut message = self.message;
-        message.header.receiver_module_id = self.module.id();
+        message.header.receiver_module_id = self.module.ctx.id;
 
         info!("Handling message {:?}", message.str());
 
-        let mut module = PtrWeakMut::clone(&self.module);
+        let module = self.module;
 
         #[cfg(feature = "metrics-module-time")]
         use std::time::Instant;
         #[cfg(feature = "metrics-module-time")]
         let t0 = Instant::now();
 
-        module.prepare_buffers();
-        module.handle_message(message);
-        module.handle_buffers(rt);
+        module.activiate();
+        module.handler.borrow_mut().handle_message(message);
+        module.deactivate();
+
+        buf_process(&module, rt);
 
         #[cfg(feature = "metrics-module-time")]
         {
@@ -141,7 +143,7 @@ impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
 
 #[derive(Debug)]
 pub struct ChannelUnbusyNotif {
-    pub(crate) channel: ChannelRefMut,
+    pub(crate) channel: ChannelRef,
 }
 
 impl<A> Event<NetworkRuntime<A>> for ChannelUnbusyNotif {
@@ -158,21 +160,19 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
         // This is a explicit for loop to prevent borrow rt only in the inner block
         // allowing preemtive dropping of 'module' so that rt can be used in
         // 'module_handle_jobs'.
-        let max_stage = rt
-            .app
-            .modules()
-            .iter()
-            .fold(1, |acc, module| acc.max(module.num_sim_start_stages()));
+        let max_stage = rt.app.modules().iter().fold(1, |acc, module| {
+            acc.max(module.handler.borrow_mut().num_sim_start_stages())
+        });
 
         for stage in 0..max_stage {
             // Direct indexing since rt must be borrowed mutably in handle_buffers.
             for i in 0..rt.app.modules().len() {
-                let mut module = PtrWeakMut::from_strong(&rt.app.modules()[i]);
-                log_scope!(module.path());
+                let module = rt.app.modules()[i].clone();
+                log_scope!(module.ctx.path.path());
 
-                if stage < module.num_sim_start_stages() {
+                if stage < module.handler.borrow_mut().num_sim_start_stages() {
                     info!(
-                        target: &format!("{}", module.path()),
+                        target: &format!("{}", module.ctx.path.path()),
                         "Calling at_sim_start({}).", stage
                     );
 
@@ -181,9 +181,11 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
                     #[cfg(feature = "metrics-module-time")]
                     let t0 = Instant::now();
 
-                    module.prepare_buffers();
-                    module.at_sim_start(stage);
-                    module.handle_buffers(rt);
+                    module.activiate();
+                    module.handler.borrow_mut().at_sim_start(stage);
+                    module.deactivate();
+
+                    super::buf_process(&module, rt);
 
                     #[cfg(feature = "metrics-module-time")]
                     {
@@ -200,136 +202,18 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
             // Ensure all sim_start stages have finished
 
             for i in 0..rt.app.modules().len() {
-                let mut module = PtrWeakMut::from_strong(&rt.app.modules()[i]);
-                log_scope!(module.str());
-                module.finish_sim_start();
+                let module = rt.app.modules()[i].clone();
+                log_scope!(module.ctx.path.path());
+
+                module.activiate();
+                module.handler.borrow_mut().finish_sim_start();
+                module.deactivate();
+
+                // TODO: Is this really nessecary?
+                super::buf_process(&module, rt);
             }
         }
 
         log_scope!();
-    }
-}
-
-//
-// # Helper functions
-//
-
-impl PtrWeakMut<dyn Module> {
-    fn prepare_buffers(&mut self) {
-        self.buffers.processing_time_delay = Duration::ZERO;
-    }
-
-    fn handle_buffers<A>(&mut self, rt: &mut Runtime<NetworkRuntime<A>>) {
-        let self_id = self.id();
-        let mref = PtrWeakMut::clone(self);
-
-        // Drain the buffers from the async handle
-        #[cfg(feature = "async")]
-        {
-            use crate::net::module::BufferEvent;
-
-            while let Ok(ev) = self.module_core_mut().async_ext.buffers.try_recv() {
-                match ev {
-                    BufferEvent::Send {
-                        mut msg,
-                        time_offset,
-                        out,
-                    } => {
-                        let gate = out
-                            .as_gate(self.module_core())
-                            .expect("Async buffers failed to resolve out parameter");
-
-                        assert!(
-                                gate.service_type() != GateServiceType::Input,
-                                "To send messages onto a gate it must have service type of 'Output' or 'Undefined'"
-                            );
-                        msg.header.sender_module_id = self_id;
-                        rt.add_event(
-                            NetEvents::MessageAtGateEvent(MessageAtGateEvent {
-                                gate,
-                                message: msg,
-                            }),
-                            SimTime::now() + time_offset,
-                        );
-                    }
-
-                    BufferEvent::ScheduleIn { msg, time_offset } => rt.add_event(
-                        NetEvents::HandleMessageEvent(HandleMessageEvent {
-                            module: PtrWeakMut::clone(&mref),
-                            message: msg,
-                        }),
-                        SimTime::now() + time_offset,
-                    ),
-
-                    BufferEvent::ScheduleAt { msg, time } => rt.add_event(
-                        NetEvents::HandleMessageEvent(HandleMessageEvent {
-                            module: PtrWeakMut::clone(&mref),
-                            message: msg,
-                        }),
-                        time,
-                    ),
-
-                    #[cfg(not(feature = "async-sharedrt"))]
-                    BufferEvent::Shutdown { restart_at } => {
-                        use crate::net::message::TYP_RESTART;
-                        // Delete the runtimes
-                        let _ = self.module_core_mut().async_ext.rt.take();
-                        // Send restart packet if nessecary
-                        if let Some(restart_at) = restart_at {
-                            rt.add_event(
-                                NetEvents::HandleMessageEvent(HandleMessageEvent {
-                                    module: PtrWeakMut::clone(&mref),
-                                    message: Message::new().typ(TYP_RESTART).build(),
-                                }),
-                                restart_at,
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // get drain
-        let mut_ref = &mut self.module_core_mut().buffers.out_buffer;
-
-        // Send gate events from the 'send' method calls
-        while let Some((mut message, gate, offset)) = mut_ref.pop() {
-            assert!(
-                gate.service_type() != GateServiceType::Input,
-                "To send messages onto a gate it must have service type of 'Output' or 'Undefined'"
-            );
-            message.header.sender_module_id = self_id;
-            rt.add_event(
-                NetEvents::MessageAtGateEvent(MessageAtGateEvent {
-                    // TODO
-                    gate,
-                    message,
-                }),
-                offset,
-            );
-        }
-
-        // get drain
-        let mut_ref = &mut self.module_core_mut().buffers.loopback_buffer;
-
-        // Send loopback events from 'scheduleAt'
-        while let Some((message, time)) = mut_ref.pop() {
-            rt.add_event(
-                NetEvents::HandleMessageEvent(HandleMessageEvent {
-                    module: PtrWeakMut::clone(&mref),
-                    message,
-                }),
-                time,
-            );
-        }
-
-        if !rt.app.globals.parameters.updates.borrow().is_empty() {
-            for update in rt.app.globals.parameters.updates.borrow_mut().drain(..) {
-                rt.app
-                    .module(|m| m.name() == update)
-                    .unwrap()
-                    .handle_par_change();
-            }
-        }
     }
 }

@@ -67,7 +67,7 @@ impl InProgressChannelStats {
 
     pub(crate) fn register_message_passed(&mut self, msg: &Message) {
         self.num_messages_passed += 1;
-        self.num_bytes_passed += msg.header.length as usize;
+        self.num_bytes_passed += msg.length() as usize;
 
         let busy = self.metrics.calculate_busy(msg);
         self.busy_time += busy;
@@ -77,7 +77,7 @@ impl InProgressChannelStats {
 
     pub(crate) fn register_message_dropped(&mut self, msg: &Message) {
         self.num_messages_dropped += 1;
-        self.num_bytes_dropped += msg.header.length as usize;
+        self.num_bytes_dropped += msg.length() as usize;
     }
 }
 

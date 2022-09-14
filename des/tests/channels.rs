@@ -1,5 +1,6 @@
 #![cfg(feature = "net")]
-use des::prelude::*;
+use des::net::__Buildable0;
+use des::{net::BuildContext, prelude::*};
 use serial_test::serial;
 
 #[NdlModule]
@@ -8,20 +9,17 @@ struct DropChanModule {
     received: usize,
 }
 
-impl NameableModule for DropChanModule {
-    fn named(core: ModuleCore) -> Self {
+impl Module for DropChanModule {
+    fn new() -> Self {
         Self {
-            __core: core,
             send: 0,
             received: 0,
         }
     }
-}
 
-impl Module for DropChanModule {
     fn at_sim_start(&mut self, _stage: usize) {
-        self.send(Message::new().content([0u8; 512]).build(), "out");
-        self.send(Message::new().content([1u8; 512]).build(), "out");
+        send(Message::new().content([0u8; 512]).build(), "out");
+        send(Message::new().content([1u8; 512]).build(), "out");
 
         self.send += 2;
     }
@@ -39,16 +37,15 @@ impl Module for DropChanModule {
 #[test]
 fn channel_dropping_message() {
     let mut rt = NetworkRuntime::new(());
-    let mut module = DropChanModule::named_root(ModuleCore::new_with(
-        ObjectPath::root_module("root".to_string()),
-        PtrWeak::from_strong(&rt.globals()),
-    ));
+    let mut cx = BuildContext::new(&mut rt);
 
-    let g_in = module.create_gate("in", GateServiceType::Input, &mut rt);
-    let mut g_out = module.create_gate("out", GateServiceType::Output, &mut rt);
+    let module = DropChanModule::build_named(ObjectPath::root_module("root".to_string()), &mut cx);
+
+    let g_in = module.create_gate("in", GateServiceType::Input);
+    let g_out = module.create_gate("out", GateServiceType::Output);
 
     let channel = Channel::new(
-        ObjectPath::channel_with("chan", module.path()),
+        ObjectPath::channel_with("chan", &module.path()),
         ChannelMetrics {
             bitrate: 1000,
             latency: Duration::from_millis(100),
@@ -73,21 +70,18 @@ struct BufferChanModule {
     received: usize,
 }
 
-impl NameableModule for BufferChanModule {
-    fn named(core: ModuleCore) -> Self {
+impl Module for BufferChanModule {
+    fn new() -> Self {
         Self {
-            __core: core,
             send: 0,
             received: 0,
         }
     }
-}
 
-impl Module for BufferChanModule {
     fn at_sim_start(&mut self, _stage: usize) {
-        self.send(Message::new().content([0u8; 512]).build(), "out");
-        self.send(Message::new().content([1u8; 512]).build(), "out");
-        self.send(Message::new().content([1u8; 512]).build(), "out");
+        send(Message::new().content([0u8; 512]).build(), "out");
+        send(Message::new().content([1u8; 512]).build(), "out");
+        send(Message::new().content([1u8; 512]).build(), "out");
 
         self.send += 3;
     }
@@ -106,16 +100,16 @@ impl Module for BufferChanModule {
 #[test]
 fn channel_buffering_message() {
     let mut rt = NetworkRuntime::new(());
-    let mut module = BufferChanModule::named_root(ModuleCore::new_with(
-        ObjectPath::root_module("root".to_string()),
-        PtrWeak::from_strong(&rt.globals()),
-    ));
+    let mut cx = BuildContext::new(&mut rt);
 
-    let g_in = module.create_gate("in", GateServiceType::Input, &mut rt);
-    let mut g_out = module.create_gate("out", GateServiceType::Output, &mut rt);
+    let module =
+        BufferChanModule::build_named(ObjectPath::root_module("root".to_string()), &mut cx);
+
+    let g_in = module.create_gate("in", GateServiceType::Input);
+    let g_out = module.create_gate("out", GateServiceType::Output);
 
     let channel = Channel::new(
-        ObjectPath::channel_with("chan", module.path()),
+        ObjectPath::channel_with("chan", &module.path()),
         ChannelMetrics {
             bitrate: 1000,
             latency: Duration::from_millis(100),

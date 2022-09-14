@@ -1,6 +1,7 @@
 #![cfg(feature = "async")]
 #![cfg(not(feature = "async-sharedrt"))]
 
+use des::net::{BuildContext, __Buildable0};
 use des::prelude::*;
 use serial_test::serial;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -37,6 +38,10 @@ struct StatelessModule {}
 
 #[async_trait::async_trait]
 impl AsyncModule for StatelessModule {
+    fn new() -> Self {
+        Self {}
+    }
+
     async fn at_sim_start(&mut self, _: usize) {
         tokio::spawn(async {
             let mut drop_test = DropTest::new(&DROPPED_STATELESS_SHUTDOWN);
@@ -48,7 +53,7 @@ impl AsyncModule for StatelessModule {
     }
 
     async fn handle_message(&mut self, _msg: Message) {
-        self.shutdown(None);
+        shutdown();
     }
 }
 
@@ -60,11 +65,11 @@ fn stateless_module_shudown() {
     DROPPED_STATELESS_SHUTDOWN.store(0, Ordering::SeqCst);
 
     let mut rt = NetworkRuntime::new(());
-    let mut module = StatelessModule::named_root(ModuleCore::new_with(
-        ObjectPath::root_module("RootModule".to_string()),
-        Ptr::downgrade(&rt.globals()),
-    ));
-    let gate = module.create_gate("in", GateServiceType::Input, &mut rt);
+    let mut cx = BuildContext::new(&mut rt);
+
+    let module =
+        StatelessModule::build_named(ObjectPath::root_module("RootModule".to_string()), &mut cx);
+    let gate = module.create_gate("in", GateServiceType::Input);
 
     rt.create_module(module);
     let mut rt = Runtime::new(rt);
@@ -83,6 +88,10 @@ struct StatelessModuleRestart {}
 
 #[async_trait::async_trait]
 impl AsyncModule for StatelessModuleRestart {
+    fn new() -> Self {
+        Self {}
+    }
+
     async fn at_sim_start(&mut self, _: usize) {
         tokio::spawn(async {
             let mut drop_test = DropTest::new(&DROPPED_STATLESS_RESTART);
@@ -95,8 +104,8 @@ impl AsyncModule for StatelessModuleRestart {
 
     async fn handle_message(&mut self, msg: Message) {
         match msg.header().id {
-            9 => self.shutdown(Some(SimTime::now() + Duration::from_secs(10))),
-            10 => self.shutdown(None),
+            9 => shutdow_and_restart_at(SimTime::now() + Duration::from_secs(10)),
+            10 => shutdown(),
             _ => unreachable!(),
         }
     }
@@ -110,11 +119,13 @@ fn stateless_module_restart() {
     DROPPED_STATLESS_RESTART.store(0, Ordering::SeqCst);
 
     let mut rt = NetworkRuntime::new(());
-    let mut module = StatelessModuleRestart::named_root(ModuleCore::new_with(
+    let mut cx = BuildContext::new(&mut rt);
+
+    let module = StatelessModuleRestart::build_named(
         ObjectPath::root_module("RootModule".to_string()),
-        Ptr::downgrade(&rt.globals()),
-    ));
-    let gate = module.create_gate("in", GateServiceType::Input, &mut rt);
+        &mut cx,
+    );
+    let gate = module.create_gate("in", GateServiceType::Input);
 
     rt.create_module(module);
     let mut rt = Runtime::new(rt);
@@ -138,17 +149,11 @@ struct StatefullModule {
     state: usize,
 }
 
-impl NameableModule for StatefullModule {
-    fn named(core: ModuleCore) -> Self {
-        Self {
-            __core: core,
-            state: 0,
-        }
-    }
-}
-
 #[async_trait::async_trait]
 impl AsyncModule for StatefullModule {
+    fn new() -> Self {
+        Self { state: 0 }
+    }
     async fn at_sim_start(&mut self, _: usize) {
         self.state = 10;
         tokio::spawn(async {
@@ -162,8 +167,8 @@ impl AsyncModule for StatefullModule {
 
     async fn handle_message(&mut self, msg: Message) {
         match msg.header().id {
-            9 => self.shutdown(Some(SimTime::now() + Duration::from_secs(10))),
-            10 => self.shutdown(None),
+            9 => shutdow_and_restart_at(SimTime::now() + Duration::from_secs(10)),
+            10 => shutdown(),
             _ => unreachable!(),
         }
     }
@@ -186,11 +191,11 @@ fn statefull_module_restart() {
     DROPPED_STATFULL_RESTART.store(0, Ordering::SeqCst);
 
     let mut rt = NetworkRuntime::new(());
-    let mut module = StatefullModule::named_root(ModuleCore::new_with(
-        ObjectPath::root_module("RootModule".to_string()),
-        Ptr::downgrade(&rt.globals()),
-    ));
-    let gate = module.create_gate("in", GateServiceType::Input, &mut rt);
+    let mut cx = BuildContext::new(&mut rt);
+
+    let module =
+        StatefullModule::build_named(ObjectPath::root_module("RootModule".to_string()), &mut cx);
+    let gate = module.create_gate("in", GateServiceType::Input);
 
     rt.create_module(module);
     let mut rt = Runtime::new(rt);
@@ -214,14 +219,17 @@ struct ShutdownViaHandleModule {}
 
 #[async_trait::async_trait]
 impl AsyncModule for ShutdownViaHandleModule {
+    fn new() -> Self {
+        Self {}
+    }
+
     async fn at_sim_start(&mut self, _: usize) {
-        let handle = self.async_handle();
         tokio::spawn(async move {
             let mut drop_test = DropTest::new(&DROPPED_SHUTDOWN_VIA_HANDLE);
             loop {
                 tokio::sim::time::sleep(Duration::from_secs(1)).await;
                 if drop_test.step() > 10 {
-                    handle.shutdown(None);
+                    shutdown()
                 }
             }
         });
@@ -236,10 +244,12 @@ fn shutdown_via_async_handle() {
     DROPPED_SHUTDOWN_VIA_HANDLE.store(0, Ordering::SeqCst);
 
     let mut rt = NetworkRuntime::new(());
-    let module = ShutdownViaHandleModule::named_root(ModuleCore::new_with(
+    let mut cx = BuildContext::new(&mut rt);
+
+    let module = ShutdownViaHandleModule::build_named(
         ObjectPath::root_module("RootModule".to_string()),
-        Ptr::downgrade(&rt.globals()),
-    ));
+        &mut cx,
+    );
     rt.create_module(module);
     let rt = Runtime::new(rt);
 
@@ -252,8 +262,11 @@ struct RestartViaHandleModule {}
 
 #[async_trait::async_trait]
 impl AsyncModule for RestartViaHandleModule {
+    fn new() -> Self {
+        Self {}
+    }
+
     async fn at_sim_start(&mut self, _: usize) {
-        let handle = self.async_handle();
         tokio::spawn(async move {
             let mut drop_test = DropTest::new(&DROPPED_RESTART_VIA_HANDLE);
             loop {
@@ -262,9 +275,9 @@ impl AsyncModule for RestartViaHandleModule {
 
                 if v == 10 {
                     if SimTime::now() < SimTime::from_duration(Duration::from_secs(20)) {
-                        handle.shutdown(Some(SimTime::from_duration(Duration::from_secs(30))));
+                        shutdow_and_restart_at(SimTime::from_duration(Duration::from_secs(30)));
                     } else {
-                        handle.shutdown(None);
+                        shutdown();
                     }
                 }
             }
@@ -280,10 +293,12 @@ fn restart_via_async_handle() {
     DROPPED_RESTART_VIA_HANDLE.store(0, Ordering::SeqCst);
 
     let mut rt = NetworkRuntime::new(());
-    let module = RestartViaHandleModule::named_root(ModuleCore::new_with(
+    let mut cx = BuildContext::new(&mut rt);
+
+    let module = RestartViaHandleModule::build_named(
         ObjectPath::root_module("RootModule".to_string()),
-        Ptr::downgrade(&rt.globals()),
-    ));
+        &mut cx,
+    );
     rt.create_module(module);
     let rt = Runtime::new(rt);
 

@@ -1,19 +1,19 @@
-use crate::net::{ChannelRef, ChannelRefMut, Module};
-use crate::util::{Ptr, PtrConst, PtrMut, PtrWeakMut};
+use crate::net::ChannelRef;
+use std::cell::RefCell;
 use std::fmt::{Debug, Display};
-use std::marker::Unsize;
+use std::sync::{Arc, Weak};
 
-use super::module::ModuleCore;
-
-///
-/// A readonly reference to a gate.
-///
-pub type GateRef = PtrConst<Gate>;
+use super::module::ModuleContext;
+use super::ModuleRef;
 
 ///
-/// A mutable reference to a gate.
+/// A  reference to a gate.
 ///
-pub type GateRefMut = PtrMut<Gate>;
+pub type GateRef = Arc<Gate>;
+///
+/// A weak reference to a gate.
+///
+pub type GateRefWeak = Weak<Gate>;
 
 ///
 /// The type of service a gate cluster can support.
@@ -38,7 +38,7 @@ pub struct GateDescription {
     ///
     /// The identifier of the module the gate was created on.
     ///
-    pub owner: PtrWeakMut<dyn Module>,
+    pub owner: ModuleRef,
     ///
     /// A human readable name for a gate cluster.
     ///
@@ -74,11 +74,7 @@ impl GateDescription {
     /// Panics if the size is 0.
     ///
     #[must_use]
-    pub fn new<T>(name: String, size: usize, owner: PtrWeakMut<T>, typ: GateServiceType) -> Self
-    where
-        T: Module + Unsize<dyn Module>,
-    {
-        let owner: PtrWeakMut<dyn Module> = owner;
+    pub fn new(name: String, size: usize, owner: ModuleRef, typ: GateServiceType) -> Self {
         assert!(size >= 1, "Cannot create with a non-postive size");
         Self {
             owner,
@@ -100,7 +96,7 @@ impl Debug for GateDescription {
         f.debug_struct("GateDescription")
             .field("name", &self.name)
             .field("size", &self.size)
-            .field("owner", self.owner.path())
+            .field("owner", &self.owner.ctx.path)
             .field("typ", &self.typ)
             .finish()
     }
@@ -110,7 +106,7 @@ impl PartialEq for GateDescription {
     fn eq(&self, other: &Self) -> bool {
         // self.size can be ignored since no descriptors with the same name can exist
         // on the same owner
-        self.name == other.name && self.owner.id() == other.owner.id()
+        self.name == other.name && self.owner.ctx.id == other.owner.ctx.id
     }
 }
 
@@ -131,16 +127,17 @@ pub struct Gate {
     /// The position index of the gate in the descriptor cluster.
     ///
     pos: usize,
+
     ///
     /// A identifier of the channel linked to the gate chain.
     ///
-    channel: Option<ChannelRefMut>,
+    channel: RefCell<Option<ChannelRef>>,
 
     ///
     /// The next gate in the gate chain, GATE_NULL if non is existent.
     ///
-    next_gate: Option<GateRef>,
-    previous_gate: Option<GateRef>,
+    next_gate: RefCell<Option<GateRef>>,
+    previous_gate: RefCell<Option<GateRefWeak>>,
 }
 
 impl Gate {
@@ -201,32 +198,36 @@ impl Gate {
     ///
     #[must_use]
     pub fn path(&self) -> String {
-        format!("{}:{}", self.description.owner.path(), self.name_with_pos())
+        format!(
+            "{}:{}",
+            self.description.owner.ctx.path,
+            self.name_with_pos()
+        )
     }
 
     ///
     /// The next gate in the gate chain by reference.
     ///
     #[must_use]
-    pub fn previous_gate(&self) -> Option<&GateRef> {
-        self.previous_gate.as_ref()
+    pub fn previous_gate(&self) -> Option<GateRef> {
+        self.previous_gate.borrow().clone()?.upgrade()
     }
 
     ///
     /// The next gate in the gate chain by reference.
     ///
     #[must_use]
-    pub fn next_gate(&self) -> Option<&GateRef> {
-        self.next_gate.as_ref()
+    pub fn next_gate(&self) -> Option<GateRef> {
+        self.next_gate.borrow().clone()
     }
 
     ///
     /// A function to link the next gate in the gate chain, by referencing
     /// its identifier.
     ///
-    pub fn set_next_gate(self: &mut PtrMut<Self>, mut next_gate: GateRefMut) {
-        self.next_gate = Some(PtrMut::clone(&next_gate).make_const());
-        next_gate.previous_gate = Some(self.clone().make_const());
+    pub fn set_next_gate(self: &GateRef, next_gate: GateRef) {
+        *next_gate.previous_gate.borrow_mut() = Some(Arc::downgrade(self));
+        *self.next_gate.borrow_mut() = Some(next_gate);
     }
 
     ///
@@ -235,22 +236,22 @@ impl Gate {
     #[must_use]
     pub fn channel(&self) -> Option<ChannelRef> {
         // only provide a read_only interface publicly
-        Some(Ptr::clone(self.channel.as_ref()?).make_const())
+        Some(Arc::clone(self.channel.borrow().as_ref()?))
     }
 
     ///
     /// Returns the channel attached to this gate, if any exits.
     ///
-    pub(crate) fn channel_mut(&self) -> Option<ChannelRefMut> {
+    pub(crate) fn channel_mut(&self) -> Option<ChannelRef> {
         // only provide a read_only interface publicly
-        Some(Ptr::clone(self.channel.as_ref()?))
+        Some(Arc::clone(self.channel.borrow().as_ref()?))
     }
 
     ///
     /// Sets the channel attached to this gate.
     ///
-    pub fn set_channel(&mut self, channel: ChannelRefMut) {
-        self.channel = Some(channel);
+    pub fn set_channel(&self, channel: ChannelRef) {
+        *self.channel.borrow_mut() = Some(channel);
     }
 
     ///
@@ -259,12 +260,12 @@ impl Gate {
     ///
     #[must_use]
     pub fn path_start(&self) -> Option<GateRef> {
-        let mut current = self.previous_gate.as_ref()?;
-        while let Some(previous_gate) = &current.previous_gate {
+        let mut current = self.previous_gate()?;
+        while let Some(previous_gate) = current.previous_gate() {
             current = previous_gate;
         }
 
-        Some(PtrConst::clone(current))
+        Some(current)
     }
 
     ///
@@ -273,12 +274,12 @@ impl Gate {
     ///
     #[must_use]
     pub fn path_end(&self) -> Option<GateRef> {
-        let mut current = self.next_gate.as_ref()?;
-        while let Some(next_gate) = &current.next_gate {
+        let mut current = self.next_gate()?;
+        while let Some(next_gate) = current.next_gate() {
             current = next_gate;
         }
 
-        Some(PtrConst::clone(current))
+        Some(current)
     }
 
     ///
@@ -286,7 +287,7 @@ impl Gate {
     ///
 
     #[must_use]
-    pub fn owner(&self) -> &PtrWeakMut<dyn Module> {
+    pub fn owner(&self) -> &ModuleRef {
         &self.description.owner
     }
 
@@ -297,15 +298,15 @@ impl Gate {
     pub fn new(
         description: GateDescription,
         pos: usize,
-        channel: Option<ChannelRefMut>,
-        next_gate: Option<GateRefMut>,
-    ) -> GateRefMut {
-        let mut this = PtrMut::new(Self {
+        channel: Option<ChannelRef>,
+        next_gate: Option<GateRef>,
+    ) -> GateRef {
+        let this = GateRef::new(Self {
             description,
             pos,
-            channel,
-            next_gate: None,
-            previous_gate: None,
+            channel: RefCell::new(channel),
+            next_gate: RefCell::new(None),
+            previous_gate: RefCell::new(None),
         });
 
         if let Some(next_gate) = next_gate {
@@ -342,59 +343,52 @@ pub trait IntoModuleGate: private::Sealed {
     /// Extracts a gate identifier from a module using the given
     /// value as implicit reference.
     ///
-    fn as_gate(&self, _module: &ModuleCore) -> Option<GateRef> {
+    fn as_gate(&self, _module: &ModuleContext) -> Option<GateRef> {
         None
     }
 }
 
 impl IntoModuleGate for GateRef {
-    fn as_gate(&self, _module: &ModuleCore) -> Option<GateRef> {
+    fn as_gate(&self, _module: &ModuleContext) -> Option<GateRef> {
         Some(self.clone())
     }
 }
 impl private::Sealed for GateRef {}
 
 impl IntoModuleGate for &GateRef {
-    fn as_gate(&self, _module: &ModuleCore) -> Option<GateRef> {
-        Some(Ptr::clone(self))
+    fn as_gate(&self, _module: &ModuleContext) -> Option<GateRef> {
+        Some(GateRef::clone(self))
     }
 }
 impl private::Sealed for &GateRef {}
 
-impl IntoModuleGate for GateRefMut {
-    fn as_gate(&self, _module: &ModuleCore) -> Option<GateRef> {
-        Some(self.clone().make_const())
+impl IntoModuleGate for &GateRefWeak {
+    fn as_gate(&self, _module: &ModuleContext) -> Option<GateRef> {
+        self.upgrade()
     }
 }
-impl private::Sealed for GateRefMut {}
-
-impl IntoModuleGate for &GateRefMut {
-    fn as_gate(&self, _module: &ModuleCore) -> Option<GateRef> {
-        Some(Ptr::clone(self).make_const())
-    }
-}
-impl private::Sealed for &GateRefMut {}
+impl private::Sealed for &GateRefWeak {}
 
 impl IntoModuleGate for (&str, usize) {
-    fn as_gate(&self, module: &ModuleCore) -> Option<GateRef> {
-        let element = module
-            .gates()
+    fn as_gate(&self, module: &ModuleContext) -> Option<GateRef> {
+        module
+            .gates
+            .borrow()
             .iter()
-            .find(|&g| g.name() == self.0 && g.pos() == self.1)?;
-
-        Some(Ptr::clone(element).make_const())
+            .find(|&g| g.name() == self.0 && g.pos() == self.1)
+            .cloned()
     }
 }
 impl private::Sealed for (&str, usize) {}
 
 impl IntoModuleGate for &str {
-    fn as_gate(&self, module: &ModuleCore) -> Option<GateRef> {
-        let element = module
-            .gates()
+    fn as_gate(&self, module: &ModuleContext) -> Option<GateRef> {
+        module
+            .gates
+            .borrow()
             .iter()
-            .find(|&g| g.name() == *self && g.size() == 1)?;
-
-        Some(Ptr::clone(element).make_const())
+            .find(|&g| g.name() == *self && g.size() == 1)
+            .cloned()
     }
 }
 impl private::Sealed for &str {}

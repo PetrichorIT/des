@@ -10,6 +10,8 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
+use super::ChannelRef;
+
 ///
 /// A type that contains a `SubmoduleCore`.
 ///
@@ -38,7 +40,7 @@ pub struct SubsystemCore {
     pub(crate) id: SubsystemId,
     pub(crate) path: ObjectPath,
 
-    pub(crate) channels: Vec<PtrMut<Channel>>,
+    pub(crate) channels: Vec<ChannelRef>,
 
     pub(crate) parent: Option<PtrWeakMut<dyn StaticSubsystemCore>>,
     pub(crate) children: HashMap<String, PtrWeakMut<dyn StaticSubsystemCore>>,
@@ -82,7 +84,7 @@ impl SubsystemCore {
     /// All channels managed by this subsystem.
     ///
     #[must_use]
-    pub fn channels(&self) -> &[PtrMut<Channel>] {
+    pub fn channels(&self) -> &[ChannelRef] {
         &self.channels
     }
 

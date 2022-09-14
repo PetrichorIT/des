@@ -1,6 +1,8 @@
-use crate::net::{GateRef, Module, ModuleId, ModuleRefMut};
-use crate::util::{Ptr, PtrMut};
+use crate::net::{GateRef, ModuleId};
 use std::fmt::Debug;
+use std::sync::Arc;
+
+use super::ModuleRef;
 
 ///
 /// A mapping of the runtimes modules, and their connections.
@@ -31,7 +33,7 @@ impl Topology {
     ///
     /// The full set of nodes in the topology.
     ///
-    pub fn nodes(&self) -> impl Iterator<Item = &PtrMut<dyn Module>> {
+    pub fn nodes(&self) -> impl Iterator<Item = &ModuleRef> {
         self.nodes.iter().map(|def| &def.node)
     }
 
@@ -47,10 +49,10 @@ impl Topology {
     /// or `None` if the nodes does not exist.
     ///
     #[must_use]
-    pub fn edges_for(&self, node: &ModuleRefMut) -> Option<&Vec<Edge>> {
+    pub fn edges_for(&self, node: &ModuleRef) -> Option<&Vec<Edge>> {
         self.nodes
             .iter()
-            .find(|def| def.node.id() == node.id())
+            .find(|def| def.node.ctx.id == node.ctx.id)
             .map(|def| &def.edges)
     }
 
@@ -59,10 +61,10 @@ impl Topology {
     /// or `None` if the nodes does not exist.
     ///
     #[must_use]
-    pub fn edges_mut_for(&mut self, node: &ModuleRefMut) -> Option<&mut Vec<Edge>> {
+    pub fn edges_mut_for(&mut self, node: &ModuleRef) -> Option<&mut Vec<Edge>> {
         self.nodes
             .iter_mut()
-            .find(|def| def.node.id() == node.id())
+            .find(|def| def.node.ctx.id == node.ctx.id)
             .map(|def| &mut def.edges)
     }
 
@@ -79,13 +81,13 @@ impl Topology {
     /// a new part of the network. Be aware that all nodes that will be found should
     /// either allready be build, or be in the given input `modules`.
     ///
-    pub fn build(&mut self, modules: &[ModuleRefMut]) {
+    pub fn build(&mut self, modules: &[ModuleRef]) {
         let allready_existing_nodes_offset = self.nodes.len();
 
         // Setup nodes
         for module in modules {
             self.nodes.push(NodeDefinition {
-                node: PtrMut::clone(module),
+                node: module.clone(),
                 edges: Vec::new(),
             });
         }
@@ -94,25 +96,25 @@ impl Topology {
         for (i, module) in modules.iter().enumerate() {
             // let module = &modules[i];
             let mut outgoing_edges = Vec::new();
-            let gates = module.gates();
+            let gates = module.ctx.gates.borrow();
 
-            for start in gates {
+            for start in gates.iter() {
                 let mut cost = 0.0;
-                let mut current = Ptr::clone(start).make_const();
+                let mut current = Arc::clone(start);
                 while let Some(next_gate) = current.next_gate() {
                     if let Some(channel) = current.channel() {
                         cost += channel.metrics().cost;
                     }
-                    current = Ptr::clone(next_gate);
+                    current = Arc::clone(&next_gate);
 
-                    if current.owner().id() != start.owner().id() {
+                    if current.owner().ctx.id != start.owner().ctx.id {
                         break;
                     }
                 }
 
                 if *current != **start {
                     outgoing_edges.push(Edge {
-                        src_gate: Ptr::clone(start).make_const(),
+                        src_gate: Arc::clone(&start),
                         target_gate: current,
                         cost,
                     });
@@ -130,7 +132,7 @@ impl Topology {
     #[must_use]
     pub fn filter_nodes<P>(&self, mut predicate: P) -> Self
     where
-        P: FnMut(&PtrMut<dyn Module>) -> bool,
+        P: FnMut(&ModuleRef) -> bool,
     {
         // Remove unwanted nodes
         let mut nodes: Vec<NodeDefinition> = self
@@ -140,12 +142,12 @@ impl Topology {
             .cloned()
             .collect();
 
-        let ids: Vec<ModuleId> = nodes.iter().map(|def| def.node.id()).collect();
+        let ids: Vec<ModuleId> = nodes.iter().map(|def| def.node.ctx.id).collect();
 
         for node in &mut nodes {
             // let node = &mut nodes[m];
             node.edges
-                .retain(|edge| ids.contains(&edge.target_gate.owner().id()));
+                .retain(|edge| ids.contains(&edge.target_gate.owner().ctx.id));
         }
 
         Self { nodes }
@@ -158,7 +160,7 @@ impl Topology {
     #[must_use]
     pub fn filter_edges<P>(&self, mut predicate: P) -> Self
     where
-        P: FnMut(&PtrMut<dyn Module>, &Edge) -> bool,
+        P: FnMut(&ModuleRef, &Edge) -> bool,
     {
         let mut nodes = self.nodes.clone();
         for def in &mut nodes {
@@ -257,7 +259,7 @@ pub struct NodeDefinition {
     ///
     /// A reference of the described node.
     ///
-    pub node: PtrMut<dyn Module>,
+    pub node: ModuleRef,
     ///
     /// All edges, starting from this node.
     ///

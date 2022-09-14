@@ -19,6 +19,7 @@ pub use header::{MessageHeader, MessageId, MessageKind, MessageType};
 ///
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
+#[derive(Debug)]
 pub struct Message {
     pub(crate) header: MessageHeader,
     pub(crate) content: Option<AnyBox>,
@@ -247,35 +248,6 @@ impl Message {
         let header = self.header.dup();
 
         Some(Self { header, content })
-    }
-}
-
-impl Debug for Message {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Message")
-            .field("id", &self.header.id)
-            .field("kind", &self.header.kind)
-            .field(
-                "last_gate",
-                &format!(
-                    "{}",
-                    if let Some(ref g) = self.header.last_gate {
-                        g.name()
-                    } else {
-                        ""
-                    }
-                ),
-            )
-            .field("sender_module_id", &self.header.sender_module_id)
-            .field("target_module_id", &self.header.receiver_module_id)
-            .field(
-                "timestamp",
-                &format!(
-                    "(created: {}, send: {})",
-                    self.header.creation_time, self.header.send_time
-                ),
-            )
-            .finish()
     }
 }
 

@@ -18,17 +18,22 @@ struct Client {}
 
 #[async_trait::async_trait]
 impl AsyncModule for Client {
+    fn new() -> Self {
+        Self {}
+    }
+
     async fn at_sim_start(&mut self, _: usize) {
-        let ip = self.par("ip").unwrap().parse::<Ipv4Addr>().unwrap();
+        let ip = par("ip").unwrap().parse::<Ipv4Addr>().unwrap();
         IOContext::new(random::<[u8; 6]>(), ip).set();
 
         // if ip.octets()[3] != 120 {
         //     return;
         // }
 
-        self.send(Message::new().content(IpAddr::V4(ip)).build(), "out");
-
-        let handle = self.async_handle();
+        send(
+            Message::new().kind(10).content(IpAddr::V4(ip)).build(),
+            "out",
+        );
 
         tokio::spawn(async move {
             let delay = random::<f64>() * 10.0;
@@ -51,7 +56,7 @@ impl AsyncModule for Client {
             }
 
             let delay = random::<f64>() * 10.0 + 5.0;
-            handle.shutdown(Some(SimTime::now() + delay))
+            shutdow_and_restart_at(SimTime::now() + delay)
         });
     }
 }
@@ -61,11 +66,15 @@ struct Server {}
 
 #[async_trait::async_trait]
 impl AsyncModule for Server {
+    fn new() -> Self {
+        Self {}
+    }
+
     async fn at_sim_start(&mut self, _: usize) {
-        let ip = self.par("ip").unwrap().parse::<Ipv4Addr>().unwrap();
+        let ip = par("ip").unwrap().parse::<Ipv4Addr>().unwrap();
         IOContext::new(random::<[u8; 6]>(), ip).set();
 
-        self.send(
+        send(
             Message::new().kind(10).content(IpAddr::V4(ip)).build(),
             "out",
         );
@@ -137,24 +146,22 @@ struct Router {
     fwd: HashMap<IpAddr, GateRef>,
 }
 
-impl NameableModule for Router {
-    fn named(core: ModuleCore) -> Self {
+impl Module for Router {
+    fn new() -> Self {
         Self {
-            __core: core,
             fwd: HashMap::new(),
         }
     }
-}
 
-impl Module for Router {
     fn handle_message(&mut self, msg: Message) {
+        // println!("{:?}", msg);
         match msg.header().kind {
             10 => {
                 let (addr, meta) = msg.cast::<IpAddr>();
                 let last_gate = meta.last_gate.as_ref().unwrap();
                 let last_gate = match last_gate.name() {
-                    "in" => self.gate("out", last_gate.pos()),
-                    "in_server" => self.gate("out_server", 0),
+                    "in" => gate("out", last_gate.pos()),
+                    "in_server" => gate("out_server", 0),
                     _ => unreachable!(),
                 }
                 .unwrap();
@@ -164,7 +171,7 @@ impl Module for Router {
             _ => {
                 let dest = msg.header().dest_addr.ip();
                 let gate = self.fwd.get(&dest).unwrap().clone();
-                self.send(msg, gate)
+                send(msg, gate)
             }
         }
     }

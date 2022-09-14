@@ -197,8 +197,9 @@ fn main() {
     let (app, time, p) = rt.run().unwrap();
 
     let _ = app
-        .globals_weak()
+        .globals()
         .topology
+        .borrow()
         .write_to_svg("examples/inet/graph");
 
     assert_eq_time!(time, 0.200127998);

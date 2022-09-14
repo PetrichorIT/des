@@ -792,8 +792,7 @@ impl<A> RuntimeResult<A> {
 }
 
 cfg_net! {
-    use crate::net::{GateRefMut, HandleMessageEvent, Message, MessageAtGateEvent, Module, NetEvents, NetworkRuntime};
-    use crate::util::PtrWeakMut;
+    use crate::net::{GateRef,  HandleMessageEvent, Message, MessageAtGateEvent, ModuleRef, NetEvents, NetworkRuntime};
 
     impl<A> Runtime<NetworkRuntime<A>> {
         ///
@@ -801,12 +800,12 @@ cfg_net! {
         ///
         pub fn add_message_onto(
             &mut self,
-            gate: GateRefMut,
+            gate: GateRef,
             message: impl Into<Message>,
             time: SimTime,
         ) {
             let event = MessageAtGateEvent {
-                gate: gate.make_const(),
+                gate,
                 message: message.into(),
             };
 
@@ -818,7 +817,7 @@ cfg_net! {
         ///
         pub fn handle_message_on(
             &mut self,
-            module: impl Into<PtrWeakMut<dyn Module>>,
+            module: impl Into<ModuleRef>,
             message: impl Into<Message>,
             time: SimTime,
         ) {

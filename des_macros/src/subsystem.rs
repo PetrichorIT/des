@@ -96,11 +96,11 @@ fn subsystem_main(vis: Visibility, ident: Ident, attr: Attr, out: &mut TokenStre
                         }
 
                         token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                            let mut #ident: ::des::util::PtrMut<#ty> = #ty::build_named::<Self, #p>(#descriptor.parse().unwrap(), ctx);
+                            let mut #ident: ::des::net::ModuleRef = #ty::build_named::<Self, #p>(#descriptor.parse().unwrap(), ctx);
                         });
                     } else {
                         token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                            let mut #ident: ::des::util::PtrMut<#ty> = #ty::build_named(#descriptor.parse().unwrap(), ctx);
+                            let mut #ident: ::des::net::ModuleRef = #ty::build_named(#descriptor.parse().unwrap(), ctx);
                         })
                     }
                 }

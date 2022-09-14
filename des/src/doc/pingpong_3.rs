@@ -38,6 +38,11 @@
 //! # struct Pong {}
 //! #[async_trait::async_trait]
 //! impl AsyncModule for Pong {
+//!     fn new() -> Self {
+//!         /* ... */
+//!         # todo!()
+//!     }
+//!
 //!     async fn at_sim_start(&mut self, _stage: usize) {
 //!         IOContext::new([0,0,0,0,0,1], Ipv4Addr::new(192, 168, 2, 100)).set();
 //!
@@ -87,6 +92,11 @@
 //! # struct Ping {}
 //! #[async_trait::async_trait]
 //! impl AsyncModule for Ping {
+//!     fn new() -> Self {
+//!         /* ... */
+//!         # todo!()
+//!     }
+//!
 //!     async fn at_sim_start(&mut self, _stage: usize) {
 //!         IOContext::new([0,0,0,0,0,2], Ipv4Addr::new(192, 168, 2, 200)).set();
 //!

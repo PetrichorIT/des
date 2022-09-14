@@ -1,4 +1,7 @@
-use des::prelude::*;
+use des::{
+    net::{BuildContext, __Buildable0},
+    prelude::*,
+};
 use log::*;
 use serial_test::serial;
 
@@ -38,10 +41,14 @@ fn raw_logger() {
 struct SomeModule {}
 
 impl Module for SomeModule {
+    fn new() -> Self {
+        SomeModule {}
+    }
+
     fn at_sim_start(&mut self, stage: usize) {
         info!("at_sim_start_{}", stage);
         if stage == 1 {
-            self.schedule_in(Message::new().build(), Duration::from_secs(2));
+            schedule_in(Message::new().build(), Duration::from_secs(2));
         }
     }
 
@@ -67,34 +74,19 @@ fn module_auto_scopes() {
         .expect("Failed to set logger");
 
     let mut rt = NetworkRuntime::new(());
-    let globals = Ptr::downgrade(&rt.globals());
+    let mut cx = BuildContext::new(&mut rt);
 
-    let module_a = {
-        let core = ModuleCore::new_with(
-            ObjectPath::root_module("Module A".to_string()),
-            globals.clone(),
-        );
+    let module_a =
+        SomeModule::build_named(ObjectPath::root_module("Module A".to_string()), &mut cx);
+    cx.create_module(module_a);
 
-        Ptr::new(SomeModule::named(core))
-    };
-    rt.create_module(module_a);
+    let module_b =
+        SomeModule::build_named(ObjectPath::root_module("Module B".to_string()), &mut cx);
+    cx.create_module(module_b);
 
-    let module_b = {
-        let core = ModuleCore::new_with(
-            ObjectPath::root_module("Module B".to_string()),
-            globals.clone(),
-        );
-
-        Ptr::new(SomeModule::named(core))
-    };
-    rt.create_module(module_b);
-
-    let module_c = {
-        let core = ModuleCore::new_with(ObjectPath::root_module("Module C".to_string()), globals);
-
-        Ptr::new(SomeModule::named(core))
-    };
-    rt.create_module(module_c);
+    let module_c =
+        SomeModule::build_named(ObjectPath::root_module("Module C".to_string()), &mut cx);
+    cx.create_module(module_c);
 
     let runtime = Runtime::new(rt);
     match runtime.run() {

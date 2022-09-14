@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::ops::Deref;
 
+use crate::net::globals;
+
 ///
 /// The collection of all loaded parameters for modules,
 /// inside a network runtime.
@@ -25,11 +27,24 @@ impl Parameters {
         }
     }
 
+    // // internal
+    // pub fn set_globals(self) -> std::sync::Arc<crate::net::NetworkRuntimeGlobals> {
+    //     use crate::net::NetworkRuntimeGlobals;
+    //     use std::sync::Arc;
+
+    //     let mut g = NetworkRuntimeGlobals::new();
+    //     g.parameters = self;
+    //     let g = Arc::new(g);
+    //     crate::net::runtime::buf_set_globals(Arc::downgrade(&g));
+
+    //     g
+    // }
+
     ///
     /// Populates the parameter tree using the given raw text
     /// as parameter definitions.
     ///
-    pub fn build(&mut self, raw_text: &str) {
+    pub fn build(&self, raw_text: &str) {
         for line in raw_text.lines() {
             if let Some((key, value)) = line.split_once('=') {
                 self.insert(key.trim(), value.trim());
@@ -37,7 +52,7 @@ impl Parameters {
         }
     }
 
-    pub(crate) fn insert(&mut self, key: &str, value: &str) {
+    pub(crate) fn insert(&self, key: &str, value: &str) {
         self.tree.borrow_mut().insert(key, value);
     }
 
@@ -53,11 +68,10 @@ impl Parameters {
     /// This handle can point to a nonexiting value if its only used for writing.
     ///
     #[must_use]
-    pub fn get_handle<'a>(&'a self, path: &'a str, key: &'a str) -> ParHandle<'a, Optional> {
+    pub fn get_handle(&self, path: &str, key: &str) -> ParHandle<Optional> {
         ParHandle {
-            tree_ref: self,
-            path,
-            key,
+            path: path.to_string(),
+            key: key.to_string(),
 
             value: None,
 
@@ -97,20 +111,18 @@ impl private::ParHandleState for Unwraped {}
 /// module path and parameter key.
 ///
 #[derive(Debug)]
-pub struct ParHandle<'a, State>
+pub struct ParHandle<State>
 where
     State: private::ParHandleState,
 {
-    tree_ref: &'a Parameters,
-    path: &'a str,
-    key: &'a str,
+    path: String,
+    key: String,
 
     value: Option<String>,
-
     _phantom: PhantomData<State>,
 }
 
-impl<'a, State> ParHandle<'a, State>
+impl<State> ParHandle<State>
 where
     State: private::ParHandleState,
 {
@@ -123,10 +135,14 @@ where
     /// Panics if the handle points to no existing value.
     ///
     #[must_use]
-    pub fn unwrap(self) -> ParHandle<'a, Unwraped> {
-        if let Some(val) = self.tree_ref.tree.borrow().get_value(self.path, self.key) {
+    pub fn unwrap(self) -> ParHandle<Unwraped> {
+        if let Some(val) = globals()
+            .parameters
+            .tree
+            .borrow()
+            .get_value(&self.path, &self.key)
+        {
             ParHandle {
-                tree_ref: self.tree_ref,
                 path: self.path,
                 key: self.key,
 
@@ -147,7 +163,7 @@ where
     ///
     pub fn map<F, T>(self, mut f: F) -> Option<T>
     where
-        F: FnMut(ParHandle<'_, Unwraped>) -> T,
+        F: FnMut(ParHandle<Unwraped>) -> T,
     {
         if self.is_some() {
             Some(f(self.unwrap()))
@@ -162,11 +178,11 @@ where
     #[must_use]
     pub fn is_some(&self) -> bool {
         self.value.is_some()
-            || self
-                .tree_ref
+            || globals()
+                .parameters
                 .tree
                 .borrow()
-                .get_value(self.path, self.key)
+                .get_value(&self.path, &self.key)
                 .is_some()
     }
 
@@ -186,11 +202,11 @@ where
     pub fn as_optional(self) -> Option<String> {
         match self.value {
             Some(value) => Some(value),
-            None => self
-                .tree_ref
+            None => globals()
+                .parameters
                 .tree
                 .borrow()
-                .get_value(self.path, self.key)
+                .get_value(&self.path, &self.key)
                 .map(str::to_string),
         }
     }
@@ -204,19 +220,21 @@ where
         T: ToString,
     {
         let str = value.to_string();
-        self.tree_ref
+        globals()
+            .parameters
             .tree
             .borrow_mut()
             .insert(&format!("{}.{}", self.path, self.key), &str);
 
-        self.tree_ref
+        globals()
+            .parameters
             .updates
             .borrow_mut()
             .push(self.path.to_string());
     }
 }
 
-impl<'a> ParHandle<'a, Unwraped> {
+impl ParHandle<Unwraped> {
     ///
     /// Uses a custom string parser to parse a string, timming
     /// quotation marks in the process.
@@ -241,7 +259,7 @@ impl<'a> ParHandle<'a, Unwraped> {
     }
 }
 
-impl Deref for ParHandle<'_, Unwraped> {
+impl Deref for ParHandle<Unwraped> {
     type Target = str;
     fn deref(&self) -> &Self::Target {
         self.value.as_ref().unwrap()

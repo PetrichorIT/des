@@ -18,6 +18,7 @@ pub(crate) use self::runtime::HandleMessageEvent;
 pub(crate) use self::runtime::MessageAtGateEvent;
 pub(crate) use self::runtime::NetEvents;
 
+pub use self::runtime::globals;
 pub use self::runtime::NetworkRuntime;
 pub use self::runtime::NetworkRuntimeGlobals;
 
@@ -28,7 +29,7 @@ pub use self::runtime::NetworkRuntimeGlobals;
 pub use self::channel::Channel;
 pub use self::channel::ChannelMetrics;
 pub use self::channel::ChannelRef;
-pub use self::channel::ChannelRefMut;
+// pub use self::channel::ChannelRefMut;
 
 //
 // # Gate definitions
@@ -37,9 +38,10 @@ pub use self::channel::ChannelRefMut;
 pub use self::gate::Gate;
 pub use self::gate::GateDescription;
 pub use self::gate::GateRef;
-pub use self::gate::GateRefMut;
+pub use self::gate::GateRefWeak;
+// pub use self::gate::GateRefMut;
 pub use self::gate::GateServiceType;
-pub use self::gate::IntoModuleGate;
+// pub use self::gate::IntoModuleGate;
 
 //
 // # Messages & Packets
@@ -59,20 +61,23 @@ pub use self::message::MessageType;
 //
 
 pub use self::module::Module;
-pub use self::module::ModuleCore;
+// pub use self::module::ModuleCore;
 pub use self::module::ModuleId;
 pub use self::module::ModuleRef;
-pub use self::module::ModuleRefMut;
 pub use self::module::ModuleReferencingError;
-pub use self::module::StaticModuleCore;
+// pub use self::module::StaticModuleCore;
 
 cfg_async! {
     pub use self::module::AsyncModule;
-    pub use self::module::SenderHandle;
+    // pub use self::module::SenderHandle;
 }
 
+pub use self::module::{
+    child, gate, gates, module_id, module_name, module_path, par, parent, pars, schedule_at,
+    schedule_in, send, send_at, send_in, shutdow_and_restart_at, shutdow_and_restart_in, shutdown,
+};
+
 pub use self::ndl::BuildContext;
-pub use self::ndl::NameableModule;
 pub use self::ndl::__Buildable0;
 pub use self::ndl::__Buildable1;
 pub use self::ndl::__Buildable2;

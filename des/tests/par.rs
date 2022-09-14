@@ -1,6 +1,6 @@
 #![cfg(feature = "net")]
 
-use des::{net::Parameters, runtime::StandardLogger};
+use des::{prelude::NetworkRuntime, runtime::StandardLogger};
 
 const EXAMPLE_NETWORK: &str = "
     netA.*.dnsServer = 1.1.1.1
@@ -24,7 +24,8 @@ const EXAMPLE_TYPES: &str = "
 fn non_parse_read() {
     StandardLogger::active(false);
 
-    let mut par = Parameters::new();
+    let rt = NetworkRuntime::new(());
+    let par = &rt.globals().parameters;
 
     par.build(EXAMPLE_NETWORK);
 
@@ -66,7 +67,9 @@ fn non_parse_read() {
 fn parse_integers() {
     StandardLogger::active(false);
 
-    let mut par = Parameters::new();
+    let rt = NetworkRuntime::new(());
+    let par = &rt.globals().parameters;
+
     par.build(EXAMPLE_TYPES);
 
     // Case "netA.s0"
@@ -116,7 +119,8 @@ fn parse_integers() {
 fn parse_strings() {
     StandardLogger::active(false);
 
-    let mut par = Parameters::new();
+    let rt = NetworkRuntime::new(());
+    let par = &rt.globals().parameters;
     par.build(EXAMPLE_TYPES);
 
     let handle = par.get_handle("netA.other", "text").unwrap();

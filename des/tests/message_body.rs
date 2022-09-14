@@ -211,7 +211,11 @@ fn macro_enum() {
     let v = D0::TwentyOne(3, 'c', Box::new(0));
     assert_eq!(v.byte_len(), 21);
 
-    let v = D0::TwentyTwo { a: 3, b: 'c', c: Box::new(0) };
+    let v = D0::TwentyTwo {
+        a: 3,
+        b: 'c',
+        c: Box::new(0),
+    };
     assert_eq!(v.byte_len(), 22);
 
     let v = D0::Dynamic("Hello World".to_string());

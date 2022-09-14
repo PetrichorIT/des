@@ -54,14 +54,14 @@ cfg_net! {
     pub use crate::net::Channel;
     pub use crate::net::ChannelMetrics;
     pub use crate::net::ChannelRef;
-    pub use crate::net::ChannelRefMut;
+    // pub use crate::net::ChannelRefMut;
 
     pub use crate::net::Gate;
     pub use crate::net::GateDescription;
     pub use crate::net::GateRef;
-    pub use crate::net::GateRefMut;
+    // pub use crate::net::GateRefMut;
     pub use crate::net::GateServiceType;
-    pub use crate::net::IntoModuleGate;
+    // pub use crate::net::IntoModuleGate;
 
     pub use crate::net::CustomSizeBody;
     pub use crate::net::Message;
@@ -72,13 +72,19 @@ cfg_net! {
     pub use crate::net::MessageType;
 
     pub use crate::net::Module;
-    pub use crate::net::ModuleCore;
+    // pub use crate::net::ModuleCore;
     pub use crate::net::ModuleId;
     pub use crate::net::ModuleRef;
-    pub use crate::net::ModuleRefMut;
+    // pub use crate::net::ModuleRefMut;
     pub use crate::net::ModuleReferencingError;
-    pub use crate::net::NameableModule;
-    pub use crate::net::StaticModuleCore;
+    // pub use crate::net::NameableModule;
+    // pub use crate::net::StaticModuleCore;
+
+    pub use crate::net::{
+        child, gate, gates, module_id, module_name, module_path, par, parent, pars, schedule_at,
+        schedule_in, send, send_at, send_in, shutdow_and_restart_at, shutdow_and_restart_in, shutdown,
+    };
+
 
     pub use crate::net::StaticSubsystemCore;
     pub use crate::net::SubsystemCore;

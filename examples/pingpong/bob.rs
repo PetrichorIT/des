@@ -2,9 +2,13 @@ use des::prelude::*;
 use log::info;
 
 #[NdlModule]
-pub struct Bob(pub ModuleCore);
+pub struct Bob();
 
 impl Module for Bob {
+    fn new() -> Bob {
+        Bob()
+    }
+
     fn handle_message(&mut self, msg: Message) {
         let (str, meta) = msg.cast::<String>();
         info!(target: "Bob", "Received at {}: message #{:?} content: {}", sim_time(), meta.id, str);
@@ -12,7 +16,7 @@ impl Module for Bob {
         if str == "Pong" {
             let msg = Message::new().content("Ping".to_string()).build();
 
-            self.send(msg, ("netOut", 0))
+            send(msg, ("netOut", 0))
         }
     }
 }

@@ -2,15 +2,9 @@ use crate::net::message::{
     TYP_IO_TICK, TYP_RESTART, TYP_TCP_CONNECT, TYP_TCP_CONNECT_TIMEOUT, TYP_TCP_PACKET,
     TYP_UDP_PACKET, TYP_WAKEUP,
 };
-use crate::net::{Message, Module, StaticModuleCore};
+use crate::net::{Message, Module};
 use crate::time::SimTime;
 use async_trait::async_trait;
-use std::sync::Arc;
-
-use tokio::runtime::Runtime;
-
-mod handle;
-pub use handle::*;
 
 pub(crate) mod ext;
 use ext::WaitingMessage;
@@ -29,7 +23,12 @@ use ext::WaitingMessage;
 /// signatures.
 ///
 #[async_trait]
-pub trait AsyncModule: StaticModuleCore + Send {
+pub trait AsyncModule: Send {
+    /// Creates a new instance of Self.
+    fn new() -> Self
+    where
+        Self: Sized;
+
     ///
     /// A message handler for receiving events, user defined.
     ///
@@ -54,6 +53,9 @@ pub trait AsyncModule: StaticModuleCore + Send {
     ///
     /// #[async_trait]
     /// impl AsyncModule for MyAsyncModule {
+    /// # fn new() -> Self { todo!() }
+    ///     /* ... */    
+    ///
     ///     async fn handle_message(&mut self, msg: Message) {
     ///         println!("Received {:?}", msg);
     ///     }
@@ -83,18 +85,16 @@ pub trait AsyncModule: StaticModuleCore + Send {
     ///
     /// #[async_trait]
     /// impl AsyncModule for MyChannelProbe {
+    ///     fn new() -> Self {
+    ///         /* ... */
+    /// # todo!()
+    ///     }
+    ///
     ///     async fn handle_message(&mut self, msg: Message) {
     ///         self.throughput += 1;        
     ///         if is_good_packet(msg) {
     ///             self.goodput += 1;
     ///         }
-    ///     }
-    ///
-    ///     async fn activity(&mut self) {
-    ///         let rate = (self.goodput as f64) / (self.throughput as f64);
-    ///         self.goodput = 0;
-    ///         self.throughput = 0;
-    ///         self.metrics.send(rate).await.expect("Failed to send");
     ///     }
     /// }
     /// ```
@@ -132,12 +132,15 @@ pub trait AsyncModule: StaticModuleCore + Send {
     ///
     /// #[async_trait]
     /// impl AsyncModule for MyModule {
+    /// # fn new() -> Self { todo!() }
+    ///     /* ... */    
+    ///
     ///     async fn handle_message(&mut self, _: Message) {
     ///         // ...
     ///     }
     ///
     ///     async fn at_sim_start(&mut self, _stage: usize) {
-    ///         self.config = fetch_config(self.id()).await;
+    ///         self.config = fetch_config(module_id()).await;
     ///         self.records.clear();
     ///     }
     /// }
@@ -186,25 +189,13 @@ pub trait AsyncModule: StaticModuleCore + Send {
     }
 
     #[doc(hidden)]
-    #[cfg(feature = "async-sharedrt")]
-    fn __get_rt(&self) -> Option<Arc<Runtime>> {
-        Some(Arc::clone(&self.globals().runtime))
-    }
-
-    #[doc(hidden)]
-    #[cfg(not(feature = "async-sharedrt"))]
-    fn __get_rt(&self) -> Option<Arc<Runtime>> {
-        Some(Arc::clone(self.module_core().async_ext.rt.as_ref()?))
-    }
-
-    #[doc(hidden)]
     fn __manage_intents(&mut self, intents: Vec<tokio::sim::net::IOIntent>) {
         for intent in intents {
             use tokio::sim::net::IOIntent;
             match intent {
                 IOIntent::UdpSendPacket(pkt) => {
                     log::info!("Sending captured UDP packet: {:?}", pkt);
-                    self.send(
+                    super::send(
                         Message::new()
                             // .kind(RT_UDP)
                             .typ(TYP_UDP_PACKET)
@@ -216,7 +207,7 @@ pub trait AsyncModule: StaticModuleCore + Send {
                 }
                 IOIntent::TcpConnect(pkt) => {
                     log::info!("Sending captured TCP connect: {:?}", pkt);
-                    self.send(
+                    super::send(
                         Message::new()
                             // .kind(RT_TCP_CONNECT)
                             .typ(TYP_TCP_CONNECT)
@@ -228,7 +219,7 @@ pub trait AsyncModule: StaticModuleCore + Send {
                 }
                 IOIntent::TcpSendPacket(pkt, delay) => {
                     log::info!("Sending captured TCP packet: {:?}", pkt);
-                    self.send_in(
+                    super::send_in(
                         Message::new()
                             // .kind(RT_TCP_PACKET)
                             .typ(TYP_TCP_PACKET)
@@ -241,7 +232,7 @@ pub trait AsyncModule: StaticModuleCore + Send {
                 }
                 IOIntent::TcpConnectTimeout(pkt, timeout) => {
                     log::info!("Scheduling TCP Connect Timeout: {:?} in {:?}", pkt, timeout);
-                    self.schedule_in(
+                    super::schedule_in(
                         Message::new()
                             // .kind(RT_TCP_CONNECT_TIMEOUT)
                             .typ(TYP_TCP_CONNECT_TIMEOUT)
@@ -253,7 +244,7 @@ pub trait AsyncModule: StaticModuleCore + Send {
                 }
                 IOIntent::IoTick(wakeup_time) => {
                     log::info!("Scheduling IO Tick at {}", wakeup_time.as_millis());
-                    self.schedule_at(Message::new().typ(TYP_IO_TICK).build(), wakeup_time)
+                    super::schedule_at(Message::new().typ(TYP_IO_TICK).build(), wakeup_time)
                 }
                 _ => {
                     log::warn!("Unkown Intent")
@@ -267,11 +258,18 @@ impl<T> Module for T
 where
     T: 'static + AsyncModule,
 {
+    fn new() -> Self
+    where
+        Self: Sized,
+    {
+        <T as AsyncModule>::new()
+    }
+
     fn handle_message(&mut self, msg: Message) {
         // (0) Check meta messaeg
         #[cfg(not(feature = "async-sharedrt"))]
         if msg.header().typ == TYP_RESTART {
-            self.async_ext.reset();
+            super::async_ctx_reset();
             self.at_restart();
 
             // Do sim start procedure
@@ -283,8 +281,8 @@ where
         }
 
         // (1) Fetch the runtime and initial the time context.
-        if let Some(rt) = self.__get_rt() {
-            let guard = rt.enter_context(self.async_ext.ctx.take().unwrap());
+        if let Some(rt) = super::async_get_rt() {
+            let guard = rt.enter_context(super::async_take_sim_ctx());
 
             // (2) Poll time time events before excuting
             rt.poll_time_events();
@@ -331,50 +329,41 @@ where
                     rt.process_tcp_packet(msg)
                         .map_err(|msg| Message::new().content(msg).header(header).build().into())
                 }
-                _ => Err(msg), /*match msg.meta().kind {
-                                   RT_UDP => {}
-                                   RT_TCP_CONNECT => {}
-                                   RT_TCP_CONNECT_TIMEOUT => {}
-                                   RT_TCP_PACKET => {}
-                                   _ => {
-                                       self.async_ext
-                                           .wait_queue_tx
-                                           .send(WaitingMessage {
-                                               msg,
-                                               time: SimTime::now(),
-                                           })
-                                           .expect("Failed to send to unbounded channel");
-                                   }
-                               },*/
+                _ => Err(msg),
             };
 
             if let Err(msg) = typ_processed {
-                self.async_ext
-                    .wait_queue_tx
-                    .send(WaitingMessage {
-                        msg,
-                        time: SimTime::now(),
-                    })
-                    .expect("Failed to forward message to 'handle_message'")
+                super::async_wait_queue_tx_send(WaitingMessage {
+                    msg,
+                    time: SimTime::now(),
+                })
+                .expect("Failed to forward message to 'handle_message'");
+                // self.async_ext
+                //     .wait_queue_tx
+                //     .send(WaitingMessage {
+                //         msg,
+                //         time: SimTime::now(),
+                //     })
+                //     .expect("Failed to forward message to 'handle_message'")
             }
 
             rt.poll_until_idle();
 
             if let Some(next_time) = rt.next_time_poll() {
-                self.schedule_at(Message::new().typ(TYP_WAKEUP).build(), next_time);
+                super::schedule_at(Message::new().typ(TYP_WAKEUP).build(), next_time);
             }
 
             self.__manage_intents(rt.yield_intents());
 
             // (1) Suspend the time context
-            self.async_ext.ctx = Some(guard.leave());
+            super::async_leave_sim_ctx(guard.leave());
         }
     }
 
     fn at_sim_start(&mut self, stage: usize) {
         // time is 0
-        if let Some(rt) = self.__get_rt() {
-            let guard = rt.enter_context(self.async_ext.ctx.take().unwrap());
+        if let Some(rt) = super::async_get_rt() {
+            let guard = rt.enter_context(super::async_take_sim_ctx());
             rt.poll_time_events();
             {
                 // # Setup message receive handle.
@@ -395,13 +384,9 @@ where
                         unsafe { &mut *ptr }
                     };
 
-                    let mut rx = self
-                        .async_ext
-                        .wait_queue_rx
-                        .take()
-                        .expect("We have been robbed");
+                    let mut rx = super::async_wait_queue_rx_take().expect("We have been robbed");
 
-                    self.async_ext.wait_queue_join = Some(rt.spawn(async move {
+                    super::async_set_wait_queue_join(rt.spawn(async move {
                         while let Some(wmsg) = rx.recv().await {
                             let WaitingMessage { msg, .. } = wmsg;
                             <T as AsyncModule>::handle_message(self_ref, msg).await;
@@ -418,13 +403,10 @@ where
                         unsafe { &mut *ptr }
                     };
 
-                    let mut srx = self
-                        .async_ext
-                        .sim_start_rx
-                        .take()
-                        .expect("We have been robbed at sim start");
+                    let mut srx =
+                        super::async_sim_start_rx_take().expect("We have been robbed at sim start");
 
-                    self.async_ext.sim_start_join = Some(rt.spawn(async move {
+                    super::async_set_sim_start_join(rt.spawn(async move {
                         while let Some(stage) = srx.recv().await {
                             if stage == usize::MAX {
                                 srx.close();
@@ -435,52 +417,47 @@ where
                     }));
                 }
 
-                self.async_ext
-                    .sim_start_tx
-                    .send(stage)
-                    .expect("Failed to send to unbounded sender");
+                super::async_sim_start_tx_send(stage).expect("Failed to send to unbounded sender");
             }
             rt.poll_until_idle();
 
             if let Some(next_time) = rt.next_time_poll() {
-                self.schedule_at(Message::new().typ(TYP_WAKEUP).build(), next_time);
+                super::schedule_at(Message::new().typ(TYP_WAKEUP).build(), next_time);
             }
             self.__manage_intents(rt.yield_intents());
 
-            self.async_ext.ctx = Some(guard.leave());
+            super::async_leave_sim_ctx(guard.leave());
         }
     }
 
     fn finish_sim_start(&mut self) {
-        if let Some(rt) = self.__get_rt() {
-            let guard = rt.enter_context(self.async_ext.ctx.take().unwrap());
+        if let Some(rt) = super::async_get_rt() {
+            let guard = rt.enter_context(super::async_take_sim_ctx());
 
             rt.poll_time_events();
             {
-                self.async_ext
-                    .sim_start_tx
-                    .send(usize::MAX)
+                super::async_sim_start_tx_send(usize::MAX)
                     .expect("Failed to send close signal to sim_start_task");
             }
             rt.poll_until_idle();
 
             // The join must succeed else saftey invariant cannot be archived.
-            rt.block_or_idle_on(self.async_ext.sim_start_join.take().expect("Crime"))
+            rt.block_or_idle_on(super::async_sim_start_join_take().expect("Crime"))
                 .expect("Join Idle")
                 .expect("Join Error");
 
             if let Some(next_time) = rt.next_time_poll() {
-                self.schedule_at(Message::new().typ(TYP_WAKEUP).build(), next_time);
+                super::schedule_at(Message::new().typ(TYP_WAKEUP).build(), next_time);
             }
             self.__manage_intents(rt.yield_intents());
 
-            self.async_ext.ctx = Some(guard.leave());
+            super::async_leave_sim_ctx(guard.leave());
         }
     }
 
     fn at_sim_end(&mut self) {
-        if let Some(rt) = self.__get_rt() {
-            let guard = rt.enter_context(self.async_ext.ctx.take().unwrap());
+        if let Some(rt) = super::async_get_rt() {
+            let guard = rt.enter_context(super::async_take_sim_ctx());
             rt.poll_time_events();
             {
                 // SAFTEY:
@@ -489,30 +466,29 @@ where
                 let self_ptr: *mut T = self;
                 let self_ref: &'static mut T = unsafe { &mut *self_ptr };
 
-                self.async_ext.sim_end_join =
-                    Some(rt.spawn(<T as AsyncModule>::at_sim_end(self_ref)));
+                super::async_sim_end_join_set(rt.spawn(<T as AsyncModule>::at_sim_end(self_ref)));
             }
             rt.poll_until_idle();
 
             // No time event enqueue needed, wont be resolved either way
 
-            self.async_ext.ctx = Some(guard.leave());
+            super::async_leave_sim_ctx(guard.leave());
         }
     }
 
     fn finish_sim_end(&mut self) {
-        if let Some(rt) = self.__get_rt() {
-            let guard = rt.enter_context(self.async_ext.ctx.take().unwrap());
+        if let Some(rt) = super::async_get_rt() {
+            let guard = rt.enter_context(super::async_take_sim_ctx());
             rt.poll_time_events();
             rt.poll_until_idle();
 
-            rt.block_or_idle_on(self.async_ext.sim_end_join.take().expect("Theif"))
+            rt.block_or_idle_on(super::async_sim_end_join_take().expect("Theif"))
                 .expect("Join Idle")
                 .expect("Join Error");
 
             // No time event enqueue needed, wont be resolved either way
 
-            self.async_ext.ctx = Some(guard.leave());
+            super::async_leave_sim_ctx(guard.leave());
         }
     }
 

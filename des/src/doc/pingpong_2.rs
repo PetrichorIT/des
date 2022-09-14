@@ -99,23 +99,23 @@
 //! # struct Ping { pongs_recv: usize, pings_send: usize }
 //! # #[NdlModule]
 //! # struct Pong { pings_recv: usize, pongs_send: usize }
-//! impl NameableModule for Ping {
-//!     fn named(__core: ModuleCore) -> Self {
+//! impl Module for Ping {
+//!     fn new() -> Self {
 //!         Self {
-//!             __core,
 //!             pongs_recv: 0,
 //!             pings_send: 0,
 //!         }
 //!     }
+//!     /* ... */
 //! }
-//! impl NameableModule for Pong {
-//!     fn named(__core: ModuleCore) -> Self {
+//! impl Module for Pong {
+//!     fn new() -> Self {
 //!         Self {
-//!             __core,
 //!             pings_recv: 0,
 //!             pongs_send: 0,
 //!         }
 //!     }
+//!     /* ... */
 //! }
 //! ```
 //!
@@ -134,19 +134,22 @@
 //! const WAKEUP: MessageKind = 69;
 //!
 //! impl Module for Ping {
+//! # fn new() -> Self { todo!() }
+//!     /* ... */
+//!
 //!     fn at_sim_start(&mut self, _stage: usize) {
 //!         // Create the inital wakeup event.
-//!         self.schedule_at(Message::new().kind(WAKEUP).build(), SimTime::ZERO)
+//!         schedule_at(Message::new().kind(WAKEUP).build(), SimTime::ZERO)
 //!     }
 //!
 //!     fn handle_message(&mut self, msg: Message) {
 //!         match msg.header().kind {
 //!             WAKEUP => {
 //!                 // Send a PING every 1s, for the first 30s
-//!                 self.send(Message::new().kind(PING).build(), "out");
+//!                 send(Message::new().kind(PING).build(), "out");
 //!                 self.pings_send += 1;
 //!                 if SimTime::now().as_secs() < 30 {
-//!                     self.schedule_in(msg, Duration::from_secs(1));
+//!                     schedule_in(msg, Duration::from_secs(1));
 //!                 }
 //!             },
 //!             PONG => self.pongs_recv += 1,
@@ -161,10 +164,13 @@
 //! }
 //!
 //! impl Module for Pong {
+//! # fn new() -> Self { todo!() }
+//!     /* ... */
+//!
 //!     fn handle_message(&mut self, msg: Message) {
 //!         assert_eq!(msg.header().kind, PING);
 //!         self.pings_recv += 1;
-//!         self.send(Message::new().kind(PONG).build(), "out");
+//!         send(Message::new().kind(PONG).build(), "out");
 //!         self.pongs_send += 1;
 //!     }
 //!
