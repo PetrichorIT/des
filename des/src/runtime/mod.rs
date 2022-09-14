@@ -38,7 +38,6 @@ pub(crate) mod logger;
 pub use self::logger::*;
 
 pub(crate) const FT_NET: bool = cfg!(feature = "net");
-pub(crate) const FT_STD_NET: bool = cfg!(feature = "std-net");
 pub(crate) const FT_CQUEUE: bool = cfg!(feature = "cqueue");
 pub(crate) const FT_INTERNAL_METRICS: bool = cfg!(feature = "metrics");
 pub(crate) const FT_ASYNC: bool = cfg!(feature = "async");

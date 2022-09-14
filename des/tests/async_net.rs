@@ -401,9 +401,8 @@ struct TcpFullRouter {}
 
 impl Module for TcpFullRouter {
     fn handle_message(&mut self, msg: Message) {
-        if msg.meta().typ() == MessageType::Tcp {
-            let msg = msg.as_packet();
-            match msg.header().dest_node {
+        if msg.header().typ() == MessageType::Tcp {
+            match msg.header().dest_addr.ip() {
                 IpAddr::V4(ip) if ip == Ipv4Addr::new(192, 168, 2, 110) => self.send(msg, "out1"),
                 IpAddr::V4(ip) if ip == Ipv4Addr::new(192, 168, 2, 112) => self.send(msg, "out2"),
                 _ => unreachable!(),

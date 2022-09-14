@@ -68,14 +68,8 @@ cfg_net! {
     pub use crate::net::MessageBody;
     pub use crate::net::MessageId;
     pub use crate::net::MessageKind;
-    pub use crate::net::MessageMetadata;
-
-    pub use crate::net::NodeAddress;
-    pub use crate::net::Packet;
-    pub use crate::net::PacketHeader;
-    pub use crate::net::PortAddress;
-    pub use crate::net::NODE_ADDR_BROADCAST;
-    pub use crate::net::NODE_ADDR_LOOPBACK;
+    pub use crate::net::MessageHeader;
+    pub use crate::net::MessageType;
 
     pub use crate::net::Module;
     pub use crate::net::ModuleCore;
@@ -98,8 +92,15 @@ cfg_net! {
 
     cfg_async! {
         pub use crate::net::AsyncModule;
-        pub use crate::net::MessageType;
+
     }
+
+    pub use std::net::IpAddr;
+    pub use std::net::Ipv4Addr;
+    pub use std::net::Ipv6Addr;
+    pub use std::net::SocketAddr;
+    pub use std::net::SocketAddrV4;
+    pub use std::net::SocketAddrV6;
 
     //
     // Export the derives if net

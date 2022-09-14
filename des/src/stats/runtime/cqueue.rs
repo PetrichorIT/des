@@ -1,6 +1,7 @@
 use crate::stats::{CompressedStdDev, StdDev};
 use std::io::Write;
 
+#[cfg(feature = "metrics-rt-full")]
 use super::EventCountVec;
 
 /// Metrics that sample the runtime
@@ -50,12 +51,15 @@ impl CQueueMetrics {
         Ok(())
     }
 
+    #[cfg(feature = "metrics-rt-full")]
     pub(crate) fn write_event_count_to(&self, f: &mut impl Write) -> std::io::Result<()> {
         self.event_count.write_to(f)
     }
 
     pub(crate) fn finish(&mut self) {
         self.non_zero_event_wait_time.flush();
+
+        #[cfg(feature = "metrics-rt-full")]
         self.event_count.finish();
 
         println!("\u{23A2} Metrics");

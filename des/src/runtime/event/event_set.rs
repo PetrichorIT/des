@@ -207,6 +207,7 @@ cfg_cqueue! {
                         metrics.nonzero_event_count.add_assign(1);
                     }
 
+                    #[cfg(feature = "metrics-rt-full")]
                     metrics.event_count.collect(self.len() as f64);
                 }
 

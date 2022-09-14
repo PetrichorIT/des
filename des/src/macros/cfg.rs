@@ -30,26 +30,6 @@ macro_rules! cfg_not_async {
     }
 }
 
-macro_rules! cfg_net_default {
-    ($($item:item)*) => {
-        $(
-            #[cfg(not(feature = "std-net"))]
-            #[cfg_attr(docsrs, doc(cfg(not(feature = "std-net"))))]
-            $item
-        )*
-    }
-}
-
-macro_rules! cfg_net_std {
-    ($($item:item)*) => {
-        $(
-            #[cfg(feature = "std-net")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "std-net")))]
-            $item
-        )*
-    }
-}
-
 macro_rules! cfg_metrics {
     ($($item:item)*) => {
         $(

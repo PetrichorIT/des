@@ -65,7 +65,10 @@ impl AsyncModule for Server {
         let ip = self.par("ip").unwrap().parse::<Ipv4Addr>().unwrap();
         IOContext::new(random::<[u8; 6]>(), ip).set();
 
-        self.send(Message::new().content(IpAddr::V4(ip)).build(), "out");
+        self.send(
+            Message::new().kind(10).content(IpAddr::V4(ip)).build(),
+            "out",
+        );
 
         tokio::spawn(async {
             let sock = TcpListener::bind("0.0.0.0:8000").await.unwrap();
@@ -145,13 +148,8 @@ impl NameableModule for Router {
 
 impl Module for Router {
     fn handle_message(&mut self, msg: Message) {
-        match msg.try_as_packet() {
-            Ok(pkt) => {
-                let dest = pkt.header().dest_node;
-                let gate = self.fwd.get(&dest).unwrap().clone();
-                self.send(pkt, gate)
-            }
-            Err(msg) => {
+        match msg.header().kind {
+            10 => {
                 let (addr, meta) = msg.cast::<IpAddr>();
                 let last_gate = meta.last_gate.as_ref().unwrap();
                 let last_gate = match last_gate.name() {
@@ -162,6 +160,11 @@ impl Module for Router {
                 .unwrap();
                 log::info!("Added fwd entry for {} --> {:?}", addr, last_gate.str());
                 self.fwd.insert(addr, last_gate);
+            }
+            _ => {
+                let dest = msg.header().dest_addr.ip();
+                let gate = self.fwd.get(&dest).unwrap().clone();
+                self.send(msg, gate)
             }
         }
     }

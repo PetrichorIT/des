@@ -140,7 +140,7 @@
 //!     }
 //!
 //!     fn handle_message(&mut self, msg: Message) {
-//!         match msg.meta().kind {
+//!         match msg.header().kind {
 //!             WAKEUP => {
 //!                 // Send a PING every 1s, for the first 30s
 //!                 self.send(Message::new().kind(PING).build(), "out");
@@ -162,7 +162,7 @@
 //!
 //! impl Module for Pong {
 //!     fn handle_message(&mut self, msg: Message) {
-//!         assert_eq!(msg.meta().kind, PING);
+//!         assert_eq!(msg.header().kind, PING);
 //!         self.pings_recv += 1;
 //!         self.send(Message::new().kind(PONG).build(), "out");
 //!         self.pongs_send += 1;

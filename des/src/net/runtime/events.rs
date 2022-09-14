@@ -35,7 +35,7 @@ pub struct MessageAtGateEvent {
 impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
     fn handle(self, rt: &mut Runtime<NetworkRuntime<A>>) {
         let mut message = self.message;
-        message.meta.last_gate = Some(Ptr::clone(&self.gate));
+        message.header.last_gate = Some(Ptr::clone(&self.gate));
 
         //
         // Iterate through gates until:
@@ -48,7 +48,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
 
             // A next gate exists.
             // redirect to next channel
-            message.meta.last_gate = Some(Ptr::clone(next_gate));
+            message.header.last_gate = Some(Ptr::clone(next_gate));
 
             info!(
                 "Gate '{}' forwarding message [{}] to next gate delayed: {}",
@@ -114,7 +114,7 @@ impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
     fn handle(self, rt: &mut Runtime<NetworkRuntime<A>>) {
         log_scope!(self.module.str());
         let mut message = self.message;
-        message.meta.receiver_module_id = self.module.id();
+        message.header.receiver_module_id = self.module.id();
 
         info!("Handling message {:?}", message.str());
 
@@ -303,7 +303,7 @@ impl PtrWeakMut<dyn Module> {
                                 gate.service_type() != GateServiceType::Input,
                                 "To send messages onto a gate it must have service type of 'Output' or 'Undefined'"
                             );
-                        msg.meta.sender_module_id = self_id;
+                        msg.header.sender_module_id = self_id;
                         rt.add_event(
                             NetEvents::MessageAtGateEvent(MessageAtGateEvent {
                                 gate,
@@ -358,7 +358,7 @@ impl PtrWeakMut<dyn Module> {
                 gate.service_type() != GateServiceType::Input,
                 "To send messages onto a gate it must have service type of 'Output' or 'Undefined'"
             );
-            message.meta.sender_module_id = self_id;
+            message.header.sender_module_id = self_id;
             rt.add_event(
                 NetEvents::MessageAtGateEvent(MessageAtGateEvent {
                     // TODO

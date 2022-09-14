@@ -8,9 +8,7 @@ mod gate;
 mod message;
 mod module;
 mod ndl;
-mod packet;
 mod runtime;
-#[allow(unused)]
 mod subsystem;
 mod topology;
 
@@ -51,20 +49,10 @@ pub use self::message::CustomSizeBody;
 pub use self::message::Message;
 pub use self::message::MessageBody;
 pub use self::message::MessageBuilder;
+pub use self::message::MessageHeader;
 pub use self::message::MessageId;
 pub use self::message::MessageKind;
-pub use self::message::MessageMetadata;
-
-#[cfg(feature = "async")]
 pub use self::message::MessageType;
-
-pub use self::packet::NodeAddress;
-pub use self::packet::Packet;
-pub use self::packet::PacketBuilder;
-pub use self::packet::PacketHeader;
-pub use self::packet::PortAddress;
-pub use self::packet::NODE_ADDR_BROADCAST;
-pub use self::packet::NODE_ADDR_LOOPBACK;
 
 //
 // # Modules

@@ -50,8 +50,7 @@ pub trait Module: StaticModuleCore {
     ///
     /// impl Module for MyModule {
     ///     fn handle_message(&mut self, msg: Message) {
-    ///         let (pkt, meta) = msg.cast::<Packet>();
-    ///         println!("Received {:?} with metadata {:?}", pkt, meta);
+    ///         println!("Received {:?}", msg);
     ///     }
     /// }
     /// ```
@@ -79,8 +78,7 @@ pub trait Module: StaticModuleCore {
     ///
     /// impl Module for OurModule {
     ///     fn handle_message(&mut self, msg: Message) {
-    ///         let (pkt, _meta) = msg.cast::<Packet>();
-    ///         if is_good_packet(pkt) {
+    ///         if is_good_packet(msg) {
     ///             self.good_packets += 1.0;
     ///         } else {
     ///             self.bad_packets += 1.0;

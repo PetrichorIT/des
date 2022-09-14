@@ -1,3 +1,4 @@
+#![allow(unused)]
 use std::{any::*, fmt::Debug};
 
 pub(crate) struct AnyBox {
@@ -20,6 +21,11 @@ impl AnyBox {
     #[cfg(debug_assertions)]
     pub(crate) fn ty(&self) -> &'static str {
         self.ty_info
+    }
+
+    #[cfg(not(debug_assertions))]
+    pub(crate) fn ty(&self) -> &'static str {
+        "no ty info"
     }
 
     pub(crate) fn try_dup<T: 'static>(&self) -> Option<Self>

@@ -7,7 +7,7 @@ use log::info;
 pub struct RandomRoutingDeamon {
     core: ModuleCore,
 
-    hop_counts: HashMap<NodeAddress, usize>,
+    hop_counts: HashMap<IpAddr, usize>,
 }
 
 impl RandomRoutingDeamon {
@@ -21,8 +21,8 @@ impl RandomRoutingDeamon {
         }
     }
 
-    pub fn handle(&mut self, pkt: &Packet, incoming: GateRef) {
-        let source = pkt.header().src_node;
+    pub fn handle(&mut self, pkt: &Message, incoming: GateRef) {
+        let source = pkt.header().src_addr.ip();
         if let Some(path_cost) = self.hop_counts.get_mut(&source) {
             // Allready knows path
             info!(target: "RandomRoutingDeamon", "Updating backproc path");

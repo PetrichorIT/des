@@ -82,7 +82,7 @@ impl ChannelMetrics {
             return Duration::ZERO;
         }
 
-        let len = msg.bit_len;
+        let len = msg.length() * 8;
         let transmission_time = Duration::from_secs_f64(len as f64 / self.bitrate as f64);
         if self.jitter == Duration::ZERO {
             self.latency + transmission_time
@@ -101,7 +101,7 @@ impl ChannelMetrics {
         if self.bitrate == 0 {
             Duration::ZERO
         } else {
-            let len = msg.bit_len;
+            let len = msg.length() * 8;
             Duration::from_secs_f64(len as f64 / self.bitrate as f64)
         }
     }
@@ -261,7 +261,7 @@ impl Channel {
         let rng_ref = rng();
 
         if self.is_busy() {
-            let msg_size = msg.byte_len;
+            let msg_size = msg.length();
             if self.buffer_len + msg_size > self.metrics.queuesize {
                 log::warn!(
                     "Gate '{}' dropping message [{}] pushed onto busy channel {}",
@@ -284,7 +284,7 @@ impl Channel {
                     next_gate.previous_gate().unwrap().name(),
                     msg.str()
                 );
-                self.buffer_len += msg.byte_len;
+                self.buffer_len += msg.length();
                 self.buffer.push_back((msg, Ptr::clone(next_gate)));
             }
         } else {
@@ -332,7 +332,7 @@ impl Channel {
         self.transmission_finish_time = SimTime::ZERO;
 
         if let Some((msg, next_gate)) = self.buffer.pop_front() {
-            self.buffer_len -= msg.byte_len;
+            self.buffer_len -= msg.length();
             self.send_message(msg, &next_gate, rt)
         }
     }

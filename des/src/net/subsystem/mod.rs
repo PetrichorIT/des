@@ -1,4 +1,10 @@
-use crate::{create_global_uid, net::{Channel, NetworkRuntimeGlobals, ObjectPath}, util::{PtrMut, PtrWeakConst, PtrWeakMut}};
+#![allow(unused)]
+
+use crate::{
+    create_global_uid,
+    net::{Channel, NetworkRuntimeGlobals, ObjectPath},
+    util::{PtrMut, PtrWeakConst, PtrWeakMut},
+};
 use std::{
     collections::HashMap,
     ops::{Deref, DerefMut},

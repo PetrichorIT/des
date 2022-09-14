@@ -49,7 +49,7 @@ impl Module for MultiRunner {
 
     fn handle_message(&mut self, msg: Message) {
         // println!("M: [{}] {:?}", SimTime::now(), msg);
-        if msg.meta().kind == 42 {
+        if msg.header().kind == 42 {
             self.send(msg.dup::<()>(), ("toAppl", 1));
             self.processing_time(Duration::new(1, 0));
             self.send(msg, ("toAppl", 2));

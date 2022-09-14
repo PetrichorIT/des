@@ -10,7 +10,7 @@ use sysinfo::{CpuExt, SystemExt};
 #[cfg(feature = "metrics")]
 use crate::stats::ProfilerOutputTarget;
 
-use super::{FT_ASYNC, FT_CQUEUE, FT_INTERNAL_METRICS, FT_NET, FT_STD_NET};
+use super::{FT_ASYNC, FT_CQUEUE, FT_INTERNAL_METRICS, FT_NET};
 
 /// A run profiler
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -136,9 +136,6 @@ impl Default for Profiler {
         }
         if FT_NET {
             features.push("net".into());
-        }
-        if FT_STD_NET {
-            features.push("std-net".into());
         }
         if FT_ASYNC {
             features.push("async".into());

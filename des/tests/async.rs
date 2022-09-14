@@ -37,8 +37,8 @@ impl NameableModule for QuasaiSyncModule {
 #[async_trait]
 impl AsyncModule for QuasaiSyncModule {
     async fn handle_message(&mut self, msg: Message) {
-        println!("[{}] Received msg: {}", self.name(), msg.meta().id);
-        self.counter += msg.meta().id as usize;
+        println!("[{}] Received msg: {}", self.name(), msg.header().id);
+        self.counter += msg.header().id as usize;
     }
 }
 
@@ -138,7 +138,7 @@ impl AsyncModule for MutipleTasksModule {
 
         let ta = tokio::spawn(async move {
             while let Some(v) = rxa.recv().await {
-                let k = v.meta().kind;
+                let k = v.header().kind;
                 txb.send(v).await.unwrap();
 
                 if k == 42 {
@@ -150,7 +150,7 @@ impl AsyncModule for MutipleTasksModule {
 
         let tb = tokio::spawn(async move {
             while let Some(v) = rxb.recv().await {
-                let k = v.meta().kind;
+                let k = v.header().kind;
                 txc.send(v).await.unwrap();
 
                 if k == 42 {
@@ -162,8 +162,8 @@ impl AsyncModule for MutipleTasksModule {
 
         let tc = tokio::spawn(async move {
             while let Some(v) = rxc.recv().await {
-                let k = v.meta().kind;
-                result.fetch_add(v.meta().id as usize, std::sync::atomic::Ordering::SeqCst);
+                let k = v.header().kind;
+                result.fetch_add(v.header().id as usize, std::sync::atomic::Ordering::SeqCst);
 
                 if k == 42 {
                     rxc.close();
@@ -262,16 +262,16 @@ impl NameableModule for TimeSleepModule {
 #[async_trait]
 impl AsyncModule for TimeSleepModule {
     async fn handle_message(&mut self, msg: Message) {
-        let wait_time = msg.meta().kind as u64;
+        let wait_time = msg.header().kind as u64;
         println!("<{}> [{}] Waiting for timer", self.name(), SimTime::now());
         tokio::time::sleep(Duration::from_secs(wait_time)).await;
         println!(
             "<{}> [{}] Done waiting for id: {}",
             self.name(),
             SimTime::now(),
-            msg.meta().id
+            msg.header().id
         );
-        self.counter += msg.meta().id as usize
+        self.counter += msg.header().id as usize
     }
 }
 
@@ -498,7 +498,7 @@ impl AsyncModule for SemaphoreModule {
     }
 
     async fn handle_message(&mut self, msg: Message) {
-        self.semaphore.add_permits(msg.meta().kind as usize);
+        self.semaphore.add_permits(msg.header().kind as usize);
     }
 }
 

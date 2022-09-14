@@ -48,3 +48,9 @@ If no hooks match, use the handle_message as the default hook.
 
 SimContext handlers are hooks.
 Shutdown is invoked using a hook.
+
+# Bug in message builders
+
+length is set to the header when calling content.
+however while the length cannot be set directly in can be set indirectly using
+header() leading to incorrect messages.

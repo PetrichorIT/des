@@ -9,14 +9,14 @@ use crate::routing_deamon::RandomRoutingDeamon;
 pub struct NetworkStack {
     core: ModuleCore,
 
-    address: NodeAddress,
+    address: IpAddr,
 
-    forwarding_table: HashMap<NodeAddress, GateRef>,
+    forwarding_table: HashMap<IpAddr, GateRef>,
     routing_deamon: Option<PtrMut<RandomRoutingDeamon>>,
 }
 
 impl NetworkStack {
-    pub fn new(name: &str, address: NodeAddress, router: RandomRoutingDeamon) -> PtrMut<Self> {
+    pub fn new(name: &str, address: IpAddr, router: RandomRoutingDeamon) -> PtrMut<Self> {
         let mut obj = PtrMut::new(Self {
             core: ModuleCore::new_with(
                 ObjectPath::new(name.to_string()).unwrap(),
@@ -34,40 +34,36 @@ impl NetworkStack {
         obj
     }
 
-    pub fn add_route(&mut self, target: NodeAddress, gate_id: GateRef) {
+    pub fn add_route(&mut self, target: IpAddr, gate_id: GateRef) {
         self.forwarding_table.insert(target, gate_id);
     }
 
-    pub fn lookup_route(&mut self, target: NodeAddress) -> Option<&GateRef> {
+    pub fn lookup_route(&mut self, target: IpAddr) -> Option<&GateRef> {
         self.forwarding_table.get(&target)
     }
 }
 
 impl Module for NetworkStack {
     fn handle_message(&mut self, msg: Message) {
-        let (mut pkt, meta) = msg.cast::<Packet>();
+        // let (mut pkt, meta) = msg.cast::<Packet>();
+        let mut pkt = msg;
 
         pkt.register_hop();
         self.routing_deamon
             .as_mut()
             .unwrap()
-            .handle(&pkt, meta.last_gate.clone().unwrap());
+            .handle(&pkt, pkt.header().last_gate.clone().unwrap());
 
         // Route packet
-        if pkt.header().dest_node == self.address {
+        if pkt.header().dest_addr.ip() == self.address {
             info!(target: "Application Layer", "=== Received packet ===");
-        } else if let Some(route) = self.lookup_route(pkt.header().dest_node) {
+        } else if let Some(route) = self.lookup_route(pkt.header().dest_addr.ip()) {
             let route = route.clone();
 
             // PATH ROUTE
             info!(target: "NetworkStack", "Routing over backproc path");
-            let msg = Message::new()
-                .kind(2)
-                .timestamp(SimTime::now())
-                .content(pkt)
-                .build();
             // let msg = Message::legacy_new_interned(0, 2, self.id(), SimTime::now(), pkt);
-            self.send(msg, route);
+            self.send(pkt, route);
         } else {
             // RANDOM ROUTE
             info!(target: "NetworkStack", "Routing random path");
@@ -76,17 +72,17 @@ impl Module for NetworkStack {
             let idx = random::<usize>() % out_size;
 
             let mut gate_id = self.gate("netOut", idx).unwrap();
-            if gate_id == meta.last_gate.unwrap() {
+            if gate_id == *pkt.header().last_gate.as_ref().unwrap() {
                 gate_id = self.gate("netOut", (idx + 1) % self.gates().len()).unwrap()
             }
 
-            let msg = Message::new()
-                .kind(2)
-                .timestamp(SimTime::now())
-                .content(pkt)
-                .build();
+            // let msg = Message::new()
+            //     .kind(2)
+            //     .timestamp(SimTime::now())
+            //     .content(pkt)
+            //     .build();
             // let msg = Message::legacy_new_interned(0, 2, self.id(), SimTime::now(), pkt);
-            self.send(msg, gate_id);
+            self.send(pkt, gate_id);
         }
     }
 }

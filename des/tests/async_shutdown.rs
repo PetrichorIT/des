@@ -94,7 +94,7 @@ impl AsyncModule for StatelessModuleRestart {
     }
 
     async fn handle_message(&mut self, msg: Message) {
-        match msg.meta().id {
+        match msg.header().id {
             9 => self.shutdown(Some(SimTime::now() + Duration::from_secs(10))),
             10 => self.shutdown(None),
             _ => unreachable!(),
@@ -161,7 +161,7 @@ impl AsyncModule for StatefullModule {
     }
 
     async fn handle_message(&mut self, msg: Message) {
-        match msg.meta().id {
+        match msg.header().id {
             9 => self.shutdown(Some(SimTime::now() + Duration::from_secs(10))),
             10 => self.shutdown(None),
             _ => unreachable!(),

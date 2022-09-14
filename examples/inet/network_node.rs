@@ -23,7 +23,7 @@ impl NetworkNode {
 
 impl Module for NetworkNode {
     fn handle_message(&mut self, msg: Message) {
-        let incoming = msg.meta().last_gate.as_ref().unwrap();
+        let incoming = msg.header().last_gate.as_ref().unwrap();
 
         let pos = incoming.pos();
         info!("Node incoming at gate {:?}", incoming);

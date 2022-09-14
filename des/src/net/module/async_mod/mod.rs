@@ -2,7 +2,7 @@ use crate::net::message::{
     TYP_IO_TICK, TYP_RESTART, TYP_TCP_CONNECT, TYP_TCP_CONNECT_TIMEOUT, TYP_TCP_PACKET,
     TYP_UDP_PACKET, TYP_WAKEUP,
 };
-use crate::net::{Message, Module, Packet, StaticModuleCore};
+use crate::net::{Message, Module, StaticModuleCore};
 use crate::time::SimTime;
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -55,8 +55,7 @@ pub trait AsyncModule: StaticModuleCore + Send {
     /// #[async_trait]
     /// impl AsyncModule for MyAsyncModule {
     ///     async fn handle_message(&mut self, msg: Message) {
-    ///         let (pkt, meta) = msg.cast::<Packet>();
-    ///         println!("Received {:?} with metadata {:?}", pkt, meta);
+    ///         println!("Received {:?}", msg);
     ///     }
     /// }
     /// ```
@@ -72,7 +71,7 @@ pub trait AsyncModule: StaticModuleCore + Send {
     /// use des::prelude::*;
     /// use async_trait::async_trait;
     ///
-    /// # fn is_good_packet(pkt: Packet) -> bool { true }
+    /// # fn is_good_packet(pkt: Message) -> bool { true }
     ///
     /// #[NdlModule]
     /// struct MyChannelProbe {
@@ -85,9 +84,8 @@ pub trait AsyncModule: StaticModuleCore + Send {
     /// #[async_trait]
     /// impl AsyncModule for MyChannelProbe {
     ///     async fn handle_message(&mut self, msg: Message) {
-    ///         let (pkt, _meta) = msg.cast::<Packet>();
     ///         self.throughput += 1;        
-    ///         if is_good_packet(pkt) {
+    ///         if is_good_packet(msg) {
     ///             self.goodput += 1;
     ///         }
     ///     }
@@ -207,10 +205,10 @@ pub trait AsyncModule: StaticModuleCore + Send {
                 IOIntent::UdpSendPacket(pkt) => {
                     log::info!("Sending captured UDP packet: {:?}", pkt);
                     self.send(
-                        Packet::new()
+                        Message::new()
                             // .kind(RT_UDP)
                             .typ(TYP_UDP_PACKET)
-                            .dest_addr(pkt.dest_addr)
+                            .dest(pkt.dest_addr)
                             .content(pkt)
                             .build(),
                         "out",
@@ -219,10 +217,10 @@ pub trait AsyncModule: StaticModuleCore + Send {
                 IOIntent::TcpConnect(pkt) => {
                     log::info!("Sending captured TCP connect: {:?}", pkt);
                     self.send(
-                        Packet::new()
+                        Message::new()
                             // .kind(RT_TCP_CONNECT)
                             .typ(TYP_TCP_CONNECT)
-                            .dest_addr(pkt.dest())
+                            .dest(pkt.dest())
                             .content(pkt)
                             .build(),
                         "out",
@@ -231,10 +229,10 @@ pub trait AsyncModule: StaticModuleCore + Send {
                 IOIntent::TcpSendPacket(pkt, delay) => {
                     log::info!("Sending captured TCP packet: {:?}", pkt);
                     self.send_in(
-                        Packet::new()
+                        Message::new()
                             // .kind(RT_TCP_PACKET)
                             .typ(TYP_TCP_PACKET)
-                            .dest_addr(pkt.dest_addr)
+                            .dest(pkt.dest_addr)
                             .content(pkt)
                             .build(),
                         "out",
@@ -244,7 +242,7 @@ pub trait AsyncModule: StaticModuleCore + Send {
                 IOIntent::TcpConnectTimeout(pkt, timeout) => {
                     log::info!("Scheduling TCP Connect Timeout: {:?} in {:?}", pkt, timeout);
                     self.schedule_in(
-                        Packet::new()
+                        Message::new()
                             // .kind(RT_TCP_CONNECT_TIMEOUT)
                             .typ(TYP_TCP_CONNECT_TIMEOUT)
                             // .dest_addr(pkt.)
@@ -255,7 +253,7 @@ pub trait AsyncModule: StaticModuleCore + Send {
                 }
                 IOIntent::IoTick(wakeup_time) => {
                     log::info!("Scheduling IO Tick at {}", wakeup_time.as_millis());
-                    self.schedule_at(Packet::new().typ(TYP_IO_TICK).build(), wakeup_time)
+                    self.schedule_at(Message::new().typ(TYP_IO_TICK).build(), wakeup_time)
                 }
                 _ => {
                     log::warn!("Unkown Intent")
@@ -272,7 +270,7 @@ where
     fn handle_message(&mut self, msg: Message) {
         // (0) Check meta messaeg
         #[cfg(not(feature = "async-sharedrt"))]
-        if msg.meta().typ == TYP_RESTART {
+        if msg.header().typ == TYP_RESTART {
             self.async_ext.reset();
             self.at_restart();
 
@@ -291,7 +289,7 @@ where
             // (2) Poll time time events before excuting
             rt.poll_time_events();
 
-            let typ_processed = match msg.meta().typ {
+            let typ_processed = match msg.header().typ {
                 TYP_WAKEUP => {
                     log::trace!("Wakeup received");
                     Ok(())
@@ -307,63 +305,31 @@ where
                 }
                 TYP_UDP_PACKET => {
                     use tokio::sim::net::UdpMessage;
-                    let msg = msg.as_packet();
-                    let meta = msg.meta().clone();
                     let (msg, header) = msg.cast::<UdpMessage>();
 
-                    rt.process_udp(msg).map_err(|msg| {
-                        Packet::new()
-                            .content(msg)
-                            .meta(meta)
-                            .header(header)
-                            .build()
-                            .into()
-                    })
+                    rt.process_udp(msg)
+                        .map_err(|msg| Message::new().content(msg).header(header).build().into())
                 }
                 TYP_TCP_CONNECT => {
                     use tokio::sim::net::TcpConnectMessage;
-                    let msg = msg.as_packet();
-                    let meta = msg.meta().clone();
                     let (msg, header) = msg.cast::<TcpConnectMessage>();
 
-                    rt.process_tcp_connect(msg).map_err(|msg| {
-                        Packet::new()
-                            .content(msg)
-                            .meta(meta)
-                            .header(header)
-                            .build()
-                            .into()
-                    })
+                    rt.process_tcp_connect(msg)
+                        .map_err(|msg| Message::new().content(msg).header(header).build().into())
                 }
                 TYP_TCP_CONNECT_TIMEOUT => {
                     use tokio::sim::net::TcpConnectMessage;
-                    let msg = msg.as_packet();
-                    let meta = msg.meta().clone();
                     let (msg, header) = msg.cast::<TcpConnectMessage>();
 
-                    rt.process_tcp_connect_timeout(msg).map_err(|msg| {
-                        Packet::new()
-                            .content(msg)
-                            .meta(meta)
-                            .header(header)
-                            .build()
-                            .into()
-                    })
+                    rt.process_tcp_connect_timeout(msg)
+                        .map_err(|msg| Message::new().content(msg).header(header).build().into())
                 }
                 TYP_TCP_PACKET => {
                     use tokio::sim::net::TcpMessage;
-                    let msg = msg.as_packet();
-                    let meta = msg.meta().clone();
                     let (msg, header) = msg.cast::<TcpMessage>();
 
-                    rt.process_tcp_packet(msg).map_err(|msg| {
-                        Packet::new()
-                            .content(msg)
-                            .meta(meta)
-                            .header(header)
-                            .build()
-                            .into()
-                    })
+                    rt.process_tcp_packet(msg)
+                        .map_err(|msg| Message::new().content(msg).header(header).build().into())
                 }
                 _ => Err(msg), /*match msg.meta().kind {
                                    RT_UDP => {}
