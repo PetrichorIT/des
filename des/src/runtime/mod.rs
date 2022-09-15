@@ -3,8 +3,8 @@
 //!
 
 use crate::{
+    macros::support::SyncWrap,
     time::{Duration, SimTime},
-    util::SyncWrap,
 };
 use log::warn;
 use rand::{
@@ -142,21 +142,19 @@ impl<A> Runtime<A>
 where
     A: Application,
 {
-    ///
-    /// Returns the current number of events on enqueud.
-    ///
-    #[allow(unused)]
-    pub(crate) fn num_non_zero_events_queued(&self) -> usize {
-        self.future_event_set.len_nonzero()
-    }
+    // ///
+    // /// Returns the current number of events on enqueud.
+    // ///
+    // pub(crate) fn num_non_zero_events_queued(&self) -> usize {
+    //     self.future_event_set.len_nonzero()
+    // }
 
-    ///
-    /// Returns the current number of events on enqueud.
-    ///
-    #[allow(unused)]
-    pub(crate) fn num_zero_events_queued(&self) -> usize {
-        self.future_event_set.len_zero()
-    }
+    // ///
+    // /// Returns the current number of events on enqueud.
+    // ///
+    // pub(crate) fn num_zero_events_queued(&self) -> usize {
+    //     self.future_event_set.len_zero()
+    // }
 
     ///
     /// Returns the number of events that were dispatched on this [`Runtime`] instance.
@@ -181,14 +179,12 @@ where
         SimTime::now()
     }
 
-    ///
-    /// Returns the random number generator by mutable refernce
-    ///
-    #[allow(unused)]
-    #[allow(clippy::unused_self)]
-    pub(crate) fn rng(&mut self) -> *mut StdRng {
-        self::rng()
-    }
+    // ///
+    // /// Returns the random number generator by mutable refernce
+    // ///
+    // pub(crate) fn rng(&mut self) -> *mut StdRng {
+    //     self::rng()
+    // }
 
     ///
     /// Returns the rng.
@@ -472,7 +468,7 @@ where
                 #[cfg(feature = "metrics")]
                 {
                     println!("\u{23A2}");
-                    self.profiler.metrics.borrow_mut().finish()
+                    self.profiler.metrics.borrow_mut().finish();
                 }
 
                 println!("\u{23A3}");
@@ -499,7 +495,7 @@ where
                 #[cfg(feature = "metrics")]
                 {
                     println!("\u{23A2}");
-                    self.profiler.metrics.borrow_mut().finish()
+                    self.profiler.metrics.borrow_mut().finish();
                 }
 
                 println!("\u{23A3}");

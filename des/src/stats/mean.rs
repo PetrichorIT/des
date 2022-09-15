@@ -31,14 +31,13 @@ impl MeanVec {
 
     fn mean_step(&mut self) {
         if self.current_slot_buffer.is_empty() {
-            self.results
-                .push(self.results.last().map(|v| *v).unwrap_or((
-                    self.current_slot_end,
-                    0.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                )));
+            self.results.push(self.results.last().copied().unwrap_or((
+                self.current_slot_end,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+            )));
         } else {
             self.results.push((
                 self.current_slot_end,
@@ -55,7 +54,7 @@ impl MeanVec {
 
     /// Finishes th last computation
     pub fn finish(&mut self) {
-        self.mean_step()
+        self.mean_step();
     }
 }
 

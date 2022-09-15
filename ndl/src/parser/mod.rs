@@ -22,7 +22,6 @@ const SUBSYS_SUBSECTION_IDENT: [&str; 4] = ["nodes", "connections", "parameters"
 /// Parses the given asset and its associated tokenstream
 /// returning a parsing result that may or may not contain errors.
 /// 
-#[allow(unused)]
 pub fn parse(asset: Asset<'_>, tokens: TokenStream) -> ParsingResult {
 
     let last_loc = asset.end_loc();
@@ -78,7 +77,7 @@ pub fn parse(asset: Asset<'_>, tokens: TokenStream) -> ParsingResult {
                                 parser.parse_subsystem(&mut ectx)?
                             },
                             _ => { 
-                                ectx.record(
+                                let _ = ectx.record(
                                     ParUnexpectedKeyword, 
                                     format!("Unexpected keyword '{}'. Expected include / module / link or network", ident), 
                                     token.loc
@@ -94,7 +93,7 @@ pub fn parse(asset: Asset<'_>, tokens: TokenStream) -> ParsingResult {
     })();
 
     if let Err(e) = p_state {
-        ectx.record(
+        let _ = ectx.record(
             ParUnexpectedEOF, 
             e.into(), 
             last_loc

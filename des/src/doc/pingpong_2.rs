@@ -17,7 +17,7 @@
 //!
 //! When using the more abstract tools provided by the feature `net`,
 //! you must firstly define the topology of network you want to simulate.
-//! This can be done using the NetworkDescriptionLanguage [ndl] in a file
+//! This can be done using the `NetworkDescriptionLanguage` [ndl] in a file
 //! ending with '.ndl'. This language describes a network through
 //! modules, gates and channels. At first lets decribe the module required
 //! for our example:
@@ -67,7 +67,7 @@
 //!
 //! Once we have defined the network topology, modules can be defined in rust code.
 //! For that you may define a struct or enum of the with the same name as the described
-//! module. To link the type and the module use the [NdlModule](crate::prelude::NdlModule)
+//! module. To link the type and the module use the [`NdlModule`](crate::prelude::NdlModule)
 //! macro. Note that you must provide the macro with a relative path to the workspace.
 //!
 //! > Note that the test cases are ignored, since they require access to the filesystem at compile time.
@@ -90,7 +90,7 @@
 //! However should the modules contain fields, they will need a constructor to build
 //! the inital state. To provide this constructor they must implement the [NameableModule](crate::net::NameableModule)
 //! trait. This trait is automatically derived on empty types, but must be manually implemented
-//! for all other case. Note that the [NdlModule](crate::prelude::NdlModule) macro attached a new field
+//! for all other case. Note that the [`NdlModule`](crate::prelude::NdlModule) macro attached a new field
 //! `__core` to the type:
 //!
 //! ```rust
@@ -120,7 +120,7 @@
 //! ```
 //!
 //! Once module construction is finished you can define the behaviour of the module by implementing
-//! the [Module](crate::net::Module) trait. Noteably you can use the [handle_message](crate::net::Module::handle_message)
+//! the [`Module`](crate::net::Module) trait. Noteably you can use the [`handle_message`](crate::net::Module::handle_message)
 //! function to react to arriving packets
 //!
 //! ```
@@ -184,7 +184,7 @@
 //! ### The app
 //!
 //! Now that we have defined the modules we can do the same with the test case / the subsystem.
-//! Define a struct with the same name, and bind it using the [NdlSubsystem](crate::prelude::NdlSubsystem)
+//! Define a struct with the same name, and bind it using the [`NdlSubsystem`](crate::prelude::NdlSubsystem)
 //! macro.
 //!
 //! ```ignore
@@ -195,7 +195,7 @@
 //! ```
 //!
 //! Now we have defined everything to create the simulation. To do that create a instance of
-//! the application, call the 'build_rt' function and use the provided [NetworkRuntime]
+//! the application, call the [`build_rt`] function and use the provided [`NetworkRuntime`]
 //! to power a simulation.
 //!
 //! ```ignore

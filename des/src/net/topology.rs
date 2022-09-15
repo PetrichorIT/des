@@ -114,7 +114,7 @@ impl Topology {
 
                 if *current != **start {
                     outgoing_edges.push(Edge {
-                        src_gate: Arc::clone(&start),
+                        src_gate: Arc::clone(start),
                         target_gate: current,
                         cost,
                     });

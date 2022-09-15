@@ -22,7 +22,7 @@ pub use self::ctx::*;
 pub struct NetworkRuntime<A> {
     ///
     /// The set of module used in the network simulation.
-    /// All module must be boxed, since they must conform to the [Module] trait.
+    /// All module must be boxed, since they must conform to the [`Module`] trait.
     ///
     module_list: Vec<ModuleRef>,
 
@@ -48,7 +48,7 @@ impl<A> NetworkRuntime<A> {
             module_list: Vec::new(),
             globals: Arc::new(NetworkRuntimeGlobals::new()),
 
-            inner: inner,
+            inner,
         };
 
         // attack to current buffer

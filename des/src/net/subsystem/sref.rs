@@ -18,13 +18,14 @@ pub struct SubsystemRef {
 
 impl SubsystemRef {
     /// Creates the main subsystem
+    #[allow(clippy::explicit_deref_methods)]
     pub fn main<T>(subsystem: T) -> Self
     where
         T: Subsystem,
     {
         let handler = Arc::new(RefCell::new(subsystem));
         let ptr: *mut T = handler.borrow_mut().deref_mut();
-        let ptr = ptr as *mut u8;
+        let ptr = ptr.cast::<u8>();
 
         let ctx = Arc::new(SubsystemContext::new_with(ObjectPath::root_subsystem(
             "root".to_string(),

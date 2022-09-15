@@ -155,7 +155,7 @@ impl<K: MessageBody, V: MessageBody, S> MessageBody for HashMap<K, V, S> {
     fn byte_len(&self) -> usize {
         let mut sum = 0;
         for (k, v) in self.iter() {
-            sum += k.byte_len() + v.byte_len()
+            sum += k.byte_len() + v.byte_len();
         }
         sum
     }
@@ -165,7 +165,7 @@ impl<K: MessageBody, V: MessageBody> MessageBody for BTreeMap<K, V> {
     fn byte_len(&self) -> usize {
         let mut sum = 0;
         for (k, v) in self.iter() {
-            sum += k.byte_len() + v.byte_len()
+            sum += k.byte_len() + v.byte_len();
         }
         sum
     }
@@ -175,7 +175,7 @@ impl<T: MessageBody, S> MessageBody for HashSet<T, S> {
     fn byte_len(&self) -> usize {
         let mut sum = 0;
         for v in self.iter() {
-            sum += v.byte_len()
+            sum += v.byte_len();
         }
         sum
     }
@@ -185,7 +185,7 @@ impl<T: MessageBody> MessageBody for BTreeSet<T> {
     fn byte_len(&self) -> usize {
         let mut sum = 0;
         for v in self.iter() {
-            sum += v.byte_len()
+            sum += v.byte_len();
         }
         sum
     }
@@ -195,7 +195,7 @@ impl<T: MessageBody> MessageBody for BinaryHeap<T> {
     fn byte_len(&self) -> usize {
         let mut sum = 0;
         for v in self.iter() {
-            sum += v.byte_len()
+            sum += v.byte_len();
         }
         sum
     }

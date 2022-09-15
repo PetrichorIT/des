@@ -44,6 +44,7 @@ pub struct ProfilerOutputTarget {
 
 impl ProfilerOutputTarget {
     /// Creates a new instance of Self.s
+    #[must_use]
     pub fn new() -> Self {
         Self {
             log_output: None,
@@ -56,6 +57,7 @@ impl ProfilerOutputTarget {
     }
 
     /// Sets the output file.
+    #[must_use]
     pub fn write_into(mut self, f: impl AsRef<Path>) -> Self {
         let path = f.as_ref().to_owned();
         self.log_output = Some(path);
@@ -63,19 +65,22 @@ impl ProfilerOutputTarget {
     }
 
     /// Sets the option to create files if nessecary
+    #[must_use]
     pub fn opt_create(mut self, b: bool) -> Self {
         self.log_create = b;
         self
     }
 
     /// Set the option to append to files.
+    #[must_use]
     pub fn opt_append(mut self, b: bool) -> Self {
         self.log_append = b;
         self
     }
 
-    /// Sets the output file for the event_count (as json).
+    /// Sets the output file for the `event_count` (as json).
     #[cfg(feature = "metrics-rt-full")]
+    #[must_use]
     pub fn write_event_count_into(mut self, f: impl AsRef<Path>) -> Self {
         let path = f.as_ref().to_owned();
         self.event_count_output = Some(path);
@@ -93,7 +98,7 @@ impl ProfilerOutputTarget {
             let mut f = BufWriter::new(f);
             metrics.write_to(&mut f)?;
         } else {
-            eprintln!("Didn't set output path at ProfilerOutputTarget")
+            eprintln!("Didn't set output path at ProfilerOutputTarget");
         }
 
         #[cfg(feature = "metrics-rt-full")]
@@ -114,5 +119,11 @@ impl From<&str> for ProfilerOutputTarget {
         ProfilerOutputTarget::new()
             .write_into(string)
             .opt_create(true)
+    }
+}
+
+impl Default for ProfilerOutputTarget {
+    fn default() -> Self {
+        Self::new()
     }
 }

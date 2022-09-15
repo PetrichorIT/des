@@ -10,7 +10,7 @@ use des::tokio::net::IOContext;
 use des::tokio::net::TcpListener;
 use des::tokio::net::TcpStream;
 
-const REQ_STR: [&'static [u8]; 5] = [b"100b", b"1k", b"10k", b"100k", b"1mb"];
+const REQ_STR: [&[u8]; 5] = [b"100b", b"1k", b"10k", b"100k", b"1mb"];
 
 #[NdlModule("examples/net")]
 struct Client {}
@@ -42,7 +42,7 @@ impl AsyncModule for Client {
 
             for _ in 0..3 {
                 let i = random::<usize>() % 5;
-                sock.write_all(&REQ_STR[i]).await.unwrap();
+                sock.write_all(REQ_STR[i]).await.unwrap();
 
                 let mut header = [0u8; 4];
                 sock.read_exact(&mut header).await.unwrap();

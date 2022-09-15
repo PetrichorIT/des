@@ -1,11 +1,10 @@
 cfg_not_cqueue! {
     mod default_impl {
-        #[allow(unused)]
-        use crate::{stats::Statistic, runtime::{Application, EventNode, RuntimeOptions}, time::SimTime, util::*};
+        use crate::{runtime::{Application, EventNode, RuntimeOptions}, time::SimTime};
         use std::collections::{BinaryHeap, VecDeque};
 
         #[cfg(feature = "metrics")]
-        use crate::stats::RuntimeMetrics;
+        use crate::stats::{Statistic, RuntimeMetrics};
         #[cfg(feature = "metrics")]
         use std::{cell::RefCell, sync::Arc};
 
@@ -23,7 +22,7 @@ cfg_not_cqueue! {
         where
             A: Application,
         {
-            #[allow(clippy::unused_self)]
+
             pub(crate) fn descriptor(&self) -> String {
                 "FutureEventSet::BinaryHeap()".to_string()
             }
@@ -111,7 +110,13 @@ cfg_not_cqueue! {
                     "Sorry we cannot timetravel yet"
                 );
 
-                let node = EventNode::create_no_id(event.into(), time);
+                let node = EventNode {
+                    id: 0,
+                    event: event.into(),
+                    time,
+
+                    _phantom: std::marker::PhantomData,
+                };
 
                 if self.last_event_simtime == time {
                     self.zero_queue.push_back(node);
@@ -132,18 +137,15 @@ cfg_not_cqueue! {
 
 cfg_cqueue! {
     mod cqueue_impl {
-        #[allow(unused)]
-        use super::*;
         use std::marker::PhantomData;
 
         #[cfg(feature = "metrics")]
         use std::{sync::Arc, cell::RefCell};
         #[cfg(feature = "metrics")]
-        use crate::stats::RuntimeMetrics;
+        use crate::stats::{Statistic, RuntimeMetrics};
 
 
-        #[allow(unused)]
-        use crate::{stats::Statistic, runtime::{Application, EventNode, RuntimeOptions}, time::{Duration, SimTime}, util::*};
+        use crate::{runtime::{Application, EventNode, RuntimeOptions}, time::SimTime};
         use crate::cqueue::{CQueue, CQueueOptions, Node};
 
 
@@ -168,15 +170,15 @@ cfg_cqueue! {
                 self.inner.len()
             }
 
-            pub(crate) fn len_nonzero(&self) -> usize {
-                // self.inner.len_nonzero()
-                self.inner.len_nonzero()
-            }
+            // pub(crate) fn len_nonzero(&self) -> usize {
+            //     // self.inner.len_nonzero()
+            //     self.inner.len_nonzero()
+            // }
 
-            pub(crate) fn len_zero(&self) -> usize {
-                // self.inner.len_zero()
-                self.inner.len_zero()
-            }
+            // pub(crate) fn len_zero(&self) -> usize {
+            //     // self.inner.len_zero()
+            //     self.inner.len_zero()
+            // }
 
             pub(crate) fn is_empty(&self) -> bool {
                 self.inner.is_empty()
@@ -194,6 +196,7 @@ cfg_cqueue! {
             }
 
             #[inline]
+            #[allow(clippy::needless_pass_by_value)]
             pub(crate) fn fetch_next(
                 &mut self,
                 #[cfg(feature = "metrics")]  metrics: Arc<RefCell<RuntimeMetrics>>,
@@ -203,6 +206,7 @@ cfg_cqueue! {
                 let mut metrics = metrics.borrow_mut();
 
                 #[cfg(feature = "metrics")]
+                #[allow(clippy::cast_precision_loss)]
                 {
                     use std::ops::AddAssign;
                     let is_zero_time = self.inner.len_zero() > 0;
@@ -216,6 +220,7 @@ cfg_cqueue! {
                     }
 
                     #[cfg(feature = "metrics-rt-full")]
+                    #[allow(clippy::cast_precision_loss)]
                     metrics.event_count.collect(self.len() as f64);
                 }
 
@@ -253,6 +258,7 @@ cfg_cqueue! {
                 }
             }
 
+            #[allow(clippy::needless_pass_by_value)]
             pub(crate) fn add(
                 &mut self,
                 time: SimTime,

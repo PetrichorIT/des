@@ -1,5 +1,4 @@
-#![allow(unused)]
-use std::{any::*, fmt::Debug};
+use std::{any::Any, fmt::Debug};
 
 pub(crate) struct AnyBox {
     inner: Box<dyn Any>,
@@ -14,7 +13,7 @@ impl AnyBox {
             inner: Box::new(val),
 
             #[cfg(debug_assertions)]
-            ty_info: type_name::<T>(),
+            ty_info: std::any::type_name::<T>(),
         }
     }
 
@@ -28,36 +27,29 @@ impl AnyBox {
         "no ty info"
     }
 
-    pub(crate) fn try_dup<T: 'static>(&self) -> Option<Self>
-    where
-        T: Clone,
-    {
-        if let Some(v) = self.inner.downcast_ref::<T>() {
-            Some(Self {
-                inner: Box::new(v.clone()),
+    pub(crate) fn try_dup<T: 'static + Clone>(&self) -> Option<Self> {
+        self.inner.downcast_ref::<T>().map(|v| Self {
+            inner: Box::new(v.clone()),
 
-                #[cfg(debug_assertions)]
-                ty_info: type_name::<T>(),
-            })
-        } else {
-            None
-        }
+            #[cfg(debug_assertions)]
+            ty_info: std::any::type_name::<T>(),
+        })
     }
 
     pub(crate) fn can_cast<T: 'static>(&self) -> bool {
         self.inner.is::<T>()
     }
 
-    pub(crate) fn try_cast<T: 'static + Send>(self) -> Result<T, Self> {
-        match self.inner.downcast::<T>() {
-            Ok(v) => Ok(Box::into_inner(v)),
-            Err(e) => Err(Self {
-                inner: e,
-                #[cfg(debug_assertions)]
-                ty_info: self.ty_info,
-            }),
-        }
-    }
+    // pub(crate) fn try_cast<T: 'static + Send>(self) -> Result<T, Self> {
+    //     match self.inner.downcast::<T>() {
+    //         Ok(v) => Ok(Box::into_inner(v)),
+    //         Err(e) => Err(Self {
+    //             inner: e,
+    //             #[cfg(debug_assertions)]
+    //             ty_info: self.ty_info,
+    //         }),
+    //     }
+    // }
 
     pub(crate) unsafe fn try_cast_unsafe<T: 'static>(self) -> Result<T, Self> {
         match self.inner.downcast::<T>() {

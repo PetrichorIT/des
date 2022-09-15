@@ -25,7 +25,6 @@ thread_local! {
     static MOD_CTX: RefCell<Option<Arc<ModuleContext>>> = const { RefCell::new(None) }
 }
 
-#[allow(missing_docs)]
 pub struct ModuleContext {
     pub(crate) id: ModuleId,
 
@@ -65,6 +64,7 @@ impl ModuleContext {
     }
 
     /// Creates a child
+    #[allow(clippy::needless_pass_by_value)]
     pub fn child_of(name: &str, parent: ModuleRef) -> Self {
         let path = ObjectPath::module_with_parent(name, &parent.ctx.path);
         #[cfg(feature = "async")]
@@ -153,16 +153,19 @@ fn with_mod_ctx<R>(f: impl FnOnce(Ref<Arc<ModuleContext>>) -> R) -> R {
 }
 
 /// A runtime-unqiue identifier for this module-core and by extension this module.
+#[must_use]
 pub fn module_id() -> ModuleId {
     with_mod_ctx(|ctx| ctx.id())
 }
 
 /// A runtime-unqiue (not enforced) identifier for this module, based on its place in the module tree.
+#[must_use]
 pub fn module_path() -> ObjectPath {
     with_mod_ctx(|ctx| ctx.path())
 }
 
 /// Returns the name of the module instance.
+#[must_use]
 pub fn module_name() -> String {
     with_mod_ctx(|ctx| ctx.name())
 }
@@ -170,11 +173,21 @@ pub fn module_name() -> String {
 // PARENT CHILD
 
 /// Returns the parent element
+///
+/// # Errors
+///
+/// Returns an error if the module has no parent.
+///
 pub fn parent() -> Result<ModuleRef, ModuleReferencingError> {
     with_mod_ctx(|ctx| ctx.parent())
 }
 
 /// Returns the child element.
+///
+/// # Errors
+///
+/// Returns an error if no child was found under the given name.
+///
 pub fn child(name: &str) -> Result<ModuleRef, ModuleReferencingError> {
     with_mod_ctx(|ctx| ctx.child(name))
 }
@@ -184,6 +197,7 @@ pub fn child(name: &str) -> Result<ModuleRef, ModuleReferencingError> {
 ///
 /// Returns a ref unstructured list of all gates from the current module.
 ///
+#[must_use]
 pub fn gates() -> Vec<GateRef> {
     with_mod_ctx(|ctx| ctx.gates())
 }
@@ -192,6 +206,7 @@ pub fn gates() -> Vec<GateRef> {
 /// Returns a ref to a gate of the current module dependent on its name and cluster position
 /// if possible.
 ///
+#[must_use]
 pub fn gate(name: &str, pos: usize) -> Option<GateRef> {
     with_mod_ctx(|ctx| ctx.gate(name, pos))
 }
@@ -202,21 +217,28 @@ pub fn gate(name: &str, pos: usize) -> Option<GateRef> {
 /// Sends a message onto a given gate. This operation will be performed after
 /// `handle_message` finished.
 ///
+#[allow(clippy::needless_pass_by_value)]
 pub fn send(msg: impl Into<Message>, gate: impl IntoModuleGate) {
-    self::send_at(msg, gate, SimTime::now())
+    self::send_at(msg, gate, SimTime::now());
 }
 
 ///
 /// Sends a message onto a given gate with a delay. This operation will be performed after
 /// `handle_message` finished.
 ///
+#[allow(clippy::needless_pass_by_value)]
 pub fn send_in(msg: impl Into<Message>, gate: impl IntoModuleGate, dur: Duration) {
-    self::send_at(msg, gate, SimTime::now() + dur)
+    self::send_at(msg, gate, SimTime::now() + dur);
 }
 ///
 /// Sends a message onto a given gate at the sepcified time. This operation will be performed after
 /// `handle_message` finished.
 ///
+/// # Panics
+///
+/// Panics if the send time is in the past.
+///
+#[allow(clippy::needless_pass_by_value)]
 pub fn send_at(msg: impl Into<Message>, gate: impl IntoModuleGate, send_time: SimTime) {
     assert!(send_time >= SimTime::now());
     // (0) Cast the message.
@@ -224,15 +246,14 @@ pub fn send_at(msg: impl Into<Message>, gate: impl IntoModuleGate, send_time: Si
 
     let gate = with_mod_ctx(|ctx| {
         // (1) Cast the gate
-        let gate = gate.as_gate(&*ctx);
-        // (3) Return the results (DO NOT USE BOTH CONTEXTES AT THE SAME TIME)
-        gate
+        #[allow(clippy::explicit_auto_deref)]
+        gate.as_gate(&*ctx)
     });
 
     if let Some(gate) = gate {
-        buf_send_at(msg, gate, send_time)
+        buf_send_at(msg, gate, send_time);
     } else {
-        log::error!("Error: Could not find gate in current module")
+        log::error!("Error: Could not find gate in current module");
     }
 }
 
@@ -241,24 +262,28 @@ pub fn send_at(msg: impl Into<Message>, gate: impl IntoModuleGate, send_time: Si
 /// in duration seconds, shifted by the processing time delay.
 ///
 pub fn schedule_in(msg: impl Into<Message>, dur: Duration) {
-    self::schedule_at(msg, SimTime::now() + dur)
+    self::schedule_at(msg, SimTime::now() + dur);
 }
 
 ///
 /// Enqueues a event that will trigger the [`Module::handle_message`] function
 /// at the given `SimTime`
 ///
+/// # Panics
+///
+/// Panics if the specified time is in the past.
+///
 pub fn schedule_at(msg: impl Into<Message>, arrival_time: SimTime) {
     assert!(arrival_time >= SimTime::now());
     let msg: Message = msg.into();
-    buf_schedule_at(msg, arrival_time)
+    buf_schedule_at(msg, arrival_time);
 }
 
 ///
 /// Shuts down all activity for the module.
 ///
 pub fn shutdown() {
-    buf_schedule_shutdown(None)
+    buf_schedule_shutdown(None);
 }
 
 ///
@@ -266,7 +291,7 @@ pub fn shutdown() {
 /// Restarts after the given duration.
 ///
 pub fn shutdow_and_restart_in(dur: Duration) {
-    self::shutdow_and_restart_at(SimTime::now() + dur)
+    self::shutdow_and_restart_at(SimTime::now() + dur);
 }
 
 ///
@@ -280,6 +305,7 @@ pub fn shutdow_and_restart_at(restart_at: SimTime) {
 ///
 /// Returns the parameters for the current module.
 ///
+#[must_use]
 pub fn pars() -> HashMap<String, String> {
     let path = self::module_path();
     globals().parameters.get_def_table(path.path())
@@ -288,6 +314,7 @@ pub fn pars() -> HashMap<String, String> {
 ///
 /// Returns a parameter by reference (not parsed).
 ///
+#[must_use]
 pub fn par(key: &str) -> ParHandle<Optional> {
     globals()
         .parameters
@@ -315,12 +342,12 @@ cfg_async! {
     }
 
     pub(super) fn async_leave_sim_ctx(sim_ctx: SimContext) {
-        with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().ctx = Some(sim_ctx))
+        with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().ctx = Some(sim_ctx));
     }
 
     #[cfg(not(feature = "async-sharedrt"))]
     pub(super) fn async_ctx_reset() {
-        with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().reset())
+        with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().reset());
     }
 
     // Wait queue
@@ -334,7 +361,7 @@ cfg_async! {
     }
 
     pub(super) fn async_set_wait_queue_join(join: JoinHandle<()>) {
-        with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().wait_queue_join = Some(join))
+        with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().wait_queue_join = Some(join));
     }
 
     // Sim Staart
@@ -344,7 +371,7 @@ cfg_async! {
     }
 
     pub(super) fn async_set_sim_start_join(join: JoinHandle<()>) {
-        with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().sim_start_join = Some(join))
+        with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().sim_start_join = Some(join));
     }
 
     pub(super) fn async_sim_start_tx_send(stage: usize) -> Result<(), SendError<usize>>  {
@@ -358,7 +385,7 @@ cfg_async! {
     // SIM END
 
     pub(super) fn async_sim_end_join_set(join: JoinHandle<()>)  {
-        with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().sim_end_join = Some(join))
+        with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().sim_end_join = Some(join));
     }
 
     pub(super) fn async_sim_end_join_take() -> Option<JoinHandle<()>> {

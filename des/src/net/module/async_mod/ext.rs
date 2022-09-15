@@ -54,7 +54,9 @@ impl AsyncCoreExt {
     pub(crate) fn reset(&mut self) {
         self.rt = Some(std::sync::Arc::new(tokio::runtime::Runtime::new().unwrap()));
 
-        self.ctx.as_mut().map(|ctx| ctx.reset());
+        if let Some(ctx) = self.ctx.as_mut() {
+            ctx.reset();
+        }
 
         // let (tx, rx) = unbounded_channel();
         let (wtx, wrx) = unbounded_channel();
@@ -76,8 +78,8 @@ impl AsyncCoreExt {
 }
 
 #[derive(Debug)]
-#[allow(unused)]
 pub(crate) struct WaitingMessage {
     pub(crate) msg: Message,
+    #[allow(dead_code)]
     pub(crate) time: SimTime,
 }

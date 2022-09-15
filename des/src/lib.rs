@@ -1,6 +1,3 @@
-#![feature(unsize)]
-#![feature(dispatch_from_dyn)]
-#![feature(coerce_unsized)]
 #![feature(arbitrary_self_types)]
 #![feature(box_into_inner)]
 #![feature(const_weak_new)]
@@ -136,7 +133,6 @@ pub mod prelude;
 pub mod runtime;
 pub mod stats;
 pub mod time;
-pub mod util;
 
 cfg_cqueue! {
     pub(crate) mod cqueue;

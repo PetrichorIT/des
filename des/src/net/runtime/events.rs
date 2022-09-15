@@ -10,7 +10,7 @@ use crate::{
 
 create_event_set!(
     ///
-    /// The event set for a [NetworkRuntime].
+    /// The event set for a [`NetworkRuntime`].
     ///
     /// * This type is only available of DES is build with the `"net"` feature.
     #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
@@ -93,7 +93,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
             current_gate.owner().ctx.id
         );
 
-        let module = current_gate.owner().clone();
+        let module = current_gate.owner();
         rt.add_event(
             NetEvents::HandleMessageEvent(HandleMessageEvent { module, message }),
             SimTime::now(),
@@ -171,10 +171,7 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
                 log_scope!(module.ctx.path.path());
 
                 if stage < module.handler().num_sim_start_stages() {
-                    info!(
-                        target: &format!("{}", module.ctx.path.path()),
-                        "Calling at_sim_start({}).", stage
-                    );
+                    info!("Calling at_sim_start({}).", stage);
 
                     #[cfg(feature = "metrics-module-time")]
                     use std::time::Instant;

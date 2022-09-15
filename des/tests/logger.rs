@@ -100,7 +100,7 @@ fn module_auto_scopes() {
 
             // Time
             // Delay  2s until handle_message
-            assert_eq_time!(time, 2.0);
+            assert_eq!(time.as_secs(), 2);
 
             let scopes = ScopedLogger::yield_scopes();
             assert_eq!(scopes.len(), 3);

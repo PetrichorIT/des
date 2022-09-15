@@ -36,6 +36,7 @@ impl Message {
     }
 
     /// Returns the length of the complete message
+    #[must_use]
     pub fn length(&self) -> usize {
         self.header.length as usize + self.header.byte_len()
     }
@@ -57,10 +58,7 @@ impl Message {
         format!(
             "Message {{ {} bytes {} }}",
             self.header.length,
-            self.content
-                .as_ref()
-                .map(|v| v.ty())
-                .unwrap_or("no content")
+            self.content.as_ref().map_or("no content", AnyBox::ty)
         )
     }
 }
@@ -131,7 +129,7 @@ impl Message {
     #[inline]
     #[must_use]
     pub fn can_cast<T: 'static + MessageBody>(&self) -> bool {
-        self.content.as_ref().map_or(false, |v| v.can_cast::<T>())
+        self.content.as_ref().map_or(false, AnyBox::can_cast::<T>)
     }
 
     ///
@@ -153,7 +151,10 @@ impl Message {
     /// Note that DES guarntees that the data refernced by ptr will not
     /// be freed until this function is called, and ownership is thereby moved..
     ///
-    #[must_use]
+    /// # Errors
+    ///
+    /// Returns an error if either there is no content, or
+    /// the content is not of type T.
     pub fn try_cast<T: 'static + MessageBody + Send>(self) -> Result<(T, MessageHeader), Self> {
         // SAFTY:
         // Since T is 'Send' this is safe within the bounds of Messages safty contract
@@ -184,7 +185,12 @@ impl Message {
     /// Note that this function allows T to be !Send. Be aware of safty problems arriving
     /// from this.
     ///
-    #[must_use]
+    /// # Errors
+    ///
+    /// Returns an error if either there is no content,
+    /// or the content is not of type T.
+    ///
+
     pub unsafe fn try_cast_unsafe<T: 'static + MessageBody>(
         self,
     ) -> Result<(T, MessageHeader), Self> {
@@ -388,6 +394,7 @@ impl MessageBuilder {
 
     /// Sets the field `content`.
     #[must_use]
+    #[allow(clippy::cast_possible_truncation)]
     pub fn content<T>(mut self, content: T) -> Self
     where
         T: 'static + MessageBody + Send,
@@ -399,6 +406,7 @@ impl MessageBuilder {
 
     /// Sets the field `content`.
     #[must_use]
+    #[allow(clippy::cast_possible_truncation)]
     pub fn content_boxed<T>(mut self, content: Box<T>) -> Self
     where
         T: 'static + MessageBody + Send,

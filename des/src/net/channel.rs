@@ -33,11 +33,10 @@ pub struct ChannelMetrics {
     pub latency: Duration,
     /// The variance in latency.
     pub jitter: Duration,
-    /// The size of the channels queue in bytes.
-    pub queuesize: usize,
-
     /// A userdefined cost for the channel.
     pub cost: f64,
+    /// The size of the channels queue in bytes.
+    pub queuesize: usize,
 }
 
 impl ChannelMetrics {
@@ -284,7 +283,7 @@ impl Channel {
                 }
 
                 drop(msg);
-                log_scope!()
+                log_scope!();
             } else {
                 log::trace!(
                     "Gate '{}' added message [{}] to queue",
@@ -344,7 +343,7 @@ impl Channel {
         if let Some((msg, next_gate)) = chan.buffer.pop_front() {
             chan.buffer_len -= msg.length();
             drop(chan);
-            self.send_message(msg, &next_gate, rt)
+            self.send_message(msg, &next_gate, rt);
         }
     }
 }

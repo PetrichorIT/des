@@ -199,11 +199,7 @@ impl Gate {
     ///
     #[must_use]
     pub fn path(&self) -> String {
-        format!(
-            "{}:{}",
-            self.description.owner.upgrade().unwrap().ctx.path,
-            self.name_with_pos()
-        )
+        format!("{}:{}", self.owner().ctx.path, self.name_with_pos())
     }
 
     ///
@@ -286,7 +282,11 @@ impl Gate {
     ///
     /// Returns the owner module by reference of this gate.
     ///
-
+    /// # Panics
+    ///
+    /// May panic when called in Drop, since the owner may allready
+    /// be dropped.
+    ///
     #[must_use]
     pub fn owner(&self) -> ModuleRef {
         self.description.owner.upgrade().unwrap()

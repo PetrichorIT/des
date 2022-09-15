@@ -1,8 +1,9 @@
-use crate::{
-    runtime::RuntimeLimit,
-    time::{Duration, SimTime},
-};
+use crate::{runtime::RuntimeLimit, time::SimTime};
 use rand::{prelude::StdRng, SeedableRng};
+
+#[cfg(feature = "cqueue")]
+use crate::time::Duration;
+
 ///
 /// Options for specifing the behaviour of the core runtime
 /// independent of the app logic.
@@ -71,14 +72,12 @@ impl RuntimeOptions {
     /// Sets the cqueue options if this runtime uses a cqueue.
     /// NOP otherwise.
     ///
-    #[allow(unused)]
     #[must_use]
+    #[cfg(feature = "cqueue")]
     pub fn cqueue_options(mut self, n: usize, t: Duration) -> Self {
-        #[cfg(feature = "cqueue")]
-        {
-            self.cqueue_num_buckets = n;
-            self.cqueue_bucket_timespan = t;
-        }
+        self.cqueue_num_buckets = n;
+        self.cqueue_bucket_timespan = t;
+
         self
     }
 

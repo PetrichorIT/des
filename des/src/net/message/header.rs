@@ -64,6 +64,7 @@ pub struct MessageHeader {
 
 impl MessageHeader {
     /// Returns the type of the message
+    #[must_use]
     pub fn typ(&self) -> MessageType {
         match self.typ {
             0 => MessageType::UserDefined,

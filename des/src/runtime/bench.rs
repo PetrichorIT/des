@@ -55,7 +55,7 @@ impl Profiler {
 
     /// Starts the profile.
     pub(super) fn start(&mut self) {
-        self.time_start = Instant::now()
+        self.time_start = Instant::now();
     }
 
     /// Finishes the profile.
@@ -66,7 +66,13 @@ impl Profiler {
     }
 
     /// Writes into a benchmark folder.
+    ///
+    /// # Errors
+    ///
+    /// Returns an IO error when an underlying IO operation has failed.
+    ///
     #[cfg(feature = "metrics")]
+    #[allow(clippy::explicit_auto_deref)]
     pub fn write_to(&self, target: impl Into<ProfilerOutputTarget>) -> std::io::Result<()> {
         let target = target.into();
         target.run(&*self.metrics.borrow())
@@ -120,7 +126,7 @@ fn is_release() -> bool {
 
 impl Default for Profiler {
     fn default() -> Self {
-        let target = std::env::current_exe().unwrap_or(PathBuf::new());
+        let target = std::env::current_exe().unwrap_or_default();
         let target_is_release = is_release();
 
         let mut exec = target
@@ -186,8 +192,12 @@ impl ProfilerEnv {
         writeln!(
             f,
             "\t{} / {}",
-            self.system.host_name().unwrap_or("Unknown-System".into()),
-            self.system.long_os_version().unwrap_or(self.os.clone())
+            self.system
+                .host_name()
+                .unwrap_or_else(|| "Unknown-System".into()),
+            self.system
+                .long_os_version()
+                .unwrap_or_else(|| self.os.clone())
         )?;
         writeln!(f, "\t{}-{}-{}", self.arch, self.os_family, self.os)?;
         if let Some(cpu) = self.system.cpus().first() {

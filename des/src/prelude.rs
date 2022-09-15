@@ -6,8 +6,6 @@
 // # Generic core exports
 //
 
-pub use crate::assert_eq_time;
-
 pub use crate::runtime::Runtime;
 pub use crate::runtime::RuntimeOptions;
 pub use crate::runtime::RuntimeResult;

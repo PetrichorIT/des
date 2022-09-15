@@ -226,11 +226,7 @@ where
             .borrow_mut()
             .insert(&format!("{}.{}", self.path, self.key), &str);
 
-        globals()
-            .parameters
-            .updates
-            .borrow_mut()
-            .push(self.path.to_string());
+        globals().parameters.updates.borrow_mut().push(self.path);
     }
 }
 

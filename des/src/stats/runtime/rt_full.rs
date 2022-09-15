@@ -33,9 +33,9 @@ impl EventCountVec {
         write!(f, "{{ \"results\": [ ")?;
         for (i, (time, mean, min, max, stddev)) in self.inner.results.iter().enumerate() {
             if i == self.inner.results.len() - 1 {
-                write!(f, "{{ \"command\": \"mean-vec\", \"mean\": {}, \"min\": {}, \"max\": {}, \"stddev\": {}, \"median\": {}, \"parameters\": {{ \"time\": {} }} }}", nnan!(mean), nnan!(min), nnan!(max), nnan!(stddev), nnan!(mean), time.as_secs_f64().ceil())?
+                write!(f, "{{ \"command\": \"mean-vec\", \"mean\": {}, \"min\": {}, \"max\": {}, \"stddev\": {}, \"median\": {}, \"parameters\": {{ \"time\": {} }} }}", nnan!(mean), nnan!(min), nnan!(max), nnan!(stddev), nnan!(mean), time.as_secs_f64().ceil())?;
             } else {
-                write!(f, "{{ \"command\": \"mean-vec\", \"mean\": {}, \"min\": {}, \"max\": {}, \"stddev\": {}, \"median\": {}, \"parameters\": {{ \"time\": {} }} }},", nnan!(mean), nnan!(min), nnan!(max), nnan!(stddev), nnan!(mean), time.as_secs_f64().ceil())?
+                write!(f, "{{ \"command\": \"mean-vec\", \"mean\": {}, \"min\": {}, \"max\": {}, \"stddev\": {}, \"median\": {}, \"parameters\": {{ \"time\": {} }} }},", nnan!(mean), nnan!(min), nnan!(max), nnan!(stddev), nnan!(mean), time.as_secs_f64().ceil())?;
             }
         }
         write!(f, "] }}")?;

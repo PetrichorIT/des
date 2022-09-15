@@ -18,8 +18,8 @@ use ext::WaitingMessage;
 /// A set of user defined functions for customizing the behaviour
 /// of an asynchronous module.
 ///
-/// This trait is just a async version of [Module](crate::net::Module).
-/// Note that this implementation used [async_trait] to provide function
+/// This trait is just a async version of [`Module`](crate::net::Module).
+/// Note that this implementation used [`async_trait`] to provide function
 /// signatures.
 ///
 #[async_trait]
@@ -240,14 +240,14 @@ pub trait AsyncModule: Send {
                             .content(pkt)
                             .build(),
                         timeout,
-                    )
+                    );
                 }
                 IOIntent::IoTick(wakeup_time) => {
                     log::info!("Scheduling IO Tick at {}", wakeup_time.as_millis());
-                    super::schedule_at(Message::new().typ(TYP_IO_TICK).build(), wakeup_time)
+                    super::schedule_at(Message::new().typ(TYP_IO_TICK).build(), wakeup_time);
                 }
                 _ => {
-                    log::warn!("Unkown Intent")
+                    log::warn!("Unkown Intent");
                 }
             }
         }
@@ -306,28 +306,28 @@ where
                     let (msg, header) = msg.cast::<UdpMessage>();
 
                     rt.process_udp(msg)
-                        .map_err(|msg| Message::new().content(msg).header(header).build().into())
+                        .map_err(|msg| Message::new().content(msg).header(header).build())
                 }
                 TYP_TCP_CONNECT => {
                     use tokio::sim::net::TcpConnectMessage;
                     let (msg, header) = msg.cast::<TcpConnectMessage>();
 
                     rt.process_tcp_connect(msg)
-                        .map_err(|msg| Message::new().content(msg).header(header).build().into())
+                        .map_err(|msg| Message::new().content(msg).header(header).build())
                 }
                 TYP_TCP_CONNECT_TIMEOUT => {
                     use tokio::sim::net::TcpConnectMessage;
                     let (msg, header) = msg.cast::<TcpConnectMessage>();
 
                     rt.process_tcp_connect_timeout(msg)
-                        .map_err(|msg| Message::new().content(msg).header(header).build().into())
+                        .map_err(|msg| Message::new().content(msg).header(header).build())
                 }
                 TYP_TCP_PACKET => {
                     use tokio::sim::net::TcpMessage;
                     let (msg, header) = msg.cast::<TcpMessage>();
 
                     rt.process_tcp_packet(msg)
-                        .map_err(|msg| Message::new().content(msg).header(header).build().into())
+                        .map_err(|msg| Message::new().content(msg).header(header).build())
                 }
                 _ => Err(msg),
             };

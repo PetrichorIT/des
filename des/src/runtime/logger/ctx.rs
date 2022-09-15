@@ -91,7 +91,6 @@ pub struct ScopedLogger {
     ignore_custom_target: bool,
 }
 
-#[allow(unused)]
 impl ScopedLogger {
     /// Creates a new Logger (builder).
     #[must_use]
@@ -176,6 +175,7 @@ impl ScopedLogger {
     }
 
     /// Sets the logger to ignore arguments for custom log targets
+    #[must_use]
     pub fn ignore_custom_target(mut self, ingore: bool) -> Self {
         self.ignore_custom_target = ingore;
         self
@@ -283,16 +283,14 @@ impl Log for ScopedLogger {
                 }
                 return;
             }
-        } else {
-            if self.ignore_custom_target {
-                if let Some(v) = CURRENT_SCOPE.with(|c| c.borrow().clone()) {
-                    (v, format!("{}: ", record.target().to_string()))
-                } else {
-                    (record.target().to_string(), String::new())
-                }
+        } else if self.ignore_custom_target {
+            if let Some(v) = CURRENT_SCOPE.with(|c| c.borrow().clone()) {
+                (v, format!("{}: ", record.target()))
             } else {
                 (record.target().to_string(), String::new())
             }
+        } else {
+            (record.target().to_string(), String::new())
         };
 
         let scope = scopes.get_mut(&target);

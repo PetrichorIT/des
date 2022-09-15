@@ -25,6 +25,7 @@ struct BufferContext {
     // (Message, SendTime)
     loopback: Vec<(Message, SimTime)>,
     // shudown,
+    #[allow(clippy::option_option)]
     shutdown: Option<Option<SimTime>>,
     // globals
     globals: Weak<NetworkRuntimeGlobals>,
@@ -33,6 +34,7 @@ struct BufferContext {
 ///
 /// Returns the globals of the runtime.
 ///
+#[must_use]
 pub fn globals() -> Arc<NetworkRuntimeGlobals> {
     BUF_CTX.with(|ctx| {
         ctx.borrow()
@@ -43,17 +45,17 @@ pub fn globals() -> Arc<NetworkRuntimeGlobals> {
 }
 
 pub(crate) fn buf_send_at(msg: Message, gate: GateRef, send_time: SimTime) {
-    BUF_CTX.with(|ctx| ctx.borrow_mut().output.push((msg, gate, send_time)))
+    BUF_CTX.with(|ctx| ctx.borrow_mut().output.push((msg, gate, send_time)));
 }
 pub(crate) fn buf_schedule_at(msg: Message, arrival_time: SimTime) {
-    BUF_CTX.with(|ctx| ctx.borrow_mut().loopback.push((msg, arrival_time)))
+    BUF_CTX.with(|ctx| ctx.borrow_mut().loopback.push((msg, arrival_time)));
 }
 pub(crate) fn buf_schedule_shutdown(restart: Option<SimTime>) {
-    BUF_CTX.with(|ctx| ctx.borrow_mut().shutdown = Some(restart))
+    BUF_CTX.with(|ctx| ctx.borrow_mut().shutdown = Some(restart));
 }
 
 pub(crate) fn buf_set_globals(globals: Weak<NetworkRuntimeGlobals>) {
-    BUF_CTX.with(|ctx| ctx.borrow_mut().globals = globals)
+    BUF_CTX.with(|ctx| ctx.borrow_mut().globals = globals);
 }
 
 pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<NetworkRuntime<A>>) {
@@ -95,7 +97,8 @@ pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<NetworkRuntime
         if let Some(rest) = ctx.shutdown.take() {
             use crate::net::message::TYP_RESTART;
 
-            let _ = module.ctx.async_ext.borrow_mut().rt.take();
+            drop(module.ctx.async_ext.borrow_mut().rt.take());
+
             if let Some(rest) = rest {
                 rt.add_event(
                     NetEvents::HandleMessageEvent(HandleMessageEvent {
@@ -103,7 +106,7 @@ pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<NetworkRuntime
                         message: Message::new().typ(TYP_RESTART).build(),
                     }),
                     rest,
-                )
+                );
             }
         }
 

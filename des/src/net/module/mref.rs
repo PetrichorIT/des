@@ -4,7 +4,6 @@ use super::{Module, ModuleContext};
 use std::any::{Any, TypeId};
 use std::cell::{Ref, RefCell, RefMut};
 use std::fmt::Debug;
-use std::ops::Deref;
 use std::sync::{Arc, Weak};
 
 #[derive(Clone)]
@@ -60,12 +59,13 @@ impl ModuleRef {
 }
 
 impl ModuleRef {
+    #[allow(clippy::explicit_deref_methods)]
     pub(crate) fn new<T: Module>(ctx: Arc<ModuleContext>, module: T) -> Self {
         use std::ops::DerefMut;
 
         let handler = Arc::new(RefCell::new(module));
         let ptr: *mut T = handler.borrow_mut().deref_mut();
-        let ptr: *mut u8 = ptr as *mut u8;
+        let ptr = ptr.cast::<u8>();
 
         Self {
             ctx,
@@ -86,6 +86,7 @@ impl ModuleRef {
     ///
     /// Panics if either the module is not of type T,
     /// or the module is allready borrowed mutably.
+    #[must_use]
     pub fn as_ref<T: Any>(&self) -> Ref<T> {
         self.try_as_ref::<T>()
             .expect("Failed to cast ModuleRef to readonly reference to type T")
@@ -104,9 +105,10 @@ impl ModuleRef {
     /// mutably. This may be the case if another borrow has allready occured
     /// or the reference module is `self` and a module-specific function is called.
     ///
+    #[must_use]
     pub fn try_as_ref<T: Any>(&self) -> Option<Ref<T>> {
         let brw = self.handler.borrow();
-        let rf = brw.deref();
+        let rf = &*brw;
         let ty = rf.type_id();
         if ty == TypeId::of::<T>() {
             // SAFTEY:
@@ -134,6 +136,7 @@ impl ModuleRef {
     ///
     /// Panics if either the module is not of type T,
     /// or the module is allready borrowed on any way.
+    #[must_use]
     pub fn as_mut<T: Any>(&self) -> RefMut<T> {
         self.try_as_mut()
             .expect("Failed to cast ModuleRef to mutable reference to type T")
@@ -152,9 +155,10 @@ impl ModuleRef {
     /// in any way. This may be the case if another borrow has allready occured
     /// or the reference module is `self` and a module-specific function is called.
     ///
+    #[must_use]
     pub fn try_as_mut<T: Any>(&self) -> Option<RefMut<T>> {
         let brw = self.handler.borrow_mut();
-        let rf = brw.deref();
+        let rf = &*brw;
         let ty = rf.type_id();
         if ty == TypeId::of::<T>() {
             // SAFTEY:
@@ -168,7 +172,7 @@ impl ModuleRef {
             //
             // Should the type check fail, the Ref is dropped so the borrow is freed.
             Some(RefMut::map(brw, |_| unsafe {
-                &mut *(self.handler_ptr as *mut T)
+                &mut *(self.handler_ptr.cast::<T>())
             }))
         } else {
             None
@@ -195,6 +199,7 @@ impl ModuleRef {
 
     /// Creates a gate on the current module, returning its ID.
     ///
+    #[must_use]
     pub fn create_gate(&self, name: &str, typ: GateServiceType) -> GateRef {
         self.create_gate_cluster(name, 1, typ).remove(0)
     }
@@ -203,6 +208,7 @@ impl ModuleRef {
     /// Creates a gate on the current module that points to another gate as its
     /// next hop, returning the ID of the created gate.
     ///
+    #[must_use]
     pub fn create_gate_into(
         &self,
         name: &str,
@@ -217,6 +223,7 @@ impl ModuleRef {
     ///
     /// Createas a cluster of gates on the current module returning their IDs.
     ///
+    #[must_use]
     pub fn create_gate_cluster(
         &self,
         name: &str,
@@ -234,6 +241,8 @@ impl ModuleRef {
     ///
     /// This function will panic should size != `next_hops.len`()
     ///
+    #[allow(clippy::needless_pass_by_value)]
+    #[must_use]
     pub fn create_gate_cluster_into(
         &self,
         name: &str,
@@ -262,7 +271,7 @@ impl ModuleRef {
 
     /// Handles a message
     pub fn handle_message(&self, msg: Message) {
-        self.handler.borrow_mut().handle_message(msg)
+        self.handler.borrow_mut().handle_message(msg);
     }
 }
 
