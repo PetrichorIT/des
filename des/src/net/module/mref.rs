@@ -1,16 +1,18 @@
 use crate::prelude::{ChannelRef, Gate, GateDescription, GateRef, GateServiceType, Message};
 
 use super::{Module, ModuleContext};
-use std::any::Any;
+use std::any::{Any, TypeId};
 use std::cell::{Ref, RefCell, RefMut};
 use std::fmt::Debug;
+use std::ops::Deref;
 use std::sync::Arc;
 
 /// A reference to a module
 #[derive(Clone)]
 pub struct ModuleRef {
     pub(crate) ctx: Arc<ModuleContext>,
-    pub(crate) handler: Arc<RefCell<dyn Module + 'static>>,
+    handler: Arc<RefCell<dyn Module>>,
+    handler_ptr: *mut u8,
 }
 
 impl std::ops::Deref for ModuleRef {
@@ -21,60 +23,144 @@ impl std::ops::Deref for ModuleRef {
 }
 
 impl ModuleRef {
-    /// Casts self as ref
-    pub fn ref_as<T: Any>(&self) -> Ref<T> {
+    pub(crate) fn handler(&self) -> RefMut<dyn Module> {
+        self.handler.borrow_mut()
+    }
+}
+
+impl ModuleRef {
+    pub(crate) fn new<T: Module>(ctx: Arc<ModuleContext>, module: T) -> Self {
+        use std::ops::DerefMut;
+
+        let handler = Arc::new(RefCell::new(module));
+        let ptr: *mut T = handler.borrow_mut().deref_mut();
+        let ptr: *mut u8 = ptr as *mut u8;
+
+        Self {
+            ctx,
+            handler,
+            handler_ptr: ptr,
+        }
+    }
+
+    // NOTE / TODO
+    // Once feature(trait_upcasting) is stabalized, use traitupcasting for
+    // safe interactions with the v-table.
+    // For now us raw pointer casts.
+
+    /// Borrows the referenced module as a readonly reference
+    /// to the provided type T.
+    ///
+    /// # Panics
+    ///
+    /// Panics if either the module is not of type T,
+    /// or the module is allready borrowed mutably.
+    pub fn as_ref<T: Any>(&self) -> Ref<T> {
+        self.try_as_ref::<T>()
+            .expect("Failed to cast ModuleRef to readonly reference to type T")
+    }
+
+    ///
+    /// Tries to borrow the referenced module as an readonly
+    /// reference to the provided type T.
+    ///
+    /// This function will return `None` is the contained module
+    /// is not of type T.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the contained module is allready borrowed
+    /// mutably. This may be the case if another borrow has allready occured
+    /// or the reference module is `self` and a module-specific function is called.
+    ///
+    pub fn try_as_ref<T: Any>(&self) -> Option<Ref<T>> {
         let brw = self.handler.borrow();
-        let brw: Ref<T> = Ref::map(brw, |v| {
-            let r = v as &dyn Any;
-            r.downcast_ref::<T>().unwrap()
-        });
-        brw
+        let rf = brw.deref();
+        let ty = rf.type_id();
+        if ty == TypeId::of::<T>() {
+            // SAFTEY:
+            // The pointer 'handler_ptr' will allways point to the object
+            // refered to by the 'handler': Since 'handler' is owned through
+            // an 'Arc' its memory position will NOT changed. Thus 'handler_ptr'
+            // allways points to valid memory. Pointer aligment is guranteed.
+            //
+            // Since the created &T is encapluslated in a Ref<&T> this functions acts as
+            // a call of 'RefCell::borrow' thus upholding the borrowing invariants.
+            //
+            // Should the type check fail, the Ref is dropped so the borrow is freed.
+            Some(Ref::map(brw, |_| unsafe {
+                &*(self.handler_ptr as *const T)
+            }))
+        } else {
+            None
+        }
     }
 
-    /// Casts self as mut
-    pub fn mut_as<T: Any>(&self) -> RefMut<T> {
+    /// Borrows the referenced module as a mutable reference
+    /// to the provided type T.
+    ///
+    /// # Panics
+    ///
+    /// Panics if either the module is not of type T,
+    /// or the module is allready borrowed on any way.
+    pub fn as_mut<T: Any>(&self) -> RefMut<T> {
+        self.try_as_mut()
+            .expect("Failed to cast ModuleRef to mutable reference to type T")
+    }
+
+    ///
+    /// Tries to borrow the referenced module as an mutable
+    /// reference to the provided type T.
+    ///
+    /// This function will return `None` is the contained module
+    /// is not of type T.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the contained module is allready borrowed
+    /// in any way. This may be the case if another borrow has allready occured
+    /// or the reference module is `self` and a module-specific function is called.
+    ///
+    pub fn try_as_mut<T: Any>(&self) -> Option<RefMut<T>> {
         let brw = self.handler.borrow_mut();
-        let brw: RefMut<T> = RefMut::map(brw, |v| {
-            let r = v as &mut dyn Any;
-            r.downcast_mut::<T>().unwrap()
-        });
-        brw
+        let rf = brw.deref();
+        let ty = rf.type_id();
+        if ty == TypeId::of::<T>() {
+            // SAFTEY:
+            // The pointer 'handler_ptr' will allways point to the object
+            // refered to by the 'handler': Since 'handler' is owned through
+            // an 'Arc' its memory position will NOT changed. Thus 'handler_ptr'
+            // allways points to valid memory. Pointer aligment is guranteed.
+            //
+            // Since the created &T is encapluslated in a Ref<&T> this functions acts as
+            // a call of 'RefCell::borrow' thus upholding the borrowing invariants.
+            //
+            // Should the type check fail, the Ref is dropped so the borrow is freed.
+            Some(RefMut::map(brw, |_| unsafe {
+                &mut *(self.handler_ptr as *mut T)
+            }))
+        } else {
+            None
+        }
     }
+}
 
+impl ModuleRef {
     pub(crate) fn str(&self) -> &str {
         self.ctx.path.path()
     }
 
-    pub(crate) fn activiate(&self) {
+    /// INTERNAL
+    #[doc(hidden)]
+    pub fn activate(&self) {
         ModuleContext::place(Arc::clone(&self.ctx));
     }
 
-    pub(crate) fn deactivate(&self) {
-
+    // INTERNAL
+    #[doc(hidden)]
+    pub fn deactivate(&self) {
         // NOP
     }
-
-    /// internal
-    // pub fn create_gate_cluster<A>(
-    //     &self,
-    //     name: &str,
-    //     size: usize,
-    //     typ: GateServiceType,
-    // ) -> Vec<GateRef> {
-    //     let ptr = self.clone();
-    //     let descriptor = GateDescription::new(name.to_owned(), size, ptr, typ);
-    //     let mut ids = Vec::new();
-
-    //     for i in 0..size {
-    //         let gate = Gate::new(descriptor.clone(), i, None, None);
-    //         ids.push(GateRef::clone(&gate));
-
-    //         self.ctx.gates.borrow_mut().push(gate)
-    //         // self.deref_mut().gates.push(gate);
-    //     }
-
-    //     ids
-    // }
 
     /// Creates a gate on the current module, returning its ID.
     ///

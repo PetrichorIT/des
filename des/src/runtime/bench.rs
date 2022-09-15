@@ -8,7 +8,9 @@ use std::{
 use sysinfo::{CpuExt, SystemExt};
 
 #[cfg(feature = "metrics")]
-use crate::stats::ProfilerOutputTarget;
+use crate::stats::{ProfilerOutputTarget, RuntimeMetrics};
+#[cfg(feature = "metrics")]
+use std::cell::RefCell;
 
 use super::{FT_ASYNC, FT_CQUEUE, FT_INTERNAL_METRICS, FT_NET};
 
@@ -38,7 +40,7 @@ pub struct Profiler {
 
     /// Internal metrics
     #[cfg(feature = "metrics")]
-    pub metrics: crate::util::PtrMut<crate::stats::RuntimeMetrics>,
+    pub metrics: Arc<RefCell<RuntimeMetrics>>,
 }
 
 impl Profiler {
@@ -67,7 +69,7 @@ impl Profiler {
     #[cfg(feature = "metrics")]
     pub fn write_to(&self, target: impl Into<ProfilerOutputTarget>) -> std::io::Result<()> {
         let target = target.into();
-        target.run(&self.metrics)
+        target.run(&*self.metrics.borrow())
         // writeln!(f, "[{}] {{", self.exec)?;
         // writeln!(
         //     f,
@@ -159,7 +161,7 @@ impl Default for Profiler {
             features,
 
             #[cfg(feature = "metrics")]
-            metrics: crate::util::PtrMut::new(crate::stats::RuntimeMetrics::new()),
+            metrics: Arc::new(RefCell::new(RuntimeMetrics::new())),
         }
     }
 }

@@ -124,8 +124,8 @@ impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
         #[cfg(feature = "metrics-module-time")]
         let t0 = Instant::now();
 
-        module.activiate();
-        module.handler.borrow_mut().handle_message(message);
+        module.activate();
+        module.handler().handle_message(message);
         module.deactivate();
 
         buf_process(&module, rt);
@@ -161,7 +161,7 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
         // allowing preemtive dropping of 'module' so that rt can be used in
         // 'module_handle_jobs'.
         let max_stage = rt.app.modules().iter().fold(1, |acc, module| {
-            acc.max(module.handler.borrow_mut().num_sim_start_stages())
+            acc.max(module.handler().num_sim_start_stages())
         });
 
         for stage in 0..max_stage {
@@ -170,7 +170,7 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
                 let module = rt.app.modules()[i].clone();
                 log_scope!(module.ctx.path.path());
 
-                if stage < module.handler.borrow_mut().num_sim_start_stages() {
+                if stage < module.handler().num_sim_start_stages() {
                     info!(
                         target: &format!("{}", module.ctx.path.path()),
                         "Calling at_sim_start({}).", stage
@@ -181,8 +181,8 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
                     #[cfg(feature = "metrics-module-time")]
                     let t0 = Instant::now();
 
-                    module.activiate();
-                    module.handler.borrow_mut().at_sim_start(stage);
+                    module.activate();
+                    module.handler().at_sim_start(stage);
                     module.deactivate();
 
                     super::buf_process(&module, rt);
@@ -205,8 +205,8 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
                 let module = rt.app.modules()[i].clone();
                 log_scope!(module.ctx.path.path());
 
-                module.activiate();
-                module.handler.borrow_mut().finish_sim_start();
+                module.activate();
+                module.handler().finish_sim_start();
                 module.deactivate();
 
                 // TODO: Is this really nessecary?

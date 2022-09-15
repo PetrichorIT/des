@@ -65,6 +65,7 @@ fn channel_dropping_message() {
 }
 
 #[NdlModule]
+#[derive(Debug)]
 struct BufferChanModule {
     send: usize,
     received: usize,

@@ -3,7 +3,6 @@ use super::ModuleRef;
 use crate::net::{ObjectPath, Topology};
 use crate::runtime::{Application, Runtime};
 use crate::time::SimTime;
-use crate::util::PtrMut;
 use log::info;
 use std::cell::RefCell;
 use std::fmt::{Debug, Display};
@@ -36,7 +35,7 @@ pub struct NetworkRuntime<A> {
     ///
     /// A inner container for holding user defined global state.
     ///
-    pub inner: PtrMut<A>,
+    pub inner: A,
 }
 
 impl<A> NetworkRuntime<A> {
@@ -49,7 +48,7 @@ impl<A> NetworkRuntime<A> {
             module_list: Vec::new(),
             globals: Arc::new(NetworkRuntimeGlobals::new()),
 
-            inner: PtrMut::new(inner),
+            inner: inner,
         };
 
         // attack to current buffer
@@ -100,7 +99,7 @@ impl<A> NetworkRuntime<A> {
     ///
     #[must_use]
     pub fn finish(self) -> A {
-        PtrMut::try_unwrap(self.inner).expect("HUH")
+        self.inner
     }
 
     /// Returns the network runtime globals
@@ -130,8 +129,8 @@ impl<A> Application for NetworkRuntime<A> {
         for module in &mut rt.app.module_list {
             log_scope!(module.ctx.path.path());
             info!("Calling 'at_sim_end'");
-            module.activiate();
-            module.handler.borrow_mut().at_sim_end();
+            module.activate();
+            module.handler().at_sim_end();
             module.deactivate();
 
             // NOTE: no buf_process since no furthe events will be processed.
@@ -142,8 +141,8 @@ impl<A> Application for NetworkRuntime<A> {
             // Ensure all sim_start stages have finished
             for module in &mut rt.app.module_list {
                 log_scope!(module.ctx.path.path());
-                module.activiate();
-                module.handler.borrow_mut().finish_sim_end();
+                module.activate();
+                module.handler().finish_sim_end();
                 module.deactivate();
             }
         }

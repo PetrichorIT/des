@@ -6,6 +6,8 @@ cfg_not_cqueue! {
 
         #[cfg(feature = "metrics")]
         use crate::stats::RuntimeMetrics;
+        #[cfg(feature = "metrics")]
+        use std::{cell::RefCell, sync::Arc};
 
         pub(crate) struct FutureEventSet<A>
         where
@@ -58,11 +60,11 @@ cfg_not_cqueue! {
             #[allow(clippy::let_and_return)]
             pub(crate) fn fetch_next(
                 &mut self,
-                #[cfg(feature = "metrics")] mut metrics: crate::util::PtrMut<
-                    RuntimeMetrics,
-                >,
+                #[cfg(feature = "metrics")]  metrics: Arc<RefCell<RuntimeMetrics>>,
             ) -> EventNode<A> {
                 // Internal runtime metrics
+                #[cfg(feature = "metrics")]
+                let mut metrics = metrics.borrow_mut();
 
                 let event = if let Some(event) = self.zero_queue.pop_front() {
                     #[cfg(feature = "metrics")]
@@ -102,9 +104,7 @@ cfg_not_cqueue! {
                 &mut self,
                 time: SimTime,
                 event: impl Into<A::EventSet>,
-                #[cfg(feature = "metrics")] mut metrics: crate::util::PtrMut<
-                    RuntimeMetrics,
-                >,
+                #[cfg(feature = "metrics")]  metrics: Arc<RefCell<RuntimeMetrics>>,
             ) {
                 assert!(
                     time >= self.last_event_simtime,
@@ -117,7 +117,7 @@ cfg_not_cqueue! {
                     self.zero_queue.push_back(node);
                 } else {
                     #[cfg(feature = "metrics")]
-                    metrics
+                    metrics.borrow_mut()
                         .non_zero_event_wait_time
                         .collect_at((time - SimTime::now()).as_secs_f64(), SimTime::now());
 
@@ -136,12 +136,16 @@ cfg_cqueue! {
         use super::*;
         use std::marker::PhantomData;
 
+        #[cfg(feature = "metrics")]
+        use std::{sync::Arc, cell::RefCell};
+        #[cfg(feature = "metrics")]
+        use crate::stats::RuntimeMetrics;
+
+
         #[allow(unused)]
         use crate::{stats::Statistic, runtime::{Application, EventNode, RuntimeOptions}, time::{Duration, SimTime}, util::*};
         use crate::cqueue::{CQueue, CQueueOptions, Node};
 
-        #[cfg(feature = "metrics")]
-        use crate::stats::RuntimeMetrics;
 
 
         pub(crate) struct FutureEventSet<A>
@@ -192,8 +196,12 @@ cfg_cqueue! {
             #[inline]
             pub(crate) fn fetch_next(
                 &mut self,
-                #[cfg(feature = "metrics")] mut metrics: PtrMut<RuntimeMetrics>,
+                #[cfg(feature = "metrics")]  metrics: Arc<RefCell<RuntimeMetrics>>,
             ) -> EventNode<A> {
+
+                #[cfg(feature = "metrics")]
+                let mut metrics = metrics.borrow_mut();
+
                 #[cfg(feature = "metrics")]
                 {
                     use std::ops::AddAssign;
@@ -249,12 +257,12 @@ cfg_cqueue! {
                 &mut self,
                 time: SimTime,
                 event: impl Into<A::EventSet>,
-                #[cfg(feature = "metrics")] mut metrics: PtrMut<RuntimeMetrics>,
+                #[cfg(feature = "metrics")]  metrics: Arc<RefCell<RuntimeMetrics>>,
             ) {
                 #[cfg(feature = "metrics")]
                 {
                     if time > self.inner.time() {
-                        metrics
+                        metrics.borrow_mut()
                             .non_zero_event_wait_time
                             .collect_at((time - SimTime::now()).as_secs_f64(), SimTime::now());
                     }

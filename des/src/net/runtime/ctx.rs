@@ -1,7 +1,6 @@
 #![allow(missing_docs)]
 
 use super::{HandleMessageEvent, NetworkRuntime, NetworkRuntimeGlobals};
-use crate::net::message::TYP_RESTART;
 use crate::net::{GateRef, Message, MessageAtGateEvent, NetEvents};
 use crate::prelude::{GateServiceType, ModuleRef};
 use crate::runtime::Runtime;
@@ -91,7 +90,11 @@ pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<NetworkRuntime
             );
         }
 
+        #[cfg(feature = "async")]
+        #[cfg(not(feature = "async-sharedrt"))]
         if let Some(rest) = ctx.shutdown.take() {
+            use crate::net::message::TYP_RESTART;
+
             let _ = module.ctx.async_ext.borrow_mut().rt.take();
             if let Some(rest) = rest {
                 rt.add_event(

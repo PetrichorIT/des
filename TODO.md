@@ -54,3 +54,11 @@ Shutdown is invoked using a hook.
 length is set to the header when calling content.
 however while the length cannot be set directly in can be set indirectly using
 header() leading to incorrect messages.
+
+# Create custom Ref/RefMut structures for MREF and SREF
+
+-   Currently a cast to a type using as_ref / as_mut
+    removed the ctx information in the relevant ref
+-   Try attaching ctx inforamtion to better controll calls of
+    ctx specific actions
+-   Note that the ctx should be drived based on the caller not the callie

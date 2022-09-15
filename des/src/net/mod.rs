@@ -12,8 +12,6 @@ mod runtime;
 mod subsystem;
 mod topology;
 
-// pub(crate) use self::runtime::ChannelUnbusyNotif; <unused>
-// pub(crate) use self::runtime::CoroutineMessageEvent; <unused>
 pub(crate) use self::runtime::HandleMessageEvent;
 pub(crate) use self::runtime::MessageAtGateEvent;
 pub(crate) use self::runtime::NetEvents;
@@ -29,7 +27,6 @@ pub use self::runtime::NetworkRuntimeGlobals;
 pub use self::channel::Channel;
 pub use self::channel::ChannelMetrics;
 pub use self::channel::ChannelRef;
-// pub use self::channel::ChannelRefMut;
 
 //
 // # Gate definitions
@@ -39,9 +36,7 @@ pub use self::gate::Gate;
 pub use self::gate::GateDescription;
 pub use self::gate::GateRef;
 pub use self::gate::GateRefWeak;
-// pub use self::gate::GateRefMut;
 pub use self::gate::GateServiceType;
-// pub use self::gate::IntoModuleGate;
 
 //
 // # Messages & Packets
@@ -61,15 +56,12 @@ pub use self::message::MessageType;
 //
 
 pub use self::module::Module;
-// pub use self::module::ModuleCore;
 pub use self::module::ModuleId;
 pub use self::module::ModuleRef;
 pub use self::module::ModuleReferencingError;
-// pub use self::module::StaticModuleCore;
 
 cfg_async! {
     pub use self::module::AsyncModule;
-    // pub use self::module::SenderHandle;
 }
 
 pub use self::module::{
@@ -103,6 +95,7 @@ pub use self::topology::Topology;
 // # Subsystem
 //
 
-pub use self::subsystem::StaticSubsystemCore;
-pub use self::subsystem::SubsystemCore;
+pub use self::subsystem::Subsystem;
+pub use self::subsystem::SubsystemContext;
 pub use self::subsystem::SubsystemId;
+pub use self::subsystem::SubsystemRef;

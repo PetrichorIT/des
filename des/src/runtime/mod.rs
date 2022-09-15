@@ -20,7 +20,7 @@ use std::{
 };
 
 #[cfg(feature = "metrics")]
-use crate::util::PtrMut;
+use std::sync::Arc;
 
 mod event;
 pub use self::event::*;
@@ -359,7 +359,7 @@ where
 
         let node = self.future_event_set.fetch_next(
             #[cfg(feature = "metrics")]
-            PtrMut::clone(&self.profiler.metrics),
+            Arc::clone(&self.profiler.metrics),
         );
 
         self.itr += 1;
@@ -370,7 +370,7 @@ where
                 time,
                 event,
                 #[cfg(feature = "metrics")]
-                PtrMut::clone(&self.profiler.metrics),
+                Arc::clone(&self.profiler.metrics),
             );
             return false;
         }
@@ -472,7 +472,7 @@ where
                 #[cfg(feature = "metrics")]
                 {
                     println!("\u{23A2}");
-                    self.profiler.metrics.finish()
+                    self.profiler.metrics.borrow_mut().finish()
                 }
 
                 println!("\u{23A3}");
@@ -499,7 +499,7 @@ where
                 #[cfg(feature = "metrics")]
                 {
                     println!("\u{23A2}");
-                    self.profiler.metrics.finish()
+                    self.profiler.metrics.borrow_mut().finish()
                 }
 
                 println!("\u{23A3}");
@@ -602,7 +602,7 @@ where
             time,
             event,
             #[cfg(feature = "metrics")]
-            PtrMut::clone(&self.profiler.metrics),
+            Arc::clone(&self.profiler.metrics),
         );
     }
 }

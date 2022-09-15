@@ -1,5 +1,3 @@
-use tokio::sim::SimContext;
-
 use super::{ModuleId, ModuleRef, ModuleReferencingError};
 use crate::{
     net::{
@@ -20,6 +18,8 @@ use std::{
 
 #[cfg(feature = "async")]
 use super::ext::AsyncCoreExt;
+#[cfg(feature = "async")]
+use tokio::sim::SimContext;
 
 thread_local! {
     static MOD_CTX: RefCell<Option<Arc<ModuleContext>>> = const { RefCell::new(None) }
@@ -112,6 +112,28 @@ impl ModuleContext {
             .find(|&g| g.name() == name && g.pos() == pos)
             .cloned()
     }
+
+    pub fn parent(&self) -> Result<ModuleRef, ModuleReferencingError> {
+        if let Some(ref parent) = self.parent {
+            Ok(parent.clone())
+        } else {
+            Err(ModuleReferencingError::NoEntry(format!(
+                "The module '{}' does not posses a parent ptr",
+                self.path
+            )))
+        }
+    }
+
+    pub fn child(&self, name: &str) -> Result<ModuleRef, ModuleReferencingError> {
+        if let Some(child) = self.children.get(name) {
+            Ok(child.clone())
+        } else {
+            Err(ModuleReferencingError::NoEntry(format!(
+                "The module '{}' does not posses a child ptr with the name '{}'",
+                self.path, name
+            )))
+        }
+    }
 }
 
 impl Debug for ModuleContext {
@@ -147,30 +169,12 @@ pub fn module_name() -> String {
 
 /// Returns the parent element
 pub fn parent() -> Result<ModuleRef, ModuleReferencingError> {
-    with_mod_ctx(|ctx| {
-        if let Some(ref parent) = ctx.parent {
-            Ok(parent.clone())
-        } else {
-            Err(ModuleReferencingError::NoEntry(format!(
-                "The module '{}' does not posses a parent ptr",
-                ctx.path
-            )))
-        }
-    })
+    with_mod_ctx(|ctx| ctx.parent())
 }
 
 /// Returns the child element.
 pub fn child(name: &str) -> Result<ModuleRef, ModuleReferencingError> {
-    with_mod_ctx(|ctx| {
-        if let Some(child) = ctx.children.get(name) {
-            Ok(child.clone())
-        } else {
-            Err(ModuleReferencingError::NoEntry(format!(
-                "The module '{}' does not posses a child ptr with the name '{}'",
-                ctx.path, name
-            )))
-        }
-    })
+    with_mod_ctx(|ctx| ctx.child(name))
 }
 
 // GATE RELATED
@@ -294,8 +298,14 @@ cfg_async! {
     use tokio::sync::mpsc::{UnboundedReceiver, error::SendError};
     use super::ext::WaitingMessage;
 
+    #[cfg(not(feature = "async-sharedrt"))]
     pub(super) fn async_get_rt() -> Option<Arc<Runtime>> {
         with_mod_ctx(|ctx| Some(Arc::clone(ctx.async_ext.borrow().rt.as_ref()?)))
+    }
+
+    #[cfg(feature = "async-sharedrt")]
+    pub(super) fn async_get_rt() -> Option<Arc<Runtime>> {
+         Some(Arc::clone(&globals().runtime))
     }
 
     pub(super) fn async_take_sim_ctx() -> SimContext {
@@ -306,6 +316,7 @@ cfg_async! {
         with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().ctx = Some(sim_ctx))
     }
 
+    #[cfg(not(feature = "async-sharedrt"))]
     pub(super) fn async_ctx_reset() {
         with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().reset())
     }

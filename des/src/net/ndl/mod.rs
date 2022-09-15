@@ -1,18 +1,16 @@
-use std::cell::RefCell;
-use std::marker::Unsize;
 use std::sync::Arc;
 
 use crate::prelude::{Module, NetworkRuntime};
-use crate::util::PtrMut;
 
 use super::module::ModuleContext;
-use super::{ChannelRef, ModuleRef, ObjectPath, StaticSubsystemCore};
+use super::subsystem::SubsystemRef;
+use super::{ChannelRef, ModuleRef, ObjectPath};
 
 #[doc(hidden)]
 #[derive(Debug)]
 pub struct BuildContext<'a, A> {
     rt: &'a mut NetworkRuntime<A>,
-    sys_stack: Vec<PtrMut<dyn StaticSubsystemCore>>,
+    sys_stack: Vec<SubsystemRef>,
 }
 
 impl<'a, A> BuildContext<'a, A> {
@@ -47,17 +45,13 @@ impl<'a, A> BuildContext<'a, A> {
     /// Creates a channnel
     pub fn create_channel(&mut self, channel: ChannelRef) {
         if let Some(top) = self.sys_stack.last_mut() {
-            top.channels.push(channel);
+            top.ctx.channels.borrow_mut().push(channel);
         }
     }
 
     /// Pushes a value
-    pub fn push_subsystem<T>(&mut self, subsystem: PtrMut<T>)
-    where
-        T: StaticSubsystemCore + Unsize<dyn StaticSubsystemCore>,
-    {
-        let dyned: PtrMut<dyn StaticSubsystemCore> = subsystem;
-        self.sys_stack.push(dyned);
+    pub fn push_subsystem(&mut self, subsystem: SubsystemRef) {
+        self.sys_stack.push(subsystem);
     }
 
     /// Pops a value.
@@ -76,14 +70,11 @@ macro_rules! impl_buildable {
                 Self: 'static + Module + Sized,
         {
             let core = Arc::new(ModuleContext::standalone(path));
-            let this = Arc::new(RefCell::new(<Self as Module>::new()));
 
-            let mref = ModuleRef {
-                ctx: core,
-                handler: this,
-            };
+            let this = <Self as Module>::new();
+            let mref = ModuleRef::new(core, this);
 
-            mref.activiate();
+            mref.activate();
             Self::build::<A$(,$g)*>(mref, rt)
         }
 
@@ -97,14 +88,11 @@ macro_rules! impl_buildable {
                 Self: 'static +  Module + Sized,
         {
             let core = Arc::new(ModuleContext::child_of(name, parent));
-            let this = Arc::new(RefCell::new(<Self as Module>::new()));
 
-            let mref = ModuleRef {
-                ctx: core,
-                handler: this,
-            };
+            let this = <Self as Module>::new();
+            let mref = ModuleRef::new(core, this);
 
-            mref.activiate();
+            mref.activate();
             Self::build::<A$(,$g)*>(mref, rt)
         }
     };
@@ -132,13 +120,10 @@ pub trait __Buildable0 {
         let core = Arc::new(ModuleContext::standalone(path));
         // TODO: Maybe activate the core here to provide funtionality witin user defined call of new
 
-        let this = Arc::new(RefCell::new(<Self as Module>::new()));
-        let mref = ModuleRef {
-            ctx: core,
-            handler: this,
-        };
+        let this = <Self as Module>::new();
+        let mref = ModuleRef::new(core, this);
 
-        mref.activiate();
+        mref.activate();
         Self::build(mref, ctx)
     }
 
@@ -153,13 +138,10 @@ pub trait __Buildable0 {
         let core = Arc::new(ModuleContext::child_of(name, parent));
         // TODO: Maybe activate the core here to provide funtionality witin user defined call of new
 
-        let this = Arc::new(RefCell::new(<Self as Module>::new()));
-        let mref = ModuleRef {
-            ctx: core,
-            handler: this,
-        };
+        let this = <Self as Module>::new();
+        let mref = ModuleRef::new(core, this);
 
-        mref.activiate();
+        mref.activate();
         Self::build(mref, ctx)
     }
 }
