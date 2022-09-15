@@ -64,3 +64,10 @@ header() leading to incorrect messages.
 -   Note that the ctx should be drived based on the caller not the callie
 
 # t-utils runs and compltes withoiut sim end message
+
+# Removed the following API features
+
+-   GateDescription
+-   SubsystemContext, ModuleContext (make non-pub)
+-   ChannelRef, GateRef, GateRefWeak (make weak versions internal only expose Arc<...>)
+-   util
