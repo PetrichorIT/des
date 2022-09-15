@@ -31,5 +31,5 @@ fn main() {
     assert_eq!(MODULE_LEN.load(Ordering::SeqCst), 0);
 
     assert_eq!(p.event_count, 9);
-    assert_eq_time!(time, 0.285330151)
+    assert_eq!(time.as_millis(), 387)
 }

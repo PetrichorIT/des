@@ -3,7 +3,7 @@ use std::cell::RefCell;
 use std::fmt::{Debug, Display};
 use std::sync::{Arc, Weak};
 
-use super::module::ModuleContext;
+use super::module::{ModuleContext, ModuleRefWeak};
 use super::ModuleRef;
 
 ///
@@ -38,7 +38,7 @@ pub struct GateDescription {
     ///
     /// The identifier of the module the gate was created on.
     ///
-    pub owner: ModuleRef,
+    pub(crate) owner: ModuleRefWeak,
     ///
     /// A human readable name for a gate cluster.
     ///
@@ -74,10 +74,10 @@ impl GateDescription {
     /// Panics if the size is 0.
     ///
     #[must_use]
-    pub fn new(name: String, size: usize, owner: ModuleRef, typ: GateServiceType) -> Self {
+    pub fn new(name: String, size: usize, owner: &ModuleRef, typ: GateServiceType) -> Self {
         assert!(size >= 1, "Cannot create with a non-postive size");
         Self {
-            owner,
+            owner: ModuleRefWeak::new(owner),
             name,
             size,
             typ,
@@ -96,7 +96,7 @@ impl Debug for GateDescription {
         f.debug_struct("GateDescription")
             .field("name", &self.name)
             .field("size", &self.size)
-            .field("owner", &self.owner.ctx.path)
+            .field("owner", &self.owner.upgrade().unwrap().ctx.path)
             .field("typ", &self.typ)
             .finish()
     }
@@ -106,7 +106,8 @@ impl PartialEq for GateDescription {
     fn eq(&self, other: &Self) -> bool {
         // self.size can be ignored since no descriptors with the same name can exist
         // on the same owner
-        self.name == other.name && self.owner.ctx.id == other.owner.ctx.id
+        self.name == other.name
+            && self.owner.upgrade().unwrap().ctx.id == other.owner.upgrade().unwrap().ctx.id
     }
 }
 
@@ -200,7 +201,7 @@ impl Gate {
     pub fn path(&self) -> String {
         format!(
             "{}:{}",
-            self.description.owner.ctx.path,
+            self.description.owner.upgrade().unwrap().ctx.path,
             self.name_with_pos()
         )
     }
@@ -287,8 +288,8 @@ impl Gate {
     ///
 
     #[must_use]
-    pub fn owner(&self) -> &ModuleRef {
-        &self.description.owner
+    pub fn owner(&self) -> ModuleRef {
+        self.description.owner.upgrade().unwrap()
     }
 
     ///

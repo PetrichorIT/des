@@ -5,7 +5,38 @@ use std::any::{Any, TypeId};
 use std::cell::{Ref, RefCell, RefMut};
 use std::fmt::Debug;
 use std::ops::Deref;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
+
+#[derive(Clone)]
+pub(crate) struct ModuleRefWeak {
+    ctx: Weak<ModuleContext>,
+    handler: Weak<RefCell<dyn Module>>,
+    handler_ptr: *mut u8,
+}
+
+impl ModuleRefWeak {
+    pub(crate) fn new(strong: &ModuleRef) -> Self {
+        Self {
+            ctx: Arc::downgrade(&strong.ctx),
+            handler: Arc::downgrade(&strong.handler),
+            handler_ptr: strong.handler_ptr,
+        }
+    }
+
+    pub(crate) fn upgrade(&self) -> Option<ModuleRef> {
+        Some(ModuleRef {
+            ctx: self.ctx.upgrade()?,
+            handler: self.handler.upgrade()?,
+            handler_ptr: self.handler_ptr,
+        })
+    }
+}
+
+impl Debug for ModuleRefWeak {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ModuleRefWeak").finish()
+    }
+}
 
 /// A reference to a module
 #[derive(Clone)]
@@ -216,8 +247,7 @@ impl ModuleRef {
             "The value 'next_hops' must be equal to the size of the gate cluster"
         );
 
-        let ptr = self.clone();
-        let descriptor = GateDescription::new(name.to_owned(), size, ptr, typ);
+        let descriptor = GateDescription::new(name.to_owned(), size, self, typ);
         let mut ids = Vec::new();
 
         for (i, item) in next_hops.into_iter().enumerate() {

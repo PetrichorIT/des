@@ -190,7 +190,8 @@ impl Topology {
                 target_gate,
             } in edges
             {
-                let to_node = target_gate.owner().str();
+                let owner = target_gate.owner();
+                let to_node = owner.str();
                 edges_out.push_str(&format!(
                     "    \"{}\" -> \"{}\" [ headlabel=\"{}\" {} taillabel=\"{}\" ]\n",
                     from_node,

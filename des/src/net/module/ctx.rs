@@ -1,4 +1,4 @@
-use super::{ModuleId, ModuleRef, ModuleReferencingError};
+use super::{ModuleId, ModuleRef, ModuleRefWeak, ModuleReferencingError};
 use crate::{
     net::{
         common::Optional,
@@ -40,7 +40,7 @@ pub struct ModuleContext {
     pub(crate) async_ext: RefCell<AsyncCoreExt>,
 
     /// The reference for the parent module.
-    pub(crate) parent: Option<ModuleRef>,
+    pub(crate) parent: Option<ModuleRefWeak>,
 
     /// The collection of child nodes for the current module.
     pub(crate) children: HashMap<String, ModuleRef>,
@@ -76,7 +76,7 @@ impl ModuleContext {
             id: ModuleId::gen(),
             path,
             gates: RefCell::new(Vec::new()),
-            parent: Some(parent),
+            parent: Some(ModuleRefWeak::new(&parent)),
             children: HashMap::new(),
 
             #[cfg(feature = "async")]
@@ -115,7 +115,9 @@ impl ModuleContext {
 
     pub fn parent(&self) -> Result<ModuleRef, ModuleReferencingError> {
         if let Some(ref parent) = self.parent {
-            Ok(parent.clone())
+            Ok(parent
+                .upgrade()
+                .expect("Failed to fetch parent, ptr missing in drop"))
         } else {
             Err(ModuleReferencingError::NoEntry(format!(
                 "The module '{}' does not posses a parent ptr",
