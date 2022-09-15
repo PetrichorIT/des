@@ -3,24 +3,20 @@ use des::{prelude::*, runtime::ScopedLogger};
 #[NdlModule("examples/metrics")]
 #[derive(Debug)]
 struct Alice {
-    core: ModuleCore,
     outvec: OutVec,
 }
 
-impl NameableModule for Alice {
-    fn named(core: ModuleCore) -> Self {
+impl Module for Alice {
+    fn new() -> Self {
         Self {
-            outvec: OutVec::new("sample_vec".to_string(), Some(core.path().clone()))
+            outvec: OutVec::new("sample_vec".to_string(), Some(module_path()))
                 .buffer_max(100)
                 .result_dir(String::from("examples/metrics/results")),
-            core,
         }
     }
-}
 
-impl Module for Alice {
     fn at_sim_start(&mut self, _: usize) {
-        self.schedule_in(Message::new().build(), Duration::from_secs_f64(1.0))
+        schedule_in(Message::new().build(), Duration::from_secs_f64(1.0))
     }
 
     fn at_sim_end(&mut self) {
@@ -32,7 +28,7 @@ impl Module for Alice {
         if SimTime::now() == 42.0 {
             log::trace!("Message");
         }
-        self.schedule_in(Message::new().build(), Duration::from_secs_f64(1.0))
+        schedule_in(Message::new().build(), Duration::from_secs_f64(1.0))
     }
 }
 

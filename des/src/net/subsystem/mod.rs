@@ -17,3 +17,5 @@ create_global_uid!(
 
 /// The functions of a subsystem
 pub trait Subsystem: Any {}
+
+impl<T: Any> Subsystem for T {}

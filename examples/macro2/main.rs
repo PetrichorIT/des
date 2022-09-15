@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use des::prelude::*;
 
 #[NdlModule(workspace = "examples/macro2", ndl_ident = "Alice")]
@@ -6,17 +7,10 @@ struct AliceImpl {
     some_state: usize,
 }
 
-// TODO: Find a solution for this
-impl NameableModule for Alice {
-    fn named(core: ModuleCore) -> Self {
-        Self {
-            some_state: 42,
-            __core: core,
-        }
-    }
-}
-
 impl Module for Alice {
+    fn new() -> Self {
+        Self { some_state: 42 }
+    }
     fn handle_message(&mut self, _msg: Message) {}
 }
 

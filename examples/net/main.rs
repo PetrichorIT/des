@@ -3,7 +3,6 @@ use std::net::IpAddr;
 use std::net::Ipv4Addr;
 
 use des::prelude::*;
-use des::stats::ProfilerOutputTarget;
 use des::tokio;
 use des::tokio::io::AsyncReadExt;
 use des::tokio::io::AsyncWriteExt;
@@ -193,13 +192,13 @@ fn main() {
         RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(10000))),
     );
 
-    let (_, _, profiler, _) = rt.run().unwrap_premature_abort();
-    profiler
-        .write_to(
-            ProfilerOutputTarget::new()
-                .write_into("net.output")
-                .write_event_count_into("net.event_count.json"),
-        )
-        .unwrap();
+    let (_, _, _profiler, _) = rt.run().unwrap_premature_abort();
+    // profiler
+    //     .write_to(
+    //         ProfilerOutputTarget::new()
+    //             .write_into("net.output")
+    //             .write_event_count_into("net.event_count.json"),
+    //     )
+    //     .unwrap();
     // profiler.write_to("net.out.json").unwrap()
 }

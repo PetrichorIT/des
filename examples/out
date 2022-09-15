@@ -3,1099 +3,740 @@
 use std::prelude::rust_2021::*;
 #[macro_use]
 extern crate std;
-use std::collections::HashMap;
-use std::net::IpAddr;
-use std::net::Ipv4Addr;
 use des::prelude::*;
-use des::stats::ProfilerOutputTarget;
-use des::tokio;
-use des::tokio::io::AsyncReadExt;
-use des::tokio::io::AsyncWriteExt;
-use des::tokio::net::IOContext;
-use des::tokio::net::TcpListener;
-use des::tokio::net::TcpStream;
-const REQ_STR: [&'static [u8]; 5] = [b"100b", b"1k", b"10k", b"100k", b"1mb"];
-struct Client {}
-impl ::des::net::__Buildable0 for Client {
-    fn build<A>(
-        mut this: ::des::net::ModuleRef,
-        ctx: &mut ::des::net::BuildContext<'_, A>,
-    ) -> ::des::net::ModuleRef {
-        use des::net::*;
-        let _ = this.create_gate_cluster("in", 1usize, ::des::net::GateServiceType::Input);
-        let _ = this.create_gate_cluster("out", 1usize, ::des::net::GateServiceType::Output);
-        this
-    }
-}
-impl AsyncModule for Client {
-    fn new() -> Self {
-        Self {}
-    }
-    #[allow(
-        clippy::let_unit_value,
-        clippy::no_effect_underscore_binding,
-        clippy::shadow_same,
-        clippy::type_complexity,
-        clippy::type_repetition_in_bounds,
-        clippy::used_underscore_binding
-    )]
-    fn at_sim_start<'life0, 'async_trait>(
-        &'life0 mut self,
-        __arg1: usize,
-    ) -> ::core::pin::Pin<
-        Box<dyn ::core::future::Future<Output = ()> + ::core::marker::Send + 'async_trait>,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        Box::pin(async move {
-            let mut __self = self;
-            let __arg1 = __arg1;
-            let _: () = {
-                let ip = par("ip").unwrap().parse::<Ipv4Addr>().unwrap();
-                IOContext::new(random::<[u8; 6]>(), ip).set();
-                send(Message::new().content(IpAddr::V4(ip)).build(), "out");
-                tokio::spawn(async move {
-                    let delay = random::<f64>() * 10.0;
-                    tokio::time::sleep(Duration::from_secs_f64(delay)).await;
-                    let mut sock = TcpStream::connect("212.71.90.69:8000").await.unwrap();
-                    for _ in 0..3 {
-                        let i = random::<usize>() % 5;
-                        sock.write_all(&REQ_STR[i]).await.unwrap();
-                        let mut header = [0u8; 4];
-                        sock.read_exact(&mut header).await.unwrap();
-                        let size = u32::from_be_bytes(header) as usize;
-                        let mut buf = ::alloc::vec::from_elem(0, size);
-                        sock.read_exact(&mut buf).await.unwrap();
-                        sock.write_all(b"DONE").await.unwrap();
-                    }
-                    let delay = random::<f64>() * 10.0 + 5.0;
-                    shutdow_and_restart_at(SimTime::now() + delay)
-                });
-            };
-        })
-    }
-}
-struct Server {}
-impl ::des::net::__Buildable0 for Server {
-    fn build<A>(
-        mut this: ::des::net::ModuleRef,
-        ctx: &mut ::des::net::BuildContext<'_, A>,
-    ) -> ::des::net::ModuleRef {
-        use des::net::*;
-        let _ = this.create_gate_cluster("in", 1usize, ::des::net::GateServiceType::Input);
-        let _ = this.create_gate_cluster("out", 1usize, ::des::net::GateServiceType::Output);
-        this
-    }
-}
-impl AsyncModule for Server {
-    fn new() -> Self {
-        Self {}
-    }
-    #[allow(
-        clippy::let_unit_value,
-        clippy::no_effect_underscore_binding,
-        clippy::shadow_same,
-        clippy::type_complexity,
-        clippy::type_repetition_in_bounds,
-        clippy::used_underscore_binding
-    )]
-    fn at_sim_start<'life0, 'async_trait>(
-        &'life0 mut self,
-        __arg1: usize,
-    ) -> ::core::pin::Pin<
-        Box<dyn ::core::future::Future<Output = ()> + ::core::marker::Send + 'async_trait>,
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait,
-    {
-        Box::pin(async move {
-            let mut __self = self;
-            let __arg1 = __arg1;
-            let _: () = {
-                let ip = par("ip").unwrap().parse::<Ipv4Addr>().unwrap();
-                IOContext::new(random::<[u8; 6]>(), ip).set();
-                send(
-                    Message::new().kind(10).content(IpAddr::V4(ip)).build(),
-                    "out",
-                );
-                tokio::spawn(async {
-                    let sock = TcpListener::bind("0.0.0.0:8000").await.unwrap();
-                    while let Ok((mut stream, _)) = sock.accept().await {
-                        tokio::spawn(async move {
-                            for _ in 0..3 {
-                                let mut req = [0u8; 32];
-                                let n = stream.read(&mut req).await.unwrap();
-                                match &req[..n] {
-                                    b"100b" => {
-                                        let value = [42u8; 10];
-                                        stream.write_u32(value.len() as u32).await.unwrap();
-                                        stream.write_all(&value).await.unwrap();
-                                        let mut ack = [0u8; 4];
-                                        stream.read_exact(&mut ack).await.unwrap();
-                                        match (&b"DONE", &&ack) {
-                                            (left_val, right_val) => {
-                                                if !(*left_val == *right_val) {
-                                                    let kind = ::core::panicking::AssertKind::Eq;
-                                                    ::core::panicking::assert_failed(
-                                                        kind,
-                                                        &*left_val,
-                                                        &*right_val,
-                                                        ::core::option::Option::None,
-                                                    );
-                                                }
-                                            }
-                                        };
-                                    }
-                                    b"1k" => {
-                                        let value = [56u8; 10];
-                                        stream.write_u32(value.len() as u32).await.unwrap();
-                                        stream.write_all(&value).await.unwrap();
-                                        let mut ack = [0u8; 4];
-                                        stream.read_exact(&mut ack).await.unwrap();
-                                        match (&b"DONE", &&ack) {
-                                            (left_val, right_val) => {
-                                                if !(*left_val == *right_val) {
-                                                    let kind = ::core::panicking::AssertKind::Eq;
-                                                    ::core::panicking::assert_failed(
-                                                        kind,
-                                                        &*left_val,
-                                                        &*right_val,
-                                                        ::core::option::Option::None,
-                                                    );
-                                                }
-                                            }
-                                        };
-                                    }
-                                    b"10k" => {
-                                        let value = [22u8; 10];
-                                        stream.write_u32(value.len() as u32).await.unwrap();
-                                        stream.write_all(&value).await.unwrap();
-                                        let mut ack = [0u8; 4];
-                                        stream.read_exact(&mut ack).await.unwrap();
-                                        match (&b"DONE", &&ack) {
-                                            (left_val, right_val) => {
-                                                if !(*left_val == *right_val) {
-                                                    let kind = ::core::panicking::AssertKind::Eq;
-                                                    ::core::panicking::assert_failed(
-                                                        kind,
-                                                        &*left_val,
-                                                        &*right_val,
-                                                        ::core::option::Option::None,
-                                                    );
-                                                }
-                                            }
-                                        };
-                                    }
-                                    b"100k" => {
-                                        let value = [40u8; 10];
-                                        stream.write_u32(value.len() as u32).await.unwrap();
-                                        stream.write_all(&value).await.unwrap();
-                                        let mut ack = [0u8; 4];
-                                        stream.read_exact(&mut ack).await.unwrap();
-                                        match (&b"DONE", &&ack) {
-                                            (left_val, right_val) => {
-                                                if !(*left_val == *right_val) {
-                                                    let kind = ::core::panicking::AssertKind::Eq;
-                                                    ::core::panicking::assert_failed(
-                                                        kind,
-                                                        &*left_val,
-                                                        &*right_val,
-                                                        ::core::option::Option::None,
-                                                    );
-                                                }
-                                            }
-                                        };
-                                    }
-                                    b"1mb" => {
-                                        let value = [44u8; 10];
-                                        stream.write_u32(value.len() as u32).await.unwrap();
-                                        stream.write_all(&value).await.unwrap();
-                                        let mut ack = [0u8; 4];
-                                        stream.read_exact(&mut ack).await.unwrap();
-                                        match (&b"DONE", &&ack) {
-                                            (left_val, right_val) => {
-                                                if !(*left_val == *right_val) {
-                                                    let kind = ::core::panicking::AssertKind::Eq;
-                                                    ::core::panicking::assert_failed(
-                                                        kind,
-                                                        &*left_val,
-                                                        &*right_val,
-                                                        ::core::option::Option::None,
-                                                    );
-                                                }
-                                            }
-                                        };
-                                    }
-                                    _ => ::core::panicking::panic("not yet implemented"),
-                                }
-                            }
-                        });
-                    }
-                });
-            };
-        })
-    }
-}
-struct Router {
-    fwd: HashMap<IpAddr, GateRef>,
-}
-impl ::des::net::__Buildable0 for Router {
-    fn build<A>(
-        mut this: ::des::net::ModuleRef,
-        ctx: &mut ::des::net::BuildContext<'_, A>,
-    ) -> ::des::net::ModuleRef {
-        use des::net::*;
-        let mut clients1_child: ::des::net::ModuleRef =
-            Client::build_named_with_parent("clients[1]", this.clone(), ctx);
-        let mut clients2_child: ::des::net::ModuleRef =
-            Client::build_named_with_parent("clients[2]", this.clone(), ctx);
-        let mut clients3_child: ::des::net::ModuleRef =
-            Client::build_named_with_parent("clients[3]", this.clone(), ctx);
-        let mut clients4_child: ::des::net::ModuleRef =
-            Client::build_named_with_parent("clients[4]", this.clone(), ctx);
-        let mut clients5_child: ::des::net::ModuleRef =
-            Client::build_named_with_parent("clients[5]", this.clone(), ctx);
-        let mut server_child: ::des::net::ModuleRef =
-            Server::build_named_with_parent("server", this.clone(), ctx);
-        let _ = this.create_gate_cluster("in", 5usize, ::des::net::GateServiceType::Input);
-        let _ = this.create_gate_cluster("in_server", 1usize, ::des::net::GateServiceType::Input);
-        let _ = this.create_gate_cluster("out", 5usize, ::des::net::GateServiceType::Output);
-        let _ = this.create_gate_cluster("out_server", 1usize, ::des::net::GateServiceType::Output);
-        let mut in_gate0_ref: ::des::net::GateRef = this
-            .gate("in", 0usize)
-            .expect(&{
-                let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                    &[
-                        "Internal macro err. Could not find local gate \'",
-                        "[",
-                        "]\'.",
-                    ],
-                    &[
-                        ::core::fmt::ArgumentV1::new_display(&"in"),
-                        ::core::fmt::ArgumentV1::new_display(&0usize),
-                    ],
-                ));
-                res
-            })
-            .clone();
-        let mut clients1_child_out_gate0: ::des::net::GateRef = clients1_child
-            .gate("out", 0usize)
-            .expect(&{
-                let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                    &[
-                        "Internal macro err. Could not find child gate \'",
-                        "[",
-                        "]\'.",
-                    ],
-                    &[
-                        ::core::fmt::ArgumentV1::new_display(&"out"),
-                        ::core::fmt::ArgumentV1::new_display(&0usize),
-                    ],
-                ));
-                res
-            })
-            .clone();
-        let channel = ::des::net::Channel::new(
-            ::des::net::ObjectPath::channel_with(
-                &{
-                    let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                        &["", "->"],
-                        &[
-                            ::core::fmt::ArgumentV1::new_display(&clients1_child_out_gate0.name()),
-                            ::core::fmt::ArgumentV1::new_display(&in_gate0_ref.name()),
-                        ],
-                    ));
-                    res
-                },
-                &this.path(),
-            ),
-            ::des::net::ChannelMetrics {
-                bitrate: 10000000usize,
-                latency: ::des::time::Duration::from_secs_f64(0.02f64),
-                jitter: ::des::time::Duration::from_secs_f64(0f64),
-                cost: 1f64,
-                queuesize: 4096usize,
-            },
-        );
-        ctx.create_channel(channel.clone());
-        clients1_child_out_gate0.set_next_gate(in_gate0_ref);
-        clients1_child_out_gate0.set_channel(channel);
-        let mut in_gate1_ref: ::des::net::GateRef = this
-            .gate("in", 1usize)
-            .expect(&{
-                let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                    &[
-                        "Internal macro err. Could not find local gate \'",
-                        "[",
-                        "]\'.",
-                    ],
-                    &[
-                        ::core::fmt::ArgumentV1::new_display(&"in"),
-                        ::core::fmt::ArgumentV1::new_display(&1usize),
-                    ],
-                ));
-                res
-            })
-            .clone();
-        let mut clients2_child_out_gate0: ::des::net::GateRef = clients2_child
-            .gate("out", 0usize)
-            .expect(&{
-                let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                    &[
-                        "Internal macro err. Could not find child gate \'",
-                        "[",
-                        "]\'.",
-                    ],
-                    &[
-                        ::core::fmt::ArgumentV1::new_display(&"out"),
-                        ::core::fmt::ArgumentV1::new_display(&0usize),
-                    ],
-                ));
-                res
-            })
-            .clone();
-        let channel = ::des::net::Channel::new(
-            ::des::net::ObjectPath::channel_with(
-                &{
-                    let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                        &["", "->"],
-                        &[
-                            ::core::fmt::ArgumentV1::new_display(&clients2_child_out_gate0.name()),
-                            ::core::fmt::ArgumentV1::new_display(&in_gate1_ref.name()),
-                        ],
-                    ));
-                    res
-                },
-                &this.path(),
-            ),
-            ::des::net::ChannelMetrics {
-                bitrate: 10000000usize,
-                latency: ::des::time::Duration::from_secs_f64(0.02f64),
-                jitter: ::des::time::Duration::from_secs_f64(0f64),
-                cost: 1f64,
-                queuesize: 4096usize,
-            },
-        );
-        ctx.create_channel(channel.clone());
-        clients2_child_out_gate0.set_next_gate(in_gate1_ref);
-        clients2_child_out_gate0.set_channel(channel);
-        let mut in_gate2_ref: ::des::net::GateRef = this
-            .gate("in", 2usize)
-            .expect(&{
-                let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                    &[
-                        "Internal macro err. Could not find local gate \'",
-                        "[",
-                        "]\'.",
-                    ],
-                    &[
-                        ::core::fmt::ArgumentV1::new_display(&"in"),
-                        ::core::fmt::ArgumentV1::new_display(&2usize),
-                    ],
-                ));
-                res
-            })
-            .clone();
-        let mut clients3_child_out_gate0: ::des::net::GateRef = clients3_child
-            .gate("out", 0usize)
-            .expect(&{
-                let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                    &[
-                        "Internal macro err. Could not find child gate \'",
-                        "[",
-                        "]\'.",
-                    ],
-                    &[
-                        ::core::fmt::ArgumentV1::new_display(&"out"),
-                        ::core::fmt::ArgumentV1::new_display(&0usize),
-                    ],
-                ));
-                res
-            })
-            .clone();
-        let channel = ::des::net::Channel::new(
-            ::des::net::ObjectPath::channel_with(
-                &{
-                    let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                        &["", "->"],
-                        &[
-                            ::core::fmt::ArgumentV1::new_display(&clients3_child_out_gate0.name()),
-                            ::core::fmt::ArgumentV1::new_display(&in_gate2_ref.name()),
-                        ],
-                    ));
-                    res
-                },
-                &this.path(),
-            ),
-            ::des::net::ChannelMetrics {
-                bitrate: 10000000usize,
-                latency: ::des::time::Duration::from_secs_f64(0.02f64),
-                jitter: ::des::time::Duration::from_secs_f64(0f64),
-                cost: 1f64,
-                queuesize: 4096usize,
-            },
-        );
-        ctx.create_channel(channel.clone());
-        clients3_child_out_gate0.set_next_gate(in_gate2_ref);
-        clients3_child_out_gate0.set_channel(channel);
-        let mut in_gate3_ref: ::des::net::GateRef = this
-            .gate("in", 3usize)
-            .expect(&{
-                let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                    &[
-                        "Internal macro err. Could not find local gate \'",
-                        "[",
-                        "]\'.",
-                    ],
-                    &[
-                        ::core::fmt::ArgumentV1::new_display(&"in"),
-                        ::core::fmt::ArgumentV1::new_display(&3usize),
-                    ],
-                ));
-                res
-            })
-            .clone();
-        let mut clients4_child_out_gate0: ::des::net::GateRef = clients4_child
-            .gate("out", 0usize)
-            .expect(&{
-                let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                    &[
-                        "Internal macro err. Could not find child gate \'",
-                        "[",
-                        "]\'.",
-                    ],
-                    &[
-                        ::core::fmt::ArgumentV1::new_display(&"out"),
-                        ::core::fmt::ArgumentV1::new_display(&0usize),
-                    ],
-                ));
-                res
-            })
-            .clone();
-        let channel = ::des::net::Channel::new(
-            ::des::net::ObjectPath::channel_with(
-                &{
-                    let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                        &["", "->"],
-                        &[
-                            ::core::fmt::ArgumentV1::new_display(&clients4_child_out_gate0.name()),
-                            ::core::fmt::ArgumentV1::new_display(&in_gate3_ref.name()),
-                        ],
-                    ));
-                    res
-                },
-                &this.path(),
-            ),
-            ::des::net::ChannelMetrics {
-                bitrate: 10000000usize,
-                latency: ::des::time::Duration::from_secs_f64(0.02f64),
-                jitter: ::des::time::Duration::from_secs_f64(0f64),
-                cost: 1f64,
-                queuesize: 4096usize,
-            },
-        );
-        ctx.create_channel(channel.clone());
-        clients4_child_out_gate0.set_next_gate(in_gate3_ref);
-        clients4_child_out_gate0.set_channel(channel);
-        let mut in_gate4_ref: ::des::net::GateRef = this
-            .gate("in", 4usize)
-            .expect(&{
-                let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                    &[
-                        "Internal macro err. Could not find local gate \'",
-                        "[",
-                        "]\'.",
-                    ],
-                    &[
-                        ::core::fmt::ArgumentV1::new_display(&"in"),
-                        ::core::fmt::ArgumentV1::new_display(&4usize),
-                    ],
-                ));
-                res
-            })
-            .clone();
-        let mut clients5_child_out_gate0: ::des::net::GateRef = clients5_child
-            .gate("out", 0usize)
-            .expect(&{
-                let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                    &[
-                        "Internal macro err. Could not find child gate \'",
-                        "[",
-                        "]\'.",
-                    ],
-                    &[
-                        ::core::fmt::ArgumentV1::new_display(&"out"),
-                        ::core::fmt::ArgumentV1::new_display(&0usize),
-                    ],
-                ));
-                res
-            })
-            .clone();
-        let channel = ::des::net::Channel::new(
-            ::des::net::ObjectPath::channel_with(
-                &{
-                    let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                        &["", "->"],
-                        &[
-                            ::core::fmt::ArgumentV1::new_display(&clients5_child_out_gate0.name()),
-                            ::core::fmt::ArgumentV1::new_display(&in_gate4_ref.name()),
-                        ],
-                    ));
-                    res
-                },
-                &this.path(),
-            ),
-            ::des::net::ChannelMetrics {
-                bitrate: 10000000usize,
-                latency: ::des::time::Duration::from_secs_f64(0.02f64),
-                jitter: ::des::time::Duration::from_secs_f64(0f64),
-                cost: 1f64,
-                queuesize: 4096usize,
-            },
-        );
-        ctx.create_channel(channel.clone());
-        clients5_child_out_gate0.set_next_gate(in_gate4_ref);
-        clients5_child_out_gate0.set_channel(channel);
-        let mut clients1_child_in_gate0: ::des::net::GateRef = clients1_child
-            .gate("in", 0usize)
-            .expect(&{
-                let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                    &[
-                        "Internal macro err. Could not find child gate \'",
-                        "[",
-                        "]\'.",
-                    ],
-                    &[
-                        ::core::fmt::ArgumentV1::new_display(&"in"),
-                        ::core::fmt::ArgumentV1::new_display(&0usize),
-                    ],
-                ));
-                res
-            })
-            .clone();
-        let mut out_gate0_ref: ::des::net::GateRef = this
-            .gate("out", 0usize)
-            .expect(&{
-                let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                    &[
-                        "Internal macro err. Could not find local gate \'",
-                        "[",
-                        "]\'.",
-                    ],
-                    &[
-                        ::core::fmt::ArgumentV1::new_display(&"out"),
-                        ::core::fmt::ArgumentV1::new_display(&0usize),
-                    ],
-                ));
-                res
-            })
-            .clone();
-        let channel = ::des::net::Channel::new(
-            ::des::net::ObjectPath::channel_with(
-                &{
-                    let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                        &["", "->"],
-                        &[
-                            ::core::fmt::ArgumentV1::new_display(&out_gate0_ref.name()),
-                            ::core::fmt::ArgumentV1::new_display(&clients1_child_in_gate0.name()),
-                        ],
-                    ));
-                    res
-                },
-                &this.path(),
-            ),
-            ::des::net::ChannelMetrics {
-                bitrate: 10000000usize,
-                latency: ::des::time::Duration::from_secs_f64(0.02f64),
-                jitter: ::des::time::Duration::from_secs_f64(0f64),
-                cost: 1f64,
-                queuesize: 4096usize,
-            },
-        );
-        ctx.create_channel(channel.clone());
-        out_gate0_ref.set_next_gate(clients1_child_in_gate0);
-        out_gate0_ref.set_channel(channel);
-        let mut clients2_child_in_gate0: ::des::net::GateRef = clients2_child
-            .gate("in", 0usize)
-            .expect(&{
-                let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                    &[
-                        "Internal macro err. Could not find child gate \'",
-                        "[",
-                        "]\'.",
-                    ],
-                    &[
-                        ::core::fmt::ArgumentV1::new_display(&"in"),
-                        ::core::fmt::ArgumentV1::new_display(&0usize),
-                    ],
-                ));
-                res
-            })
-            .clone();
-        let mut out_gate1_ref: ::des::net::GateRef = this
-            .gate("out", 1usize)
-            .expect(&{
-                let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                    &[
-                        "Internal macro err. Could not find local gate \'",
-                        "[",
-                        "]\'.",
-                    ],
-                    &[
-                        ::core::fmt::ArgumentV1::new_display(&"out"),
-                        ::core::fmt::ArgumentV1::new_display(&1usize),
-                    ],
-                ));
-                res
-            })
-            .clone();
-        let channel = ::des::net::Channel::new(
-            ::des::net::ObjectPath::channel_with(
-                &{
-                    let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                        &["", "->"],
-                        &[
-                            ::core::fmt::ArgumentV1::new_display(&out_gate1_ref.name()),
-                            ::core::fmt::ArgumentV1::new_display(&clients2_child_in_gate0.name()),
-                        ],
-                    ));
-                    res
-                },
-                &this.path(),
-            ),
-            ::des::net::ChannelMetrics {
-                bitrate: 10000000usize,
-                latency: ::des::time::Duration::from_secs_f64(0.02f64),
-                jitter: ::des::time::Duration::from_secs_f64(0f64),
-                cost: 1f64,
-                queuesize: 4096usize,
-            },
-        );
-        ctx.create_channel(channel.clone());
-        out_gate1_ref.set_next_gate(clients2_child_in_gate0);
-        out_gate1_ref.set_channel(channel);
-        let mut clients3_child_in_gate0: ::des::net::GateRef = clients3_child
-            .gate("in", 0usize)
-            .expect(&{
-                let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                    &[
-                        "Internal macro err. Could not find child gate \'",
-                        "[",
-                        "]\'.",
-                    ],
-                    &[
-                        ::core::fmt::ArgumentV1::new_display(&"in"),
-                        ::core::fmt::ArgumentV1::new_display(&0usize),
-                    ],
-                ));
-                res
-            })
-            .clone();
-        let mut out_gate2_ref: ::des::net::GateRef = this
-            .gate("out", 2usize)
-            .expect(&{
-                let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                    &[
-                        "Internal macro err. Could not find local gate \'",
-                        "[",
-                        "]\'.",
-                    ],
-                    &[
-                        ::core::fmt::ArgumentV1::new_display(&"out"),
-                        ::core::fmt::ArgumentV1::new_display(&2usize),
-                    ],
-                ));
-                res
-            })
-            .clone();
-        let channel = ::des::net::Channel::new(
-            ::des::net::ObjectPath::channel_with(
-                &{
-                    let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                        &["", "->"],
-                        &[
-                            ::core::fmt::ArgumentV1::new_display(&out_gate2_ref.name()),
-                            ::core::fmt::ArgumentV1::new_display(&clients3_child_in_gate0.name()),
-                        ],
-                    ));
-                    res
-                },
-                &this.path(),
-            ),
-            ::des::net::ChannelMetrics {
-                bitrate: 10000000usize,
-                latency: ::des::time::Duration::from_secs_f64(0.02f64),
-                jitter: ::des::time::Duration::from_secs_f64(0f64),
-                cost: 1f64,
-                queuesize: 4096usize,
-            },
-        );
-        ctx.create_channel(channel.clone());
-        out_gate2_ref.set_next_gate(clients3_child_in_gate0);
-        out_gate2_ref.set_channel(channel);
-        let mut clients4_child_in_gate0: ::des::net::GateRef = clients4_child
-            .gate("in", 0usize)
-            .expect(&{
-                let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                    &[
-                        "Internal macro err. Could not find child gate \'",
-                        "[",
-                        "]\'.",
-                    ],
-                    &[
-                        ::core::fmt::ArgumentV1::new_display(&"in"),
-                        ::core::fmt::ArgumentV1::new_display(&0usize),
-                    ],
-                ));
-                res
-            })
-            .clone();
-        let mut out_gate3_ref: ::des::net::GateRef = this
-            .gate("out", 3usize)
-            .expect(&{
-                let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                    &[
-                        "Internal macro err. Could not find local gate \'",
-                        "[",
-                        "]\'.",
-                    ],
-                    &[
-                        ::core::fmt::ArgumentV1::new_display(&"out"),
-                        ::core::fmt::ArgumentV1::new_display(&3usize),
-                    ],
-                ));
-                res
-            })
-            .clone();
-        let channel = ::des::net::Channel::new(
-            ::des::net::ObjectPath::channel_with(
-                &{
-                    let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                        &["", "->"],
-                        &[
-                            ::core::fmt::ArgumentV1::new_display(&out_gate3_ref.name()),
-                            ::core::fmt::ArgumentV1::new_display(&clients4_child_in_gate0.name()),
-                        ],
-                    ));
-                    res
-                },
-                &this.path(),
-            ),
-            ::des::net::ChannelMetrics {
-                bitrate: 10000000usize,
-                latency: ::des::time::Duration::from_secs_f64(0.02f64),
-                jitter: ::des::time::Duration::from_secs_f64(0f64),
-                cost: 1f64,
-                queuesize: 4096usize,
-            },
-        );
-        ctx.create_channel(channel.clone());
-        out_gate3_ref.set_next_gate(clients4_child_in_gate0);
-        out_gate3_ref.set_channel(channel);
-        let mut clients5_child_in_gate0: ::des::net::GateRef = clients5_child
-            .gate("in", 0usize)
-            .expect(&{
-                let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                    &[
-                        "Internal macro err. Could not find child gate \'",
-                        "[",
-                        "]\'.",
-                    ],
-                    &[
-                        ::core::fmt::ArgumentV1::new_display(&"in"),
-                        ::core::fmt::ArgumentV1::new_display(&0usize),
-                    ],
-                ));
-                res
-            })
-            .clone();
-        let mut out_gate4_ref: ::des::net::GateRef = this
-            .gate("out", 4usize)
-            .expect(&{
-                let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                    &[
-                        "Internal macro err. Could not find local gate \'",
-                        "[",
-                        "]\'.",
-                    ],
-                    &[
-                        ::core::fmt::ArgumentV1::new_display(&"out"),
-                        ::core::fmt::ArgumentV1::new_display(&4usize),
-                    ],
-                ));
-                res
-            })
-            .clone();
-        let channel = ::des::net::Channel::new(
-            ::des::net::ObjectPath::channel_with(
-                &{
-                    let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                        &["", "->"],
-                        &[
-                            ::core::fmt::ArgumentV1::new_display(&out_gate4_ref.name()),
-                            ::core::fmt::ArgumentV1::new_display(&clients5_child_in_gate0.name()),
-                        ],
-                    ));
-                    res
-                },
-                &this.path(),
-            ),
-            ::des::net::ChannelMetrics {
-                bitrate: 10000000usize,
-                latency: ::des::time::Duration::from_secs_f64(0.02f64),
-                jitter: ::des::time::Duration::from_secs_f64(0f64),
-                cost: 1f64,
-                queuesize: 4096usize,
-            },
-        );
-        ctx.create_channel(channel.clone());
-        out_gate4_ref.set_next_gate(clients5_child_in_gate0);
-        out_gate4_ref.set_channel(channel);
-        let mut in_server_gate0_ref: ::des::net::GateRef = this
-            .gate("in_server", 0usize)
-            .expect(&{
-                let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                    &[
-                        "Internal macro err. Could not find local gate \'",
-                        "[",
-                        "]\'.",
-                    ],
-                    &[
-                        ::core::fmt::ArgumentV1::new_display(&"in_server"),
-                        ::core::fmt::ArgumentV1::new_display(&0usize),
-                    ],
-                ));
-                res
-            })
-            .clone();
-        let mut server_child_out_gate0: ::des::net::GateRef = server_child
-            .gate("out", 0usize)
-            .expect(&{
-                let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                    &[
-                        "Internal macro err. Could not find child gate \'",
-                        "[",
-                        "]\'.",
-                    ],
-                    &[
-                        ::core::fmt::ArgumentV1::new_display(&"out"),
-                        ::core::fmt::ArgumentV1::new_display(&0usize),
-                    ],
-                ));
-                res
-            })
-            .clone();
-        let channel = ::des::net::Channel::new(
-            ::des::net::ObjectPath::channel_with(
-                &{
-                    let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                        &["", "->"],
-                        &[
-                            ::core::fmt::ArgumentV1::new_display(&server_child_out_gate0.name()),
-                            ::core::fmt::ArgumentV1::new_display(&in_server_gate0_ref.name()),
-                        ],
-                    ));
-                    res
-                },
-                &this.path(),
-            ),
-            ::des::net::ChannelMetrics {
-                bitrate: 10000000usize,
-                latency: ::des::time::Duration::from_secs_f64(0.02f64),
-                jitter: ::des::time::Duration::from_secs_f64(0f64),
-                cost: 1f64,
-                queuesize: 4096usize,
-            },
-        );
-        ctx.create_channel(channel.clone());
-        server_child_out_gate0.set_next_gate(in_server_gate0_ref);
-        server_child_out_gate0.set_channel(channel);
-        let mut server_child_in_gate0: ::des::net::GateRef = server_child
-            .gate("in", 0usize)
-            .expect(&{
-                let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                    &[
-                        "Internal macro err. Could not find child gate \'",
-                        "[",
-                        "]\'.",
-                    ],
-                    &[
-                        ::core::fmt::ArgumentV1::new_display(&"in"),
-                        ::core::fmt::ArgumentV1::new_display(&0usize),
-                    ],
-                ));
-                res
-            })
-            .clone();
-        let mut out_server_gate0_ref: ::des::net::GateRef = this
-            .gate("out_server", 0usize)
-            .expect(&{
-                let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                    &[
-                        "Internal macro err. Could not find local gate \'",
-                        "[",
-                        "]\'.",
-                    ],
-                    &[
-                        ::core::fmt::ArgumentV1::new_display(&"out_server"),
-                        ::core::fmt::ArgumentV1::new_display(&0usize),
-                    ],
-                ));
-                res
-            })
-            .clone();
-        let channel = ::des::net::Channel::new(
-            ::des::net::ObjectPath::channel_with(
-                &{
-                    let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
-                        &["", "->"],
-                        &[
-                            ::core::fmt::ArgumentV1::new_display(&out_server_gate0_ref.name()),
-                            ::core::fmt::ArgumentV1::new_display(&server_child_in_gate0.name()),
-                        ],
-                    ));
-                    res
-                },
-                &this.path(),
-            ),
-            ::des::net::ChannelMetrics {
-                bitrate: 10000000usize,
-                latency: ::des::time::Duration::from_secs_f64(0.02f64),
-                jitter: ::des::time::Duration::from_secs_f64(0f64),
-                cost: 1f64,
-                queuesize: 4096usize,
-            },
-        );
-        ctx.create_channel(channel.clone());
-        out_server_gate0_ref.set_next_gate(server_child_in_gate0);
-        out_server_gate0_ref.set_channel(channel);
-        ctx.create_module(clients1_child);
-        ctx.create_module(clients2_child);
-        ctx.create_module(clients3_child);
-        ctx.create_module(clients4_child);
-        ctx.create_module(clients5_child);
-        ctx.create_module(server_child);
-        this
-    }
-}
-impl Module for Router {
-    fn new() -> Self {
-        Self {
-            fwd: HashMap::new(),
+mod members {
+    use des::prelude::*;
+    use log::info;
+    use std::ops::Deref;
+    pub struct Alice();
+    impl ::des::net::__Buildable0 for Alice {
+        fn build<A>(
+            mut this: ::des::net::ModuleRef,
+            ctx: &mut ::des::net::BuildContext<'_, A>,
+        ) -> ::des::net::ModuleRef {
+            use des::net::*;
+            let _ =
+                this.create_gate_cluster("netIn", 3usize, ::des::net::GateServiceType::Undefined);
+            let _ =
+                this.create_gate_cluster("netOut", 3usize, ::des::net::GateServiceType::Undefined);
+            this
         }
     }
-    fn handle_message(&mut self, msg: Message) {
-        match msg.header().kind {
-            10 => {
-                let (addr, meta) = msg.cast::<IpAddr>();
-                let last_gate = meta.last_gate.as_ref().unwrap();
-                let last_gate = match last_gate.name() {
-                    "in" => gate("out", last_gate.pos()),
-                    "in_server" => gate("out_server", 0),
-                    _ => ::core::panicking::panic("internal error: entered unreachable code"),
+    #[automatically_derived]
+    impl ::core::fmt::Debug for Alice {
+        fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+            ::core::fmt::Formatter::write_str(f, "Alice")
+        }
+    }
+    impl Module for Alice {
+        fn new() -> Self {
+            Self()
+        }
+        fn handle_message(&mut self, msg: Message) {
+            let mut pkt = msg;
+            {
+                let lvl = ::log::Level::Info;
+                if lvl <= ::log::STATIC_MAX_LEVEL && lvl <= ::log::max_level() {
+                    ::log::__private_api_log(
+                        ::core::fmt::Arguments::new_v1(
+                            &["Received at ", ": Message with content: "],
+                            &[
+                                ::core::fmt::ArgumentV1::new_display(&sim_time()),
+                                ::core::fmt::ArgumentV1::new_display(
+                                    &pkt.content::<String>().deref(),
+                                ),
+                            ],
+                        ),
+                        lvl,
+                        &(
+                            "t_utils::members",
+                            "t_utils::members",
+                            "examples\\utils\\members.rs",
+                            18u32,
+                        ),
+                        ::log::__private_api::Option::None,
+                    );
                 }
-                .unwrap();
-                {
-                    let lvl = ::log::Level::Info;
-                    if lvl <= ::log::STATIC_MAX_LEVEL && lvl <= ::log::max_level() {
-                        ::log::__private_api_log(
-                            ::core::fmt::Arguments::new_v1(
-                                &["Added fwd entry for ", " --> "],
-                                &[
-                                    ::core::fmt::ArgumentV1::new_display(&addr),
-                                    ::core::fmt::ArgumentV1::new_debug(&last_gate.str()),
-                                ],
-                            ),
-                            lvl,
-                            &("t_net", "t_net", "examples\\net/main.rs", 164u32),
-                            ::log::__private_api::Option::None,
-                        );
-                    }
-                };
-                self.fwd.insert(addr, last_gate);
-            }
-            _ => {
-                let dest = msg.header().dest_addr.ip();
-                let gate = self.fwd.get(&dest).unwrap().clone();
-                send(msg, gate)
+            };
+            if pkt.header().hop_count > par("limit").unwrap().parse::<usize>().unwrap() {
+            } else {
+                pkt.register_hop();
+                send(pkt, ("netOut", 0))
             }
         }
     }
+    pub struct Bob();
+    impl ::des::net::__Buildable0 for Bob {
+        fn build<A>(
+            mut this: ::des::net::ModuleRef,
+            ctx: &mut ::des::net::BuildContext<'_, A>,
+        ) -> ::des::net::ModuleRef {
+            use des::net::*;
+            let mut child_child: ::des::net::ModuleRef =
+                Alice::build_named_with_parent("child", this.clone(), ctx);
+            let _ =
+                this.create_gate_cluster("netIn", 3usize, ::des::net::GateServiceType::Undefined);
+            let _ =
+                this.create_gate_cluster("netOut", 3usize, ::des::net::GateServiceType::Undefined);
+            let _ = this.create_gate_cluster("uplink", 1usize, ::des::net::GateServiceType::Output);
+            let _ =
+                this.create_gate_cluster("downlink", 1usize, ::des::net::GateServiceType::Input);
+            let mut child_child_netIn_gate0: ::des::net::GateRef = child_child
+                .gate("netIn", 0usize)
+                .expect(&{
+                    let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
+                        &[
+                            "Internal macro err. Could not find child gate \'",
+                            "[",
+                            "]\'.",
+                        ],
+                        &[
+                            ::core::fmt::ArgumentV1::new_display(&"netIn"),
+                            ::core::fmt::ArgumentV1::new_display(&0usize),
+                        ],
+                    ));
+                    res
+                })
+                .clone();
+            let mut netOut_gate0_ref: ::des::net::GateRef = this
+                .gate("netOut", 0usize)
+                .expect(&{
+                    let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
+                        &[
+                            "Internal macro err. Could not find local gate \'",
+                            "[",
+                            "]\'.",
+                        ],
+                        &[
+                            ::core::fmt::ArgumentV1::new_display(&"netOut"),
+                            ::core::fmt::ArgumentV1::new_display(&0usize),
+                        ],
+                    ));
+                    res
+                })
+                .clone();
+            let channel = ::des::net::Channel::new(
+                ::des::net::ObjectPath::channel_with(
+                    &{
+                        let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
+                            &["", "->"],
+                            &[
+                                ::core::fmt::ArgumentV1::new_display(&netOut_gate0_ref.name()),
+                                ::core::fmt::ArgumentV1::new_display(
+                                    &child_child_netIn_gate0.name(),
+                                ),
+                            ],
+                        ));
+                        res
+                    },
+                    &this.path(),
+                ),
+                ::des::net::ChannelMetrics {
+                    bitrate: 100usize,
+                    latency: ::des::time::Duration::from_secs_f64(0.1f64),
+                    jitter: ::des::time::Duration::from_secs_f64(0.1f64),
+                    cost: 1f64,
+                    queuesize: 0usize,
+                },
+            );
+            ctx.create_channel(channel.clone());
+            netOut_gate0_ref.set_next_gate(child_child_netIn_gate0);
+            netOut_gate0_ref.set_channel(channel);
+            let mut child_child_netIn_gate1: ::des::net::GateRef = child_child
+                .gate("netIn", 1usize)
+                .expect(&{
+                    let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
+                        &[
+                            "Internal macro err. Could not find child gate \'",
+                            "[",
+                            "]\'.",
+                        ],
+                        &[
+                            ::core::fmt::ArgumentV1::new_display(&"netIn"),
+                            ::core::fmt::ArgumentV1::new_display(&1usize),
+                        ],
+                    ));
+                    res
+                })
+                .clone();
+            let mut netOut_gate1_ref: ::des::net::GateRef = this
+                .gate("netOut", 1usize)
+                .expect(&{
+                    let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
+                        &[
+                            "Internal macro err. Could not find local gate \'",
+                            "[",
+                            "]\'.",
+                        ],
+                        &[
+                            ::core::fmt::ArgumentV1::new_display(&"netOut"),
+                            ::core::fmt::ArgumentV1::new_display(&1usize),
+                        ],
+                    ));
+                    res
+                })
+                .clone();
+            let channel = ::des::net::Channel::new(
+                ::des::net::ObjectPath::channel_with(
+                    &{
+                        let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
+                            &["", "->"],
+                            &[
+                                ::core::fmt::ArgumentV1::new_display(&netOut_gate1_ref.name()),
+                                ::core::fmt::ArgumentV1::new_display(
+                                    &child_child_netIn_gate1.name(),
+                                ),
+                            ],
+                        ));
+                        res
+                    },
+                    &this.path(),
+                ),
+                ::des::net::ChannelMetrics {
+                    bitrate: 100usize,
+                    latency: ::des::time::Duration::from_secs_f64(0.1f64),
+                    jitter: ::des::time::Duration::from_secs_f64(0.1f64),
+                    cost: 1f64,
+                    queuesize: 0usize,
+                },
+            );
+            ctx.create_channel(channel.clone());
+            netOut_gate1_ref.set_next_gate(child_child_netIn_gate1);
+            netOut_gate1_ref.set_channel(channel);
+            let mut child_child_netIn_gate2: ::des::net::GateRef = child_child
+                .gate("netIn", 2usize)
+                .expect(&{
+                    let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
+                        &[
+                            "Internal macro err. Could not find child gate \'",
+                            "[",
+                            "]\'.",
+                        ],
+                        &[
+                            ::core::fmt::ArgumentV1::new_display(&"netIn"),
+                            ::core::fmt::ArgumentV1::new_display(&2usize),
+                        ],
+                    ));
+                    res
+                })
+                .clone();
+            let mut netOut_gate2_ref: ::des::net::GateRef = this
+                .gate("netOut", 2usize)
+                .expect(&{
+                    let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
+                        &[
+                            "Internal macro err. Could not find local gate \'",
+                            "[",
+                            "]\'.",
+                        ],
+                        &[
+                            ::core::fmt::ArgumentV1::new_display(&"netOut"),
+                            ::core::fmt::ArgumentV1::new_display(&2usize),
+                        ],
+                    ));
+                    res
+                })
+                .clone();
+            let channel = ::des::net::Channel::new(
+                ::des::net::ObjectPath::channel_with(
+                    &{
+                        let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
+                            &["", "->"],
+                            &[
+                                ::core::fmt::ArgumentV1::new_display(&netOut_gate2_ref.name()),
+                                ::core::fmt::ArgumentV1::new_display(
+                                    &child_child_netIn_gate2.name(),
+                                ),
+                            ],
+                        ));
+                        res
+                    },
+                    &this.path(),
+                ),
+                ::des::net::ChannelMetrics {
+                    bitrate: 100usize,
+                    latency: ::des::time::Duration::from_secs_f64(0.1f64),
+                    jitter: ::des::time::Duration::from_secs_f64(0.1f64),
+                    cost: 1f64,
+                    queuesize: 0usize,
+                },
+            );
+            ctx.create_channel(channel.clone());
+            netOut_gate2_ref.set_next_gate(child_child_netIn_gate2);
+            netOut_gate2_ref.set_channel(channel);
+            let mut netIn_gate0_ref: ::des::net::GateRef = this
+                .gate("netIn", 0usize)
+                .expect(&{
+                    let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
+                        &[
+                            "Internal macro err. Could not find local gate \'",
+                            "[",
+                            "]\'.",
+                        ],
+                        &[
+                            ::core::fmt::ArgumentV1::new_display(&"netIn"),
+                            ::core::fmt::ArgumentV1::new_display(&0usize),
+                        ],
+                    ));
+                    res
+                })
+                .clone();
+            let mut child_child_netOut_gate0: ::des::net::GateRef = child_child
+                .gate("netOut", 0usize)
+                .expect(&{
+                    let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
+                        &[
+                            "Internal macro err. Could not find child gate \'",
+                            "[",
+                            "]\'.",
+                        ],
+                        &[
+                            ::core::fmt::ArgumentV1::new_display(&"netOut"),
+                            ::core::fmt::ArgumentV1::new_display(&0usize),
+                        ],
+                    ));
+                    res
+                })
+                .clone();
+            let channel = ::des::net::Channel::new(
+                ::des::net::ObjectPath::channel_with(
+                    &{
+                        let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
+                            &["", "->"],
+                            &[
+                                ::core::fmt::ArgumentV1::new_display(
+                                    &child_child_netOut_gate0.name(),
+                                ),
+                                ::core::fmt::ArgumentV1::new_display(&netIn_gate0_ref.name()),
+                            ],
+                        ));
+                        res
+                    },
+                    &this.path(),
+                ),
+                ::des::net::ChannelMetrics {
+                    bitrate: 100usize,
+                    latency: ::des::time::Duration::from_secs_f64(0.1f64),
+                    jitter: ::des::time::Duration::from_secs_f64(0.1f64),
+                    cost: 1f64,
+                    queuesize: 0usize,
+                },
+            );
+            ctx.create_channel(channel.clone());
+            child_child_netOut_gate0.set_next_gate(netIn_gate0_ref);
+            child_child_netOut_gate0.set_channel(channel);
+            let mut netIn_gate1_ref: ::des::net::GateRef = this
+                .gate("netIn", 1usize)
+                .expect(&{
+                    let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
+                        &[
+                            "Internal macro err. Could not find local gate \'",
+                            "[",
+                            "]\'.",
+                        ],
+                        &[
+                            ::core::fmt::ArgumentV1::new_display(&"netIn"),
+                            ::core::fmt::ArgumentV1::new_display(&1usize),
+                        ],
+                    ));
+                    res
+                })
+                .clone();
+            let mut child_child_netOut_gate1: ::des::net::GateRef = child_child
+                .gate("netOut", 1usize)
+                .expect(&{
+                    let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
+                        &[
+                            "Internal macro err. Could not find child gate \'",
+                            "[",
+                            "]\'.",
+                        ],
+                        &[
+                            ::core::fmt::ArgumentV1::new_display(&"netOut"),
+                            ::core::fmt::ArgumentV1::new_display(&1usize),
+                        ],
+                    ));
+                    res
+                })
+                .clone();
+            let channel = ::des::net::Channel::new(
+                ::des::net::ObjectPath::channel_with(
+                    &{
+                        let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
+                            &["", "->"],
+                            &[
+                                ::core::fmt::ArgumentV1::new_display(
+                                    &child_child_netOut_gate1.name(),
+                                ),
+                                ::core::fmt::ArgumentV1::new_display(&netIn_gate1_ref.name()),
+                            ],
+                        ));
+                        res
+                    },
+                    &this.path(),
+                ),
+                ::des::net::ChannelMetrics {
+                    bitrate: 100usize,
+                    latency: ::des::time::Duration::from_secs_f64(0.1f64),
+                    jitter: ::des::time::Duration::from_secs_f64(0.1f64),
+                    cost: 1f64,
+                    queuesize: 0usize,
+                },
+            );
+            ctx.create_channel(channel.clone());
+            child_child_netOut_gate1.set_next_gate(netIn_gate1_ref);
+            child_child_netOut_gate1.set_channel(channel);
+            let mut netIn_gate2_ref: ::des::net::GateRef = this
+                .gate("netIn", 2usize)
+                .expect(&{
+                    let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
+                        &[
+                            "Internal macro err. Could not find local gate \'",
+                            "[",
+                            "]\'.",
+                        ],
+                        &[
+                            ::core::fmt::ArgumentV1::new_display(&"netIn"),
+                            ::core::fmt::ArgumentV1::new_display(&2usize),
+                        ],
+                    ));
+                    res
+                })
+                .clone();
+            let mut child_child_netOut_gate2: ::des::net::GateRef = child_child
+                .gate("netOut", 2usize)
+                .expect(&{
+                    let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
+                        &[
+                            "Internal macro err. Could not find child gate \'",
+                            "[",
+                            "]\'.",
+                        ],
+                        &[
+                            ::core::fmt::ArgumentV1::new_display(&"netOut"),
+                            ::core::fmt::ArgumentV1::new_display(&2usize),
+                        ],
+                    ));
+                    res
+                })
+                .clone();
+            let channel = ::des::net::Channel::new(
+                ::des::net::ObjectPath::channel_with(
+                    &{
+                        let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
+                            &["", "->"],
+                            &[
+                                ::core::fmt::ArgumentV1::new_display(
+                                    &child_child_netOut_gate2.name(),
+                                ),
+                                ::core::fmt::ArgumentV1::new_display(&netIn_gate2_ref.name()),
+                            ],
+                        ));
+                        res
+                    },
+                    &this.path(),
+                ),
+                ::des::net::ChannelMetrics {
+                    bitrate: 100usize,
+                    latency: ::des::time::Duration::from_secs_f64(0.1f64),
+                    jitter: ::des::time::Duration::from_secs_f64(0.1f64),
+                    cost: 1f64,
+                    queuesize: 0usize,
+                },
+            );
+            ctx.create_channel(channel.clone());
+            child_child_netOut_gate2.set_next_gate(netIn_gate2_ref);
+            child_child_netOut_gate2.set_channel(channel);
+            ctx.create_module(child_child);
+            this
+        }
+    }
+    #[automatically_derived]
+    impl ::core::fmt::Debug for Bob {
+        fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+            ::core::fmt::Formatter::write_str(f, "Bob")
+        }
+    }
+    impl Module for Bob {
+        fn new() -> Self {
+            Self()
+        }
+        fn num_sim_start_stages(&self) -> usize {
+            2
+        }
+        fn at_sim_start(&mut self, stage: usize) {
+            match stage {
+                0 => {
+                    {
+                        let lvl = ::log::Level::Info;
+                        if lvl <= ::log::STATIC_MAX_LEVEL && lvl <= ::log::max_level() {
+                            ::log::__private_api_log(
+                                ::core::fmt::Arguments::new_v1(&["Initalizing"], &[]),
+                                lvl,
+                                &(
+                                    "t_utils::members",
+                                    "t_utils::members",
+                                    "examples\\utils\\members.rs",
+                                    49u32,
+                                ),
+                                ::log::__private_api::Option::None,
+                            );
+                        }
+                    };
+                    send(
+                        Message::new().kind(1).content("Ping".to_string()).build(),
+                        ("netOut", 2),
+                    );
+                }
+                1 => {}
+                _ => ::core::panicking::panic("internal error: entered unreachable code"),
+            }
+        }
+        fn handle_message(&mut self, msg: Message) {
+            let mut pkt = msg;
+            pkt.register_hop();
+            {
+                let lvl = ::log::Level::Info;
+                if lvl <= ::log::STATIC_MAX_LEVEL && lvl <= ::log::max_level() {
+                    ::log::__private_api_log(
+                        ::core::fmt::Arguments::new_v1(
+                            &["Received at ", ": Message with content: "],
+                            &[
+                                ::core::fmt::ArgumentV1::new_display(&sim_time()),
+                                ::core::fmt::ArgumentV1::new_display(
+                                    &pkt.content::<String>().deref(),
+                                ),
+                            ],
+                        ),
+                        lvl,
+                        &(
+                            "t_utils::members",
+                            "t_utils::members",
+                            "examples\\utils\\members.rs",
+                            71u32,
+                        ),
+                        ::log::__private_api::Option::None,
+                    );
+                }
+            };
+            pkt.content_mut::<String>().push_str(&par("char").unwrap());
+            send(pkt, ("netOut", 2));
+        }
+    }
 }
-struct Main {
-    __core: ::des::net::SubsystemCore,
-}
+use members::*;
+struct A();
 #[automatically_derived]
-impl ::core::fmt::Debug for Main {
+impl ::core::fmt::Debug for A {
     fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-        ::core::fmt::Formatter::debug_struct_field1_finish(f, "Main", "__core", &&self.__core)
+        ::core::fmt::Formatter::write_str(f, "A")
     }
 }
 #[automatically_derived]
-impl ::core::default::Default for Main {
+impl ::core::default::Default for A {
     #[inline]
-    fn default() -> Main {
-        Main {
-            __core: ::core::default::Default::default(),
-        }
+    fn default() -> A {
+        A {}
     }
 }
-impl ::std::ops::Deref for Main {
-    type Target = ::des::net::SubsystemCore;
-    fn deref(&self) -> &Self::Target {
-        &self.__core
-    }
-}
-impl ::std::ops::DerefMut for Main {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.__core
-    }
-}
-impl Main {
-    pub fn run(self) -> ::des::runtime::RuntimeResult<Self> {
+impl A {
+    pub fn run(self) -> ::des::runtime::RuntimeResult<::des::net::SubsystemRef> {
         self.run_with_options(::des::runtime::RuntimeOptions::default())
     }
     pub fn run_with_options(
         self,
         options: ::des::runtime::RuntimeOptions,
-    ) -> ::des::runtime::RuntimeResult<Self> {
-        use ::des::runtime::Runtime;
-        use ::des::net::NetworkRuntime;
+    ) -> ::des::runtime::RuntimeResult<::des::net::SubsystemRef> {
+        use des::net::NetworkRuntime;
+        use des::runtime::Runtime;
         let net_rt = self.build_rt();
         let rt = Runtime::new_with(net_rt, options);
         rt.run().map_app(|network_app| network_app.finish())
     }
-    pub fn build_rt(self) -> ::des::net::NetworkRuntime<Self> {
+    pub fn build_rt(self) -> ::des::net::NetworkRuntime<::des::net::SubsystemRef> {
         let this = self;
-        let this_path = this.path().clone();
-        let mut runtime = ::des::net::NetworkRuntime::new(this);
-        let inner = ::des::util::Ptr::clone(&runtime.inner);
+        let this = ::des::net::SubsystemRef::main(this);
+        let this_path = this.path();
+        let mut runtime = ::des::net::NetworkRuntime::new(this.clone());
         let mut builder = ::des::net::BuildContext::new(&mut runtime);
-        builder.push_subsystem(inner);
-        let ctx: &mut ::des::net::BuildContext<'_, Self> = &mut builder;
-        use ::des::net::*;
-        ctx.include_par_file("examples/net\\Main.par");
-        let mut root_child: ::des::net::ModuleRef =
-            Router::build_named("root".parse().unwrap(), ctx);
-        ctx.create_module(root_child);
+        builder.push_subsystem(this);
+        let ctx: &mut ::des::net::BuildContext<'_, SubsystemRef> = &mut builder;
+        use des::net::*;
+        ctx.include_par_file("examples/utils\\init.par");
+        let mut bob1_child: ::des::net::ModuleRef =
+            Bob::build_named("bob[1]".parse().unwrap(), ctx);
+        let mut bob2_child: ::des::net::ModuleRef =
+            Bob::build_named("bob[2]".parse().unwrap(), ctx);
+        let mut bob1_child_uplink_gate0: ::des::net::GateRef = bob1_child
+            .gate("uplink", 0usize)
+            .expect(&{
+                let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
+                    &[
+                        "Internal macro err. Could not find child gate \'",
+                        "[",
+                        "]\'.",
+                    ],
+                    &[
+                        ::core::fmt::ArgumentV1::new_display(&"uplink"),
+                        ::core::fmt::ArgumentV1::new_display(&0usize),
+                    ],
+                ));
+                res
+            })
+            .clone();
+        let mut bob2_child_downlink_gate0: ::des::net::GateRef = bob2_child
+            .gate("downlink", 0usize)
+            .expect(&{
+                let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
+                    &[
+                        "Internal macro err. Could not find child gate \'",
+                        "[",
+                        "]\'.",
+                    ],
+                    &[
+                        ::core::fmt::ArgumentV1::new_display(&"downlink"),
+                        ::core::fmt::ArgumentV1::new_display(&0usize),
+                    ],
+                ));
+                res
+            })
+            .clone();
+        let channel = ::des::net::Channel::new(
+            ::des::net::ObjectPath::channel_with(
+                &{
+                    let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
+                        &["", "->"],
+                        &[
+                            ::core::fmt::ArgumentV1::new_display(&bob1_child_uplink_gate0.name()),
+                            ::core::fmt::ArgumentV1::new_display(&bob2_child_downlink_gate0.name()),
+                        ],
+                    ));
+                    res
+                },
+                &this_path,
+            ),
+            ::des::net::ChannelMetrics {
+                bitrate: 10000usize,
+                latency: ::des::time::Duration::from_secs_f64(0.05f64),
+                jitter: ::des::time::Duration::from_secs_f64(0.01f64),
+                cost: 1f64,
+                queuesize: 0usize,
+            },
+        );
+        bob1_child_uplink_gate0.set_next_gate(bob2_child_downlink_gate0);
+        bob1_child_uplink_gate0.set_channel(channel);
+        let mut bob2_child_uplink_gate0: ::des::net::GateRef = bob2_child
+            .gate("uplink", 0usize)
+            .expect(&{
+                let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
+                    &[
+                        "Internal macro err. Could not find child gate \'",
+                        "[",
+                        "]\'.",
+                    ],
+                    &[
+                        ::core::fmt::ArgumentV1::new_display(&"uplink"),
+                        ::core::fmt::ArgumentV1::new_display(&0usize),
+                    ],
+                ));
+                res
+            })
+            .clone();
+        let mut bob1_child_downlink_gate0: ::des::net::GateRef = bob1_child
+            .gate("downlink", 0usize)
+            .expect(&{
+                let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
+                    &[
+                        "Internal macro err. Could not find child gate \'",
+                        "[",
+                        "]\'.",
+                    ],
+                    &[
+                        ::core::fmt::ArgumentV1::new_display(&"downlink"),
+                        ::core::fmt::ArgumentV1::new_display(&0usize),
+                    ],
+                ));
+                res
+            })
+            .clone();
+        let channel = ::des::net::Channel::new(
+            ::des::net::ObjectPath::channel_with(
+                &{
+                    let res = ::alloc::fmt::format(::core::fmt::Arguments::new_v1(
+                        &["", "->"],
+                        &[
+                            ::core::fmt::ArgumentV1::new_display(&bob2_child_uplink_gate0.name()),
+                            ::core::fmt::ArgumentV1::new_display(&bob1_child_downlink_gate0.name()),
+                        ],
+                    ));
+                    res
+                },
+                &this_path,
+            ),
+            ::des::net::ChannelMetrics {
+                bitrate: 10000usize,
+                latency: ::des::time::Duration::from_secs_f64(0.05f64),
+                jitter: ::des::time::Duration::from_secs_f64(0.01f64),
+                cost: 1f64,
+                queuesize: 0usize,
+            },
+        );
+        bob2_child_uplink_gate0.set_next_gate(bob1_child_downlink_gate0);
+        bob2_child_uplink_gate0.set_channel(channel);
+        ctx.create_module(bob1_child);
+        ctx.create_module(bob2_child);
         runtime
     }
 }
 fn main() {
-    let app = Main::default().build_rt();
-    let rt = Runtime::new_with(
-        app,
-        RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(10000))),
-    );
-    let (_, _, profiler, _) = rt.run().unwrap_premature_abort();
-    profiler
-        .write_to(
-            ProfilerOutputTarget::new()
-                .write_into("net.output")
-                .write_event_count_into("net.event_count.json"),
-        )
-        .unwrap();
+    let app = A::default().build_rt();
+    let rt = Runtime::new_with(app, RuntimeOptions::seeded(0x123).quiet());
+    let (app, time, p) = rt.run().unwrap();
+    let topo = app.globals().topology.borrow().clone();
+    match (&topo.nodes().count(), &4) {
+        (left_val, right_val) => {
+            if !(*left_val == *right_val) {
+                let kind = ::core::panicking::AssertKind::Eq;
+                ::core::panicking::assert_failed(
+                    kind,
+                    &*left_val,
+                    &*right_val,
+                    ::core::option::Option::None,
+                );
+            }
+        }
+    };
+    match (&topo.edges().count(), &14) {
+        (left_val, right_val) => {
+            if !(*left_val == *right_val) {
+                let kind = ::core::panicking::AssertKind::Eq;
+                ::core::panicking::assert_failed(
+                    kind,
+                    &*left_val,
+                    &*right_val,
+                    ::core::option::Option::None,
+                );
+            }
+        }
+    };
+    let _ = topo.write_to_svg("examples/utils/graph");
+    match (&p.event_count, &94) {
+        (left_val, right_val) => {
+            if !(*left_val == *right_val) {
+                let kind = ::core::panicking::AssertKind::Eq;
+                ::core::panicking::assert_failed(
+                    kind,
+                    &*left_val,
+                    &*right_val,
+                    ::core::option::Option::None,
+                );
+            }
+        }
+    };
+    if !time.eq_approx(
+        ::des::time::SimTime::from_duration(std::time::Duration::from_secs_f64(45.0)),
+        std::time::Duration::from_nanos(100),
+    ) {
+        :: core :: panicking :: panic ("assertion failed: time.eq_approx(::des::time::SimTime::from_duration(std::time::Duration::from_secs_f64(45.0)),\\n    std::time::Duration::from_nanos(100))")
+    }
 }

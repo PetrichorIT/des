@@ -70,11 +70,12 @@ macro_rules! impl_buildable {
                 Self: 'static + Module + Sized,
         {
             let core = Arc::new(ModuleContext::standalone(path));
+            ModuleContext::place(Arc::clone(&core));
 
             let this = <Self as Module>::new();
             let mref = ModuleRef::new(core, this);
 
-            mref.activate();
+            // mref.activate();
             Self::build::<A$(,$g)*>(mref, rt)
         }
 
@@ -88,11 +89,12 @@ macro_rules! impl_buildable {
                 Self: 'static +  Module + Sized,
         {
             let core = Arc::new(ModuleContext::child_of(name, parent));
+            ModuleContext::place(Arc::clone(&core));
 
             let this = <Self as Module>::new();
             let mref = ModuleRef::new(core, this);
 
-            mref.activate();
+            // mref.activate();
             Self::build::<A$(,$g)*>(mref, rt)
         }
     };
@@ -118,12 +120,13 @@ pub trait __Buildable0 {
         Self: 'static + Module + Sized,
     {
         let core = Arc::new(ModuleContext::standalone(path));
+        ModuleContext::place(Arc::clone(&core));
         // TODO: Maybe activate the core here to provide funtionality witin user defined call of new
 
         let this = <Self as Module>::new();
         let mref = ModuleRef::new(core, this);
 
-        mref.activate();
+        // mref.activate();
         Self::build(mref, ctx)
     }
 
@@ -136,12 +139,13 @@ pub trait __Buildable0 {
         Self: 'static + Module + Sized,
     {
         let core = Arc::new(ModuleContext::child_of(name, parent));
+        ModuleContext::place(Arc::clone(&core));
         // TODO: Maybe activate the core here to provide funtionality witin user defined call of new
 
         let this = <Self as Module>::new();
         let mref = ModuleRef::new(core, this);
 
-        mref.activate();
+        // mref.activate();
         Self::build(mref, ctx)
     }
 }

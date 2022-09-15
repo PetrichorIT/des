@@ -17,7 +17,7 @@ fn main() {
         RuntimeOptions::seeded(0x123)
     };
 
-    let app: NetworkRuntime<A> = A::default().build_rt();
+    let app = A::default().build_rt();
 
     let ids: Vec<ModuleRef> = (1..=100)
         .map(|n| app.module(|m| m.name() == format!("bob[{}]", n)).unwrap())

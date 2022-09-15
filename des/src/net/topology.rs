@@ -7,7 +7,7 @@ use super::ModuleRef;
 ///
 /// A mapping of the runtimes modules, and their connections.
 ///
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Topology {
     // A mapping (index --> Module)
     nodes: Vec<NodeDefinition>,
