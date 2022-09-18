@@ -12,12 +12,19 @@ use std::{
 static PERIODIC_HOOK_ID: AtomicU16 = AtomicU16::new(0);
 
 /// A hook for running a certain calculation once in a periodic manner.
+///
+/// This hook can create a periodic F activity with a custom state S.
+/// Upon creation the first wakup is scheduled with a period
+/// provided by the caller.
+///
+/// Call deactivate to stop the periodic activity.
 #[derive(Debug)]
 pub struct PeriodicHook<S, F: Fn(&mut S)> {
     f: F,
     unique_id: u16,
     period: Duration,
     state: S,
+    active: bool,
 }
 
 impl<S: Any, F: Fn(&mut S)> PeriodicHook<S, F> {
@@ -28,31 +35,45 @@ impl<S: Any, F: Fn(&mut S)> PeriodicHook<S, F> {
             state,
             period,
             unique_id: PERIODIC_HOOK_ID.fetch_add(1, SeqCst),
+            active: true,
         };
 
+        log::trace!(
+            "<PeriodicActivityHook> Created hook #{} with period {:?}",
+            this.unique_id,
+            this.period
+        );
         this.send_wakeup();
         this
     }
 
+    /// Removes all future wakeups.
+    pub fn deactivate(&mut self) {
+        self.active = false;
+    }
+
     fn send_wakeup(&self) {
-        schedule_in(
-            Message::new()
-                .typ(TYP_HOOK_PERIODIC)
-                .id(self.unique_id)
-                .build(),
-            self.period,
-        )
+        if self.active {
+            schedule_in(
+                Message::new()
+                    .typ(TYP_HOOK_PERIODIC)
+                    .id(self.unique_id)
+                    .build(),
+                self.period,
+            )
+        }
     }
 }
 
 impl<S: Any, F: Fn(&mut S)> Hook for PeriodicHook<S, F> {
-    fn state(&self) -> &dyn std::any::Any {
+    fn state(&self) -> &dyn Any {
         &self.state
     }
 
     fn handle_message(&mut self, msg: Message) -> Result<(), Message> {
         if msg.header().typ == TYP_HOOK_PERIODIC && msg.header().id == self.unique_id {
             let f = &self.f;
+            log::trace!("<PeriodicActivityHook> Actvitated Hook #{}", self.unique_id);
             f(&mut self.state);
             self.send_wakeup();
             Ok(())

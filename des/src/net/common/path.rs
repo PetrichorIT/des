@@ -349,7 +349,8 @@ impl ObjectPath {
     /// ```
     ///
     #[must_use]
-    pub fn root_module(name: String) -> Self {
+    pub fn root_module(name: impl AsRef<str>) -> Self {
+        let name = name.as_ref().to_string();
         assert!(!name.contains('/') && !name.contains('.'));
 
         Self {

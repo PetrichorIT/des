@@ -1,4 +1,4 @@
-use des::{prelude::*, runtime::StandardLogger};
+use des::prelude::*;
 use rand::{distributions::Standard, prelude::SliceRandom, Rng};
 use serial_test::serial;
 
@@ -58,8 +58,6 @@ impl Application for App {
 #[test]
 #[serial]
 fn zero_event_runtime() {
-    StandardLogger::active(false);
-
     let rt = Runtime::<App>::new(App {
         event_list: Vec::new(),
     });
@@ -87,8 +85,6 @@ impl Event<App> for RepeatWithDelay {
 #[test]
 #[serial]
 fn one_event_runtime() {
-    StandardLogger::active(false);
-
     let mut rt = Runtime::<App>::new(App {
         event_list: Vec::new(),
     });
@@ -118,8 +114,6 @@ fn one_event_runtime() {
 #[test]
 #[serial]
 fn ensure_event_order() {
-    StandardLogger::active(false);
-
     use rand::{rngs::StdRng, SeedableRng};
 
     let mut id = 0;
@@ -253,8 +247,6 @@ const N: usize = 100_000;
 #[test]
 #[serial]
 fn full_test_n_100_000() {
-    StandardLogger::active(false);
-
     let mut rt: Runtime<App> = Runtime::new_with(
         App {
             event_list: Vec::with_capacity(N),

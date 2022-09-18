@@ -212,7 +212,7 @@ impl Channel {
 
                 #[cfg(feature = "metrics")]
                 stats: crate::stats::InProgressChannelStats::new(
-                    ObjectPath::root_module("chan".to_string()),
+                    ObjectPath::root_module("chan"),
                     metrics,
                 ),
             }),

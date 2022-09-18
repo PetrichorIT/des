@@ -22,7 +22,6 @@ pub use crate::runtime::sample;
 pub use crate::runtime::sim_time;
 
 pub use crate::runtime::ScopedLogger;
-pub use crate::runtime::StandardLogger;
 
 //
 // # Metrics & Misc

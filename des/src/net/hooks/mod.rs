@@ -13,3 +13,8 @@ pub trait Hook {
 
 mod periodic;
 pub use periodic::PeriodicHook;
+
+cfg_async! {
+    mod routing;
+    pub use routing::RoutingHook;
+}

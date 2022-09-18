@@ -10,7 +10,6 @@ use async_trait::async_trait;
 use des::{
     net::{BuildContext, __Buildable0},
     prelude::*,
-    runtime::StandardLogger,
 };
 use tokio::{
     sync::{
@@ -46,8 +45,6 @@ impl AsyncModule for QuasaiSyncModule {
 #[test]
 #[serial]
 fn quasai_sync_non_blocking() {
-    StandardLogger::active(false);
-
     let mut rt = NetworkRuntime::new(());
     let mut cx = BuildContext::new(&mut rt);
 
@@ -199,8 +196,6 @@ impl AsyncModule for MutipleTasksModule {
 #[test]
 #[serial]
 fn mutiple_active_tasks() {
-    StandardLogger::active(false);
-
     let mut rt = NetworkRuntime::new(());
     let mut cx = BuildContext::new(&mut rt);
 
@@ -271,8 +266,6 @@ impl AsyncModule for TimeSleepModule {
 #[test]
 #[serial]
 fn one_module_timers() {
-    StandardLogger::active(false);
-
     let mut rt = NetworkRuntime::new(());
     let mut cx = BuildContext::new(&mut rt);
 
@@ -325,8 +318,6 @@ fn one_module_timers() {
 #[test]
 #[serial]
 fn one_module_delayed_recv() {
-    StandardLogger::active(false);
-
     let mut rt = NetworkRuntime::new(());
     let mut cx = BuildContext::new(&mut rt);
 
@@ -378,8 +369,6 @@ fn one_module_delayed_recv() {
 #[test]
 #[serial]
 fn mutiple_module_delayed_recv() {
-    StandardLogger::active(false);
-
     let mut rt = NetworkRuntime::new(());
     let mut cx = BuildContext::new(&mut rt);
 
@@ -494,8 +483,6 @@ impl AsyncModule for SemaphoreModule {
 #[test]
 #[serial]
 fn semaphore_in_waiting_task() {
-    StandardLogger::active(false);
-
     let mut rt = NetworkRuntime::new(());
     let mut cx = BuildContext::new(&mut rt);
 
@@ -591,8 +578,6 @@ impl AsyncModule for ShouldBlockSimStart {
 #[test]
 #[should_panic = "Join Idle: RuntimeIdle(())"]
 fn sim_start_deadlock() {
-    StandardLogger::active(false);
-
     let mut rt = NetworkRuntime::new(());
     let mut cx = BuildContext::new(&mut rt);
 

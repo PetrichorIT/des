@@ -301,6 +301,12 @@ impl ModuleRef {
     }
 }
 
+impl PartialEq for ModuleRef {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.ctx, &other.ctx)
+    }
+}
+
 impl Debug for ModuleRef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ModuleRef").finish()

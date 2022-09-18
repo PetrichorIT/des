@@ -93,7 +93,7 @@ impl ModuleContext {
     }
 
     pub(crate) fn place(self: Arc<Self>) -> Option<Arc<ModuleContext>> {
-        log::trace!("Now active module: {}", self.path.path());
+        // log::trace!("Now active module: {}", self.path.path());
         MOD_CTX.with(|ctx| ctx.borrow_mut().replace(self))
     }
 

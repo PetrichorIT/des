@@ -3,7 +3,6 @@
 use des::{
     net::{BuildContext, __Buildable0},
     prelude::*,
-    runtime::StandardLogger,
 };
 
 #[NdlModule]
@@ -88,15 +87,11 @@ impl TestCase {
 
 #[test]
 fn test_case_build() {
-    StandardLogger::active(false);
-
     let _case = TestCase::build();
 }
 
 #[test]
 fn test_parent_ptr() {
-    StandardLogger::active(false);
-
     let case = TestCase::build();
 
     // println!("Parent: {:?}", TypeId::of::<Parent>());
@@ -125,8 +120,6 @@ fn test_parent_ptr() {
 
 #[test]
 fn test_parent_mut_ptr() {
-    StandardLogger::active(false);
-
     let case = TestCase::build();
 
     // NOTE: inc internally used parent() (glob scope)

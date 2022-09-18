@@ -236,7 +236,7 @@ pub trait AsyncModule: Send {
                         Message::new()
                             // .kind(RT_TCP_CONNECT_TIMEOUT)
                             .typ(TYP_TCP_CONNECT_TIMEOUT)
-                            // .dest_addr(pkt.)
+                            .dest(pkt.src())
                             .content(pkt)
                             .build(),
                         timeout,
