@@ -167,6 +167,8 @@ pub(crate) const TYP_TCP_CONNECT: u8 = 101;
 pub(crate) const TYP_TCP_CONNECT_TIMEOUT: u8 = 102;
 pub(crate) const TYP_TCP_PACKET: u8 = 103;
 
+pub(crate) const TYP_HOOK_PERIODIC: u8 = 200;
+
 /// The internal typ of the message set by the des not the user.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub enum MessageType {

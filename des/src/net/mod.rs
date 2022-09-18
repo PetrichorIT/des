@@ -12,6 +12,8 @@ mod runtime;
 mod subsystem;
 mod topology;
 
+pub mod hooks;
+
 pub(crate) use self::runtime::HandleMessageEvent;
 pub(crate) use self::runtime::MessageAtGateEvent;
 pub(crate) use self::runtime::NetEvents;
@@ -65,8 +67,9 @@ cfg_async! {
 }
 
 pub use self::module::{
-    child, gate, gates, module_id, module_name, module_path, par, parent, pars, schedule_at,
-    schedule_in, send, send_at, send_in, shutdow_and_restart_at, shutdow_and_restart_in, shutdown,
+    child, create_hook, gate, gates, module_id, module_name, module_path, par, parent, pars,
+    schedule_at, schedule_in, send, send_at, send_in, shutdow_and_restart_at,
+    shutdow_and_restart_in, shutdown,
 };
 
 pub use self::ndl::BuildContext;

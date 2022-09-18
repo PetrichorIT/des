@@ -53,8 +53,39 @@ impl std::ops::Deref for ModuleRef {
 }
 
 impl ModuleRef {
-    pub(crate) fn handler(&self) -> RefMut<dyn Module> {
-        self.handler.borrow_mut()
+    pub(crate) fn at_sim_start(&self, stage: usize) {
+        self.handler.borrow_mut().at_sim_start(stage)
+    }
+
+    pub(crate) fn num_sim_start_stages(&self) -> usize {
+        self.handler.borrow().num_sim_start_stages()
+    }
+
+    #[cfg(feature = "async")]
+    pub(crate) fn finish_sim_start(&self) {
+        self.handler.borrow_mut().finish_sim_start()
+    }
+
+    pub(crate) fn at_sim_end(&self) {
+        self.handler.borrow_mut().at_sim_end()
+    }
+
+    #[cfg(feature = "async")]
+    pub(crate) fn finish_sim_end(&self) {
+        self.handler.borrow_mut().finish_sim_end()
+    }
+
+    /// Handles a message
+    pub fn handle_message(&self, mut msg: Message) {
+        // First check the hooks.
+        for hook in self.ctx.hooks.borrow_mut().iter_mut() {
+            msg = match hook.handle_message(msg) {
+                Ok(()) => return,
+                Err(msg) => msg,
+            }
+        }
+
+        self.handler.borrow_mut().handle_message(msg)
     }
 }
 
@@ -267,11 +298,6 @@ impl ModuleRef {
         }
 
         ids
-    }
-
-    /// Handles a message
-    pub fn handle_message(&self, msg: Message) {
-        self.handler.borrow_mut().handle_message(msg);
     }
 }
 

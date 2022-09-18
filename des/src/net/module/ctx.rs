@@ -4,6 +4,7 @@ use crate::{
         common::Optional,
         gate::IntoModuleGate,
         globals,
+        hooks::Hook,
         runtime::{buf_schedule_at, buf_schedule_shutdown, buf_send_at},
         ParHandle,
     },
@@ -34,6 +35,9 @@ pub struct ModuleContext {
     /// A collection of all gates register to the current module
     pub(crate) gates: RefCell<Vec<GateRef>>,
 
+    /// A collection of hooks
+    pub(crate) hooks: RefCell<Vec<Box<dyn Hook>>>,
+
     /// Expensions for async
     #[cfg(feature = "async")]
     pub(crate) async_ext: RefCell<AsyncCoreExt>,
@@ -55,6 +59,8 @@ impl ModuleContext {
             id: ModuleId::gen(),
             path,
             gates: RefCell::new(Vec::new()),
+            hooks: RefCell::new(Vec::new()),
+
             parent: None,
             children: HashMap::new(),
 
@@ -76,6 +82,8 @@ impl ModuleContext {
             id: ModuleId::gen(),
             path,
             gates: RefCell::new(Vec::new()),
+            hooks: RefCell::new(Vec::new()),
+
             parent: Some(ModuleRefWeak::new(&parent)),
             children: HashMap::new(),
 
@@ -87,6 +95,10 @@ impl ModuleContext {
     pub(crate) fn place(self: Arc<Self>) -> Option<Arc<ModuleContext>> {
         log::trace!("Now active module: {}", self.path.path());
         MOD_CTX.with(|ctx| ctx.borrow_mut().replace(self))
+    }
+
+    pub fn create_hook(&self, hook: impl Hook + 'static) {
+        self.hooks.borrow_mut().push(Box::new(hook))
     }
 
     pub fn id(&self) -> ModuleId {
@@ -209,6 +221,13 @@ pub fn gates() -> Vec<GateRef> {
 #[must_use]
 pub fn gate(name: &str, pos: usize) -> Option<GateRef> {
     with_mod_ctx(|ctx| ctx.gate(name, pos))
+}
+
+///
+/// Creates a new module specific hook.
+///
+pub fn create_hook(hook: impl Hook + 'static) {
+    with_mod_ctx(|ctx| ctx.create_hook(hook))
 }
 
 // BUF CTX based

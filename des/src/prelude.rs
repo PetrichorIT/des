@@ -64,7 +64,7 @@ cfg_net! {
     pub use crate::net::ModuleReferencingError;
     pub use crate::net::{
         child, gate, gates, module_id, module_name, module_path, par, parent, pars, schedule_at,
-        schedule_in, send, send_at, send_in, shutdow_and_restart_at, shutdow_and_restart_in, shutdown,
+        schedule_in, send, send_at, send_in, shutdow_and_restart_at, shutdow_and_restart_in, shutdown,create_hook
     };
 
     pub use crate::net::Subsystem;
