@@ -70,7 +70,7 @@ impl Message {
     /// while incrementing the hop count.
     ///
     pub fn register_hop(&mut self) {
-        self.header.ttl = self.header.ttl.wrapping_sub(1);
+        self.header.ttl = self.header.ttl.saturating_sub(1);
         self.header.hop_count += 1;
     }
 }

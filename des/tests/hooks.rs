@@ -2,7 +2,7 @@ use std::sync::{atomic::AtomicUsize, Arc};
 
 use des::{
     net::{
-        hooks::{PeriodicHook, RoutingHook},
+        hooks::{PeriodicHook, RoutingHook, RoutingHookOptions},
         BuildContext, __Buildable0,
     },
     prelude::*,
@@ -139,7 +139,7 @@ impl Module for Router {
 
             log::info!("Router with addr {}", ip);
 
-            create_hook(RoutingHook::new(true))
+            create_hook(RoutingHook::new(RoutingHookOptions::INET))
         }
     }
 

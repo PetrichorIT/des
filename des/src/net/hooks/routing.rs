@@ -1,24 +1,58 @@
 use std::{
     any::Any,
     collections::{BinaryHeap, HashMap},
-    net::{IpAddr, Ipv4Addr},
+    net::IpAddr,
 };
-
-use tokio::net::get_ip;
 
 use super::Hook;
 use crate::{
     net::globals,
-    prelude::{module_id, send, GateRef, Message, MessageType, ModuleRef},
+    prelude::{module_id, send, GateRef, Message, ModuleId, ModuleRef},
 };
+
+/// options for configuring the routing hook
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct RoutingHookOptions {
+    /// If this flag is set all TCP / UDP packtes will be routed
+    /// based on the `dest_node`. If no destionation was set the packet
+    /// will NOT be consumed by the hook.
+    ///
+    /// If no route was found, the packet will NOT be consumed by the hook.
+    #[cfg(feature = "async")]
+    pub route_tcp_udp: bool,
+    /// If this flag is set all packtes will be routed
+    /// based on the `target_module_id`. If no destionation was set the packet
+    /// will NOT be consumed by the hook.
+    ///
+    /// If no route was found, the packet will NOT be consumed by the hook.
+    /// This routing mechanism is secondary to TCP / UDP routing.
+    pub route_module_id: bool,
+    /// If this flag is set, the router will decrease the ttl of all arriving
+    /// routed packets, dropping those with a ttl == 0. This will only
+    /// affect packets that would have been routed by the hook.
+    pub ttl: bool,
+}
+
+impl RoutingHookOptions {
+    /// A config used for most internet cases
+    #[cfg(feature = "async")]
+    pub const INET: RoutingHookOptions = RoutingHookOptions {
+        route_tcp_udp: true,
+        route_module_id: false,
+        ttl: true,
+    };
+}
 
 /// A hook that provides routing abilities
 #[derive(Debug)]
 pub struct RoutingHook {
-    // opts
-    is_router: bool,
-    addr: IpAddr,
-    fwd: HashMap<IpAddr, GateRef>,
+    opts: RoutingHookOptions,
+
+    #[cfg(feature = "async")]
+    addr: Option<IpAddr>,
+
+    mod_id_fwd: HashMap<ModuleId, GateRef>,
+    tcp_udp_fwd: HashMap<IpAddr, GateRef>,
 }
 
 impl RoutingHook {
@@ -26,23 +60,18 @@ impl RoutingHook {
     /// Creates a new routing hook for either
     /// an endsystem or a router.
     ///
-    pub fn new(is_router: bool) -> Self {
-        if is_router {
-            let mut this = Self {
-                is_router,
-                addr: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
-                fwd: HashMap::new(),
-            };
+    pub fn new(opts: RoutingHookOptions) -> Self {
+        let mut this = Self {
+            opts,
+            mod_id_fwd: HashMap::new(),
+            tcp_udp_fwd: HashMap::new(),
 
-            this.create_routing_table_direct();
-            this
-        } else {
-            Self {
-                is_router,
-                addr: get_ip().expect("Failed to fetch valid ip from tokio-sim context"),
-                fwd: HashMap::new(),
-            }
-        }
+            #[cfg(feature = "async")]
+            addr: tokio::net::get_ip(),
+        };
+
+        this.create_routing_table_direct();
+        this
     }
 
     fn create_routing_table_direct(&mut self) {
@@ -67,20 +96,30 @@ impl RoutingHook {
 
         while let Some(cur) = active.pop() {
             // let the ip of the node
-            if let Some(ip) = cur
-                .module
-                .ctx
-                .async_ext
-                .borrow_mut()
-                .ctx
-                .as_mut()
-                .map(|ctx| ctx.io.as_mut().map(|io| io.get_ip()))
-                .flatten()
-                .flatten()
-            {
-                // seach for entry
-                if self.fwd.get(&ip).is_none() {
-                    self.fwd.insert(ip, cur.gate.clone());
+            #[cfg(feature = "async")]
+            if self.opts.route_tcp_udp {
+                if let Some(ip) = cur
+                    .module
+                    .ctx
+                    .async_ext
+                    .borrow_mut()
+                    .ctx
+                    .as_mut()
+                    .map(|ctx| ctx.io.as_mut().map(|io| io.get_ip()))
+                    .flatten()
+                    .flatten()
+                {
+                    // seach for entry
+                    if self.tcp_udp_fwd.get(&ip).is_none() {
+                        self.tcp_udp_fwd.insert(ip, cur.gate.clone());
+                    }
+                }
+            }
+
+            if self.opts.route_module_id {
+                if self.mod_id_fwd.get(&cur.module.ctx.id()).is_none() {
+                    self.mod_id_fwd
+                        .insert(cur.module.ctx.id(), cur.gate.clone());
                 }
             }
 
@@ -98,18 +137,16 @@ impl RoutingHook {
         }
 
         log::trace!(
-            "<RoutingHook> Created routing table with {} destinations",
-            self.fwd.len()
+            "<RoutingHook> Created routing table with {}/{} destinations",
+            self.tcp_udp_fwd.len(),
+            self.mod_id_fwd.len()
         );
     }
-}
 
-impl Hook for RoutingHook {
-    fn state(&self) -> &dyn Any {
-        &self.fwd
-    }
+    #[cfg(feature = "async")]
+    fn route_tcp(&self, msg: Message) -> Result<(), Message> {
+        use crate::net::MessageType;
 
-    fn handle_message(&mut self, msg: Message) -> Result<(), Message> {
         if matches!(msg.header().typ(), MessageType::Tcp | MessageType::Udp) {
             if msg.header().dest_addr.ip().is_unspecified() {
                 return Err(msg);
@@ -119,15 +156,12 @@ impl Hook for RoutingHook {
                 return Err(msg);
             }
 
-            // This should have been catched by the IOContext
-            // so if not ... probably a lost packet
-            // fwd to handle_message anyways
-            if msg.header().dest_addr.ip() == self.addr && !self.is_router {
+            if Some(msg.header().dest_addr.ip()) == self.addr {
                 return Err(msg);
             }
 
             // if not
-            if let Some(path) = self.fwd.get(&msg.header().dest_addr.ip()) {
+            if let Some(path) = self.tcp_udp_fwd.get(&msg.header().dest_addr.ip()) {
                 log::trace!(
                     "<RoutingHook> Forwarding a packet from {} to {} via {}",
                     msg.header().src_addr,
@@ -143,6 +177,67 @@ impl Hook for RoutingHook {
         } else {
             Err(msg)
         }
+    }
+
+    fn route_module_id(&self, msg: Message) -> Result<(), Message> {
+        if msg.header().receiver_module_id == ModuleId::NULL {
+            return Err(msg);
+        }
+
+        // if not
+        if let Some(path) = self.mod_id_fwd.get(&msg.header().receiver_module_id) {
+            log::trace!(
+                "<RoutingHook> Forwarding a packet from #{} to #{} via {}",
+                msg.header().sender_module_id,
+                msg.header.receiver_module_id,
+                path.path()
+            );
+            send(msg, path);
+            Ok(())
+        } else {
+            log::error!("Could not route packet");
+            Err(msg)
+        }
+    }
+}
+
+impl Hook for RoutingHook {
+    fn state(&self) -> &dyn Any {
+        &self.tcp_udp_fwd
+    }
+
+    fn handle_message(&mut self, mut msg: Message) -> Result<(), Message> {
+        // TTL check
+        if self.opts.ttl {
+            msg.register_hop();
+            if msg.header().ttl == 0 {
+                log::debug!("<RoutingHook> Dropped packet because TTL reached zero");
+                return Ok(());
+            }
+        }
+
+        #[cfg(feature = "async")]
+        let msg = if self.opts.route_tcp_udp {
+            if let Err(msg) = self.route_tcp(msg) {
+                msg
+            } else {
+                return Ok(());
+            }
+        } else {
+            msg
+        };
+
+        let msg = if self.opts.route_module_id {
+            if let Err(msg) = self.route_module_id(msg) {
+                msg
+            } else {
+                return Ok(());
+            }
+        } else {
+            msg
+        };
+
+        Err(msg)
     }
 }
 
