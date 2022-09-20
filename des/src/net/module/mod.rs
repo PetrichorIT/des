@@ -35,6 +35,9 @@ pub trait Module: Any {
     where
         Self: Sized;
 
+    /// Resets the custom state when a module is restarted.
+    fn reset(&mut self) {}
+
     ///
     /// A message handler for receiving events, user defined.
     ///

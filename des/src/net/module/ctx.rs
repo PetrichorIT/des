@@ -14,7 +14,7 @@ use std::{
     cell::{Ref, RefCell},
     collections::HashMap,
     fmt::Debug,
-    sync::Arc,
+    sync::{atomic::AtomicBool, Arc},
 };
 
 #[cfg(feature = "async")]
@@ -27,6 +27,8 @@ thread_local! {
 }
 
 pub struct ModuleContext {
+    pub(crate) active: AtomicBool,
+
     pub(crate) id: ModuleId,
 
     /// A human readable identifier for the module.
@@ -56,6 +58,8 @@ impl ModuleContext {
         let ident = path.path().to_string();
 
         Self {
+            active: AtomicBool::new(true),
+
             id: ModuleId::gen(),
             path,
             gates: RefCell::new(Vec::new()),
@@ -79,6 +83,8 @@ impl ModuleContext {
         // TODO set parents child
 
         Self {
+            active: AtomicBool::new(true),
+
             id: ModuleId::gen(),
             path,
             gates: RefCell::new(Vec::new()),

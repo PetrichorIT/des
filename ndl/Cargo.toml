@@ -5,7 +5,6 @@ version = "0.2.1"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-
 [[bin]]
 name = "ndl"
 path = "bin/main.rs"
@@ -15,31 +14,30 @@ name = "ndl-test"
 path = "tests/test.rs"
 
 [[bench]]
+harness = false
 name = "lexer"
-harness = false
 
 [[bench]]
+harness = false
 name = "parser"
-harness = false
 
 [[bench]]
+harness = false
 name = "desugar"
-harness = false
 
 [[bench]]
+harness = false
 name = "tycheck"
-harness = false
 
 [[bench]]
-name = "full"
 harness = false
+name = "full"
 
 [dev-dependencies]
-criterion = "0.3"
+criterion = "0.4"
 
 [dependencies]
-structopt = "0.3.26"
-log = "0.4.14"
-termcolor = "1.1.2"
-unic-emoji-char = "0.9.0"
-unicode-xid = "0.2.0"
+structopt = "0.3"
+termcolor = "1"
+unic-emoji-char = "0.9"
+unicode-xid = "0.2"

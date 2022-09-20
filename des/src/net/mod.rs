@@ -35,9 +35,7 @@ pub use self::channel::ChannelRef;
 //
 
 pub use self::gate::Gate;
-pub use self::gate::GateDescription;
 pub use self::gate::GateRef;
-pub use self::gate::GateRefWeak;
 pub use self::gate::GateServiceType;
 
 //

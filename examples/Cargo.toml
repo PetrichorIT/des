@@ -53,7 +53,5 @@ path = "net/main.rs"
 [dependencies]
 async-trait = "*"
 des = {path = "../des", features = ["full", "metrics-rt-full"]}
-lazy_static = "*"
 log = {version = "*", features = ["max_level_trace", "release_max_level_trace"]}
-ndl = {path = "../ndl"}
 rand = "*"
