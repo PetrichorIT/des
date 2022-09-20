@@ -1,5 +1,5 @@
 use super::{SubsystemId, SubsystemRef};
-use crate::net::{ChannelRef, ObjectPath};
+use crate::net::{channel::ChannelRef, ObjectPath};
 use std::{cell::RefCell, collections::HashMap};
 
 ///

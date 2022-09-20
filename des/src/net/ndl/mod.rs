@@ -4,7 +4,7 @@ use crate::prelude::{Module, NetworkRuntime};
 
 use super::module::ModuleContext;
 use super::subsystem::SubsystemRef;
-use super::{ChannelRef, ModuleRef, ObjectPath};
+use super::{channel::ChannelRef, module::ModuleRef, ObjectPath};
 
 #[doc(hidden)]
 #[derive(Debug)]

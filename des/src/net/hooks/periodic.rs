@@ -1,6 +1,6 @@
 use super::Hook;
 use crate::{
-    net::{message::TYP_HOOK_PERIODIC, Message},
+    net::message::{Message, TYP_HOOK_PERIODIC},
     prelude::schedule_in,
 };
 use std::{
@@ -66,10 +66,6 @@ impl<S: Any, F: Fn(&mut S)> PeriodicHook<S, F> {
 }
 
 impl<S: Any, F: Fn(&mut S)> Hook for PeriodicHook<S, F> {
-    fn state(&self) -> &dyn Any {
-        &self.state
-    }
-
     fn handle_message(&mut self, msg: Message) -> Result<(), Message> {
         if msg.header().typ == TYP_HOOK_PERIODIC && msg.header().id == self.unique_id {
             let f = &self.f;

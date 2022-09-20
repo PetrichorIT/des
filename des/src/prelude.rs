@@ -37,38 +37,43 @@ pub use crate::stats::StdDev;
 //
 
 cfg_net! {
+    pub use crate::net::hooks::create_hook;
+
+    pub use crate::net::message::CustomSizeBody;
+    pub use crate::net::message::Message;
+    pub use crate::net::message::MessageBody;
+    pub use crate::net::message::MessageId;
+    pub use crate::net::message::MessageKind;
+    pub use crate::net::message::MessageHeader;
+    pub use crate::net::message::MessageType;
+
+    pub use crate::net::message::{send, send_in, send_at, schedule_in, schedule_at};
+
     pub use crate::net::NetworkRuntime;
     pub use crate::net::NetworkRuntimeGlobals;
 
-    pub use crate::net::Channel;
-    pub use crate::net::ChannelMetrics;
-    pub use crate::net::ChannelRef;
+    pub use crate::net::channel::Channel;
+    pub use crate::net::channel::ChannelMetrics;
+    pub use crate::net::channel::ChannelRef;
 
-    pub use crate::net::Gate;
-    pub use crate::net::GateRef;
-    pub use crate::net::GateServiceType;
+    pub use crate::net::gate::Gate;
+    pub use crate::net::gate::GateRef;
+    pub use crate::net::gate::GateServiceType;
 
-    pub use crate::net::CustomSizeBody;
-    pub use crate::net::Message;
-    pub use crate::net::MessageBody;
-    pub use crate::net::MessageId;
-    pub use crate::net::MessageKind;
-    pub use crate::net::MessageHeader;
-    pub use crate::net::MessageType;
 
-    pub use crate::net::Module;
-    pub use crate::net::ModuleId;
-    pub use crate::net::ModuleRef;
-    pub use crate::net::ModuleReferencingError;
-    pub use crate::net::{
-        child, gate, gates, module_id, module_name, module_path, par, parent, pars, schedule_at,
-        schedule_in, send, send_at, send_in, shutdow_and_restart_at, shutdow_and_restart_in, shutdown,create_hook
+    pub use crate::net::module::Module;
+    pub use crate::net::module::ModuleId;
+    pub use crate::net::module::ModuleRef;
+    pub use crate::net::module::ModuleReferencingError;
+
+    pub use crate::net::module::{
+        child, gate, gates, module_id, module_name, module_path, par, parent, pars, shutdow_and_restart_at, shutdow_and_restart_in, shutdown
     };
 
-    pub use crate::net::Subsystem;
-    pub use crate::net::SubsystemRef;
-    pub use crate::net::SubsystemContext;
-    pub use crate::net::SubsystemId;
+    pub use crate::net::subsystem::Subsystem;
+    pub use crate::net::subsystem::SubsystemRef;
+    pub use crate::net::subsystem::SubsystemContext;
+    pub use crate::net::subsystem::SubsystemId;
 
     pub use crate::net::ObjectPath;
     pub use crate::net::Parameters;
@@ -77,8 +82,7 @@ cfg_net! {
     pub use crate::net::Topology;
 
     cfg_async! {
-        pub use crate::net::AsyncModule;
-
+        pub use crate::net::module::AsyncModule;
     }
 
     pub use std::net::IpAddr;

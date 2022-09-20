@@ -1,7 +1,12 @@
-use crate::net::{GateRef, ModuleId};
+//! Generic network messages.
+
+use crate::net::{gate::GateRef, module::ModuleId};
 use crate::time::SimTime;
 use std::fmt::Debug;
 use std::net::{IpAddr, SocketAddr};
+
+mod func;
+pub use func::*;
 
 mod body;
 pub use body::{CustomSizeBody, MessageBody};

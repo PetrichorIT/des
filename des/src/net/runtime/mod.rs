@@ -1,5 +1,5 @@
 use super::common::Parameters;
-use super::ModuleRef;
+use super::module::ModuleRef;
 use crate::net::{ObjectPath, Topology};
 use crate::runtime::{Application, Runtime};
 use crate::time::SimTime;

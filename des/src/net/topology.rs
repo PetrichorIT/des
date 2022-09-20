@@ -1,8 +1,8 @@
-use crate::net::{GateRef, ModuleId};
+use crate::net::gate::GateRef;
 use std::fmt::Debug;
 use std::sync::Arc;
 
-use super::ModuleRef;
+use super::module::{ModuleId, ModuleRef};
 
 ///
 /// A mapping of the runtimes modules, and their connections.

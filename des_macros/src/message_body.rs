@@ -17,13 +17,13 @@ pub fn derive_message_body(ident: Ident, data: Data) -> crate::common::Result<To
                     let fident = field.ident.unwrap();
 
                     ts.extend(quote! {
-                        <#ty as des::net::MessageBody>::byte_len(&self.#fident) +
+                        <#ty as ::des::net::message::MessageBody>::byte_len(&self.#fident) +
                     });
                 }
 
                 let wrapped = WrappedTokenStream(ts);
                 Ok(quote! {
-                    impl des::net::MessageBody for #ident {
+                    impl ::des::net::message::MessageBody for #ident {
                         fn byte_len(&self) -> usize {
                             #wrapped 0
                         }
@@ -40,13 +40,13 @@ pub fn derive_message_body(ident: Ident, data: Data) -> crate::common::Result<To
                     let fident = Index::from(i);
 
                     ts.extend(quote! {
-                        <#ty as des::net::MessageBody>::byte_len(&self.#fident) +
+                        <#ty as des::net::message::MessageBody>::byte_len(&self.#fident) +
                     });
                 }
 
                 let wrapped = WrappedTokenStream(ts);
                 Ok(quote! {
-                    impl des::net::MessageBody for #ident {
+                    impl des::net::message::MessageBody for #ident {
                         fn byte_len(&self) -> usize {
                             #wrapped 0
                         }
@@ -55,7 +55,7 @@ pub fn derive_message_body(ident: Ident, data: Data) -> crate::common::Result<To
                 .into())
             }
             Fields::Unit => Ok(quote! {
-                impl des::net::MessageBody for #ident {
+                impl ::des::net::message::MessageBody for #ident {
                     fn byte_len(&self) -> usize { 0 }
                 }
             }
@@ -65,7 +65,7 @@ pub fn derive_message_body(ident: Ident, data: Data) -> crate::common::Result<To
             let mut gts = TokenStream2::new();
             if data_enum.variants.is_empty() {
                 return Ok(quote! {
-                    impl des::net::MessageBody for #ident {
+                    impl ::des::net::message::MessageBody for #ident {
                         fn byte_len(&self) -> usize { 0 }
                     }
                 }
@@ -86,7 +86,7 @@ pub fn derive_message_body(ident: Ident, data: Data) -> crate::common::Result<To
 
                             pts.extend(quote! { ref #fident, });
                             ts.extend(quote! {
-                                <#ty as des::net::MessageBody>::byte_len(#fident) +
+                                <#ty as ::des::net::message::MessageBody>::byte_len(#fident) +
                             });
                         }
 
@@ -106,7 +106,7 @@ pub fn derive_message_body(ident: Ident, data: Data) -> crate::common::Result<To
 
                             pts.extend(quote! { #fident,  });
                             ts.extend(quote! {
-                                <#ty as des::net::MessageBody>::byte_len(#fident) +
+                                <#ty as ::des::net::message::MessageBody>::byte_len(#fident) +
                             });
                         }
 
@@ -126,7 +126,7 @@ pub fn derive_message_body(ident: Ident, data: Data) -> crate::common::Result<To
             }
 
             Ok(quote! {
-                impl des::net::MessageBody for #ident {
+                impl ::des::net::message::MessageBody for #ident {
                     fn byte_len(&self) -> usize {
                         match self {
                             #gts

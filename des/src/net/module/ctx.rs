@@ -1,14 +1,7 @@
 use super::{ModuleId, ModuleRef, ModuleRefWeak, ModuleReferencingError};
 use crate::{
-    net::{
-        common::Optional,
-        gate::IntoModuleGate,
-        globals,
-        hooks::Hook,
-        runtime::{buf_schedule_at, buf_schedule_shutdown, buf_send_at},
-        ParHandle,
-    },
-    prelude::{Duration, GateRef, Message, ObjectPath, SimTime},
+    net::hooks::HookEntry,
+    prelude::{GateRef, ObjectPath},
 };
 use std::{
     cell::{Ref, RefCell},
@@ -38,7 +31,7 @@ pub struct ModuleContext {
     pub(crate) gates: RefCell<Vec<GateRef>>,
 
     /// A collection of hooks
-    pub(crate) hooks: RefCell<Vec<Box<dyn Hook>>>,
+    pub(crate) hooks: RefCell<Vec<HookEntry>>,
 
     /// Expensions for async
     #[cfg(feature = "async")]
@@ -103,10 +96,6 @@ impl ModuleContext {
         MOD_CTX.with(|ctx| ctx.borrow_mut().replace(self))
     }
 
-    pub fn create_hook(&self, hook: impl Hook + 'static) {
-        self.hooks.borrow_mut().push(Box::new(hook))
-    }
-
     pub fn id(&self) -> ModuleId {
         self.id
     }
@@ -162,188 +151,12 @@ impl Debug for ModuleContext {
     }
 }
 
-fn with_mod_ctx<R>(f: impl FnOnce(Ref<Arc<ModuleContext>>) -> R) -> R {
+pub(crate) fn with_mod_ctx<R>(f: impl FnOnce(Ref<Arc<ModuleContext>>) -> R) -> R {
     MOD_CTX.with(|ctx| {
         let brw = ctx.borrow();
         let brw = Ref::map(brw, |v| v.as_ref().unwrap());
         f(brw)
     })
-}
-
-/// A runtime-unqiue identifier for this module-core and by extension this module.
-#[must_use]
-pub fn module_id() -> ModuleId {
-    with_mod_ctx(|ctx| ctx.id())
-}
-
-/// A runtime-unqiue (not enforced) identifier for this module, based on its place in the module tree.
-#[must_use]
-pub fn module_path() -> ObjectPath {
-    with_mod_ctx(|ctx| ctx.path())
-}
-
-/// Returns the name of the module instance.
-#[must_use]
-pub fn module_name() -> String {
-    with_mod_ctx(|ctx| ctx.name())
-}
-
-// PARENT CHILD
-
-/// Returns the parent element
-///
-/// # Errors
-///
-/// Returns an error if the module has no parent.
-///
-pub fn parent() -> Result<ModuleRef, ModuleReferencingError> {
-    with_mod_ctx(|ctx| ctx.parent())
-}
-
-/// Returns the child element.
-///
-/// # Errors
-///
-/// Returns an error if no child was found under the given name.
-///
-pub fn child(name: &str) -> Result<ModuleRef, ModuleReferencingError> {
-    with_mod_ctx(|ctx| ctx.child(name))
-}
-
-// GATE RELATED
-
-///
-/// Returns a ref unstructured list of all gates from the current module.
-///
-#[must_use]
-pub fn gates() -> Vec<GateRef> {
-    with_mod_ctx(|ctx| ctx.gates())
-}
-
-///
-/// Returns a ref to a gate of the current module dependent on its name and cluster position
-/// if possible.
-///
-#[must_use]
-pub fn gate(name: &str, pos: usize) -> Option<GateRef> {
-    with_mod_ctx(|ctx| ctx.gate(name, pos))
-}
-
-///
-/// Creates a new module specific hook.
-///
-pub fn create_hook(hook: impl Hook + 'static) {
-    with_mod_ctx(|ctx| ctx.create_hook(hook))
-}
-
-// BUF CTX based
-
-///
-/// Sends a message onto a given gate. This operation will be performed after
-/// `handle_message` finished.
-///
-#[allow(clippy::needless_pass_by_value)]
-pub fn send(msg: impl Into<Message>, gate: impl IntoModuleGate) {
-    self::send_at(msg, gate, SimTime::now());
-}
-
-///
-/// Sends a message onto a given gate with a delay. This operation will be performed after
-/// `handle_message` finished.
-///
-#[allow(clippy::needless_pass_by_value)]
-pub fn send_in(msg: impl Into<Message>, gate: impl IntoModuleGate, dur: Duration) {
-    self::send_at(msg, gate, SimTime::now() + dur);
-}
-///
-/// Sends a message onto a given gate at the sepcified time. This operation will be performed after
-/// `handle_message` finished.
-///
-/// # Panics
-///
-/// Panics if the send time is in the past.
-///
-#[allow(clippy::needless_pass_by_value)]
-pub fn send_at(msg: impl Into<Message>, gate: impl IntoModuleGate, send_time: SimTime) {
-    assert!(send_time >= SimTime::now());
-    // (0) Cast the message.
-    let msg: Message = msg.into();
-
-    let gate = with_mod_ctx(|ctx| {
-        // (1) Cast the gate
-        #[allow(clippy::explicit_auto_deref)]
-        gate.as_gate(&*ctx)
-    });
-
-    if let Some(gate) = gate {
-        buf_send_at(msg, gate, send_time);
-    } else {
-        log::error!("Error: Could not find gate in current module");
-    }
-}
-
-///
-/// Enqueues a event that will trigger the [`Module::handle_message`] function
-/// in duration seconds, shifted by the processing time delay.
-///
-pub fn schedule_in(msg: impl Into<Message>, dur: Duration) {
-    self::schedule_at(msg, SimTime::now() + dur);
-}
-
-///
-/// Enqueues a event that will trigger the [`Module::handle_message`] function
-/// at the given `SimTime`
-///
-/// # Panics
-///
-/// Panics if the specified time is in the past.
-///
-pub fn schedule_at(msg: impl Into<Message>, arrival_time: SimTime) {
-    assert!(arrival_time >= SimTime::now());
-    let msg: Message = msg.into();
-    buf_schedule_at(msg, arrival_time);
-}
-
-///
-/// Shuts down all activity for the module.
-///
-pub fn shutdown() {
-    buf_schedule_shutdown(None);
-}
-
-///
-/// Shuts down all activity for the module.
-/// Restarts after the given duration.
-///
-pub fn shutdow_and_restart_in(dur: Duration) {
-    self::shutdow_and_restart_at(SimTime::now() + dur);
-}
-
-///
-/// Shuts down all activity for the module.
-/// Restarts at the given time.
-///
-pub fn shutdow_and_restart_at(restart_at: SimTime) {
-    buf_schedule_shutdown(Some(restart_at));
-}
-
-///
-/// Returns the parameters for the current module.
-///
-#[must_use]
-pub fn pars() -> HashMap<String, String> {
-    let path = self::module_path();
-    globals().parameters.get_def_table(path.path())
-}
-
-///
-/// Returns a parameter by reference (not parsed).
-///
-#[must_use]
-pub fn par(key: &str) -> ParHandle<Optional> {
-    globals()
-        .parameters
-        .get_handle(self::module_path().path(), key)
 }
 
 cfg_async! {
@@ -359,7 +172,7 @@ cfg_async! {
 
     #[cfg(feature = "async-sharedrt")]
     pub(super) fn async_get_rt() -> Option<Arc<Runtime>> {
-         Some(Arc::clone(&globals().runtime))
+         Some(Arc::clone(&crate::net::globals().runtime))
     }
 
     pub(super) fn async_take_sim_ctx() -> SimContext {

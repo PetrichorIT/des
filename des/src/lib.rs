@@ -77,8 +77,8 @@
 //! # Using a module oriented system
 //!
 //! DES is able to provide tools for simulating network-like structures with [Modules](crate::net::Module).
-//! These modules are self contained units with their own state, connected via [Channels](crate::net::Channel)
-//! (network links) that are attached to [Gates](crate::net::Gate) (physical ports) on modules.
+//! These modules are self contained units with their own state, connected via [Channels](crate::net::channel::Channel)
+//! (network links) that are attached to [Gates](crate::net::gate::Gate) (physical ports) on modules.
 //! Modules can send messages (packtes) through these gates / channels to communicated
 //! with other modules. Additionally modules can be created in a tree like structure,
 //! providing links like [`parent`](crate::net::ModuleCore::parent) or

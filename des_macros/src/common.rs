@@ -101,7 +101,7 @@ pub fn ident_from_conident(
             let ident_token = ident!(format!("{}_child_{}_gate{}", child_ident, gate_ident, pos));
 
             token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                let mut #ident_token: ::des::net::GateRef = #submodule_ident.gate(#gate_ident, #pos)
+                let mut #ident_token: ::des::net::gate::GateRef = #submodule_ident.gate(#gate_ident, #pos)
                     .expect(&format!("Internal macro err. Could not find child gate '{}[{}]'.", #gate_ident, #pos)).clone();
             });
 
@@ -113,7 +113,7 @@ pub fn ident_from_conident(
             let ident = ident!(format!("{}_gate{}_ref", gate_ident, pos));
 
             token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                let mut #ident: ::des::net::GateRef = this.gate(#gate_ident, #pos)
+                let mut #ident: ::des::net::gate::GateRef = this.gate(#gate_ident, #pos)
                     .expect(&format!("Internal macro err. Could not find local gate '{}[{}]'.", #gate_ident, #pos)).clone();
             });
 
@@ -157,6 +157,7 @@ pub fn build_impl_from(ident: Ident, wrapped: WrappedTokenStream, submodules: &[
         let mut segments_3 = Punctuated::new();
         segments_3.push(PathSegment { ident: ident!("des"), arguments: PathArguments::None });
         segments_3.push(PathSegment { ident: ident!("net"), arguments: PathArguments::None });
+        segments_3.push(PathSegment { ident: ident!("module"), arguments: PathArguments::None });
         segments_3.push(PathSegment { ident: ident!("Module"), arguments: PathArguments::None });
 
         let mut bounds = Punctuated::new();
@@ -198,9 +199,10 @@ pub fn build_impl_from(ident: Ident, wrapped: WrappedTokenStream, submodules: &[
 
     quote! {
         impl ::des::net::#build_trait for #ident {
-            fn build<#puntuated_a>(mut this: ::des::net::ModuleRef, ctx: &mut ::des::net::BuildContext<'_, A>) 
-            -> ::des::net::ModuleRef {
+            fn build<#puntuated_a>(mut this: ::des::net::module::ModuleRef, ctx: &mut ::des::net::BuildContext<'_, A>) 
+            -> ::des::net::module::ModuleRef {
                 use des::net::*;
+                use des::net::module::*;
                 
                 #wrapped
                 this

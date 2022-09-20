@@ -2,7 +2,10 @@ use log::info;
 
 use crate::{
     create_event_set,
-    net::{runtime::buf_process, GateRef, GateServiceType, Message, NetworkRuntime},
+    net::{
+        gate::GateRef, gate::GateServiceType, message::Message, runtime::buf_process,
+        NetworkRuntime,
+    },
     prelude::{ChannelRef, ModuleRef},
     runtime::{Event, EventSet, Runtime},
     time::SimTime,

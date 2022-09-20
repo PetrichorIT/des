@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
 
 use super::{HandleMessageEvent, NetworkRuntime, NetworkRuntimeGlobals};
-use crate::net::{GateRef, Message, MessageAtGateEvent, NetEvents};
+use crate::net::{gate::GateRef, message::Message, MessageAtGateEvent, NetEvents};
 use crate::prelude::{GateServiceType, ModuleRef};
 use crate::runtime::Runtime;
 use crate::time::SimTime;

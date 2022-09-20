@@ -788,7 +788,7 @@ impl<A> RuntimeResult<A> {
 }
 
 cfg_net! {
-    use crate::net::{GateRef,  HandleMessageEvent, Message, MessageAtGateEvent, ModuleRef, NetEvents, NetworkRuntime};
+    use crate::net::{gate::GateRef,  HandleMessageEvent, message::Message, MessageAtGateEvent, module::ModuleRef, NetEvents, NetworkRuntime};
 
     impl<A> Runtime<NetworkRuntime<A>> {
         ///

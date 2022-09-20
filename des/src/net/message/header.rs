@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use crate::net::{GateRef, ModuleId};
+use crate::net::{gate::GateRef, module::ModuleId};
 use crate::time::SimTime;
 
 use std::fmt::Debug;

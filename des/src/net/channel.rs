@@ -1,3 +1,4 @@
+//! Physical link abstractions.
 #![allow(clippy::cast_precision_loss)]
 
 use rand::distributions::Uniform;
@@ -9,11 +10,11 @@ use std::fmt::Display;
 use std::sync::Arc;
 
 use crate::net::runtime::ChannelUnbusyNotif;
-use crate::net::{Message, MessageAtGateEvent, NetEvents, ObjectPath};
+use crate::net::{message::Message, MessageAtGateEvent, NetEvents, ObjectPath};
 use crate::runtime::{rng, Runtime};
 use crate::time::{Duration, SimTime};
 
-use super::{GateRef, NetworkRuntime};
+use super::{gate::GateRef, NetworkRuntime};
 
 ///
 /// A readonly reference to a channel.

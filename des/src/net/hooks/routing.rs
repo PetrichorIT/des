@@ -1,5 +1,4 @@
 use std::{
-    any::Any,
     collections::{BinaryHeap, HashMap},
     net::IpAddr,
 };
@@ -145,7 +144,7 @@ impl RoutingHook {
 
     #[cfg(feature = "async")]
     fn route_tcp(&self, msg: Message) -> Result<(), Message> {
-        use crate::net::MessageType;
+        use crate::net::message::MessageType;
 
         if matches!(msg.header().typ(), MessageType::Tcp | MessageType::Udp) {
             if msg.header().dest_addr.ip().is_unspecified() {
@@ -202,10 +201,6 @@ impl RoutingHook {
 }
 
 impl Hook for RoutingHook {
-    fn state(&self) -> &dyn Any {
-        &self.tcp_udp_fwd
-    }
-
     fn handle_message(&mut self, mut msg: Message) -> Result<(), Message> {
         // TTL check
         if self.opts.ttl {

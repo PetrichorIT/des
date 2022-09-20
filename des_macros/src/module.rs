@@ -109,7 +109,7 @@ fn generate_dynamic_builder(
                     }
                 };
                 token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                        let mut #ident: ::des::net::ModuleRef = #ty::build_named_with_parent(#descriptor, this.clone(), ctx);
+                        let mut #ident: ::des::net::module::ModuleRef = #ty::build_named_with_parent(#descriptor, this.clone(), ctx);
                 });
             }
 
@@ -126,7 +126,7 @@ fn generate_dynamic_builder(
                     Span::call_site(),
                 );
                 token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                        let _ = this.create_gate_cluster(#ident, #size, ::des::net::GateServiceType::#typ);
+                        let _ = this.create_gate_cluster(#ident, #size, ::des::net::gate::GateServiceType::#typ);
                 });
             }
 
@@ -156,12 +156,12 @@ fn generate_dynamic_builder(
                     } = channel;
 
                     token_stream.extend(quote! {
-                        let channel = ::des::net::Channel::new(
+                        let channel = ::des::net::channel::Channel::new(
                             ::des::net::ObjectPath::channel_with(
                                 &format!("{}->{}", #from_ident.name(), #to_ident.name()),
                                 &this.path()
                             ),
-                            ::des::net::ChannelMetrics {
+                            ::des::net::channel::ChannelMetrics {
                                 bitrate: #bitrate,
                                 latency: ::des::time::Duration::from_secs_f64(#latency),
                                 jitter: ::des::time::Duration::from_secs_f64(#jitter),

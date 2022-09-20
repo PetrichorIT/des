@@ -1,15 +1,19 @@
+//! Network nodes with custom state.
+
+use crate::net::message::Message;
 use std::any::Any;
 
-use crate::net::Message;
-
 mod ctx;
-pub use self::ctx::*;
+pub(crate) use self::ctx::*;
 
 mod mref;
 pub use mref::*;
 
 mod error;
 pub use error::*;
+
+mod func;
+pub use func::*;
 
 cfg_async! {
     mod async_mod;

@@ -1,3 +1,4 @@
+//! Network subsection management.
 #![allow(unused)]
 
 use std::any::Any;

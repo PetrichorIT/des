@@ -2,7 +2,7 @@ use std::sync::{atomic::AtomicUsize, Arc};
 
 use des::{
     net::{
-        hooks::{PeriodicHook, RoutingHook, RoutingHookOptions},
+        hooks::{Hook, PeriodicHook, RoutingHook, RoutingHookOptions},
         BuildContext, __Buildable0,
     },
     prelude::*,
@@ -13,6 +13,66 @@ use tokio::{
     net::{IOContext, TcpListener, TcpStream},
     task::JoinHandle,
 };
+
+struct ConsumAllHook;
+impl Hook for ConsumAllHook {
+    fn handle_message(&mut self, _: Message) -> Result<(), Message> {
+        log::info!("Consumed message");
+        Ok(())
+    }
+}
+
+struct PanicAllHook;
+impl Hook for PanicAllHook {
+    fn handle_message(&mut self, _: Message) -> Result<(), Message> {
+        panic!("This hook should never get any message")
+    }
+}
+
+#[NdlModule]
+struct HookPriorityModule {}
+
+impl Module for HookPriorityModule {
+    fn new() -> Self {
+        Self {}
+    }
+
+    fn at_sim_start(&mut self, _stage: usize) {
+        create_hook(
+            PeriodicHook::new(
+                |_| schedule_in(Message::new().build(), Duration::from_secs(1)),
+                Duration::from_secs(1),
+                (),
+            ),
+            0,
+        );
+
+        create_hook(PanicAllHook, 100);
+        create_hook(ConsumAllHook, 10);
+    }
+
+    fn handle_message(&mut self, _msg: Message) {
+        panic!("All messages should have been processed by the hooks")
+    }
+}
+
+#[test]
+#[serial]
+fn hook_priority() {
+    // ScopedLogger::new().finish().unwrap();
+
+    let mut rt = NetworkRuntime::new(());
+    let mut cx = BuildContext::new(&mut rt);
+
+    let module = HookPriorityModule::build_named(ObjectPath::root_module("root"), &mut cx);
+    cx.create_module(module);
+
+    let rt = Runtime::new_with(
+        rt,
+        RuntimeOptions::seeded(123).max_time(SimTime::from(10.0)),
+    );
+    let _ = rt.run();
+}
 
 #[NdlModule]
 struct HookAtShutdown {
@@ -27,16 +87,19 @@ impl Module for HookAtShutdown {
     }
 
     fn at_sim_start(&mut self, _stage: usize) {
-        create_hook(PeriodicHook::new(
-            |state| {
-                state.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                if SimTime::now().as_secs() == 5 {
-                    shutdow_and_restart_in(Duration::from_secs(2));
-                }
-            },
-            Duration::from_secs(1),
-            self.state.clone(),
-        ))
+        create_hook(
+            PeriodicHook::new(
+                |state| {
+                    state.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    if SimTime::now().as_secs() == 5 {
+                        shutdow_and_restart_in(Duration::from_secs(2));
+                    }
+                },
+                Duration::from_secs(1),
+                self.state.clone(),
+            ),
+            0,
+        )
     }
 
     fn handle_message(&mut self, msg: Message) {
@@ -84,13 +147,16 @@ impl Module for PeriodicModule {
     }
 
     fn at_sim_start(&mut self, _stage: usize) {
-        create_hook(PeriodicHook::new(
-            |state| {
-                state.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-            },
-            Duration::from_secs(1),
-            self.state.clone(),
-        ))
+        create_hook(
+            PeriodicHook::new(
+                |state| {
+                    state.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                },
+                Duration::from_secs(1),
+                self.state.clone(),
+            ),
+            0,
+        )
     }
 
     fn handle_message(&mut self, _msg: Message) {
@@ -134,20 +200,26 @@ impl Module for PeriodicMultiModule {
     }
 
     fn at_sim_start(&mut self, _stage: usize) {
-        create_hook(PeriodicHook::new(
-            |state| {
-                state.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-            },
-            Duration::from_secs(1),
-            self.state.clone(),
-        ));
-        create_hook(PeriodicHook::new(
-            |state| {
-                state.fetch_add(2, std::sync::atomic::Ordering::SeqCst);
-            },
-            Duration::from_secs(2),
-            self.state.clone(),
-        ));
+        create_hook(
+            PeriodicHook::new(
+                |state| {
+                    state.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                },
+                Duration::from_secs(1),
+                self.state.clone(),
+            ),
+            0,
+        );
+        create_hook(
+            PeriodicHook::new(
+                |state| {
+                    state.fetch_add(2, std::sync::atomic::Ordering::SeqCst);
+                },
+                Duration::from_secs(2),
+                self.state.clone(),
+            ),
+            0,
+        );
     }
 
     fn handle_message(&mut self, _msg: Message) {
@@ -196,7 +268,7 @@ impl Module for Router {
 
             log::info!("Router with addr {}", ip);
 
-            create_hook(RoutingHook::new(RoutingHookOptions::INET))
+            create_hook(RoutingHook::new(RoutingHookOptions::INET), 0)
         }
     }
 

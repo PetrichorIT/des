@@ -1,4 +1,4 @@
-use des::{net::GateServiceType, prelude::*};
+use des::{net::gate::GateServiceType, prelude::*};
 
 mod alice;
 mod bob;

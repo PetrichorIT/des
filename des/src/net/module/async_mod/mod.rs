@@ -1,8 +1,8 @@
 use crate::net::message::{
-    TYP_IO_TICK, TYP_RESTART, TYP_TCP_CONNECT, TYP_TCP_CONNECT_TIMEOUT, TYP_TCP_PACKET,
-    TYP_UDP_PACKET, TYP_WAKEUP,
+    schedule_at, schedule_in, send, send_in, TYP_IO_TICK, TYP_RESTART, TYP_TCP_CONNECT,
+    TYP_TCP_CONNECT_TIMEOUT, TYP_TCP_PACKET, TYP_UDP_PACKET, TYP_WAKEUP,
 };
-use crate::net::{Message, Module};
+use crate::net::{message::Message, module::Module};
 use crate::time::SimTime;
 use async_trait::async_trait;
 
@@ -160,7 +160,7 @@ pub trait AsyncModule: Send {
             match intent {
                 IOIntent::UdpSendPacket(pkt) => {
                     log::info!("Sending captured UDP packet: {:?}", pkt);
-                    super::send(
+                    send(
                         Message::new()
                             // .kind(RT_UDP)
                             .typ(TYP_UDP_PACKET)
@@ -172,7 +172,7 @@ pub trait AsyncModule: Send {
                 }
                 IOIntent::TcpConnect(pkt) => {
                     log::info!("Sending captured TCP connect: {:?}", pkt);
-                    super::send(
+                    send(
                         Message::new()
                             // .kind(RT_TCP_CONNECT)
                             .typ(TYP_TCP_CONNECT)
@@ -184,7 +184,7 @@ pub trait AsyncModule: Send {
                 }
                 IOIntent::TcpSendPacket(pkt, delay) => {
                     log::info!("Sending captured TCP packet: {:?}", pkt);
-                    super::send_in(
+                    send_in(
                         Message::new()
                             // .kind(RT_TCP_PACKET)
                             .typ(TYP_TCP_PACKET)
@@ -197,7 +197,7 @@ pub trait AsyncModule: Send {
                 }
                 IOIntent::TcpConnectTimeout(pkt, timeout) => {
                     log::info!("Scheduling TCP Connect Timeout: {:?} in {:?}", pkt, timeout);
-                    super::schedule_in(
+                    schedule_in(
                         Message::new()
                             // .kind(RT_TCP_CONNECT_TIMEOUT)
                             .typ(TYP_TCP_CONNECT_TIMEOUT)
@@ -209,7 +209,7 @@ pub trait AsyncModule: Send {
                 }
                 IOIntent::IoTick(wakeup_time) => {
                     log::info!("Scheduling IO Tick at {}", wakeup_time.as_millis());
-                    super::schedule_at(Message::new().typ(TYP_IO_TICK).build(), wakeup_time);
+                    schedule_at(Message::new().typ(TYP_IO_TICK).build(), wakeup_time);
                 }
                 _ => {
                     log::warn!("Unkown Intent");
@@ -308,7 +308,7 @@ where
             rt.poll_until_idle();
 
             if let Some(next_time) = rt.next_time_poll() {
-                super::schedule_at(Message::new().typ(TYP_WAKEUP).build(), next_time);
+                schedule_at(Message::new().typ(TYP_WAKEUP).build(), next_time);
             }
 
             self.__manage_intents(rt.yield_intents());
@@ -380,7 +380,7 @@ where
             rt.poll_until_idle();
 
             if let Some(next_time) = rt.next_time_poll() {
-                super::schedule_at(Message::new().typ(TYP_WAKEUP).build(), next_time);
+                schedule_at(Message::new().typ(TYP_WAKEUP).build(), next_time);
             }
             self.__manage_intents(rt.yield_intents());
 
@@ -405,7 +405,7 @@ where
                 .expect("Join Error");
 
             if let Some(next_time) = rt.next_time_poll() {
-                super::schedule_at(Message::new().typ(TYP_WAKEUP).build(), next_time);
+                schedule_at(Message::new().typ(TYP_WAKEUP).build(), next_time);
             }
             self.__manage_intents(rt.yield_intents());
 

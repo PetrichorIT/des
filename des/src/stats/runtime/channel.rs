@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::net::{ChannelMetrics, Message, ObjectPath};
+use crate::net::{channel::ChannelMetrics, message::Message, ObjectPath};
 use crate::stats::SlottedActivityTimeline;
 
 /// Defines the slot size used for activity timelines of

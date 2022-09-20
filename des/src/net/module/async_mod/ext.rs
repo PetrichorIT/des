@@ -1,4 +1,4 @@
-use crate::{net::Message, time::SimTime};
+use crate::{net::message::Message, time::SimTime};
 use tokio::{
     sim::SimContext,
     sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},

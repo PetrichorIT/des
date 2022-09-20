@@ -1,10 +1,11 @@
-use crate::net::ChannelRef;
+//! Module-specific network ports.
+
+use crate::net::channel::ChannelRef;
 use std::cell::RefCell;
 use std::fmt::Debug;
 use std::sync::{Arc, Weak};
 
-use super::module::{ModuleContext, ModuleRefWeak};
-use super::ModuleRef;
+use super::module::{ModuleContext, ModuleRef, ModuleRefWeak};
 
 ///
 /// A  reference to a gate.

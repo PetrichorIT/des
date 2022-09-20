@@ -52,6 +52,6 @@ path = "net/main.rs"
 
 [dependencies]
 async-trait = "*"
-des = {path = "../des", features = ["full", "metrics-rt-full"]}
+des = {path = "../des", features = ["full"]}
 log = {version = "*", features = ["max_level_trace", "release_max_level_trace"]}
 rand = "*"
