@@ -287,10 +287,15 @@ impl MessageBuilder {
         self
     }
 
-    /// Sets the field `meta`.
+    /// Sets the field `header`.
+    ///
+    /// Note that the header may change the length field depending on the content
+    /// that may allready be set.
     #[must_use]
     pub fn header(mut self, meta: MessageHeader) -> Self {
+        let old_len = self.header.length;
         self.header = meta;
+        self.header.length = old_len;
         self
     }
 

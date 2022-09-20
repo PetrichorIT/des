@@ -1,5 +1,5 @@
 use crate::net::message::TYP_RESTART;
-use crate::prelude::{ChannelRef, Gate, GateDescription, GateRef, GateServiceType, Message};
+use crate::prelude::{ChannelRef, Gate, GateRef, GateServiceType, Message};
 
 use super::{Module, ModuleContext};
 use std::any::{Any, TypeId};
@@ -314,11 +314,10 @@ impl ModuleRef {
             "The value 'next_hops' must be equal to the size of the gate cluster"
         );
 
-        let descriptor = GateDescription::new(name.to_owned(), size, self, typ);
         let mut ids = Vec::new();
 
         for (i, item) in next_hops.into_iter().enumerate() {
-            let gate = Gate::new(descriptor.clone(), i, channel.clone(), item);
+            let gate = Gate::new(self, name, typ, size, i, channel.clone(), item);
             ids.push(GateRef::clone(&gate));
 
             self.ctx.gates.borrow_mut().push(gate);

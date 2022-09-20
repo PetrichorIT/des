@@ -45,7 +45,6 @@ cfg_net! {
     pub use crate::net::ChannelRef;
 
     pub use crate::net::Gate;
-    pub use crate::net::GateDescription;
     pub use crate::net::GateRef;
     pub use crate::net::GateServiceType;
 
