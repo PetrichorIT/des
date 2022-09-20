@@ -2,11 +2,13 @@ use des::prelude::*;
 
 #[derive(Debug)]
 #[NdlModule("examples/proto")]
-struct AppA {
-    core: ModuleCore,
-}
+struct AppA {}
 
 impl Module for AppA {
+    fn new() -> Self {
+        Self {}
+    }
+
     fn handle_message(&mut self, _msg: Message) {
         // println!("A: [{}] {:?}", SimTime::now(), _msg);
         assert_eq!(SimTime::now(), 1.0);
@@ -15,48 +17,54 @@ impl Module for AppA {
 
 #[derive(Debug)]
 #[NdlModule("examples/proto")]
-struct AppB {
-    core: ModuleCore,
-}
+struct AppB {}
 
 impl Module for AppB {
+    fn new() -> Self {
+        Self {}
+    }
+
     fn handle_message(&mut self, _msg: Message) {
         // println!("B: [{}] {:?}", SimTime::now(), _msg);
-        assert_eq!(SimTime::now(), 1.0);
+        assert_eq!(SimTime::now(), 2.0);
     }
 }
 
 #[derive(Debug)]
 #[NdlModule("examples/proto")]
-struct Runner {
-    core: ModuleCore,
-}
+struct Runner {}
 
 impl Module for Runner {
+    fn new() -> Self {
+        Self {}
+    }
+
     fn handle_message(&mut self, _msg: Message) {}
 }
 
 #[derive(Debug)]
 #[NdlModule("examples/proto")]
-struct MultiRunner {
-    core: ModuleCore,
-}
+struct MultiRunner {}
 
 impl Module for MultiRunner {
+    fn new() -> Self {
+        Self {}
+    }
+
     fn at_sim_start(&mut self, _stage: usize) {
-        self.schedule_at(Message::new().kind(42).build(), 1.0.into());
+        schedule_at(Message::new().kind(42).build(), 1.0.into());
     }
 
     fn handle_message(&mut self, msg: Message) {
         // println!("M: [{}] {:?}", SimTime::now(), msg);
-        if msg.meta().kind == 42 {
-            self.send(msg.dup::<()>(), ("toAppl", 1));
-            self.processing_time(Duration::new(1, 0));
-            self.send(msg, ("toAppl", 2));
-            self.schedule_in(Message::new().kind(69).build(), Duration::new(1, 0));
+        if msg.header().kind == 42 {
+            send(msg.dup::<()>(), ("toAppl", 0));
+            // processing_time(Duration::new(1, 0));
+            send_in(msg, ("toAppl", 1), Duration::from_secs(1));
+            schedule_in(Message::new().kind(69).build(), Duration::new(2, 0));
         } else {
             // Send at 1.0 with processing 1.0 and delay 1.0
-            assert_eq!(SimTime::now(), 2.0);
+            assert_eq!(SimTime::now(), 3.0);
         }
     }
 }
@@ -65,7 +73,8 @@ impl Module for MultiRunner {
 #[derive(Debug, Default)]
 struct Main();
 fn main() {
-    let app: NetworkRuntime<Main> = Main::default().build_rt();
+    // ScopedLogger::new().finish().unwrap();
+    let app = Main::default().build_rt();
 
     // println!("{:?}", app.globals().parameters);
 
@@ -73,7 +82,8 @@ fn main() {
     let (app, _time, _event_count) = rt.run().unwrap();
 
     let _ = app
-        .globals_weak()
+        .globals()
         .topology
+        .borrow()
         .write_to_svg("examples/proto/graph");
 }

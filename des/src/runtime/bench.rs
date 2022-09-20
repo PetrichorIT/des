@@ -8,9 +8,11 @@ use std::{
 use sysinfo::{CpuExt, SystemExt};
 
 #[cfg(feature = "metrics")]
-use crate::stats::ProfilerOutputTarget;
+use crate::stats::{ProfilerOutputTarget, RuntimeMetrics};
+#[cfg(feature = "metrics")]
+use std::cell::RefCell;
 
-use super::{FT_ASYNC, FT_CQUEUE, FT_INTERNAL_METRICS, FT_NET, FT_STD_NET};
+use super::{FT_ASYNC, FT_CQUEUE, FT_INTERNAL_METRICS, FT_NET};
 
 /// A run profiler
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -38,7 +40,7 @@ pub struct Profiler {
 
     /// Internal metrics
     #[cfg(feature = "metrics")]
-    pub metrics: crate::util::PtrMut<crate::stats::RuntimeMetrics>,
+    pub metrics: Arc<RefCell<RuntimeMetrics>>,
 }
 
 impl Profiler {
@@ -53,7 +55,7 @@ impl Profiler {
 
     /// Starts the profile.
     pub(super) fn start(&mut self) {
-        self.time_start = Instant::now()
+        self.time_start = Instant::now();
     }
 
     /// Finishes the profile.
@@ -64,10 +66,16 @@ impl Profiler {
     }
 
     /// Writes into a benchmark folder.
+    ///
+    /// # Errors
+    ///
+    /// Returns an IO error when an underlying IO operation has failed.
+    ///
     #[cfg(feature = "metrics")]
+    #[allow(clippy::explicit_auto_deref)]
     pub fn write_to(&self, target: impl Into<ProfilerOutputTarget>) -> std::io::Result<()> {
         let target = target.into();
-        target.run(&self.metrics)
+        target.run(&*self.metrics.borrow())
         // writeln!(f, "[{}] {{", self.exec)?;
         // writeln!(
         //     f,
@@ -118,7 +126,7 @@ fn is_release() -> bool {
 
 impl Default for Profiler {
     fn default() -> Self {
-        let target = std::env::current_exe().unwrap_or(PathBuf::new());
+        let target = std::env::current_exe().unwrap_or_default();
         let target_is_release = is_release();
 
         let mut exec = target
@@ -136,9 +144,6 @@ impl Default for Profiler {
         }
         if FT_NET {
             features.push("net".into());
-        }
-        if FT_STD_NET {
-            features.push("std-net".into());
         }
         if FT_ASYNC {
             features.push("async".into());
@@ -162,7 +167,7 @@ impl Default for Profiler {
             features,
 
             #[cfg(feature = "metrics")]
-            metrics: crate::util::PtrMut::new(crate::stats::RuntimeMetrics::new()),
+            metrics: Arc::new(RefCell::new(RuntimeMetrics::new())),
         }
     }
 }
@@ -187,8 +192,12 @@ impl ProfilerEnv {
         writeln!(
             f,
             "\t{} / {}",
-            self.system.host_name().unwrap_or("Unknown-System".into()),
-            self.system.long_os_version().unwrap_or(self.os.clone())
+            self.system
+                .host_name()
+                .unwrap_or_else(|| "Unknown-System".into()),
+            self.system
+                .long_os_version()
+                .unwrap_or_else(|| self.os.clone())
         )?;
         writeln!(f, "\t{}-{}-{}", self.arch, self.os_family, self.os)?;
         if let Some(cpu) = self.system.cpus().first() {

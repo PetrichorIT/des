@@ -30,29 +30,21 @@ echo "[des] net + metrics"
 cargo build -p des --features net --features metrics
 echo "[des] net + cqueue + metrics"
 cargo build -p des --features net --features cqueue --features metrics
-echo "[des] net-std"
-cargo build -p des --features net --features std-net
-echo "[des] net-std + cqueue"
-cargo build -p des --features net --features std-net --features cqueue
-echo "[des] net-std + metrics"
-cargo build -p des --features net --features std-net --features metrics
-echo "[des] net-std + cqueue + metrics"
-cargo build -p des --features net --features std-net --features cqueue --features metrics
-echo "[des] net + std-net + async"
+echo "[des] net + async"
 cargo build -p des --features net --features async
-echo "[des] net + std-net + async + cqueue"
+echo "[des] net + async + cqueue"
 cargo build -p des --features net --features cqueue --features async
-echo "[des] net + std-net + async + metrics"
+echo "[des] net + async + metrics"
 cargo build -p des --features net --features metrics --features async
-echo "[des] net + std-net + async + cqueue + metrics"
+echo "[des] net + async + cqueue + metrics"
 cargo build -p des --features net --features cqueue --features metrics --features async
-echo "[des] net + std-net + async + async-sharedrt"
+echo "[des] net + async + async-sharedrt"
 cargo build -p des --features net --features async --features async-sharedrt
-echo "[des] net + std-net + async + async-sharedrt + cqueue"
+echo "[des] net + async + async-sharedrt + cqueue"
 cargo build -p des --features net --features async --features async-sharedrt --features cqueue
-echo "[des] net + std-net + async + async-sharedrt + metrics"
+echo "[des] net + async + async-sharedrt + metrics"
 cargo build -p des --features net --features async --features async-sharedrt --features metrics 
-echo "[des] net + std-net + async + async-sharedrt + cqueue + metrics"
+echo "[des] net + async + async-sharedrt + cqueue + metrics"
 cargo build -p des --features net --features async --features async-sharedrt --features cqueue --features metrics
 
 

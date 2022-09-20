@@ -3,8 +3,8 @@
 //!
 
 use crate::{
+    macros::support::SyncWrap,
     time::{Duration, SimTime},
-    util::SyncWrap,
 };
 use log::warn;
 use rand::{
@@ -20,7 +20,7 @@ use std::{
 };
 
 #[cfg(feature = "metrics")]
-use crate::util::PtrMut;
+use std::sync::Arc;
 
 mod event;
 pub use self::event::*;
@@ -38,7 +38,6 @@ pub(crate) mod logger;
 pub use self::logger::*;
 
 pub(crate) const FT_NET: bool = cfg!(feature = "net");
-pub(crate) const FT_STD_NET: bool = cfg!(feature = "std-net");
 pub(crate) const FT_CQUEUE: bool = cfg!(feature = "cqueue");
 pub(crate) const FT_INTERNAL_METRICS: bool = cfg!(feature = "metrics");
 pub(crate) const FT_ASYNC: bool = cfg!(feature = "async");
@@ -143,21 +142,19 @@ impl<A> Runtime<A>
 where
     A: Application,
 {
-    ///
-    /// Returns the current number of events on enqueud.
-    ///
-    #[allow(unused)]
-    pub(crate) fn num_non_zero_events_queued(&self) -> usize {
-        self.future_event_set.len_nonzero()
-    }
+    // ///
+    // /// Returns the current number of events on enqueud.
+    // ///
+    // pub(crate) fn num_non_zero_events_queued(&self) -> usize {
+    //     self.future_event_set.len_nonzero()
+    // }
 
-    ///
-    /// Returns the current number of events on enqueud.
-    ///
-    #[allow(unused)]
-    pub(crate) fn num_zero_events_queued(&self) -> usize {
-        self.future_event_set.len_zero()
-    }
+    // ///
+    // /// Returns the current number of events on enqueud.
+    // ///
+    // pub(crate) fn num_zero_events_queued(&self) -> usize {
+    //     self.future_event_set.len_zero()
+    // }
 
     ///
     /// Returns the number of events that were dispatched on this [`Runtime`] instance.
@@ -182,14 +179,12 @@ where
         SimTime::now()
     }
 
-    ///
-    /// Returns the random number generator by mutable refernce
-    ///
-    #[allow(unused)]
-    #[allow(clippy::unused_self)]
-    pub(crate) fn rng(&mut self) -> *mut StdRng {
-        self::rng()
-    }
+    // ///
+    // /// Returns the random number generator by mutable refernce
+    // ///
+    // pub(crate) fn rng(&mut self) -> *mut StdRng {
+    //     self::rng()
+    // }
 
     ///
     /// Returns the rng.
@@ -360,7 +355,7 @@ where
 
         let node = self.future_event_set.fetch_next(
             #[cfg(feature = "metrics")]
-            PtrMut::clone(&self.profiler.metrics),
+            Arc::clone(&self.profiler.metrics),
         );
 
         self.itr += 1;
@@ -371,7 +366,7 @@ where
                 time,
                 event,
                 #[cfg(feature = "metrics")]
-                PtrMut::clone(&self.profiler.metrics),
+                Arc::clone(&self.profiler.metrics),
             );
             return false;
         }
@@ -473,7 +468,7 @@ where
                 #[cfg(feature = "metrics")]
                 {
                     println!("\u{23A2}");
-                    self.profiler.metrics.finish()
+                    self.profiler.metrics.borrow_mut().finish();
                 }
 
                 println!("\u{23A3}");
@@ -500,7 +495,7 @@ where
                 #[cfg(feature = "metrics")]
                 {
                     println!("\u{23A2}");
-                    self.profiler.metrics.finish()
+                    self.profiler.metrics.borrow_mut().finish();
                 }
 
                 println!("\u{23A3}");
@@ -603,7 +598,7 @@ where
             time,
             event,
             #[cfg(feature = "metrics")]
-            PtrMut::clone(&self.profiler.metrics),
+            Arc::clone(&self.profiler.metrics),
         );
     }
 }
@@ -793,8 +788,7 @@ impl<A> RuntimeResult<A> {
 }
 
 cfg_net! {
-    use crate::net::{GateRefMut, HandleMessageEvent, Message, MessageAtGateEvent, Module, NetEvents, NetworkRuntime};
-    use crate::util::PtrWeakMut;
+    use crate::net::{gate::GateRef,  HandleMessageEvent, message::Message, MessageAtGateEvent, module::ModuleRef, NetEvents, NetworkRuntime};
 
     impl<A> Runtime<NetworkRuntime<A>> {
         ///
@@ -802,12 +796,12 @@ cfg_net! {
         ///
         pub fn add_message_onto(
             &mut self,
-            gate: GateRefMut,
+            gate: GateRef,
             message: impl Into<Message>,
             time: SimTime,
         ) {
             let event = MessageAtGateEvent {
-                gate: gate.make_const(),
+                gate,
                 message: message.into(),
             };
 
@@ -819,7 +813,7 @@ cfg_net! {
         ///
         pub fn handle_message_on(
             &mut self,
-            module: impl Into<PtrWeakMut<dyn Module>>,
+            module: impl Into<ModuleRef>,
             message: impl Into<Message>,
             time: SimTime,
         ) {

@@ -14,7 +14,7 @@ keywords = ["async", "simulation", "tokio", "net"]
 license = "MIT"
 readme = "../README.md"
 repository = "https://github.com/PetrichorIT/des"
-version = "0.3.3"
+version = "0.4.0"
 
 [features]
 # Include nothing by default
@@ -23,12 +23,11 @@ default = []
 # Include everything used for default test runs.
 full = ["net", "cqueue", "async"]
 
-async = ["net", "std-net", "dep:tokio", "dep:async-trait"]
+async = ["net", "dep:tokio", "dep:async-trait"]
 async-sharedrt = ["async"]
 cqueue = []
 
 net = ["dep:des_macros"]
-std-net = ["net"]
 
 # Different metrics features
 metrics = []
@@ -37,14 +36,14 @@ metrics-rt-full = ["metrics"]
 
 [dependencies]
 # An internal logging impl can be very usefull. 
-log = {version = "0.4.14"}
-termcolor = "1.1.2"
+log = {version = "0.4"}
+termcolor = "1.1"
 
 # Rand primives must be set since they are bound to the
 # runtime and sould be seedable by the user.
 rand = {version = "*", features = ["std_rng"]}
 
-sysinfo = "0.25"
+sysinfo = "0.26"
 
 # All other dependencies are optional
 async-trait = {version = "0.1", optional = true}
@@ -53,8 +52,8 @@ des_macros = {path = "../des_macros", optional = true}
 tokio = {path = "../../tokio_sim/tokio", features = ["sim"], optional = true}
 
 [dev-dependencies]
-futures = "0.3.21"
-serial_test = "0.8.0"
+futures = "0.3"
+serial_test = "0.9"
 
 [package.metadata.docs.rs]
 all-features = true

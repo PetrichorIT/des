@@ -1,11 +1,12 @@
 cfg_not_cqueue! {
     mod default_impl {
-        #[allow(unused)]
-        use crate::{stats::Statistic, runtime::{Application, EventNode, RuntimeOptions}, time::SimTime, util::*};
+        use crate::{runtime::{Application, EventNode, RuntimeOptions}, time::SimTime};
         use std::collections::{BinaryHeap, VecDeque};
 
         #[cfg(feature = "metrics")]
-        use crate::stats::RuntimeMetrics;
+        use crate::stats::{Statistic, RuntimeMetrics};
+        #[cfg(feature = "metrics")]
+        use std::{cell::RefCell, sync::Arc};
 
         pub(crate) struct FutureEventSet<A>
         where
@@ -21,7 +22,7 @@ cfg_not_cqueue! {
         where
             A: Application,
         {
-            #[allow(clippy::unused_self)]
+
             pub(crate) fn descriptor(&self) -> String {
                 "FutureEventSet::BinaryHeap()".to_string()
             }
@@ -58,11 +59,11 @@ cfg_not_cqueue! {
             #[allow(clippy::let_and_return)]
             pub(crate) fn fetch_next(
                 &mut self,
-                #[cfg(feature = "metrics")] mut metrics: crate::util::PtrMut<
-                    RuntimeMetrics,
-                >,
+                #[cfg(feature = "metrics")]  metrics: Arc<RefCell<RuntimeMetrics>>,
             ) -> EventNode<A> {
                 // Internal runtime metrics
+                #[cfg(feature = "metrics")]
+                let mut metrics = metrics.borrow_mut();
 
                 let event = if let Some(event) = self.zero_queue.pop_front() {
                     #[cfg(feature = "metrics")]
@@ -102,22 +103,26 @@ cfg_not_cqueue! {
                 &mut self,
                 time: SimTime,
                 event: impl Into<A::EventSet>,
-                #[cfg(feature = "metrics")] mut metrics: crate::util::PtrMut<
-                    RuntimeMetrics,
-                >,
+                #[cfg(feature = "metrics")]  metrics: Arc<RefCell<RuntimeMetrics>>,
             ) {
                 assert!(
                     time >= self.last_event_simtime,
                     "Sorry we cannot timetravel yet"
                 );
 
-                let node = EventNode::create_no_id(event.into(), time);
+                let node = EventNode {
+                    id: 0,
+                    event: event.into(),
+                    time,
+
+                    _phantom: std::marker::PhantomData,
+                };
 
                 if self.last_event_simtime == time {
                     self.zero_queue.push_back(node);
                 } else {
                     #[cfg(feature = "metrics")]
-                    metrics
+                    metrics.borrow_mut()
                         .non_zero_event_wait_time
                         .collect_at((time - SimTime::now()).as_secs_f64(), SimTime::now());
 
@@ -132,16 +137,17 @@ cfg_not_cqueue! {
 
 cfg_cqueue! {
     mod cqueue_impl {
-        #[allow(unused)]
-        use super::*;
         use std::marker::PhantomData;
 
-        #[allow(unused)]
-        use crate::{stats::Statistic, runtime::{Application, EventNode, RuntimeOptions}, time::{Duration, SimTime}, util::*};
+        #[cfg(feature = "metrics")]
+        use std::{sync::Arc, cell::RefCell};
+        #[cfg(feature = "metrics")]
+        use crate::stats::{Statistic, RuntimeMetrics};
+
+
+        use crate::{runtime::{Application, EventNode, RuntimeOptions}, time::SimTime};
         use crate::cqueue::{CQueue, CQueueOptions, Node};
 
-        #[cfg(feature = "metrics")]
-        use crate::stats::RuntimeMetrics;
 
 
         pub(crate) struct FutureEventSet<A>
@@ -164,15 +170,15 @@ cfg_cqueue! {
                 self.inner.len()
             }
 
-            pub(crate) fn len_nonzero(&self) -> usize {
-                // self.inner.len_nonzero()
-                self.inner.len_nonzero()
-            }
+            // pub(crate) fn len_nonzero(&self) -> usize {
+            //     // self.inner.len_nonzero()
+            //     self.inner.len_nonzero()
+            // }
 
-            pub(crate) fn len_zero(&self) -> usize {
-                // self.inner.len_zero()
-                self.inner.len_zero()
-            }
+            // pub(crate) fn len_zero(&self) -> usize {
+            //     // self.inner.len_zero()
+            //     self.inner.len_zero()
+            // }
 
             pub(crate) fn is_empty(&self) -> bool {
                 self.inner.is_empty()
@@ -190,11 +196,17 @@ cfg_cqueue! {
             }
 
             #[inline]
+            #[allow(clippy::needless_pass_by_value)]
             pub(crate) fn fetch_next(
                 &mut self,
-                #[cfg(feature = "metrics")] mut metrics: PtrMut<RuntimeMetrics>,
+                #[cfg(feature = "metrics")]  metrics: Arc<RefCell<RuntimeMetrics>>,
             ) -> EventNode<A> {
+
                 #[cfg(feature = "metrics")]
+                let mut metrics = metrics.borrow_mut();
+
+                #[cfg(feature = "metrics")]
+                #[allow(clippy::cast_precision_loss)]
                 {
                     use std::ops::AddAssign;
                     let is_zero_time = self.inner.len_zero() > 0;
@@ -207,6 +219,8 @@ cfg_cqueue! {
                         metrics.nonzero_event_count.add_assign(1);
                     }
 
+                    #[cfg(feature = "metrics-rt-full")]
+                    #[allow(clippy::cast_precision_loss)]
                     metrics.event_count.collect(self.len() as f64);
                 }
 
@@ -244,16 +258,17 @@ cfg_cqueue! {
                 }
             }
 
+            #[allow(clippy::needless_pass_by_value)]
             pub(crate) fn add(
                 &mut self,
                 time: SimTime,
                 event: impl Into<A::EventSet>,
-                #[cfg(feature = "metrics")] mut metrics: PtrMut<RuntimeMetrics>,
+                #[cfg(feature = "metrics")]  metrics: Arc<RefCell<RuntimeMetrics>>,
             ) {
                 #[cfg(feature = "metrics")]
                 {
                     if time > self.inner.time() {
-                        metrics
+                        metrics.borrow_mut()
                             .non_zero_event_wait_time
                             .collect_at((time - SimTime::now()).as_secs_f64(), SimTime::now());
                     }

@@ -162,7 +162,6 @@ impl CompressedStdDev {
     ///
     /// Creates  a new instance of [`CompressedStdDev`].
     ///
-    #[allow(unused)]
     #[must_use]
     pub fn new(bound: usize) -> Self {
         Self {

@@ -3,38 +3,33 @@ use des::{prelude::*, runtime::ScopedLogger};
 #[NdlModule("examples/metrics")]
 #[derive(Debug)]
 struct Alice {
-    core: ModuleCore,
     outvec: OutVec,
 }
 
-impl NameableModule for Alice {
-    fn named(core: ModuleCore) -> Self {
+impl Module for Alice {
+    fn new() -> Self {
         Self {
-            outvec: OutVec::new("sample_vec".to_string(), Some(core.path().clone()))
+            outvec: OutVec::new("sample_vec".to_string(), Some(module_path()))
                 .buffer_max(100)
                 .result_dir(String::from("examples/metrics/results")),
-            core,
         }
     }
-}
 
-impl Module for Alice {
     fn at_sim_start(&mut self, _: usize) {
-        self.enable_activity(Duration::from_secs_f64(1.0))
-    }
-
-    fn activity(&mut self) {
-        self.outvec.collect(rand::random::<f64>());
-        if SimTime::now() == 42.0 {
-            log::trace!("Message");
-        }
+        schedule_in(Message::new().build(), Duration::from_secs_f64(1.0))
     }
 
     fn at_sim_end(&mut self) {
         self.outvec.finish()
     }
 
-    fn handle_message(&mut self, _: Message) {}
+    fn handle_message(&mut self, _: Message) {
+        self.outvec.collect(rand::random::<f64>());
+        if SimTime::now() == 42.0 {
+            log::trace!("Message");
+        }
+        schedule_in(Message::new().build(), Duration::from_secs_f64(1.0))
+    }
 }
 
 #[NdlSubsystem("examples/metrics")]

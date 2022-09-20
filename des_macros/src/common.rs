@@ -7,7 +7,7 @@ use quote::quote;
 use quote::ToTokens;
 use syn::*;
 use syn::punctuated::Punctuated;
-use syn::token::{Comma, Colon2, Brace};
+use syn::token::Comma;
 use std::{collections::HashMap, path::PathBuf, sync::Mutex};
 
 use proc_macro2::TokenStream as TokenStream2;
@@ -101,7 +101,7 @@ pub fn ident_from_conident(
             let ident_token = ident!(format!("{}_child_{}_gate{}", child_ident, gate_ident, pos));
 
             token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                let mut #ident_token: ::des::net::GateRefMut = #submodule_ident.gate_mut(#gate_ident, #pos)
+                let mut #ident_token: ::des::net::gate::GateRef = #submodule_ident.gate(#gate_ident, #pos)
                     .expect(&format!("Internal macro err. Could not find child gate '{}[{}]'.", #gate_ident, #pos)).clone();
             });
 
@@ -113,7 +113,7 @@ pub fn ident_from_conident(
             let ident = ident!(format!("{}_gate{}_ref", gate_ident, pos));
 
             token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                let mut #ident: ::des::net::GateRefMut = this.gate_mut(#gate_ident, #pos)
+                let mut #ident: ::des::net::gate::GateRef = this.gate(#gate_ident, #pos)
                     .expect(&format!("Internal macro err. Could not find local gate '{}[{}]'.", #gate_ident, #pos)).clone();
             });
 
@@ -148,10 +148,6 @@ pub fn build_impl_from(ident: Ident, wrapped: WrappedTokenStream, submodules: &[
     // }
     // for ty in  (0..proto_t_counter).map(|i| ident!(format!("T{}", i))) {
 
-        let mut segments = Punctuated::new();
-        segments.push(PathSegment { ident: ident!("des"), arguments: PathArguments::None });
-        segments.push(PathSegment { ident: ident!("net"), arguments: PathArguments::None });
-        segments.push(PathSegment { ident: ident!("NameableModule"), arguments: PathArguments::None });
 
         let mut segments_2 = Punctuated::new();
         segments_2.push(PathSegment { ident: ident!("des"), arguments: PathArguments::None });
@@ -161,18 +157,11 @@ pub fn build_impl_from(ident: Ident, wrapped: WrappedTokenStream, submodules: &[
         let mut segments_3 = Punctuated::new();
         segments_3.push(PathSegment { ident: ident!("des"), arguments: PathArguments::None });
         segments_3.push(PathSegment { ident: ident!("net"), arguments: PathArguments::None });
+        segments_3.push(PathSegment { ident: ident!("module"), arguments: PathArguments::None });
         segments_3.push(PathSegment { ident: ident!("Module"), arguments: PathArguments::None });
 
         let mut bounds = Punctuated::new();
-        bounds.push(TypeParamBound::Trait(TraitBound {
-            paren_token: None,
-            modifier: TraitBoundModifier::None,
-            lifetimes: None,
-            path: Path {
-                leading_colon: None,
-                segments,
-            },
-        }));
+      
         bounds.push(TypeParamBound::Trait(TraitBound {
             paren_token: None,
             modifier: TraitBoundModifier::None,
@@ -210,9 +199,10 @@ pub fn build_impl_from(ident: Ident, wrapped: WrappedTokenStream, submodules: &[
 
     quote! {
         impl ::des::net::#build_trait for #ident {
-            fn build<#puntuated_a>(mut this: ::des::util::PtrMut<Self>, ctx: &mut ::des::net::BuildContext<'_, A>) 
-            -> ::des::util::PtrMut<Self> {
+            fn build<#puntuated_a>(mut this: ::des::net::module::ModuleRef, ctx: &mut ::des::net::BuildContext<'_, A>) 
+            -> ::des::net::module::ModuleRef {
                 use des::net::*;
+                use des::net::module::*;
                 
                 #wrapped
                 this
@@ -223,193 +213,7 @@ pub fn build_impl_from(ident: Ident, wrapped: WrappedTokenStream, submodules: &[
 }
 
 
-pub fn gen_named_object(ident: Ident, data: &DataStruct) -> Result<TokenStream2> {
-    match &data.fields {
-        syn::Fields::Named(FieldsNamed { named, .. }) => {
-            if named.len() == 1 {
-                let field = named.first().unwrap().ident.clone().unwrap();
-                Ok(quote! {
-                    impl ::des::net::NameableModule for #ident {
-                        fn named(core: ::des::net::ModuleCore) -> Self {
-                            Self { #field: core }
-                        }
-                    }
-                })
-            } else {
-                Ok(TokenStream2::new())
-            }
-        }
-        syn::Fields::Unnamed(FieldsUnnamed { unnamed, .. }) => {
-            if unnamed.len() == 1 {
-                Ok(quote! {
-                    impl ::des::net::NameableModule for #ident {
-                        fn named(core: ::des::net::ModuleCore) -> Self {
-                            Self(core)
-                        }
-                    }
-                })
-            } else {
-                Ok(TokenStream2::new())
-            }
-        }
-        _ => Ok(TokenStream2::new()),
-    }
-}
 
 
 
-pub fn derive_deref(
-    ident: Ident,
-    data: &mut DataStruct,
-    out: &mut TokenStream,
-    searched_ty: &str,
-) -> Result<()> {
-    let token_stream: TokenStream2;
-    let ty_path = {
-        let mut segments = Punctuated::new();
-        segments.push(PathSegment {
-            ident: Ident::new("des", Span::call_site()),
-            arguments: PathArguments::None,
-        });
-        segments.push(PathSegment {
-            ident: Ident::new("net", Span::call_site()),
-            arguments: PathArguments::None,
-        });
-        segments.push(PathSegment {
-            ident: Ident::new(searched_ty, Span::call_site()),
-            arguments: PathArguments::None,
-        });
 
-        Type::Path(TypePath {
-            qself: None,
-            path: Path {
-                leading_colon: Some(Colon2::default()),
-                segments,
-            },
-        })
-    };
-
-    let elem_ident = {
-        match &data.fields {
-            syn::Fields::Named(FieldsNamed { named, .. }) => named
-                .iter()
-                .find(|f| {
-                    if let Type::Path(ty) = &f.ty {
-                        ty.path.segments.last().unwrap().ident
-                            == Ident::new(
-                                searched_ty,
-                                ty.path.segments.last().unwrap().ident.span(),
-                            )
-                    } else {
-                        false
-                    }
-                })
-                .map(|field| (Some(field.ident.clone().unwrap()), 0)),
-            syn::Fields::Unnamed(FieldsUnnamed { unnamed, .. }) => unnamed
-                .iter()
-                .enumerate()
-                .find(|(_, f)| {
-                    if let Type::Path(ty) = &f.ty {
-                        ty.path.segments.last().unwrap().ident
-                            == Ident::new(
-                                searched_ty,
-                                ty.path.segments.last().unwrap().ident.span(),
-                            )
-                    } else {
-                        false
-                    }
-                })
-                .map(|(idx, _)| (None, idx)),
-            syn::Fields::Unit => None,
-        }
-    };
-
-    let (eident, idx) = match elem_ident {
-        Some(v) => v,
-        None => match &mut data.fields {
-            syn::Fields::Named(FieldsNamed { named, .. }) => {
-                // build sgements
-
-                named.push(Field {
-                    attrs: Vec::new(),
-                    vis: Visibility::Inherited,
-                    ident: Some(Ident::new("__core", Span::call_site())),
-                    colon_token: None,
-                    ty: ty_path.clone(),
-                });
-
-                (Some(Ident::new("__core", Span::call_site())), 0)
-            }
-            syn::Fields::Unnamed(FieldsUnnamed { unnamed, ..}) => {
-                unnamed.insert(0, Field {
-                    attrs: Vec::new(),
-                    vis: Visibility::Inherited,
-                    ident: None,
-                    colon_token: None,
-                    ty: ty_path.clone(),
-                });
-
-                (None, 0)
-            },
-            syn::Fields::Unit => {
-                let mut named = Punctuated::new();
-                named.push(Field {
-                    attrs: Vec::new(),
-                    vis: Visibility::Inherited,
-                    ident: Some(Ident::new("__core", Span::call_site())),
-                    colon_token: None,
-                    ty: ty_path.clone(),
-                });
-
-                data.fields = Fields::Named(FieldsNamed { named, brace_token: Brace { span: Span::call_site()} });
-
-                (Some(Ident::new("__core", Span::call_site())), 0)
-            },
-        },
-    };
-
-    if searched_ty == "ModuleCore" { 
-        token_stream = gen_named_object(ident.clone(), data)?; 
-        out.extend::<TokenStream>(token_stream.into());
-    }
-    
-
-    if let Some(eident) = eident {
-        out.extend::<TokenStream>(
-            quote! {
-                impl ::std::ops::Deref for #ident {
-                    type Target = #ty_path;
-                    fn deref(&self) -> &Self::Target {
-                        &self.#eident
-                    }
-                }
-                impl ::std::ops::DerefMut for #ident {
-                    fn deref_mut(&mut self) -> &mut Self::Target {
-                        &mut self.#eident
-                    }
-                }
-            }
-            .into(),
-        );
-    } else {
-        let idx = syn::Index::from(idx);
-        out.extend::<TokenStream>(
-            quote! {
-                impl ::std::ops::Deref for #ident {
-                    type Target = #ty_path;
-                    fn deref(&self) -> &Self::Target {
-                        &self.#idx
-                    }
-                }
-                impl ::std::ops::DerefMut for #ident {
-                    fn deref_mut(&mut self) -> &mut Self::Target {
-                        &mut self.#idx
-                    }
-                }
-            }
-            .into(),
-        );
-    }
-
-    Ok(())
-}

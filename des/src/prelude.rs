@@ -6,8 +6,6 @@
 // # Generic core exports
 //
 
-pub use crate::assert_eq_time;
-
 pub use crate::runtime::Runtime;
 pub use crate::runtime::RuntimeOptions;
 pub use crate::runtime::RuntimeResult;
@@ -24,7 +22,6 @@ pub use crate::runtime::sample;
 pub use crate::runtime::sim_time;
 
 pub use crate::runtime::ScopedLogger;
-pub use crate::runtime::StandardLogger;
 
 //
 // # Metrics & Misc
@@ -35,60 +32,48 @@ pub use crate::stats::OutVec;
 pub use crate::stats::Statistic;
 pub use crate::stats::StdDev;
 
-pub use crate::util::Ptr;
-pub use crate::util::PtrConst;
-pub use crate::util::PtrMut;
-
-pub use crate::util::PtrWeak;
-pub use crate::util::PtrWeakConst;
-pub use crate::util::PtrWeakMut;
-
 //
 // # feature = "net"
 //
 
 cfg_net! {
+    pub use crate::net::hooks::create_hook;
+
+    pub use crate::net::message::CustomSizeBody;
+    pub use crate::net::message::Message;
+    pub use crate::net::message::MessageBody;
+    pub use crate::net::message::MessageId;
+    pub use crate::net::message::MessageKind;
+    pub use crate::net::message::MessageHeader;
+    pub use crate::net::message::MessageType;
+
+    pub use crate::net::message::{send, send_in, send_at, schedule_in, schedule_at};
+
     pub use crate::net::NetworkRuntime;
     pub use crate::net::NetworkRuntimeGlobals;
 
-    pub use crate::net::Channel;
-    pub use crate::net::ChannelMetrics;
-    pub use crate::net::ChannelRef;
-    pub use crate::net::ChannelRefMut;
+    pub use crate::net::channel::Channel;
+    pub use crate::net::channel::ChannelMetrics;
+    pub use crate::net::channel::ChannelRef;
 
-    pub use crate::net::Gate;
-    pub use crate::net::GateDescription;
-    pub use crate::net::GateRef;
-    pub use crate::net::GateRefMut;
-    pub use crate::net::GateServiceType;
-    pub use crate::net::IntoModuleGate;
+    pub use crate::net::gate::Gate;
+    pub use crate::net::gate::GateRef;
+    pub use crate::net::gate::GateServiceType;
 
-    pub use crate::net::CustomSizeBody;
-    pub use crate::net::Message;
-    pub use crate::net::MessageBody;
-    pub use crate::net::MessageId;
-    pub use crate::net::MessageKind;
-    pub use crate::net::MessageMetadata;
 
-    pub use crate::net::NodeAddress;
-    pub use crate::net::Packet;
-    pub use crate::net::PacketHeader;
-    pub use crate::net::PortAddress;
-    pub use crate::net::NODE_ADDR_BROADCAST;
-    pub use crate::net::NODE_ADDR_LOOPBACK;
+    pub use crate::net::module::Module;
+    pub use crate::net::module::ModuleId;
+    pub use crate::net::module::ModuleRef;
+    pub use crate::net::module::ModuleReferencingError;
 
-    pub use crate::net::Module;
-    pub use crate::net::ModuleCore;
-    pub use crate::net::ModuleId;
-    pub use crate::net::ModuleRef;
-    pub use crate::net::ModuleRefMut;
-    pub use crate::net::ModuleReferencingError;
-    pub use crate::net::NameableModule;
-    pub use crate::net::StaticModuleCore;
+    pub use crate::net::module::{
+        child, gate, gates, module_id, module_name, module_path, par, parent, pars, shutdow_and_restart_at, shutdow_and_restart_in, shutdown
+    };
 
-    pub use crate::net::StaticSubsystemCore;
-    pub use crate::net::SubsystemCore;
-    pub use crate::net::SubsystemId;
+    pub use crate::net::subsystem::Subsystem;
+    pub use crate::net::subsystem::SubsystemRef;
+    pub use crate::net::subsystem::SubsystemContext;
+    pub use crate::net::subsystem::SubsystemId;
 
     pub use crate::net::ObjectPath;
     pub use crate::net::Parameters;
@@ -97,9 +82,15 @@ cfg_net! {
     pub use crate::net::Topology;
 
     cfg_async! {
-        pub use crate::net::AsyncModule;
-        pub use crate::net::MessageType;
+        pub use crate::net::module::AsyncModule;
     }
+
+    pub use std::net::IpAddr;
+    pub use std::net::Ipv4Addr;
+    pub use std::net::Ipv6Addr;
+    pub use std::net::SocketAddr;
+    pub use std::net::SocketAddrV4;
+    pub use std::net::SocketAddrV6;
 
     //
     // Export the derives if net

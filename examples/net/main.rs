@@ -3,7 +3,6 @@ use std::net::IpAddr;
 use std::net::Ipv4Addr;
 
 use des::prelude::*;
-use des::stats::ProfilerOutputTarget;
 use des::tokio;
 use des::tokio::io::AsyncReadExt;
 use des::tokio::io::AsyncWriteExt;
@@ -11,24 +10,29 @@ use des::tokio::net::IOContext;
 use des::tokio::net::TcpListener;
 use des::tokio::net::TcpStream;
 
-const REQ_STR: [&'static [u8]; 5] = [b"100b", b"1k", b"10k", b"100k", b"1mb"];
+const REQ_STR: [&[u8]; 5] = [b"100b", b"1k", b"10k", b"100k", b"1mb"];
 
 #[NdlModule("examples/net")]
 struct Client {}
 
 #[async_trait::async_trait]
 impl AsyncModule for Client {
+    fn new() -> Self {
+        Self {}
+    }
+
     async fn at_sim_start(&mut self, _: usize) {
-        let ip = self.par("ip").unwrap().parse::<Ipv4Addr>().unwrap();
+        let ip = par("ip").unwrap().parse::<Ipv4Addr>().unwrap();
         IOContext::new(random::<[u8; 6]>(), ip).set();
 
         // if ip.octets()[3] != 120 {
         //     return;
         // }
 
-        self.send(Message::new().content(IpAddr::V4(ip)).build(), "out");
-
-        let handle = self.async_handle();
+        send(
+            Message::new().kind(10).content(IpAddr::V4(ip)).build(),
+            "out",
+        );
 
         tokio::spawn(async move {
             let delay = random::<f64>() * 10.0;
@@ -38,7 +42,7 @@ impl AsyncModule for Client {
 
             for _ in 0..3 {
                 let i = random::<usize>() % 5;
-                sock.write_all(&REQ_STR[i]).await.unwrap();
+                sock.write_all(REQ_STR[i]).await.unwrap();
 
                 let mut header = [0u8; 4];
                 sock.read_exact(&mut header).await.unwrap();
@@ -51,7 +55,7 @@ impl AsyncModule for Client {
             }
 
             let delay = random::<f64>() * 10.0 + 5.0;
-            handle.shutdown(Some(SimTime::now() + delay))
+            shutdow_and_restart_at(SimTime::now() + delay)
         });
     }
 }
@@ -61,11 +65,18 @@ struct Server {}
 
 #[async_trait::async_trait]
 impl AsyncModule for Server {
+    fn new() -> Self {
+        Self {}
+    }
+
     async fn at_sim_start(&mut self, _: usize) {
-        let ip = self.par("ip").unwrap().parse::<Ipv4Addr>().unwrap();
+        let ip = par("ip").unwrap().parse::<Ipv4Addr>().unwrap();
         IOContext::new(random::<[u8; 6]>(), ip).set();
 
-        self.send(Message::new().content(IpAddr::V4(ip)).build(), "out");
+        send(
+            Message::new().kind(10).content(IpAddr::V4(ip)).build(),
+            "out",
+        );
 
         tokio::spawn(async {
             let sock = TcpListener::bind("0.0.0.0:8000").await.unwrap();
@@ -134,34 +145,32 @@ struct Router {
     fwd: HashMap<IpAddr, GateRef>,
 }
 
-impl NameableModule for Router {
-    fn named(core: ModuleCore) -> Self {
+impl Module for Router {
+    fn new() -> Self {
         Self {
-            __core: core,
             fwd: HashMap::new(),
         }
     }
-}
 
-impl Module for Router {
     fn handle_message(&mut self, msg: Message) {
-        match msg.try_as_packet() {
-            Ok(pkt) => {
-                let dest = pkt.header().dest_node;
-                let gate = self.fwd.get(&dest).unwrap().clone();
-                self.send(pkt, gate)
-            }
-            Err(msg) => {
+        // println!("{:?}", msg);
+        match msg.header().kind {
+            10 => {
                 let (addr, meta) = msg.cast::<IpAddr>();
                 let last_gate = meta.last_gate.as_ref().unwrap();
                 let last_gate = match last_gate.name() {
-                    "in" => self.gate("out", last_gate.pos()),
-                    "in_server" => self.gate("out_server", 0),
+                    "in" => gate("out", last_gate.pos()),
+                    "in_server" => gate("out_server", 0),
                     _ => unreachable!(),
                 }
                 .unwrap();
                 log::info!("Added fwd entry for {} --> {:?}", addr, last_gate.str());
                 self.fwd.insert(addr, last_gate);
+            }
+            _ => {
+                let dest = msg.header().dest_addr.ip();
+                let gate = self.fwd.get(&dest).unwrap().clone();
+                send(msg, gate)
             }
         }
     }
@@ -183,13 +192,13 @@ fn main() {
         RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(10000))),
     );
 
-    let (_, _, profiler, _) = rt.run().unwrap_premature_abort();
-    profiler
-        .write_to(
-            ProfilerOutputTarget::new()
-                .write_into("net.output")
-                .write_event_count_into("net.event_count.json"),
-        )
-        .unwrap();
+    let (_, _, _profiler, _) = rt.run().unwrap_premature_abort();
+    // profiler
+    //     .write_to(
+    //         ProfilerOutputTarget::new()
+    //             .write_into("net.output")
+    //             .write_event_count_into("net.event_count.json"),
+    //     )
+    //     .unwrap();
     // profiler.write_to("net.out.json").unwrap()
 }

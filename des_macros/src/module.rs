@@ -11,9 +11,9 @@ use proc_macro2::Span;
 use proc_macro_error::{Diagnostic, Level};
 use quote::quote;
 use syn::Visibility;
-use syn::{AttributeArgs, Data, DeriveInput, Ident};
+use syn::{AttributeArgs, DeriveInput, Ident};
 
-pub fn derive_impl(mut input: DeriveInput, attrs: AttributeArgs) -> Result<TokenStream> {
+pub fn derive_impl(input: DeriveInput, attrs: AttributeArgs) -> Result<TokenStream> {
     let attr = Attr::from_args(attrs)?;
     let ident = input.ident.clone();
 
@@ -21,19 +21,19 @@ pub fn derive_impl(mut input: DeriveInput, attrs: AttributeArgs) -> Result<Token
     let mut derive_stream = TokenStream::new();
 
     // (1) Cast to data struct, This macro can only be applied to struct.
-    let data = match &mut input.data {
-        Data::Struct(data) => data,
-        _ => {
-            return Err(Diagnostic::new(
-                Level::Error,
-                "Failed to find a field containing a module core.".to_string(),
-            )
-            .help(String::from("Try adding a module core to the struct.")))
-        }
-    };
+    // let data = match &mut input.data {
+    //     Data::Struct(data) => data,
+    //     _ => {
+    //         return Err(Diagnostic::new(
+    //             Level::Error,
+    //             "Failed to find a field containing a module core.".to_string(),
+    //         )
+    //         .help(String::from("Try adding a module core to the struct.")))
+    //     }
+    // };
 
     // (2) Derive the deref impls / generate that approiated changes in the data struct.
-    derive_deref(ident.clone(), data, &mut derive_stream, "ModuleCore")?;
+    // derive_deref(ident.clone(), data, &mut derive_stream, "ModuleCore")?;
     generate_dynamic_builder(input.vis.clone(), ident, attr, &mut derive_stream)?;
 
     let mut structdef_stream: TokenStream = quote! {
@@ -62,7 +62,17 @@ fn generate_dynamic_builder(
 ) -> Result<()> {
     let workspace = match &attr.workspace {
         Some(ref w) => w,
-        None => return Ok(()),
+        None => {
+            // Implement emoty build
+            out.extend::<TokenStream>(
+                quote! {
+                    impl ::des::net::__Buildable0 for #ident {}
+                }
+                .into(),
+            );
+
+            return Ok(());
+        }
     };
 
     match get_resolver(workspace) {
@@ -99,8 +109,8 @@ fn generate_dynamic_builder(
                     }
                 };
                 token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                        let mut #ident: ::des::util::PtrMut<#ty> = #ty::build_named_with_parent(#descriptor, &mut this, ctx);
-                    })
+                        let mut #ident: ::des::net::module::ModuleRef = #ty::build_named_with_parent(#descriptor, this.clone(), ctx);
+                });
             }
 
             // Gate configuration
@@ -116,8 +126,8 @@ fn generate_dynamic_builder(
                     Span::call_site(),
                 );
                 token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                        let _ = this.create_gate_cluster(#ident, #size, ::des::net::GateServiceType::#typ, ctx.rt());
-                    })
+                        let _ = this.create_gate_cluster(#ident, #size, ::des::net::gate::GateServiceType::#typ);
+                });
             }
 
             // Connection configuration.
@@ -146,12 +156,12 @@ fn generate_dynamic_builder(
                     } = channel;
 
                     token_stream.extend(quote! {
-                        let channel = ::des::net::Channel::new(
+                        let channel = ::des::net::channel::Channel::new(
                             ::des::net::ObjectPath::channel_with(
                                 &format!("{}->{}", #from_ident.name(), #to_ident.name()),
-                                this.path()
+                                &this.path()
                             ),
-                            ::des::net::ChannelMetrics {
+                            ::des::net::channel::ChannelMetrics {
                                 bitrate: #bitrate,
                                 latency: ::des::time::Duration::from_secs_f64(#latency),
                                 jitter: ::des::time::Duration::from_secs_f64(#jitter),

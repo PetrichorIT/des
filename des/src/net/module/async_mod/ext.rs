@@ -1,4 +1,4 @@
-use crate::{net::Message, time::SimTime};
+use crate::{net::message::Message, time::SimTime};
 use tokio::{
     sim::SimContext,
     sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
@@ -9,9 +9,8 @@ pub(crate) struct AsyncCoreExt {
     #[cfg(not(feature = "async-sharedrt"))]
     pub(crate) rt: Option<std::sync::Arc<tokio::runtime::Runtime>>,
 
-    pub(crate) buffers: UnboundedReceiver<super::BufferEvent>,
-    pub(crate) handle: UnboundedSender<super::BufferEvent>,
-
+    // pub(crate) buffers: UnboundedReceiver<super::BufferEvent>,
+    // pub(crate) handle: UnboundedSender<super::BufferEvent>,
     pub(crate) ctx: Option<SimContext>,
 
     pub(crate) wait_queue_tx: UnboundedSender<WaitingMessage>,
@@ -27,7 +26,7 @@ pub(crate) struct AsyncCoreExt {
 
 impl AsyncCoreExt {
     pub(crate) fn new(ident: String) -> AsyncCoreExt {
-        let (tx, rx) = unbounded_channel();
+        // let (tx, rx) = unbounded_channel();
         let (wtx, wrx) = unbounded_channel();
         let (stx, srx) = unbounded_channel();
 
@@ -35,9 +34,8 @@ impl AsyncCoreExt {
             #[cfg(not(feature = "async-sharedrt"))]
             rt: Some(std::sync::Arc::new(tokio::runtime::Runtime::new().unwrap())),
 
-            buffers: rx,
-            handle: tx,
-
+            // buffers: rx,
+            // handle: tx,
             ctx: Some(SimContext::empty().with_io().with_time(ident)),
 
             wait_queue_tx: wtx,
@@ -56,14 +54,16 @@ impl AsyncCoreExt {
     pub(crate) fn reset(&mut self) {
         self.rt = Some(std::sync::Arc::new(tokio::runtime::Runtime::new().unwrap()));
 
-        self.ctx.as_mut().map(|ctx| ctx.reset());
+        if let Some(ctx) = self.ctx.as_mut() {
+            ctx.reset();
+        }
 
-        let (tx, rx) = unbounded_channel();
+        // let (tx, rx) = unbounded_channel();
         let (wtx, wrx) = unbounded_channel();
         let (stx, srx) = unbounded_channel();
 
-        self.buffers = rx;
-        self.handle = tx;
+        // self.buffers = rx;
+        // self.handle = tx;
 
         self.wait_queue_tx = wtx;
         self.wait_queue_rx = Some(wrx);
@@ -78,8 +78,8 @@ impl AsyncCoreExt {
 }
 
 #[derive(Debug)]
-#[allow(unused)]
 pub(crate) struct WaitingMessage {
     pub(crate) msg: Message,
+    #[allow(dead_code)]
     pub(crate) time: SimTime,
 }

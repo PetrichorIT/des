@@ -8,11 +8,17 @@ use std::str::FromStr;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::task::JoinHandle;
 
+use des::net::{BuildContext, __Buildable0};
+
 #[NdlModule]
 struct TcpBindTests {}
 
 #[async_trait::async_trait]
 impl AsyncModule for TcpBindTests {
+    fn new() -> Self {
+        Self {}
+    }
+
     async fn at_sim_start(&mut self, _: usize) {
         // Set IO Context
         IOContext::new([1, 2, 3, 4, 5, 6], Ipv4Addr::new(192, 168, 2, 112)).set();
@@ -106,10 +112,9 @@ impl AsyncModule for TcpBindTests {
 #[serial]
 fn tcp_listener_binds() {
     let mut rt = NetworkRuntime::new(());
-    let module = TcpBindTests::named_root(ModuleCore::new_with(
-        ObjectPath::root_module("RootModule".to_string()),
-        Ptr::downgrade(&rt.globals()),
-    ));
+    let mut cx = BuildContext::new(&mut rt);
+    let module =
+        TcpBindTests::build_named(ObjectPath::root_module("RootModule".to_string()), &mut cx);
 
     rt.create_module(module);
 
@@ -122,17 +127,12 @@ struct TcpConnectPing {
     handle: Option<JoinHandle<()>>,
 }
 
-impl NameableModule for TcpConnectPing {
-    fn named(core: ModuleCore) -> Self {
-        Self {
-            __core: core,
-            handle: None,
-        }
-    }
-}
-
 #[async_trait::async_trait]
 impl AsyncModule for TcpConnectPing {
+    fn new() -> Self {
+        Self { handle: None }
+    }
+
     async fn at_sim_start(&mut self, _: usize) {
         IOContext::new([1, 2, 3, 4, 5, 6], Ipv4Addr::new(192, 168, 2, 110)).set();
         self.handle = Some(tokio::spawn(async {
@@ -190,17 +190,12 @@ struct TcpConnectPong {
     handle: Option<JoinHandle<()>>,
 }
 
-impl NameableModule for TcpConnectPong {
-    fn named(core: ModuleCore) -> Self {
-        Self {
-            __core: core,
-            handle: None,
-        }
-    }
-}
-
 #[async_trait::async_trait]
 impl AsyncModule for TcpConnectPong {
+    fn new() -> Self {
+        Self { handle: None }
+    }
+
     async fn at_sim_start(&mut self, _: usize) {
         self.handle = Some(tokio::spawn(async {
             IOContext::new([1, 2, 3, 4, 5, 6], Ipv4Addr::new(192, 168, 2, 112)).set();
@@ -227,30 +222,26 @@ impl AsyncModule for TcpConnectPong {
 #[serial]
 fn tcp_connection_buildup() {
     let mut rt = NetworkRuntime::new(());
-    let mut ping = TcpConnectPing::named_root(ModuleCore::new_with(
-        ObjectPath::root_module("ping".to_string()),
-        Ptr::downgrade(&rt.globals()),
-    ));
-    let ping_in = ping.create_gate("in", GateServiceType::Input, &mut rt);
-    let mut ping_out = ping.create_gate("out", GateServiceType::Output, &mut rt);
+    let mut cx = BuildContext::new(&mut rt);
 
-    let mut pong = TcpConnectPong::named_root(ModuleCore::new_with(
-        ObjectPath::root_module("pang".to_string()),
-        Ptr::downgrade(&rt.globals()),
-    ));
-    let pong_in = pong.create_gate("in", GateServiceType::Input, &mut rt);
-    let mut pong_out = pong.create_gate("out", GateServiceType::Output, &mut rt);
+    let ping = TcpConnectPing::build_named(ObjectPath::root_module("ping".to_string()), &mut cx);
+    let ping_in = ping.create_gate("in", GateServiceType::Input);
+    let ping_out = ping.create_gate("out", GateServiceType::Output);
+
+    let pong = TcpConnectPong::build_named(ObjectPath::root_module("pang".to_string()), &mut cx);
+    let pong_in = pong.create_gate("in", GateServiceType::Input);
+    let pong_out = pong.create_gate("out", GateServiceType::Output);
 
     ping_out.set_next_gate(pong_in);
     pong_out.set_next_gate(ping_in);
 
     let ping_to_pong = Channel::new(
-        ObjectPath::channel_with("to_pong", ping.path()),
+        ObjectPath::channel_with("to_pong", &ping.path()),
         ChannelMetrics::new(1000, Duration::from_millis(100), Duration::ZERO),
     );
 
     let pong_to_ping = Channel::new(
-        ObjectPath::channel_with("to_ping", pong.path()),
+        ObjectPath::channel_with("to_ping", &pong.path()),
         ChannelMetrics::new(1000, Duration::from_millis(100), Duration::ZERO),
     );
 
@@ -269,17 +260,12 @@ struct TcpFullPing {
     handle: Option<JoinHandle<()>>,
 }
 
-impl NameableModule for TcpFullPing {
-    fn named(core: ModuleCore) -> Self {
-        Self {
-            __core: core,
-            handle: None,
-        }
-    }
-}
-
 #[async_trait::async_trait]
 impl AsyncModule for TcpFullPing {
+    fn new() -> Self {
+        Self { handle: None }
+    }
+
     async fn handle_message(&mut self, _: Message) {}
 
     async fn at_sim_start(&mut self, _: usize) {
@@ -331,17 +317,12 @@ struct TcpFullPong {
     handle: Option<JoinHandle<()>>,
 }
 
-impl NameableModule for TcpFullPong {
-    fn named(core: ModuleCore) -> Self {
-        Self {
-            __core: core,
-            handle: None,
-        }
-    }
-}
-
 #[async_trait::async_trait]
 impl AsyncModule for TcpFullPong {
+    fn new() -> Self {
+        Self { handle: None }
+    }
+
     async fn handle_message(&mut self, _: Message) {}
 
     async fn at_sim_start(&mut self, _: usize) {
@@ -365,17 +346,12 @@ struct TcpFullPang {
     handle: Option<JoinHandle<()>>,
 }
 
-impl NameableModule for TcpFullPang {
-    fn named(core: ModuleCore) -> Self {
-        Self {
-            __core: core,
-            handle: None,
-        }
-    }
-}
-
 #[async_trait::async_trait]
 impl AsyncModule for TcpFullPang {
+    fn new() -> Self {
+        Self { handle: None }
+    }
+
     async fn handle_message(&mut self, _: Message) {}
 
     async fn at_sim_start(&mut self, _: usize) {
@@ -400,12 +376,15 @@ impl AsyncModule for TcpFullPang {
 struct TcpFullRouter {}
 
 impl Module for TcpFullRouter {
+    fn new() -> Self {
+        Self {}
+    }
+
     fn handle_message(&mut self, msg: Message) {
-        if msg.meta().typ() == MessageType::Tcp {
-            let msg = msg.as_packet();
-            match msg.header().dest_node {
-                IpAddr::V4(ip) if ip == Ipv4Addr::new(192, 168, 2, 110) => self.send(msg, "out1"),
-                IpAddr::V4(ip) if ip == Ipv4Addr::new(192, 168, 2, 112) => self.send(msg, "out2"),
+        if msg.header().typ() == MessageType::Tcp {
+            match msg.header().dest_addr.ip() {
+                IpAddr::V4(ip) if ip == Ipv4Addr::new(192, 168, 2, 110) => send(msg, "out1"),
+                IpAddr::V4(ip) if ip == Ipv4Addr::new(192, 168, 2, 112) => send(msg, "out2"),
                 _ => unreachable!(),
             }
         } else {
@@ -429,40 +408,30 @@ fn tcp_full_test() {
     //     .unwrap();
 
     let mut rt = NetworkRuntime::new(());
-    let mut ping = TcpFullPing::named_root(ModuleCore::new_with(
-        ObjectPath::root_module("ping".to_string()),
-        Ptr::downgrade(&rt.globals()),
-    ));
-    let ping_in1 = ping.create_gate("in1", GateServiceType::Input, &mut rt);
+    let mut cx = BuildContext::new(&mut rt);
 
-    let ping_in2 = ping.create_gate("in2", GateServiceType::Input, &mut rt);
+    let ping = TcpFullPing::build_named(ObjectPath::root_module("ping".to_string()), &mut cx);
+    let ping_in1 = ping.create_gate("in1", GateServiceType::Input);
 
-    let mut router = TcpFullRouter::named_root(ModuleCore::new_with(
-        ObjectPath::root_module("router".to_string()),
-        Ptr::downgrade(&rt.globals()),
-    ));
+    let ping_in2 = ping.create_gate("in2", GateServiceType::Input);
 
-    let mut ping_out = ping.create_gate("out", GateServiceType::Output, &mut rt);
-    let ping_router_in = router.create_gate("in", GateServiceType::Input, &mut rt);
+    let router = TcpFullRouter::build_named(ObjectPath::root_module("router".to_string()), &mut cx);
+
+    let ping_out = ping.create_gate("out", GateServiceType::Output);
+    let ping_router_in = router.create_gate("in", GateServiceType::Input);
 
     ping_out.set_next_gate(ping_router_in);
 
-    let mut ping_out1 = router.create_gate("out1", GateServiceType::Output, &mut rt);
-    let mut ping_out2 = router.create_gate("out2", GateServiceType::Output, &mut rt);
+    let ping_out1 = router.create_gate("out1", GateServiceType::Output);
+    let ping_out2 = router.create_gate("out2", GateServiceType::Output);
 
-    let mut pong = TcpFullPong::named_root(ModuleCore::new_with(
-        ObjectPath::root_module("pong".to_string()),
-        Ptr::downgrade(&rt.globals()),
-    ));
-    let pong_in = pong.create_gate("in", GateServiceType::Input, &mut rt);
-    let mut pong_out = pong.create_gate("out", GateServiceType::Output, &mut rt);
+    let pong = TcpFullPong::build_named(ObjectPath::root_module("pong".to_string()), &mut cx);
+    let pong_in = pong.create_gate("in", GateServiceType::Input);
+    let pong_out = pong.create_gate("out", GateServiceType::Output);
 
-    let mut pang = TcpFullPang::named_root(ModuleCore::new_with(
-        ObjectPath::root_module("pang".to_string()),
-        Ptr::downgrade(&rt.globals()),
-    ));
-    let pang_in = pang.create_gate("in", GateServiceType::Input, &mut rt);
-    let mut pang_out = pang.create_gate("out", GateServiceType::Output, &mut rt);
+    let pang = TcpFullPang::build_named(ObjectPath::root_module("pang".to_string()), &mut cx);
+    let pang_in = pang.create_gate("in", GateServiceType::Input);
+    let pang_out = pang.create_gate("out", GateServiceType::Output);
 
     // ping pong connections
     ping_out1.set_next_gate(pong_in);
@@ -475,12 +444,12 @@ fn tcp_full_test() {
     // Channels
 
     let ping_to_pong = Channel::new(
-        ObjectPath::channel_with("to_pong", ping.path()),
+        ObjectPath::channel_with("to_pong", &ping.path()),
         ChannelMetrics::new(1000, Duration::from_millis(100), Duration::ZERO),
     );
 
     let pong_to_ping = Channel::new(
-        ObjectPath::channel_with("to_ping_from_pong", pong.path()),
+        ObjectPath::channel_with("to_ping_from_pong", &pong.path()),
         ChannelMetrics::new(1000, Duration::from_millis(100), Duration::ZERO),
     );
 
@@ -488,12 +457,12 @@ fn tcp_full_test() {
     pong_out.set_channel(pong_to_ping);
 
     let ping_to_pang = Channel::new(
-        ObjectPath::channel_with("to_pang", ping.path()),
+        ObjectPath::channel_with("to_pang", &ping.path()),
         ChannelMetrics::new(1000000, Duration::from_millis(10), Duration::ZERO),
     );
 
     let pang_to_ping = Channel::new(
-        ObjectPath::channel_with("to_ping_from_pang", pong.path()),
+        ObjectPath::channel_with("to_ping_from_pang", &pong.path()),
         ChannelMetrics::new(1000000, Duration::from_millis(10), Duration::ZERO),
     );
 
@@ -513,6 +482,10 @@ struct IoDelayReceiver {}
 
 #[async_trait::async_trait]
 impl AsyncModule for IoDelayReceiver {
+    fn new() -> Self {
+        Self {}
+    }
+
     async fn at_sim_start(&mut self, _: usize) {
         IOContext::new([1, 2, 3, 4, 5, 6], Ipv4Addr::new(192, 168, 2, 10)).set();
 
@@ -534,17 +507,12 @@ struct IoDelaySender {
     handle: Option<JoinHandle<()>>,
 }
 
-impl NameableModule for IoDelaySender {
-    fn named(core: ModuleCore) -> Self {
-        Self {
-            __core: core,
-            handle: None,
-        }
-    }
-}
-
 #[async_trait::async_trait]
 impl AsyncModule for IoDelaySender {
+    fn new() -> Self {
+        Self { handle: None }
+    }
+
     async fn at_sim_start(&mut self, _: usize) {
         IOContext::new([1, 2, 3, 4, 5, 6], Ipv4Addr::new(192, 168, 2, 9)).set();
 
@@ -621,21 +589,17 @@ impl AsyncModule for IoDelaySender {
 #[serial]
 fn delayed_write() {
     let mut rt = NetworkRuntime::new(());
-    let mut rx = IoDelayReceiver::named_root(ModuleCore::new_with(
-        ObjectPath::root_module("receiver".to_string()),
-        Ptr::downgrade(&rt.globals()),
-    ));
+    let mut cx = BuildContext::new(&mut rt);
 
-    let rx_in = rx.create_gate("in", GateServiceType::Input, &mut rt);
-    let mut rx_out = rx.create_gate("out", GateServiceType::Output, &mut rt);
+    let rx = IoDelayReceiver::build_named(ObjectPath::root_module("receiver".to_string()), &mut cx);
 
-    let mut tx = IoDelaySender::named_root(ModuleCore::new_with(
-        ObjectPath::root_module("sender".to_string()),
-        Ptr::downgrade(&rt.globals()),
-    ));
+    let rx_in = rx.create_gate("in", GateServiceType::Input);
+    let rx_out = rx.create_gate("out", GateServiceType::Output);
 
-    let tx_in = tx.create_gate("in", GateServiceType::Input, &mut rt);
-    let mut tx_out = tx.create_gate("out", GateServiceType::Output, &mut rt);
+    let tx = IoDelaySender::build_named(ObjectPath::root_module("sender".to_string()), &mut cx);
+
+    let tx_in = tx.create_gate("in", GateServiceType::Input);
+    let tx_out = tx.create_gate("out", GateServiceType::Output);
 
     rx_out.set_next_gate(tx_in);
     tx_out.set_next_gate(rx_in);

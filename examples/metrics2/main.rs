@@ -6,29 +6,23 @@ struct HastyModule {
     peak: f64,
 }
 
-impl NameableModule for HastyModule {
-    fn named(core: ModuleCore) -> Self {
-        Self {
-            __core: core,
-            peak: 0.0,
-        }
-    }
-}
-
 impl Module for HastyModule {
+    fn new() -> Self {
+        Self { peak: 0.0 }
+    }
+
     fn at_sim_start(&mut self, _: usize) {
-        self.peak = self
-            .par("peak")
+        self.peak = par("peak")
             .as_optional()
-            .unwrap_or("10.0".to_string())
+            .unwrap_or_else(|| "10.0".to_string())
             .parse::<f64>()
             .expect("Parse fail");
 
-        self.schedule_in(Message::new().kind(69).build(), Duration::from_millis(10));
+        schedule_in(Message::new().kind(69).build(), Duration::from_millis(10));
     }
 
     fn handle_message(&mut self, _: Message) {
-        self.schedule_in(Message::new().kind(69).build(), Duration::from_millis(10));
+        schedule_in(Message::new().kind(69).build(), Duration::from_millis(10));
 
         let diff = (SimTime::now().as_secs_f64() - self.peak).abs() / 100.0;
         let inv = 1.0 - diff;
@@ -36,7 +30,7 @@ impl Module for HastyModule {
 
         let probe = random::<f64>();
         if probe < inv {
-            self.send(
+            send(
                 Message::new()
                     .content(CustomSizeBody::new(8 * 1024, ()))
                     .build(),
@@ -51,11 +45,14 @@ impl Module for HastyModule {
 struct Collector {}
 
 impl Module for Collector {
+    fn new() -> Self {
+        Self {}
+    }
+
     fn handle_message(&mut self, _: Message) {}
 
     fn at_sim_end(&mut self) {
-        let chan = self
-            .gate("out", 0)
+        let chan = gate("out", 0)
             .expect("Expected gate")
             .channel()
             .expect("Expected chan");
@@ -70,6 +67,9 @@ impl Module for Collector {
 struct Consumer {}
 
 impl Module for Consumer {
+    fn new() -> Self {
+        Self {}
+    }
     fn handle_message(&mut self, _: Message) {}
 }
 

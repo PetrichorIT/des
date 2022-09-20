@@ -1,6 +1,5 @@
 #!/bin/bash
 
-cargo run --release --bin t-inet
 cargo run --release --bin t-metrics
 cargo run --release --bin t-metrics2 --features des/metrics
 cargo run --release --bin t-ndl

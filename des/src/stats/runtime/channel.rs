@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::net::*;
+use crate::net::{channel::ChannelMetrics, message::Message, ObjectPath};
 use crate::stats::SlottedActivityTimeline;
 
 /// Defines the slot size used for activity timelines of
@@ -27,7 +27,7 @@ pub(crate) struct InProgressChannelStats {
 
 impl InProgressChannelStats {
     ///
-    /// Creates a new instance of [ChannelStats].
+    /// Creates a new instance of [`ChannelStats`].
     ///
     pub(crate) fn new(channel: ObjectPath, metrics: ChannelMetrics) -> Self {
         Self {
@@ -67,7 +67,7 @@ impl InProgressChannelStats {
 
     pub(crate) fn register_message_passed(&mut self, msg: &Message) {
         self.num_messages_passed += 1;
-        self.num_bytes_passed += msg.byte_len;
+        self.num_bytes_passed += msg.length() as usize;
 
         let busy = self.metrics.calculate_busy(msg);
         self.busy_time += busy;
@@ -77,7 +77,7 @@ impl InProgressChannelStats {
 
     pub(crate) fn register_message_dropped(&mut self, msg: &Message) {
         self.num_messages_dropped += 1;
-        self.num_bytes_dropped += msg.byte_len;
+        self.num_bytes_dropped += msg.length() as usize;
     }
 }
 
@@ -102,18 +102,22 @@ pub struct ChannelStats {
 
 #[allow(missing_docs)]
 impl ChannelStats {
+    #[must_use]
     pub fn total_messages(&self) -> usize {
         self.num_messages_passed + self.num_messages_droppped
     }
 
+    #[must_use]
     pub fn message_pass_probability(&self) -> f64 {
         self.num_messages_passed as f64 / self.total_messages() as f64
     }
 
+    #[must_use]
     pub fn total_bytes(&self) -> usize {
         self.num_bytes_passed + self.num_bytes_dropped
     }
 
+    #[must_use]
     pub fn byte_pass_probability(&self) -> f64 {
         self.num_bytes_passed as f64 / self.total_bytes() as f64
     }

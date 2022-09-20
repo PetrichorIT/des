@@ -1,28 +1,25 @@
+//! Physical link abstractions.
 #![allow(clippy::cast_precision_loss)]
 
 use rand::distributions::Uniform;
 use rand::prelude::StdRng;
 use rand::Rng;
+use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::fmt::Display;
+use std::sync::Arc;
 
 use crate::net::runtime::ChannelUnbusyNotif;
-use crate::net::{Message, MessageAtGateEvent, NetEvents, ObjectPath};
+use crate::net::{message::Message, MessageAtGateEvent, NetEvents, ObjectPath};
 use crate::runtime::{rng, Runtime};
 use crate::time::{Duration, SimTime};
-use crate::util::{Ptr, PtrConst, PtrMut};
 
-use super::{GateRef, NetworkRuntime};
+use super::{gate::GateRef, NetworkRuntime};
 
 ///
 /// A readonly reference to a channel.
 ///
-pub type ChannelRef = PtrConst<Channel>;
-
-///
-/// A mutable reference to a channel.
-///
-pub type ChannelRefMut = PtrMut<Channel>;
+pub type ChannelRef = Arc<Channel>;
 
 ///
 /// Metrics that define a channels capabilitites.
@@ -37,11 +34,10 @@ pub struct ChannelMetrics {
     pub latency: Duration,
     /// The variance in latency.
     pub jitter: Duration,
-    /// The size of the channels queue in bytes.
-    pub queuesize: usize,
-
     /// A userdefined cost for the channel.
     pub cost: f64,
+    /// The size of the channels queue in bytes.
+    pub queuesize: usize,
 }
 
 impl ChannelMetrics {
@@ -82,7 +78,7 @@ impl ChannelMetrics {
             return Duration::ZERO;
         }
 
-        let len = msg.bit_len;
+        let len = msg.length() * 8;
         let transmission_time = Duration::from_secs_f64(len as f64 / self.bitrate as f64);
         if self.jitter == Duration::ZERO {
             self.latency + transmission_time
@@ -101,7 +97,7 @@ impl ChannelMetrics {
         if self.bitrate == 0 {
             Duration::ZERO
         } else {
-            let len = msg.bit_len;
+            let len = msg.length() * 8;
             Duration::from_secs_f64(len as f64 / self.bitrate as f64)
         }
     }
@@ -126,6 +122,11 @@ impl Eq for ChannelMetrics {}
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 #[derive(Debug)]
 pub struct Channel {
+    inner: RefCell<ChannelInner>,
+}
+
+#[derive(Debug)]
+struct ChannelInner {
     /// The path.
     path: ObjectPath,
 
@@ -151,8 +152,8 @@ impl Channel {
     /// The object path of the channel.
     ///
     #[must_use]
-    pub fn path(&self) -> &ObjectPath {
-        &self.path
+    pub fn path(&self) -> ObjectPath {
+        self.inner.borrow().path.clone()
     }
 
     ///
@@ -160,8 +161,8 @@ impl Channel {
     /// independent from its current state.
     ///
     #[must_use]
-    pub fn metrics(&self) -> &ChannelMetrics {
-        &self.metrics
+    pub fn metrics(&self) -> ChannelMetrics {
+        self.inner.borrow().metrics
     }
 
     ///
@@ -173,16 +174,17 @@ impl Channel {
     ///
     #[must_use]
     pub fn is_busy(&self) -> bool {
-        self.busy
+        self.inner.borrow().busy
     }
 
     ///
     /// Sets the channel busy, announcing that the message will be trabńsmitted
     /// in '`sim_time`' time units.
     ///
-    pub(crate) fn set_busy_until(&mut self, sim_time: SimTime) {
-        self.busy = true;
-        self.transmission_finish_time = sim_time;
+    pub(crate) fn set_busy_until(&self, sim_time: SimTime) {
+        let mut chan = self.inner.borrow_mut();
+        chan.busy = true;
+        chan.transmission_finish_time = sim_time;
     }
 
     ///
@@ -191,7 +193,7 @@ impl Channel {
     ///
     #[must_use]
     pub fn transmission_finish_time(&self) -> SimTime {
-        self.transmission_finish_time
+        self.inner.borrow().transmission_finish_time
     }
 
     ///
@@ -199,20 +201,22 @@ impl Channel {
     /// with an initially unbusy state.
     ///
     #[must_use]
-    pub fn new(path: ObjectPath, metrics: ChannelMetrics) -> ChannelRefMut {
-        Ptr::new(Self {
-            path,
-            metrics,
-            busy: false,
-            transmission_finish_time: SimTime::ZERO,
-            buffer: VecDeque::new(),
-            buffer_len: 0,
-
-            #[cfg(feature = "metrics")]
-            stats: crate::stats::InProgressChannelStats::new(
-                ObjectPath::root_module("chan".to_string()),
+    pub fn new(path: ObjectPath, metrics: ChannelMetrics) -> ChannelRef {
+        ChannelRef::new(Channel {
+            inner: RefCell::new(ChannelInner {
+                path,
                 metrics,
-            ),
+                busy: false,
+                transmission_finish_time: SimTime::ZERO,
+                buffer: VecDeque::new(),
+                buffer_len: 0,
+
+                #[cfg(feature = "metrics")]
+                stats: crate::stats::InProgressChannelStats::new(
+                    ObjectPath::root_module("chan"),
+                    metrics,
+                ),
+            }),
         })
     }
 
@@ -221,26 +225,28 @@ impl Channel {
     ///
     #[cfg(feature = "metrics")]
     pub fn calculate_stats(&self) -> crate::stats::ChannelStats {
-        self.stats
+        self.inner
+            .borrow()
+            .stats
             .evaluate(SimTime::now().duration_since(SimTime::MIN))
     }
 
-    #[cfg(feature = "metrics")]
-    pub(crate) fn register_message_passed(&mut self, msg: &Message) {
-        self.stats.register_message_passed(msg)
-    }
+    // #[cfg(feature = "metrics")]
+    // pub(crate) fn register_message_passed(&self, msg: &Message) {
+    //     self.inner.borrow_mut().stats.register_message_passed(msg)
+    // }
 
-    #[cfg(feature = "metrics")]
-    pub(crate) fn register_message_dropped(&mut self, msg: &Message) {
-        self.stats.register_message_dropped(msg)
-    }
+    // #[cfg(feature = "metrics")]
+    // pub(crate) fn register_message_dropped(&self, msg: &Message) {
+    //     self.inner.borrow_mut().stats.register_message_dropped(msg)
+    // }
 
     ///
     /// Calcualtes the packet travel duration using the
     /// underlying metric.
     ///
     pub fn calculate_duration(&self, msg: &Message, rng: &mut StdRng) -> Duration {
-        self.metrics.calculate_duration(msg, rng)
+        self.inner.borrow().metrics.calculate_duration(msg, rng)
     }
 
     ///
@@ -249,20 +255,21 @@ impl Channel {
     ///
     #[must_use]
     pub fn calculate_busy(&self, msg: &Message) -> Duration {
-        self.metrics.calculate_busy(msg)
+        self.inner.borrow().metrics.calculate_busy(msg)
     }
 
     pub(super) fn send_message<A>(
-        mut self: PtrMut<Self>,
+        self: Arc<Self>,
         msg: Message,
         next_gate: &GateRef,
         rt: &mut Runtime<NetworkRuntime<A>>,
     ) {
         let rng_ref = rng();
+        let mut chan = self.inner.borrow_mut();
 
-        if self.is_busy() {
-            let msg_size = msg.byte_len;
-            if self.buffer_len + msg_size > self.metrics.queuesize {
+        if chan.busy {
+            let msg_size = msg.length();
+            if chan.buffer_len + msg_size > chan.metrics.queuesize {
                 log::warn!(
                     "Gate '{}' dropping message [{}] pushed onto busy channel {}",
                     next_gate.previous_gate().unwrap().name(),
@@ -273,32 +280,33 @@ impl Channel {
                 // Register message progress (DROP)
                 #[cfg(feature = "metrics")]
                 {
-                    self.register_message_dropped(&msg);
+                    chan.stats.register_message_dropped(&msg);
                 }
 
                 drop(msg);
-                log_scope!()
+                log_scope!();
             } else {
                 log::trace!(
                     "Gate '{}' added message [{}] to queue",
                     next_gate.previous_gate().unwrap().name(),
                     msg.str()
                 );
-                self.buffer_len += msg.byte_len;
-                self.buffer.push_back((msg, Ptr::clone(next_gate)));
+                chan.buffer_len += msg.length();
+                chan.buffer.push_back((msg, Arc::clone(next_gate)));
             }
         } else {
             // Register message progress (SUCC)
             #[cfg(feature = "metrics")]
             {
-                self.register_message_passed(&msg);
+                chan.stats.register_message_passed(&msg);
             }
 
-            let dur = self.calculate_duration(&msg, rng_ref);
-            let busy = self.calculate_busy(&msg);
+            let dur = chan.metrics.calculate_duration(&msg, rng_ref);
+            let busy = chan.metrics.calculate_busy(&msg);
 
             let transmissin_finish = SimTime::now() + busy;
 
+            drop(chan);
             self.set_busy_until(transmissin_finish);
 
             rt.add_event(
@@ -312,7 +320,7 @@ impl Channel {
 
             rt.add_event(
                 NetEvents::MessageAtGateEvent(MessageAtGateEvent {
-                    gate: Ptr::clone(next_gate),
+                    gate: Arc::clone(next_gate),
                     message: msg,
                 }),
                 next_event_time,
@@ -327,13 +335,16 @@ impl Channel {
     ///
     /// Resets the busy state of a channel.
     ///
-    pub(crate) fn unbusy<A>(mut self: PtrMut<Self>, rt: &mut Runtime<NetworkRuntime<A>>) {
-        self.busy = false;
-        self.transmission_finish_time = SimTime::ZERO;
+    pub(crate) fn unbusy<A>(self: Arc<Self>, rt: &mut Runtime<NetworkRuntime<A>>) {
+        let mut chan = self.inner.borrow_mut();
 
-        if let Some((msg, next_gate)) = self.buffer.pop_front() {
-            self.buffer_len -= msg.byte_len;
-            self.send_message(msg, &next_gate, rt)
+        chan.busy = false;
+        chan.transmission_finish_time = SimTime::ZERO;
+
+        if let Some((msg, next_gate)) = chan.buffer.pop_front() {
+            chan.buffer_len -= msg.length();
+            drop(chan);
+            self.send_message(msg, &next_gate, rt);
         }
     }
 }

@@ -11,9 +11,9 @@ use quote::quote;
 use syn::punctuated::Punctuated;
 use syn::token::Comma;
 use syn::Visibility;
-use syn::{AttributeArgs, Data, DeriveInput};
+use syn::{AttributeArgs, DeriveInput};
 
-pub fn derive_impl(mut input: DeriveInput, attrs: AttributeArgs) -> Result<TokenStream> {
+pub fn derive_impl(input: DeriveInput, attrs: AttributeArgs) -> Result<TokenStream> {
     let attr = Attr::from_args(attrs)?;
     let ident = input.ident.clone();
 
@@ -21,19 +21,19 @@ pub fn derive_impl(mut input: DeriveInput, attrs: AttributeArgs) -> Result<Token
     let mut derive_stream = TokenStream::new();
 
     // (1) Cast to data struct, This macro can only be applied to struct.
-    let data = match &mut input.data {
-        Data::Struct(data) => data,
-        _ => {
-            return Err(Diagnostic::new(
-                Level::Error,
-                "Failed to find a field containing a module core.".to_string(),
-            )
-            .help(String::from("Try adding a module core to the struct.")))
-        }
-    };
+    // let data = match &mut input.data {
+    //     Data::Struct(data) => data,
+    //     _ => {
+    //         return Err(Diagnostic::new(
+    //             Level::Error,
+    //             "Failed to find a field containing a module core.".to_string(),
+    //         )
+    //         .help(String::from("Try adding a module core to the struct.")))
+    //     }
+    // };
 
     // (2) Derive the deref impls / generate that approiated changes in the data struct.
-    derive_deref(ident.clone(), data, &mut derive_stream, "SubsystemCore")?;
+    // derive_deref(ident.clone(), data, &mut derive_stream, "SubsystemCore")?;
     subsystem_main(input.vis.clone(), ident, attr, &mut derive_stream)?;
 
     let mut structdef_stream: TokenStream = quote! {
@@ -96,11 +96,11 @@ fn subsystem_main(vis: Visibility, ident: Ident, attr: Attr, out: &mut TokenStre
                         }
 
                         token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                            let mut #ident: ::des::util::PtrMut<#ty> = #ty::build_named::<Self, #p>(#descriptor.parse().unwrap(), ctx);
+                            let mut #ident: ::des::net::module::ModuleRef = #ty::build_named::<SubsystemRef, #p>(#descriptor.parse().unwrap(), ctx);
                         });
                     } else {
                         token_stream.extend::<proc_macro2::TokenStream>(quote! {
-                            let mut #ident: ::des::util::PtrMut<#ty> = #ty::build_named(#descriptor.parse().unwrap(), ctx);
+                            let mut #ident: ::des::net::module::ModuleRef = #ty::build_named(#descriptor.parse().unwrap(), ctx);
                         })
                     }
                 }
@@ -131,12 +131,12 @@ fn subsystem_main(vis: Visibility, ident: Ident, attr: Attr, out: &mut TokenStre
                         } = channel;
 
                         token_stream.extend(quote! {
-                            let channel = ::des::net::Channel::new(
+                            let channel = ::des::net::channel::Channel::new(
                                 ::des::net::ObjectPath::channel_with(
                                     &format!("{}->{}", #from_ident.name(), #to_ident.name()),
                                     &this_path
                                 ),
-                                ::des::net::ChannelMetrics {
+                                ::des::net::channel::ChannelMetrics {
                                     bitrate: #bitrate,
                                     latency: ::des::time::Duration::from_secs_f64(#latency),
                                     jitter: ::des::time::Duration::from_secs_f64(#jitter),
@@ -171,11 +171,11 @@ fn subsystem_main(vis: Visibility, ident: Ident, attr: Attr, out: &mut TokenStre
 
                 let ts = quote! {
                     impl #ident {
-                        pub fn run(self) -> ::des::runtime::RuntimeResult<Self> {
+                        pub fn run(self) -> ::des::runtime::RuntimeResult<::des::net::subsystem::SubsystemRef> {
                             self.run_with_options(::des::runtime::RuntimeOptions::default())
                         }
 
-                        pub fn run_with_options(self, options: ::des::runtime::RuntimeOptions) -> ::des::runtime::RuntimeResult<Self> {
+                        pub fn run_with_options(self, options: ::des::runtime::RuntimeOptions) -> ::des::runtime::RuntimeResult<::des::net::subsystem::SubsystemRef> {
                             use ::des::runtime::Runtime;
                             use ::des::net::NetworkRuntime;
 
@@ -186,14 +186,15 @@ fn subsystem_main(vis: Visibility, ident: Ident, attr: Attr, out: &mut TokenStre
                             rt.run().map_app(|network_app| network_app.finish())
                         }
 
-                        pub fn build_rt(self) -> ::des::net::NetworkRuntime<Self> {
+                        pub fn build_rt(self) -> ::des::net::NetworkRuntime<::des::net::subsystem::SubsystemRef> {
                             let this = self;
-                            let this_path = this.path().clone();
-                            let mut runtime = ::des::net::NetworkRuntime::new(this);
-                            let inner = ::des::util::Ptr::clone(&runtime.inner);
+                            let this_ref = ::des::net::subsystem::SubsystemRef::main(this);
+                            let this_path = this_ref.path();
+
+                            let mut runtime = ::des::net::NetworkRuntime::new(this_ref.clone());
                             let mut builder = ::des::net::BuildContext::new(&mut runtime);
-                            builder.push_subsystem(inner);
-                            let ctx: &mut ::des::net::BuildContext<'_, Self> = &mut builder;
+                            builder.push_subsystem(this_ref.clone());
+                            let ctx: &mut ::des::net::BuildContext<'_, SubsystemRef> = &mut builder;
 
 
                             use ::des::net::*;

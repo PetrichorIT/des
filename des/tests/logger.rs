@@ -1,4 +1,7 @@
-use des::prelude::*;
+use des::{
+    net::{BuildContext, __Buildable0},
+    prelude::*,
+};
 use log::*;
 use serial_test::serial;
 
@@ -38,21 +41,19 @@ fn raw_logger() {
 struct SomeModule {}
 
 impl Module for SomeModule {
+    fn new() -> Self {
+        SomeModule {}
+    }
+
     fn at_sim_start(&mut self, stage: usize) {
         info!("at_sim_start_{}", stage);
         if stage == 1 {
-            self.enable_activity(Duration::from_secs(2));
+            schedule_in(Message::new().build(), Duration::from_secs(2));
         }
     }
 
     fn num_sim_start_stages(&self) -> usize {
         2
-    }
-
-    fn activity(&mut self) {
-        info!("activity");
-        self.disable_activity();
-        self.schedule_in(Message::new().build(), Duration::from_secs(2));
     }
 
     fn handle_message(&mut self, _msg: Message) {
@@ -73,54 +74,39 @@ fn module_auto_scopes() {
         .expect("Failed to set logger");
 
     let mut rt = NetworkRuntime::new(());
-    let globals = Ptr::downgrade(&rt.globals());
+    let mut cx = BuildContext::new(&mut rt);
 
-    let module_a = {
-        let core = ModuleCore::new_with(
-            ObjectPath::root_module("Module A".to_string()),
-            globals.clone(),
-        );
+    let module_a =
+        SomeModule::build_named(ObjectPath::root_module("Module A".to_string()), &mut cx);
+    cx.create_module(module_a);
 
-        Ptr::new(SomeModule::named(core))
-    };
-    rt.create_module(module_a);
+    let module_b =
+        SomeModule::build_named(ObjectPath::root_module("Module B".to_string()), &mut cx);
+    cx.create_module(module_b);
 
-    let module_b = {
-        let core = ModuleCore::new_with(
-            ObjectPath::root_module("Module B".to_string()),
-            globals.clone(),
-        );
-
-        Ptr::new(SomeModule::named(core))
-    };
-    rt.create_module(module_b);
-
-    let module_c = {
-        let core = ModuleCore::new_with(ObjectPath::root_module("Module C".to_string()), globals);
-
-        Ptr::new(SomeModule::named(core))
-    };
-    rt.create_module(module_c);
+    let module_c =
+        SomeModule::build_named(ObjectPath::root_module("Module C".to_string()), &mut cx);
+    cx.create_module(module_c);
 
     let runtime = Runtime::new(rt);
     match runtime.run() {
         RuntimeResult::Finished { time, profiler, .. } => {
             // Event Count
             // 1 SimStart
-            // 3 x 1Activity
+            // no 3 x 1Activity
             // 3 x 1HandleMessage
             // == 7
-            assert_eq!(profiler.event_count, 7);
+            assert_eq!(profiler.event_count, 4);
 
             // Time
-            // Delay 2s until activity + 2 until handle_message
-            assert_eq_time!(time, 4.0);
+            // Delay  2s until handle_message
+            assert_eq!(time.as_secs(), 2);
 
             let scopes = ScopedLogger::yield_scopes();
             assert_eq!(scopes.len(), 3);
             for (trg, scope) in scopes {
                 assert_eq!(trg, *scope.target);
-                assert_eq!(scope.stream.len(), 5);
+                assert_eq!(scope.stream.len(), 4);
 
                 assert!(["Module A", "Module B", "Module C"].contains(&&trg[..]));
 

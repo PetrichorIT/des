@@ -19,7 +19,7 @@ macro_rules! create_global_uid {
             #[repr(transparent)]
             $vis struct $ident(pub $ty);
 
-            static $sident: $crate::util::SyncWrap<::std::cell::Cell<$ty>> = $crate::util::SyncWrap::new(::std::cell::Cell::new(0xff));
+            static $sident: $crate::macros::support::SyncWrap<::std::cell::Cell<$ty>> = $crate::macros::support::SyncWrap::new(::std::cell::Cell::new(0xff));
 
             impl $ident {
                 ///

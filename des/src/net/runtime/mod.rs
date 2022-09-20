@@ -1,17 +1,18 @@
 use super::common::Parameters;
-use crate::net::{Module, ObjectPath, Topology};
+use super::module::ModuleRef;
+use crate::net::{ObjectPath, Topology};
 use crate::runtime::{Application, Runtime};
 use crate::time::SimTime;
-use crate::util::{Ptr, PtrConst, PtrMut, PtrWeak, PtrWeakConst};
-use log::error;
 use log::info;
-use std::{
-    fmt::{Debug, Display},
-    marker::Unsize,
-};
+use std::cell::RefCell;
+use std::fmt::{Debug, Display};
+use std::sync::Arc;
 
 mod events;
 pub(crate) use events::*;
+
+mod ctx;
+pub use self::ctx::*;
 
 ///
 /// A runtime application for a module/network oriantated simulation.
@@ -21,51 +22,38 @@ pub(crate) use events::*;
 pub struct NetworkRuntime<A> {
     ///
     /// The set of module used in the network simulation.
-    /// All module must be boxed, since they must conform to the [Module] trait.
+    /// All module must be boxed, since they must conform to the [`Module`] trait.
     ///
-    module_list: Vec<PtrMut<dyn Module>>,
+    module_list: Vec<ModuleRef>,
 
     ///
     /// The globals provided by the runtime
     /// that cannot be mutated by the users.
     ///
-    globals: PtrMut<NetworkRuntimeGlobals>,
+    globals: Arc<NetworkRuntimeGlobals>,
 
     ///
     /// A inner container for holding user defined global state.
     ///
-    pub inner: PtrMut<A>,
+    pub inner: A,
 }
 
 impl<A> NetworkRuntime<A> {
-    ///
-    /// Returns the globals (readonly) of the entire simulation.
-    ///
-    #[doc(hidden)]
-    #[must_use]
-    pub fn globals_weak(&self) -> PtrWeakConst<NetworkRuntimeGlobals> {
-        PtrWeak::from_strong(&self.globals).make_const()
-    }
-
-    ///
-    /// Returns the globals (readonly) of the entire simulation.
-    ///
-    #[must_use]
-    pub fn globals(&self) -> PtrConst<NetworkRuntimeGlobals> {
-        Ptr::clone(&self.globals).make_const()
-    }
-
     ///
     /// Creates a new instance by wrapping 'inner' into a empty `NetworkRuntime`<A>.
     ///
     #[must_use]
     pub fn new(inner: A) -> Self {
-        Self {
+        let this = Self {
             module_list: Vec::new(),
-            globals: PtrMut::new(NetworkRuntimeGlobals::new()),
+            globals: Arc::new(NetworkRuntimeGlobals::new()),
 
-            inner: PtrMut::new(inner),
-        }
+            inner,
+        };
+
+        // attack to current buffer
+        buf_set_globals(Arc::downgrade(&this.globals));
+        this
     }
 
     ///
@@ -74,7 +62,7 @@ impl<A> NetworkRuntime<A> {
     pub fn include_par_file(&mut self, file: &str) {
         match std::fs::read_to_string(file) {
             Ok(string) => self.globals.parameters.build(&string),
-            Err(e) => error!(target: "ParLoader", "{}", e),
+            Err(e) => eprintln!("Failed to load par file: {}", e),
         }
     }
 
@@ -83,19 +71,15 @@ impl<A> NetworkRuntime<A> {
     /// Returns a mutable refernce to the boxed module.
     /// This reference should be short lived since it blocks any other reference to self.
     ///
-    pub fn create_module<T>(&mut self, module: PtrMut<T>)
-    where
-        T: Module + Unsize<dyn Module>,
-    {
-        let dyned: PtrMut<dyn Module> = module;
-        self.module_list.push(dyned);
+    pub fn create_module(&mut self, module: ModuleRef) {
+        self.module_list.push(module);
     }
 
     ///
     /// Returns a reference to the list of all modules.
     ///
     #[must_use]
-    pub fn modules(&self) -> &Vec<PtrMut<dyn Module>> {
+    pub fn modules(&self) -> &Vec<ModuleRef> {
         &self.module_list
     }
 
@@ -103,9 +87,9 @@ impl<A> NetworkRuntime<A> {
     /// Searches a module based on this predicate.
     /// Shortcircuits if found and returns a read-only reference.
     ///
-    pub fn module<F>(&self, predicate: F) -> Option<PtrMut<dyn Module>>
+    pub fn module<F>(&self, predicate: F) -> Option<ModuleRef>
     where
-        F: FnMut(&&PtrMut<dyn Module>) -> bool,
+        F: FnMut(&&ModuleRef) -> bool,
     {
         self.modules().iter().find(predicate).cloned()
     }
@@ -115,7 +99,12 @@ impl<A> NetworkRuntime<A> {
     ///
     #[must_use]
     pub fn finish(self) -> A {
-        PtrMut::try_unwrap(self.inner).expect("HUH")
+        self.inner
+    }
+
+    /// Returns the network runtime globals
+    pub fn globals(&self) -> Arc<NetworkRuntimeGlobals> {
+        self.globals.clone()
     }
 }
 
@@ -127,24 +116,34 @@ impl<A> Application for NetworkRuntime<A> {
         // this is done via an event to get the usual module buffer clearing behavoir
         // while the end ignores all send packets.
 
-        rt.app.globals.topology.build(&rt.app.module_list);
+        rt.app
+            .globals
+            .topology
+            .borrow_mut()
+            .build(&rt.app.module_list);
 
         rt.add_event(NetEvents::SimStartNotif(SimStartNotif()), SimTime::now());
     }
 
     fn at_sim_end(rt: &mut Runtime<Self>) {
         for module in &mut rt.app.module_list {
-            log_scope!(module.path());
+            log_scope!(module.ctx.path.path());
             info!("Calling 'at_sim_end'");
+            module.activate();
             module.at_sim_end();
+            module.deactivate();
+
+            // NOTE: no buf_process since no furthe events will be processed.
         }
 
         #[cfg(feature = "async")]
         {
             // Ensure all sim_start stages have finished
             for module in &mut rt.app.module_list {
-                log_scope!(module.path());
+                log_scope!(module.ctx.path.path());
+                module.activate();
                 module.finish_sim_end();
+                module.deactivate();
             }
         }
 
@@ -160,7 +159,7 @@ where
         let modules = self
             .module_list
             .iter()
-            .map(|m| m.path())
+            .map(|m| &m.ctx.path)
             .collect::<Vec<&ObjectPath>>();
 
         f.debug_struct("NetworkRuntime")
@@ -195,7 +194,7 @@ pub struct NetworkRuntimeGlobals {
     ///
     /// The topology of the network from a module viewpoint.
     ///
-    pub topology: Topology,
+    pub topology: RefCell<Topology>,
 
     ///
     /// The total duration spend in the module specific handlers.
@@ -222,7 +221,7 @@ impl NetworkRuntimeGlobals {
     pub fn new() -> Self {
         Self {
             parameters: Parameters::new(),
-            topology: Topology::new(),
+            topology: RefCell::new(Topology::new()),
 
             #[cfg(feature = "metrics-module-time")]
             time_elapsed: std::time::Duration::ZERO,

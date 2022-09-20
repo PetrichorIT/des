@@ -155,18 +155,6 @@ where
     pub(crate) fn handle(self, rt: &mut Runtime<A>) {
         self.event.handle(rt);
     }
-
-    #[must_use]
-    #[allow(unused)]
-    pub(crate) fn create_no_id(event: A::EventSet, time: SimTime) -> Self {
-        Self {
-            id: 0,
-            event,
-            time,
-
-            _phantom: PhantomData,
-        }
-    }
 }
 
 impl<A> cmp::PartialEq for EventNode<A>

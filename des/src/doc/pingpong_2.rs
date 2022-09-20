@@ -17,7 +17,7 @@
 //!
 //! When using the more abstract tools provided by the feature `net`,
 //! you must firstly define the topology of network you want to simulate.
-//! This can be done using the NetworkDescriptionLanguage [ndl] in a file
+//! This can be done using the `NetworkDescriptionLanguage` [ndl] in a file
 //! ending with '.ndl'. This language describes a network through
 //! modules, gates and channels. At first lets decribe the module required
 //! for our example:
@@ -67,7 +67,7 @@
 //!
 //! Once we have defined the network topology, modules can be defined in rust code.
 //! For that you may define a struct or enum of the with the same name as the described
-//! module. To link the type and the module use the [NdlModule](crate::prelude::NdlModule)
+//! module. To link the type and the module use the [`NdlModule`](crate::prelude::NdlModule)
 //! macro. Note that you must provide the macro with a relative path to the workspace.
 //!
 //! > Note that the test cases are ignored, since they require access to the filesystem at compile time.
@@ -90,7 +90,7 @@
 //! However should the modules contain fields, they will need a constructor to build
 //! the inital state. To provide this constructor they must implement the [NameableModule](crate::net::NameableModule)
 //! trait. This trait is automatically derived on empty types, but must be manually implemented
-//! for all other case. Note that the [NdlModule](crate::prelude::NdlModule) macro attached a new field
+//! for all other case. Note that the [`NdlModule`](crate::prelude::NdlModule) macro attached a new field
 //! `__core` to the type:
 //!
 //! ```rust
@@ -99,28 +99,28 @@
 //! # struct Ping { pongs_recv: usize, pings_send: usize }
 //! # #[NdlModule]
 //! # struct Pong { pings_recv: usize, pongs_send: usize }
-//! impl NameableModule for Ping {
-//!     fn named(__core: ModuleCore) -> Self {
+//! impl Module for Ping {
+//!     fn new() -> Self {
 //!         Self {
-//!             __core,
 //!             pongs_recv: 0,
 //!             pings_send: 0,
 //!         }
 //!     }
+//!     /* ... */
 //! }
-//! impl NameableModule for Pong {
-//!     fn named(__core: ModuleCore) -> Self {
+//! impl Module for Pong {
+//!     fn new() -> Self {
 //!         Self {
-//!             __core,
 //!             pings_recv: 0,
 //!             pongs_send: 0,
 //!         }
 //!     }
+//!     /* ... */
 //! }
 //! ```
 //!
 //! Once module construction is finished you can define the behaviour of the module by implementing
-//! the [Module](crate::net::Module) trait. Noteably you can use the [handle_message](crate::net::Module::handle_message)
+//! the [`Module`](crate::net::Module) trait. Noteably you can use the [`handle_message`](crate::net::Module::handle_message)
 //! function to react to arriving packets
 //!
 //! ```
@@ -134,19 +134,22 @@
 //! const WAKEUP: MessageKind = 69;
 //!
 //! impl Module for Ping {
+//! # fn new() -> Self { todo!() }
+//!     /* ... */
+//!
 //!     fn at_sim_start(&mut self, _stage: usize) {
 //!         // Create the inital wakeup event.
-//!         self.schedule_at(Message::new().kind(WAKEUP).build(), SimTime::ZERO)
+//!         schedule_at(Message::new().kind(WAKEUP).build(), SimTime::ZERO)
 //!     }
 //!
 //!     fn handle_message(&mut self, msg: Message) {
-//!         match msg.meta().kind {
+//!         match msg.header().kind {
 //!             WAKEUP => {
 //!                 // Send a PING every 1s, for the first 30s
-//!                 self.send(Message::new().kind(PING).build(), "out");
+//!                 send(Message::new().kind(PING).build(), "out");
 //!                 self.pings_send += 1;
 //!                 if SimTime::now().as_secs() < 30 {
-//!                     self.schedule_in(msg, Duration::from_secs(1));
+//!                     schedule_in(msg, Duration::from_secs(1));
 //!                 }
 //!             },
 //!             PONG => self.pongs_recv += 1,
@@ -161,10 +164,13 @@
 //! }
 //!
 //! impl Module for Pong {
+//! # fn new() -> Self { todo!() }
+//!     /* ... */
+//!
 //!     fn handle_message(&mut self, msg: Message) {
-//!         assert_eq!(msg.meta().kind, PING);
+//!         assert_eq!(msg.header().kind, PING);
 //!         self.pings_recv += 1;
-//!         self.send(Message::new().kind(PONG).build(), "out");
+//!         send(Message::new().kind(PONG).build(), "out");
 //!         self.pongs_send += 1;
 //!     }
 //!
@@ -178,7 +184,7 @@
 //! ### The app
 //!
 //! Now that we have defined the modules we can do the same with the test case / the subsystem.
-//! Define a struct with the same name, and bind it using the [NdlSubsystem](crate::prelude::NdlSubsystem)
+//! Define a struct with the same name, and bind it using the [`NdlSubsystem`](crate::prelude::NdlSubsystem)
 //! macro.
 //!
 //! ```ignore
@@ -189,7 +195,7 @@
 //! ```
 //!
 //! Now we have defined everything to create the simulation. To do that create a instance of
-//! the application, call the 'build_rt' function and use the provided [NetworkRuntime]
+//! the application, call the [`build_rt`] function and use the provided [`NetworkRuntime`]
 //! to power a simulation.
 //!
 //! ```ignore

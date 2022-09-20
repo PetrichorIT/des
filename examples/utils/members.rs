@@ -6,36 +6,39 @@ use log::info;
 
 #[derive(Debug)]
 #[NdlModule("examples/utils")]
-pub struct Alice(ModuleCore);
+pub struct Alice();
 
 impl Module for Alice {
-    fn handle_message(&mut self, msg: Message) {
-        let mut pkt = msg.as_packet();
-        info!(target: self.name(), "Received at {}: Message with content: {}", sim_time(), pkt.content::<String>().deref());
+    fn new() -> Self {
+        Self()
+    }
 
-        if pkt.header().hop_count > self.par("limit").unwrap().parse::<usize>().unwrap() {
+    fn handle_message(&mut self, msg: Message) {
+        let mut pkt = msg;
+        info!(
+            "Received at {}: Message with content: {}",
+            sim_time(),
+            pkt.content::<String>().deref()
+        );
+
+        if pkt.header().hop_count > par("limit").unwrap().parse::<usize>().unwrap() {
             // TERMINATE
-            self.disable_activity()
         } else {
             pkt.register_hop();
-            self.send(pkt, ("netOut", 0))
+            send(pkt, ("netOut", 0))
         }
-    }
-
-    fn at_sim_start(&mut self, _: usize) {
-        self.enable_activity(Duration::new(3, 0));
-    }
-
-    fn activity(&mut self) {
-        info!(target: self.str(), "ACTIVITY");
     }
 }
 
 #[derive(Debug)]
 #[NdlModule("examples/utils")]
-pub struct Bob(ModuleCore);
+pub struct Bob();
 
 impl Module for Bob {
+    fn new() -> Self {
+        Self()
+    }
+
     fn num_sim_start_stages(&self) -> usize {
         2
     }
@@ -43,9 +46,9 @@ impl Module for Bob {
     fn at_sim_start(&mut self, stage: usize) {
         match stage {
             0 => {
-                info!(target: self.str(), "Initalizing");
-                self.send(
-                    Packet::new()
+                info!("Initalizing");
+                send(
+                    Message::new()
                         .kind(1)
                         // .src(0x7f_00_00_01, 80)
                         // .dest(0x7f_00_00_02, 80)
@@ -62,14 +65,17 @@ impl Module for Bob {
     }
 
     fn handle_message(&mut self, msg: Message) {
-        let mut pkt = msg.as_packet();
+        let mut pkt = msg;
         pkt.register_hop();
 
-        info!(target: self.name(), "Received at {}: Message with content: {}", sim_time(), pkt.content::<String>().deref());
+        info!(
+            "Received at {}: Message with content: {}",
+            sim_time(),
+            pkt.content::<String>().deref()
+        );
 
-        pkt.content_mut::<String>()
-            .push_str(&self.par("char").unwrap());
+        pkt.content_mut::<String>().push_str(&par("char").unwrap());
 
-        self.send(pkt, ("netOut", 2));
+        send(pkt, ("netOut", 2));
     }
 }

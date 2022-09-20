@@ -1,6 +1,3 @@
-#![feature(unsize)]
-#![feature(dispatch_from_dyn)]
-#![feature(coerce_unsized)]
 #![feature(arbitrary_self_types)]
 #![feature(box_into_inner)]
 #![feature(const_weak_new)]
@@ -80,15 +77,15 @@
 //! # Using a module oriented system
 //!
 //! DES is able to provide tools for simulating network-like structures with [Modules](crate::net::Module).
-//! These modules are self contained units with their own state, connected via [Channels](crate::net::Channel)
-//! (network links) that are attached to [Gates](crate::net::Gate) (physical ports) on modules.
+//! These modules are self contained units with their own state, connected via [Channels](crate::net::channel::Channel)
+//! (network links) that are attached to [Gates](crate::net::gate::Gate) (physical ports) on modules.
 //! Modules can send messages (packtes) through these gates / channels to communicated
 //! with other modules. Additionally modules can be created in a tree like structure,
 //! providing links like [`parent`](crate::net::ModuleCore::parent) or
 //! [`child(...)`](crate::net::ModuleCore::child).
 //!
 //! These tools are available in the [`net`](crate::net) module
-//! when the feature `net` or `std-net` is active.
+//! when the feature `net` is active.
 //!
 //! ```toml
 //! des = { version = "*", features = [ "net" ] }
@@ -136,7 +133,6 @@ pub mod prelude;
 pub mod runtime;
 pub mod stats;
 pub mod time;
-pub mod util;
 
 cfg_cqueue! {
     pub(crate) mod cqueue;
@@ -158,7 +154,6 @@ cfg_async! {
 // | Feature          | Description                                                              |
 // |------------------|--------------------------------------------------------------------------|
 // | net              | Adds a module oriented design-abstraction that provides its own events.  |
-// | std-net          | Configures the net module to use [std] addresses.                         |
 // | cqueue           | Configures the runtime to use a calender queue for better performance.   |
 // | metrics | Collects internal metrics about the runtime, to improve parametrization. |
 // | async            | Provides utilites and modifications for simulating asynchronous systems including a full reexport of safe tokio funtions. |

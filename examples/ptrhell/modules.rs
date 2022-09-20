@@ -2,12 +2,16 @@ use des::prelude::*;
 
 #[derive(Debug)]
 #[NdlModule("examples/ptrhell")]
-pub struct Alice(ModuleCore);
+pub struct Alice();
 
 impl Module for Alice {
+    fn new() -> Self {
+        Self {}
+    }
+
     fn at_sim_start(&mut self, _: usize) {
         let msg = Message::new().kind(1).content(42usize).build();
-        self.send(msg, ("netOut", 0));
+        send(msg, ("netOut", 0));
 
         println!("SimStared");
     }
@@ -20,24 +24,32 @@ impl Module for Alice {
 
 #[derive(Debug)]
 #[NdlModule("examples/ptrhell")]
-pub struct Bob(ModuleCore);
+pub struct Bob();
 
 impl Module for Bob {
+    fn new() -> Self {
+        Self {}
+    }
+
     fn handle_message(&mut self, msg: Message) {
         let (msg, head) = msg.cast::<usize>();
 
         println!("Received msg: {} - {:?}", msg, head);
 
         let msg = Message::new().kind(2).content(msg).build();
-        self.send(msg, ("netOut", 0))
+        send(msg, ("netOut", 0))
     }
 }
 
 #[derive(Debug)]
 #[NdlModule("examples/ptrhell")]
-pub struct Network(ModuleCore);
+pub struct Network();
 
 impl Module for Network {
+    fn new() -> Self {
+        Self {}
+    }
+
     fn handle_message(&mut self, _: Message) {
         unimplemented!()
     }

@@ -22,7 +22,6 @@ impl<T> TyResolveError<T> {
     }
 }
 
-#[allow(unused)]
 pub fn edit_distance(lhs: &str, rhs: &str) -> usize {
     let n = lhs.chars().count();
     let m = rhs.chars().count();
