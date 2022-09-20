@@ -29,6 +29,9 @@ pub trait AsyncModule: Send {
     where
         Self: Sized;
 
+    /// Resets the custom state after shutdown.
+    fn reset(&mut self) {}
+
     ///
     /// A message handler for receiving events, user defined.
     ///
@@ -62,44 +65,6 @@ pub trait AsyncModule: Send {
     /// }
     /// ```
     async fn handle_message(&mut self, _msg: Message) {}
-
-    ///
-    /// A periodic activity manager that is activated if [ModuleCore::enable_activity] is
-    /// set.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use des::prelude::*;
-    /// use async_trait::async_trait;
-    ///
-    /// # fn is_good_packet(pkt: Message) -> bool { true }
-    ///
-    /// #[NdlModule]
-    /// struct MyChannelProbe {
-    ///     goodput: u64,
-    ///     throughput: u64,
-    ///
-    ///     metrics: des::tokio::sync::mpsc::Sender<f64>,
-    /// }
-    ///
-    /// #[async_trait]
-    /// impl AsyncModule for MyChannelProbe {
-    ///     fn new() -> Self {
-    ///         /* ... */
-    /// # todo!()
-    ///     }
-    ///
-    ///     async fn handle_message(&mut self, msg: Message) {
-    ///         self.throughput += 1;        
-    ///         if is_good_packet(msg) {
-    ///             self.goodput += 1;
-    ///         }
-    ///     }
-    /// }
-    /// ```
-    ///
-    async fn activity(&mut self) {}
 
     ///
     /// A function that is run at the start of each simulation, for each module.
@@ -265,21 +230,14 @@ where
         <T as AsyncModule>::new()
     }
 
-    fn handle_message(&mut self, msg: Message) {
-        // (0) Check meta messaeg
+    fn reset(&mut self) {
         #[cfg(not(feature = "async-sharedrt"))]
-        if msg.header().typ == TYP_RESTART {
-            super::async_ctx_reset();
-            self.at_restart();
+        super::async_ctx_reset();
 
-            // Do sim start procedure
-            let stages = <Self as Module>::num_sim_start_stages(self);
-            for stage in 0..stages {
-                <Self as Module>::at_sim_start(self, stage);
-            }
-            <Self as Module>::finish_sim_start(self);
-        }
+        <T as AsyncModule>::reset(self);
+    }
 
+    fn handle_message(&mut self, msg: Message) {
         // (1) Fetch the runtime and initial the time context.
         if let Some(rt) = super::async_get_rt() {
             let guard = rt.enter_context(super::async_take_sim_ctx());

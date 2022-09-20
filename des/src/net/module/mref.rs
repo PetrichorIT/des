@@ -1,10 +1,11 @@
+use crate::net::message::TYP_RESTART;
 use crate::prelude::{ChannelRef, Gate, GateDescription, GateRef, GateServiceType, Message};
 
 use super::{Module, ModuleContext};
 use std::any::{Any, TypeId};
 use std::cell::{Ref, RefCell, RefMut};
 use std::fmt::Debug;
-use std::sync::{Arc, Weak};
+use std::sync::{atomic::Ordering::SeqCst, Arc, Weak};
 
 #[derive(Clone)]
 pub(crate) struct ModuleRefWeak {
@@ -75,17 +76,43 @@ impl ModuleRef {
         self.handler.borrow_mut().finish_sim_end()
     }
 
+    pub(crate) fn reset(&self) {
+        self.handler.borrow_mut().reset()
+    }
+
+    // MARKER: handle_message
+
     /// Handles a message
     pub fn handle_message(&self, mut msg: Message) {
-        // First check the hooks.
-        for hook in self.ctx.hooks.borrow_mut().iter_mut() {
-            msg = match hook.handle_message(msg) {
-                Ok(()) => return,
-                Err(msg) => msg,
+        if self.ctx.active.load(SeqCst) {
+            // First check the hooks.
+            for hook in self.ctx.hooks.borrow_mut().iter_mut() {
+                msg = match hook.handle_message(msg) {
+                    Ok(()) => return,
+                    Err(msg) => msg,
+                }
+            }
+
+            self.handler.borrow_mut().handle_message(msg);
+        } else {
+            if msg.header().typ == TYP_RESTART {
+                log::debug!("Restarting module");
+                // restart the module itself.
+                self.reset();
+                self.ctx.active.store(true, SeqCst);
+
+                // Do sim start procedure
+                let stages = self.num_sim_start_stages();
+                for stage in 0..stages {
+                    self.at_sim_start(stage);
+                }
+
+                #[cfg(feature = "async")]
+                self.finish_sim_start();
+            } else {
+                log::debug!("Ignoring message since module is inactive");
             }
         }
-
-        self.handler.borrow_mut().handle_message(msg)
     }
 }
 

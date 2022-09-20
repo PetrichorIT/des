@@ -92,13 +92,25 @@ pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<NetworkRuntime
             );
         }
 
-        #[cfg(feature = "async")]
-        #[cfg(not(feature = "async-sharedrt"))]
+        // MARKER: shutdown
         if let Some(rest) = ctx.shutdown.take() {
+            log::debug!("Shuttind down module and restaring at {:?}", rest);
             use crate::net::message::TYP_RESTART;
 
+            module
+                .ctx
+                .active
+                .store(false, std::sync::atomic::Ordering::SeqCst);
+
+            // drop the rt, to prevent all async activity from happening.
+            #[cfg(feature = "async")]
+            #[cfg(not(feature = "async-sharedrt"))]
             drop(module.ctx.async_ext.borrow_mut().rt.take());
 
+            // drop all hooks to ensure all messages reach the async impl
+            module.ctx.hooks.borrow_mut().clear();
+
+            // Reschedule wakeup
             if let Some(rest) = rest {
                 rt.add_event(
                     NetEvents::HandleMessageEvent(HandleMessageEvent {

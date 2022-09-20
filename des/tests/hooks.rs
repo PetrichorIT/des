@@ -15,6 +15,63 @@ use tokio::{
 };
 
 #[NdlModule]
+struct HookAtShutdown {
+    state: Arc<AtomicUsize>,
+}
+
+impl Module for HookAtShutdown {
+    fn new() -> Self {
+        Self {
+            state: Arc::new(AtomicUsize::new(0)),
+        }
+    }
+
+    fn at_sim_start(&mut self, _stage: usize) {
+        create_hook(PeriodicHook::new(
+            |state| {
+                state.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                if SimTime::now().as_secs() == 5 {
+                    shutdow_and_restart_in(Duration::from_secs(2));
+                }
+            },
+            Duration::from_secs(1),
+            self.state.clone(),
+        ))
+    }
+
+    fn handle_message(&mut self, msg: Message) {
+        dbg!(msg);
+        panic!("This function should never be called")
+    }
+
+    fn at_sim_end(&mut self) {
+        // at 1,2,3,4,5 .. 8,9,10
+        assert_eq!(self.state.load(std::sync::atomic::Ordering::SeqCst), 5 + 3)
+    }
+}
+
+#[test]
+fn hook_at_shutdown() {
+    // ScopedLogger::new().finish().unwrap();
+
+    // run 5s shutdown for 3s run 2s
+    let mut rt = NetworkRuntime::new(());
+    let mut cx = BuildContext::new(&mut rt);
+
+    let module = HookAtShutdown::build_named(ObjectPath::root_module("root".to_string()), &mut cx);
+    cx.create_module(module);
+
+    let rt = Runtime::new_with(
+        rt,
+        RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(10))),
+    );
+
+    let res = dbg!(rt.run());
+    let res = res.unwrap_premature_abort();
+    assert_eq!(res.3, 1)
+}
+
+#[NdlModule]
 struct PeriodicModule {
     state: Arc<AtomicUsize>,
 }
