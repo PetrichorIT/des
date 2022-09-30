@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::prelude::{Module, NetworkRuntime};
 
 use super::module::ModuleContext;
@@ -62,21 +60,24 @@ impl<'a, A> BuildContext<'a, A> {
 
 macro_rules! impl_buildable {
     ($($g: ident),*) => {
-        fn build<A$(,$g: Module  + __Buildable0)*>(this: ModuleRef, rt: &mut BuildContext<'_, A>) -> ModuleRef
+        fn build<A$(,$g: Module  + __Buildable0)*>(this: ModuleRef, rt: &mut BuildContext<'_, A>)
             where Self: Sized;
 
         fn build_named<A$(,$g: Module  + __Buildable0)*>(path: ObjectPath, rt: &mut BuildContext<'_, A>) -> ModuleRef
             where
                 Self: 'static + Module + Sized,
         {
-            let core = Arc::new(ModuleContext::standalone(path));
-            ModuleContext::place(Arc::clone(&core));
+            let mref = ModuleContext::standalone(path);
 
+            // (3) Build NDL
+            Self::build::<A$(,$g)*>(mref.clone(), rt);
+
+            // (4) Build and attach custom state
+            mref.activate();
             let this = <Self as Module>::new();
-            let mref = ModuleRef::new(core, this);
+            mref.upgrade_dummy(this);
 
-            // mref.activate();
-            Self::build::<A$(,$g)*>(mref, rt)
+            mref
         }
 
         fn build_named_with_parent<A, T$(,$g: Module  + __Buildable0)*>(
@@ -88,14 +89,15 @@ macro_rules! impl_buildable {
                 T: Module,
                 Self: 'static +  Module + Sized,
         {
-            let core = Arc::new(ModuleContext::child_of(name, parent));
-            ModuleContext::place(Arc::clone(&core));
+            let mref = ModuleContext::child_of(name, parent);
 
+            Self::build::<A$(,$g)*>(mref.clone(), rt);
+
+            mref.activate();
             let this = <Self as Module>::new();
-            let mref = ModuleRef::new(core, this);
+            mref.upgrade_dummy(this);
 
-            // mref.activate();
-            Self::build::<A$(,$g)*>(mref, rt)
+            mref
         }
     };
 
@@ -108,26 +110,28 @@ pub trait __Buildable0 {
     /// Builds the given module according to the NDL specification
     /// if any is provided, else doesn't change a thing.
     ///
-    fn build<A>(this: ModuleRef, _ctx: &mut BuildContext<'_, A>) -> ModuleRef
+    fn build<A>(_this: ModuleRef, _ctx: &mut BuildContext<'_, A>)
     where
         Self: Sized,
     {
-        this
     }
 
     fn build_named<A>(path: ObjectPath, ctx: &mut BuildContext<'_, A>) -> ModuleRef
     where
         Self: 'static + Module + Sized,
     {
-        let core = Arc::new(ModuleContext::standalone(path));
-        ModuleContext::place(Arc::clone(&core));
-        // TODO: Maybe activate the core here to provide funtionality witin user defined call of new
+        // (1) Create empty module contxt bound to path.
+        let mref = ModuleContext::standalone(path);
 
+        // (3) Build NDL
+        Self::build(mref.clone(), ctx);
+
+        // (4) Build and attach custom state
+        mref.activate();
         let this = <Self as Module>::new();
-        let mref = ModuleRef::new(core, this);
+        mref.upgrade_dummy(this);
 
-        // mref.activate();
-        Self::build(mref, ctx)
+        mref
     }
 
     fn build_named_with_parent<A>(
@@ -138,15 +142,18 @@ pub trait __Buildable0 {
     where
         Self: 'static + Module + Sized,
     {
-        let core = Arc::new(ModuleContext::child_of(name, parent));
-        ModuleContext::place(Arc::clone(&core));
-        // TODO: Maybe activate the core here to provide funtionality witin user defined call of new
+        // (1) Create empty module contxt bound to path.
+        let mref = ModuleContext::child_of(name, parent);
 
+        // (3) Build NDL
+        Self::build(mref.clone(), ctx);
+
+        // (4) Build and attach custom state
+        mref.activate();
         let this = <Self as Module>::new();
-        let mref = ModuleRef::new(core, this);
+        mref.upgrade_dummy(this);
 
-        // mref.activate();
-        Self::build(mref, ctx)
+        mref
     }
 }
 

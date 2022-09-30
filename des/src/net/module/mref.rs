@@ -1,17 +1,18 @@
 use crate::net::message::TYP_RESTART;
 use crate::prelude::{ChannelRef, Gate, GateRef, GateServiceType, Message};
 
-use super::{Module, ModuleContext};
+use super::{DummyModule, Module, ModuleContext};
 use std::any::{Any, TypeId};
 use std::cell::{Ref, RefCell, RefMut};
 use std::fmt::Debug;
+use std::ops::Deref;
 use std::sync::{atomic::Ordering::SeqCst, Arc, Weak};
 
 #[derive(Clone)]
 pub(crate) struct ModuleRefWeak {
     ctx: Weak<ModuleContext>,
-    handler: Weak<RefCell<dyn Module>>,
-    handler_ptr: *mut u8,
+    handler: Weak<RefCell<Box<dyn Module>>>,
+    // handler_ptr: *mut u8,
 }
 
 impl ModuleRefWeak {
@@ -19,7 +20,7 @@ impl ModuleRefWeak {
         Self {
             ctx: Arc::downgrade(&strong.ctx),
             handler: Arc::downgrade(&strong.handler),
-            handler_ptr: strong.handler_ptr,
+            // handler_ptr: strong.handler_ptr,
         }
     }
 
@@ -27,7 +28,7 @@ impl ModuleRefWeak {
         Some(ModuleRef {
             ctx: self.ctx.upgrade()?,
             handler: self.handler.upgrade()?,
-            handler_ptr: self.handler_ptr,
+            // handler_ptr: self.handler_ptr,
         })
     }
 }
@@ -42,11 +43,11 @@ impl Debug for ModuleRefWeak {
 #[derive(Clone)]
 pub struct ModuleRef {
     pub(crate) ctx: Arc<ModuleContext>,
-    handler: Arc<RefCell<dyn Module>>,
-    handler_ptr: *mut u8,
+    handler: Arc<RefCell<Box<dyn Module>>>,
+    // handler_ptr: *mut u8,
 }
 
-impl std::ops::Deref for ModuleRef {
+impl Deref for ModuleRef {
     type Target = ModuleContext;
     fn deref(&self) -> &Self::Target {
         &self.ctx
@@ -119,17 +120,36 @@ impl ModuleRef {
 impl ModuleRef {
     #[allow(clippy::explicit_deref_methods)]
     pub(crate) fn new<T: Module>(ctx: Arc<ModuleContext>, module: T) -> Self {
-        use std::ops::DerefMut;
+        // use std::ops::DerefMut;
 
-        let handler = Arc::new(RefCell::new(module));
-        let ptr: *mut T = handler.borrow_mut().deref_mut();
-        let ptr = ptr.cast::<u8>();
+        let boxed = Box::new(module);
+        // let ptr: *mut T = boxed.deref_mut();
+        // let ptr = ptr.cast::<u8>();
+
+        let dynboxed: Box<dyn Module> = boxed;
+
+        let handler = Arc::new(RefCell::new(dynboxed));
 
         Self {
             ctx,
             handler,
-            handler_ptr: ptr,
+            // handler_ptr: ptr,
         }
+    }
+
+    #[allow(unused)]
+    pub(crate) fn dummy(ctx: Arc<ModuleContext>) -> Self {
+        // Create the dummy module explicitly not with ::new since
+        // all dyn Module calls would panic
+        Self::new(ctx, DummyModule {})
+    }
+
+    #[allow(unused)]
+    // Caller must ensure that handler is indeed a dummy
+    pub(crate) fn upgrade_dummy<T: Module>(&self, module: T) {
+        let celled = RefCell::new(Box::new(module));
+        let celled: RefCell<Box<dyn Module>> = celled;
+        self.handler.swap(&celled);
     }
 
     // NOTE / TODO
@@ -166,7 +186,7 @@ impl ModuleRef {
     #[must_use]
     pub fn try_as_ref<T: Any>(&self) -> Option<Ref<T>> {
         let brw = self.handler.borrow();
-        let rf = &*brw;
+        let rf = &**brw;
         let ty = rf.type_id();
         if ty == TypeId::of::<T>() {
             // SAFTEY:
@@ -179,8 +199,9 @@ impl ModuleRef {
             // a call of 'RefCell::borrow' thus upholding the borrowing invariants.
             //
             // Should the type check fail, the Ref is dropped so the borrow is freed.
-            Some(Ref::map(brw, |_| unsafe {
-                &*(self.handler_ptr as *const T)
+            Some(Ref::map(brw, |brw| unsafe {
+                let hpt: *const dyn Module = &**brw;
+                &*(hpt as *const T)
             }))
         } else {
             None
@@ -216,7 +237,7 @@ impl ModuleRef {
     #[must_use]
     pub fn try_as_mut<T: Any>(&self) -> Option<RefMut<T>> {
         let brw = self.handler.borrow_mut();
-        let rf = &*brw;
+        let rf = &**brw;
         let ty = rf.type_id();
         if ty == TypeId::of::<T>() {
             // SAFTEY:
@@ -229,8 +250,9 @@ impl ModuleRef {
             // a call of 'RefCell::borrow' thus upholding the borrowing invariants.
             //
             // Should the type check fail, the Ref is dropped so the borrow is freed.
-            Some(RefMut::map(brw, |_| unsafe {
-                &mut *(self.handler_ptr.cast::<T>())
+            Some(RefMut::map(brw, |brw| unsafe {
+                let hpt: *mut dyn Module = &mut **brw;
+                &mut *(hpt.cast::<T>())
             }))
         } else {
             None

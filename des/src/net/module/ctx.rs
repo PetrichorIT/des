@@ -1,4 +1,4 @@
-use super::{ModuleId, ModuleRef, ModuleRefWeak, ModuleReferencingError};
+use super::{DummyModule, ModuleId, ModuleRef, ModuleRefWeak, ModuleReferencingError};
 use crate::{
     net::hooks::HookEntry,
     prelude::{GateRef, ObjectPath},
@@ -41,16 +41,16 @@ pub struct ModuleContext {
     pub(crate) parent: Option<ModuleRefWeak>,
 
     /// The collection of child nodes for the current module.
-    pub(crate) children: HashMap<String, ModuleRef>,
+    pub(crate) children: RefCell<HashMap<String, ModuleRef>>,
 }
 
 impl ModuleContext {
     /// Creates a new standalone instance
-    pub fn standalone(path: ObjectPath) -> Self {
+    pub fn standalone(path: ObjectPath) -> ModuleRef {
         #[cfg(feature = "async")]
         let ident = path.path().to_string();
 
-        Self {
+        ModuleRef::dummy(Arc::new(Self {
             active: AtomicBool::new(true),
 
             id: ModuleId::gen(),
@@ -59,23 +59,21 @@ impl ModuleContext {
             hooks: RefCell::new(Vec::new()),
 
             parent: None,
-            children: HashMap::new(),
+            children: RefCell::new(HashMap::new()),
 
             #[cfg(feature = "async")]
             async_ext: RefCell::new(AsyncCoreExt::new(ident)),
-        }
+        }))
     }
 
     /// Creates a child
     #[allow(clippy::needless_pass_by_value)]
-    pub fn child_of(name: &str, parent: ModuleRef) -> Self {
+    pub fn child_of(name: &str, parent: ModuleRef) -> ModuleRef {
         let path = ObjectPath::module_with_parent(name, &parent.ctx.path);
         #[cfg(feature = "async")]
         let ident = path.path().to_string();
 
-        // TODO set parents child
-
-        Self {
+        let this = ModuleRef::dummy(Arc::new(Self {
             active: AtomicBool::new(true),
 
             id: ModuleId::gen(),
@@ -84,15 +82,24 @@ impl ModuleContext {
             hooks: RefCell::new(Vec::new()),
 
             parent: Some(ModuleRefWeak::new(&parent)),
-            children: HashMap::new(),
+            children: RefCell::new(HashMap::new()),
 
             #[cfg(feature = "async")]
             async_ext: RefCell::new(AsyncCoreExt::new(ident)),
-        }
+        }));
+
+        parent
+            .ctx
+            .children
+            .borrow_mut()
+            .insert(name.to_string(), this.clone());
+
+        dbg!(parent.ctx.path.path(), parent.ctx.children.borrow());
+        this
     }
 
     pub(crate) fn place(self: Arc<Self>) -> Option<Arc<ModuleContext>> {
-        // log::trace!("Now active module: {}", self.path.path());
+        // println!("Now active module: {}", self.path.path());
         MOD_CTX.with(|ctx| ctx.borrow_mut().replace(self))
     }
 
@@ -122,9 +129,15 @@ impl ModuleContext {
 
     pub fn parent(&self) -> Result<ModuleRef, ModuleReferencingError> {
         if let Some(ref parent) = self.parent {
-            Ok(parent
+            let strong = parent
                 .upgrade()
-                .expect("Failed to fetch parent, ptr missing in drop"))
+                .expect("Failed to fetch parent, ptr missing in drop");
+
+            if strong.try_as_ref::<DummyModule>().is_some() {
+                Err(ModuleReferencingError::NotYetInitalized(format!("The parent ptr of module '{}' is existent but not yet initalized, according to the load order.", self.path)))
+            } else {
+                Ok(strong)
+            }
         } else {
             Err(ModuleReferencingError::NoEntry(format!(
                 "The module '{}' does not posses a parent ptr",
@@ -134,7 +147,8 @@ impl ModuleContext {
     }
 
     pub fn child(&self, name: &str) -> Result<ModuleRef, ModuleReferencingError> {
-        if let Some(child) = self.children.get(name) {
+        dbg!(self.path.path(), self.children.borrow());
+        if let Some(child) = self.children.borrow().get(name) {
             Ok(child.clone())
         } else {
             Err(ModuleReferencingError::NoEntry(format!(

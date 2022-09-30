@@ -15,6 +15,9 @@ pub use error::*;
 mod func;
 pub use func::*;
 
+mod dummy;
+pub(crate) use dummy::*;
+
 cfg_async! {
     mod async_mod;
     pub use self::async_mod::*;
@@ -139,3 +142,39 @@ pub trait Module: Any {
     ///
     fn handle_par_change(&mut self) {}
 }
+
+// impl<T: Module> Module for Box<T> {
+//     fn new() -> Self {
+//         Box::new(T::new())
+//     }
+
+//     fn handle_message(&mut self, msg: Message) {
+//         self.deref_mut().handle_message(msg)
+//     }
+
+//     fn handle_par_change(&mut self) {
+//         self.deref_mut().handle_par_change()
+//     }
+
+//     fn at_sim_start(&mut self, stage: usize) {
+//         self.deref_mut().at_sim_start(stage)
+//     }
+
+//     #[cfg(feature = "async")]
+//     fn finish_sim_start(&mut self) {
+//         self.deref_mut().finish_sim_start()
+//     }
+
+//     fn num_sim_start_stages(&self) -> usize {
+//         self.deref().num_sim_start_stages()
+//     }
+
+//     fn at_sim_end(&mut self) {
+//         self.deref_mut().at_sim_end()
+//     }
+
+//     #[cfg(feature = "async")]
+//     fn finish_sim_end(&mut self) {
+//         self.deref_mut().finish_sim_end()
+//     }
+// }

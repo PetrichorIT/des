@@ -200,12 +200,11 @@ pub fn build_impl_from(ident: Ident, wrapped: WrappedTokenStream, submodules: &[
     quote! {
         impl ::des::net::#build_trait for #ident {
             fn build<#puntuated_a>(mut this: ::des::net::module::ModuleRef, ctx: &mut ::des::net::BuildContext<'_, A>) 
-            -> ::des::net::module::ModuleRef {
+            {
                 use des::net::*;
                 use des::net::module::*;
                 
                 #wrapped
-                this
             }
         }
     }
