@@ -8,9 +8,6 @@ use tokio::{
 pub(crate) struct AsyncCoreExt {
     #[cfg(not(feature = "async-sharedrt"))]
     pub(crate) rt: Option<std::sync::Arc<tokio::runtime::Runtime>>,
-
-    // pub(crate) buffers: UnboundedReceiver<super::BufferEvent>,
-    // pub(crate) handle: UnboundedSender<super::BufferEvent>,
     pub(crate) ctx: Option<SimContext>,
 
     pub(crate) wait_queue_tx: UnboundedSender<WaitingMessage>,

@@ -335,8 +335,6 @@ where
                     //    wont overlap, since the queue rx synchronises and delays them.
                     // 4) References to at_sim_start have been droped since all futures of at_sim_start
                     //    must be resoved before event 1
-                    //
-                    // TODO: Sync with activity()
                     let self_ref: &'static mut T = {
                         let ptr: *mut T = self;
                         unsafe { &mut *ptr }
