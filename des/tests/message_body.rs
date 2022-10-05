@@ -101,9 +101,6 @@ fn test_collections() {
 
     let v = vec![String::new(), format!("Hello World"), format!("ABC")];
     assert_eq!(v.byte_len(), 11 + 3);
-
-    // TODO:
-    // Remaining collections
 }
 
 // # Test macros

@@ -211,7 +211,6 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
                 module.finish_sim_start();
                 module.deactivate();
 
-                // TODO: Is this really nessecary?
                 super::buf_process(&module, rt);
             }
         }

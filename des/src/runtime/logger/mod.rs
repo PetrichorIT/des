@@ -2,15 +2,24 @@ use std::{
     cell::{RefCell, UnsafeCell},
     collections::{HashMap, LinkedList},
     fmt::Debug,
-    io::Write,
     sync::Arc,
 };
 
+mod env;
+mod fmt;
+mod record;
+
+pub use fmt::LogFormat;
+pub use record::LogRecord;
+
 use crate::time::SimTime;
 use log::{Level, LevelFilter, Log, SetLoggerError};
-use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
+use termcolor::{ColorChoice, StandardStream};
+
+use self::env::LogEnvOptions;
 
 static SCOPED_LOGGER: ScopedLoggerWrap = ScopedLoggerWrap::uninitalized();
+
 thread_local! {
     pub(crate) static CURRENT_SCOPE: RefCell<Option<String>> = const { RefCell::new(None) }
 }
@@ -85,10 +94,14 @@ unsafe impl Sync for ScopedLoggerWrap {}
 pub struct ScopedLogger {
     active: bool,
     scopes: UnsafeCell<HashMap<String, LoggerScope>>,
+
     stdout_policy: Box<dyn Fn(&str) -> bool>,
     stderr_policy: Box<dyn Fn(&str) -> bool>,
+
     interal_max_level: LevelFilter,
     ignore_custom_target: bool,
+
+    env: LogEnvOptions,
 }
 
 impl ScopedLogger {
@@ -104,6 +117,8 @@ impl ScopedLogger {
 
             interal_max_level: LevelFilter::Trace,
             ignore_custom_target: false,
+
+            env: LogEnvOptions::new(),
         }
     }
 
@@ -119,6 +134,8 @@ impl ScopedLogger {
 
             interal_max_level: LevelFilter::Trace,
             ignore_custom_target: false,
+
+            env: LogEnvOptions::new(),
         }
     }
 
@@ -240,7 +257,7 @@ impl Default for ScopedLogger {
 
 impl Log for ScopedLogger {
     fn enabled(&self, metadata: &log::Metadata) -> bool {
-        self.active && metadata.level() <= LevelFilter::Trace
+        self.active && metadata.level() <= log::STATIC_MAX_LEVEL
     }
 
     fn log(&self, record: &log::Record) {
@@ -272,14 +289,15 @@ impl Log for ScopedLogger {
                         _ => StandardStream::stdout(ColorChoice::Always),
                     };
 
-                    let record = LoggerRecord {
+                    let record = LogRecord {
                         target: Arc::new(record.target().to_string()),
                         level: record.level(),
                         time: SimTime::now(),
                         msg: format!("{}", record.args()),
                     };
 
-                    record.log(out);
+                    LogFormat::fmt(LogFormat::ColorFull, &record, out);
+                    // record.log(out);
                 }
                 return;
             }
@@ -307,6 +325,7 @@ impl Log for ScopedLogger {
                 stream: LinkedList::new(),
                 fwd_stdout: stdout(record.target()),
                 fwd_stderr: stderr(record.target()),
+                filter: self.env.level_filter_for(&target),
             };
 
             new_scope.log(format!("{}{}", appendix, record.args()), record.level());
@@ -325,15 +344,19 @@ pub struct LoggerScope {
     /// The target identifier for the current logger.
     pub target: Arc<String>,
     /// The stream of logs.
-    pub stream: LinkedList<LoggerRecord>,
+    pub stream: LinkedList<LogRecord>,
+
     fwd_stdout: bool,
     fwd_stderr: bool,
+    filter: LevelFilter,
 }
-
-const PARENS_COLOR: Color = Color::Rgb(0x7f, 0x8c, 0x8d);
 
 impl LoggerScope {
     fn log(&mut self, msg: String, level: Level) {
+        if level > self.filter {
+            return;
+        }
+
         let out = match level {
             Level::Error | Level::Warn if self.fwd_stderr => {
                 Some(StandardStream::stderr(ColorChoice::Always))
@@ -343,62 +366,17 @@ impl LoggerScope {
             }
             _ => None,
         };
-        let record = LoggerRecord {
+
+        let record = LogRecord {
             msg,
             level,
             time: SimTime::now(),
             target: self.target.clone(),
         };
         if let Some(out) = out {
-            record.log(out);
+            LogFormat::fmt(LogFormat::ColorFull, &record, out);
         }
 
         self.stream.push_back(record);
-    }
-}
-
-/// A logging record.
-#[derive(Debug)]
-pub struct LoggerRecord {
-    /// The target of the log message.
-    pub target: Arc<String>,
-    /// The temporal origin point.
-    pub time: SimTime,
-    /// The message formated with the std formater
-    pub msg: String,
-    /// The original log level.
-    pub level: Level,
-}
-
-impl LoggerRecord {
-    fn log(&self, mut out: StandardStream) {
-        out.set_color(ColorSpec::new().set_fg(Some(PARENS_COLOR)))
-            .expect("Failed to set color on output stream");
-
-        write!(&mut out, "[ ").expect("Failed to write to output stream");
-
-        // [ time ... target ] max 10 max 14
-        let time = format!("{}", self.time);
-        write!(&mut out, "{:^5}", time).expect("Failed to write to output stream");
-        write!(&mut out, " ] ").expect("Failed to write to output stream");
-
-        out.set_color(ColorSpec::new().set_fg(Some(get_level_color(self.level))))
-            .expect("Failed to set color on output stream");
-
-        write!(&mut out, "{}: ", self.target).expect("Failed to write to output stream");
-
-        out.reset().expect("Failed to reset output stream");
-
-        writeln!(&mut out, "{}", self.msg).expect("Failed to write to output stream");
-    }
-}
-
-fn get_level_color(level: Level) -> Color {
-    match level {
-        Level::Debug => Color::Magenta,
-        Level::Trace => Color::Cyan,
-        Level::Info => Color::Green,
-        Level::Warn => Color::Yellow,
-        Level::Error => Color::Red,
     }
 }

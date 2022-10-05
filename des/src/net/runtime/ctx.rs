@@ -73,7 +73,6 @@ pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<NetworkRuntime
             message.header.sender_module_id = self_id;
             rt.add_event(
                 NetEvents::MessageAtGateEvent(MessageAtGateEvent {
-                    // TODO
                     gate,
                     message,
                 }),

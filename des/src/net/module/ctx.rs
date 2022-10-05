@@ -94,7 +94,6 @@ impl ModuleContext {
             .borrow_mut()
             .insert(name.to_string(), this.clone());
 
-        dbg!(parent.ctx.path.path(), parent.ctx.children.borrow());
         this
     }
 
