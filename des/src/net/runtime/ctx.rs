@@ -14,7 +14,7 @@ thread_local! {
             output: Vec::new(),
             loopback: Vec::new(),
             shutdown: None,
-            globals: Weak::new(),
+            globals: None,
         })
     }
 }
@@ -28,7 +28,7 @@ struct BufferContext {
     #[allow(clippy::option_option)]
     shutdown: Option<Option<SimTime>>,
     // globals
-    globals: Weak<NetworkRuntimeGlobals>,
+    globals: Option<Weak<NetworkRuntimeGlobals>>,
 }
 
 ///
@@ -39,6 +39,8 @@ pub fn globals() -> Arc<NetworkRuntimeGlobals> {
     BUF_CTX.with(|ctx| {
         ctx.borrow()
             .globals
+            .as_ref()
+            .unwrap()
             .upgrade()
             .expect("No runtime globals attached")
     })
@@ -55,7 +57,7 @@ pub(crate) fn buf_schedule_shutdown(restart: Option<SimTime>) {
 }
 
 pub(crate) fn buf_set_globals(globals: Weak<NetworkRuntimeGlobals>) {
-    BUF_CTX.with(|ctx| ctx.borrow_mut().globals = globals);
+    BUF_CTX.with(|ctx| ctx.borrow_mut().globals = Some(globals));
 }
 
 pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<NetworkRuntime<A>>) {
@@ -72,10 +74,7 @@ pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<NetworkRuntime
             );
             message.header.sender_module_id = self_id;
             rt.add_event(
-                NetEvents::MessageAtGateEvent(MessageAtGateEvent {
-                    gate,
-                    message,
-                }),
+                NetEvents::MessageAtGateEvent(MessageAtGateEvent { gate, message }),
                 time,
             );
         }

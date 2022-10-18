@@ -1,6 +1,3 @@
-#![feature(arbitrary_self_types)]
-#![feature(box_into_inner)]
-#![feature(const_weak_new)]
 // Lints
 #![deny(unused_must_use)]
 #![warn(clippy::pedantic)]

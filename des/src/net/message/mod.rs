@@ -422,7 +422,7 @@ impl MessageBuilder {
         T: 'static + MessageBody + Send,
     {
         self.header.length = content.byte_len() as u32;
-        self.content = Some(AnyBox::new(Box::into_inner(content)));
+        self.content = Some(AnyBox::new(*content));
         self
     }
 

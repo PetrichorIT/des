@@ -53,7 +53,7 @@ impl AnyBox {
 
     pub(crate) unsafe fn try_cast_unsafe<T: 'static>(self) -> Result<T, Self> {
         match self.inner.downcast::<T>() {
-            Ok(v) => Ok(Box::into_inner(v)),
+            Ok(v) => Ok(*v),
             Err(e) => Err(Self {
                 inner: e,
                 #[cfg(debug_assertions)]

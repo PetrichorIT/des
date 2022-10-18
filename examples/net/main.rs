@@ -189,7 +189,9 @@ fn main() {
     let app = Main::default().build_rt();
     let rt = Runtime::new_with(
         app,
-        RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(10000))),
+        RuntimeOptions::seeded(123)
+            .max_time(SimTime::from_duration(Duration::from_secs(10000)))
+            .include_env(),
     );
 
     let (_, _, _profiler, _) = rt.run().unwrap_premature_abort();

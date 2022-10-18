@@ -274,7 +274,7 @@ impl Channel {
                     "Gate '{}' dropping message [{}] pushed onto busy channel {}",
                     next_gate.previous_gate().unwrap().name(),
                     msg.str(),
-                    self.path()
+                    chan.path
                 );
 
                 // Register message progress (DROP)
