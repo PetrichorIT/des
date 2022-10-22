@@ -2,7 +2,7 @@ use std::sync::{atomic::AtomicUsize, Arc};
 
 use des::{
     net::{
-        hooks::{Hook, PeriodicHook, RoutingHook, RoutingHookOptions},
+        hooks::{Hook, HookHandle, PeriodicHook, RoutingHook, RoutingHookOptions},
         BuildContext, __Buildable0,
     },
     prelude::*,
@@ -99,7 +99,7 @@ impl Module for HookAtShutdown {
                 self.state.clone(),
             ),
             0,
-        )
+        );
     }
 
     fn handle_message(&mut self, msg: Message) {
@@ -156,7 +156,7 @@ impl Module for PeriodicModule {
                 self.state.clone(),
             ),
             0,
-        )
+        );
     }
 
     fn handle_message(&mut self, _msg: Message) {
@@ -268,7 +268,7 @@ impl Module for Router {
 
             log::info!("Router with addr {}", ip);
 
-            create_hook(RoutingHook::new(RoutingHookOptions::INET), 0)
+            create_hook(RoutingHook::new(RoutingHookOptions::INET), 0);
         }
     }
 
@@ -450,4 +450,43 @@ fn routing_hook() {
 
     let rt = Runtime::new(rt);
     let _ = rt.run();
+}
+
+#[NdlModule]
+struct HookDestructionModule {
+    handle: Option<HookHandle>,
+}
+
+impl Module for HookDestructionModule {
+    fn new() -> Self {
+        Self { handle: None }
+    }
+
+    fn at_sim_start(&mut self, _stage: usize) {
+        self.handle = Some(create_hook(
+            PeriodicHook::new(|_| {}, Duration::from_secs(12), ()),
+            1,
+        ));
+
+        schedule_in(Message::new().build(), Duration::from_secs(1000));
+    }
+
+    fn handle_message(&mut self, _msg: Message) {
+        if let Some(handle) = self.handle.take() {
+            println!("{:?}", handle);
+            destroy_hook(handle)
+        }
+    }
+}
+
+#[test]
+#[serial]
+fn hook_destruction() {
+    let mut rt = NetworkRuntime::new(());
+    let mut cx = BuildContext::new(&mut rt);
+    let m = HookDestructionModule::build_named(ObjectPath::root_module("Root"), &mut cx);
+    cx.create_module(m);
+
+    let rt = Runtime::new(rt);
+    let _ = rt.run().unwrap();
 }

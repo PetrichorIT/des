@@ -5,6 +5,7 @@ use super::{message::Message, module::with_mod_ctx};
 use std::fmt::Debug;
 use std::ops::Deref;
 use std::ops::DerefMut;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 mod periodic;
 pub use periodic::PeriodicHook;
@@ -20,6 +21,26 @@ pub trait Hook {
     /// message as input. It may return Ok(()) if the message was consumed
     /// by the hook or Err(msg) when the message should be further processed.
     fn handle_message(&mut self, msg: Message) -> Result<(), Message>;
+}
+
+/// A handle to a hook that allows the lifetime managment
+/// of hooks.
+#[derive(PartialEq, Eq, Hash)]
+pub struct HookHandle {
+    id: usize,
+
+    #[cfg(debug_assertions)]
+    hook_info: String,
+}
+
+impl Debug for HookHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        #[cfg(debug_assertions)]
+        return write!(f, "Hook #{} {{ {} }}", self.id, self.hook_info);
+
+        #[cfg(not(debug_assertions))]
+        return write!(f, "Hook #{}", self.id);
+    }
 }
 
 ///
@@ -67,18 +88,34 @@ pub trait Hook {
 ///                 INITIAL_COUNT
 ///             ),
 ///             100
-///         )
+///         );
 ///     }
 /// }
 /// ```
-pub fn create_hook(hook: impl Hook + 'static, priority: usize) {
+pub fn create_hook(hook: impl Hook + 'static, priority: usize) -> HookHandle {
     with_mod_ctx(|ctx| ctx.create_hook(hook, priority))
 }
 
+///
+/// Destroys the hook described by this handle.
+///
+/// # Panics
+///
+/// This function panics, if the hooks was not defined in the context of this module.
+/// Also panics if executed outside of a module context.
+///
+pub fn destroy_hook(handle: HookHandle) {
+    with_mod_ctx(|ctx| ctx.destroy_hook(handle))
+}
+
+thread_local! {static HOOK_ID: AtomicUsize = const { AtomicUsize::new(0)}}
+
 impl ModuleContext {
     /// Refer to [create_hook].
-    pub fn create_hook(&self, hook: impl Hook + 'static, priority: usize) {
+    pub fn create_hook<T: Hook + 'static>(&self, hook: T, priority: usize) -> HookHandle {
+        let id = HOOK_ID.with(|c| c.fetch_add(1, Ordering::SeqCst));
         let entry = HookEntry {
+            id,
             hook: Box::new(hook),
             priority,
         };
@@ -88,12 +125,28 @@ impl ModuleContext {
             Ok(at) => hooks.insert(at, entry),
             Err(at) => hooks.insert(at, entry),
         };
+
+        HookHandle {
+            id,
+            #[cfg(debug_assertions)]
+            hook_info: format!("{} @ {}", std::any::type_name::<T>(), self.path.path()),
+        }
+    }
+
+    pub fn destroy_hook(&self, handle: HookHandle) {
+        let mut hooks = self.hooks.borrow_mut();
+        if let Some((idx, _)) = hooks.iter().enumerate().find(|(_, e)| e.id == handle.id) {
+            hooks.remove(idx);
+        } else {
+            panic!("Hook with id #{} not found on this module", handle.id);
+        }
     }
 }
 
 // # INTERNALS
 
 pub(crate) struct HookEntry {
+    pub(crate) id: usize,
     pub(crate) hook: Box<dyn Hook>,
     pub(crate) priority: usize,
 }
