@@ -1,8 +1,6 @@
+use crate::time::Duration;
 use crate::{runtime::RuntimeLimit, time::SimTime};
 use rand::{prelude::StdRng, SeedableRng};
-
-#[cfg(feature = "cqueue")]
-use crate::time::Duration;
 
 ///
 /// Options for specifing the behaviour of the core runtime
@@ -79,11 +77,13 @@ impl RuntimeOptions {
                         self.rng = Some(StdRng::seed_from_u64(state))
                     }
                 }
+                #[cfg(feature = "cqueue")]
                 "--cfg-cqueue-n" => {
                     if let Ok(n) = split[1].parse::<usize>() {
                         self.cqueue_num_buckets = n
                     }
                 }
+                #[cfg(feature = "cqueue")]
                 "--cfg-cqueue-t" => {
                     if let Ok(t) = split[1].parse::<f64>() {
                         self.cqueue_bucket_timespan = Duration::from_secs_f64(t)
