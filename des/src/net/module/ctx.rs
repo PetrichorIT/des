@@ -102,6 +102,10 @@ impl ModuleContext {
         MOD_CTX.with(|ctx| ctx.borrow_mut().replace(self))
     }
 
+    pub(crate) fn take() -> Option<Arc<ModuleContext>> {
+        MOD_CTX.with(|ctx| ctx.take())
+    }
+
     pub fn id(&self) -> ModuleId {
         self.id
     }
@@ -163,6 +167,12 @@ impl Debug for ModuleContext {
         f.debug_struct("ModuleContext").finish()
     }
 }
+
+// impl Drop for ModuleContext {
+//     fn drop(&mut self) {
+//         println!("<DROP> dropping module ctx '{}'", self.path)
+//     }
+// }
 
 pub(crate) fn with_mod_ctx<R>(f: impl FnOnce(Ref<Arc<ModuleContext>>) -> R) -> R {
     MOD_CTX.with(|ctx| {

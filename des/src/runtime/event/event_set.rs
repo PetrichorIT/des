@@ -257,7 +257,7 @@ cfg_cqueue! {
             ) {
                 #[cfg(feature = "metrics")]
                 {
-                    if time > self.inner.time() {
+                    if time > SimTime::from_duration(self.inner.time()) {
                         metrics.borrow_mut()
                             .non_zero_event_wait_time
                             .collect_at((time - SimTime::now()).as_secs_f64(), SimTime::now());

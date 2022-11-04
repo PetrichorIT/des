@@ -23,7 +23,7 @@ cfg_not_cqueue! {
 
 cfg_cqueue! {
     mod cqueue;
-    pub use cqueue::*;
+    pub use self::cqueue::*;
 }
 
 cfg_metrics_rt_full! {

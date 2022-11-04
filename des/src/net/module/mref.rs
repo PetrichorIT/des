@@ -274,7 +274,7 @@ impl ModuleRef {
     // INTERNAL
     #[doc(hidden)]
     pub fn deactivate(&self) {
-        // NOP
+        let _ = ModuleContext::take();
     }
 
     /// Creates a gate on the current module, returning its ID.
@@ -357,6 +357,12 @@ impl PartialEq for ModuleRef {
 
 impl Debug for ModuleRef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ModuleRef").finish()
+        f.debug_struct(&format!(
+            "ModuleRef {{ name: {}, handler: {}, ctx {} }}",
+            self.ctx.path.name(),
+            Arc::strong_count(&self.handler),
+            Arc::strong_count(&self.ctx),
+        ))
+        .finish()
     }
 }

@@ -17,17 +17,13 @@ fn main() {
 
     let (app, time, p) = rt.run().unwrap();
     let globals = app.globals();
-
     drop(app);
 
     // println!("{:?}", globals);
 
-    // for m in globals.topology.nodes() {
-    //     println!("> {:?}", m)
-    // }
-
     drop(globals);
-    // Assume full drop.
+
+    // // Assume full drop.
     assert_eq!(MODULE_LEN.load(Ordering::SeqCst), 0);
 
     assert_eq!(p.event_count, 9);
