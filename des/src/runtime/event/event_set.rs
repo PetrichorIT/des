@@ -146,7 +146,7 @@ cfg_cqueue! {
 
 
         use crate::{runtime::{Application, EventNode, RuntimeOptions}, time::SimTime};
-        use crate::cqueue::{CQueue, CQueueOptions, Node};
+        use cqueue::{CQueue};
 
 
 
@@ -185,13 +185,8 @@ cfg_cqueue! {
             }
 
             pub(crate) fn new_with(options: &RuntimeOptions) -> Self {
-                let cqueue_options = CQueueOptions {
-                    num_buckets: options.cqueue_num_buckets,
-                    bucket_timespan: options.cqueue_bucket_timespan,
-                };
-
                 Self {
-                    inner: CQueue::new(cqueue_options),
+                    inner: CQueue::new(options.cqueue_num_buckets, options.cqueue_bucket_timespan),
                 }
             }
 
@@ -224,12 +219,7 @@ cfg_cqueue! {
                     metrics.event_count.collect(self.len() as f64);
                 }
 
-                let Node {
-                    time,
-                    event,
-                    cookie,
-                    ..
-                } = self.inner.fetch_next();
+                let (event, time) = self.inner.fetch_next();
 
                 #[cfg(feature = "metrics")]
                 {
@@ -250,8 +240,8 @@ cfg_cqueue! {
                 }
 
                 EventNode {
-                    time,
-                    id: cookie,
+                    time: SimTime::from_duration(time),
+                    id: 0,
                     event,
 
                     _phantom: PhantomData,
@@ -274,7 +264,7 @@ cfg_cqueue! {
                     }
                 }
 
-                self.inner.add(time, event.into());
+                self.inner.add(*time, event.into());
             }
         }
     }

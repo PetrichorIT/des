@@ -349,7 +349,15 @@ fn one_module_delayed_recv() {
         } => {
             assert_eq!(time, 4.0);
 
-            assert_eq!(profiler.event_count, 7);
+            // 1) SimStart (0s)
+            // 2) Gate #1 (0s)
+            // 3) HandleMessage #1 (0s)
+            // 4) Gate #2 (2s)
+            // 5) HandleMessage #2 (2s) (will finish sleep but wakeup was added later)
+            // 6) Wakeup aka NOP (2s)
+            // 7) Wakeup - sleep reloved - send in '5 (4s)
+            // 8) Wakeup - NOP - send in '6 (4s)
+            assert_eq!(profiler.event_count, 8);
 
             // let m1 = app
             //     .module(|m| m.module_core().name() == "RootModule")

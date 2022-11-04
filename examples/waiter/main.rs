@@ -49,6 +49,7 @@ impl des::runtime::Application for Application {
     type EventSet = Events;
 }
 
+#[derive(Debug)]
 enum Events {
     ServerDone(ServerDone),
     CustomerArrival(CustomerArrival),

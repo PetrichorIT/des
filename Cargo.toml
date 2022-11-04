@@ -4,6 +4,7 @@ debug = true
 [workspace]
 
 members = [
+  "cqueue",
   "des",
   "des_macros",
   "ndl",

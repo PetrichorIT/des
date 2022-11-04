@@ -131,10 +131,6 @@ pub mod runtime;
 pub mod stats;
 pub mod time;
 
-cfg_cqueue! {
-    pub(crate) mod cqueue;
-}
-
 cfg_net! {
     pub mod net;
 }
