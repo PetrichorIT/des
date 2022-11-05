@@ -39,7 +39,6 @@ pub struct CQueue<E> {
 
     // Buckets
     pub(crate) zero_event_bucket: DLL<E>,
-
     pub(crate) buckets: Vec<DLL<E>>,
     pub(crate) head: usize,
 
@@ -50,6 +49,7 @@ pub struct CQueue<E> {
     pub(crate) t_all: u128,
 
     // Misc
+    pub(crate) empty_nodes: Vec<Box<EventNode<E>>>,
     pub(crate) len: Arc<AtomicUsize>,
 }
 
@@ -112,6 +112,9 @@ impl<E> CQueue<E> {
 
             t_all,
 
+            empty_nodes: std::iter::repeat_with(|| EventNode::empty(Duration::ZERO))
+                .take(256)
+                .collect(),
             len,
         }
     }
@@ -130,7 +133,17 @@ impl<E> CQueue<E> {
         assert!(time >= self.t_current);
 
         if time == self.t_current {
-            self.zero_event_bucket.add_to_tail(event, time)
+            let (node, handle) = if let Some(mut node) = self.empty_nodes.pop() {
+                node.time = time;
+                node.value = Some(event);
+                let handle = EventHandle::new(&mut node, self.len.clone());
+
+                (node, handle)
+            } else {
+                EventNode::new(event, time, self.len.clone())
+            };
+            self.zero_event_bucket.add_to_tail(node);
+            handle
         } else {
             // delta time ?
 
@@ -144,7 +157,17 @@ impl<E> CQueue<E> {
             // dbg!(index_mod);
 
             // find insert pos
-            self.buckets[index].add(event, time)
+            let (node, handle) = if let Some(mut node) = self.empty_nodes.pop() {
+                node.time = time;
+                node.value = Some(event);
+                let handle = EventHandle::new(&mut node, self.len.clone());
+
+                (node, handle)
+            } else {
+                EventNode::new(event, time, self.len.clone())
+            };
+            self.buckets[index].add(node);
+            handle
         }
     }
 
@@ -159,8 +182,9 @@ impl<E> CQueue<E> {
     pub fn fetch_next(&mut self) -> (E, Duration) {
         assert!(self.len() != 0, "Cannot fetch from empty queue");
 
-        if let Some(node) = self.zero_event_bucket.pop_min() {
-            return node;
+        if let Some((ret, node)) = self.zero_event_bucket.pop_min() {
+            self.empty_nodes.push(node);
+            return ret;
         }
 
         loop {
@@ -183,7 +207,9 @@ impl<E> CQueue<E> {
 
             self.t_current = min;
 
-            return self.buckets[self.head].pop_min().unwrap();
+            let (ret, node) = self.buckets[self.head].pop_min().unwrap();
+            self.empty_nodes.push(node);
+            return ret;
         }
     }
 }
@@ -191,6 +217,12 @@ impl<E> CQueue<E> {
 impl<E> Default for CQueue<E> {
     fn default() -> Self {
         Self::new(1024, Duration::from_millis(5))
+    }
+}
+
+impl<E> Drop for CQueue<E> {
+    fn drop(&mut self) {
+        println!("Num nodes: {} / {}", self.empty_nodes.len(), self.len())
     }
 }
 

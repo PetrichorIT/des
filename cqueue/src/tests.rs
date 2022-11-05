@@ -1,4 +1,4 @@
-use super::linked_list::*;
+// use super::linked_list::*;
 use super::*;
 use rand::distributions::Uniform;
 use rand::rngs::SmallRng;
@@ -6,262 +6,262 @@ use rand::seq::SliceRandom;
 use rand::*;
 use std::time::Duration;
 
-#[test]
-fn linked_list_ordered_in_ordered_out() {
-    let events = [
-        (1, Duration::from_secs_f64(1.0)),
-        (2, Duration::from_secs_f64(2.0)),
-        (3, Duration::from_secs_f64(3.0)),
-        (4, Duration::from_secs_f64(4.0)),
-        (5, Duration::from_secs_f64(5.0)),
-        (6, Duration::from_secs_f64(6.0)),
-    ];
+// #[test]
+// fn linked_list_ordered_in_ordered_out() {
+//     let events = [
+//         (1, Duration::from_secs_f64(1.0)),
+//         (2, Duration::from_secs_f64(2.0)),
+//         (3, Duration::from_secs_f64(3.0)),
+//         (4, Duration::from_secs_f64(4.0)),
+//         (5, Duration::from_secs_f64(5.0)),
+//         (6, Duration::from_secs_f64(6.0)),
+//     ];
 
-    let dll = DLL::from_iter(events.clone());
-    let event = dll.into_iter().collect::<Vec<_>>();
+//     let dll = DLL::from_iter(events.clone());
+//     let event = dll.into_iter().collect::<Vec<_>>();
 
-    assert_eq!(&events[..], &event);
-}
+//     assert_eq!(&events[..], &event);
+// }
 
-#[test]
-fn linked_list_unordered_in_ordered_out() {
-    let mut events = [
-        (5, Duration::from_secs_f64(5.0)),
-        (1, Duration::from_secs_f64(1.0)),
-        (2, Duration::from_secs_f64(2.0)),
-        (6, Duration::from_secs_f64(6.0)),
-        (4, Duration::from_secs_f64(4.0)),
-        (3, Duration::from_secs_f64(3.0)),
-    ];
+// #[test]
+// fn linked_list_unordered_in_ordered_out() {
+//     let mut events = [
+//         (5, Duration::from_secs_f64(5.0)),
+//         (1, Duration::from_secs_f64(1.0)),
+//         (2, Duration::from_secs_f64(2.0)),
+//         (6, Duration::from_secs_f64(6.0)),
+//         (4, Duration::from_secs_f64(4.0)),
+//         (3, Duration::from_secs_f64(3.0)),
+//     ];
 
-    let dll = DLL::from_iter(events.clone());
-    let event = dll.into_iter().collect::<Vec<_>>();
+//     let dll = DLL::from_iter(events.clone());
+//     let event = dll.into_iter().collect::<Vec<_>>();
 
-    events.sort();
+//     events.sort();
 
-    assert_eq!(&events[..], &event);
-}
+//     assert_eq!(&events[..], &event);
+// }
 
-#[test]
-fn linked_list_ordered_collision_in_retain() {
-    let events = [
-        (1, Duration::from_secs_f64(1.0)),
-        (2, Duration::from_secs_f64(2.0)),
-        (3, Duration::from_secs_f64(4.0)),
-        (4, Duration::from_secs_f64(4.0)),
-        (5, Duration::from_secs_f64(5.0)),
-        (6, Duration::from_secs_f64(6.0)),
-    ];
+// #[test]
+// fn linked_list_ordered_collision_in_retain() {
+//     let events = [
+//         (1, Duration::from_secs_f64(1.0)),
+//         (2, Duration::from_secs_f64(2.0)),
+//         (3, Duration::from_secs_f64(4.0)),
+//         (4, Duration::from_secs_f64(4.0)),
+//         (5, Duration::from_secs_f64(5.0)),
+//         (6, Duration::from_secs_f64(6.0)),
+//     ];
 
-    let dll = DLL::from_iter(events.clone());
-    let event = dll.into_iter().collect::<Vec<_>>();
+//     let dll = DLL::from_iter(events.clone());
+//     let event = dll.into_iter().collect::<Vec<_>>();
 
-    assert_eq!(&events[..], &event);
-}
+//     assert_eq!(&events[..], &event);
+// }
 
-#[test]
-fn linked_list_unordered_collision_in_retain() {
-    let mut events = [
-        (5, Duration::from_secs_f64(5.0)),
-        (1, Duration::from_secs_f64(1.0)),
-        (2, Duration::from_secs_f64(2.0)),
-        (6, Duration::from_secs_f64(6.0)),
-        (4, Duration::from_secs_f64(1.0)),
-        (3, Duration::from_secs_f64(3.0)),
-    ];
+// #[test]
+// fn linked_list_unordered_collision_in_retain() {
+//     let mut events = [
+//         (5, Duration::from_secs_f64(5.0)),
+//         (1, Duration::from_secs_f64(1.0)),
+//         (2, Duration::from_secs_f64(2.0)),
+//         (6, Duration::from_secs_f64(6.0)),
+//         (4, Duration::from_secs_f64(1.0)),
+//         (3, Duration::from_secs_f64(3.0)),
+//     ];
 
-    let dll = DLL::from_iter(events.clone());
-    let event = dll.into_iter().collect::<Vec<_>>();
+//     let dll = DLL::from_iter(events.clone());
+//     let event = dll.into_iter().collect::<Vec<_>>();
 
-    events.sort_by(|l, r| l.1.cmp(&r.1));
+//     events.sort_by(|l, r| l.1.cmp(&r.1));
 
-    assert_eq!(&events[..], &event);
-}
+//     assert_eq!(&events[..], &event);
+// }
 
-#[test]
-fn linked_list_iter_and_iter_mut() {
-    let events = [
-        (1, Duration::from_secs_f64(1.0)),
-        (2, Duration::from_secs_f64(2.0)),
-        (3, Duration::from_secs_f64(3.0)),
-        (4, Duration::from_secs_f64(4.0)),
-        (5, Duration::from_secs_f64(5.0)),
-        (6, Duration::from_secs_f64(6.0)),
-    ];
+// #[test]
+// fn linked_list_iter_and_iter_mut() {
+//     let events = [
+//         (1, Duration::from_secs_f64(1.0)),
+//         (2, Duration::from_secs_f64(2.0)),
+//         (3, Duration::from_secs_f64(3.0)),
+//         (4, Duration::from_secs_f64(4.0)),
+//         (5, Duration::from_secs_f64(5.0)),
+//         (6, Duration::from_secs_f64(6.0)),
+//     ];
 
-    let mut dll = DLL::from_iter(events.clone());
+//     let mut dll = DLL::from_iter(events.clone());
 
-    let mut c = 1;
-    for item in dll.iter() {
-        assert_eq!(*item.0, c);
-        assert_eq!(item.1.as_secs(), c);
-        c += 1;
-    }
+//     let mut c = 1;
+//     for item in dll.iter() {
+//         assert_eq!(*item.0, c);
+//         assert_eq!(item.1.as_secs(), c);
+//         c += 1;
+//     }
 
-    for item in dll.iter_mut() {
-        *item.0 += 1;
-    }
+//     for item in dll.iter_mut() {
+//         *item.0 += 1;
+//     }
 
-    let mut c = 1;
-    for item in dll.iter() {
-        assert_eq!(*item.0, c + 1);
-        assert_eq!(item.1.as_secs(), c);
-        c += 1;
-    }
-}
+//     let mut c = 1;
+//     for item in dll.iter() {
+//         assert_eq!(*item.0, c + 1);
+//         assert_eq!(item.1.as_secs(), c);
+//         c += 1;
+//     }
+// }
 
-#[test]
-fn linked_list_ordered_in_eq() {
-    let events = [
-        (1, Duration::from_secs_f64(1.0)),
-        (2, Duration::from_secs_f64(2.0)),
-        (3, Duration::from_secs_f64(3.0)),
-        (4, Duration::from_secs_f64(4.0)),
-        (5, Duration::from_secs_f64(5.0)),
-        (6, Duration::from_secs_f64(6.0)),
-    ];
+// #[test]
+// fn linked_list_ordered_in_eq() {
+//     let events = [
+//         (1, Duration::from_secs_f64(1.0)),
+//         (2, Duration::from_secs_f64(2.0)),
+//         (3, Duration::from_secs_f64(3.0)),
+//         (4, Duration::from_secs_f64(4.0)),
+//         (5, Duration::from_secs_f64(5.0)),
+//         (6, Duration::from_secs_f64(6.0)),
+//     ];
 
-    let dll = DLL::from(events);
-    let dll2 = DLL::from(events);
+//     let dll = DLL::from(events);
+//     let dll2 = DLL::from(events);
 
-    assert_eq!(dll, dll2)
-}
+//     assert_eq!(dll, dll2)
+// }
 
-#[test]
-fn linked_list_unordered_in_eq() {
-    let dll = DLL::from([
-        (4, Duration::from_secs_f64(4.0)),
-        (5, Duration::from_secs_f64(5.0)),
-        (6, Duration::from_secs_f64(6.0)),
-        (1, Duration::from_secs_f64(1.0)),
-        (3, Duration::from_secs_f64(3.0)),
-        (2, Duration::from_secs_f64(2.0)),
-    ]);
-    let dll2 = DLL::from([
-        (5, Duration::from_secs_f64(5.0)),
-        (1, Duration::from_secs_f64(1.0)),
-        (3, Duration::from_secs_f64(3.0)),
-        (4, Duration::from_secs_f64(4.0)),
-        (2, Duration::from_secs_f64(2.0)),
-        (6, Duration::from_secs_f64(6.0)),
-    ]);
+// #[test]
+// fn linked_list_unordered_in_eq() {
+//     let dll = DLL::from([
+//         (4, Duration::from_secs_f64(4.0)),
+//         (5, Duration::from_secs_f64(5.0)),
+//         (6, Duration::from_secs_f64(6.0)),
+//         (1, Duration::from_secs_f64(1.0)),
+//         (3, Duration::from_secs_f64(3.0)),
+//         (2, Duration::from_secs_f64(2.0)),
+//     ]);
+//     let dll2 = DLL::from([
+//         (5, Duration::from_secs_f64(5.0)),
+//         (1, Duration::from_secs_f64(1.0)),
+//         (3, Duration::from_secs_f64(3.0)),
+//         (4, Duration::from_secs_f64(4.0)),
+//         (2, Duration::from_secs_f64(2.0)),
+//         (6, Duration::from_secs_f64(6.0)),
+//     ]);
 
-    assert_eq!(dll, dll2)
-}
+//     assert_eq!(dll, dll2)
+// }
 
-#[test]
-fn linked_list_same_time_in_order() {
-    let dll = DLL::from([
-        (1, Duration::from_secs_f64(1.0)),
-        (2, Duration::from_secs_f64(3.0)),
-        (3, Duration::from_secs_f64(3.0)),
-        (4, Duration::from_secs_f64(3.0)),
-        (5, Duration::from_secs_f64(3.0)),
-        (6, Duration::from_secs_f64(6.0)),
-    ]);
-    let mut c = 1;
-    for item in dll {
-        assert_eq!(item.0, c);
-        c += 1;
-    }
-    assert_eq!(c, 7);
+// #[test]
+// fn linked_list_same_time_in_order() {
+//     let dll = DLL::from([
+//         (1, Duration::from_secs_f64(1.0)),
+//         (2, Duration::from_secs_f64(3.0)),
+//         (3, Duration::from_secs_f64(3.0)),
+//         (4, Duration::from_secs_f64(3.0)),
+//         (5, Duration::from_secs_f64(3.0)),
+//         (6, Duration::from_secs_f64(6.0)),
+//     ]);
+//     let mut c = 1;
+//     for item in dll {
+//         assert_eq!(item.0, c);
+//         c += 1;
+//     }
+//     assert_eq!(c, 7);
 
-    let dll = DLL::from([
-        // (1, Duration::from_secs_f64(1.0)),
-        (2, Duration::from_secs_f64(3.0)),
-        (3, Duration::from_secs_f64(3.0)),
-        (4, Duration::from_secs_f64(3.0)),
-        (5, Duration::from_secs_f64(3.0)),
-        (6, Duration::from_secs_f64(6.0)),
-    ]);
-    let mut c = 2;
-    for item in dll {
-        assert_eq!(item.0, c);
-        c += 1;
-    }
-    assert_eq!(c, 7);
+//     let dll = DLL::from([
+//         // (1, Duration::from_secs_f64(1.0)),
+//         (2, Duration::from_secs_f64(3.0)),
+//         (3, Duration::from_secs_f64(3.0)),
+//         (4, Duration::from_secs_f64(3.0)),
+//         (5, Duration::from_secs_f64(3.0)),
+//         (6, Duration::from_secs_f64(6.0)),
+//     ]);
+//     let mut c = 2;
+//     for item in dll {
+//         assert_eq!(item.0, c);
+//         c += 1;
+//     }
+//     assert_eq!(c, 7);
 
-    let dll = DLL::from([
-        (1, Duration::from_secs_f64(1.0)),
-        (2, Duration::from_secs_f64(3.0)),
-        (3, Duration::from_secs_f64(3.0)),
-        (4, Duration::from_secs_f64(3.0)),
-        (5, Duration::from_secs_f64(3.0)),
-        // (6, Duration::from_secs_f64(6.0)),
-    ]);
-    let mut c = 1;
-    for item in dll {
-        assert_eq!(item.0, c);
-        c += 1;
-    }
-    assert_eq!(c, 6);
-}
+//     let dll = DLL::from([
+//         (1, Duration::from_secs_f64(1.0)),
+//         (2, Duration::from_secs_f64(3.0)),
+//         (3, Duration::from_secs_f64(3.0)),
+//         (4, Duration::from_secs_f64(3.0)),
+//         (5, Duration::from_secs_f64(3.0)),
+//         // (6, Duration::from_secs_f64(6.0)),
+//     ]);
+//     let mut c = 1;
+//     for item in dll {
+//         assert_eq!(item.0, c);
+//         c += 1;
+//     }
+//     assert_eq!(c, 6);
+// }
 
-#[test]
-fn linked_list_remove_min() {
-    let mut dll = DLL::from([
-        // (1, Duration::from_secs_f64(1.0)),
-        // (2, Duration::from_secs_f64(2.0)),
-        // (3, Duration::from_secs_f64(3.0)),
-        (4, Duration::from_secs_f64(4.0)),
-        (5, Duration::from_secs_f64(5.0)),
-        (6, Duration::from_secs_f64(6.0)),
-    ]);
+// #[test]
+// fn linked_list_remove_min() {
+//     let mut dll = DLL::from([
+//         // (1, Duration::from_secs_f64(1.0)),
+//         // (2, Duration::from_secs_f64(2.0)),
+//         // (3, Duration::from_secs_f64(3.0)),
+//         (4, Duration::from_secs_f64(4.0)),
+//         (5, Duration::from_secs_f64(5.0)),
+//         (6, Duration::from_secs_f64(6.0)),
+//     ]);
 
-    let e1 = dll.add(1, Duration::from_secs_f64(1.0));
-    let e2 = dll.add(2, Duration::from_secs_f64(2.0));
-    let e3 = dll.add(3, Duration::from_secs_f64(3.0));
+//     let e1 = dll.add(1, Duration::from_secs_f64(1.0));
+//     let e2 = dll.add(2, Duration::from_secs_f64(2.0));
+//     let e3 = dll.add(3, Duration::from_secs_f64(3.0));
 
-    assert_eq!(dll.len(), 6);
-    e1.cancel();
-    assert_eq!(dll.len(), 5);
-    e3.cancel();
-    assert_eq!(dll.len(), 4);
-    e2.cancel();
-    assert_eq!(dll.len(), 3);
+//     assert_eq!(dll.len(), 6);
+//     e1.cancel();
+//     assert_eq!(dll.len(), 5);
+//     e3.cancel();
+//     assert_eq!(dll.len(), 4);
+//     e2.cancel();
+//     assert_eq!(dll.len(), 3);
 
-    assert_eq!(
-        dll.into_iter().collect::<Vec<_>>(),
-        vec![
-            (4, Duration::from_secs_f64(4.0)),
-            (5, Duration::from_secs_f64(5.0)),
-            (6, Duration::from_secs_f64(6.0)),
-        ]
-    )
-}
+//     assert_eq!(
+//         dll.into_iter().collect::<Vec<_>>(),
+//         vec![
+//             (4, Duration::from_secs_f64(4.0)),
+//             (5, Duration::from_secs_f64(5.0)),
+//             (6, Duration::from_secs_f64(6.0)),
+//         ]
+//     )
+// }
 
-#[test]
-fn linked_list_remove_back() {
-    let mut dll = DLL::from([
-        (1, Duration::from_secs_f64(1.0)),
-        (2, Duration::from_secs_f64(2.0)),
-        (3, Duration::from_secs_f64(3.0)),
-        // (4, Duration::from_secs_f64(4.0)),
-        // (5, Duration::from_secs_f64(5.0)),
-        // (6, Duration::from_secs_f64(6.0)),
-    ]);
+// #[test]
+// fn linked_list_remove_back() {
+//     let mut dll = DLL::from([
+//         (1, Duration::from_secs_f64(1.0)),
+//         (2, Duration::from_secs_f64(2.0)),
+//         (3, Duration::from_secs_f64(3.0)),
+//         // (4, Duration::from_secs_f64(4.0)),
+//         // (5, Duration::from_secs_f64(5.0)),
+//         // (6, Duration::from_secs_f64(6.0)),
+//     ]);
 
-    let e1 = dll.add(4, Duration::from_secs_f64(4.0));
-    let e2 = dll.add(5, Duration::from_secs_f64(5.0));
-    let e3 = dll.add(6, Duration::from_secs_f64(6.0));
+//     let e1 = dll.add(4, Duration::from_secs_f64(4.0));
+//     let e2 = dll.add(5, Duration::from_secs_f64(5.0));
+//     let e3 = dll.add(6, Duration::from_secs_f64(6.0));
 
-    assert_eq!(dll.len(), 6);
-    e3.cancel();
-    assert_eq!(dll.len(), 5);
-    e1.cancel();
-    assert_eq!(dll.len(), 4);
-    e2.cancel();
-    assert_eq!(dll.len(), 3);
+//     assert_eq!(dll.len(), 6);
+//     e3.cancel();
+//     assert_eq!(dll.len(), 5);
+//     e1.cancel();
+//     assert_eq!(dll.len(), 4);
+//     e2.cancel();
+//     assert_eq!(dll.len(), 3);
 
-    assert_eq!(
-        dll.into_iter().collect::<Vec<_>>(),
-        vec![
-            (1, Duration::from_secs_f64(1.0)),
-            (2, Duration::from_secs_f64(2.0)),
-            (3, Duration::from_secs_f64(3.0)),
-        ]
-    )
-}
+//     assert_eq!(
+//         dll.into_iter().collect::<Vec<_>>(),
+//         vec![
+//             (1, Duration::from_secs_f64(1.0)),
+//             (2, Duration::from_secs_f64(2.0)),
+//             (3, Duration::from_secs_f64(3.0)),
+//         ]
+//     )
+// }
 
 #[test]
 fn cqueue_simple_event_order_nonoverlapping() {

@@ -16,13 +16,14 @@ pub(super) struct DLL<E> {
     shared_len: Arc<AtomicUsize>,
 }
 
-struct EventNode<E> {
-    value: Option<E>,
-    time: Duration,
+#[derive(Clone)]
+pub(super) struct EventNode<E> {
+    pub(super) value: Option<E>,
+    pub(super) time: Duration,
 
-    handle: *mut *mut EventNode<E>,
-    prev: *mut EventNode<E>,
-    next: *mut EventNode<E>,
+    pub(super) handle: *mut *mut EventNode<E>,
+    pub(super) prev: *mut EventNode<E>,
+    pub(super) next: *mut EventNode<E>,
 }
 
 /// A handle to cancel an event.
@@ -85,30 +86,30 @@ impl<T> DLL<T> {
         }
     }
 
-    pub(super) fn add_to_tail(&mut self, value: T, time: Duration) -> EventHandle<T> {
-        let (mut node, handle) = EventNode::new(value, time, self.shared_len.clone());
+    pub(super) fn add_to_tail(&mut self, mut node: Box<EventNode<T>>) {
         let prev = self.tail.prev;
         node.prev = prev;
+        let node_ptr: *mut EventNode<T> = &mut *node;
 
         // SAFTEY:
         // tail->prev allways points to a valid value (maybe a head)
         let mut prev = unsafe { Box::from_raw(prev) };
-        prev.next = *handle.inner;
+        prev.next = node_ptr;
         std::mem::forget(prev);
 
         node.next = &mut *self.tail;
-        self.tail.prev = *handle.inner;
+        self.tail.prev = node_ptr;
 
         self.shared_len.fetch_add(1, SeqCst);
         std::mem::forget(node);
-        handle
     }
 
     /// Inserts a new element into the queue, returing a Handle to
     /// cancel the event at will
-    pub(super) fn add(&mut self, value: T, time: Duration) -> EventHandle<T> {
-        let (mut node, handle) = EventNode::new(value, time, self.shared_len.clone());
+    pub(super) fn add(&mut self, mut node: Box<EventNode<T>>) {
+        // let (mut node) = EventNode::new(value, time, self.shared_len.clone());
         self.shared_len.fetch_add(1, SeqCst);
+        let node_ptr: *mut EventNode<T> = &mut *node;
 
         // From back insert
         let mut cur: *mut EventNode<T> = &mut *self.tail;
@@ -142,21 +143,20 @@ impl<T> DLL<T> {
         // since nodes are only dropped once they were removed from the DLL.
         // At removal, they remove ptrs to themselfs from other nodes.
         if !prev.is_null() {
-            unsafe { (*prev).next = *handle.inner }
+            unsafe { (*prev).next = node_ptr }
         }
 
         // SAFTEY: see prev
         if !next.is_null() {
-            unsafe { (*next).prev = *handle.inner }
+            unsafe { (*next).prev = node_ptr }
         }
 
         // Forget the node to leak the memory.
         std::mem::forget(node);
-        handle
     }
 
     /// Removes the element with the earliest time from the queue.
-    pub(super) fn pop_min(&mut self) -> Option<(T, Duration)> {
+    pub(super) fn pop_min(&mut self) -> Option<((T, Duration), Box<EventNode<T>>)> {
         let node = unsafe { Box::from_raw(self.head.next) };
         if node.next.is_null() {
             // The node that would have been returned is the tail.
@@ -198,7 +198,7 @@ impl<T: Clone> Clone for DLL<T> {
     fn clone(&self) -> Self {
         let mut r = Self::new(self.shared_len.clone());
         for (event, time) in self.into_iter() {
-            r.add(event.clone(), *time);
+            r.add(EventNode::new(event.clone(), *time, r.shared_len.clone()).0);
         }
         r
     }
@@ -275,7 +275,7 @@ impl<T> FromIterator<(T, Duration)> for DLL<T> {
     fn from_iter<I: IntoIterator<Item = (T, Duration)>>(iter: I) -> Self {
         let mut r = Self::new(Arc::new(AtomicUsize::new(0)));
         for (item, time) in iter {
-            r.add(item, time);
+            r.add(EventNode::new(item, time, r.shared_len.clone()).0);
         }
         r
     }
@@ -378,7 +378,7 @@ pub struct IntoIter<T> {
 impl<T> Iterator for IntoIter<T> {
     type Item = (T, Duration);
     fn next(&mut self) -> Option<Self::Item> {
-        self.dll.pop_min()
+        Some(self.dll.pop_min()?.0)
     }
 }
 
@@ -393,7 +393,7 @@ impl<T> IntoIterator for DLL<T> {
 // IMPL: Node
 
 impl<T> EventNode<T> {
-    fn empty(time: Duration) -> Box<EventNode<T>> {
+    pub(super) fn empty(time: Duration) -> Box<EventNode<T>> {
         Box::new(Self {
             value: None,
             time,
@@ -403,7 +403,7 @@ impl<T> EventNode<T> {
         })
     }
 
-    fn new(
+    pub(super) fn new(
         value: T,
         time: Duration,
         shared_len: Arc<AtomicUsize>,
@@ -426,7 +426,7 @@ impl<T> EventNode<T> {
         (node, handle)
     }
 
-    fn into_inner(self) -> (T, Duration) {
+    fn into_inner(mut self: Box<Self>) -> ((T, Duration), Box<EventNode<T>>) {
         if !self.handle.is_null() {
             unsafe {
                 (*self.handle) = std::ptr::null_mut();
@@ -435,7 +435,10 @@ impl<T> EventNode<T> {
         // SAFTEY:
         // This function may only be applied to nodes that are
         // neither head nor tail. Such notes allways contain a value
-        (unsafe { self.value.unwrap_unchecked() }, self.time)
+        (
+            (unsafe { self.value.take().unwrap_unchecked() }, self.time),
+            self,
+        )
     }
 }
 
@@ -451,7 +454,18 @@ impl<E> Debug for EventNode<E> {
     }
 }
 
-impl<T> EventHandle<T> {
+impl<E> EventHandle<E> {
+    pub(super) fn new(event_node: &mut Box<EventNode<E>>, shared_len: Arc<AtomicUsize>) -> Self {
+        let ptr: *mut EventNode<E> = &mut **event_node;
+        let mut this = Self {
+            inner: Box::new(ptr),
+            shared_len,
+        };
+        event_node.handle = &mut *this.inner;
+
+        this
+    }
+
     /// Cancels a event if the event is still in the Future-Event-Set
     ///
     /// This operation may only be performed if the Future-Event-Set
