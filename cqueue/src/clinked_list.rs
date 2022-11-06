@@ -131,6 +131,12 @@ impl<E> CacheOptimizedLinkedList<E> {
             self.head = self.next[ele];
             self.len -= 1;
 
+            if self.head == usize::MAX {
+                self.tail = usize::MAX;
+            } else {
+                self.prev[self.head] = usize::MAX;
+            }
+
             let res = (self.body[ele].take().unwrap(), self.time[ele], self.id[ele]);
             self.time[ele] = Duration::ZERO;
             self.id[ele] = 0;
@@ -142,8 +148,8 @@ impl<E> CacheOptimizedLinkedList<E> {
 
     pub(super) fn info(&self) -> String {
         format!(
-            "CLL {{ len: {}, head: {}, tail: {} }}",
-            self.len, self.head, self.tail
+            "CLL {{ len: {}, head: {}, tail: {}, prev: {:?}, next: {:?}, free_list: {:?} }}",
+            self.len, self.head, self.tail, self.prev, self.next, self.free_list
         )
     }
 
