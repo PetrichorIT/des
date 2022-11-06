@@ -21,7 +21,7 @@ use self::env::LogEnvOptions;
 static SCOPED_LOGGER: ScopedLoggerWrap = ScopedLoggerWrap::uninitalized();
 
 thread_local! {
-    pub(crate) static CURRENT_SCOPE: RefCell<Option<String>> = const { RefCell::new(None) }
+    pub(crate) static CURRENT_SCOPE: RefCell<Option<&'static str>> = const { RefCell::new(None) }
 }
 
 struct ScopedLoggerWrap {
@@ -141,9 +141,10 @@ impl ScopedLogger {
 
     /// Begins a new scope, returning the currently active scope.
     #[doc(hidden)]
-    pub fn begin_scope(ident: impl AsRef<str>) -> Option<String> {
-        let ident = Some(ident.as_ref().to_string());
-        CURRENT_SCOPE.with(|cell| cell.replace(ident))
+    pub fn begin_scope(ident: impl AsRef<str>) {
+        let ident: *const str = ident.as_ref();
+        let ident: &'static str = unsafe { &*ident };
+        CURRENT_SCOPE.with(|cell| cell.replace(Some(ident)));
     }
 
     /// Removes the current scope.
@@ -305,13 +306,13 @@ impl Log for ScopedLogger {
             if let Some(v) = CURRENT_SCOPE.with(|c| c.borrow().clone()) {
                 (v, format!("{}: ", record.target()))
             } else {
-                (record.target().to_string(), String::new())
+                (record.target(), String::new())
             }
         } else {
-            (record.target().to_string(), String::new())
+            (record.target(), String::new())
         };
 
-        let scope = scopes.get_mut(&target);
+        let scope = scopes.get_mut(target);
         if let Some(scope) = scope {
             let text = format!("{}{}", appendix, record.args());
             scope.log(text, record.level());
@@ -321,7 +322,7 @@ impl Log for ScopedLogger {
             let stderr = &self.stderr_policy;
 
             let mut new_scope = LoggerScope {
-                target: Arc::new(target.clone()),
+                target: Arc::new(target.to_string()),
                 stream: LinkedList::new(),
                 fwd_stdout: stdout(record.target()),
                 fwd_stderr: stderr(record.target()),
@@ -331,7 +332,7 @@ impl Log for ScopedLogger {
             new_scope.log(format!("{}{}", appendix, record.args()), record.level());
 
             let scopes = unsafe { &mut *self.scopes.get() };
-            scopes.insert(target, new_scope);
+            scopes.insert(target.to_string(), new_scope);
         }
     }
 

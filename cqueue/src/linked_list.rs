@@ -17,7 +17,7 @@ pub(super) struct DLL<E> {
 }
 
 #[derive(Clone)]
-pub(super) struct EventNode<E> {
+pub struct EventNode<E> {
     pub(super) value: Option<E>,
     pub(super) time: Duration,
 

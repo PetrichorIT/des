@@ -53,9 +53,17 @@ fn main() {
     // RUN
 
     let mut time = Duration::ZERO;
+    let mut c = 0;
     while time < Duration::from_secs(100_000) && !cqueue.is_empty() {
         let (e, t) = cqueue.fetch_next();
         time = t;
-        cqueue.add(time + delay, e);
+        cqueue.add(time + Duration::from_secs_f64(e_delay), e);
+        c += 1;
     }
+    println!(
+        "Event count: {} at {}s with remaining {}",
+        c,
+        time.as_secs(),
+        cqueue.len()
+    );
 }
