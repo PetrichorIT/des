@@ -173,7 +173,15 @@ impl<E> CQueue<E> {
 
             // Bucket with > 0 elements found
 
-            let min = self.buckets[self.head].front_time().unwrap();
+            let min = self.buckets[self.head].front_time().unwrap_or_else(|| {
+                // This is a very rare bug in te cll.
+                eprintln!(
+                    "[CLL] Could no fetch front elemen even though list is non-empty {}",
+                    self.buckets[self.head].info()
+                );
+
+                Duration::MAX
+            });
             if min > self.t1 {
                 self.head = (self.head + 1) % self.n;
                 self.t0 += self.t;

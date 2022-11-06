@@ -114,7 +114,7 @@ impl<E> CacheOptimizedLinkedList<E> {
     }
 
     pub fn front_time(&self) -> Option<Duration> {
-        if self.head == usize::MAX {
+        if self.is_empty() {
             None
         } else {
             Some(self.time[self.head])
@@ -129,9 +129,20 @@ impl<E> CacheOptimizedLinkedList<E> {
             self.head = self.next[ele];
             self.len -= 1;
 
+            let res = (self.body[ele].take().unwrap(), self.time[ele], self.id[ele]);
+            self.time[ele] = Duration::ZERO;
+            self.id[ele] = 0;
+
             self.free_list.push(ele);
-            Some((self.body[ele].take().unwrap(), self.time[ele], self.id[ele]))
+            Some(res)
         }
+    }
+
+    pub(super) fn info(&self) -> String {
+        format!(
+            "CLL {{ len: {}, head: {}, tail: {} }}",
+            self.len, self.head, self.tail
+        )
     }
 
     pub fn grow(&mut self) {
