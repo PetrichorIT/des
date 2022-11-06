@@ -114,7 +114,9 @@ impl<E> CacheOptimizedLinkedList<E> {
     }
 
     pub fn front_time(&self) -> Option<Duration> {
-        if self.is_empty() {
+        if
+        /*self.is_empty()*/
+        self.head == usize::MAX {
             None
         } else {
             Some(self.time[self.head])
