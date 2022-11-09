@@ -66,7 +66,7 @@ pub fn derive_message_body(ident: Ident, data: Data) -> crate::common::Result<To
             if data_enum.variants.is_empty() {
                 return Ok(quote! {
                     impl ::des::net::message::MessageBody for #ident {
-                        fn byte_len(&self) -> usize { 0 }
+                        fn byte_len(&self) -> usize { 1 }
                     }
                 }
                 .into());
@@ -92,7 +92,7 @@ pub fn derive_message_body(ident: Ident, data: Data) -> crate::common::Result<To
 
                         let wrapped = WrappedTokenStream(ts);
                         quote! {
-                            #ident::#vident { #pts } => #wrapped 0
+                            #ident::#vident { #pts } => #wrapped 1
                         }
                     }
                     Fields::Unnamed(unnamed_fields) => {
@@ -111,11 +111,11 @@ pub fn derive_message_body(ident: Ident, data: Data) -> crate::common::Result<To
                         }
 
                         let wrapped = WrappedTokenStream(ts);
-                        quote! { #ident::#vident(#pts) => #wrapped 0 }
+                        quote! { #ident::#vident(#pts) => #wrapped 1 }
                     }
                     Fields::Unit => {
                         quote! {
-                            #ident::#vident => 0
+                            #ident::#vident => 1
                         }
                     }
                 };

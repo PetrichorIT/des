@@ -203,21 +203,21 @@ enum D0 {
 #[test]
 fn macro_enum() {
     let v = D0::Zero;
-    assert_eq!(v.byte_len(), 0);
+    assert_eq!(v.byte_len(), 1);
 
     let v = D0::TwentyOne(3, 'c', Box::new(0));
-    assert_eq!(v.byte_len(), 21);
+    assert_eq!(v.byte_len(), 22);
 
     let v = D0::TwentyTwo {
         a: 3,
         b: 'c',
         c: Box::new(0),
     };
-    assert_eq!(v.byte_len(), 22);
+    assert_eq!(v.byte_len(), 23);
 
     let v = D0::Dynamic("Hello World".to_string());
-    assert_eq!(v.byte_len(), 11);
+    assert_eq!(v.byte_len(), 12);
 
     let v = D0::Dynamic(String::new());
-    assert_eq!(v.byte_len(), 0)
+    assert_eq!(v.byte_len(), 1)
 }
