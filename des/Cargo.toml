@@ -49,8 +49,8 @@ sysinfo = "0.26"
 async-trait = {version = "0.1", optional = true}
 cqueue = {path = "../cqueue", optional = true}
 des_macros = {path = "../des_macros", optional = true}
-# tokio = {git = "https://github.com/PetrichorIT/tokio_sim", features = ["sim"], optional = true}
-tokio = {path = "../../tokio_sim/tokio", features = ["sim"], optional = true}
+tokio = {git = "https://github.com/PetrichorIT/tokio_sim", features = ["sim"], optional = true}
+# tokio = {path = "../../tokio_sim/tokio", features = ["sim"], optional = true}
 
 [dev-dependencies]
 futures = "0.3"
