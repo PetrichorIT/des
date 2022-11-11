@@ -51,19 +51,23 @@ fn main() {
     }
 
     // RUN
+    let e_delay = Duration::from_secs_f64(e_delay);
 
+    // let t0 = Instant::now();
     let mut time = Duration::ZERO;
     let mut c = 0;
-    while time < Duration::from_secs(100_000) && !cqueue.is_empty() {
+    while c < 100_000_000 {
         let (e, t) = cqueue.fetch_next();
         time = t;
-        cqueue.add(time + Duration::from_secs_f64(e_delay), e);
+        cqueue.add(time + e_delay, e);
         c += 1;
     }
+
     println!(
         "Event count: {} at {}s with remaining {}",
         c,
         time.as_secs(),
-        cqueue.len()
+        cqueue.len(),
+        // Instant::now().duration_since(t0)
     );
 }
