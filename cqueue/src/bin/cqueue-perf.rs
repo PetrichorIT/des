@@ -41,7 +41,10 @@ fn main() {
 
     // SETUP
 
-    let rng = [0.123, 1.89123, 1.2223, 0.878, 0.4657, 1.123, 1.645];
+    let rng = [
+        0.123, 1.89123, 1.2223, 0.878, 0.4657, 1.123, 1.645, 0.3568, 1.2432, 1.909734, 1.465465,
+        1.8886, 0.97897, 0.34,
+    ];
 
     let mut delay = Duration::ZERO;
     for e in 0..num {
@@ -53,9 +56,12 @@ fn main() {
     // RUN
 
     let mut time = Duration::ZERO;
-    while time < Duration::from_secs(100_000) && !cqueue.is_empty() {
+    let mut c = 0;
+    while c < 1_000_000 {
         let (e, t) = cqueue.fetch_next();
         time = t;
         cqueue.add(time + delay, e);
+        c += 1;
     }
+    println!("Finished after {}s (c = {})", time.as_secs(), c);
 }
