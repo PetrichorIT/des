@@ -65,5 +65,5 @@ fn main() {
 
     let _ = time;
 
-    println!("{}", Instant::now().duration_since(t0).as_secs());
+    println!("{}", Instant::now().duration_since(t0).as_secs_f64());
 }
