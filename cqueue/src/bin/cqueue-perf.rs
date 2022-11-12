@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use cqueue::CQueue;
 
@@ -41,10 +41,7 @@ fn main() {
 
     // SETUP
 
-    let rng = [
-        0.123, 1.89123, 1.2223, 0.878, 0.4657, 1.123, 1.645, 0.3568, 1.2432, 1.909734, 1.465465,
-        1.8886, 0.97897, 0.34,
-    ];
+    let rng = [0.123, 1.89123, 1.2223, 0.878, 0.4657, 1.123, 1.645];
 
     let mut delay = Duration::ZERO;
     for e in 0..num {
@@ -54,14 +51,19 @@ fn main() {
     }
 
     // RUN
+    let e_delay = Duration::from_secs_f64(e_delay);
 
+    let t0 = Instant::now();
     let mut time = Duration::ZERO;
     let mut c = 0;
-    while c < 1_000_000 {
+    while c < 100_000_000 {
         let (e, t) = cqueue.fetch_next();
         time = t;
-        cqueue.add(time + delay, e);
+        cqueue.add(time + e_delay, e);
         c += 1;
     }
-    println!("Finished after {}s (c = {})", time.as_secs(), c);
+
+    let _ = time;
+
+    println!("{}", Instant::now().duration_since(t0).as_secs_f64());
 }
