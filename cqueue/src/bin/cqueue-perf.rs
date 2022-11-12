@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use cqueue::CQueue;
 
@@ -53,7 +53,7 @@ fn main() {
     // RUN
     let e_delay = Duration::from_secs_f64(e_delay);
 
-    // let t0 = Instant::now();
+    let t0 = Instant::now();
     let mut time = Duration::ZERO;
     let mut c = 0;
     while c < 100_000_000 {
@@ -63,11 +63,7 @@ fn main() {
         c += 1;
     }
 
-    println!(
-        "Event count: {} at {}s with remaining {}",
-        c,
-        time.as_secs(),
-        cqueue.len(),
-        // Instant::now().duration_since(t0)
-    );
+    let _ = time;
+
+    println!("{}", Instant::now().duration_since(t0).as_secs());
 }
