@@ -65,13 +65,31 @@ fn main() {
     // RUN
     let e_delay = Duration::from_secs_f64(e_delay);
 
+    let rng_table: Vec<usize> =
+        std::iter::repeat_with(|| rng.sample(Uniform::new(usize::MIN, usize::MAX)))
+            .take(num)
+            .collect();
+
     let t0 = Instant::now();
     let mut time = Duration::ZERO;
     let mut c = 0;
+    let mut pending_event = Vec::new();
+
     while c < 100_000_000 {
         let (e, t) = cqueue.fetch_next();
         time = t;
-        cqueue.add(time + e_delay, e);
+
+        pending_event.push(e);
+        while !pending_event.is_empty() {
+            let rng_sample = rng_table[e] % num;
+            if rng_sample < pending_event.len() {
+                cqueue.add(time + e_delay, pending_event.pop().unwrap())
+            } else {
+                break;
+            }
+        }
+
+        // cqueue.add(time + e_delay, e);
         c += 1;
     }
 
