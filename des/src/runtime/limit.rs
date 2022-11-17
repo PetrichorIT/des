@@ -1,4 +1,3 @@
-use super::event::{Application, EventNode};
 use crate::time::SimTime;
 use std::fmt::Display;
 
@@ -36,21 +35,18 @@ pub enum RuntimeLimit {
 }
 
 impl RuntimeLimit {
-    pub(crate) fn applies<A>(&self, itr_count: usize, node: &EventNode<A>) -> bool
-    where
-        A: Application,
-    {
+    pub(crate) fn applies(&self, itr_count: usize, time: SimTime) -> bool {
         match self {
             Self::None => false,
 
             Self::EventCount(e) => itr_count > *e,
-            Self::SimTime(t) => node.time > *t,
+            Self::SimTime(t) => time > *t,
 
             Self::CombinedAnd(lhs, rhs) => {
-                lhs.applies(itr_count, node) && rhs.applies(itr_count, node)
+                lhs.applies(itr_count, time) && rhs.applies(itr_count, time)
             }
             Self::CombinedOr(lhs, rhs) => {
-                lhs.applies(itr_count, node) || rhs.applies(itr_count, node)
+                lhs.applies(itr_count, time) || rhs.applies(itr_count, time)
             }
         }
     }

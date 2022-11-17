@@ -353,15 +353,14 @@ where
     pub fn next(&mut self) -> bool {
         debug_assert!(!self.future_event_set.is_empty());
 
-        let node = self.future_event_set.fetch_next(
+        let (event, time) = self.future_event_set.fetch_next(
             #[cfg(feature = "metrics")]
             Arc::clone(&self.profiler.metrics),
         );
 
         self.itr += 1;
 
-        if self.check_break_condition(&node) {
-            let EventNode { time, event, .. } = node;
+        if self.check_break_condition(time) {
             self.future_event_set.add(
                 time,
                 event,
@@ -372,9 +371,9 @@ where
         }
 
         // Let this be the only position where SimTime is changed
-        SimTime::set_now(node.time);
+        SimTime::set_now(time);
 
-        node.handle(self);
+        event.handle(self);
         !self.future_event_set.is_empty()
     }
 
@@ -382,8 +381,8 @@ where
     /// Returns true if the one of the break conditions is met.
     ///
     #[inline]
-    fn check_break_condition(&self, node: &EventNode<A>) -> bool {
-        self.limit.applies(self.itr, node)
+    fn check_break_condition(&self, time: SimTime) -> bool {
+        self.limit.applies(self.itr, time)
     }
 
     ///
@@ -802,7 +801,7 @@ cfg_net! {
         ) {
             let event = MessageAtGateEvent {
                 gate,
-                message: message.into(),
+                message: Box::new(message.into()),
             };
 
             self.add_event(NetEvents::MessageAtGateEvent(event), time);
@@ -819,7 +818,7 @@ cfg_net! {
         ) {
             let event = HandleMessageEvent {
                 module: module.into(),
-                message: message.into(),
+                message: Box::new(message.into()),
             };
 
             self.add_event(NetEvents::HandleMessageEvent(event), time);

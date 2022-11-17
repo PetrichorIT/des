@@ -31,7 +31,7 @@ create_event_set!(
 #[derive(Debug)]
 pub struct MessageAtGateEvent {
     pub(crate) gate: GateRef,
-    pub(crate) message: Message,
+    pub(crate) message: Box<Message>,
 }
 
 impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
@@ -109,13 +109,13 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
 #[derive(Debug)]
 pub struct HandleMessageEvent {
     pub(crate) module: ModuleRef,
-    pub(crate) message: Message,
+    pub(crate) message: Box<Message>,
 }
 
 impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
     fn handle(self, rt: &mut Runtime<NetworkRuntime<A>>) {
         log_scope!(self.module.str());
-        let mut message = self.message;
+        let mut message = *self.message;
         message.header.receiver_module_id = self.module.ctx.id;
 
         info!("Handling message {:?}", message.str());

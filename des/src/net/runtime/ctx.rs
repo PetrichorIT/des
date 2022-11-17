@@ -74,7 +74,10 @@ pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<NetworkRuntime
             );
             message.header.sender_module_id = self_id;
             rt.add_event(
-                NetEvents::MessageAtGateEvent(MessageAtGateEvent { gate, message }),
+                NetEvents::MessageAtGateEvent(MessageAtGateEvent {
+                    gate,
+                    message: Box::new(message),
+                }),
                 time,
             );
         }
@@ -84,7 +87,7 @@ pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<NetworkRuntime
             rt.add_event(
                 NetEvents::HandleMessageEvent(HandleMessageEvent {
                     module: module.clone(),
-                    message,
+                    message: Box::new(message),
                 }),
                 time,
             );
@@ -113,7 +116,7 @@ pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<NetworkRuntime
                 rt.add_event(
                     NetEvents::HandleMessageEvent(HandleMessageEvent {
                         module: module.clone(),
-                        message: Message::new().typ(TYP_RESTART).build(),
+                        message: Box::new(Message::new().typ(TYP_RESTART).build()),
                     }),
                     rest,
                 );

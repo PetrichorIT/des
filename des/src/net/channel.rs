@@ -143,7 +143,7 @@ struct ChannelInner {
     /// The time the current packet is fully transmitted onto the channel.
     transmission_finish_time: SimTime,
 
-    buffer: VecDeque<(Message, GateRef)>,
+    buffer: VecDeque<(Box<Message>, GateRef)>,
     buffer_len: usize,
 }
 
@@ -260,7 +260,7 @@ impl Channel {
 
     pub(super) fn send_message<A>(
         self: Arc<Self>,
-        msg: Message,
+        msg: Box<Message>,
         next_gate: &GateRef,
         rt: &mut Runtime<NetworkRuntime<A>>,
     ) {

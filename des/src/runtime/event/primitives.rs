@@ -145,18 +145,6 @@ where
     pub(crate) _phantom: PhantomData<A>,
 }
 
-impl<A> EventNode<A>
-where
-    A: Application,
-{
-    ///
-    /// Delegation call to 'handle' on the event from the [`EventSet`].
-    ///
-    pub(crate) fn handle(self, rt: &mut Runtime<A>) {
-        self.event.handle(rt);
-    }
-}
-
 impl<A> cmp::PartialEq for EventNode<A>
 where
     A: Application,
