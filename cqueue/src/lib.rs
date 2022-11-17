@@ -1,10 +1,19 @@
-mod clinked_list;
-// mod linked_list;
-
-// use linked_list::*;
+#![feature(allocator_api)]
+#![feature(nonnull_slice_from_raw_parts)]
+#![feature(const_trait_impl)]
+#![feature(const_mut_refs)]
 use std::{collections::VecDeque, ops::Rem, time::Duration};
 
-use clinked_list::CacheOptimizedLinkedList;
+// mod _alloc;
+mod alloc;
+mod linked_list;
+// mod clinked_list;
+// mod linked_list;
+
+pub(crate) use alloc::*;
+use linked_list::DLL;
+
+// use linked_list::*;
 
 // pub use linked_list::EventHandle;
 
@@ -25,8 +34,11 @@ use clinked_list::CacheOptimizedLinkedList;
 /// the insertion of entries with a timestamp smaller that entries
 /// that was last fetched (or Duration::ZERO initally).
 ///
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct CQueue<E> {
+    #[allow(unused)]
+    pub(crate) alloc: Box<CQueueLLAllocatorInner>,
+
     // Parameters
     pub(crate) n: usize,
     pub(crate) t: Duration,
@@ -35,7 +47,7 @@ pub struct CQueue<E> {
 
     // Buckets
     pub(crate) zero_event_bucket: VecDeque<(E, Duration, usize)>,
-    pub(crate) buckets: Vec<CacheOptimizedLinkedList<E>>,
+    pub(crate) buckets: Vec<DLL<E>>,
     pub(crate) head: usize,
 
     pub(crate) t_current: Duration,
@@ -88,13 +100,15 @@ impl<E> CQueue<E> {
         // essentialy t*n
         let t_all = t.as_nanos() * n as u128;
 
+        let alloc = Box::new(CQueueLLAllocatorInner::new());
+
         Self {
             n,
             t_nanos: t.as_nanos(),
             t,
 
             zero_event_bucket: VecDeque::with_capacity(64),
-            buckets: std::iter::repeat_with(|| CacheOptimizedLinkedList::with_capacity(8))
+            buckets: std::iter::repeat_with(|| DLL::new(alloc.handle()))
                 .take(n)
                 .collect(),
             head: 0,
@@ -105,6 +119,7 @@ impl<E> CQueue<E> {
 
             t_all,
 
+            alloc,
             event_id: 0,
             len: 0,
         }
@@ -175,10 +190,10 @@ impl<E> CQueue<E> {
 
             let min = self.buckets[self.head].front_time().unwrap_or_else(|| {
                 // This is a very rare bug in te cll.
-                eprintln!(
-                    "[CLL] Could no fetch front elemen even though list is non-empty {}",
-                    self.buckets[self.head].info()
-                );
+                // eprintln!(
+                //     "[CLL] Could no fetch front elemen even though list is non-empty {}",
+                //     self.buckets[self.head].info()
+                // );
 
                 Duration::MAX
             });
@@ -191,7 +206,7 @@ impl<E> CQueue<E> {
 
             self.t_current = min;
 
-            let (ret, node, _) = self.buckets[self.head].pop_min().unwrap();
+            let (ret, node) = self.buckets[self.head].pop_min().unwrap();
             self.len -= 1;
             return (ret, node);
         }
@@ -201,6 +216,15 @@ impl<E> CQueue<E> {
 impl<E> Default for CQueue<E> {
     fn default() -> Self {
         Self::new(1024, Duration::from_millis(5))
+    }
+}
+
+impl<E> Drop for CQueue<E> {
+    fn drop(&mut self) {
+        // Manually drop the DLL so that the alloc can be dropped last
+        for dll in self.buckets.drain(..) {
+            drop(dll)
+        }
     }
 }
 

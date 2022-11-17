@@ -1,11 +1,19 @@
-use crate::alloc::CQueueLLAllocator;
-use std::{fmt::Debug, hash::Hash, marker::PhantomData, time::Duration};
+#![allow(unused)]
+use std::{
+    fmt::Debug,
+    hash::Hash,
+    marker::PhantomData,
+    sync::{
+        atomic::{AtomicUsize, Ordering::SeqCst},
+        Arc,
+    },
+    time::Duration,
+};
 
 pub(super) struct DLL<E> {
-    alloc: CQueueLLAllocator,
-    head: Box<EventNode<E>, CQueueLLAllocator>,
-    tail: Box<EventNode<E>, CQueueLLAllocator>,
-    len: usize,
+    head: Box<EventNode<E>>,
+    tail: Box<EventNode<E>>,
+    shared_len: Arc<AtomicUsize>,
 }
 
 #[derive(Clone)]
@@ -13,19 +21,24 @@ pub struct EventNode<E> {
     pub(super) value: Option<E>,
     pub(super) time: Duration,
 
-    #[allow(unused)]
-    pub(super) id: usize,
-
+    pub(super) handle: *mut *mut EventNode<E>,
     pub(super) prev: *mut EventNode<E>,
     pub(super) next: *mut EventNode<E>,
+}
+
+/// A handle to cancel an event.
+#[derive(Debug)]
+pub struct EventHandle<E> {
+    inner: Box<*mut EventNode<E>>,
+    shared_len: Arc<AtomicUsize>,
 }
 
 // IMPL: DLL
 
 impl<T> DLL<T> {
-    pub(super) fn new(alloc: CQueueLLAllocator) -> Self {
-        let mut head = EventNode::empty(Duration::ZERO, alloc);
-        let mut tail = EventNode::empty(Duration::MAX, alloc);
+    pub(super) fn new(len: Arc<AtomicUsize>) -> Self {
+        let mut head = EventNode::empty(Duration::ZERO);
+        let mut tail = EventNode::empty(Duration::MAX);
 
         let head_ptr: *mut EventNode<T> = &mut *head;
         let tail_ptr: *mut EventNode<T> = &mut *tail;
@@ -34,10 +47,9 @@ impl<T> DLL<T> {
         tail.prev = head_ptr;
 
         Self {
-            alloc,
             head,
             tail,
-            len: 0,
+            shared_len: len,
         }
     }
 
@@ -46,20 +58,22 @@ impl<T> DLL<T> {
     }
 
     pub(super) fn len(&self) -> usize {
-        self.len
+        self.iter().count()
     }
 
-    pub(super) fn front_time(&self) -> Option<Duration> {
+    /// Returns a ref valid,
+    /// unless a handle is used.
+    pub(super) fn front(&self) -> Option<(&T, Duration)> {
         // SAFTEY:
         // Value is guranteed to be valid since head->next is allways valid
-        let front = unsafe { Box::from_raw_in(self.head.next, self.alloc) };
+        let front = unsafe { Box::from_raw(self.head.next) };
         if front.next.is_null() {
             std::mem::forget(front);
             None
         } else {
             // SAFTEY:
             // front is valid, and neither head nor tail so itt must contain a value
-            let (_, t): (*const T, Duration) = (
+            let (v, t): (*const T, Duration) = (
                 unsafe { front.value.as_ref().unwrap_unchecked() },
                 front.time,
             );
@@ -68,33 +82,33 @@ impl<T> DLL<T> {
             // Borrow points to valid datate an has a valid lifetime of (&self)
             // since the &self ref will gurantee that v is not dropped
             // unless via a handle
-            Some(t)
+            Some((unsafe { &*v }, t))
         }
     }
 
-    // pub(super) fn add_to_tail(&mut self, mut node: Box<EventNode<T>>) {
-    //     let prev = self.tail.prev;
-    //     node.prev = prev;
-    //     let node_ptr: *mut EventNode<T> = &mut *node;
+    pub(super) fn add_to_tail(&mut self, mut node: Box<EventNode<T>>) {
+        let prev = self.tail.prev;
+        node.prev = prev;
+        let node_ptr: *mut EventNode<T> = &mut *node;
 
-    //     // SAFTEY:
-    //     // tail->prev allways points to a valid value (maybe a head)
-    //     let mut prev = unsafe { Box::from_raw(prev) };
-    //     prev.next = node_ptr;
-    //     std::mem::forget(prev);
+        // SAFTEY:
+        // tail->prev allways points to a valid value (maybe a head)
+        let mut prev = unsafe { Box::from_raw(prev) };
+        prev.next = node_ptr;
+        std::mem::forget(prev);
 
-    //     node.next = &mut *self.tail;
-    //     self.tail.prev = node_ptr;
+        node.next = &mut *self.tail;
+        self.tail.prev = node_ptr;
 
-    //     self.len += 1;
-    //     std::mem::forget(node);
-    // }
+        self.shared_len.fetch_add(1, SeqCst);
+        std::mem::forget(node);
+    }
 
     /// Inserts a new element into the queue, returing a Handle to
     /// cancel the event at will
-    pub(super) fn add(&mut self, event: T, time: Duration, event_id: usize) {
-        let mut node = EventNode::new(event, time, event_id, self.alloc);
-        self.len += 1;
+    pub(super) fn add(&mut self, mut node: Box<EventNode<T>>) {
+        // let (mut node) = EventNode::new(value, time, self.shared_len.clone());
+        self.shared_len.fetch_add(1, SeqCst);
         let node_ptr: *mut EventNode<T> = &mut *node;
 
         // From back insert
@@ -142,15 +156,15 @@ impl<T> DLL<T> {
     }
 
     /// Removes the element with the earliest time from the queue.
-    pub(super) fn pop_min(&mut self) -> Option<(T, Duration)> {
-        let node = unsafe { Box::from_raw_in(self.head.next, self.alloc) };
+    pub(super) fn pop_min(&mut self) -> Option<((T, Duration), Box<EventNode<T>>)> {
+        let node = unsafe { Box::from_raw(self.head.next) };
         if node.next.is_null() {
             // The node that would have been returned is the tail.
             // Thus forgett this Box, since the tail is allready owned by self.
             std::mem::forget(node);
             None
         } else {
-            self.len -= 1;
+            self.shared_len.fetch_sub(1, SeqCst);
 
             // The node is not the tail (or the head),
             // Thus the node has valid ptrs to prev and next.
@@ -167,8 +181,7 @@ impl<T> DLL<T> {
             // Droping the node via into_inner is valid since the only remaining
             // ref (the NodeHandle) will be invalidated by this operation,
             // if nessecary
-            let v = node.into_inner();
-            Some(v)
+            Some(node.into_inner())
         }
     }
 
@@ -176,21 +189,20 @@ impl<T> DLL<T> {
         self.into_iter()
     }
 
-    #[allow(unused)]
     pub(super) fn iter_mut(&mut self) -> IterMut<'_, T> {
         self.into_iter()
     }
 }
 
-// impl<T: Clone> Clone for DLL<T> {
-//     fn clone(&self) -> Self {
-//         let mut r = Self::new(self.shared_len.clone(), todo!());
-//         for (event, time) in self.into_iter() {
-//             r.add(EventNode::new(event.clone(), *time, r.shared_len.clone()).0);
-//         }
-//         r
-//     }
-// }
+impl<T: Clone> Clone for DLL<T> {
+    fn clone(&self) -> Self {
+        let mut r = Self::new(self.shared_len.clone());
+        for (event, time) in self.into_iter() {
+            r.add(EventNode::new(event.clone(), *time, r.shared_len.clone()).0);
+        }
+        r
+    }
+}
 
 impl<T> Debug for DLL<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -204,11 +216,11 @@ impl<T> Debug for DLL<T> {
     }
 }
 
-// impl<T> Default for DLL<T> {
-//     fn default() -> Self {
-//         Self::new(Arc::new(AtomicUsize::new(0)), todo!())
-//     }
-// // }
+impl<T> Default for DLL<T> {
+    fn default() -> Self {
+        Self::new(Arc::new(AtomicUsize::new(0)))
+    }
+}
 
 impl<T> Drop for DLL<T> {
     fn drop(&mut self) {
@@ -259,28 +271,27 @@ impl<T: Hash> Hash for DLL<T> {
 
 // FROM
 
-// impl<T> FromIterator<(T, Duration)> for DLL<T> {
-//     fn from_iter<I: IntoIterator<Item = (T, Duration)>>(iter: I) -> Self {
-//         let mut r = Self::new(todo!());
-//         for (item, time) in iter {
-//             r.add(EventNode::new(item, time, r.shared_len.clone()).0);
-//         }
-//         r
-//     }
-// }
+impl<T> FromIterator<(T, Duration)> for DLL<T> {
+    fn from_iter<I: IntoIterator<Item = (T, Duration)>>(iter: I) -> Self {
+        let mut r = Self::new(Arc::new(AtomicUsize::new(0)));
+        for (item, time) in iter {
+            r.add(EventNode::new(item, time, r.shared_len.clone()).0);
+        }
+        r
+    }
+}
 
-// impl<T, const N: usize> From<[(T, Duration); N]> for DLL<T> {
-//     fn from(value: [(T, Duration); N]) -> Self {
-//         Self::from_iter(value)
-//     }
-// }
+impl<T, const N: usize> From<[(T, Duration); N]> for DLL<T> {
+    fn from(value: [(T, Duration); N]) -> Self {
+        Self::from_iter(value)
+    }
+}
 
 // IMPL: DLL Into Iter
 
 pub struct Iter<'a, T> {
     marker: PhantomData<&'a DLL<T>>,
     cur: *mut EventNode<T>,
-    alloc: CQueueLLAllocator,
 }
 
 impl<'a, T> Iterator for Iter<'a, T> {
@@ -291,7 +302,7 @@ impl<'a, T> Iterator for Iter<'a, T> {
         // Will point to a valid node since:
         // IA) head->next is a valid node
         // IS) each time the next node is check to be non-null (thus valid)
-        let cur = unsafe { Box::from_raw_in(self.cur, self.alloc) };
+        let cur = unsafe { Box::from_raw(self.cur) };
         let result: Option<(*const T, *const Duration)> = {
             if cur.next.is_null() {
                 // is tail
@@ -315,7 +326,6 @@ impl<'a, T> IntoIterator for &'a DLL<T> {
         Iter {
             marker: PhantomData,
             cur: self.head.next,
-            alloc: self.alloc,
         }
     }
 }
@@ -323,7 +333,6 @@ impl<'a, T> IntoIterator for &'a DLL<T> {
 pub struct IterMut<'a, T> {
     marker: PhantomData<&'a mut DLL<T>>,
     cur: *mut EventNode<T>,
-    alloc: CQueueLLAllocator,
 }
 
 impl<'a, T> Iterator for IterMut<'a, T> {
@@ -334,7 +343,7 @@ impl<'a, T> Iterator for IterMut<'a, T> {
         // Will point to a valid node since:
         // IA) head->next is a valid node
         // IS) each time the next node is check to be non-null (thus valid)
-        let mut cur = unsafe { Box::from_raw_in(self.cur, self.alloc) };
+        let mut cur = unsafe { Box::from_raw(self.cur) };
         let result: Option<(*mut T, *const Duration)> = {
             if cur.next.is_null() {
                 // is tail
@@ -358,7 +367,6 @@ impl<'a, T> IntoIterator for &'a mut DLL<T> {
         IterMut {
             marker: PhantomData,
             cur: self.head.next,
-            alloc: self.alloc,
         }
     }
 }
@@ -370,7 +378,7 @@ pub struct IntoIter<T> {
 impl<T> Iterator for IntoIter<T> {
     type Item = (T, Duration);
     fn next(&mut self) -> Option<Self::Item> {
-        self.dll.pop_min()
+        Some(self.dll.pop_min()?.0)
     }
 }
 
@@ -385,55 +393,117 @@ impl<T> IntoIterator for DLL<T> {
 // IMPL: Node
 
 impl<T> EventNode<T> {
-    pub(super) fn empty(
-        time: Duration,
-        alloc: CQueueLLAllocator,
-    ) -> Box<EventNode<T>, CQueueLLAllocator> {
-        Box::new_in(
-            Self {
-                value: None,
-                id: 0,
-                time,
-                prev: std::ptr::null_mut(),
-                next: std::ptr::null_mut(),
-            },
-            alloc,
-        )
+    pub(super) fn empty(time: Duration) -> Box<EventNode<T>> {
+        Box::new(Self {
+            value: None,
+            time,
+            handle: std::ptr::null_mut(),
+            prev: std::ptr::null_mut(),
+            next: std::ptr::null_mut(),
+        })
     }
 
     pub(super) fn new(
         value: T,
         time: Duration,
-        id: usize,
-        alloc: CQueueLLAllocator,
-    ) -> Box<EventNode<T>, CQueueLLAllocator> {
-        Box::new_in(
-            Self {
-                value: Some(value),
-                time,
-                id,
-                prev: std::ptr::null_mut(),
-                next: std::ptr::null_mut(),
-            },
-            alloc,
-        )
+        shared_len: Arc<AtomicUsize>,
+    ) -> (Box<EventNode<T>>, EventHandle<T>) {
+        let mut node = Box::new(Self {
+            value: Some(value),
+            time,
+            handle: std::ptr::null_mut(),
+            prev: std::ptr::null_mut(),
+            next: std::ptr::null_mut(),
+        });
+
+        let mut handle = EventHandle {
+            inner: Box::new(&mut *node),
+            shared_len,
+        };
+
+        node.handle = &mut *handle.inner;
+
+        (node, handle)
     }
 
-    fn into_inner(mut self: Box<Self, CQueueLLAllocator>) -> (T, Duration) {
+    fn into_inner(mut self: Box<Self>) -> ((T, Duration), Box<EventNode<T>>) {
+        if !self.handle.is_null() {
+            unsafe {
+                (*self.handle) = std::ptr::null_mut();
+            }
+        }
         // SAFTEY:
         // This function may only be applied to nodes that are
         // neither head nor tail. Such notes allways contain a value
-        (unsafe { self.value.take().unwrap_unchecked() }, self.time)
+        (
+            (unsafe { self.value.take().unwrap_unchecked() }, self.time),
+            self,
+        )
     }
 }
 
 impl<E> Debug for EventNode<E> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("EventNode")
+            .field("handle", &self.handle)
             .field("prev", &self.prev)
             .field("next", &self.next)
             .field("time", &self.time)
             .field("value", &self.value.is_some())
             .finish()
+    }
+}
+
+impl<E> EventHandle<E> {
+    pub(super) fn new(event_node: &mut Box<EventNode<E>>, shared_len: Arc<AtomicUsize>) -> Self {
+        let ptr: *mut EventNode<E> = &mut **event_node;
+        let mut this = Self {
+            inner: Box::new(ptr),
+            shared_len,
+        };
+        event_node.handle = &mut *this.inner;
+
+        this
+    }
+
+    /// Cancels a event if the event is still in the Future-Event-Set
+    ///
+    /// This operation may only be performed if the Future-Event-Set
+    /// is not currently accessed by another operation. Addditionally
+    /// this operation may invalidate references provided
+    /// by DLL::front.
+    pub fn cancel(self) {
+        if self.inner.is_null() {
+            // HUH
+        } else {
+            let node = unsafe { Box::from_raw(*self.inner) };
+
+            if !node.prev.is_null() {
+                let mut prev = unsafe { Box::from_raw(node.prev) };
+                prev.next = node.next;
+                std::mem::forget(prev);
+            }
+
+            if !node.next.is_null() {
+                let mut next = unsafe { Box::from_raw(node.next) };
+                next.prev = node.prev;
+                std::mem::forget(next);
+            }
+
+            self.shared_len.fetch_sub(1, SeqCst);
+            drop(node);
+        }
+        std::mem::drop(self);
+    }
+}
+
+impl<T> Drop for EventHandle<T> {
+    fn drop(&mut self) {
+        // remove handle entry from node
+        if !self.inner.is_null() {
+            unsafe {
+                (**self.inner).handle = std::ptr::null_mut();
+            }
+        }
     }
 }
