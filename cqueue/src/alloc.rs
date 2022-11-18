@@ -5,8 +5,6 @@ use std::{
     ptr::NonNull,
 };
 
-const PAGE_SIZE: usize = 4096;
-
 struct ListNode {
     size: usize,
     next: Option<&'static mut ListNode>,
@@ -28,7 +26,8 @@ impl ListNode {
 
 pub struct CQueueLLAllocatorInner {
     head: ListNode,
-    pages: Vec<Box<[u8; PAGE_SIZE]>>,
+    pages: Vec<*mut u8>,
+    page_size: usize,
     allocated_mem: usize,
 }
 
@@ -38,6 +37,7 @@ impl CQueueLLAllocatorInner {
         let mut this = Self {
             head: ListNode::new(0),
             pages: Vec::new(),
+            page_size: page_size::get(),
             allocated_mem: 0,
         };
 
@@ -53,11 +53,10 @@ impl CQueueLLAllocatorInner {
 
     unsafe fn add_page(&mut self) {
         let block = alloc::alloc_zeroed(
-            Layout::from_size_align(PAGE_SIZE, PAGE_SIZE).expect("page layout invalid"),
+            Layout::from_size_align(self.page_size, self.page_size).expect("page layout invalid"),
         );
-        self.pages
-            .push(Box::from_raw(block as *mut [u8; PAGE_SIZE]));
-        self.add_free_region(block as usize, PAGE_SIZE)
+        self.pages.push(block);
+        self.add_free_region(block as usize, self.page_size)
     }
 
     pub fn handle(&self) -> CQueueLLAllocator {
@@ -169,6 +168,16 @@ impl Debug for CQueueLLAllocatorInner {
     }
 }
 
+impl Drop for CQueueLLAllocatorInner {
+    fn drop(&mut self) {
+        let layout = Layout::from_size_align(self.page_size, self.page_size)
+            .expect("failed to generate page layout");
+        for page in self.pages.iter() {
+            unsafe { alloc::dealloc(*page, layout) }
+        }
+    }
+}
+
 // impl Allocator for LinkedListAllocator {}
 
 fn align_up(addr: usize, align: usize) -> usize {
@@ -185,7 +194,7 @@ unsafe impl Allocator for CQueueLLAllocator {
         let (size, align) = CQueueLLAllocatorInner::size_align(layout);
         let allocator = unsafe { &mut *self.inner };
 
-        if size > PAGE_SIZE {
+        if size > allocator.page_size {
             return Err(AllocError);
         }
 

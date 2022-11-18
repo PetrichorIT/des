@@ -275,6 +275,10 @@ where
     pub fn new_with(app: A, mut options: RuntimeOptions) -> Self {
         // Log prep
         // StandardLogger::setup().expect("Failed to create logger");
+        #[cfg(feature = "cqueue")]
+        if std::mem::size_of::<A::EventSet>() > 128 {
+            eprintln!("des::warning ** creating runtime with event-set bigger that 128 bytes * this may lead to performance losses");
+        }
 
         // Set SimTime
         let sim_time = options.min_sim_time.unwrap_or(SimTime::MIN);
