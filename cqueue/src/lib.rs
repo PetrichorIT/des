@@ -89,6 +89,13 @@ impl<E> CQueue<E> {
         self.len() == 0
     }
 
+    pub fn metrics(&self) -> (usize, usize) {
+        let (alloc, total) = self.alloc.metrics();
+        let additional = std::mem::size_of::<Self>();
+        let additional = additional + std::mem::size_of::<(E, Duration, usize)>() * self.len_zero();
+        (alloc + additional, total + additional)
+    }
+
     /// Returns the timestamp of the last emitted event.
     /// This acts as a lower bound to the insertion of new events.
     pub fn time(&self) -> Duration {

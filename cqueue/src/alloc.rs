@@ -48,6 +48,10 @@ impl CQueueLLAllocatorInner {
         this
     }
 
+    pub(super) fn metrics(&self) -> (usize, usize) {
+        (self.allocated_mem, self.page_size * self.page_size)
+    }
+
     #[cfg(test)]
     pub(crate) fn info(&self) {}
 

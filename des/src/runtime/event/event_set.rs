@@ -215,6 +215,9 @@ cfg_cqueue! {
                     #[cfg(feature = "metrics-rt-full")]
                     #[allow(clippy::cast_precision_loss)]
                     metrics.event_count.collect(self.len() as f64);
+
+                    #[cfg(feature = "metrics-rt-full")]
+                    let _ = self.inner.metrics();
                 }
 
                 let (event, time) = self.inner.fetch_next();

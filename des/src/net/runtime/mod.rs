@@ -201,16 +201,6 @@ pub struct NetworkRuntimeGlobals {
     ///
     #[cfg(feature = "metrics-module-time")]
     pub time_elapsed: std::time::Duration,
-
-    ///
-    /// The runtime that executes all futures.
-    /// Note that the set of all futures within this runtime can be partitioned into
-    /// subsets required by each module. No future should be used by more than one module.
-    /// (Expect some global values for data collection)
-    ///
-    #[cfg(feature = "async")]
-    #[cfg(feature = "async-sharedrt")]
-    pub runtime: std::sync::Arc<tokio::runtime::Runtime>,
 }
 
 impl NetworkRuntimeGlobals {
@@ -225,12 +215,6 @@ impl NetworkRuntimeGlobals {
 
             #[cfg(feature = "metrics-module-time")]
             time_elapsed: std::time::Duration::ZERO,
-
-            #[cfg(feature = "async")]
-            #[cfg(feature = "async-sharedrt")]
-            runtime: std::sync::Arc::new(
-                tokio::runtime::Runtime::new().expect("Failed to create global runtime"),
-            ),
         }
     }
 }

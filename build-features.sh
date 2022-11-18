@@ -38,15 +38,6 @@ echo "[des] net + async + metrics"
 cargo build -p des --features net --features metrics --features async
 echo "[des] net + async + cqueue + metrics"
 cargo build -p des --features net --features cqueue --features metrics --features async
-echo "[des] net + async + async-sharedrt"
-cargo build -p des --features net --features async --features async-sharedrt
-echo "[des] net + async + async-sharedrt + cqueue"
-cargo build -p des --features net --features async --features async-sharedrt --features cqueue
-echo "[des] net + async + async-sharedrt + metrics"
-cargo build -p des --features net --features async --features async-sharedrt --features metrics 
-echo "[des] net + async + async-sharedrt + cqueue + metrics"
-cargo build -p des --features net --features async --features async-sharedrt --features cqueue --features metrics
-
 
 
 # 'tests' build

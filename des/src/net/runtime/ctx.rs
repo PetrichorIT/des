@@ -105,7 +105,6 @@ pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<NetworkRuntime
 
             // drop the rt, to prevent all async activity from happening.
             #[cfg(feature = "async")]
-            #[cfg(not(feature = "async-sharedrt"))]
             drop(module.ctx.async_ext.borrow_mut().rt.take());
 
             // drop all hooks to ensure all messages reach the async impl

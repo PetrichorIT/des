@@ -188,15 +188,10 @@ cfg_async! {
     use tokio::sync::mpsc::{UnboundedReceiver, error::SendError};
     use super::ext::WaitingMessage;
 
-    #[cfg(not(feature = "async-sharedrt"))]
     pub(super) fn async_get_rt() -> Option<Arc<Runtime>> {
         with_mod_ctx(|ctx| Some(Arc::clone(ctx.async_ext.borrow().rt.as_ref()?)))
     }
 
-    #[cfg(feature = "async-sharedrt")]
-    pub(super) fn async_get_rt() -> Option<Arc<Runtime>> {
-         Some(Arc::clone(&crate::net::globals().runtime))
-    }
 
     pub(super) fn async_take_sim_ctx() -> SimContext {
         with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().ctx.take().expect("Sombody stole our sim context"))
@@ -206,7 +201,6 @@ cfg_async! {
         with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().ctx = Some(sim_ctx));
     }
 
-    #[cfg(not(feature = "async-sharedrt"))]
     pub(super) fn async_ctx_reset() {
         with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().reset());
     }

@@ -6,7 +6,6 @@ use tokio::{
 };
 
 pub(crate) struct AsyncCoreExt {
-    #[cfg(not(feature = "async-sharedrt"))]
     pub(crate) rt: Option<std::sync::Arc<tokio::runtime::Runtime>>,
     pub(crate) ctx: Option<SimContext>,
 
@@ -28,7 +27,6 @@ impl AsyncCoreExt {
         let (stx, srx) = unbounded_channel();
 
         Self {
-            #[cfg(not(feature = "async-sharedrt"))]
             rt: Some(std::sync::Arc::new(tokio::runtime::Runtime::new().unwrap())),
 
             // buffers: rx,
@@ -47,7 +45,6 @@ impl AsyncCoreExt {
         }
     }
 
-    #[cfg(not(feature = "async-sharedrt"))]
     pub(crate) fn reset(&mut self) {
         self.rt = Some(std::sync::Arc::new(tokio::runtime::Runtime::new().unwrap()));
 

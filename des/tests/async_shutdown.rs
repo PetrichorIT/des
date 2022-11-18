@@ -1,5 +1,4 @@
 #![cfg(feature = "async")]
-#![cfg(not(feature = "async-sharedrt"))]
 
 use des::net::{BuildContext, __Buildable0};
 use des::prelude::*;

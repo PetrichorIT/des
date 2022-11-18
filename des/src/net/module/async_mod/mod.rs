@@ -114,15 +114,6 @@ pub trait AsyncModule: Send {
     async fn at_sim_start(&mut self, _stage: usize) {}
 
     ///
-    /// Module shutdown and restart is not supported with the feature 'asnyc-sharedrt'.
-    ///
-    #[cfg(feature = "async-sharedrt")]
-    #[deprecated(
-        note = "Module shutdown and restart is not supported with the feature 'asnyc-sharedrt'"
-    )]
-    fn at_restart(&mut self) {}
-
-    ///
     /// A function that is called once the module restarts,
     /// after using [shutdown](super::core::ModuleCore::shutdown).
     /// This means that all async elements have been pruged,
@@ -130,7 +121,6 @@ pub trait AsyncModule: Send {
     ///
     /// Use this function to reset the local state of nessecary.
     ///
-    #[cfg(not(feature = "async-sharedrt"))]
     fn at_restart(&mut self) {}
 
     ///
@@ -231,7 +221,6 @@ where
     }
 
     fn reset(&mut self) {
-        #[cfg(not(feature = "async-sharedrt"))]
         super::async_ctx_reset();
 
         <T as AsyncModule>::reset(self);
