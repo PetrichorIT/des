@@ -49,46 +49,18 @@ impl<T> DLL<T> {
         self.len
     }
 
-    pub(super) fn front_time(&self) -> Option<Duration> {
+    pub(super) fn front_time(&self) -> Duration {
         // SAFTEY:
         // Value is guranteed to be valid since head->next is allways valid
-        let front = unsafe { Box::from_raw_in(self.head.next, self.alloc) };
+        let front = unsafe { &mut *self.head.next };
         if front.next.is_null() {
-            std::mem::forget(front);
-            None
+            Duration::MAX
         } else {
             // SAFTEY:
             // front is valid, and neither head nor tail so itt must contain a value
-            let (_, t): (*const T, Duration) = (
-                unsafe { front.value.as_ref().unwrap_unchecked() },
-                front.time,
-            );
-            std::mem::forget(front);
-            // SAFTEY:
-            // Borrow points to valid datate an has a valid lifetime of (&self)
-            // since the &self ref will gurantee that v is not dropped
-            // unless via a handle
-            Some(t)
+            front.time
         }
     }
-
-    // pub(super) fn add_to_tail(&mut self, mut node: Box<EventNode<T>>) {
-    //     let prev = self.tail.prev;
-    //     node.prev = prev;
-    //     let node_ptr: *mut EventNode<T> = &mut *node;
-
-    //     // SAFTEY:
-    //     // tail->prev allways points to a valid value (maybe a head)
-    //     let mut prev = unsafe { Box::from_raw(prev) };
-    //     prev.next = node_ptr;
-    //     std::mem::forget(prev);
-
-    //     node.next = &mut *self.tail;
-    //     self.tail.prev = node_ptr;
-
-    //     self.len += 1;
-    //     std::mem::forget(node);
-    // }
 
     /// Inserts a new element into the queue, returing a Handle to
     /// cancel the event at will

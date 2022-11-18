@@ -136,7 +136,10 @@ impl<E> CQueue<E> {
     /// bound, defined by the timestamp of the last emitted event.
     ///
     pub fn add(&mut self, time: Duration, event: E) {
-        assert!(time >= self.t_current);
+        assert!(
+            time >= self.t_current,
+            "Cannot add past event to calender queue"
+        );
 
         self.len += 1;
         if time == self.t_current {
@@ -151,9 +154,6 @@ impl<E> CQueue<E> {
             let index = time_mod / self.t_nanos;
             let index: usize = index as usize;
             let index = index % self.n;
-
-            // let index_mod = (index + self.head) % self.n;
-            // dbg!(index_mod);
 
             // find insert pos
 
@@ -188,15 +188,7 @@ impl<E> CQueue<E> {
 
             // Bucket with > 0 elements found
 
-            let min = self.buckets[self.head].front_time().unwrap_or_else(|| {
-                // This is a very rare bug in te cll.
-                // eprintln!(
-                //     "[CLL] Could no fetch front elemen even though list is non-empty {}",
-                //     self.buckets[self.head].info()
-                // );
-
-                Duration::MAX
-            });
+            let min = self.buckets[self.head].front_time();
             if min > self.t1 {
                 self.head = (self.head + 1) % self.n;
                 self.t0 += self.t;
@@ -206,9 +198,10 @@ impl<E> CQueue<E> {
 
             self.t_current = min;
 
-            let (ret, node) = self.buckets[self.head].pop_min().unwrap();
+            // SAFTEY:
+            // Bucket is non-empty, thus pop-min returns a valid value.
             self.len -= 1;
-            return (ret, node);
+            return unsafe { self.buckets[self.head].pop_min().unwrap_unchecked() };
         }
     }
 }

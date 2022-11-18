@@ -188,7 +188,7 @@ cfg_cqueue! {
                 }
             }
 
-            #[inline]
+            #[inline(always)]
             #[allow(clippy::needless_pass_by_value)]
             pub(crate) fn fetch_next(
                 &mut self,
@@ -219,8 +219,8 @@ cfg_cqueue! {
 
                 let (event, time) = self.inner.fetch_next();
 
-                #[cfg(feature = "metrics")]
-                {
+                // #[cfg(feature = "metrics")]
+                // {
                     // metrics
                     //    .overflow_heap_size
                     //    .collect_at(self.inner.len_overflow() as f64, time);
@@ -235,7 +235,7 @@ cfg_cqueue! {
                     // metrics
                     //     .avg_filled_buckets
                     //    .collect_at(self.inner.len_buckets_filled() as f64, time);
-                }
+                // }
 
                 (event, SimTime::from_duration(time))
             }
