@@ -217,7 +217,11 @@ cfg_cqueue! {
                     metrics.event_count.collect(self.len() as f64);
 
                     #[cfg(feature = "metrics-rt-full")]
-                    let _ = self.inner.metrics();
+                    {
+                        let (used, total) = self.inner.metrics();
+                        metrics.cqueue_memory_used.collect(used as f64);
+                        metrics.cqueue_memory_total.collect(total as f64);
+                    }
                 }
 
                 let (event, time) = self.inner.fetch_next();
