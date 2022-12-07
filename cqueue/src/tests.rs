@@ -632,71 +632,71 @@ fn cqueue_zero_bucket_in_out() {
     assert_eq!(c, 10);
 }
 
-// #[test]
-// fn cqueue_zero_bucket_cancel() {
-//     let mut cqueue = CQueue::new(10, Duration::new(1, 0));
-//     let mut handles = (0..10)
-//         .map(|i| cqueue.add(Duration::ZERO, i))
-//         .collect::<Vec<_>>();
-//     assert_eq!(cqueue.len_zero(), 10);
+#[test]
+fn cqueue_zero_bucket_cancel() {
+    let mut cqueue = CQueue::new(10, Duration::new(1, 0));
+    let mut handles = (0..10)
+        .map(|i| cqueue.add(Duration::ZERO, i))
+        .collect::<Vec<_>>();
+    assert_eq!(cqueue.len_zero(), 10);
 
-//     // remove element 6
-//     handles.remove(6).cancel();
-//     assert_eq!(cqueue.len(), 9);
-//     assert_eq!(cqueue.len_zero(), 9);
+    // remove element 6
+    cqueue.cancel(handles.remove(6));
+    assert_eq!(cqueue.len(), 9);
+    assert_eq!(cqueue.len_zero(), 9);
 
-//     let mut c = 0;
-//     while !cqueue.is_empty() {
-//         if c == 6 {
-//             c += 1;
-//             continue;
-//         }
-//         let (e, _) = cqueue.fetch_next();
-//         assert_eq!(e, c);
-//         c += 1;
-//     }
-//     assert_eq!(c, 10);
+    let mut c = 0;
+    while !cqueue.is_empty() {
+        if c == 6 {
+            c += 1;
+            continue;
+        }
+        let (e, _) = cqueue.fetch_next();
+        assert_eq!(e, c);
+        c += 1;
+    }
+    assert_eq!(c, 10);
 
-//     // STAGE 2 - without forwarding to the current event
+    // STAGE 2 - without forwarding to the current event
 
-//     let mut handles = (0..10)
-//         .map(|i| cqueue.add(Duration::new(9, 0), i))
-//         .collect::<Vec<_>>();
-//     assert_eq!(cqueue.len_zero(), 0);
+    let mut handles = (0..10)
+        .map(|i| cqueue.add(Duration::new(9, 0), i))
+        .collect::<Vec<_>>();
+    assert_eq!(cqueue.len_zero(), 0);
 
-//     handles.remove(3).cancel();
+    cqueue.cancel(handles.remove(3));
 
-//     let mut c = 0;
-//     while !cqueue.is_empty() {
-//         if c == 3 {
-//             c += 1;
-//             continue;
-//         }
-//         let (e, _) = cqueue.fetch_next();
-//         assert_eq!(e, c);
-//         c += 1;
-//     }
-//     assert_eq!(c, 10);
+    let mut c = 0;
+    while !cqueue.is_empty() {
+        if c == 3 {
+            c += 1;
+            continue;
+        }
+        let (e, _) = cqueue.fetch_next();
+        assert_eq!(e, c);
+        c += 1;
+    }
+    assert_eq!(c, 10);
 
-//     // STAGE 3: allready forwared
+    // STAGE 3: allready forwared
 
-//     let mut handles = (0..10)
-//         .map(|i| cqueue.add(Duration::new(9, 0), i))
-//         .collect::<Vec<_>>();
-//     assert_eq!(cqueue.len_zero(), 10);
+    let mut handles = (0..10)
+        .map(|i| cqueue.add(Duration::new(9, 0), i))
+        .collect::<Vec<_>>();
+    assert_eq!(cqueue.len_zero(), 10);
 
-//     handles.remove(0).cancel();
+    cqueue.cancel(handles.remove(0));
 
-//     let mut c = 1;
-//     while !cqueue.is_empty() {
-//         // if c == 0 { ... }
-//         assert_eq!(cqueue.len(), 10 - c);
-//         let (e, _) = cqueue.fetch_next();
-//         assert_eq!(e, c);
-//         c += 1;
-//     }
-//     assert_eq!(c, 10);
-// }
+    let mut c = 1;
+    while !cqueue.is_empty() {
+        // if c == 0 { ... }
+        assert_eq!(cqueue.len(), 10 - c);
+        let (e, _) = cqueue.fetch_next();
+        assert_eq!(e, c);
+        c += 1;
+    }
+    assert_eq!(c, 10);
+}
 
 #[test]
 fn cqueue_out_of_order_with_overlaps() {
@@ -729,53 +729,53 @@ fn cqueue_out_of_order_with_overlaps() {
     assert_eq!(c, 200);
 }
 
-// #[test]
-// fn cqueue_out_of_order_with_cancel() {
-//     let mut cqueue = CQueue::new(32, Duration::new(1, 0));
-//     let mut delay = Duration::new(1, 0);
-//     let mut rng = SmallRng::seed_from_u64(123);
-//     let mut events = (0..200)
-//         .map(|v| {
-//             delay += Duration::from_secs_f64(rng.sample(Uniform::new(0.1, 1.0)));
-//             (v, delay, rng.sample(Uniform::new(1, 10)) == 8)
-//         })
-//         .collect::<Vec<_>>();
-//     events.shuffle(&mut rng);
-//     let handles = events
-//         .into_iter()
-//         .map(|(event, time, cancel)| (cqueue.add(time, event), cancel, event))
-//         .collect::<Vec<_>>();
+#[test]
+fn cqueue_out_of_order_with_cancel() {
+    let mut cqueue = CQueue::new(32, Duration::new(1, 0));
+    let mut delay = Duration::new(1, 0);
+    let mut rng = SmallRng::seed_from_u64(123);
+    let mut events = (0..200)
+        .map(|v| {
+            delay += Duration::from_secs_f64(rng.sample(Uniform::new(0.1, 1.0)));
+            (v, delay, rng.sample(Uniform::new(1, 10)) == 8)
+        })
+        .collect::<Vec<_>>();
+    events.shuffle(&mut rng);
+    let handles = events
+        .into_iter()
+        .map(|(event, time, cancel)| (cqueue.add(time, event), cancel, event))
+        .collect::<Vec<_>>();
 
-//     let canceled = handles
-//         .into_iter()
-//         .filter_map(|(h, flg, event)| {
-//             if flg {
-//                 h.cancel();
-//                 Some(event)
-//             } else {
-//                 None
-//             }
-//         })
-//         .collect::<Vec<_>>();
+    let canceled = handles
+        .into_iter()
+        .filter_map(|(h, flg, event)| {
+            if flg {
+                cqueue.cancel(h);
+                Some(event)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
 
-//     let mut c = 0;
-//     let mut last_time = Duration::ZERO;
-//     while !cqueue.is_empty() {
-//         if canceled.contains(&c) {
-//             c += 1;
-//             continue;
-//         }
-//         let (e, t) = cqueue.fetch_next();
-//         assert_eq!(e, c);
-//         assert!(t > last_time);
+    let mut c = 0;
+    let mut last_time = Duration::ZERO;
+    while !cqueue.is_empty() {
+        if canceled.contains(&c) {
+            c += 1;
+            continue;
+        }
+        let (e, t) = cqueue.fetch_next();
+        assert_eq!(e, c);
+        assert!(t > last_time);
 
-//         last_time = t;
-//         c += 1;
-//     }
-//     // The 200th event was canceld thus the loop broke, event though one
-//     // iteration was still due (to be simpliar to previous test cases)
-//     assert_eq!(c, 199);
-// }
+        last_time = t;
+        c += 1;
+    }
+    // The 200th event was canceld thus the loop broke, event though one
+    // iteration was still due (to be simpliar to previous test cases)
+    assert_eq!(c, 199);
+}
 
 #[test]
 fn cqueue_out_of_order_boxes_overlapping() {
@@ -814,56 +814,140 @@ fn cqueue_out_of_order_boxes_overlapping() {
     }
 }
 
-// #[test]
-// fn cqueue_out_of_order_boxes_with_cancel() {
-//     let mut cqueue = CQueue::new(32, Duration::new(1, 0));
-//     let mut rng = SmallRng::seed_from_u64(123);
-//     let mut delay = Duration::new(1, 0);
-//     let mut s = 0;
-//     let mut event_boxes = (0..100)
-//         .map(|_| {
-//             delay += Duration::from_secs_f64(rng.sample(Uniform::new(0.0, 1.0)));
-//             let n = rng.sample(Uniform::new(1, 4));
-//             let old_s = s;
-//             s += n;
-//             (delay, old_s, n)
-//         })
-//         // .map(|(t, from, n)| (from..(from + n)).map(|i| (i, t)))
-//         // .flatten()
-//         .collect::<Vec<_>>();
+#[test]
+fn cqueue_out_of_order_boxes_with_cancel() {
+    let mut cqueue = CQueue::new(32, Duration::new(1, 0));
+    let mut rng = SmallRng::seed_from_u64(123);
+    let mut delay = Duration::new(1, 0);
+    let mut s = 0;
+    let mut event_boxes = (0..100)
+        .map(|_| {
+            delay += Duration::from_secs_f64(rng.sample(Uniform::new(0.0, 1.0)));
+            let n = rng.sample(Uniform::new(1, 4));
+            let old_s = s;
+            s += n;
+            (delay, old_s, n)
+        })
+        // .map(|(t, from, n)| (from..(from + n)).map(|i| (i, t)))
+        // .flatten()
+        .collect::<Vec<_>>();
 
-//     event_boxes.shuffle(&mut rng);
-//     let handles = event_boxes
-//         .into_iter()
-//         .map(|(t, from, n)| (from..(from + n)).map(move |i| (i, t)))
-//         .flatten()
-//         .map(|(e, t)| (cqueue.add(t, e), e, rng.sample(Uniform::new(1, 10)) == 2))
-//         .collect::<Vec<_>>();
+    event_boxes.shuffle(&mut rng);
+    let handles = event_boxes
+        .into_iter()
+        .map(|(t, from, n)| (from..(from + n)).map(move |i| (i, t)))
+        .flatten()
+        .map(|(e, t)| (cqueue.add(t, e), e, rng.sample(Uniform::new(1, 10)) == 2))
+        .collect::<Vec<_>>();
 
-//     // Cancel events
-//     let cancelled = handles
-//         .into_iter()
-//         .filter_map(|(h, e, flg)| {
-//             if flg {
-//                 h.cancel();
-//                 Some(e)
-//             } else {
-//                 None
-//             }
-//         })
-//         .collect::<Vec<_>>();
+    // Cancel events
+    let cancelled = handles
+        .into_iter()
+        .filter_map(|(h, e, flg)| {
+            if flg {
+                cqueue.cancel(h);
+                Some(e)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
 
-//     let mut c = 0;
-//     let mut lt = Duration::ZERO;
-//     while !cqueue.is_empty() {
-//         if cancelled.contains(&c) {
-//             c += 1;
-//             continue;
-//         }
-//         let (e, t) = cqueue.fetch_next();
-//         assert_eq!(e, c);
-//         assert!(t >= lt);
-//         c += 1;
-//         lt = t;
-//     }
-// }
+    let mut c = 0;
+    let mut lt = Duration::ZERO;
+    while !cqueue.is_empty() {
+        if cancelled.contains(&c) {
+            c += 1;
+            continue;
+        }
+        let (e, t) = cqueue.fetch_next();
+        assert_eq!(e, c);
+        assert!(t >= lt);
+        c += 1;
+        lt = t;
+    }
+}
+
+#[test]
+fn cqueue_cancel_validity() {
+    let mut cqueue = CQueue::new(32, Duration::new(1, 0));
+    let mut handles = (0..10)
+        .map(|i| Some(cqueue.add(Duration::from_secs(i), i)))
+        .collect::<Vec<_>>();
+    assert_eq!(cqueue.len(), 10);
+
+    // Succesful cancel 0, 9
+    cqueue.cancel(handles[0].take().unwrap());
+    cqueue.cancel(handles[9].take().unwrap());
+
+    assert_eq!(cqueue.len(), 8);
+
+    // Cur [1,2,3,4,5,6,7,8]
+    for i in 1..4 {
+        let event = cqueue.fetch_next();
+        assert_eq!(event.0, i);
+    }
+    assert_eq!(cqueue.len(), 5);
+
+    // Cur [4,5,6,7,8]
+    cqueue.cancel(handles[2].take().unwrap());
+    assert_eq!(cqueue.len(), 5);
+
+    cqueue.cancel(handles[3].take().unwrap());
+    assert_eq!(cqueue.len(), 5);
+
+    // Suc again
+    cqueue.cancel(handles[8].take().unwrap());
+    assert_eq!(cqueue.len(), 4);
+
+    // Cur [4,5,6,7]
+    let mut c = 0;
+    while !cqueue.is_empty() {
+        let _ = cqueue.fetch_next();
+        c += 1;
+    }
+
+    assert_eq!(c, 4)
+}
+
+#[test]
+fn cqueue_cancel_validity_2() {
+    let mut cqueue = CQueue::new(10, Duration::new(3, 0));
+    let mut handles = (0..10)
+        .map(|i| Some(cqueue.add(Duration::from_secs(i), i)))
+        .collect::<Vec<_>>();
+    assert_eq!(cqueue.len(), 10);
+
+    // Succesful cancel 0, 9
+    cqueue.cancel(handles[0].take().unwrap());
+    cqueue.cancel(handles[9].take().unwrap());
+
+    assert_eq!(cqueue.len(), 8);
+
+    // Cur [1,2,3,4,5,6,7,8]
+    for i in 1..4 {
+        let event = cqueue.fetch_next();
+        assert_eq!(event.0, i);
+    }
+    assert_eq!(cqueue.len(), 5);
+
+    // Cur [4,5,6,7,8]
+    cqueue.cancel(handles[2].take().unwrap());
+    assert_eq!(cqueue.len(), 5);
+
+    cqueue.cancel(handles[3].take().unwrap());
+    assert_eq!(cqueue.len(), 5);
+
+    // Suc again
+    cqueue.cancel(handles[8].take().unwrap());
+    assert_eq!(cqueue.len(), 4);
+
+    // Cur [4,5,6,7]
+    let mut c = 0;
+    while !cqueue.is_empty() {
+        let _ = cqueue.fetch_next();
+        c += 1;
+    }
+
+    assert_eq!(c, 4)
+}

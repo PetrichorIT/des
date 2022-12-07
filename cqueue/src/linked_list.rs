@@ -1,4 +1,4 @@
-use crate::alloc::CQueueLLAllocator;
+use crate::{alloc::CQueueLLAllocator, EventHandle};
 use std::{fmt::Debug, hash::Hash, marker::PhantomData, time::Duration};
 
 pub(super) struct DLL<E> {
@@ -13,7 +13,6 @@ pub struct EventNode<E> {
     pub(super) value: Option<E>,
     pub(super) time: Duration,
 
-    #[allow(unused)]
     pub(super) id: usize,
 
     pub(super) prev: *mut EventNode<E>,
@@ -47,6 +46,26 @@ impl<T> DLL<T> {
 
     pub(super) fn len(&self) -> usize {
         self.len
+    }
+
+    pub(super) fn cancel(&mut self, handle: EventHandle<T>) -> bool {
+        let mut cur = self.head.next;
+        unsafe {
+            while !(*cur).next.is_null() {
+                if (*cur).id == handle.id {
+                    // remove
+                    let cur = Box::from_raw_in(cur, self.alloc);
+                    (*cur.prev).next = cur.next;
+                    (*cur.next).prev = cur.prev;
+                    self.len -= 1;
+
+                    drop(cur);
+                    return true;
+                }
+                cur = (*cur).next;
+            }
+        }
+        false
     }
 
     pub(super) fn front_time(&self) -> Duration {

@@ -2,20 +2,14 @@
 #![feature(nonnull_slice_from_raw_parts)]
 #![feature(const_trait_impl)]
 #![feature(const_mut_refs)]
-use std::{collections::VecDeque, ops::Rem, time::Duration};
+use std::{collections::VecDeque, marker::PhantomData, ops::Rem, time::Duration};
 
 // mod _alloc;
 mod alloc;
 mod linked_list;
-// mod clinked_list;
-// mod linked_list;
 
 pub(crate) use alloc::*;
 use linked_list::DLL;
-
-// use linked_list::*;
-
-// pub use linked_list::EventHandle;
 
 /// A calender queue.
 ///
@@ -42,16 +36,15 @@ pub struct CQueue<E> {
     // Parameters
     pub(crate) n: usize,
     pub(crate) t: Duration,
-
     pub(crate) t_nanos: u128,
 
     // Buckets
     pub(crate) zero_event_bucket: VecDeque<(E, Duration, usize)>,
     pub(crate) buckets: Vec<DLL<E>>,
+
     pub(crate) head: usize,
 
     pub(crate) t_current: Duration,
-
     pub(crate) t0: Duration,
     pub(crate) t1: Duration,
     pub(crate) t_all: u128,
@@ -59,6 +52,14 @@ pub struct CQueue<E> {
     // Misc
     pub(crate) event_id: usize,
     pub(crate) len: usize,
+}
+
+/// A handle that identifies a event.
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct EventHandle<E> {
+    _phantom: PhantomData<E>,
+    id: usize,
+    time: Duration,
 }
 
 impl<E> CQueue<E> {
@@ -142,7 +143,7 @@ impl<E> CQueue<E> {
     /// This funtion panics if the timestamp violates the lower
     /// bound, defined by the timestamp of the last emitted event.
     ///
-    pub fn add(&mut self, time: Duration, event: E) {
+    pub fn add(&mut self, time: Duration, event: E) -> EventHandle<E> {
         assert!(
             time >= self.t_current,
             "Cannot add past event to calender queue"
@@ -150,9 +151,15 @@ impl<E> CQueue<E> {
 
         self.len += 1;
         if time == self.t_current {
-            self.zero_event_bucket
-                .push_back((event, time, self.event_id));
-            self.event_id = self.event_id.wrapping_add(1);
+            let id = self.event_id;
+            self.zero_event_bucket.push_back((event, time, id));
+            self.event_id = id.wrapping_add(1);
+
+            EventHandle {
+                _phantom: PhantomData,
+                id: id,
+                time,
+            }
         } else {
             // delta time ?
 
@@ -164,8 +171,40 @@ impl<E> CQueue<E> {
 
             // find insert pos
 
-            self.buckets[index].add(event, time, self.event_id);
-            self.event_id = self.event_id.wrapping_add(1);
+            let id = self.event_id;
+            self.buckets[index].add(event, time, id);
+            self.event_id = id.wrapping_add(1);
+            EventHandle {
+                _phantom: PhantomData,
+                id: id,
+                time,
+            }
+        }
+    }
+
+    pub fn cancel(&mut self, handle: EventHandle<E>) {
+        if handle.time >= self.t_current {
+            if handle.time == self.t_current {
+                if let Some((i, _)) = self
+                    .zero_event_bucket
+                    .iter()
+                    .enumerate()
+                    .find(|(_, v)| v.2 == handle.id)
+                {
+                    self.zero_event_bucket.remove(i);
+                    self.len -= 1;
+                }
+            } else {
+                let time_mod = handle.time.as_nanos().rem(self.t_all);
+
+                let index = time_mod / self.t_nanos;
+                let index: usize = index as usize;
+                let index = index % self.n;
+
+                if self.buckets[index].cancel(handle) {
+                    self.len -= 1;
+                }
+            }
         }
     }
 
