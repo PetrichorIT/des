@@ -146,36 +146,36 @@ impl RoutingHook {
     fn route_tcp(&self, msg: Message) -> Result<(), Message> {
         use crate::net::message::MessageType;
 
-        if matches!(msg.header().typ(), MessageType::Tcp | MessageType::Udp) {
-            if msg.header().dest_addr.ip().is_unspecified() {
-                return Err(msg);
-            }
+        // if matches!(msg.header().typ(), MessageType::Tcp | MessageType::Udp) {
+        if msg.header().dest_addr.ip().is_unspecified() {
+            return Err(msg);
+        }
 
-            if msg.header().dest_addr.ip().is_loopback() {
-                return Err(msg);
-            }
+        if msg.header().dest_addr.ip().is_loopback() {
+            return Err(msg);
+        }
 
-            if Some(msg.header().dest_addr.ip()) == self.addr {
-                return Err(msg);
-            }
+        if Some(msg.header().dest_addr.ip()) == self.addr {
+            return Err(msg);
+        }
 
-            // if not
-            if let Some(path) = self.tcp_udp_fwd.get(&msg.header().dest_addr.ip()) {
-                log::trace!(
-                    "<RoutingHook> Forwarding a packet from {} to {} via {}",
-                    msg.header().src_addr,
-                    msg.header.dest_addr,
-                    path.path()
-                );
-                send(msg, path);
-                Ok(())
-            } else {
-                log::error!("Could not route packet");
-                Err(msg)
-            }
+        // if not
+        if let Some(path) = self.tcp_udp_fwd.get(&msg.header().dest_addr.ip()) {
+            log::trace!(
+                "<RoutingHook> Forwarding a packet from {} to {} via {}",
+                msg.header().src_addr,
+                msg.header.dest_addr,
+                path.path()
+            );
+            send(msg, path);
+            Ok(())
         } else {
+            log::error!("Could not route packet");
             Err(msg)
         }
+        // } else {
+        //     Err(msg)
+        // }
     }
 
     fn route_module_id(&self, msg: Message) -> Result<(), Message> {
