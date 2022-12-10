@@ -964,6 +964,7 @@ dependencies = [
 [[package]]
 name = "tokio"
 version = "1.19.2"
+source = "git+https://github.com/PetrichorIT/tokio_sim#c13ff09b959091b84dd64327e388467df7ab32e4"
 dependencies = [
  "autocfg",
  "bytes",
@@ -980,6 +981,7 @@ dependencies = [
 [[package]]
 name = "tokio-macros"
 version = "1.8.0"
+source = "git+https://github.com/PetrichorIT/tokio_sim#c13ff09b959091b84dd64327e388467df7ab32e4"
 dependencies = [
  "proc-macro2",
  "quote",

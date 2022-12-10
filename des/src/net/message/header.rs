@@ -184,3 +184,6 @@ pub enum MessageType {
     /// A custom internal message. Those should never appear in 'handle_message'.
     Internal,
 }
+
+unsafe impl Send for MessageHeader {}
+unsafe impl Sync for MessageHeader {}
