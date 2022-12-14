@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crate::net::message::{
     schedule_at, schedule_in, send, send_in, TYP_IO_TICK, TYP_RESTART, TYP_TCP_CONNECT,
     TYP_TCP_CONNECT_TIMEOUT, TYP_TCP_PACKET, TYP_UDP_PACKET, TYP_WAKEUP,
@@ -150,15 +152,27 @@ pub trait AsyncModule: Send {
             match intent {
                 IOIntent::UdpSendPacket(pkt) => {
                     log::info!("Sending captured UDP packet: {:?}", pkt);
-                    send(
-                        Message::new()
-                            // .kind(RT_UDP)
-                            .typ(TYP_UDP_PACKET)
-                            .dest(pkt.dest_addr)
-                            .content(pkt)
-                            .build(),
-                        "out",
-                    );
+                    if pkt.dest_addr.ip().is_loopback() {
+                        schedule_in(
+                            Message::new()
+                                // .kind(RT_UDP)
+                                .typ(TYP_UDP_PACKET)
+                                .dest(pkt.dest_addr)
+                                .content(pkt)
+                                .build(),
+                            Duration::from_nanos(10),
+                        );
+                    } else {
+                        send(
+                            Message::new()
+                                // .kind(RT_UDP)
+                                .typ(TYP_UDP_PACKET)
+                                .dest(pkt.dest_addr)
+                                .content(pkt)
+                                .build(),
+                            "out",
+                        );
+                    }
                 }
                 IOIntent::TcpConnect(pkt) => {
                     log::info!("Sending captured TCP connect: {:?}", pkt);

@@ -144,8 +144,6 @@ impl RoutingHook {
 
     #[cfg(feature = "async")]
     fn route_tcp(&self, msg: Message) -> Result<(), Message> {
-        use crate::net::message::MessageType;
-
         // if matches!(msg.header().typ(), MessageType::Tcp | MessageType::Udp) {
         if msg.header().dest_addr.ip().is_unspecified() {
             return Err(msg);
