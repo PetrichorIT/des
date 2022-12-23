@@ -166,6 +166,7 @@ pub(crate) const TYP_UDP_PACKET: u8 = 100;
 pub(crate) const TYP_TCP_CONNECT: u8 = 101;
 pub(crate) const TYP_TCP_CONNECT_TIMEOUT: u8 = 102;
 pub(crate) const TYP_TCP_PACKET: u8 = 103;
+pub(crate) const TYP_NOTIFY: u8 = 201;
 
 pub(crate) const TYP_HOOK_PERIODIC: u8 = 200;
 

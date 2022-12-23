@@ -63,7 +63,7 @@ impl CQueueMetrics {
 
         let total = self.zero_event_count + self.nonzero_event_count;
         let perc = self.nonzero_event_count as f64 / total as f64;
-        writeln!(f, "\tinstant_event_prec: {}", perc)?;
+        writeln!(f, "\tinstant_event_prec: {perc}")?;
 
         Ok(())
     }
@@ -97,6 +97,6 @@ impl CQueueMetrics {
 
         let total = self.zero_event_count + self.nonzero_event_count;
         let perc = self.nonzero_event_count as f64 / total as f64;
-        println!("\u{23A2}  Instant event prec: {}", perc);
+        println!("\u{23A2}  Instant event prec: {perc}");
     }
 }

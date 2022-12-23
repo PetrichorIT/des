@@ -1,11 +1,17 @@
 use std::collections::HashMap;
 
-use super::{with_mod_ctx, ModuleId, ModuleRef, ModuleReferencingError};
+use super::{with_mod_ctx, ModuleContext, ModuleId, ModuleRef, ModuleReferencingError, SETUP_FN};
 use crate::{
     net::{common::Optional, globals, runtime::buf_schedule_shutdown, ParHandle},
     prelude::{GateRef, ObjectPath},
     time::{Duration, SimTime},
 };
+
+/// Overwrite the setup fn all modules run. This function should be used to
+/// add plugins required by all modules.
+pub fn set_setup_fn(f: fn(&ModuleContext)) {
+    SETUP_FN.with(|cell| *cell.borrow_mut() = f);
+}
 
 /// A runtime-unqiue identifier for this module-core and by extension this module.
 #[must_use]

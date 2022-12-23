@@ -102,7 +102,7 @@ pub fn derive_message_body(ident: Ident, data: Data) -> crate::common::Result<To
 
                         for (i, field) in unnamed_fields.unnamed.into_iter().enumerate() {
                             let ty = field.ty;
-                            let fident = Ident::new(&format!("v{}", i), Span2::call_site());
+                            let fident = Ident::new(&format!("v{i}"), Span2::call_site());
 
                             pts.extend(quote! { #fident,  });
                             ts.extend(quote! {

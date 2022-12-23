@@ -9,10 +9,11 @@ mod topology;
 
 pub mod channel;
 pub mod gate;
-pub mod hooks;
 pub mod message;
 pub mod module;
 pub mod subsystem;
+
+pub mod plugin;
 
 pub(crate) use self::runtime::HandleMessageEvent;
 pub(crate) use self::runtime::MessageAtGateEvent;

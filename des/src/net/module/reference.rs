@@ -1,12 +1,11 @@
-use crate::net::message::TYP_RESTART;
-use crate::prelude::{ChannelRef, Gate, GateRef, GateServiceType, Message};
+use crate::prelude::{ChannelRef, Gate, GateRef, GateServiceType};
 
 use super::{DummyModule, Module, ModuleContext};
 use std::any::{Any, TypeId};
 use std::cell::{Ref, RefCell, RefMut};
 use std::fmt::Debug;
 use std::ops::Deref;
-use std::sync::{atomic::Ordering::SeqCst, Arc, Weak};
+use std::sync::{Arc, Weak};
 
 #[derive(Clone)]
 pub(crate) struct ModuleRefWeak {
@@ -43,8 +42,7 @@ impl Debug for ModuleRefWeak {
 #[derive(Clone)]
 pub struct ModuleRef {
     pub(crate) ctx: Arc<ModuleContext>,
-    handler: Arc<RefCell<Box<dyn Module>>>,
-    // handler_ptr: *mut u8,
+    pub(crate) handler: Arc<RefCell<Box<dyn Module>>>,
 }
 
 impl Deref for ModuleRef {
@@ -55,86 +53,14 @@ impl Deref for ModuleRef {
 }
 
 impl ModuleRef {
-    pub(crate) fn at_sim_start(&self, stage: usize) {
-        self.handler.borrow_mut().at_sim_start(stage)
-    }
-
-    pub(crate) fn num_sim_start_stages(&self) -> usize {
-        self.handler.borrow().num_sim_start_stages()
-    }
-
-    #[cfg(feature = "async")]
-    pub(crate) fn finish_sim_start(&self) {
-        self.handler.borrow_mut().finish_sim_start()
-    }
-
-    pub(crate) fn at_sim_end(&self) {
-        self.handler.borrow_mut().at_sim_end()
-    }
-
-    #[cfg(feature = "async")]
-    pub(crate) fn finish_sim_end(&self) {
-        self.handler.borrow_mut().finish_sim_end()
-    }
-
-    pub(crate) fn reset(&self) {
-        self.handler.borrow_mut().reset()
-    }
-
-    // MARKER: handle_message
-
-    /// Handles a message
-    pub fn handle_message(&self, mut msg: Message) {
-        if self.ctx.active.load(SeqCst) {
-            // First check the hooks.
-            for hook in self.ctx.hooks.borrow_mut().iter_mut() {
-                msg = match hook.handle_message(msg) {
-                    Ok(()) => return,
-                    Err(msg) => msg,
-                }
-            }
-
-            self.handler.borrow_mut().handle_message(msg);
-        } else {
-            if msg.header().typ == TYP_RESTART {
-                log::debug!("Restarting module");
-                // restart the module itself.
-                self.reset();
-                self.ctx.active.store(true, SeqCst);
-
-                // Do sim start procedure
-                let stages = self.num_sim_start_stages();
-                for stage in 0..stages {
-                    self.at_sim_start(stage);
-                }
-
-                #[cfg(feature = "async")]
-                self.finish_sim_start();
-            } else {
-                log::debug!("Ignoring message since module is inactive");
-            }
-        }
-    }
-}
-
-impl ModuleRef {
     #[allow(clippy::explicit_deref_methods)]
     pub(crate) fn new<T: Module>(ctx: Arc<ModuleContext>, module: T) -> Self {
-        // use std::ops::DerefMut;
-
         let boxed = Box::new(module);
-        // let ptr: *mut T = boxed.deref_mut();
-        // let ptr = ptr.cast::<u8>();
-
         let dynboxed: Box<dyn Module> = boxed;
 
         let handler = Arc::new(RefCell::new(dynboxed));
 
-        Self {
-            ctx,
-            handler,
-            // handler_ptr: ptr,
-        }
+        Self { ctx, handler }
     }
 
     #[allow(unused)]
@@ -201,6 +127,7 @@ impl ModuleRef {
             // Should the type check fail, the Ref is dropped so the borrow is freed.
             Some(Ref::map(brw, |brw| unsafe {
                 let hpt: *const dyn Module = &**brw;
+                // hpt.cast::<T>()
                 &*(hpt as *const T)
             }))
         } else {

@@ -1,6 +1,7 @@
 #![allow(missing_docs)]
 
 use super::{HandleMessageEvent, NetworkRuntime, NetworkRuntimeGlobals};
+use crate::net::module::SETUP_FN;
 use crate::net::{gate::GateRef, message::Message, MessageAtGateEvent, NetEvents};
 use crate::prelude::{GateServiceType, ModuleRef};
 use crate::runtime::Runtime;
@@ -95,9 +96,9 @@ pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<NetworkRuntime
 
         // MARKER: shutdown
         if let Some(rest) = ctx.shutdown.take() {
-            log::debug!("Shuttind down module and restaring at {:?}", rest);
             use crate::net::message::TYP_RESTART;
 
+            log::debug!("Shuttind down module and restaring at {:?}", rest);
             module
                 .ctx
                 .active
@@ -108,7 +109,9 @@ pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<NetworkRuntime
             drop(module.ctx.async_ext.borrow_mut().rt.take());
 
             // drop all hooks to ensure all messages reach the async impl
-            module.ctx.hooks.borrow_mut().clear();
+            // module.ctx.hooks.borrow_mut().clear(); TODO: Plugin clean
+            module.ctx.plugins.borrow_mut().clear();
+            SETUP_FN.with(|f| f.borrow()(&module.ctx));
 
             // Reschedule wakeup
             if let Some(rest) = rest {
@@ -121,15 +124,5 @@ pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<NetworkRuntime
                 );
             }
         }
-
-        // TODO: Reintroduce
-        // if !rt.app.globals.parameters.updates.borrow().is_empty() {
-        //     for update in rt.app.globals.parameters.updates.borrow_mut().drain(..) {
-        //         rt.app
-        //             .module(|m| m.name() == update)
-        //             .unwrap()
-        //             .handle_par_change();
-        //     }
-        // }
     });
 }

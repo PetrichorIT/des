@@ -64,7 +64,7 @@ impl Attr {
                 NestedMeta::Meta(meta) => match meta {
                     Meta::NameValue(MetaNameValue { path, lit, .. }) => {
                         lit_list = false;
-                        let path = match path.get_ident().map(|i| format!("{}", i)) {
+                        let path = match path.get_ident().map(|i| format!("{i}")) {
                             Some(v) => v,
                             None => {
                                 return Err(Diagnostic::new(
@@ -94,7 +94,7 @@ impl Attr {
                             _ => {
                                 return Err(Diagnostic::new(
                                     Level::Error,
-                                    format!("Unknown keyword '{}'.", path),
+                                    format!("Unknown keyword '{path}'."),
                                 ))
                             }
                         };

@@ -9,7 +9,7 @@ mod alloc;
 mod linked_list;
 
 pub(crate) use alloc::*;
-use linked_list::DLL;
+use linked_list::DualLinkedList;
 
 /// A calender queue.
 ///
@@ -40,7 +40,7 @@ pub struct CQueue<E> {
 
     // Buckets
     pub(crate) zero_event_bucket: VecDeque<(E, Duration, usize)>,
-    pub(crate) buckets: Vec<DLL<E>>,
+    pub(crate) buckets: Vec<DualLinkedList<E>>,
 
     pub(crate) head: usize,
 
@@ -116,7 +116,7 @@ impl<E> CQueue<E> {
             t,
 
             zero_event_bucket: VecDeque::with_capacity(64),
-            buckets: std::iter::repeat_with(|| DLL::new(alloc.handle()))
+            buckets: std::iter::repeat_with(|| DualLinkedList::new(alloc.handle()))
                 .take(n)
                 .collect(),
             head: 0,
@@ -157,7 +157,7 @@ impl<E> CQueue<E> {
 
             EventHandle {
                 _phantom: PhantomData,
-                id: id,
+                id,
                 time,
             }
         } else {
@@ -176,7 +176,7 @@ impl<E> CQueue<E> {
             self.event_id = id.wrapping_add(1);
             EventHandle {
                 _phantom: PhantomData,
-                id: id,
+                id,
                 time,
             }
         }
@@ -217,7 +217,7 @@ impl<E> CQueue<E> {
     /// If it is this function panics.
     ///
     pub fn fetch_next(&mut self) -> (E, Duration) {
-        assert!(self.len() != 0, "Cannot fetch from empty queue");
+        assert!(self.is_empty(), "Cannot fetch from empty queue");
 
         if let Some((event, time, _)) = self.zero_event_bucket.pop_front() {
             self.len -= 1;

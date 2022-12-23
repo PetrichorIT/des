@@ -40,7 +40,7 @@ pub struct NetworkRuntime<A> {
 
 impl<A> NetworkRuntime<A> {
     ///
-    /// Creates a new instance by wrapping 'inner' into a empty `NetworkRuntime`<A>.
+    /// Creates a new instance by wrapping 'inner' into a empty `NetworkRuntime<A>`.
     ///
     #[must_use]
     pub fn new(inner: A) -> Self {

@@ -1,7 +1,7 @@
 use crate::{alloc::CQueueLLAllocator, EventHandle};
 use std::{fmt::Debug, hash::Hash, marker::PhantomData, time::Duration};
 
-pub(super) struct DLL<E> {
+pub(super) struct DualLinkedList<E> {
     alloc: CQueueLLAllocator,
     head: Box<EventNode<E>, CQueueLLAllocator>,
     tail: Box<EventNode<E>, CQueueLLAllocator>,
@@ -21,7 +21,7 @@ pub struct EventNode<E> {
 
 // IMPL: DLL
 
-impl<T> DLL<T> {
+impl<T> DualLinkedList<T> {
     pub(super) fn new(alloc: CQueueLLAllocator) -> Self {
         let mut head = EventNode::empty(Duration::ZERO, alloc);
         let mut tail = EventNode::empty(Duration::MAX, alloc);
@@ -183,7 +183,7 @@ impl<T> DLL<T> {
 //     }
 // }
 
-impl<T> Debug for DLL<T> {
+impl<T> Debug for DualLinkedList<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let head_ptr: *const EventNode<T> = &*self.head;
         let tail_ptr: *const EventNode<T> = &*self.tail;
@@ -201,15 +201,15 @@ impl<T> Debug for DLL<T> {
 //     }
 // // }
 
-impl<T> Drop for DLL<T> {
+impl<T> Drop for DualLinkedList<T> {
     fn drop(&mut self) {
-        while let Some(_) = self.pop_min() {}
+        while self.pop_min().is_some() {}
     }
 }
 
 // EQ
 
-impl<T: PartialEq> PartialEq for DLL<T> {
+impl<T: PartialEq> PartialEq for DualLinkedList<T> {
     fn eq(&self, other: &Self) -> bool {
         let mut lhs = self.iter();
         let mut rhs = other.iter();
@@ -225,12 +225,10 @@ impl<T: PartialEq> PartialEq for DLL<T> {
                 } else {
                     return false;
                 }
+            } else if r.is_some() {
+                return false;
             } else {
-                if let Some(_) = r {
-                    return false;
-                } else {
-                    break;
-                }
+                break;
             }
         }
 
@@ -238,11 +236,11 @@ impl<T: PartialEq> PartialEq for DLL<T> {
     }
 }
 
-impl<T: Eq> Eq for DLL<T> {}
+impl<T: Eq> Eq for DualLinkedList<T> {}
 
 // HASH
 
-impl<T: Hash> Hash for DLL<T> {
+impl<T: Hash> Hash for DualLinkedList<T> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.iter().for_each(|v| v.hash(state))
     }
@@ -269,7 +267,7 @@ impl<T: Hash> Hash for DLL<T> {
 // IMPL: DLL Into Iter
 
 pub struct Iter<'a, T> {
-    marker: PhantomData<&'a DLL<T>>,
+    marker: PhantomData<&'a DualLinkedList<T>>,
     cur: *mut EventNode<T>,
     alloc: CQueueLLAllocator,
 }
@@ -299,7 +297,7 @@ impl<'a, T> Iterator for Iter<'a, T> {
     }
 }
 
-impl<'a, T> IntoIterator for &'a DLL<T> {
+impl<'a, T> IntoIterator for &'a DualLinkedList<T> {
     type Item = (&'a T, &'a Duration);
     type IntoIter = Iter<'a, T>;
     fn into_iter(self) -> Self::IntoIter {
@@ -312,7 +310,7 @@ impl<'a, T> IntoIterator for &'a DLL<T> {
 }
 
 pub struct IterMut<'a, T> {
-    marker: PhantomData<&'a mut DLL<T>>,
+    marker: PhantomData<&'a mut DualLinkedList<T>>,
     cur: *mut EventNode<T>,
     alloc: CQueueLLAllocator,
 }
@@ -342,7 +340,7 @@ impl<'a, T> Iterator for IterMut<'a, T> {
     }
 }
 
-impl<'a, T> IntoIterator for &'a mut DLL<T> {
+impl<'a, T> IntoIterator for &'a mut DualLinkedList<T> {
     type Item = (&'a mut T, &'a Duration);
     type IntoIter = IterMut<'a, T>;
     fn into_iter(self) -> Self::IntoIter {
@@ -355,7 +353,7 @@ impl<'a, T> IntoIterator for &'a mut DLL<T> {
 }
 
 pub struct IntoIter<T> {
-    dll: DLL<T>,
+    dll: DualLinkedList<T>,
 }
 
 impl<T> Iterator for IntoIter<T> {
@@ -365,7 +363,7 @@ impl<T> Iterator for IntoIter<T> {
     }
 }
 
-impl<T> IntoIterator for DLL<T> {
+impl<T> IntoIterator for DualLinkedList<T> {
     type Item = (T, Duration);
     type IntoIter = IntoIter<T>;
     fn into_iter(self) -> Self::IntoIter {
@@ -410,6 +408,7 @@ impl<T> EventNode<T> {
         )
     }
 
+    #[allow(clippy::boxed_local)]
     fn into_inner(mut self: Box<Self, CQueueLLAllocator>) -> (T, Duration) {
         // SAFTEY:
         // This function may only be applied to nodes that are

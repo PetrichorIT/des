@@ -251,9 +251,9 @@ impl AsyncModule for TimeSleepModule {
 
     async fn handle_message(&mut self, msg: Message) {
         let wait_time = msg.header().kind as u64;
-        println!("<{}> [{}] Waiting for timer", module_name(), SimTime::now());
+        log::info!("<{}> [{}] Waiting for timer", module_name(), SimTime::now());
         tokio::time::sleep(Duration::from_secs(wait_time)).await;
-        println!(
+        log::info!(
             "<{}> [{}] Done waiting for id: {}",
             module_name(),
             SimTime::now(),
@@ -266,6 +266,8 @@ impl AsyncModule for TimeSleepModule {
 #[test]
 #[serial]
 fn one_module_timers() {
+    // ScopedLogger::new().finish().unwrap();
+
     let mut rt = NetworkRuntime::new(());
     let mut cx = BuildContext::new(&mut rt);
 
@@ -296,16 +298,7 @@ fn one_module_timers() {
             profiler,
         } => {
             assert_eq!(time, 4.0);
-
             assert_eq!(profiler.event_count, 7);
-
-            // let m1 = app
-            //     .module(|m| m.module_core().name() == "RootModule")
-            //     .unwrap()
-            //     .self_as::<TimeSleepModule>()
-            //     .unwrap();
-
-            // assert_eq!(m1.counter, 3);
         }
         _ => panic!("Expected runtime to finish"),
     }
@@ -356,8 +349,8 @@ fn one_module_delayed_recv() {
             // 5) HandleMessage #2 (2s) (will finish sleep but wakeup was added later)
             // 6) Wakeup aka NOP (2s)
             // 7) Wakeup - sleep reloved - send in '5 (4s)
-            // 8) Wakeup - NOP - send in '6 (4s)
-            assert_eq!(profiler.event_count, 8);
+            // 8) Wakeup - NOP - send in '6 (4s) // REMOVE
+            assert_eq!(profiler.event_count, 7);
 
             // let m1 = app
             //     .module(|m| m.module_core().name() == "RootModule")
@@ -433,7 +426,7 @@ fn mutiple_module_delayed_recv() {
         } => {
             assert_eq!(time, 5.0);
 
-            assert_eq!(profiler.event_count, 16);
+            assert_eq!(profiler.event_count, 15);
 
             // let m1 = app
             //     .module(|m| m.module_core().name() == "RootModule")

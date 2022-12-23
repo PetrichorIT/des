@@ -1,8 +1,5 @@
 use super::{DummyModule, ModuleId, ModuleRef, ModuleRefWeak, ModuleReferencingError};
-use crate::{
-    net::hooks::HookEntry,
-    prelude::{GateRef, ObjectPath},
-};
+use crate::prelude::{GateRef, ObjectPath};
 use std::{
     cell::{Ref, RefCell},
     collections::HashMap,
@@ -10,83 +7,85 @@ use std::{
     sync::{atomic::AtomicBool, Arc},
 };
 
+use crate::net::plugin::*;
+
 #[cfg(feature = "async")]
-use super::ext::AsyncCoreExt;
-#[cfg(feature = "async")]
-use tokio::sim::SimContext;
+use crate::net::module::core::AsyncCoreExt;
 
 thread_local! {
     static MOD_CTX: RefCell<Option<Arc<ModuleContext>>> = const { RefCell::new(None) }
 }
 
+thread_local! {
+    pub (crate) static SETUP_FN: RefCell<fn(&ModuleContext)> =  const { RefCell::new(_default_setup) };
+}
+
+#[cfg(not(feature = "async"))]
+fn _default_setup(_: &ModuleContext) {}
+
+#[cfg(feature = "async")]
+fn _default_setup(this: &ModuleContext) {
+    this.add_plugin(TokioTimePlugin::new(), 0);
+    this.add_plugin(TokioNetPlugin::new(), 1);
+}
+
 pub struct ModuleContext {
     pub(crate) active: AtomicBool,
-
     pub(crate) id: ModuleId,
 
-    /// A human readable identifier for the module.
     pub(crate) path: ObjectPath,
-
-    /// A collection of all gates register to the current module
     pub(crate) gates: RefCell<Vec<GateRef>>,
+    pub(crate) plugins: RefCell<Vec<PluginEntry>>,
 
-    /// A collection of hooks
-    pub(crate) hooks: RefCell<Vec<HookEntry>>,
-
-    /// Expensions for async
     #[cfg(feature = "async")]
     pub(crate) async_ext: RefCell<AsyncCoreExt>,
-
-    /// The reference for the parent module.
     pub(crate) parent: Option<ModuleRefWeak>,
-
-    /// The collection of child nodes for the current module.
     pub(crate) children: RefCell<HashMap<String, ModuleRef>>,
 }
 
 impl ModuleContext {
     /// Creates a new standalone instance
     pub fn standalone(path: ObjectPath) -> ModuleRef {
-        #[cfg(feature = "async")]
-        let ident = path.path().to_string();
-
-        ModuleRef::dummy(Arc::new(Self {
-            active: AtomicBool::new(true),
-
-            id: ModuleId::gen(),
-            path,
-            gates: RefCell::new(Vec::new()),
-            hooks: RefCell::new(Vec::new()),
-
-            parent: None,
-            children: RefCell::new(HashMap::new()),
-
-            #[cfg(feature = "async")]
-            async_ext: RefCell::new(AsyncCoreExt::new(ident)),
-        }))
-    }
-
-    /// Creates a child
-    #[allow(clippy::needless_pass_by_value)]
-    pub fn child_of(name: &str, parent: ModuleRef) -> ModuleRef {
-        let path = ObjectPath::module_with_parent(name, &parent.ctx.path);
-        #[cfg(feature = "async")]
-        let ident = path.path().to_string();
-
         let this = ModuleRef::dummy(Arc::new(Self {
             active: AtomicBool::new(true),
 
             id: ModuleId::gen(),
             path,
             gates: RefCell::new(Vec::new()),
-            hooks: RefCell::new(Vec::new()),
+            plugins: RefCell::new(Vec::new()),
+
+            parent: None,
+            children: RefCell::new(HashMap::new()),
+
+            #[cfg(feature = "async")]
+            async_ext: RefCell::new(AsyncCoreExt::new()),
+        }));
+
+        SETUP_FN.with(|f| f.borrow()(&this));
+
+        this
+    }
+
+    /// Creates a child
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn child_of(name: &str, parent: ModuleRef) -> ModuleRef {
+        let path = ObjectPath::module_with_parent(name, &parent.ctx.path);
+        let this = ModuleRef::dummy(Arc::new(Self {
+            active: AtomicBool::new(true),
+
+            id: ModuleId::gen(),
+            path,
+            gates: RefCell::new(Vec::new()),
+            plugins: RefCell::new(Vec::new()),
 
             parent: Some(ModuleRefWeak::new(&parent)),
             children: RefCell::new(HashMap::new()),
 
             #[cfg(feature = "async")]
-            async_ext: RefCell::new(AsyncCoreExt::new(ident)),
+            async_ext: RefCell::new(AsyncCoreExt::new()),
         }));
+
+        SETUP_FN.with(|f| f.borrow()(&this));
 
         parent
             .ctx
@@ -190,15 +189,6 @@ cfg_async! {
 
     pub(super) fn async_get_rt() -> Option<Arc<Runtime>> {
         with_mod_ctx(|ctx| Some(Arc::clone(ctx.async_ext.borrow().rt.as_ref()?)))
-    }
-
-
-    pub(super) fn async_take_sim_ctx() -> SimContext {
-        with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().ctx.take().expect("Sombody stole our sim context"))
-    }
-
-    pub(super) fn async_leave_sim_ctx(sim_ctx: SimContext) {
-        with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().ctx = Some(sim_ctx));
     }
 
     pub(super) fn async_ctx_reset() {
