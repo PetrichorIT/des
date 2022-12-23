@@ -150,7 +150,7 @@ impl Statistic for Histogramm {
         let mut sum_value = 0.0;
 
         for b in &self.bins {
-            let b = *b as f64;
+            let b = *b;
             let rel = b / self.bins.len() as f64;
             let pow = self.lower_bound + rel * self.interval;
 
@@ -164,7 +164,7 @@ impl Statistic for Histogramm {
         let mut sum_value = 0.0;
 
         for b in &self.bins {
-            let b = *b as f64;
+            let b = *b;
             let rel = b / self.bins.len() as f64;
             let pow = self.lower_bound + rel * self.interval;
 

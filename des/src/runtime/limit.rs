@@ -57,11 +57,11 @@ impl Display for RuntimeLimit {
         match self {
             Self::None => write!(f, "None"),
 
-            Self::EventCount(e) => write!(f, "MaxEventCount({})", e),
-            Self::SimTime(t) => write!(f, "MaxSimTime({})", t),
+            Self::EventCount(e) => write!(f, "MaxEventCount({e})"),
+            Self::SimTime(t) => write!(f, "MaxSimTime({t})"),
 
-            Self::CombinedAnd(lhs, rhs) => write!(f, "{} and {}", lhs, rhs),
-            Self::CombinedOr(lhs, rhs) => write!(f, "{} or {}", lhs, rhs),
+            Self::CombinedAnd(lhs, rhs) => write!(f, "{lhs} and {rhs}"),
+            Self::CombinedOr(lhs, rhs) => write!(f, "{lhs} or {rhs}"),
         }
     }
 }

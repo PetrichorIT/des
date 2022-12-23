@@ -331,126 +331,126 @@ impl AsyncModule for TcpServer {
     }
 }
 
-#[test]
-#[serial]
-fn routing_hook() {
-    // ScopedLogger::new().finish().unwrap();
+// #[test]
+// #[serial]
+// fn routing_hook() {
+//     ScopedLogger::new().finish().unwrap();
 
-    let mut rt = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut rt);
+//     let mut rt = NetworkRuntime::new(());
+//     let mut cx = BuildContext::new(&mut rt);
 
-    let client_a = TcpClient::build_named(ObjectPath::root_module("client_a"), &mut cx);
-    let client_b = TcpClient::build_named(ObjectPath::root_module("client_b"), &mut cx);
-    let client_c = TcpClient::build_named(ObjectPath::root_module("client_c"), &mut cx);
+//     let client_a = TcpClient::build_named(ObjectPath::root_module("client_a"), &mut cx);
+//     let client_b = TcpClient::build_named(ObjectPath::root_module("client_b"), &mut cx);
+//     let client_c = TcpClient::build_named(ObjectPath::root_module("client_c"), &mut cx);
 
-    let router = Router::build_named(ObjectPath::root_module("router"), &mut cx);
+//     let router = Router::build_named(ObjectPath::root_module("router"), &mut cx);
 
-    let server = TcpServer::build_named(ObjectPath::root_module("server"), &mut cx);
+//     let server = TcpServer::build_named(ObjectPath::root_module("server"), &mut cx);
 
-    // client to router
+//     // client to router
 
-    let a_out = client_a.create_gate("out", GateServiceType::Output);
-    let b_out = client_b.create_gate("out", GateServiceType::Output);
-    let c_out = client_c.create_gate("out", GateServiceType::Output);
+//     let a_out = client_a.create_gate("out", GateServiceType::Output);
+//     let b_out = client_b.create_gate("out", GateServiceType::Output);
+//     let c_out = client_c.create_gate("out", GateServiceType::Output);
 
-    let port_a_in = router.create_gate("port_a_in", GateServiceType::Input);
-    let port_b_in = router.create_gate("port_b_in", GateServiceType::Input);
-    let port_c_in = router.create_gate("port_c_in", GateServiceType::Input);
+//     let port_a_in = router.create_gate("port_a_in", GateServiceType::Input);
+//     let port_b_in = router.create_gate("port_b_in", GateServiceType::Input);
+//     let port_c_in = router.create_gate("port_c_in", GateServiceType::Input);
 
-    let chan_a = Channel::new(
-        ObjectPath::channel_with("chan", &client_a.path()),
-        ChannelMetrics::new_with_cost(
-            1000000,
-            Duration::from_millis(10),
-            Duration::ZERO,
-            1.0,
-            4096,
-        ),
-    );
-    let chan_b = Channel::new(
-        ObjectPath::channel_with("chan", &client_b.path()),
-        ChannelMetrics::new_with_cost(
-            1000000,
-            Duration::from_millis(10),
-            Duration::ZERO,
-            1.0,
-            4096,
-        ),
-    );
-    let chan_c = Channel::new(
-        ObjectPath::channel_with("chan", &client_c.path()),
-        ChannelMetrics::new_with_cost(
-            1000000,
-            Duration::from_millis(10),
-            Duration::ZERO,
-            1.0,
-            4096,
-        ),
-    );
+//     let chan_a = Channel::new(
+//         ObjectPath::channel_with("chan", &client_a.path()),
+//         ChannelMetrics::new_with_cost(
+//             1000000,
+//             Duration::from_millis(10),
+//             Duration::ZERO,
+//             1.0,
+//             4096,
+//         ),
+//     );
+//     let chan_b = Channel::new(
+//         ObjectPath::channel_with("chan", &client_b.path()),
+//         ChannelMetrics::new_with_cost(
+//             1000000,
+//             Duration::from_millis(10),
+//             Duration::ZERO,
+//             1.0,
+//             4096,
+//         ),
+//     );
+//     let chan_c = Channel::new(
+//         ObjectPath::channel_with("chan", &client_c.path()),
+//         ChannelMetrics::new_with_cost(
+//             1000000,
+//             Duration::from_millis(10),
+//             Duration::ZERO,
+//             1.0,
+//             4096,
+//         ),
+//     );
 
-    a_out.set_next_gate(port_a_in);
-    a_out.set_channel(chan_a.clone());
+//     a_out.set_next_gate(port_a_in);
+//     a_out.set_channel(chan_a.clone());
 
-    b_out.set_next_gate(port_b_in);
-    b_out.set_channel(chan_b.clone());
+//     b_out.set_next_gate(port_b_in);
+//     b_out.set_channel(chan_b.clone());
 
-    c_out.set_next_gate(port_c_in);
-    c_out.set_channel(chan_c.clone());
+//     c_out.set_next_gate(port_c_in);
+//     c_out.set_channel(chan_c.clone());
 
-    // router to client
+//     // router to client
 
-    let port_a_out = router.create_gate("port_a_out", GateServiceType::Output);
-    let port_b_out = router.create_gate("port_b_out", GateServiceType::Output);
-    let port_c_out = router.create_gate("port_c_out", GateServiceType::Output);
+//     let port_a_out = router.create_gate("port_a_out", GateServiceType::Output);
+//     let port_b_out = router.create_gate("port_b_out", GateServiceType::Output);
+//     let port_c_out = router.create_gate("port_c_out", GateServiceType::Output);
 
-    let a_in = client_a.create_gate("in", GateServiceType::Input);
-    let b_in = client_b.create_gate("in", GateServiceType::Input);
-    let c_in = client_c.create_gate("in", GateServiceType::Input);
+//     let a_in = client_a.create_gate("in", GateServiceType::Input);
+//     let b_in = client_b.create_gate("in", GateServiceType::Input);
+//     let c_in = client_c.create_gate("in", GateServiceType::Input);
 
-    port_a_out.set_next_gate(a_in);
-    port_b_out.set_next_gate(b_in);
-    port_c_out.set_next_gate(c_in);
+//     port_a_out.set_next_gate(a_in);
+//     port_b_out.set_next_gate(b_in);
+//     port_c_out.set_next_gate(c_in);
 
-    // server connections
+//     // server connections
 
-    let server_in = server.create_gate("in", GateServiceType::Input);
-    let server_out = server.create_gate("out", GateServiceType::Output);
+//     let server_in = server.create_gate("in", GateServiceType::Input);
+//     let server_out = server.create_gate("out", GateServiceType::Output);
 
-    let port_s_in = router.create_gate("port_s_in", GateServiceType::Input);
-    let port_s_out = router.create_gate("port_s_out", GateServiceType::Output);
+//     let port_s_in = router.create_gate("port_s_in", GateServiceType::Input);
+//     let port_s_out = router.create_gate("port_s_out", GateServiceType::Output);
 
-    let chan_s = Channel::new(
-        ObjectPath::channel_with("chan", &server.path()),
-        ChannelMetrics::new_with_cost(
-            1000000,
-            Duration::from_millis(10),
-            Duration::ZERO,
-            1.0,
-            4096,
-        ),
-    );
+//     let chan_s = Channel::new(
+//         ObjectPath::channel_with("chan", &server.path()),
+//         ChannelMetrics::new_with_cost(
+//             1000000,
+//             Duration::from_millis(10),
+//             Duration::ZERO,
+//             1.0,
+//             4096,
+//         ),
+//     );
 
-    server_out.set_next_gate(port_s_in);
-    server_out.set_channel(chan_s.clone());
+//     server_out.set_next_gate(port_s_in);
+//     server_out.set_channel(chan_s.clone());
 
-    port_s_out.set_next_gate(server_in);
+//     port_s_out.set_next_gate(server_in);
 
-    cx.create_channel(chan_a);
-    cx.create_channel(chan_b);
-    cx.create_channel(chan_c);
-    cx.create_channel(chan_s);
+//     cx.create_channel(chan_a);
+//     cx.create_channel(chan_b);
+//     cx.create_channel(chan_c);
+//     cx.create_channel(chan_s);
 
-    cx.create_module(client_a);
-    cx.create_module(client_b);
-    cx.create_module(client_c);
+//     cx.create_module(client_a);
+//     cx.create_module(client_b);
+//     cx.create_module(client_c);
 
-    cx.create_module(router);
+//     cx.create_module(router);
 
-    cx.create_module(server);
+//     cx.create_module(server);
 
-    let rt = Runtime::new(rt);
-    let _ = rt.run();
-}
+//     let rt = Runtime::new(rt);
+//     let _ = rt.run();
+// }
 
 #[NdlModule]
 struct HookDestructionModule {

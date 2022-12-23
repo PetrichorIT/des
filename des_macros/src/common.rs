@@ -97,8 +97,8 @@ pub fn ident_from_conident(
             pos,
             ..
         } => {
-            let submodule_ident = ident!(format!("{}_child", child_ident));
-            let ident_token = ident!(format!("{}_child_{}_gate{}", child_ident, gate_ident, pos));
+            let submodule_ident = ident!(format!("{child_ident}_child"));
+            let ident_token = ident!(format!("{child_ident}_child_{gate_ident}_gate{pos}"));
 
             token_stream.extend::<proc_macro2::TokenStream>(quote! {
                 let mut #ident_token: ::des::net::gate::GateRef = #submodule_ident.gate(#gate_ident, #pos)
@@ -110,7 +110,7 @@ pub fn ident_from_conident(
         ConSpecNodeIdent::Local {
             gate_ident, pos, ..
         } => {
-            let ident = ident!(format!("{}_gate{}_ref", gate_ident, pos));
+            let ident = ident!(format!("{gate_ident}_gate{pos}_ref"));
 
             token_stream.extend::<proc_macro2::TokenStream>(quote! {
                 let mut #ident: ::des::net::gate::GateRef = this.gate(#gate_ident, #pos)
@@ -194,7 +194,7 @@ pub fn build_impl_from(ident: Ident, wrapped: WrappedTokenStream, submodules: &[
      
     }
 
-    let build_trait = ident!(format!("__Buildable{}", proto_t_counter));
+    let build_trait = ident!(format!("__Buildable{proto_t_counter}"));
 
 
     quote! {

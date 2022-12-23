@@ -275,7 +275,7 @@ impl Log for ScopedLogger {
 
         let target_is_module_path = Some(record.metadata().target()) == record.module_path();
         let (target, appendix) = if target_is_module_path {
-            if let Some(v) = CURRENT_SCOPE.with(|c| c.borrow().clone()) {
+            if let Some(v) = CURRENT_SCOPE.with(|c| *c.borrow()) {
                 (v, String::new())
             } else {
                 let policy = match record.level() {
@@ -303,7 +303,7 @@ impl Log for ScopedLogger {
                 return;
             }
         } else if self.ignore_custom_target {
-            if let Some(v) = CURRENT_SCOPE.with(|c| c.borrow().clone()) {
+            if let Some(v) = CURRENT_SCOPE.with(|c| *c.borrow()) {
                 (v, format!("{}: ", record.target()))
             } else {
                 (record.target(), String::new())
@@ -326,7 +326,7 @@ impl Log for ScopedLogger {
                 stream: LinkedList::new(),
                 fwd_stdout: stdout(record.target()),
                 fwd_stderr: stderr(record.target()),
-                filter: self.env.level_filter_for(&target),
+                filter: self.env.level_filter_for(target),
             };
 
             new_scope.log(format!("{}{}", appendix, record.args()), record.level());

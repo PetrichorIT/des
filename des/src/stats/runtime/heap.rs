@@ -37,7 +37,7 @@ impl OptimizedBinaryHeapMetrics {
 
         let total = self.zero_event_count + self.non_zero_event_count;
         let perc = self.non_zero_event_count as f64 / total as f64;
-        writeln!(f, "\ttinstant_event_prec: {}", perc)?;
+        writeln!(f, "\ttinstant_event_prec: {perc}")?;
 
         Ok(())
     }
@@ -57,6 +57,6 @@ impl OptimizedBinaryHeapMetrics {
 
         let total = self.zero_event_count + self.non_zero_event_count;
         let perc = self.non_zero_event_count as f64 / total as f64;
-        println!("\u{23A2}  Instant event prec: {}", perc);
+        println!("\u{23A2}  Instant event prec: {perc}");
     }
 }

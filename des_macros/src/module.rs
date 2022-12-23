@@ -99,11 +99,11 @@ fn generate_dynamic_builder(
             for module in &module.submodules {
                 let ChildNodeSpec { descriptor, ty, .. } = module;
 
-                let ident = ident!(format!("{}_child", descriptor));
+                let ident = ident!(format!("{descriptor}_child"));
                 let ty = match ty {
                     TySpec::Static(s) => ident!(s.inner()),
                     TySpec::Dynamic(_) => {
-                        let ident = ident!(format!("T{}", descriptor));
+                        let ident = ident!(format!("T{descriptor}"));
                         proto_t_counter += 1;
                         ident
                     }
@@ -184,7 +184,7 @@ fn generate_dynamic_builder(
 
             for module in &module.submodules {
                 let ChildNodeSpec { descriptor, .. } = module;
-                let ident = ident!(format!("{}_child", descriptor));
+                let ident = ident!(format!("{descriptor}_child"));
 
                 token_stream.extend::<proc_macro2::TokenStream>(quote! {
                     ctx.create_module(#ident);

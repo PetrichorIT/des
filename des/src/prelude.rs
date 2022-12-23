@@ -37,9 +37,6 @@ pub use crate::stats::StdDev;
 //
 
 cfg_net! {
-    pub use crate::net::hooks::create_hook;
-    pub use crate::net::hooks::destroy_hook;
-
     pub use crate::net::message::CustomSizeBody;
     pub use crate::net::message::Message;
     pub use crate::net::message::MessageBody;

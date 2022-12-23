@@ -22,7 +22,7 @@ cfg_not_cqueue! {
         where
             A: Application,
         {
-
+            #[allow(clippy::unused_self)]
             pub(crate) fn descriptor(&self) -> String {
                 "FutureEventSet::BinaryHeap()".to_string()
             }
@@ -57,6 +57,8 @@ cfg_not_cqueue! {
             // but would produce invalid code with feature "metrics"
             //
             #[allow(clippy::let_and_return)]
+            #[allow(clippy::needless_pass_by_value)]
+            #[allow(clippy::cast_precision_loss)]
             pub(crate) fn fetch_next(
                 &mut self,
                 #[cfg(feature = "metrics")]  metrics: Arc<RefCell<RuntimeMetrics>>,
@@ -99,6 +101,7 @@ cfg_not_cqueue! {
                 (event.event, event.time)
             }
 
+            #[allow(clippy::needless_pass_by_value)]
             pub(crate) fn add(
                 &mut self,
                 time: SimTime,
@@ -188,7 +191,6 @@ cfg_cqueue! {
                 }
             }
 
-            #[inline(always)]
             #[allow(clippy::needless_pass_by_value)]
             pub(crate) fn fetch_next(
                 &mut self,

@@ -86,7 +86,7 @@ fn subsystem_main(vis: Visibility, ident: Ident, attr: Attr, out: &mut TokenStre
 
                 for node in &network.nodes {
                     let ChildNodeSpec { descriptor, ty, .. } = node;
-                    let ident = ident!(format!("{}_child", descriptor));
+                    let ident = ident!(format!("{descriptor}_child"));
                     let ty = ident!(ty.unwrap());
 
                     if let Some(ref proto) = node.proto_impl {
@@ -158,7 +158,7 @@ fn subsystem_main(vis: Visibility, ident: Ident, attr: Attr, out: &mut TokenStre
 
                 for node in &network.nodes {
                     let ChildNodeSpec { descriptor, .. } = node;
-                    let ident = ident!(format!("{}_child", descriptor));
+                    let ident = ident!(format!("{descriptor}_child"));
 
                     token_stream.extend::<proc_macro2::TokenStream>(quote! {
                         ctx.create_module(#ident);
@@ -222,15 +222,14 @@ fn subsystem_main(vis: Visibility, ident: Ident, attr: Attr, out: &mut TokenStre
                 Err(Diagnostic::new(
                     Level::Error,
                     format!(
-                        "#[derive(Network)] NDL resolver failed to find network called '{}'",
-                        ident,
+                        "#[derive(Network)] NDL resolver failed to find network called '{ident}'"
                     ),
                 ))
             }
         }
         Err(e) => Err(Diagnostic::new(
             Level::Error,
-            format!("#[derive(Network)] NDL resolver failed: {}", e),
+            format!("#[derive(Network)] NDL resolver failed: {e}"),
         )),
     }
 }

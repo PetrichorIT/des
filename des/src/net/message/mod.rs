@@ -40,6 +40,11 @@ impl Message {
         MessageBuilder::new()
     }
 
+    #[cfg(feature = "async")]
+    pub(crate) fn notify() -> Self {
+        Message::new().typ(TYP_NOTIFY).build()
+    }
+
     /// Returns the length of the complete message
     #[must_use]
     pub fn length(&self) -> usize {

@@ -795,7 +795,7 @@ cfg_net! {
 
     impl<A> Runtime<NetworkRuntime<A>> {
         ///
-        /// Adds a message event into a [Runtime<NetworkRuntime<A>>] onto a gate.
+        /// Adds a message event into a [`Runtime<NetworkRuntime<A>>`] onto a gate.
         ///
         pub fn add_message_onto(
             &mut self,
@@ -812,7 +812,7 @@ cfg_net! {
         }
 
         ///
-        /// Adds a message event into a [Runtime<NetworkRuntime<A>>] onto a module.
+        /// Adds a message event into a [`Runtime<NetworkRuntime<A>>`] onto a module.
         ///
         pub fn handle_message_on(
             &mut self,

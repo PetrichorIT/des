@@ -26,7 +26,7 @@ impl LogFormat {
 
                 // [ time ... target ] max 10 max 14
                 let time = format!("{}", record.time);
-                write!(&mut out, "{:^5}", time).expect("Failed to write to output stream");
+                write!(&mut out, "{time:^5}").expect("Failed to write to output stream");
                 write!(&mut out, " ] ").expect("Failed to write to output stream");
 
                 out.set_color(ColorSpec::new().set_fg(Some(get_level_color(record.level))))
@@ -42,7 +42,7 @@ impl LogFormat {
                 write!(&mut out, "[ ").expect("Failed to write to output stream");
                 // [ time ... target ] max 10 max 14
                 let time = format!("{}", record.time);
-                write!(&mut out, "{:^5}", time).expect("Failed to write to output stream");
+                write!(&mut out, "{time:^5}").expect("Failed to write to output stream");
                 write!(&mut out, " ] ").expect("Failed to write to output stream");
                 write!(&mut out, "{}: ", record.target).expect("Failed to write to output stream");
                 writeln!(&mut out, "{}", record.msg).expect("Failed to write to output stream");

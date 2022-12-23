@@ -65,7 +65,7 @@ impl RuntimeOptions {
                 continue;
             }
 
-            let split = arg.split("=").collect::<Vec<_>>();
+            let split = arg.split('=').collect::<Vec<_>>();
             if split.len() != 2 {
                 continue;
             }
@@ -74,19 +74,19 @@ impl RuntimeOptions {
                 // "--cfg-quiet" => if let
                 "--cfg-seed" => {
                     if let Ok(state) = split[1].parse::<u64>() {
-                        self.rng = Some(StdRng::seed_from_u64(state))
+                        self.rng = Some(StdRng::seed_from_u64(state));
                     }
                 }
                 #[cfg(feature = "cqueue")]
                 "--cfg-cqueue-n" => {
                     if let Ok(n) = split[1].parse::<usize>() {
-                        self.cqueue_num_buckets = n
+                        self.cqueue_num_buckets = n;
                     }
                 }
                 #[cfg(feature = "cqueue")]
                 "--cfg-cqueue-t" => {
                     if let Ok(t) = split[1].parse::<f64>() {
-                        self.cqueue_bucket_timespan = Duration::from_secs_f64(t)
+                        self.cqueue_bucket_timespan = Duration::from_secs_f64(t);
                     }
                 }
                 "--cfg-limit-n" => {
@@ -96,7 +96,8 @@ impl RuntimeOptions {
                 }
                 "--cfg-limit-t" => {
                     if let Ok(t) = split[1].parse::<f64>() {
-                        self.max_sim_time = Some(SimTime::from_duration(Duration::from_secs_f64(t)))
+                        self.max_sim_time =
+                            Some(SimTime::from_duration(Duration::from_secs_f64(t)));
                     }
                 }
                 _ => {}

@@ -3,10 +3,14 @@ use log::info;
 use crate::{
     create_event_set,
     net::{
-        gate::GateRef, gate::GateServiceType, message::Message, runtime::buf_process,
+        gate::GateRef,
+        gate::GateServiceType,
+        message::{Message, TYP_RESTART},
+        module::with_mod_ctx,
+        runtime::buf_process,
         NetworkRuntime,
     },
-    prelude::{ChannelRef, ModuleRef},
+    prelude::{schedule_at, ChannelRef, ModuleRef},
     runtime::{Event, EventSet, Runtime},
     time::SimTime,
 };
@@ -216,5 +220,187 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
         }
 
         log_scope!();
+    }
+}
+
+impl ModuleRef {
+    pub(crate) fn num_sim_start_stages(&self) -> usize {
+        self.handler.borrow().num_sim_start_stages()
+    }
+
+    pub(crate) fn reset(&self) {
+        self.handler.borrow_mut().reset()
+    }
+
+    // MARKER: handle_message
+
+    /// Handles a message
+    pub fn handle_message(&self, msg: Message) {
+        use std::sync::atomic::Ordering::SeqCst;
+
+        if self.ctx.active.load(SeqCst) {
+            // (0) Run all plugins upward
+            // Call in order from lowest to highest priority.
+            let msg = with_mod_ctx(|ctx| {
+                let mut msg = Some(msg);
+                for plugin in ctx.plugins.borrow_mut().iter_mut() {
+                    msg = plugin.capture(msg);
+                }
+                msg
+            });
+
+            // Call handle message, if the message was not consumed
+            // - If async and the message was consumed, send a NOTIFY packet to
+            //   still call poll until idle, and internal RT management.
+            if let Some(msg) = msg {
+                self.handler.borrow_mut().handle_message(msg);
+            } else {
+                #[cfg(feature = "async")]
+                self.handler.borrow_mut().handle_message(Message::notify());
+            }
+
+            // (2) Plugin defer calls
+            // Call in reverse order to preserve user-space distance
+            with_mod_ctx(|ctx| {
+                for plugin in ctx.plugins.borrow_mut().iter_mut().rev() {
+                    plugin.defer()
+                }
+            });
+        } else if msg.header().typ == TYP_RESTART {
+            log::debug!("Restarting module");
+            // restart the module itself.
+            self.reset();
+            self.ctx.active.store(true, SeqCst);
+
+            // Do sim start procedure
+            let stages = self.num_sim_start_stages();
+            for stage in 0..stages {
+                self.at_sim_start(stage);
+            }
+
+            #[cfg(feature = "async")]
+            self.finish_sim_start();
+        } else {
+            log::debug!("Ignoring message since module is inactive");
+        }
+    }
+
+    pub(crate) fn at_sim_start(&self, stage: usize) {
+        // (0) Run all plugins upward
+        // Call in order from lowest to highest priority.
+        let rem = with_mod_ctx(|ctx| {
+            let mut msg = None;
+            for plugin in ctx.plugins.borrow_mut().iter_mut() {
+                msg = plugin.capture(msg);
+            }
+            msg
+        });
+
+        // (1) Messages should be handled via handle_message
+        if let Some(rem) = rem {
+            log::error!("Plugins created message at_sim_start");
+            schedule_at(rem, SimTime::now());
+        }
+
+        // (2) Calle the underlining impl
+        self.handler.borrow_mut().at_sim_start(stage);
+
+        // (3) Plugin defer calls
+        // Call in reverse order to preserve user-space distance
+        with_mod_ctx(|ctx| {
+            for plugin in ctx.plugins.borrow_mut().iter_mut().rev() {
+                plugin.defer()
+            }
+        });
+    }
+
+    #[cfg(feature = "async")]
+    pub(crate) fn finish_sim_start(&self) {
+        // (0) Run all plugins upward
+        // Call in order from lowest to highest priority.
+        let rem = with_mod_ctx(|ctx| {
+            let mut msg = None;
+            assert!(ctx.plugins.borrow().len() >= 1);
+            for plugin in ctx.plugins.borrow_mut().iter_mut() {
+                msg = plugin.capture(msg);
+            }
+            msg
+        });
+
+        // (1) Messages should be handled via handle_message
+        if let Some(rem) = rem {
+            log::error!("Plugins created message finish_sim_start");
+            schedule_at(rem, SimTime::now());
+        }
+
+        // (2) Calle the underlining impl
+        self.handler.borrow_mut().finish_sim_start();
+
+        // (3) Plugin defer calls
+        // Call in reverse order to preserve user-space distance
+        with_mod_ctx(|ctx| {
+            for plugin in ctx.plugins.borrow_mut().iter_mut().rev() {
+                plugin.defer()
+            }
+        });
+    }
+
+    pub(crate) fn at_sim_end(&self) {
+        // (0) Run all plugins upward
+        // Call in order from lowest to highest priority.
+        let rem = with_mod_ctx(|ctx| {
+            let mut msg = None;
+            assert!(ctx.plugins.borrow().len() >= 1);
+            for plugin in ctx.plugins.borrow_mut().iter_mut() {
+                msg = plugin.capture(msg);
+            }
+            msg
+        });
+
+        // (1) Messages should be handled via handle_message
+        if let Some(_) = rem {
+            log::error!("Plugins created message at_sim_end");
+        }
+
+        // (2) Call inner
+        self.handler.borrow_mut().at_sim_end();
+
+        // (3) Plugin defer calls
+        // Call in reverse order to preserve user-space distance
+        with_mod_ctx(|ctx| {
+            for plugin in ctx.plugins.borrow_mut().iter_mut().rev() {
+                plugin.defer()
+            }
+        });
+    }
+
+    #[cfg(feature = "async")]
+    pub(crate) fn finish_sim_end(&self) {
+        // (0) Run all plugins upward
+        // Call in order from lowest to highest priority.
+        let rem = with_mod_ctx(|ctx| {
+            let mut msg = None;
+            assert!(ctx.plugins.borrow().len() >= 1);
+            for plugin in ctx.plugins.borrow_mut().iter_mut() {
+                msg = plugin.capture(msg);
+            }
+            msg
+        });
+
+        // (1) Messages should be handled via handle_message
+        if let Some(_) = rem {
+            log::error!("Plugins created message at_sim_end");
+        }
+
+        // (2) Call inner
+        self.handler.borrow_mut().finish_sim_end();
+
+        // (3) Plugin defer calls
+        // Call in reverse order to preserve user-space distance
+        with_mod_ctx(|ctx| {
+            for plugin in ctx.plugins.borrow_mut().iter_mut().rev() {
+                plugin.defer()
+            }
+        });
     }
 }

@@ -130,7 +130,7 @@ impl OutVec {
 
         writeln!(writer, "# Slice written at {}", SimTime::now()).unwrap();
         for (time, value) in self.buffered_values.drain(..) {
-            writeln!(writer, "{} = {}", time, value).unwrap();
+            writeln!(writer, "{time} = {value}").unwrap();
         }
 
         // Done

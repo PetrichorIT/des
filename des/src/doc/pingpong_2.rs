@@ -88,7 +88,7 @@
 //!
 //! Now DES knows how to construct modules with the correct gates, and which types to use.
 //! However should the modules contain fields, they will need a constructor to build
-//! the inital state. To provide this constructor they must implement the [NameableModule](crate::net::NameableModule)
+//! the inital state. To provide this constructor they must implement the [`NameableModule`](crate::net::NameableModule)
 //! trait. This trait is automatically derived on empty types, but must be manually implemented
 //! for all other case. Note that the [`NdlModule`](crate::prelude::NdlModule) macro attached a new field
 //! `__core` to the type:

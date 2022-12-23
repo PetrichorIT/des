@@ -27,8 +27,8 @@ impl LogEnvOptions {
 }
 
 fn matches(path: &str, rule: &str) -> bool {
-    let path = path.split(".").collect::<Vec<_>>();
-    let rule = rule.split(".").collect::<Vec<_>>();
+    let path = path.split('.').collect::<Vec<_>>();
+    let rule = rule.split('.').collect::<Vec<_>>();
 
     for (path_fragment, regex) in path.iter().zip(&rule) {
         match *regex {
@@ -46,15 +46,14 @@ impl FromStr for LogEnvOptions {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        println!("{:?}", s);
         // split into seperate expresions
-        let expr = s.split(",").collect::<Vec<_>>();
+        let expr = s.split(',').collect::<Vec<_>>();
 
         // get first expr
         let max_level = if let Some(lv) = expr.first() {
             match lv.parse::<LevelFilter>() {
                 Ok(v) => v,
-                Err(e) => return Err(format!("Could not parse enviroment var RUST_LOG: {}", e)),
+                Err(e) => return Err(format!("Could not parse enviroment var RUST_LOG: {e}")),
             }
         } else {
             return Err(
@@ -65,20 +64,19 @@ impl FromStr for LogEnvOptions {
 
         let mut level_overrides = Vec::new();
         for ovr in expr.iter().skip(1) {
-            let split = ovr.split(":").collect::<Vec<_>>();
+            let split = ovr.split(':').collect::<Vec<_>>();
             if split.len() != 2 {
                 return Err(format!(
-                    "Could not parse enviroment var RUST_LOG: Overrides '{}' was formatted wrong",
-                    ovr
+                    "Could not parse enviroment var RUST_LOG: Overrides '{ovr}' was formatted wrong"
                 ));
             }
 
             let level = match split[1].parse::<LevelFilter>() {
                 Ok(v) => v,
-                Err(e) => return Err(format!("Could not parse enviroment var RUST_LOG: {}", e)),
+                Err(e) => return Err(format!("Could not parse enviroment var RUST_LOG: {e}")),
             };
 
-            level_overrides.push((split[0].to_string(), level))
+            level_overrides.push((split[0].to_string(), level));
         }
 
         Ok(Self {

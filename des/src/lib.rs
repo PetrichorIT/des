@@ -3,6 +3,7 @@
 #![warn(clippy::pedantic)]
 #![warn(missing_docs, missing_debug_implementations, unreachable_pub)]
 #![allow(
+    clippy::uninlined_format_args,
     clippy::needless_doctest_main,
     rustdoc::broken_intra_doc_links,
     clippy::module_name_repetitions
