@@ -10,8 +10,8 @@ use syn::punctuated::Punctuated;
 use syn::token::Comma;
 use std::{collections::HashMap, path::PathBuf, sync::Mutex};
 
-use proc_macro2::TokenStream as TokenStream2;
-use proc_macro_error::{Diagnostic};
+use proc_macro2::TokenStream;
+use proc_macro_error::Diagnostic;
 
 pub type Result<T> = std::result::Result<T, Diagnostic>;
 
@@ -21,6 +21,7 @@ lazy_static! {
 
 pub fn get_resolver(
     workspace: &str,
+    path_tracker: fn (&[PathBuf])
 ) -> std::result::Result<(DesugaredResult, bool, Vec<PathBuf>), &'static str> {
     let mut resolvers = RESOLVERS.lock().unwrap();
 
@@ -47,7 +48,7 @@ pub fn get_resolver(
         })?;
         
         // Parse successful from a access persepective
-        setup_path_tracking(&resolver.scopes);
+        path_tracker(&resolver.scopes);
         result
     };
         
@@ -57,12 +58,6 @@ pub fn get_resolver(
     Ok((t, has_errs, p))
 }
 
-pub fn setup_path_tracking(paths: &[PathBuf]) {
-    for path in paths {
-        proc_macro::tracked_path::path(path.to_string_lossy())
-    }
-   
-}
 
 macro_rules! ident {
     ($e:expr) => {
@@ -75,7 +70,7 @@ macro_rules! ident {
 
 
 
-pub struct WrappedTokenStream(pub TokenStream2);
+pub struct WrappedTokenStream(pub TokenStream);
 
 impl ToTokens for WrappedTokenStream {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
@@ -122,7 +117,6 @@ pub fn ident_from_conident(
     }
 }
 
-type TokenStream = proc_macro::TokenStream;
 
 pub fn build_impl_from(ident: Ident, wrapped: WrappedTokenStream, submodules: &[ChildNodeSpec], proto_t_counter: usize) -> TokenStream {
     

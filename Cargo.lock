@@ -262,7 +262,17 @@ dependencies = [
 
 [[package]]
 name = "des_macros"
-version = "0.3.0"
+version = "0.4.0"
+dependencies = [
+ "des_macros_core",
+ "proc-macro-error",
+ "proc-macro2",
+ "syn",
+]
+
+[[package]]
+name = "des_macros_core"
+version = "0.4.0"
 dependencies = [
  "lazy_static",
  "ndl",

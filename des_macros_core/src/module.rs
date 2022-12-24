@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use crate::attributes::Attr;
 use crate::common::*;
 use ndl::ChannelSpec;
@@ -6,14 +8,18 @@ use ndl::ConSpec;
 use ndl::GateAnnotation;
 use ndl::GateSpec;
 use ndl::TySpec;
-use proc_macro::TokenStream;
 use proc_macro2::Span;
+use proc_macro2::TokenStream;
 use proc_macro_error::{Diagnostic, Level};
 use quote::quote;
 use syn::Visibility;
 use syn::{AttributeArgs, DeriveInput, Ident};
 
-pub fn derive_impl(input: DeriveInput, attrs: AttributeArgs) -> Result<TokenStream> {
+pub fn derive_impl(
+    input: DeriveInput,
+    attrs: AttributeArgs,
+    path_tracker: fn(&[PathBuf]),
+) -> Result<TokenStream> {
     let attr = Attr::from_args(attrs)?;
     let ident = input.ident.clone();
 
@@ -34,7 +40,13 @@ pub fn derive_impl(input: DeriveInput, attrs: AttributeArgs) -> Result<TokenStre
 
     // (2) Derive the deref impls / generate that approiated changes in the data struct.
     // derive_deref(ident.clone(), data, &mut derive_stream, "ModuleCore")?;
-    generate_dynamic_builder(input.vis.clone(), ident, attr, &mut derive_stream)?;
+    generate_dynamic_builder(
+        input.vis.clone(),
+        ident,
+        attr,
+        &mut derive_stream,
+        path_tracker,
+    )?;
 
     let mut structdef_stream: TokenStream = quote! {
         #input
@@ -59,6 +71,7 @@ fn generate_dynamic_builder(
     ident: Ident,
     attr: Attr,
     out: &mut TokenStream,
+    path_tracker: fn(&[PathBuf]),
 ) -> Result<()> {
     let workspace = match &attr.workspace {
         Some(ref w) => w,
@@ -75,7 +88,7 @@ fn generate_dynamic_builder(
         }
     };
 
-    match get_resolver(workspace) {
+    match get_resolver(workspace, path_tracker) {
         Ok((res, _, _)) => {
             let (module, typalias) = if let Some(ident) = attr.overwrite_ident {
                 (

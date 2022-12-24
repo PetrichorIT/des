@@ -6,12 +6,7 @@
 //! rust structs to automate the module setup process.
 //!
 
-mod attributes;
-mod common;
-
-mod message_body;
-mod module;
-mod subsystem;
+use std::path::PathBuf;
 
 use proc_macro::{self, TokenStream};
 use proc_macro_error::proc_macro_error;
@@ -27,8 +22,8 @@ use syn::{parse_macro_input, AttributeArgs, DeriveInput};
 pub fn derive_message_body(input: TokenStream) -> TokenStream {
     let DeriveInput { ident, data, .. } = parse_macro_input!(input);
 
-    match message_body::derive_message_body(ident, data) {
-        Ok(ts) => ts,
+    match des_macros_core::message_body_derive_impl(ident, data) {
+        Ok(ts) => ts.into(),
         Err(e) => e.abort(),
     }
 }
@@ -67,8 +62,8 @@ pub fn NdlModule(attr: TokenStream, item: TokenStream) -> TokenStream {
     // PARSE STRUCT DEFINITION
     let inp = parse_macro_input!(item as DeriveInput);
 
-    match module::derive_impl(inp, attrs) {
-        Ok(token_stream) => token_stream,
+    match des_macros_core::module_derive_impl(inp, attrs, setup_path_tracking) {
+        Ok(token_stream) => token_stream.into(),
         Err(e) => e.abort(),
     }
 }
@@ -83,8 +78,14 @@ pub fn NdlSubsystem(attr: TokenStream, item: TokenStream) -> TokenStream {
     // PARSE STRUCT DEFINITION
     let inp = parse_macro_input!(item as DeriveInput);
 
-    match subsystem::derive_impl(inp, attrs) {
-        Ok(token_stream) => token_stream,
+    match des_macros_core::subsystem_derive_impl(inp, attrs, setup_path_tracking) {
+        Ok(token_stream) => token_stream.into(),
         Err(e) => e.abort(),
+    }
+}
+
+fn setup_path_tracking(paths: &[PathBuf]) {
+    for path in paths {
+        proc_macro::tracked_path::path(path.to_string_lossy())
     }
 }

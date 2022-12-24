@@ -1,11 +1,12 @@
+use std::path::PathBuf;
+
 use crate::attributes::Attr;
 use crate::common::*;
 use ndl::ChannelSpec;
 use ndl::ChildNodeSpec;
 use ndl::ConSpec;
-use proc_macro::TokenStream;
 use proc_macro2::Ident;
-use proc_macro2::TokenStream as TokenStream2;
+use proc_macro2::TokenStream;
 use proc_macro_error::{Diagnostic, Level};
 use quote::quote;
 use syn::punctuated::Punctuated;
@@ -13,7 +14,11 @@ use syn::token::Comma;
 use syn::Visibility;
 use syn::{AttributeArgs, DeriveInput};
 
-pub fn derive_impl(input: DeriveInput, attrs: AttributeArgs) -> Result<TokenStream> {
+pub fn derive_impl(
+    input: DeriveInput,
+    attrs: AttributeArgs,
+    path_tracker: fn(&[PathBuf]),
+) -> Result<TokenStream> {
     let attr = Attr::from_args(attrs)?;
     let ident = input.ident.clone();
 
@@ -34,7 +39,13 @@ pub fn derive_impl(input: DeriveInput, attrs: AttributeArgs) -> Result<TokenStre
 
     // (2) Derive the deref impls / generate that approiated changes in the data struct.
     // derive_deref(ident.clone(), data, &mut derive_stream, "SubsystemCore")?;
-    subsystem_main(input.vis.clone(), ident, attr, &mut derive_stream)?;
+    subsystem_main(
+        input.vis.clone(),
+        ident,
+        attr,
+        &mut derive_stream,
+        path_tracker,
+    )?;
 
     let mut structdef_stream: TokenStream = quote! {
         #input
@@ -54,12 +65,18 @@ macro_rules! ident {
     };
 }
 
-fn subsystem_main(vis: Visibility, ident: Ident, attr: Attr, out: &mut TokenStream) -> Result<()> {
+fn subsystem_main(
+    vis: Visibility,
+    ident: Ident,
+    attr: Attr,
+    out: &mut TokenStream,
+    path_tracker: fn(&[PathBuf]),
+) -> Result<()> {
     let workspace = match &attr.workspace {
         Some(ref w) => w,
         None => return Ok(()),
     };
-    match get_resolver(workspace) {
+    match get_resolver(workspace, path_tracker) {
         Ok((res, _, par_files)) => {
             let (network, tyalias) = if let Some(ident) = attr.overwrite_ident {
                 // TODO
@@ -71,7 +88,7 @@ fn subsystem_main(vis: Visibility, ident: Ident, attr: Attr, out: &mut TokenStre
             };
 
             if let Some(network) = network {
-                let mut token_stream = TokenStream2::new();
+                let mut token_stream = TokenStream::new();
 
                 // Import parameters
 

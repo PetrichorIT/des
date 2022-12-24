@@ -1,6 +1,5 @@
-use proc_macro::TokenStream;
 use proc_macro2::Span as Span2;
-use proc_macro2::TokenStream as TokenStream2;
+use proc_macro2::TokenStream;
 use proc_macro_error::{Diagnostic, Level};
 use quote::quote;
 use syn::*;
@@ -11,7 +10,7 @@ pub fn derive_message_body(ident: Ident, data: Data) -> crate::common::Result<To
     match data {
         Data::Struct(data_struct) => match data_struct.fields {
             Fields::Named(named_fields) => {
-                let mut ts = TokenStream2::new();
+                let mut ts = TokenStream::new();
                 for field in named_fields.named {
                     let ty = field.ty;
                     let fident = field.ident.unwrap();
@@ -33,7 +32,7 @@ pub fn derive_message_body(ident: Ident, data: Data) -> crate::common::Result<To
             }
             Fields::Unnamed(unnamed_fields) => {
                 // Does this case ever happen
-                let mut ts = TokenStream2::new();
+                let mut ts = TokenStream::new();
 
                 for (i, field) in unnamed_fields.unnamed.into_iter().enumerate() {
                     let ty = field.ty;
@@ -62,7 +61,7 @@ pub fn derive_message_body(ident: Ident, data: Data) -> crate::common::Result<To
             .into()),
         },
         Data::Enum(data_enum) => {
-            let mut gts = TokenStream2::new();
+            let mut gts = TokenStream::new();
             if data_enum.variants.is_empty() {
                 return Ok(quote! {
                     impl ::des::net::message::MessageBody for #ident {
@@ -77,8 +76,8 @@ pub fn derive_message_body(ident: Ident, data: Data) -> crate::common::Result<To
 
                 let ts = match variant.fields {
                     Fields::Named(named_fields) => {
-                        let mut pts = TokenStream2::new();
-                        let mut ts = TokenStream2::new();
+                        let mut pts = TokenStream::new();
+                        let mut ts = TokenStream::new();
 
                         for field in named_fields.named {
                             let ty = field.ty;
@@ -97,8 +96,8 @@ pub fn derive_message_body(ident: Ident, data: Data) -> crate::common::Result<To
                     }
                     Fields::Unnamed(unnamed_fields) => {
                         // Does this case ever happen
-                        let mut pts = TokenStream2::new();
-                        let mut ts = TokenStream2::new();
+                        let mut pts = TokenStream::new();
+                        let mut ts = TokenStream::new();
 
                         for (i, field) in unnamed_fields.unnamed.into_iter().enumerate() {
                             let ty = field.ty;
