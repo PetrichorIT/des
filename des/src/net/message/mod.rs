@@ -75,9 +75,10 @@ impl Message {
     #[must_use]
     pub fn str(&self) -> String {
         format!(
-            "Message {{ {} bytes {} }}",
+            "Message {{ {} bytes {} ({}) }}",
             self.header.length,
-            self.content.as_ref().map_or("no content", AnyBox::ty)
+            self.content.as_ref().map_or("no content", AnyBox::ty),
+            self.header.typ()
         )
     }
 }
@@ -169,7 +170,7 @@ impl Message {
     /// of type T. If this cannot be guarnteed this is UB.
     /// Note that DES guarntees that the data refernced by ptr will not
     /// be freed until this function is called, and ownership is thereby moved..
-    ///
+    ///D
     /// # Errors
     ///
     /// Returns an error if either there is no content, or

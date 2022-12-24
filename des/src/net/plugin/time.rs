@@ -19,9 +19,9 @@ pub struct TokioTimePlugin {
 
 impl TokioTimePlugin {
     /// Creates a new instance of self
-    pub fn new() -> Self {
+    pub fn new(ident: String) -> Self {
         Self {
-            time: Some(TimeContext::new("FROMPLUGIN".to_string())),
+            time: Some(TimeContext::new(ident)),
             prev: None,
             next_wakeup: SimTime::MAX,
         }

@@ -3,7 +3,7 @@
 use crate::net::{gate::GateRef, module::ModuleId};
 use crate::time::SimTime;
 
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 
@@ -184,6 +184,17 @@ pub enum MessageType {
     Udp,
     /// A custom internal message. Those should never appear in 'handle_message'.
     Internal,
+}
+
+impl Display for MessageType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::UserDefined => write!(f, "UserDefined"),
+            Self::Tcp => write!(f, "Tcp"),
+            Self::Udp => write!(f, "Udp"),
+            Self::Internal => write!(f, "Internal"),
+        }
+    }
 }
 
 unsafe impl Send for MessageHeader {}
