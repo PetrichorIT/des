@@ -29,6 +29,14 @@ impl TokioTimePlugin {
 }
 
 impl Plugin for TokioTimePlugin {
+    fn capture_sim_start(&mut self) {
+        self.capture(None);
+    }
+
+    fn capture_sim_end(&mut self) {
+        self.capture(None);
+    }
+
     fn capture(&mut self, msg: Option<Message>) -> Option<Message> {
         // (0) Swap in time context
         let mut time = self.time.take().expect("Plugin lost its time context");
@@ -56,6 +64,14 @@ impl Plugin for TokioTimePlugin {
         } else {
             Some(msg)
         }
+    }
+
+    fn defer_sim_start(&mut self) {
+        self.defer();
+    }
+
+    fn defer_sim_end(&mut self) {
+        self.defer();
     }
 
     fn defer(&mut self) {

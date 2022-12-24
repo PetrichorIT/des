@@ -10,7 +10,7 @@ use crate::{
         runtime::buf_process,
         NetworkRuntime,
     },
-    prelude::{schedule_at, ChannelRef, ModuleRef},
+    prelude::{ChannelRef, ModuleRef},
     runtime::{Event, EventSet, Runtime},
     time::SimTime,
 };
@@ -296,31 +296,23 @@ impl ModuleRef {
     pub(crate) fn at_sim_start(&self, stage: usize) {
         // (0) Run all plugins upward
         // Call in order from lowest to highest priority.
-        let rem = with_mod_ctx(|ctx| {
-            let mut msg = None;
+        with_mod_ctx(|ctx| {
             for plugin in ctx.plugins.borrow_mut().iter_mut() {
                 if !plugin.just_created {
-                    msg = plugin.capture(msg);
+                    plugin.capture_sim_start();
                 }
             }
-            msg
         });
 
-        // (1) Messages should be handled via handle_message
-        if let Some(rem) = rem {
-            log::error!("Plugins created message at_sim_start");
-            schedule_at(rem, SimTime::now());
-        }
-
-        // (2) Calle the underlining impl
+        // (1) Calle the underlining impl
         self.handler.borrow_mut().at_sim_start(stage);
 
-        // (3) Plugin defer calls
+        // (2) Plugin defer calls
         // Call in reverse order to preserve user-space distance
         with_mod_ctx(|ctx| {
             for plugin in ctx.plugins.borrow_mut().iter_mut().rev() {
                 if !plugin.just_created {
-                    plugin.defer()
+                    plugin.defer_sim_start()
                 }
                 plugin.just_created = false;
             }
@@ -331,32 +323,24 @@ impl ModuleRef {
     pub(crate) fn finish_sim_start(&self) {
         // (0) Run all plugins upward
         // Call in order from lowest to highest priority.
-        let rem = with_mod_ctx(|ctx| {
-            let mut msg = None;
+        with_mod_ctx(|ctx| {
             assert!(ctx.plugins.borrow().len() >= 1);
             for plugin in ctx.plugins.borrow_mut().iter_mut() {
                 if !plugin.just_created {
-                    msg = plugin.capture(msg);
+                    plugin.capture_sim_start();
                 }
             }
-            msg
         });
 
-        // (1) Messages should be handled via handle_message
-        if let Some(rem) = rem {
-            log::error!("Plugins created message finish_sim_start");
-            schedule_at(rem, SimTime::now());
-        }
-
-        // (2) Calle the underlining impl
+        // (1) Calle the underlining impl
         self.handler.borrow_mut().finish_sim_start();
 
-        // (3) Plugin defer calls
+        // (2) Plugin defer calls
         // Call in reverse order to preserve user-space distance
         with_mod_ctx(|ctx| {
             for plugin in ctx.plugins.borrow_mut().iter_mut().rev() {
                 if !plugin.just_created {
-                    plugin.defer()
+                    plugin.defer_sim_start()
                 }
                 plugin.just_created = false;
             }
@@ -366,31 +350,24 @@ impl ModuleRef {
     pub(crate) fn at_sim_end(&self) {
         // (0) Run all plugins upward
         // Call in order from lowest to highest priority.
-        let rem = with_mod_ctx(|ctx| {
-            let mut msg = None;
+        with_mod_ctx(|ctx| {
             assert!(ctx.plugins.borrow().len() >= 1);
             for plugin in ctx.plugins.borrow_mut().iter_mut() {
                 if !plugin.just_created {
-                    msg = plugin.capture(msg);
+                    plugin.capture_sim_end();
                 }
             }
-            msg
         });
 
-        // (1) Messages should be handled via handle_message
-        if let Some(_) = rem {
-            log::error!("Plugins created message at_sim_end");
-        }
-
-        // (2) Call inner
+        // (1) Call inner
         self.handler.borrow_mut().at_sim_end();
 
-        // (3) Plugin defer calls
+        // (2) Plugin defer calls
         // Call in reverse order to preserve user-space distance
         with_mod_ctx(|ctx| {
             for plugin in ctx.plugins.borrow_mut().iter_mut().rev() {
                 if !plugin.just_created {
-                    plugin.defer()
+                    plugin.defer_sim_end()
                 }
                 plugin.just_created = false;
             }
@@ -401,31 +378,24 @@ impl ModuleRef {
     pub(crate) fn finish_sim_end(&self) {
         // (0) Run all plugins upward
         // Call in order from lowest to highest priority.
-        let rem = with_mod_ctx(|ctx| {
-            let mut msg = None;
+        with_mod_ctx(|ctx| {
             assert!(ctx.plugins.borrow().len() >= 1);
             for plugin in ctx.plugins.borrow_mut().iter_mut() {
                 if !plugin.just_created {
-                    msg = plugin.capture(msg);
+                    plugin.capture_sim_end();
                 }
             }
-            msg
         });
 
-        // (1) Messages should be handled via handle_message
-        if let Some(_) = rem {
-            log::error!("Plugins created message at_sim_end");
-        }
-
-        // (2) Call inner
+        // (1) Call inner
         self.handler.borrow_mut().finish_sim_end();
 
-        // (3) Plugin defer calls
+        // (2) Plugin defer calls
         // Call in reverse order to preserve user-space distance
         with_mod_ctx(|ctx| {
             for plugin in ctx.plugins.borrow_mut().iter_mut().rev() {
                 if !plugin.just_created {
-                    plugin.defer()
+                    plugin.defer_sim_end()
                 }
                 plugin.just_created = false;
             }

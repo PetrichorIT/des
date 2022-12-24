@@ -37,6 +37,14 @@ impl TokioNetPlugin {
 }
 
 impl Plugin for TokioNetPlugin {
+    fn capture_sim_start(&mut self) {
+        self.capture(None);
+    }
+
+    fn capture_sim_end(&mut self) {
+        self.capture(None);
+    }
+
     fn capture(&mut self, msg: Option<Message>) -> Option<Message> {
         let io = self.io.take().expect("Plugin failure");
         self.prev = SimContext::with_current(|ctx| ctx.io.replace(io));
@@ -95,6 +103,14 @@ impl Plugin for TokioNetPlugin {
             }
             _ => Some(msg),
         }
+    }
+
+    fn defer_sim_start(&mut self) {
+        self.defer();
+    }
+
+    fn defer_sim_end(&mut self) {
+        self.defer();
     }
 
     fn defer(&mut self) {

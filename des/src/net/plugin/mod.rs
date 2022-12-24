@@ -36,8 +36,12 @@ pub trait Plugin {
     /// and `at_sim_end` cycles (called with None).
     ///
     fn capture(&mut self, msg: Option<Message>) -> Option<Message>;
-    // fn capture_sim_start(&mut self) {}
-    // fn capture_sim_end(&mut self) {}
+
+    /// A message pre-processor executed at the sim_start stage.
+    fn capture_sim_start(&mut self) {}
+
+    /// A message pre-processor executed at the sim_end stage.
+    fn capture_sim_end(&mut self) {}
 
     /// A deferred function, executed after the event processing has finished.
     ///
@@ -47,8 +51,12 @@ pub trait Plugin {
     /// Use this function to perform cleanup duties.
     ///
     fn defer(&mut self);
-    // fn defer_sim_start(&mut self) {}
-    // fn defer_sim_end(&mut self) {}
+
+    /// A message post-processor executed at the sim_start stage.
+    fn defer_sim_start(&mut self) {}
+
+    /// A message post-processor executed at the sim_end stage.
+    fn defer_sim_end(&mut self) {}
 }
 
 /// A handle to a plugin that allows the lifetime managment

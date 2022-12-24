@@ -308,8 +308,10 @@ impl Module for PluginInPluginAdd {
 
 struct RecursivePlugin;
 impl Plugin for RecursivePlugin {
-    fn capture(&mut self, msg: Option<Message>) -> Option<Message> {
+    fn capture_sim_start(&mut self) {
         add_plugin(Self, 42);
+    }
+    fn capture(&mut self, msg: Option<Message>) -> Option<Message> {
         msg
     }
     fn defer(&mut self) {}
