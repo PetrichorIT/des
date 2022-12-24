@@ -80,7 +80,7 @@ cfg_net! {
     pub use crate::net::ObjectPath;
     pub use crate::net::Parameters;
 
-    pub use crate::net::NodeDefinition;
+    pub use crate::net::TopoNode;
     pub use crate::net::Topology;
 
     cfg_async! {

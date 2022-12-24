@@ -10,6 +10,8 @@ struct Application();
 fn main() {
     use des::net::{BuildContext, __Buildable0};
 
+    // ScopedLogger::new().finish().unwrap();
+
     let mut app = NetworkRuntime::new(Application());
     let mut cx = BuildContext::new(&mut app);
 

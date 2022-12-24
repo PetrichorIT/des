@@ -4,6 +4,7 @@ use crate::net::message::Message;
 use std::any::Any;
 
 mod ctx;
+pub use self::ctx::ModuleContext;
 pub(crate) use self::ctx::*;
 
 mod reference;

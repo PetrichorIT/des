@@ -195,12 +195,6 @@ pub struct NetworkRuntimeGlobals {
     /// The topology of the network from a module viewpoint.
     ///
     pub topology: RefCell<Topology>,
-
-    ///
-    /// The total duration spend in the module specific handlers.
-    ///
-    #[cfg(feature = "metrics-module-time")]
-    pub time_elapsed: std::time::Duration,
 }
 
 impl NetworkRuntimeGlobals {
@@ -212,9 +206,6 @@ impl NetworkRuntimeGlobals {
         Self {
             parameters: Parameters::new(),
             topology: RefCell::new(Topology::new()),
-
-            #[cfg(feature = "metrics-module-time")]
-            time_elapsed: std::time::Duration::ZERO,
         }
     }
 }

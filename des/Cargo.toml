@@ -30,7 +30,6 @@ net = ["dep:des_macros"]
 
 # Different metrics features
 metrics = []
-metrics-module-time = ["metrics"]
 metrics-rt-full = ["metrics"]
 
 [dependencies]
@@ -42,7 +41,7 @@ termcolor = "1.1"
 # runtime and sould be seedable by the user.
 rand = {version = "*", features = ["std_rng"]}
 
-sysinfo = "0.26"
+sysinfo = "*"
 
 # All other dependencies are optional
 async-trait = {version = "0.1", optional = true}
@@ -53,7 +52,7 @@ tokio = {git = "https://github.com/PetrichorIT/tokio_sim", features = ["sim"], o
 
 [dev-dependencies]
 futures = "0.3"
-serial_test = "0.9"
+serial_test = "0.10"
 
 [package.metadata.docs.rs]
 all-features = true

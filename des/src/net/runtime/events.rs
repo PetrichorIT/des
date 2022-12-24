@@ -126,23 +126,11 @@ impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
 
         let module = self.module;
 
-        #[cfg(feature = "metrics-module-time")]
-        use std::time::Instant;
-        #[cfg(feature = "metrics-module-time")]
-        let t0 = Instant::now();
-
         module.activate();
         module.handle_message(message);
         module.deactivate();
 
         buf_process(&module, rt);
-
-        #[cfg(feature = "metrics-module-time")]
-        {
-            let elapsed = Instant::now().duration_since(t0);
-            module.module_core_mut().elapsed += elapsed;
-            rt.app.globals.time_elapsed += elapsed;
-        }
 
         log_scope!();
     }
@@ -182,23 +170,11 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
                 if stage < module.num_sim_start_stages() {
                     info!("Calling at_sim_start({}).", stage);
 
-                    #[cfg(feature = "metrics-module-time")]
-                    use std::time::Instant;
-                    #[cfg(feature = "metrics-module-time")]
-                    let t0 = Instant::now();
-
                     module.activate();
                     module.at_sim_start(stage);
                     module.deactivate();
 
                     super::buf_process(&module, rt);
-
-                    #[cfg(feature = "metrics-module-time")]
-                    {
-                        let elapsed = Instant::now().duration_since(t0);
-                        module.module_core_mut().elapsed += elapsed;
-                        rt.app.globals.time_elapsed += elapsed;
-                    }
                 }
             }
         }
@@ -235,7 +211,7 @@ impl ModuleRef {
     // MARKER: handle_message
 
     /// Handles a message
-    pub fn handle_message(&self, msg: Message) {
+    pub(crate) fn handle_message(&self, msg: Message) {
         use std::sync::atomic::Ordering::SeqCst;
 
         if self.ctx.active.load(SeqCst) {
@@ -324,7 +300,6 @@ impl ModuleRef {
         // (0) Run all plugins upward
         // Call in order from lowest to highest priority.
         with_mod_ctx(|ctx| {
-            assert!(ctx.plugins.borrow().len() >= 1);
             for plugin in ctx.plugins.borrow_mut().iter_mut() {
                 if !plugin.just_created {
                     plugin.capture_sim_start();
@@ -351,7 +326,6 @@ impl ModuleRef {
         // (0) Run all plugins upward
         // Call in order from lowest to highest priority.
         with_mod_ctx(|ctx| {
-            assert!(ctx.plugins.borrow().len() >= 1);
             for plugin in ctx.plugins.borrow_mut().iter_mut() {
                 if !plugin.just_created {
                     plugin.capture_sim_end();
@@ -379,7 +353,6 @@ impl ModuleRef {
         // (0) Run all plugins upward
         // Call in order from lowest to highest priority.
         with_mod_ctx(|ctx| {
-            assert!(ctx.plugins.borrow().len() >= 1);
             for plugin in ctx.plugins.borrow_mut().iter_mut() {
                 if !plugin.just_created {
                     plugin.capture_sim_end();

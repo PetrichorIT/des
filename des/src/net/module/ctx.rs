@@ -29,6 +29,7 @@ fn _default_setup(this: &ModuleContext) {
     this.add_plugin(TokioNetPlugin::new(), 1, false);
 }
 
+/// INTERNAL
 pub struct ModuleContext {
     pub(crate) active: AtomicBool,
     pub(crate) id: ModuleId,
@@ -105,22 +106,24 @@ impl ModuleContext {
         MOD_CTX.with(|ctx| ctx.take())
     }
 
+    /// INTERNAL
     pub fn id(&self) -> ModuleId {
         self.id
     }
 
+    /// INTERNAL
     pub fn path(&self) -> ObjectPath {
         self.path.clone()
     }
-
+    /// INTERNAL
     pub fn name(&self) -> String {
         self.path.name().to_string()
     }
-
+    /// INTERNAL
     pub fn gates(&self) -> Vec<GateRef> {
         self.gates.borrow().clone()
     }
-
+    /// INTERNAL
     pub fn gate(&self, name: &str, pos: usize) -> Option<GateRef> {
         self.gates
             .borrow()
@@ -128,7 +131,7 @@ impl ModuleContext {
             .find(|&g| g.name() == name && g.pos() == pos)
             .cloned()
     }
-
+    /// INTERNAL
     pub fn parent(&self) -> Result<ModuleRef, ModuleReferencingError> {
         if let Some(ref parent) = self.parent {
             let strong = parent
@@ -147,7 +150,7 @@ impl ModuleContext {
             )))
         }
     }
-
+    /// INTERNAL
     pub fn child(&self, name: &str) -> Result<ModuleRef, ModuleReferencingError> {
         dbg!(self.path.path(), self.children.borrow());
         if let Some(child) = self.children.borrow().get(name) {

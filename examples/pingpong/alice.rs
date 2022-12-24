@@ -19,8 +19,8 @@ impl Module for Alice {
             ("netOut", 0),
         );
 
-        parent()
-            .unwrap()
-            .handle_message(Message::new().kind(31).content("Pang".to_string()).build());
+        // parent()
+        //     .unwrap()
+        //     .handle_message(Message::new().kind(31).content("Pang".to_string()).build());
     }
 }
