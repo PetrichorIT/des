@@ -37,6 +37,10 @@ pub use crate::stats::StdDev;
 //
 
 cfg_net! {
+    pub use crate::net::plugin::add_plugin;
+    pub use crate::net::plugin::remove_plugin;
+    pub use crate::net::plugin::Plugin;
+
     pub use crate::net::message::CustomSizeBody;
     pub use crate::net::message::Message;
     pub use crate::net::message::MessageBody;

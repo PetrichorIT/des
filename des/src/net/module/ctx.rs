@@ -25,8 +25,8 @@ fn _default_setup(_: &ModuleContext) {}
 
 #[cfg(feature = "async")]
 fn _default_setup(this: &ModuleContext) {
-    this.add_plugin(TokioTimePlugin::new(), 0);
-    this.add_plugin(TokioNetPlugin::new(), 1);
+    this.add_plugin(TokioTimePlugin::new(), 0, false);
+    this.add_plugin(TokioNetPlugin::new(), 1, false);
 }
 
 pub struct ModuleContext {

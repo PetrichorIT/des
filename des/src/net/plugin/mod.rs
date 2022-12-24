@@ -1,5 +1,8 @@
 //! Module Plugins
 
+mod periodic;
+pub use periodic::PeriodicPlugin;
+
 cfg_async! {
     mod net;
     mod time;
@@ -18,6 +21,8 @@ use std::{
 use super::module::{with_mod_ctx, ModuleContext};
 
 /// A module-specific plugin
+///
+/// Plugins can be created using [`add_plugin`] and destroyed using [`remove_plugin`].
 pub trait Plugin {
     /// A message preprocessor which i called whenever a message
     /// arrives.
@@ -31,6 +36,8 @@ pub trait Plugin {
     /// and `at_sim_end` cycles (called with None).
     ///
     fn capture(&mut self, msg: Option<Message>) -> Option<Message>;
+    // fn capture_sim_start(&mut self) {}
+    // fn capture_sim_end(&mut self) {}
 
     /// A deferred function, executed after the event processing has finished.
     ///
@@ -40,6 +47,8 @@ pub trait Plugin {
     /// Use this function to perform cleanup duties.
     ///
     fn defer(&mut self);
+    // fn defer_sim_start(&mut self) {}
+    // fn defer_sim_end(&mut self) {}
 }
 
 /// A handle to a plugin that allows the lifetime managment
@@ -107,7 +116,7 @@ impl Debug for PluginHandle {
 ///    `handle_message`.
 ///
 pub fn add_plugin(plugin: impl Plugin + 'static, priority: usize) -> PluginHandle {
-    with_mod_ctx(|ctx| ctx.add_plugin(plugin, priority))
+    with_mod_ctx(|ctx| ctx.add_plugin(plugin, priority, true))
 }
 
 ///
@@ -126,15 +135,24 @@ thread_local! { static PLUGIN_ID: AtomicUsize = const { AtomicUsize::new(0) } }
 
 impl ModuleContext {
     /// Refer to [`add_plugin`].
-    pub fn add_plugin<T: Plugin + 'static>(&self, plugin: T, priority: usize) -> PluginHandle {
+    pub fn add_plugin<T: Plugin + 'static>(
+        &self,
+        plugin: T,
+        priority: usize,
+        just_created: bool,
+    ) -> PluginHandle {
         let id = PLUGIN_ID.with(|c| c.fetch_add(1, Ordering::SeqCst));
         let entry = PluginEntry {
             id,
             plugin: Box::new(plugin),
             priority,
+            just_created,
         };
 
-        let mut plugins = self.plugins.borrow_mut();
+        let mut plugins = self
+            .plugins
+            .try_borrow_mut()
+            .expect("cannot create new plugin while other plugin is active");
         match plugins.binary_search(&entry) {
             Ok(at) | Err(at) => plugins.insert(at, entry),
         };
@@ -149,7 +167,10 @@ impl ModuleContext {
     /// Refer to [`remove_plugin`].
     #[allow(clippy::needless_pass_by_value)]
     pub fn remove_plugin(&self, handle: PluginHandle) {
-        let mut plugins = self.plugins.borrow_mut();
+        let mut plugins = self
+            .plugins
+            .try_borrow_mut()
+            .expect("cannot remove plugin while other plugin is active");
         if let Some((idx, _)) = plugins.iter().enumerate().find(|(_, e)| e.id == handle.id) {
             plugins.remove(idx);
         } else {
@@ -164,6 +185,7 @@ pub(crate) struct PluginEntry {
     pub(crate) id: usize,
     pub(crate) plugin: Box<dyn Plugin>,
     pub(crate) priority: usize,
+    pub(crate) just_created: bool,
 }
 
 impl Deref for PluginEntry {

@@ -61,6 +61,15 @@ impl Message {
     }
 
     ///
+    /// The metadata attached to the message.
+    ///
+    #[inline]
+    #[must_use]
+    pub fn header_mut(&mut self) -> &mut MessageHeader {
+        &mut self.header
+    }
+
+    ///
     /// A strinification function that reduces it to its identifering pars.
     ///
     #[must_use]

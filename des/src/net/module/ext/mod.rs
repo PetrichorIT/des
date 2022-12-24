@@ -140,6 +140,10 @@ impl<T> Module for T
 where
     T: 'static + AsyncModule,
 {
+    fn __indicate_asnyc(&self) -> bool {
+        true
+    }
+
     fn new() -> Self
     where
         Self: Sized,

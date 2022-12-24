@@ -242,9 +242,12 @@ impl ModuleRef {
             // (0) Run all plugins upward
             // Call in order from lowest to highest priority.
             let msg = with_mod_ctx(|ctx| {
+                let mut plugins = ctx.plugins.borrow_mut();
                 let mut msg = Some(msg);
-                for plugin in ctx.plugins.borrow_mut().iter_mut() {
-                    msg = plugin.capture(msg);
+                for plugin in plugins.iter_mut() {
+                    if !plugin.just_created {
+                        msg = plugin.capture(msg);
+                    }
                 }
                 msg
             });
@@ -256,14 +259,19 @@ impl ModuleRef {
                 self.handler.borrow_mut().handle_message(msg);
             } else {
                 #[cfg(feature = "async")]
-                self.handler.borrow_mut().handle_message(Message::notify());
+                if self.handler.borrow().__indicate_asnyc() {
+                    self.handler.borrow_mut().handle_message(Message::notify());
+                }
             }
 
             // (2) Plugin defer calls
             // Call in reverse order to preserve user-space distance
             with_mod_ctx(|ctx| {
                 for plugin in ctx.plugins.borrow_mut().iter_mut().rev() {
-                    plugin.defer()
+                    if !plugin.just_created {
+                        plugin.defer()
+                    }
+                    plugin.just_created = false;
                 }
             });
         } else if msg.header().typ == TYP_RESTART {
@@ -291,7 +299,9 @@ impl ModuleRef {
         let rem = with_mod_ctx(|ctx| {
             let mut msg = None;
             for plugin in ctx.plugins.borrow_mut().iter_mut() {
-                msg = plugin.capture(msg);
+                if !plugin.just_created {
+                    msg = plugin.capture(msg);
+                }
             }
             msg
         });
@@ -309,7 +319,10 @@ impl ModuleRef {
         // Call in reverse order to preserve user-space distance
         with_mod_ctx(|ctx| {
             for plugin in ctx.plugins.borrow_mut().iter_mut().rev() {
-                plugin.defer()
+                if !plugin.just_created {
+                    plugin.defer()
+                }
+                plugin.just_created = false;
             }
         });
     }
@@ -322,7 +335,9 @@ impl ModuleRef {
             let mut msg = None;
             assert!(ctx.plugins.borrow().len() >= 1);
             for plugin in ctx.plugins.borrow_mut().iter_mut() {
-                msg = plugin.capture(msg);
+                if !plugin.just_created {
+                    msg = plugin.capture(msg);
+                }
             }
             msg
         });
@@ -340,7 +355,10 @@ impl ModuleRef {
         // Call in reverse order to preserve user-space distance
         with_mod_ctx(|ctx| {
             for plugin in ctx.plugins.borrow_mut().iter_mut().rev() {
-                plugin.defer()
+                if !plugin.just_created {
+                    plugin.defer()
+                }
+                plugin.just_created = false;
             }
         });
     }
@@ -352,7 +370,9 @@ impl ModuleRef {
             let mut msg = None;
             assert!(ctx.plugins.borrow().len() >= 1);
             for plugin in ctx.plugins.borrow_mut().iter_mut() {
-                msg = plugin.capture(msg);
+                if !plugin.just_created {
+                    msg = plugin.capture(msg);
+                }
             }
             msg
         });
@@ -369,7 +389,10 @@ impl ModuleRef {
         // Call in reverse order to preserve user-space distance
         with_mod_ctx(|ctx| {
             for plugin in ctx.plugins.borrow_mut().iter_mut().rev() {
-                plugin.defer()
+                if !plugin.just_created {
+                    plugin.defer()
+                }
+                plugin.just_created = false;
             }
         });
     }
@@ -382,7 +405,9 @@ impl ModuleRef {
             let mut msg = None;
             assert!(ctx.plugins.borrow().len() >= 1);
             for plugin in ctx.plugins.borrow_mut().iter_mut() {
-                msg = plugin.capture(msg);
+                if !plugin.just_created {
+                    msg = plugin.capture(msg);
+                }
             }
             msg
         });
@@ -399,7 +424,10 @@ impl ModuleRef {
         // Call in reverse order to preserve user-space distance
         with_mod_ctx(|ctx| {
             for plugin in ctx.plugins.borrow_mut().iter_mut().rev() {
-                plugin.defer()
+                if !plugin.just_created {
+                    plugin.defer()
+                }
+                plugin.just_created = false;
             }
         });
     }

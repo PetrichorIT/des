@@ -54,6 +54,7 @@ macro_rules! msg_body_lenable {
     };
 }
 
+msg_body_lenable!(&'static str);
 msg_body_lenable!(String);
 
 // # Basic types

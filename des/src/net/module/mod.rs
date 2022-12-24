@@ -136,6 +136,12 @@ pub trait Module: Any {
     #[cfg(feature = "async")]
     fn finish_sim_end(&mut self) {}
 
+    #[cfg(feature = "async")]
+    #[doc(hidden)]
+    fn __indicate_asnyc(&self) -> bool {
+        false
+    }
+
     ///
     /// A callback function that is called should a parameter belonging to
     /// this module be changed.
