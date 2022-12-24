@@ -40,6 +40,7 @@ impl Message {
         MessageBuilder::new()
     }
 
+    #[cfg(feature = "async")]
     pub(crate) fn notify() -> Self {
         Message::new().typ(TYP_NOTIFY).build()
     }

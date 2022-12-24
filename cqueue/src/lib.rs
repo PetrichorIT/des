@@ -217,7 +217,7 @@ impl<E> CQueue<E> {
     /// If it is this function panics.
     ///
     pub fn fetch_next(&mut self) -> (E, Duration) {
-        assert!(self.is_empty(), "Cannot fetch from empty queue");
+        assert!(!self.is_empty(), "Cannot fetch from empty queue");
 
         if let Some((event, time, _)) = self.zero_event_bucket.pop_front() {
             self.len -= 1;
