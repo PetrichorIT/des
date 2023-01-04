@@ -1,3 +1,4 @@
+use std::panic::UnwindSafe;
 use std::sync::atomic::Ordering::SeqCst;
 use std::{any::Any, sync::atomic::AtomicU16, time::Duration};
 
@@ -65,7 +66,11 @@ impl<S: Any, F: Fn(&mut S)> PeriodicPlugin<S, F> {
     }
 }
 
-impl<S: Any, F: Fn(&mut S)> Plugin for PeriodicPlugin<S, F> {
+impl<S: Any, F: Fn(&mut S)> Plugin for PeriodicPlugin<S, F>
+where
+    S: UnwindSafe,
+    F: UnwindSafe,
+{
     fn capture(&mut self, msg: Option<Message>) -> Option<Message> {
         let msg = msg?;
         if msg.header().typ == TYP_HOOK_PERIODIC && msg.header().id == self.unique_id {

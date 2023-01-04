@@ -222,7 +222,7 @@ impl ModuleRef {
                 let mut msg = Some(msg);
                 for plugin in plugins.iter_mut() {
                     if !plugin.just_created {
-                        msg = plugin.capture(msg);
+                        msg = plugin.try_capture(msg);
                     }
                 }
                 msg
@@ -245,7 +245,7 @@ impl ModuleRef {
             with_mod_ctx(|ctx| {
                 for plugin in ctx.plugins.borrow_mut().iter_mut().rev() {
                     if !plugin.just_created {
-                        plugin.defer()
+                        plugin.try_defer()
                     }
                     plugin.just_created = false;
                 }
@@ -275,7 +275,7 @@ impl ModuleRef {
         with_mod_ctx(|ctx| {
             for plugin in ctx.plugins.borrow_mut().iter_mut() {
                 if !plugin.just_created {
-                    plugin.capture_sim_start();
+                    plugin.try_capture_sim_start();
                 }
             }
         });
@@ -288,7 +288,7 @@ impl ModuleRef {
         with_mod_ctx(|ctx| {
             for plugin in ctx.plugins.borrow_mut().iter_mut().rev() {
                 if !plugin.just_created {
-                    plugin.defer_sim_start()
+                    plugin.try_defer_sim_start()
                 }
                 plugin.just_created = false;
             }
@@ -302,7 +302,7 @@ impl ModuleRef {
         with_mod_ctx(|ctx| {
             for plugin in ctx.plugins.borrow_mut().iter_mut() {
                 if !plugin.just_created {
-                    plugin.capture_sim_start();
+                    plugin.try_capture_sim_start();
                 }
             }
         });
@@ -315,7 +315,7 @@ impl ModuleRef {
         with_mod_ctx(|ctx| {
             for plugin in ctx.plugins.borrow_mut().iter_mut().rev() {
                 if !plugin.just_created {
-                    plugin.defer_sim_start()
+                    plugin.try_defer_sim_start()
                 }
                 plugin.just_created = false;
             }
@@ -328,7 +328,7 @@ impl ModuleRef {
         with_mod_ctx(|ctx| {
             for plugin in ctx.plugins.borrow_mut().iter_mut() {
                 if !plugin.just_created {
-                    plugin.capture_sim_end();
+                    plugin.try_capture_sim_end();
                 }
             }
         });
@@ -341,7 +341,7 @@ impl ModuleRef {
         with_mod_ctx(|ctx| {
             for plugin in ctx.plugins.borrow_mut().iter_mut().rev() {
                 if !plugin.just_created {
-                    plugin.defer_sim_end()
+                    plugin.try_defer_sim_end()
                 }
                 plugin.just_created = false;
             }
@@ -355,7 +355,7 @@ impl ModuleRef {
         with_mod_ctx(|ctx| {
             for plugin in ctx.plugins.borrow_mut().iter_mut() {
                 if !plugin.just_created {
-                    plugin.capture_sim_end();
+                    plugin.try_capture_sim_end();
                 }
             }
         });
@@ -368,7 +368,7 @@ impl ModuleRef {
         with_mod_ctx(|ctx| {
             for plugin in ctx.plugins.borrow_mut().iter_mut().rev() {
                 if !plugin.just_created {
-                    plugin.defer_sim_end()
+                    plugin.try_defer_sim_end()
                 }
                 plugin.just_created = false;
             }

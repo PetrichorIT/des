@@ -1,3 +1,5 @@
+use std::panic::UnwindSafe;
+
 use tokio::{
     sim::SimContext,
     time::{SimTime, TimeContext},
@@ -27,6 +29,10 @@ impl TokioTimePlugin {
         }
     }
 }
+
+// # SAFTEY:
+// Once paniced the stored prev varients are no longer used.
+impl UnwindSafe for TokioTimePlugin {}
 
 impl Plugin for TokioTimePlugin {
     fn capture_sim_start(&mut self) {

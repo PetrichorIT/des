@@ -1,5 +1,8 @@
 //! Module Plugins
 
+mod error;
+pub use error::*;
+
 mod periodic;
 pub use periodic::PeriodicPlugin;
 
@@ -13,8 +16,9 @@ cfg_async! {
 
 use crate::net::message::Message;
 use std::{
+    any::{Any, TypeId},
     fmt::Debug,
-    ops::{Deref, DerefMut},
+    panic::{catch_unwind, UnwindSafe},
     sync::atomic::{AtomicUsize, Ordering},
 };
 
@@ -23,7 +27,7 @@ use super::module::{with_mod_ctx, ModuleContext};
 /// A module-specific plugin
 ///
 /// Plugins can be created using [`add_plugin`] and destroyed using [`remove_plugin`].
-pub trait Plugin {
+pub trait Plugin: UnwindSafe {
     /// A message preprocessor which i called whenever a message
     /// arrives.
     ///
@@ -139,6 +143,16 @@ pub fn remove_plugin(plugin: PluginHandle) {
     with_mod_ctx(|ctx| ctx.remove_plugin(plugin));
 }
 
+/// Returns the status of the plugin
+///
+/// # Panics
+///
+/// This function panics, if the plugin was ot defined in the context of this module.
+/// Also panics if executed outside of a module context.
+pub fn plugin_status(plugin: &PluginHandle) -> PluginStatus {
+    with_mod_ctx(|ctx| ctx.plugin_status(plugin))
+}
+
 thread_local! { static PLUGIN_ID: AtomicUsize = const { AtomicUsize::new(0) } }
 
 impl ModuleContext {
@@ -152,7 +166,8 @@ impl ModuleContext {
         let id = PLUGIN_ID.with(|c| c.fetch_add(1, Ordering::SeqCst));
         let entry = PluginEntry {
             id,
-            plugin: Box::new(plugin),
+            state: PluginState::Idle(Box::new(plugin)),
+            typ: TypeId::of::<T>(),
             priority,
             just_created,
         };
@@ -182,30 +197,173 @@ impl ModuleContext {
         if let Some((idx, _)) = plugins.iter().enumerate().find(|(_, e)| e.id == handle.id) {
             plugins.remove(idx);
         } else {
-            panic!("Hook with id #{} not found on this module", handle.id);
+            panic!("Plugin with id #{} not found on this module", handle.id);
         }
     }
+
+    /// Refer to [`plugin_status`].
+    pub fn plugin_status(&self, handle: &PluginHandle) -> PluginStatus {
+        let plugins = self
+            .plugins
+            .try_borrow()
+            .expect("cannot probe plugin while other plugin is active");
+        if let Some((idx, _)) = plugins.iter().enumerate().find(|(_, e)| e.id == handle.id) {
+            if matches!(plugins[idx].state, PluginState::Paniced(_)) {
+                PluginStatus::Paniced
+            } else {
+                PluginStatus::Active
+            }
+        } else {
+            panic!("Plugin with id #{} not found on this module", handle.id);
+        }
+    }
+}
+
+/// The status of plugins.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PluginStatus {
+    /// The plugin is still able to receive and capture data.
+    Active,
+    /// The plugin had a malfuction and paniced.
+    Paniced,
 }
 
 // # INTERNALS
 
 pub(crate) struct PluginEntry {
-    pub(crate) id: usize,
-    pub(crate) plugin: Box<dyn Plugin>,
-    pub(crate) priority: usize,
-    pub(crate) just_created: bool,
+    pub(super) id: usize,
+    pub(super) state: PluginState,
+    pub(super) typ: TypeId,
+    pub(super) priority: usize,
+    pub(super) just_created: bool,
 }
 
-impl Deref for PluginEntry {
-    type Target = Box<dyn Plugin>;
-    fn deref(&self) -> &Self::Target {
-        &self.plugin
+pub(super) enum PluginState {
+    Idle(Box<dyn Plugin>),
+    Running(),
+    Paniced(Box<dyn Any + Send>),
+}
+
+impl PluginState {
+    fn transition_to_runnning(&mut self) -> Option<Box<dyn Plugin>> {
+        let mut swap = Self::Running();
+        std::mem::swap(self, &mut swap);
+        if let Self::Idle(plugin) = swap {
+            Some(plugin)
+        } else {
+            std::mem::swap(self, &mut swap);
+            None
+        }
     }
 }
 
-impl DerefMut for PluginEntry {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.plugin
+impl PluginEntry {
+    pub(super) fn try_capture(&mut self, msg: Option<Message>) -> Option<Message> {
+        if let Some(mut plugin) = self.state.transition_to_runnning() {
+            let result = catch_unwind(|| {
+                let res = plugin.capture(msg);
+                (plugin, res)
+            });
+
+            match result {
+                Ok((plugin, msg)) => {
+                    self.state = PluginState::Idle(plugin);
+                    return msg;
+                }
+                Err(panic) => {
+                    log::error!("Plugin #{} paniced at Plugin::capture", self.id);
+                    self.state = PluginState::Paniced(panic);
+                    return None;
+                }
+            }
+        } else {
+            msg
+        }
+    }
+
+    pub(super) fn try_capture_sim_start(&mut self) {
+        if let Some(mut plugin) = self.state.transition_to_runnning() {
+            let result = catch_unwind(|| {
+                plugin.capture_sim_start();
+                plugin
+            });
+
+            match result {
+                Ok(plugin) => self.state = PluginState::Idle(plugin),
+                Err(panic) => {
+                    log::error!("Plugin #{} paniced at Plugin::capture_sim_start", self.id);
+                    self.state = PluginState::Paniced(panic)
+                }
+            }
+        }
+    }
+
+    pub(super) fn try_capture_sim_end(&mut self) {
+        if let Some(mut plugin) = self.state.transition_to_runnning() {
+            let result = catch_unwind(|| {
+                plugin.capture_sim_end();
+                plugin
+            });
+
+            match result {
+                Ok(plugin) => self.state = PluginState::Idle(plugin),
+                Err(panic) => {
+                    log::error!("Plugin #{} paniced at Plugin::capture_sim_end", self.id);
+                    self.state = PluginState::Paniced(panic)
+                }
+            }
+        }
+    }
+
+    pub(super) fn try_defer(&mut self) {
+        if let Some(mut plugin) = self.state.transition_to_runnning() {
+            let result = catch_unwind(|| {
+                plugin.defer();
+                plugin
+            });
+
+            match result {
+                Ok(plugin) => self.state = PluginState::Idle(plugin),
+                Err(panic) => {
+                    log::error!("Plugin #{} paniced at Plugin::defer", self.id);
+                    self.state = PluginState::Paniced(panic)
+                }
+            }
+        }
+    }
+
+    pub(super) fn try_defer_sim_start(&mut self) {
+        if let Some(mut plugin) = self.state.transition_to_runnning() {
+            let result = catch_unwind(|| {
+                plugin.defer_sim_start();
+                plugin
+            });
+
+            match result {
+                Ok(plugin) => self.state = PluginState::Idle(plugin),
+                Err(panic) => {
+                    log::error!("Plugin #{} paniced at Plugin::defer_sim_start", self.id);
+                    self.state = PluginState::Paniced(panic)
+                }
+            }
+        }
+    }
+
+    pub(super) fn try_defer_sim_end(&mut self) {
+        if let Some(mut plugin) = self.state.transition_to_runnning() {
+            let result = catch_unwind(|| {
+                plugin.defer_sim_end();
+                plugin
+            });
+
+            match result {
+                Ok(plugin) => self.state = PluginState::Idle(plugin),
+                Err(panic) => {
+                    log::error!("Plugin #{} paniced at Plugin::defer_sim_end", self.id);
+                    self.state = PluginState::Paniced(panic)
+                }
+            }
+        }
     }
 }
 
@@ -234,3 +392,5 @@ impl Debug for PluginEntry {
         f.debug_struct("HookEntry").finish()
     }
 }
+
+// # Experimental

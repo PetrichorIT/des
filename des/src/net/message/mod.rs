@@ -4,6 +4,7 @@ use crate::net::{gate::GateRef, module::ModuleId};
 use crate::time::SimTime;
 use std::fmt::Debug;
 use std::net::{IpAddr, SocketAddr};
+use std::panic::UnwindSafe;
 
 mod func;
 pub use func::*;
@@ -281,6 +282,8 @@ impl Message {
 // A message only contains primitve data, ptrs that are threadsafe
 // and a untyped contained value.
 unsafe impl Send for Message {}
+
+impl UnwindSafe for Message {}
 
 ///
 /// A intermediary type for constructing messages.

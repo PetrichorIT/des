@@ -2,12 +2,15 @@
 use des::{
     net::{
         BuildContext, __Buildable0,
-        plugin::{PeriodicPlugin, PluginHandle},
+        plugin::{PeriodicPlugin, PluginError, PluginHandle, PluginStatus},
     },
     prelude::*,
 };
 use serial_test::serial;
-use std::sync::{atomic::AtomicUsize, Arc};
+use std::sync::{
+    atomic::{AtomicBool, AtomicUsize, Ordering::SeqCst},
+    Arc,
+};
 
 mod sample {
     use std::sync::atomic::Ordering::SeqCst;
@@ -319,7 +322,6 @@ impl Plugin for RecursivePlugin {
 
 #[test]
 #[serial]
-#[should_panic = "cannot create new plugin while other plugin is active: BorrowMutError"]
 fn plugin_in_plugin_add() {
     // ScopedLogger::new().finish().unwrap();
 
@@ -332,7 +334,8 @@ fn plugin_in_plugin_add() {
     let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
     let _result = rt.run();
 
-    panic!("Should not have reached this point")
+    // should rach this point;
+    // panic!("Should not have reached this point");
 }
 
 #[NdlModule]
@@ -468,4 +471,158 @@ fn plugin_periodic_plugin() {
     let res = dbg!(rt.run());
     let res = res.unwrap_premature_abort();
     assert_eq!(res.3, 2);
+}
+
+struct PluginErrorPlugin(Arc<AtomicBool>);
+impl Plugin for PluginErrorPlugin {
+    fn capture(&mut self, msg: Option<Message>) -> Option<Message> {
+        if SimTime::now().as_secs() > 20 {
+            panic!("Test-Panic to get plugin error")
+        }
+        self.0.store(true, SeqCst);
+        msg
+    }
+
+    fn defer(&mut self) {
+        self.0.store(false, SeqCst)
+    }
+}
+
+#[NdlModule]
+struct PluginErrorModule {
+    flag: Arc<AtomicBool>,
+    done: bool,
+}
+impl Module for PluginErrorModule {
+    fn new() -> Self {
+        Self {
+            flag: Arc::new(AtomicBool::new(false)),
+            done: false,
+        }
+    }
+
+    fn at_sim_start(&mut self, _stage: usize) {
+        let err = PluginError::expected::<PluginErrorPlugin>();
+        assert_eq!(
+            format!("{err}"),
+            "expected plugin of type plugins::PluginErrorPlugin -- not found"
+        );
+
+        add_plugin(PluginErrorPlugin(self.flag.clone()), 10);
+
+        // 20 valid packet
+        // 1 lost to plugin panic
+        // 1 got through to trigger error
+        for i in 1..23 {
+            schedule_in(Message::new().build(), Duration::from_secs(i))
+        }
+    }
+
+    fn handle_message(&mut self, _msg: Message) {
+        if !self.flag.load(SeqCst) {
+            let err = PluginError::expected::<PluginErrorPlugin>();
+            assert_eq!(
+                format!("{err}"),
+                "expected plugin of type plugins::PluginErrorPlugin -- paniced"
+            );
+            self.done = true;
+        }
+    }
+
+    fn at_sim_end(&mut self) {
+        assert!(self.done)
+    }
+}
+
+#[test]
+#[serial]
+fn plugin_error_expected_t() {
+    // ScopedLogger::new().finish().unwrap();
+
+    let mut rt = NetworkRuntime::new(());
+    let mut cx = BuildContext::new(&mut rt);
+
+    let module =
+        PluginErrorModule::build_named(ObjectPath::root_module("root".to_string()), &mut cx);
+    cx.create_module(module);
+
+    let rt = Runtime::new_with(
+        rt,
+        RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(30))),
+    );
+
+    let res = dbg!(rt.run());
+    let _res = res.unwrap();
+    // assert_eq!(res.3, 2);
+}
+
+struct PluginErrorTriggerPlugin(Arc<AtomicBool>);
+impl Plugin for PluginErrorTriggerPlugin {
+    fn capture(&mut self, msg: Option<Message>) -> Option<Message> {
+        if !self.0.load(SeqCst) {
+            let err = PluginError::expected::<PluginErrorPlugin>();
+            assert_eq!(
+                format!("{err}"),
+                "expected plugin of type plugins::PluginErrorPlugin -- paniced"
+            );
+        }
+        msg
+    }
+
+    fn defer(&mut self) {}
+}
+
+#[NdlModule]
+struct PluginErrorTriggerModule {
+    flag: Arc<AtomicBool>,
+    handles: Vec<PluginHandle>,
+}
+impl Module for PluginErrorTriggerModule {
+    fn new() -> Self {
+        Self {
+            flag: Arc::new(AtomicBool::new(false)),
+            handles: Vec::new(),
+        }
+    }
+
+    fn at_sim_start(&mut self, _stage: usize) {
+        self.handles
+            .push(add_plugin(PluginErrorPlugin(self.flag.clone()), 10));
+        self.handles
+            .push(add_plugin(PluginErrorTriggerPlugin(self.flag.clone()), 100));
+
+        // 20 valid packet
+        // 1 lost to plugin panic
+        // 1 got through to trigger error
+        for i in 1..23 {
+            schedule_in(Message::new().build(), Duration::from_secs(i))
+        }
+    }
+
+    fn at_sim_end(&mut self) {
+        assert_eq!(plugin_status(&self.handles[0]), PluginStatus::Paniced);
+        assert_eq!(plugin_status(&self.handles[1]), PluginStatus::Active);
+    }
+}
+
+#[test]
+#[serial]
+fn plugin_error_expected_t_inside_other_plugin() {
+    // ScopedLogger::new().finish().unwrap();
+
+    let mut rt = NetworkRuntime::new(());
+    let mut cx = BuildContext::new(&mut rt);
+
+    let module =
+        PluginErrorTriggerModule::build_named(ObjectPath::root_module("root".to_string()), &mut cx);
+    cx.create_module(module);
+
+    let rt = Runtime::new_with(
+        rt,
+        RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(30))),
+    );
+
+    let res = rt.run();
+    let _res = res.unwrap();
+    // assert_eq!(res.3, 2);
 }
