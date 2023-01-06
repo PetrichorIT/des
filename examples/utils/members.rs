@@ -14,17 +14,17 @@ impl Module for Alice {
     }
 
     fn handle_message(&mut self, msg: Message) {
-        let mut pkt = msg;
+        let pkt = msg;
         info!(
             "Received at {}: Message with content: {}",
             sim_time(),
             pkt.content::<String>().deref()
         );
 
-        if pkt.header().hop_count > par("limit").unwrap().parse::<usize>().unwrap() {
+        if pkt.content::<String>().len() > par("limit").unwrap().parse::<usize>().unwrap() {
             // TERMINATE
         } else {
-            pkt.register_hop();
+            // pkt.content_mut::<String>().push('#');
             send(pkt, ("netOut", 0))
         }
     }
@@ -66,7 +66,6 @@ impl Module for Bob {
 
     fn handle_message(&mut self, msg: Message) {
         let mut pkt = msg;
-        pkt.register_hop();
 
         info!(
             "Received at {}: Message with content: {}",

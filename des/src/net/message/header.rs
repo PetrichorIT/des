@@ -4,7 +4,6 @@ use crate::net::{gate::GateRef, module::ModuleId};
 use crate::time::SimTime;
 
 use std::fmt::{Debug, Display};
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 
 use super::MessageBody;
@@ -33,30 +32,14 @@ pub type MessageKind = u16;
 pub struct MessageHeader {
     pub(crate) typ: u8,
 
-    pub id: MessageId,
-    pub kind: MessageKind,
+    pub id: MessageId,     // Custom
+    pub kind: MessageKind, // Ethertype
     pub creation_time: SimTime,
     pub send_time: SimTime,
 
-    pub sender_module_id: ModuleId,
-    pub receiver_module_id: ModuleId,
-    pub last_gate: Option<GateRef>,
-
-    pub src_addr: SocketAddr,
-    pub dest_addr: SocketAddr,
-
-    pub version: u8,
-    pub traffic_class: u8,
-    pub flow_label: u32,
-
-    pub next_header: u8,
-    pub ttl: u8,
-    pub hop_count: usize,
-
-    pub seq_no: u32,
-    pub ack_no: u32,
-    pub win_size: u16,
-    pub flags: MessageHeaderFlags,
+    pub sender_module_id: ModuleId,   // MAC src
+    pub receiver_module_id: ModuleId, // MAC dest
+    pub last_gate: Option<GateRef>,   // Path info
 
     // The packet length in bytes.
     pub length: u32,
@@ -85,27 +68,11 @@ impl MessageHeader {
             id: self.id,
             kind: self.kind,
             creation_time: SimTime::now(),
-            send_time: SimTime::MAX,
+            send_time: SimTime::MIN,
 
             sender_module_id: self.sender_module_id,
             receiver_module_id: self.receiver_module_id,
             last_gate: self.last_gate.as_ref().map(Arc::clone),
-
-            src_addr: self.src_addr,
-            dest_addr: self.dest_addr,
-
-            version: self.version,
-            traffic_class: self.traffic_class,
-            flow_label: self.flow_label,
-
-            next_header: self.next_header,
-            ttl: self.ttl,
-            hop_count: self.hop_count,
-
-            seq_no: self.seq_no,
-            ack_no: self.ack_no,
-            win_size: self.win_size,
-            flags: self.flags,
 
             length: self.length,
         }
@@ -120,27 +87,11 @@ impl Default for MessageHeader {
             id: 0,
             kind: 0,
             creation_time: SimTime::now(),
-            send_time: SimTime::MAX,
+            send_time: SimTime::MIN,
 
             sender_module_id: ModuleId::NULL,
             receiver_module_id: ModuleId::NULL,
             last_gate: None,
-
-            src_addr: SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0),
-            dest_addr: SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0),
-
-            version: 4,
-            traffic_class: 0,
-            flow_label: 0,
-
-            next_header: 0,
-            ttl: 64,
-            hop_count: 0,
-
-            seq_no: 0,
-            ack_no: 0,
-            win_size: 0,
-            flags: MessageHeaderFlags::default(),
 
             length: 0,
         }
@@ -151,12 +102,6 @@ impl MessageBody for MessageHeader {
     fn byte_len(&self) -> usize {
         64 // TODO  compute correct header size
     }
-}
-
-/// Flags of a message header.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub struct MessageHeaderFlags {
-    inner: u8,
 }
 
 pub(crate) const TYP_RESTART: u8 = 10;

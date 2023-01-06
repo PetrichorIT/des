@@ -73,6 +73,9 @@ pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<NetworkRuntime
                 gate.service_type() != GateServiceType::Input,
                 "To send messages onto a gate it must have service type of 'Output' or 'Undefined'"
             );
+            // std::thread::sleep(Duration::from_millis(100));
+            // let secs = time.as_secs();
+            // println!("adding message: {} at {}", message.str(), time);
             message.header.sender_module_id = self_id;
             rt.add_event(
                 NetEvents::MessageAtGateEvent(MessageAtGateEvent {

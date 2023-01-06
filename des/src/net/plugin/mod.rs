@@ -7,10 +7,7 @@ mod periodic;
 pub use periodic::PeriodicPlugin;
 
 cfg_async! {
-    mod net;
     mod time;
-
-    pub use net::TokioNetPlugin;
     pub use time::TokioTimePlugin;
 }
 

@@ -26,7 +26,6 @@ fn _default_setup(_: &ModuleContext) {}
 #[cfg(feature = "async")]
 fn _default_setup(this: &ModuleContext) {
     this.add_plugin(TokioTimePlugin::new(this.path.path().to_string()), 0, false);
-    this.add_plugin(TokioNetPlugin::new(), 1, false);
 }
 
 /// INTERNAL

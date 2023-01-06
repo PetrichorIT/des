@@ -19,10 +19,10 @@ impl Module for Alice {
             pkt.content::<String>().deref()
         );
 
-        if pkt.header().hop_count > 100_000 {
+        if pkt.header().id > 60_000 {
             // TERMINATE
         } else {
-            pkt.register_hop();
+            pkt.header_mut().id += 1;
             send(pkt, ("netOut", 0))
         }
     }
@@ -46,13 +46,14 @@ impl Module for Bob {
                     .kind(1)
                     // .src(0x7f_00_00_01, 80)
                     // .dest(0x7f_00_00_02, 80)
+                    .id(0)
                     .content("Ping".to_string())
                     .build(),
                 ("netOut", 2),
             );
         } else {
             let mut pkt = msg;
-            pkt.register_hop();
+            pkt.header_mut().id += 1;
 
             info!(
                 "Received at {}: Message with content: {}",

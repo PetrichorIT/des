@@ -23,7 +23,8 @@ pub fn send(msg: impl Into<Message>, gate: impl IntoModuleGate) {
 ///
 #[allow(clippy::needless_pass_by_value)]
 pub fn send_in(msg: impl Into<Message>, gate: impl IntoModuleGate, dur: Duration) {
-    self::send_at(msg, gate, SimTime::now() + dur);
+    let deadline = SimTime::now() + dur;
+    self::send_at(msg, gate, deadline);
 }
 ///
 /// Sends a message onto a given gate at the sepcified time. This operation will be performed after
