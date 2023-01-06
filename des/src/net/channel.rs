@@ -6,7 +6,7 @@ use rand::prelude::StdRng;
 use rand::Rng;
 use std::cell::RefCell;
 use std::collections::VecDeque;
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 use std::sync::Arc;
 
 use crate::net::runtime::ChannelUnbusyNotif;
@@ -120,7 +120,6 @@ impl Eq for ChannelMetrics {}
 ///
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-#[derive(Debug)]
 pub struct Channel {
     inner: RefCell<ChannelInner>,
 }
@@ -346,5 +345,37 @@ impl Channel {
             drop(chan);
             self.send_message(msg, &next_gate, rt);
         }
+    }
+}
+
+#[derive(Debug)]
+#[allow(unused)]
+enum FmtChannelState {
+    Idle,
+    Busy { until: SimTime, buffer: usize },
+}
+
+impl FmtChannelState {
+    fn from(channel: &ChannelInner) -> Self {
+        if channel.busy {
+            Self::Busy {
+                until: channel.transmission_finish_time,
+                buffer: channel.buffer.len(),
+            }
+        } else {
+            Self::Idle
+        }
+    }
+}
+
+impl Debug for Channel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let this = self.inner.borrow();
+
+        f.debug_struct("Channel")
+            .field("path", &this.path)
+            .field("metrics", &this.metrics)
+            .field("state", &FmtChannelState::from(&*this))
+            .finish()
     }
 }

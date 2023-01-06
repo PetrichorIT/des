@@ -34,7 +34,7 @@ pub enum GateServiceType {
 ///
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Gate {
     owner: ModuleRefWeak,
     name: String,
@@ -239,6 +239,18 @@ impl Gate {
             this.set_next_gate(next_gate);
         }
         this
+    }
+}
+
+impl Debug for Gate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Gate")
+            .field("path", &self.path())
+            .field("typ", &self.typ)
+            .field("next", &self.next_gate.borrow().as_ref().map(|_| ()))
+            .field("prev", &self.previous_gate.borrow().as_ref().map(|_| ()))
+            .field("channel", &self.channel.borrow())
+            .finish()
     }
 }
 
