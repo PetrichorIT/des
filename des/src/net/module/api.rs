@@ -115,3 +115,11 @@ pub fn par(key: &str) -> ParHandle<Optional> {
         .parameters
         .get_handle(self::module_path().path(), key)
 }
+
+///
+/// Returns a parameter by reference (not parsed).
+///
+#[must_use]
+pub fn par_for(key: &str, module: &str) -> ParHandle<Optional> {
+    globals().parameters.get_handle(module, key)
+}
