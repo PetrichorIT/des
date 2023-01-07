@@ -77,7 +77,7 @@ impl Module for MultiRunner {
 #[derive(Debug, Default)]
 struct Main();
 fn main() {
-    ScopedLogger::new().finish().unwrap();
+    Logger::new().finish().unwrap();
     let app = Main::default().build_rt();
 
     // println!("{:?}", app.globals().parameters);

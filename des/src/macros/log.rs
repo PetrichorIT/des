@@ -2,10 +2,10 @@
 
 macro_rules! log_scope {
     () => {
-        $crate::runtime::ScopedLogger::end_scope()
+        $crate::runtime::Logger::end_scope()
     };
     ($i: expr) => {
-        $crate::runtime::ScopedLogger::begin_scope($i);
+        $crate::runtime::Logger::begin_scope($i);
     };
     ($i: expr, $s: expr) => {
         $crate::runtime::ScopedLogger::begin_scope(format!("{}: {}", $i, $s));

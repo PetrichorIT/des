@@ -16,36 +16,42 @@ pub enum LogFormat {
 const PARENS_COLOR: Color = Color::Rgb(0x7f, 0x8c, 0x8d);
 
 impl LogFormat {
-    pub(super) fn fmt(self, record: &LogRecord, mut out: StandardStream) {
+    pub(super) fn fmt(self, record: &LogRecord, mut out: StandardStream) -> std::io::Result<()> {
         match self {
             Self::ColorFull => {
-                out.set_color(ColorSpec::new().set_fg(Some(PARENS_COLOR)))
-                    .expect("Failed to set color on output stream");
-
-                write!(&mut out, "[ ").expect("Failed to write to output stream");
+                out.set_color(ColorSpec::new().set_fg(Some(PARENS_COLOR)))?;
+                write!(&mut out, "[ ")?;
 
                 // [ time ... target ] max 10 max 14
                 let time = format!("{}", record.time);
-                write!(&mut out, "{time:^5}").expect("Failed to write to output stream");
-                write!(&mut out, " ] ").expect("Failed to write to output stream");
+                write!(&mut out, "{time:^5}")?;
+                write!(&mut out, " ] ")?;
 
-                out.set_color(ColorSpec::new().set_fg(Some(get_level_color(record.level))))
-                    .expect("Failed to set color on output stream");
+                out.set_color(ColorSpec::new().set_fg(Some(get_level_color(record.level))))?;
 
-                write!(&mut out, "{}: ", record.target).expect("Failed to write to output stream");
+                write!(&mut out, "{}", record.scope)?;
+                out.set_color(
+                    ColorSpec::new()
+                        .set_fg(Some(get_level_color(record.level)))
+                        .set_bold(true),
+                )?;
+                write!(&mut out, "{}: ", record.target)?;
 
-                out.reset().expect("Failed to reset output stream");
+                out.reset()?;
+                writeln!(&mut out, "{}", record.msg)?;
 
-                writeln!(&mut out, "{}", record.msg).expect("Failed to write to output stream");
+                Ok(())
             }
             Self::FileOutput => {
-                write!(&mut out, "[ ").expect("Failed to write to output stream");
+                write!(&mut out, "[ ")?;
                 // [ time ... target ] max 10 max 14
                 let time = format!("{}", record.time);
-                write!(&mut out, "{time:^5}").expect("Failed to write to output stream");
-                write!(&mut out, " ] ").expect("Failed to write to output stream");
-                write!(&mut out, "{}: ", record.target).expect("Failed to write to output stream");
-                writeln!(&mut out, "{}", record.msg).expect("Failed to write to output stream");
+                write!(&mut out, "{time:^5}")?;
+                write!(&mut out, " ] ")?;
+                write!(&mut out, "{}{}: ", record.scope, record.target)?;
+                writeln!(&mut out, "{}", record.msg)?;
+
+                Ok(())
             }
         }
     }

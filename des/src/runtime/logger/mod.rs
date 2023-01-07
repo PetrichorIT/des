@@ -1,7 +1,7 @@
 use std::{
     cell::{RefCell, UnsafeCell},
-    collections::{HashMap, LinkedList},
-    fmt::Debug,
+    collections::HashMap,
+    fmt::{Arguments, Debug},
     sync::Arc,
 };
 
@@ -10,7 +10,7 @@ mod fmt;
 mod record;
 
 pub use fmt::LogFormat;
-pub use record::LogRecord;
+use record::LogRecord;
 
 use crate::time::SimTime;
 use log::{Level, LevelFilter, Log, SetLoggerError};
@@ -18,17 +18,17 @@ use termcolor::{ColorChoice, StandardStream};
 
 use self::env::LogEnvOptions;
 
-static SCOPED_LOGGER: ScopedLoggerWrap = ScopedLoggerWrap::uninitalized();
+static SCOPED_LOGGER: LoggerWrap = LoggerWrap::uninitalized();
 
 thread_local! {
     pub(crate) static CURRENT_SCOPE: RefCell<Option<&'static str>> = const { RefCell::new(None) }
 }
 
-struct ScopedLoggerWrap {
-    inner: UnsafeCell<Option<ScopedLogger>>,
+struct LoggerWrap {
+    inner: UnsafeCell<Option<Logger>>,
 }
 
-impl ScopedLoggerWrap {
+impl LoggerWrap {
     const fn uninitalized() -> Self {
         Self {
             inner: UnsafeCell::new(None),
@@ -40,12 +40,12 @@ impl ScopedLoggerWrap {
         *old_inner = None;
     }
 
-    fn reset_contents(&self, new: ScopedLogger) {
+    fn reset_contents(&self, new: Logger) {
         let old_inner = unsafe { &mut *self.inner.get() };
         old_inner.as_mut().unwrap().reset_contents(new);
     }
 
-    fn set(&self, inner: ScopedLogger) -> Option<ScopedLogger> {
+    fn set(&self, inner: Logger) -> Option<Logger> {
         let old_inner = unsafe { &mut *self.inner.get() };
         old_inner.replace(inner)
     }
@@ -64,7 +64,7 @@ impl ScopedLoggerWrap {
     }
 }
 
-impl Log for ScopedLoggerWrap {
+impl Log for LoggerWrap {
     fn enabled(&self, metadata: &log::Metadata) -> bool {
         unsafe {
             let inner = &*self.inner.get();
@@ -87,11 +87,11 @@ impl Log for ScopedLoggerWrap {
     }
 }
 
-unsafe impl Send for ScopedLoggerWrap {}
-unsafe impl Sync for ScopedLoggerWrap {}
+unsafe impl Send for LoggerWrap {}
+unsafe impl Sync for LoggerWrap {}
 
 /// A logger that collects scope specific messages.
-pub struct ScopedLogger {
+pub struct Logger {
     active: bool,
     scopes: UnsafeCell<HashMap<String, LoggerScope>>,
 
@@ -99,12 +99,10 @@ pub struct ScopedLogger {
     stderr_policy: Box<dyn Fn(&str) -> bool>,
 
     interal_max_level: LevelFilter,
-    ignore_custom_target: bool,
-
     env: LogEnvOptions,
 }
 
-impl ScopedLogger {
+impl Logger {
     /// Creates a new Logger (builder).
     #[must_use]
     pub fn new() -> Self {
@@ -116,7 +114,6 @@ impl ScopedLogger {
             stderr_policy: Box::new(|_| true),
 
             interal_max_level: LevelFilter::Trace,
-            ignore_custom_target: false,
 
             env: LogEnvOptions::new(),
         }
@@ -133,7 +130,6 @@ impl ScopedLogger {
             stderr_policy: Box::new(|_| false),
 
             interal_max_level: LevelFilter::Trace,
-            ignore_custom_target: false,
 
             env: LogEnvOptions::new(),
         }
@@ -192,13 +188,6 @@ impl ScopedLogger {
         self
     }
 
-    /// Sets the logger to ignore arguments for custom log targets
-    #[must_use]
-    pub fn ignore_custom_target(mut self, ingore: bool) -> Self {
-        self.ignore_custom_target = ingore;
-        self
-    }
-
     /// Connects the logger to the logging framework.
     ///
     /// # Errors
@@ -241,98 +230,97 @@ impl ScopedLogger {
     }
 }
 
-unsafe impl Send for ScopedLogger {}
-unsafe impl Sync for ScopedLogger {}
+unsafe impl Send for Logger {}
+unsafe impl Sync for Logger {}
 
-impl Debug for ScopedLogger {
+impl Debug for Logger {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "ScopedLogger {{ ... }}")
     }
 }
 
-impl Default for ScopedLogger {
+impl Default for Logger {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Log for ScopedLogger {
+impl Log for Logger {
     fn enabled(&self, metadata: &log::Metadata) -> bool {
         self.active && metadata.level() <= log::STATIC_MAX_LEVEL
     }
 
     fn log(&self, record: &log::Record) {
+        // (0) Check general activity metadata
         if !self.enabled(record.metadata()) {
             return;
         }
 
+        // (1) If the source is internal (but still marked) add this filter
         let source_is_internal = record.module_path().map_or(false, |s| s.starts_with("des"));
         if source_is_internal && record.level() > self.interal_max_level {
             return;
         }
 
+        // (2) Get scopes by ptr
         let scopes = unsafe { &mut *self.scopes.get() };
 
+        // (3) Get target pointer
         let target_is_module_path = Some(record.metadata().target()) == record.module_path();
-        let (target, appendix) = if target_is_module_path {
-            if let Some(v) = CURRENT_SCOPE.with(|c| *c.borrow()) {
-                (v, String::new())
-            } else {
-                let policy = match record.level() {
-                    Level::Error | Level::Warn => &self.stderr_policy,
-                    _ => &self.stdout_policy,
-                };
-
-                if policy(record.target()) {
-                    // No target scope was given --- not scoped println.
-                    let out = match record.level() {
-                        Level::Error | Level::Warn => StandardStream::stderr(ColorChoice::Always),
-                        _ => StandardStream::stdout(ColorChoice::Always),
-                    };
-
-                    let record = LogRecord {
-                        target: Arc::new(record.target().to_string()),
-                        level: record.level(),
-                        time: SimTime::now(),
-                        msg: format!("{}", record.args()),
-                    };
-
-                    LogFormat::fmt(LogFormat::ColorFull, &record, out);
-                    // record.log(out);
-                }
-                return;
-            }
-        } else if self.ignore_custom_target {
-            if let Some(v) = CURRENT_SCOPE.with(|c| *c.borrow()) {
-                (v, format!("{}: ", record.target()))
-            } else {
-                (record.target(), String::new())
-            }
+        let target_label = if target_is_module_path {
+            String::new()
         } else {
-            (record.target(), String::new())
+            format!(" ({})", record.metadata().target())
         };
 
-        let scope = scopes.get_mut(target);
+        // (4) Get scope or make defeault print based on the target marker.
+        let Some(scope_label) = CURRENT_SCOPE.with(|c| *c.borrow()) else {
+            let policy = match record.level() {
+                Level::Error | Level::Warn => &self.stderr_policy,
+                _ => &self.stdout_policy,
+            };
+
+            if policy(record.target()) {
+                // No target scope was given --- not scoped println.
+                let out = match record.level() {
+                    Level::Error | Level::Warn => StandardStream::stderr(ColorChoice::Always),
+                    _ => StandardStream::stdout(ColorChoice::Always),
+                };
+
+                let record = LogRecord {
+                    scope: Arc::new(record.target().to_string()),
+                    target: target_label,
+                    level: record.level(),
+                    time: SimTime::now(),
+                    msg: record.args(),
+                };
+
+                LogFormat::fmt(LogFormat::ColorFull, &record, out).expect("Failed to write record to output stream");
+                // record.log(out);
+            }
+            return;
+        };
+
+        // (5) Fetch scope information
+        let scope = scopes.get_mut(scope_label);
         if let Some(scope) = scope {
-            let text = format!("{}{}", appendix, record.args());
-            scope.log(text, record.level());
+            scope.log(record.args(), target_label, record.level());
         } else {
             // TODO: Check target validity
             let stdout = &self.stdout_policy;
             let stderr = &self.stderr_policy;
 
             let mut new_scope = LoggerScope {
-                target: Arc::new(target.to_string()),
-                stream: LinkedList::new(),
+                target: Arc::new(scope_label.to_string()),
                 fwd_stdout: stdout(record.target()),
                 fwd_stderr: stderr(record.target()),
-                filter: self.env.level_filter_for(target),
+                filter: self.env.level_filter_for(scope_label),
             };
 
-            new_scope.log(format!("{}{}", appendix, record.args()), record.level());
+            new_scope.log(record.args(), target_label, record.level());
 
             let scopes = unsafe { &mut *self.scopes.get() };
-            scopes.insert(target.to_string(), new_scope);
+            scopes.insert(scope_label.to_string(), new_scope);
         }
     }
 
@@ -343,17 +331,14 @@ impl Log for ScopedLogger {
 #[derive(Debug)]
 pub struct LoggerScope {
     /// The target identifier for the current logger.
-    pub target: Arc<String>,
-    /// The stream of logs.
-    pub stream: LinkedList<LogRecord>,
-
+    target: Arc<String>,
     fwd_stdout: bool,
     fwd_stderr: bool,
     filter: LevelFilter,
 }
 
 impl LoggerScope {
-    fn log(&mut self, msg: String, level: Level) {
+    fn log(&mut self, msg: &Arguments, target: String, level: Level) {
         if level > self.filter {
             return;
         }
@@ -372,12 +357,12 @@ impl LoggerScope {
             msg,
             level,
             time: SimTime::now(),
-            target: self.target.clone(),
+            scope: self.target.clone(),
+            target,
         };
         if let Some(out) = out {
-            LogFormat::fmt(LogFormat::ColorFull, &record, out);
+            LogFormat::fmt(LogFormat::ColorFull, &record, out)
+                .expect("Failed to write record to output stream");
         }
-
-        self.stream.push_back(record);
     }
 }
