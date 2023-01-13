@@ -53,6 +53,7 @@ pub(crate) static RNG: SyncWrap<UnsafeCell<Option<StdRng>>> = SyncWrap::new(Unsa
 ///
 #[inline]
 #[must_use]
+#[deprecated]
 pub fn sim_time() -> SimTime {
     SimTime::now()
 }

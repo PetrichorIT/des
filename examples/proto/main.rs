@@ -77,7 +77,7 @@ impl Module for MultiRunner {
 #[derive(Debug, Default)]
 struct Main();
 fn main() {
-    Logger::new().finish().unwrap();
+    Logger::new().try_set_logger().unwrap();
     let app = Main::default().build_rt();
 
     // println!("{:?}", app.globals().parameters);

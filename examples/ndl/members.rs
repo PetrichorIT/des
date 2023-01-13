@@ -15,7 +15,7 @@ impl Module for Alice {
         let mut pkt = msg;
         info!(
             "Received at {}: Message with content: {}",
-            sim_time(),
+            SimTime::now(),
             pkt.content::<String>().deref()
         );
 
@@ -57,7 +57,7 @@ impl Module for Bob {
 
             info!(
                 "Received at {}: Message with content: {}",
-                sim_time(),
+                SimTime::now(),
                 pkt.content::<String>().deref()
             );
 

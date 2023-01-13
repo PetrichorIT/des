@@ -8,7 +8,7 @@ pub use modules::*;
 struct Main();
 
 fn main() {
-    Logger::new().finish().unwrap();
+    Logger::new().try_set_logger().unwrap();
 
     let app = Main::default().build_rt();
 

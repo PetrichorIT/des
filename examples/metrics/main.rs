@@ -40,7 +40,7 @@ fn main() {
     Logger::new()
         .active(true)
         .interal_max_log_level(log::LevelFilter::Warn)
-        .finish()
+        .try_set_logger()
         .expect("Failed to set logger");
 
     Main::default().run_with_options(RuntimeOptions::seeded(123).max_itr(1000));

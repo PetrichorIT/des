@@ -1,4 +1,4 @@
-use std::{fmt::Arguments, sync::Arc};
+use std::sync::Arc;
 
 use log::Level;
 
@@ -6,15 +6,15 @@ use crate::time::SimTime;
 
 /// A logging record.
 #[derive(Debug)]
-pub(super) struct LogRecord<'a> {
+pub struct LogRecord {
     /// The custom target if exisitent
-    pub(super) target: String,
+    pub target: String,
     /// The target of the log message.
-    pub(super) scope: Arc<String>,
+    pub scope: Arc<String>,
     /// The temporal origin point.
-    pub(super) time: SimTime,
+    pub time: SimTime,
     /// The message formated with the std formater
-    pub(super) msg: &'a Arguments<'a>,
+    pub msg: String,
     /// The original log level.
-    pub(super) level: Level,
+    pub level: Level,
 }

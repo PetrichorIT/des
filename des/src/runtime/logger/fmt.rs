@@ -1,6 +1,6 @@
 use log::Level;
 use std::io::Write;
-use termcolor::{Color, ColorSpec, StandardStream, WriteColor};
+use termcolor::{Buffer, Color, ColorSpec, WriteColor};
 
 use super::LogRecord;
 
@@ -10,46 +10,47 @@ pub enum LogFormat {
     /// Outputs records using ANSI color code for a terminal.
     ColorFull,
     /// Outputs records in a only ASCII format for storage in files.
-    FileOutput,
+    NoColor,
 }
 
 const PARENS_COLOR: Color = Color::Rgb(0x7f, 0x8c, 0x8d);
 
 impl LogFormat {
-    pub(super) fn fmt(self, record: &LogRecord, mut out: StandardStream) -> std::io::Result<()> {
+    pub(super) fn fmt(self, record: &LogRecord, out: &mut Buffer) -> std::io::Result<()> {
         match self {
             Self::ColorFull => {
                 out.set_color(ColorSpec::new().set_fg(Some(PARENS_COLOR)))?;
-                write!(&mut out, "[ ")?;
+                write!(out, "[ ")?;
 
                 // [ time ... target ] max 10 max 14
                 let time = format!("{}", record.time);
-                write!(&mut out, "{time:^5}")?;
-                write!(&mut out, " ] ")?;
+                write!(out, "{time:^5}")?;
+                write!(out, " ] ")?;
 
                 out.set_color(ColorSpec::new().set_fg(Some(get_level_color(record.level))))?;
 
-                write!(&mut out, "{}", record.scope)?;
+                write!(out, "{}", record.scope)?;
                 out.set_color(
                     ColorSpec::new()
                         .set_fg(Some(get_level_color(record.level)))
                         .set_bold(true),
                 )?;
-                write!(&mut out, "{}: ", record.target)?;
+                write!(out, "{}: ", record.target)?;
 
                 out.reset()?;
-                writeln!(&mut out, "{}", record.msg)?;
+                writeln!(out, "{}", record.msg)?;
 
                 Ok(())
             }
-            Self::FileOutput => {
-                write!(&mut out, "[ ")?;
+            Self::NoColor => {
+                write!(out, "[ ")?;
                 // [ time ... target ] max 10 max 14
                 let time = format!("{}", record.time);
-                write!(&mut out, "{time:^5}")?;
-                write!(&mut out, " ] ")?;
-                write!(&mut out, "{}{}: ", record.scope, record.target)?;
-                writeln!(&mut out, "{}", record.msg)?;
+                write!(out, "{time:^5}")?;
+                write!(out, " ] ")?;
+                write!(out, "{} ", record.level)?;
+                write!(out, "{}{}: ", record.scope, record.target)?;
+                writeln!(out, "{}", record.msg)?;
 
                 Ok(())
             }

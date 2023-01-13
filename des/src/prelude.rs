@@ -19,6 +19,8 @@ pub use crate::runtime::EventSet;
 
 pub use crate::runtime::random;
 pub use crate::runtime::sample;
+
+#[allow(deprecated)]
 pub use crate::runtime::sim_time;
 
 pub use crate::runtime::Logger;

@@ -12,7 +12,7 @@ impl Module for Alice {
 
     fn handle_message(&mut self, msg: Message) {
         let (str, meta) = msg.cast::<String>();
-        info!(target: "Alice", "Received at {}: message #{:?} content: {}", sim_time(), meta.id, str);
+        info!(target: "Alice", "Received at {}: message #{:?} content: {}", SimTime::now(), meta.id, str);
 
         send(
             Message::new().content("Pong".to_string()).build(),
