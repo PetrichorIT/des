@@ -10,10 +10,10 @@ use des::runtime::*;
 use log::LevelFilter;
 use serial_test::serial;
 
-#[serial]
 #[test]
+#[serial]
 fn initialize_logger() {
-    Logger::new()
+    Logger::debug()
         .try_set_logger()
         .expect("Failed to create and attach logger")
 }
@@ -25,6 +25,7 @@ struct DebugOutput {
 
 impl LogOutput for DebugOutput {
     fn write(&mut self, record: &LogRecord, fmt: LogFormat) -> std::io::Result<()> {
+        println!("{:?}", record);
         self.inner.lock().unwrap().write(record, fmt)
     }
 }
@@ -57,8 +58,8 @@ impl Module for Counter {
     }
 }
 
-#[serial]
 #[test]
+#[serial]
 fn one_module_linear_logger() {
     let output = DebugOutput::default();
     struct DebugPolicy {
@@ -70,7 +71,7 @@ fn one_module_linear_logger() {
         }
     }
 
-    Logger::new()
+    Logger::debug()
         .interal_max_log_level(LevelFilter::Warn)
         .policy_object(DebugPolicy {
             output: output.clone(),
@@ -114,8 +115,8 @@ fn one_module_linear_logger() {
     }
 }
 
-#[serial]
 #[test]
+#[serial]
 fn multiple_module_linear_logger() {
     let output0 = DebugOutput::default();
     let output1 = DebugOutput::default();
@@ -133,7 +134,7 @@ fn multiple_module_linear_logger() {
         }
     }
 
-    Logger::new()
+    Logger::debug()
         .interal_max_log_level(LevelFilter::Warn)
         .policy_object(DebugPolicy {
             output0: output0.clone(),
@@ -180,6 +181,88 @@ fn multiple_module_linear_logger() {
                     i
                 )
             )
+        }
+    }
+}
+
+#[test]
+#[serial]
+fn multiple_module_linear_logger_filters() {
+    let output0 = DebugOutput::default();
+    let output1 = DebugOutput::default();
+    struct DebugPolicy {
+        output0: DebugOutput,
+        output1: DebugOutput,
+    }
+    impl LogScopeConfigurationPolicy for DebugPolicy {
+        fn configure(&self, scope: &str) -> (Box<dyn LogOutput>, LogFormat) {
+            match scope {
+                "node0" => (Box::new(self.output0.clone()), LogFormat::NoColor),
+                "node1" => (Box::new(self.output1.clone()), LogFormat::NoColor),
+                _ => unreachable!(),
+            }
+        }
+    }
+
+    let logger = Logger::debug()
+        .interal_max_log_level(LevelFilter::Warn)
+        .policy_object(DebugPolicy {
+            output0: output0.clone(),
+            output1: output1.clone(),
+        })
+        .add_filters("*=info,node0=warn");
+    println!("{:?}", logger);
+
+    logger.try_set_logger().unwrap();
+
+    let mut app = NetworkRuntime::new(());
+    let mut cx = BuildContext::new(&mut app);
+
+    let node0 = Counter::build_named(ObjectPath::root_module("node0"), &mut cx);
+    cx.create_module(node0);
+
+    let node1 = Counter::build_named(ObjectPath::root_module("node1"), &mut cx);
+    cx.create_module(node1);
+
+    let rt = Runtime::new_with(
+        app,
+        RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(30))),
+    );
+    let _ = rt.run().unwrap_premature_abort();
+
+    for (output, path) in [(output0, "node0"), (output1, "node1")] {
+        let lock = output.inner.lock().unwrap();
+        // assert_eq!(lock.len(), 31);
+        // println!("{lock:?}");
+        let mut j = 0;
+        for i in 0..31 {
+            let level = match i % 5 {
+                0 => "TRACE",
+                1 => "DEBUG",
+                2 => "INFO",
+                3 => "WARN",
+                4 => "ERROR",
+                _ => unreachable!(),
+            };
+            if (i % 5) < 2 {
+                continue;
+            }
+            if path == "node0" && (i % 5) < 3 {
+                continue;
+            }
+
+            println!("{j} @ {level}");
+            assert_eq!(
+                lock[j],
+                format!(
+                    "[ {:^5} ] {} {}: {}\n",
+                    SimTime::from_duration(Duration::from_secs(i as u64)),
+                    level,
+                    path,
+                    i
+                )
+            );
+            j += 1;
         }
     }
 }

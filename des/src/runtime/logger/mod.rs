@@ -6,10 +6,10 @@ use std::{
     sync::Arc,
 };
 
-mod env;
 mod fmt;
 mod output;
 mod record;
+mod filter;
 
 pub use fmt::LogFormat;
 pub use record::LogRecord;
@@ -19,7 +19,8 @@ use crate::time::SimTime;
 use log::{Level, LevelFilter, Log, SetLoggerError};
 use termcolor::{ColorChoice, BufferWriter};
 
-use self::env::LogEnvOptions;
+use self::filter::FilterPolicy;
+
 
 static SCOPED_LOGGER: LoggerWrap = LoggerWrap::uninitalized();
 
@@ -87,7 +88,7 @@ pub struct Logger {
     scopes: RefCell<HashMap<String, LoggerScope>>,
     policy: Box<dyn LogScopeConfigurationPolicy>,
     interal_max_level: LevelFilter,
-    env: LogEnvOptions,
+    filter: FilterPolicy,
 }
 
 
@@ -111,14 +112,7 @@ pub type LogScopeConfigurationPolicyFn = dyn Fn(&str) -> (Box<dyn LogOutput>, Lo
 struct DefaultPolicy;
 impl LogScopeConfigurationPolicy for DefaultPolicy{
     fn configure(&self, _scope: &str) -> (Box<dyn LogOutput>, LogFormat) {
-        (Box::new((stdout(), stderr())), LogFormat::ColorFull)
-    }
-}
-
-struct QuietPolicy;
-impl LogScopeConfigurationPolicy for QuietPolicy{
-    fn configure(&self, _scope: &str) -> (Box<dyn LogOutput>, LogFormat) {
-        (Box::new(()), LogFormat::ColorFull)
+        (Box::new((stdout(), stderr())), LogFormat::Color)
     }
 }
 
@@ -132,19 +126,21 @@ impl Logger {
             active: true,
             policy: Box::new(DefaultPolicy),
             interal_max_level: LevelFilter::Warn,
-            env: LogEnvOptions::new(),
+            filter: FilterPolicy::new(true),
         }
     }
 
-    /// A logger that does not forward logs to stdout or stderr
+
+    /// Creates a new Logger (builder) debug.
     #[must_use]
-    pub fn quiet() -> Self {
+    #[doc(hidden)]
+    pub fn debug() -> Self {
         Self {
             scopes: RefCell::new(HashMap::new()),
             active: true,
-            policy: Box::new(QuietPolicy),
+            policy: Box::new(DefaultPolicy),
             interal_max_level: LevelFilter::Warn,
-            env: LogEnvOptions::new(),
+            filter: FilterPolicy::new(false),
         }
     }
 
@@ -167,6 +163,13 @@ impl Logger {
         if self.active {
             *self = new;
         }
+    }
+
+    /// Adds a filter to the policy.
+    #[must_use]
+    pub fn add_filters(mut self, s: &str) -> Self {
+        self.filter.parse_str(s);
+        self
     }
 
     /// Sets the loggers activity status.
@@ -252,7 +255,7 @@ unsafe impl Sync for Logger {}
 
 impl Debug for Logger {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "ScopedLogger {{ ... }}")
+        f.debug_struct("Logger").field("filters", &self.filter).field("internal", &self.interal_max_level).field("scopes", &self.scopes.borrow().keys()).finish()
     }
 }
 
@@ -317,7 +320,7 @@ impl Log for Logger {
                     msg: format!("{}", record.args()),
                 };
 
-                LogFormat::fmt(LogFormat::ColorFull, &record, &mut buffer)
+                LogFormat::fmt(LogFormat::Color, &record, &mut buffer)
                     .expect("Failed to write record to output stream");
                 out.print(&buffer)
                     .expect("Failed to write to output buffer");
@@ -338,7 +341,7 @@ impl Log for Logger {
                 scope: Arc::new(scope_label.to_string()),
                 output,
                 fmt,
-                filter: self.env.level_filter_for(scope_label),
+                filter: dbg!(self.filter.filter_for(scope_label, LevelFilter::max())),
             };
 
             new_scope.log(format!("{}", record.args()), target_label, record.level());

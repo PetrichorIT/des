@@ -33,8 +33,8 @@ impl Module for DropChanModule {
     }
 }
 
-#[serial]
 #[test]
+#[serial]
 fn channel_dropping_message() {
     let mut rt = NetworkRuntime::new(());
     let mut cx = BuildContext::new(&mut rt);
@@ -97,8 +97,8 @@ impl Module for BufferChanModule {
     }
 }
 
-#[serial]
 #[test]
+#[serial]
 fn channel_buffering_message() {
     let mut rt = NetworkRuntime::new(());
     let mut cx = BuildContext::new(&mut rt);

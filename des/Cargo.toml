@@ -40,7 +40,6 @@ termcolor = "1.1"
 # Rand primives must be set since they are bound to the
 # runtime and sould be seedable by the user.
 rand = {version = "*", features = ["std_rng"]}
-
 sysinfo = "*"
 
 # All other dependencies are optional

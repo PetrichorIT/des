@@ -8,7 +8,7 @@ use super::LogRecord;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum LogFormat {
     /// Outputs records using ANSI color code for a terminal.
-    ColorFull,
+    Color,
     /// Outputs records in a only ASCII format for storage in files.
     NoColor,
 }
@@ -18,7 +18,7 @@ const PARENS_COLOR: Color = Color::Rgb(0x7f, 0x8c, 0x8d);
 impl LogFormat {
     pub(super) fn fmt(self, record: &LogRecord, out: &mut Buffer) -> std::io::Result<()> {
         match self {
-            Self::ColorFull => {
+            Self::Color => {
                 out.set_color(ColorSpec::new().set_fg(Some(PARENS_COLOR)))?;
                 write!(out, "[ ")?;
 

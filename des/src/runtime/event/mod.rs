@@ -1,5 +1,5 @@
 mod event_set;
-mod primitives;
+mod types;
 
 pub(crate) use event_set::*;
-pub use primitives::*;
+pub use types::*;
