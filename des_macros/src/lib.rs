@@ -20,9 +20,14 @@ use syn::{parse_macro_input, AttributeArgs, DeriveInput};
 #[proc_macro_derive(MessageBody)]
 #[proc_macro_error]
 pub fn derive_message_body(input: TokenStream) -> TokenStream {
-    let DeriveInput { ident, data, .. } = parse_macro_input!(input);
+    let DeriveInput {
+        ident,
+        data,
+        generics,
+        ..
+    } = parse_macro_input!(input);
 
-    match des_macros_core::message_body_derive_impl(ident, data) {
+    match des_macros_core::message_body_derive_impl(ident, data, generics) {
         Ok(ts) => ts.into(),
         Err(e) => e.abort(),
     }
