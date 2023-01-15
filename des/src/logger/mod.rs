@@ -1,3 +1,5 @@
+//! A simulation specific logger.
+
 use std::{
     cell::{RefCell, UnsafeCell},
     collections::HashMap,
@@ -92,11 +94,10 @@ pub struct Logger {
 }
 
 
-/// A policy object.
-
-#[cfg(debug_assertions)]
-#[doc(hidden)]
+/// An object to define a logger configuration policy.
 pub trait LogScopeConfigurationPolicy {
+    /// Configures a new logging scope with an output target and a
+    /// base format.
     fn configure(&self, scope: &str) -> (Box<dyn LogOutput>, LogFormat);
 }
 
@@ -178,20 +179,10 @@ impl Logger {
         self.active = is_active;
         self
     }
-
     /// Set the policy that dicates whether to forward messages to stdout
     #[must_use]
-    pub fn policy(mut self, predicate: Box<LogScopeConfigurationPolicyFn>) -> Self {
-        self.policy= Box::new(predicate);
-        self
-    }
-
-    /// Set the policy that dicates whether to forward messages to stdout
-    #[must_use]
-    #[cfg(debug_assertions)]
-    #[doc(hidden)]
-    pub fn policy_object(mut self, object: impl LogScopeConfigurationPolicy + 'static) -> Self {
-        self.policy = Box::new(object);
+    pub fn policy(mut self, policy: impl LogScopeConfigurationPolicy + 'static) -> Self {
+        self.policy = Box::new(policy);
         self
     }
 

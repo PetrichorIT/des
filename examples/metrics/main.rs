@@ -1,4 +1,4 @@
-use des::{prelude::*, runtime::Logger};
+use des::prelude::*;
 
 #[NdlModule("examples/metrics")]
 #[derive(Debug)]

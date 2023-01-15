@@ -120,14 +120,14 @@
 //! [`net`](https://docs.rs/tokio/latest/tokio/net/index.html) module.
 //!
 
-pub mod doc;
-
 #[macro_use]
 #[doc(hidden)]
 pub mod macros;
 
 pub mod prelude;
 
+pub mod doc;
+pub mod logger;
 pub mod runtime;
 pub mod stats;
 pub mod time;

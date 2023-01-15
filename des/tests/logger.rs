@@ -3,10 +3,10 @@
 use std::sync::Arc;
 use std::sync::Mutex;
 
+use des::logger::*;
 use des::net::BuildContext;
 use des::net::__Buildable0;
 use des::prelude::*;
-use des::runtime::*;
 use log::LevelFilter;
 use serial_test::serial;
 
@@ -73,7 +73,7 @@ fn one_module_linear_logger() {
 
     Logger::debug()
         .interal_max_log_level(LevelFilter::Warn)
-        .policy_object(DebugPolicy {
+        .policy(DebugPolicy {
             output: output.clone(),
         })
         .try_set_logger()
@@ -136,7 +136,7 @@ fn multiple_module_linear_logger() {
 
     Logger::debug()
         .interal_max_log_level(LevelFilter::Warn)
-        .policy_object(DebugPolicy {
+        .policy(DebugPolicy {
             output0: output0.clone(),
             output1: output1.clone(),
         })
@@ -206,7 +206,7 @@ fn multiple_module_linear_logger_filters() {
 
     let logger = Logger::debug()
         .interal_max_log_level(LevelFilter::Warn)
-        .policy_object(DebugPolicy {
+        .policy(DebugPolicy {
             output0: output0.clone(),
             output1: output1.clone(),
         })
