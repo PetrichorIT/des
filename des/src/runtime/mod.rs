@@ -17,6 +17,7 @@ use std::{
     any::type_name,
     cell::UnsafeCell,
     fmt::{Debug, Display},
+    sync::{Mutex, MutexGuard, TryLockError},
 };
 
 #[cfg(feature = "metrics")]
@@ -43,6 +44,9 @@ pub(crate) const SYM_CHECKMARK: char = '\u{2713}';
 pub(crate) const SYM_CROSSMARK: char = '\u{02df}';
 
 pub(crate) static RNG: SyncWrap<UnsafeCell<Option<StdRng>>> = SyncWrap::new(UnsafeCell::new(None));
+
+/// A lock the ensures only one runtime exits at a time.
+static SIMULATION_LOCK: Mutex<()> = Mutex::new(());
 
 ///
 /// Returns the current simulation time of the currentlly active
@@ -132,6 +136,9 @@ where
     // Misc
     quiet: bool,
     profiler: Profiler,
+
+    #[allow(dead_code)]
+    permit: MutexGuard<'static, ()>,
 
     future_event_set: FutureEventSet<A>,
 }
@@ -271,6 +278,32 @@ where
     ///
     #[must_use]
     pub fn new_with(app: A, mut options: RuntimeOptions) -> Self {
+        // Get simulation permit
+
+        let permit = {
+            let lock = SIMULATION_LOCK.try_lock();
+            match lock {
+                Ok(permit) => permit,
+                Err(err) => {
+                    match err {
+                        TryLockError::WouldBlock => {
+                            eprintln!("des::warning ** another runtime allready exists ... waiting for simlock");
+                            let lock = SIMULATION_LOCK.lock();
+                            match lock {
+                                Ok(lock) => lock,
+                                Err(p) => {
+                                    panic!("des::error ** another runtime poisoned the simlock ... aborting: {}", p)
+                                }
+                            }
+                        }
+                        TryLockError::Poisoned(p) => {
+                            panic!("des::error ** another runtime poisoned the simlock ... aborting: {}", p)
+                        }
+                    }
+                }
+            }
+        };
+
         // Log prep
         // StandardLogger::setup().expect("Failed to create logger");
         #[cfg(feature = "cqueue")]
@@ -294,6 +327,7 @@ where
 
             event_id: 0,
             itr: 0,
+            permit,
 
             limit: options.custom_limit.unwrap_or_else(|| {
                 match (options.max_itr, options.max_sim_time) {
