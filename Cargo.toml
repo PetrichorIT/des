@@ -10,6 +10,3 @@ members = [
   "ndl",
   "examples",
 ]
-
-[patch.crates-io]
-tokio = {git = "https://github.com/PetrichorIT/tokio_sim", branch = "sim-core"}
