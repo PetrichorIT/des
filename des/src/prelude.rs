@@ -87,6 +87,7 @@ cfg_net! {
     pub use crate::net::Topology;
 
     cfg_async! {
+        pub use ::tokio;
         pub use crate::net::module::AsyncModule;
     }
 
