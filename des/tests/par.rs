@@ -1,6 +1,7 @@
 #![cfg(feature = "net")]
 
 use des::prelude::NetworkRuntime;
+use serial_test::serial;
 
 const EXAMPLE_NETWORK: &str = "
     netA.*.dnsServer = 1.1.1.1
@@ -21,6 +22,7 @@ const EXAMPLE_TYPES: &str = "
 ";
 
 #[test]
+#[serial]
 fn non_parse_read() {
     let rt = NetworkRuntime::new(());
     let par = &rt.globals().parameters;
@@ -62,6 +64,7 @@ fn non_parse_read() {
 }
 
 #[test]
+#[serial]
 fn parse_integers() {
     let rt = NetworkRuntime::new(());
     let par = &rt.globals().parameters;
@@ -112,6 +115,7 @@ fn parse_integers() {
 }
 
 #[test]
+#[serial]
 fn parse_strings() {
     let rt = NetworkRuntime::new(());
     let par = &rt.globals().parameters;

@@ -34,9 +34,9 @@ cfg_not_async! {
     use std::fmt::{Debug, Display};
     use std::ops::{Deref, Div, Sub, SubAssign};
 
-    thread_local! {
-        static SIMTIME: Cell<SimTime> = const { Cell::new(SimTime::ZERO) };
-    }
+
+    static SIMTIME: Cell<SimTime> = Cell::new(SimTime::ZERO);
+
 
     ///
     /// A specific point of time in the simulation.

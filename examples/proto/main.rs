@@ -88,6 +88,7 @@ fn main() {
     let _ = app
         .globals()
         .topology
-        .borrow()
+        .lock()
+        .unwrap()
         .write_to_svg("examples/proto/graph");
 }

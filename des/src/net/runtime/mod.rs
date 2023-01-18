@@ -4,9 +4,8 @@ use crate::net::{ObjectPath, Topology};
 use crate::runtime::{Application, Runtime};
 use crate::time::SimTime;
 use log::info;
-use std::cell::RefCell;
 use std::fmt::{Debug, Display};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 mod events;
 pub(crate) use events::*;
@@ -119,7 +118,8 @@ impl<A> Application for NetworkRuntime<A> {
         rt.app
             .globals
             .topology
-            .borrow_mut()
+            .lock()
+            .unwrap()
             .build(&rt.app.module_list);
 
         rt.add_event(NetEvents::SimStartNotif(SimStartNotif()), SimTime::now());
@@ -194,7 +194,7 @@ pub struct NetworkRuntimeGlobals {
     ///
     /// The topology of the network from a module viewpoint.
     ///
-    pub topology: RefCell<Topology>,
+    pub topology: Mutex<Topology>,
 }
 
 impl NetworkRuntimeGlobals {
@@ -205,7 +205,7 @@ impl NetworkRuntimeGlobals {
     pub fn new() -> Self {
         Self {
             parameters: Parameters::new(),
-            topology: RefCell::new(Topology::new()),
+            topology: Mutex::new(Topology::new()),
         }
     }
 }

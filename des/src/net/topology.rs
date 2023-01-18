@@ -96,7 +96,7 @@ impl Topology {
         for (i, module) in modules.iter().enumerate() {
             // let module = &modules[i];
             let mut outgoing_edges = Vec::new();
-            let gates = module.ctx.gates.borrow();
+            let gates = module.ctx.gates.read();
 
             for start in gates.iter() {
                 let mut cost = 0.0;

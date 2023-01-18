@@ -269,6 +269,7 @@ impl Message {
 // A message only contains primitve data, ptrs that are threadsafe
 // and a untyped contained value.
 unsafe impl Send for Message {}
+unsafe impl Sync for Message {} // TODO: wrong unsafe find better method
 
 impl UnwindSafe for Message {}
 

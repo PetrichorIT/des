@@ -150,7 +150,7 @@ pub fn plugin_status(plugin: &PluginHandle) -> PluginStatus {
     with_mod_ctx(|ctx| ctx.plugin_status(plugin))
 }
 
-thread_local! { static PLUGIN_ID: AtomicUsize = const { AtomicUsize::new(0) } }
+static PLUGIN_ID: AtomicUsize = AtomicUsize::new(0);
 
 impl ModuleContext {
     /// Refer to [`add_plugin`].
@@ -160,7 +160,7 @@ impl ModuleContext {
         priority: usize,
         just_created: bool,
     ) -> PluginHandle {
-        let id = PLUGIN_ID.with(|c| c.fetch_add(1, Ordering::SeqCst));
+        let id = PLUGIN_ID.fetch_add(1, Ordering::SeqCst);
         let entry = PluginEntry {
             id,
             state: PluginState::Idle(Box::new(plugin)),
@@ -171,7 +171,7 @@ impl ModuleContext {
 
         let mut plugins = self
             .plugins
-            .try_borrow_mut()
+            .try_write()
             .expect("cannot create new plugin while other plugin is active");
         match plugins.binary_search(&entry) {
             Ok(at) | Err(at) => plugins.insert(at, entry),
@@ -189,7 +189,7 @@ impl ModuleContext {
     pub fn remove_plugin(&self, handle: PluginHandle) {
         let mut plugins = self
             .plugins
-            .try_borrow_mut()
+            .try_write()
             .expect("cannot remove plugin while other plugin is active");
         if let Some((idx, _)) = plugins.iter().enumerate().find(|(_, e)| e.id == handle.id) {
             plugins.remove(idx);
@@ -202,7 +202,7 @@ impl ModuleContext {
     pub fn plugin_status(&self, handle: &PluginHandle) -> PluginStatus {
         let plugins = self
             .plugins
-            .try_borrow()
+            .try_read()
             .expect("cannot probe plugin while other plugin is active");
         if let Some((idx, _)) = plugins.iter().enumerate().find(|(_, e)| e.id == handle.id) {
             if matches!(plugins[idx].state, PluginState::Paniced(_)) {
@@ -234,6 +234,9 @@ pub(crate) struct PluginEntry {
     pub(super) priority: usize,
     pub(super) just_created: bool,
 }
+
+unsafe impl Send for PluginEntry {}
+unsafe impl Sync for PluginEntry {}
 
 pub(super) enum PluginState {
     Idle(Box<dyn Plugin>),

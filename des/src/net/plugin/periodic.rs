@@ -1,15 +1,11 @@
+use super::Plugin;
+use crate::net::message::TYP_HOOK_PERIODIC;
+use crate::prelude::{schedule_in, Message};
 use std::panic::UnwindSafe;
 use std::sync::atomic::Ordering::SeqCst;
 use std::{any::Any, sync::atomic::AtomicU16, time::Duration};
 
-use crate::net::message::TYP_HOOK_PERIODIC;
-use crate::prelude::{schedule_in, Message};
-
-use super::Plugin;
-
-thread_local! {
-    static PERIODIC_HOOK_ID: AtomicU16 = AtomicU16::new(0);
-}
+static PERIODIC_HOOK_ID: AtomicU16 = AtomicU16::new(0);
 
 /// A plugin for running a certain calculation once in a periodic manner.
 ///
@@ -34,7 +30,7 @@ impl<S: Any, F: Fn(&mut S)> PeriodicPlugin<S, F> {
             f,
             state,
             period,
-            unique_id: PERIODIC_HOOK_ID.with(|v| v.fetch_add(1, SeqCst)),
+            unique_id: PERIODIC_HOOK_ID.fetch_add(1, SeqCst),
             active: true,
         };
 

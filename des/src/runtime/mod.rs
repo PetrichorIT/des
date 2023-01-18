@@ -292,12 +292,14 @@ where
                             match lock {
                                 Ok(lock) => lock,
                                 Err(p) => {
-                                    panic!("des::error ** another runtime poisoned the simlock ... aborting: {}", p)
+                                    eprintln!("des::error ** another runtime poisoned the simlock ... cleaning up");
+                                    p.into_inner()
                                 }
                             }
                         }
                         TryLockError::Poisoned(p) => {
-                            panic!("des::error ** another runtime poisoned the simlock ... aborting: {}", p)
+                            eprintln!("des::error ** another runtime poisoned the simlock ... cleaning up");
+                            p.into_inner()
                         }
                     }
                 }

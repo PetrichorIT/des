@@ -1,98 +1,88 @@
 //! A simulation specific logger.
 
 use std::{
-    cell::{RefCell, UnsafeCell},
     collections::HashMap,
     fmt::Debug,
     io::{stderr, stdout},
     sync::Arc,
 };
 
+mod filter;
 mod fmt;
 mod output;
 mod record;
-mod filter;
 
 pub use fmt::LogFormat;
-pub use record::LogRecord;
 pub use output::LogOutput;
+pub use record::LogRecord;
 
 use crate::time::SimTime;
 use log::{Level, LevelFilter, Log, SetLoggerError};
-use termcolor::{ColorChoice, BufferWriter};
+use termcolor::{BufferWriter, ColorChoice};
 
 use self::filter::FilterPolicy;
 
-
 static SCOPED_LOGGER: LoggerWrap = LoggerWrap::uninitalized();
-
-thread_local! {
-    pub(crate) static CURRENT_SCOPE: RefCell<Option<&'static str>> = const { RefCell::new(None) }
-}
+static CURRENT_SCOPE: spin::Mutex<&'static str> = spin::Mutex::new("");
 
 struct LoggerWrap {
-    inner: UnsafeCell<Option<Logger>>,
+    inner: spin::RwLock<Option<Logger>>,
 }
 
 impl LoggerWrap {
     const fn uninitalized() -> Self {
         Self {
-            inner: UnsafeCell::new(None),
+            inner: spin::RwLock::new(None),
         }
     }
 
     fn reset(&self) {
-        let old_inner = unsafe { &mut *self.inner.get() };
-        *old_inner = None;
+        let mut lock = self.inner.write();
+        *lock = None;
     }
 
     fn reset_contents(&self, new: Logger) {
-        let old_inner = unsafe { &mut *self.inner.get() };
-        old_inner.as_mut().unwrap().reset_contents(new);
+        let mut lock = self.inner.write();
+        lock.as_mut().unwrap().reset_contents(new);
     }
 
     fn set(&self, inner: Logger) -> Option<Logger> {
-        let old_inner = unsafe { &mut *self.inner.get() };
-        old_inner.replace(inner)
+        let mut lock = self.inner.write();
+        lock.replace(inner)
     }
 }
 
 impl Log for LoggerWrap {
     fn enabled(&self, metadata: &log::Metadata) -> bool {
         unsafe {
-            let inner = &*self.inner.get();
-            inner.as_ref().unwrap_unchecked().enabled(metadata)
+            let lock = self.inner.read();
+            lock.as_ref().unwrap_unchecked().enabled(metadata)
         }
     }
 
     fn log(&self, record: &log::Record) {
         unsafe {
-            let inner = &*self.inner.get();
-            inner.as_ref().unwrap_unchecked().log(record);
+            let lock = self.inner.read();
+            lock.as_ref().unwrap_unchecked().log(record);
         }
     }
 
     fn flush(&self) {
         unsafe {
-            let inner = &*self.inner.get();
-            inner.as_ref().unwrap_unchecked().flush();
+            let lock = self.inner.read();
+            lock.as_ref().unwrap_unchecked().flush();
         }
     }
 }
 
-unsafe impl Send for LoggerWrap {}
-unsafe impl Sync for LoggerWrap {}
-
-
 /// A logger that collects scope specific messages.
 pub struct Logger {
     active: bool,
-    scopes: RefCell<HashMap<String, LoggerScope>>,
+    scopes: spin::Mutex<HashMap<String, LoggerScope>>,
     policy: Box<dyn LogScopeConfigurationPolicy>,
     interal_max_level: LevelFilter,
     filter: FilterPolicy,
 }
-
 
 /// An object to define a logger configuration policy.
 pub trait LogScopeConfigurationPolicy {
@@ -111,19 +101,18 @@ impl LogScopeConfigurationPolicy for Box<LogScopeConfigurationPolicyFn> {
 pub type LogScopeConfigurationPolicyFn = dyn Fn(&str) -> (Box<dyn LogOutput>, LogFormat);
 
 struct DefaultPolicy;
-impl LogScopeConfigurationPolicy for DefaultPolicy{
+impl LogScopeConfigurationPolicy for DefaultPolicy {
     fn configure(&self, _scope: &str) -> (Box<dyn LogOutput>, LogFormat) {
         (Box::new((stdout(), stderr())), LogFormat::Color)
     }
 }
-
 
 impl Logger {
     /// Creates a new Logger (builder).
     #[must_use]
     pub fn new() -> Self {
         Self {
-            scopes: RefCell::new(HashMap::new()),
+            scopes: spin::Mutex::new(HashMap::new()),
             active: true,
             policy: Box::new(DefaultPolicy),
             interal_max_level: LevelFilter::Warn,
@@ -131,13 +120,12 @@ impl Logger {
         }
     }
 
-
     /// Creates a new Logger (builder) debug.
     #[must_use]
     #[doc(hidden)]
     pub fn debug() -> Self {
         Self {
-            scopes: RefCell::new(HashMap::new()),
+            scopes: spin::Mutex::new(HashMap::new()),
             active: true,
             policy: Box::new(DefaultPolicy),
             interal_max_level: LevelFilter::Warn,
@@ -150,15 +138,14 @@ impl Logger {
     pub fn begin_scope(ident: impl AsRef<str>) {
         let ident: *const str = ident.as_ref();
         let ident: &'static str = unsafe { &*ident };
-        CURRENT_SCOPE.with(|cell| cell.replace(Some(ident)));
+        *CURRENT_SCOPE.lock() = ident;
     }
 
     /// Removes the current scope.
     #[doc(hidden)]
     pub fn end_scope() {
-        CURRENT_SCOPE.with(|cell| cell.replace(None));
+        *CURRENT_SCOPE.lock() = "";
     }
-
 
     fn reset_contents(&mut self, new: Self) {
         if self.active {
@@ -194,9 +181,9 @@ impl Logger {
     }
 
     /// Connects the logger to the logging framework
-    /// 
+    ///
     /// # Panics
-    /// 
+    ///
     /// Panics if another logger as allready set, or sombody steals the
     /// logger from the static registry in a race condition.
     pub fn set_logger(self) {
@@ -219,9 +206,7 @@ impl Logger {
     pub fn try_set_logger(self) -> Result<(), SetLoggerError> {
         let old = SCOPED_LOGGER.set(self);
         match log::set_logger(&SCOPED_LOGGER).map(|()| log::set_max_level(LevelFilter::Trace)) {
-            Ok(()) => {
-                Ok(())
-            }
+            Ok(()) => Ok(()),
             Err(e) => {
                 // Since a logger was allready set it might either be a
                 // ScopedLogger or somthing elsewhere
@@ -241,12 +226,12 @@ impl Logger {
     }
 }
 
-unsafe impl Send for Logger {}
-unsafe impl Sync for Logger {}
-
 impl Debug for Logger {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Logger").field("filters", &self.filter).field("internal", &self.interal_max_level).field("scopes", &self.scopes.borrow().keys()).finish()
+        f.debug_struct("Logger")
+            .field("filters", &self.filter)
+            .field("internal", &self.interal_max_level)
+            .finish()
     }
 }
 
@@ -274,14 +259,7 @@ impl Log for Logger {
         }
 
         // (2) Get scopes by ptr
-        let Ok(mut scopes) = self.scopes.try_borrow_mut() else {
-            // TODO:
-            // If multiple accesses are happening, this is due to third party tools.
-            // For now this remains unhandled, since a mutex would be an overcommitment 
-            // for single threaded cases.
-            // Once rt-multi-thread is active, use a std::sync::mutex to solve this problem.
-            return
-        };
+        let mut scopes = self.scopes.lock();
 
         // (3) Get target pointer
         let target_is_module_path = Some(record.metadata().target()) == record.module_path();
@@ -292,33 +270,31 @@ impl Log for Logger {
         };
 
         // (4) Get scope or make defeault print based on the target marker.
-        let Some(scope_label) = CURRENT_SCOPE.with(|c| *c.borrow()) else {
-            
-
+        let scope_label = CURRENT_SCOPE.lock().clone();
+        if scope_label.is_empty() {
             // if policy(record.target()) {
-                // No target scope was given --- not scoped println.
-                let out = match record.level() {
-                    Level::Error | Level::Warn => BufferWriter::stderr(ColorChoice::Always),
-                    _ => BufferWriter::stdout(ColorChoice::Always),
-                };
-                let mut buffer = out.buffer();
+            // No target scope was given --- not scoped println.
+            let out = match record.level() {
+                Level::Error | Level::Warn => BufferWriter::stderr(ColorChoice::Always),
+                _ => BufferWriter::stdout(ColorChoice::Always),
+            };
+            let mut buffer = out.buffer();
 
-                let record = LogRecord {
-                    scope: Arc::new(record.target().to_string()),
-                    target: target_label,
-                    level: record.level(),
-                    time: SimTime::now(),
-                    msg: format!("{}", record.args()),
-                };
+            let record = LogRecord {
+                scope: Arc::new(record.target().to_string()),
+                target: target_label,
+                level: record.level(),
+                time: SimTime::now(),
+                msg: format!("{}", record.args()),
+            };
 
-                LogFormat::fmt(LogFormat::Color, &record, &mut buffer)
-                    .expect("Failed to write record to output stream");
-                out.print(&buffer)
-                    .expect("Failed to write to output buffer");
+            LogFormat::fmt(LogFormat::Color, &record, &mut buffer)
+                .expect("Failed to write record to output stream");
+            out.print(&buffer)
+                .expect("Failed to write to output buffer");
             // }
             return;
         };
-
 
         // (5) Fetch scope information
         let scope = scopes.get_mut(scope_label);
@@ -343,6 +319,9 @@ impl Log for Logger {
 
     fn flush(&self) {}
 }
+
+unsafe impl Send for Logger {}
+unsafe impl Sync for Logger {}
 
 /// A collection of all logging activity in one scope.
 pub(self) struct LoggerScope {
@@ -375,6 +354,10 @@ impl LoggerScope {
 
 impl Debug for LoggerScope {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("LoggerScope").field("scope", &self.scope).field("fmt", &self.fmt).field("filter", &self.filter).finish_non_exhaustive()
+        f.debug_struct("LoggerScope")
+            .field("scope", &self.scope)
+            .field("fmt", &self.fmt)
+            .field("filter", &self.filter)
+            .finish_non_exhaustive()
     }
 }

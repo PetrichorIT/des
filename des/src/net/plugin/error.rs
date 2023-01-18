@@ -6,7 +6,7 @@ use std::{
 
 use crate::net::module::with_mod_ctx;
 
-use super::{PluginEntry, PluginState};
+use super::PluginState;
 
 /// A error that occures in reponse to a plugin activity.
 pub struct PluginError {
@@ -28,54 +28,28 @@ impl PluginError {
         // let current_plugin = ;
 
         with_mod_ctx(|ctx| {
-            if let Ok(plugins) = ctx.plugins.try_borrow() {
-                let plugin = plugins
-                    .iter()
-                    .find(|plugin| plugin.typ == TypeId::of::<T>());
+            let plugins = unsafe { &*ctx.plugins.as_mut_ptr() };
+            let plugin = plugins
+                .iter()
+                .find(|plugin| plugin.typ == TypeId::of::<T>());
 
-                if let Some(plugin) = plugin {
-                    if matches!(plugin.state, PluginState::Paniced(_)) {
-                        PluginError {
-                            kind: PluginErrorKind::PluginPaniced,
-                            internal: format!("expected plugin of type {}", type_name::<T>()),
-                        }
-                    } else {
-                        // TODO: prio tests
-                        PluginError {
-                            kind: PluginErrorKind::PluginMalfunction,
-                            internal: format!("expected plugin of type {}", type_name::<T>()),
-                        }
+            if let Some(plugin) = plugin {
+                if matches!(plugin.state, PluginState::Paniced(_)) {
+                    PluginError {
+                        kind: PluginErrorKind::PluginPaniced,
+                        internal: format!("expected plugin of type {}", type_name::<T>()),
                     }
                 } else {
+                    // TODO: prio tests
                     PluginError {
-                        kind: PluginErrorKind::PluginNotFound,
+                        kind: PluginErrorKind::PluginMalfunction,
                         internal: format!("expected plugin of type {}", type_name::<T>()),
                     }
                 }
             } else {
-                let plugins = ctx.plugins.as_ptr() as *const Vec<PluginEntry>;
-
-                let plugin = unsafe { &*plugins }
-                    .iter()
-                    .find(|plugin| plugin.typ == TypeId::of::<T>());
-
-                if let Some(plugin) = plugin {
-                    if matches!(plugin.state, PluginState::Paniced(_)) {
-                        PluginError {
-                            kind: PluginErrorKind::PluginPaniced,
-                            internal: format!("expected plugin of type {}", type_name::<T>()),
-                        }
-                    } else {
-                        PluginError {
-                            kind: PluginErrorKind::PluginMalfunction,
-                            internal: format!("expected plugin of type {}", type_name::<T>()),
-                        }
-                    }
-                } else {
-                    PluginError {
-                        kind: PluginErrorKind::PluginNotFound,
-                        internal: format!("expected plugin of type {}", type_name::<T>()),
-                    }
+                PluginError {
+                    kind: PluginErrorKind::PluginNotFound,
+                    internal: format!("expected plugin of type {}", type_name::<T>()),
                 }
             }
         })

@@ -1,9 +1,8 @@
 //! Module-specific network ports.
 
 use crate::net::channel::ChannelRef;
-use std::cell::RefCell;
 use std::fmt::Debug;
-use std::sync::{Arc, Weak};
+use std::sync::{Arc, Mutex, Weak};
 
 use super::module::{ModuleContext, ModuleRef, ModuleRefWeak};
 
@@ -34,7 +33,6 @@ pub enum GateServiceType {
 ///
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-#[derive(Clone)]
 pub struct Gate {
     owner: ModuleRefWeak,
     name: String,
@@ -43,10 +41,10 @@ pub struct Gate {
     size: usize,
     pos: usize,
 
-    channel: RefCell<Option<ChannelRef>>,
+    channel: Mutex<Option<ChannelRef>>,
 
-    next_gate: RefCell<Option<GateRef>>,
-    previous_gate: RefCell<Option<GateRefWeak>>,
+    next_gate: Mutex<Option<GateRef>>,
+    previous_gate: Mutex<Option<GateRefWeak>>,
 }
 
 impl Gate {
@@ -124,7 +122,7 @@ impl Gate {
     ///
     #[must_use]
     pub fn previous_gate(&self) -> Option<GateRef> {
-        self.previous_gate.borrow().clone()?.upgrade()
+        self.previous_gate.lock().unwrap().clone()?.upgrade()
     }
 
     ///
@@ -132,7 +130,7 @@ impl Gate {
     ///
     #[must_use]
     pub fn next_gate(&self) -> Option<GateRef> {
-        self.next_gate.borrow().clone()
+        self.next_gate.lock().unwrap().clone()
     }
 
     ///
@@ -140,8 +138,8 @@ impl Gate {
     /// its identifier.
     ///
     pub fn set_next_gate(self: &GateRef, next_gate: GateRef) {
-        *next_gate.previous_gate.borrow_mut() = Some(Arc::downgrade(self));
-        *self.next_gate.borrow_mut() = Some(next_gate);
+        *next_gate.previous_gate.lock().unwrap() = Some(Arc::downgrade(self));
+        *self.next_gate.lock().unwrap() = Some(next_gate);
     }
 
     ///
@@ -150,7 +148,7 @@ impl Gate {
     #[must_use]
     pub fn channel(&self) -> Option<ChannelRef> {
         // only provide a read_only interface publicly
-        Some(Arc::clone(self.channel.borrow().as_ref()?))
+        Some(Arc::clone(self.channel.lock().unwrap().as_ref()?))
     }
 
     ///
@@ -158,14 +156,14 @@ impl Gate {
     ///
     pub(crate) fn channel_mut(&self) -> Option<ChannelRef> {
         // only provide a read_only interface publicly
-        Some(Arc::clone(self.channel.borrow().as_ref()?))
+        Some(Arc::clone(self.channel.lock().unwrap().as_ref()?))
     }
 
     ///
     /// Sets the channel attached to this gate.
     ///
     pub fn set_channel(&self, channel: ChannelRef) {
-        *self.channel.borrow_mut() = Some(channel);
+        *self.channel.lock().unwrap() = Some(channel);
     }
 
     ///
@@ -230,9 +228,9 @@ impl Gate {
             typ,
             size,
             pos,
-            channel: RefCell::new(channel),
-            next_gate: RefCell::new(None),
-            previous_gate: RefCell::new(None),
+            channel: Mutex::new(channel),
+            next_gate: Mutex::new(None),
+            previous_gate: Mutex::new(None),
         });
 
         if let Some(next_gate) = next_gate {
@@ -247,9 +245,9 @@ impl Debug for Gate {
         f.debug_struct("Gate")
             .field("path", &self.path())
             .field("typ", &self.typ)
-            .field("next", &self.next_gate.borrow().as_ref().map(|_| ()))
-            .field("prev", &self.previous_gate.borrow().as_ref().map(|_| ()))
-            .field("channel", &self.channel.borrow())
+            // .field("next", &self.next_gate.borrow().as_ref().map(|_| ()))
+            // .field("prev", &self.previous_gate.borrow().as_ref().map(|_| ()))
+            // .field("channel", &self.channel.borrow())
             .finish()
     }
 }
@@ -314,7 +312,7 @@ impl IntoModuleGate for (&str, usize) {
     fn as_gate(&self, module: &ModuleContext) -> Option<GateRef> {
         module
             .gates
-            .borrow()
+            .read()
             .iter()
             .find(|&g| g.name() == self.0 && g.pos() == self.1)
             .cloned()
@@ -326,7 +324,7 @@ impl IntoModuleGate for &str {
     fn as_gate(&self, module: &ModuleContext) -> Option<GateRef> {
         module
             .gates
-            .borrow()
+            .read()
             .iter()
             .find(|&g| g.name() == *self && g.size() == 1)
             .cloned()

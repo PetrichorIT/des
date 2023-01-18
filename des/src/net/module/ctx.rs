@@ -1,7 +1,6 @@
 use super::{DummyModule, ModuleId, ModuleRef, ModuleRefWeak, ModuleReferencingError};
 use crate::prelude::{GateRef, ObjectPath};
 use std::{
-    cell::{Ref, RefCell},
     collections::HashMap,
     fmt::Debug,
     sync::{atomic::AtomicBool, Arc},
@@ -12,13 +11,8 @@ use crate::net::plugin::*;
 #[cfg(feature = "async")]
 use crate::net::module::core::AsyncCoreExt;
 
-thread_local! {
-    static MOD_CTX: RefCell<Option<Arc<ModuleContext>>> = const { RefCell::new(None) }
-}
-
-thread_local! {
-    pub (crate) static SETUP_FN: RefCell<fn(&ModuleContext)> =  const { RefCell::new(_default_setup) };
-}
+pub(crate) static MOD_CTX: spin::RwLock<Option<Arc<ModuleContext>>> = spin::RwLock::new(None);
+pub(crate) static SETUP_FN: spin::Mutex<fn(&ModuleContext)> = spin::Mutex::new(_default_setup);
 
 #[cfg(not(feature = "async"))]
 fn _default_setup(_: &ModuleContext) {}
@@ -34,13 +28,13 @@ pub struct ModuleContext {
     pub(crate) id: ModuleId,
 
     pub(crate) path: ObjectPath,
-    pub(crate) gates: RefCell<Vec<GateRef>>,
-    pub(crate) plugins: RefCell<Vec<PluginEntry>>,
+    pub(crate) gates: spin::RwLock<Vec<GateRef>>,
+    pub(crate) plugins: spin::RwLock<Vec<PluginEntry>>,
 
     #[cfg(feature = "async")]
-    pub(crate) async_ext: RefCell<AsyncCoreExt>,
+    pub(crate) async_ext: spin::RwLock<AsyncCoreExt>,
     pub(crate) parent: Option<ModuleRefWeak>,
-    pub(crate) children: RefCell<HashMap<String, ModuleRef>>,
+    pub(crate) children: spin::RwLock<HashMap<String, ModuleRef>>,
 }
 
 impl ModuleContext {
@@ -51,17 +45,17 @@ impl ModuleContext {
 
             id: ModuleId::gen(),
             path,
-            gates: RefCell::new(Vec::new()),
-            plugins: RefCell::new(Vec::new()),
+            gates: spin::RwLock::new(Vec::new()),
+            plugins: spin::RwLock::new(Vec::new()),
 
             parent: None,
-            children: RefCell::new(HashMap::new()),
+            children: spin::RwLock::new(HashMap::new()),
 
             #[cfg(feature = "async")]
-            async_ext: RefCell::new(AsyncCoreExt::new()),
+            async_ext: spin::RwLock::new(AsyncCoreExt::new()),
         }));
 
-        SETUP_FN.with(|f| f.borrow()(&this));
+        SETUP_FN.lock()(&this);
 
         this
     }
@@ -75,34 +69,33 @@ impl ModuleContext {
 
             id: ModuleId::gen(),
             path,
-            gates: RefCell::new(Vec::new()),
-            plugins: RefCell::new(Vec::new()),
+            gates: spin::RwLock::new(Vec::new()),
+            plugins: spin::RwLock::new(Vec::new()),
 
             parent: Some(ModuleRefWeak::new(&parent)),
-            children: RefCell::new(HashMap::new()),
+            children: spin::RwLock::new(HashMap::new()),
 
             #[cfg(feature = "async")]
-            async_ext: RefCell::new(AsyncCoreExt::new()),
+            async_ext: spin::RwLock::new(AsyncCoreExt::new()),
         }));
 
-        SETUP_FN.with(|f| f.borrow()(&this));
+        SETUP_FN.lock()(&this);
 
         parent
             .ctx
             .children
-            .borrow_mut()
+            .write()
             .insert(name.to_string(), this.clone());
 
         this
     }
 
     pub(crate) fn place(self: Arc<Self>) -> Option<Arc<ModuleContext>> {
-        // println!("Now active module: {}", self.path.path());
-        MOD_CTX.with(|ctx| ctx.borrow_mut().replace(self))
+        MOD_CTX.write().replace(self)
     }
 
     pub(crate) fn take() -> Option<Arc<ModuleContext>> {
-        MOD_CTX.with(|ctx| ctx.take())
+        MOD_CTX.write().take()
     }
 
     /// INTERNAL
@@ -120,12 +113,12 @@ impl ModuleContext {
     }
     /// INTERNAL
     pub fn gates(&self) -> Vec<GateRef> {
-        self.gates.borrow().clone()
+        self.gates.read().clone()
     }
     /// INTERNAL
     pub fn gate(&self, name: &str, pos: usize) -> Option<GateRef> {
         self.gates
-            .borrow()
+            .read()
             .iter()
             .find(|&g| g.name() == name && g.pos() == pos)
             .cloned()
@@ -151,8 +144,7 @@ impl ModuleContext {
     }
     /// INTERNAL
     pub fn child(&self, name: &str) -> Result<ModuleRef, ModuleReferencingError> {
-        dbg!(self.path.path(), self.children.borrow());
-        if let Some(child) = self.children.borrow().get(name) {
+        if let Some(child) = self.children.read().get(name) {
             Ok(child.clone())
         } else {
             Err(ModuleReferencingError::NoEntry(format!(
@@ -175,12 +167,11 @@ impl Debug for ModuleContext {
 //     }
 // }
 
-pub(crate) fn with_mod_ctx<R>(f: impl FnOnce(Ref<Arc<ModuleContext>>) -> R) -> R {
-    MOD_CTX.with(|ctx| {
-        let brw = ctx.borrow();
-        let brw = Ref::map(brw, |v| v.as_ref().unwrap());
-        f(brw)
-    })
+pub(crate) fn with_mod_ctx<R>(f: impl FnOnce(&Arc<ModuleContext>) -> R) -> R {
+    let lock = MOD_CTX.read();
+    let r = f(&*lock.as_ref().unwrap());
+    drop(lock);
+    r
 }
 
 cfg_async! {
@@ -190,52 +181,52 @@ cfg_async! {
     use super::ext::WaitingMessage;
 
     pub(super) fn async_get_rt() -> Option<Arc<Runtime>> {
-        with_mod_ctx(|ctx| Some(Arc::clone(ctx.async_ext.borrow().rt.as_ref()?)))
+        with_mod_ctx(|ctx| Some(Arc::clone(ctx.async_ext.read().rt.as_ref()?)))
     }
 
     pub(super) fn async_ctx_reset() {
-        with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().reset());
+        with_mod_ctx(|ctx| ctx.async_ext.write().reset());
     }
 
     // Wait queue
 
     pub(super) fn async_wait_queue_tx_send(msg: WaitingMessage) -> Result<(), SendError<WaitingMessage>> {
-        with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().wait_queue_tx.send(msg))
+        with_mod_ctx(|ctx| ctx.async_ext.write().wait_queue_tx.send(msg))
     }
 
     pub(super) fn async_wait_queue_rx_take() -> Option<UnboundedReceiver<WaitingMessage>> {
-        with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().wait_queue_rx.take())
+        with_mod_ctx(|ctx| ctx.async_ext.write().wait_queue_rx.take())
     }
 
     pub(super) fn async_set_wait_queue_join(join: JoinHandle<()>) {
-        with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().wait_queue_join = Some(join));
+        with_mod_ctx(|ctx| ctx.async_ext.write().wait_queue_join = Some(join));
     }
 
     // Sim Staart
 
     pub(super) fn async_sim_start_rx_take() -> Option<UnboundedReceiver<usize>> {
-        with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().sim_start_rx.take())
+        with_mod_ctx(|ctx| ctx.async_ext.write().sim_start_rx.take())
     }
 
     pub(super) fn async_set_sim_start_join(join: JoinHandle<()>) {
-        with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().sim_start_join = Some(join));
+        with_mod_ctx(|ctx| ctx.async_ext.write().sim_start_join = Some(join));
     }
 
     pub(super) fn async_sim_start_tx_send(stage: usize) -> Result<(), SendError<usize>>  {
-        with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().sim_start_tx.send(stage))
+        with_mod_ctx(|ctx| ctx.async_ext.write().sim_start_tx.send(stage))
     }
 
     pub(super) fn async_sim_start_join_take() -> Option<JoinHandle<()>> {
-        with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().sim_start_join.take())
+        with_mod_ctx(|ctx| ctx.async_ext.write().sim_start_join.take())
     }
 
     // SIM END
 
     pub(super) fn async_sim_end_join_set(join: JoinHandle<()>)  {
-        with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().sim_end_join = Some(join));
+        with_mod_ctx(|ctx| ctx.async_ext.write().sim_end_join = Some(join));
     }
 
     pub(super) fn async_sim_end_join_take() -> Option<JoinHandle<()>> {
-        with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().sim_end_join.take())
+        with_mod_ctx(|ctx| ctx.async_ext.write().sim_end_join.take())
     }
 }

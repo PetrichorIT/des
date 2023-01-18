@@ -42,6 +42,8 @@ termcolor = "1.1"
 rand = {version = "*", features = ["std_rng"]}
 sysinfo = "*"
 
+spin = "*"
+
 # All other dependencies are optional
 async-trait = {version = "0.1", optional = true}
 cqueue = {path = "../cqueue", optional = true}

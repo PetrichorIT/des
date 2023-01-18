@@ -218,7 +218,7 @@ impl ModuleRef {
             // (0) Run all plugins upward
             // Call in order from lowest to highest priority.
             let msg = with_mod_ctx(|ctx| {
-                let mut plugins = ctx.plugins.borrow_mut();
+                let mut plugins = ctx.plugins.write();
                 let mut msg = Some(msg);
                 for plugin in plugins.iter_mut() {
                     if !plugin.just_created {
@@ -243,7 +243,7 @@ impl ModuleRef {
             // (2) Plugin defer calls
             // Call in reverse order to preserve user-space distance
             with_mod_ctx(|ctx| {
-                for plugin in ctx.plugins.borrow_mut().iter_mut().rev() {
+                for plugin in ctx.plugins.write().iter_mut().rev() {
                     if !plugin.just_created {
                         plugin.try_defer()
                     }
@@ -273,7 +273,7 @@ impl ModuleRef {
         // (0) Run all plugins upward
         // Call in order from lowest to highest priority.
         with_mod_ctx(|ctx| {
-            for plugin in ctx.plugins.borrow_mut().iter_mut() {
+            for plugin in ctx.plugins.write().iter_mut() {
                 if !plugin.just_created {
                     plugin.try_capture_sim_start();
                 }
@@ -286,7 +286,7 @@ impl ModuleRef {
         // (2) Plugin defer calls
         // Call in reverse order to preserve user-space distance
         with_mod_ctx(|ctx| {
-            for plugin in ctx.plugins.borrow_mut().iter_mut().rev() {
+            for plugin in ctx.plugins.write().iter_mut().rev() {
                 if !plugin.just_created {
                     plugin.try_defer_sim_start()
                 }
@@ -300,7 +300,7 @@ impl ModuleRef {
         // (0) Run all plugins upward
         // Call in order from lowest to highest priority.
         with_mod_ctx(|ctx| {
-            for plugin in ctx.plugins.borrow_mut().iter_mut() {
+            for plugin in ctx.plugins.write().iter_mut() {
                 if !plugin.just_created {
                     plugin.try_capture_sim_start();
                 }
@@ -313,7 +313,7 @@ impl ModuleRef {
         // (2) Plugin defer calls
         // Call in reverse order to preserve user-space distance
         with_mod_ctx(|ctx| {
-            for plugin in ctx.plugins.borrow_mut().iter_mut().rev() {
+            for plugin in ctx.plugins.write().iter_mut().rev() {
                 if !plugin.just_created {
                     plugin.try_defer_sim_start()
                 }
@@ -326,7 +326,7 @@ impl ModuleRef {
         // (0) Run all plugins upward
         // Call in order from lowest to highest priority.
         with_mod_ctx(|ctx| {
-            for plugin in ctx.plugins.borrow_mut().iter_mut() {
+            for plugin in ctx.plugins.write().iter_mut() {
                 if !plugin.just_created {
                     plugin.try_capture_sim_end();
                 }
@@ -339,7 +339,7 @@ impl ModuleRef {
         // (2) Plugin defer calls
         // Call in reverse order to preserve user-space distance
         with_mod_ctx(|ctx| {
-            for plugin in ctx.plugins.borrow_mut().iter_mut().rev() {
+            for plugin in ctx.plugins.write().iter_mut().rev() {
                 if !plugin.just_created {
                     plugin.try_defer_sim_end()
                 }
@@ -353,7 +353,7 @@ impl ModuleRef {
         // (0) Run all plugins upward
         // Call in order from lowest to highest priority.
         with_mod_ctx(|ctx| {
-            for plugin in ctx.plugins.borrow_mut().iter_mut() {
+            for plugin in ctx.plugins.write().iter_mut() {
                 if !plugin.just_created {
                     plugin.try_capture_sim_end();
                 }
@@ -366,7 +366,7 @@ impl ModuleRef {
         // (2) Plugin defer calls
         // Call in reverse order to preserve user-space distance
         with_mod_ctx(|ctx| {
-            for plugin in ctx.plugins.borrow_mut().iter_mut().rev() {
+            for plugin in ctx.plugins.write().iter_mut().rev() {
                 if !plugin.just_created {
                     plugin.try_defer_sim_end()
                 }

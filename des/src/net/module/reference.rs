@@ -269,7 +269,7 @@ impl ModuleRef {
             let gate = Gate::new(self, name, typ, size, i, channel.clone(), item);
             ids.push(GateRef::clone(&gate));
 
-            self.ctx.gates.borrow_mut().push(gate);
+            self.ctx.gates.write().push(gate);
         }
 
         ids
@@ -293,3 +293,9 @@ impl Debug for ModuleRef {
         .finish()
     }
 }
+
+unsafe impl Send for ModuleRef {}
+unsafe impl Send for ModuleRefWeak {}
+
+unsafe impl Sync for ModuleRef {}
+unsafe impl Sync for ModuleRefWeak {}

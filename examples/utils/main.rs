@@ -13,7 +13,7 @@ fn main() {
     let rt = Runtime::new_with(app, RuntimeOptions::seeded(0x123).quiet());
     let (app, time, p) = rt.run().unwrap();
 
-    let topo = app.globals().topology.borrow().clone();
+    let topo = app.globals().topology.lock().unwrap().clone();
 
     assert_eq!(topo.nodes().count(), 4);
     assert_eq!(topo.edges().count(), 14);
