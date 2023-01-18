@@ -308,7 +308,7 @@ impl Log for Logger {
                 scope: Arc::new(scope_label.to_string()),
                 output,
                 fmt,
-                filter: dbg!(self.filter.filter_for(scope_label, LevelFilter::max())),
+                filter: self.filter.filter_for(scope_label, LevelFilter::max()),
             };
 
             new_scope.log(format!("{}", record.args()), target_label, record.level());

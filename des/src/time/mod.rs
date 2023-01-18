@@ -29,14 +29,11 @@ mod duration;
 pub use duration::*;
 
 cfg_not_async! {
-    use std::cell::Cell;
     use std::f64::EPSILON;
     use std::fmt::{Debug, Display};
     use std::ops::{Deref, Div, Sub, SubAssign};
 
-
-    static SIMTIME: Cell<SimTime> = Cell::new(SimTime::ZERO);
-
+    static SIMTIME: spin::RwLock<SimTime> = spin::RwLock::new(SimTime::ZERO);
 
     ///
     /// A specific point of time in the simulation.
@@ -56,14 +53,14 @@ cfg_not_async! {
         /// ```
         #[must_use]
         pub fn now() -> Self {
-            SIMTIME.with(Cell::get)
+            *SIMTIME.read()
         }
 
         ///
         /// Sets the sim time
         ///
         pub(crate) fn set_now(time: SimTime) {
-            SIMTIME.with(|s| s.set(time));
+           *SIMTIME.write() = time;
         }
 
         ///

@@ -332,29 +332,6 @@ where
     }
 }
 
-// # Custom
-
-cfg_async! {
-    impl MessageBody for tokio::sim::net::UdpMessage {
-        fn byte_len(&self) -> usize {
-            // TODO
-            self.content.len() + 16
-        }
-    }
-
-    impl MessageBody for tokio::sim::net::TcpConnectMessage {
-        fn byte_len(&self) -> usize {
-            16
-        }
-    }
-
-    impl MessageBody for tokio::sim::net::TcpMessage {
-        fn byte_len(&self) -> usize {
-            16 + self.content.len()
-        }
-    }
-}
-
 ///
 /// A message body that does mimics a custom size
 /// independet of actualy size.
