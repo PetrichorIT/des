@@ -15,10 +15,10 @@ pub(crate) static MOD_CTX: spin::RwLock<Option<Arc<ModuleContext>>> = spin::RwLo
 pub(crate) static SETUP_FN: spin::Mutex<fn(&ModuleContext)> = spin::Mutex::new(_default_setup);
 
 #[cfg(not(feature = "async"))]
-fn _default_setup(_: &ModuleContext) {}
+pub(crate) fn _default_setup(_: &ModuleContext) {}
 
 #[cfg(feature = "async")]
-fn _default_setup(this: &ModuleContext) {
+pub(crate) fn _default_setup(this: &ModuleContext) {
     this.add_plugin(TokioTimePlugin::new(this.path.path().to_string()), 0, false);
 }
 

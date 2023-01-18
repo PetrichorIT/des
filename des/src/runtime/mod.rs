@@ -293,12 +293,14 @@ where
                                 Ok(lock) => lock,
                                 Err(p) => {
                                     eprintln!("des::error ** another runtime poisoned the simlock ... cleaning up");
+                                    Self::poison_cleanup();
                                     p.into_inner()
                                 }
                             }
                         }
                         TryLockError::Poisoned(p) => {
                             eprintln!("des::error ** another runtime poisoned the simlock ... cleaning up");
+                            Self::poison_cleanup();
                             p.into_inner()
                         }
                     }
@@ -378,6 +380,10 @@ where
 
         A::at_sim_start(&mut this);
         this
+    }
+
+    fn poison_cleanup() {
+        // NOP
     }
 
     ///

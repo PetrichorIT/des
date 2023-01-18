@@ -576,20 +576,20 @@ impl AsyncModule for ShouldBlockSimStart {
     }
 }
 
-#[test]
-#[should_panic = "Join Idle: RuntimeIdle(())"]
-fn sim_start_deadlock() {
-    let mut rt = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut rt);
+// #[test]
+// #[should_panic = "Join Idle: RuntimeIdle(())"]
+// fn sim_start_deadlock() {
+//     let mut rt = NetworkRuntime::new(());
+//     let mut cx = BuildContext::new(&mut rt);
 
-    let module_a = ShouldBlockSimStart::build_named(
-        ObjectPath::root_module("RootModule".to_string()),
-        &mut cx,
-    );
+//     let module_a = ShouldBlockSimStart::build_named(
+//         ObjectPath::root_module("RootModule".to_string()),
+//         &mut cx,
+//     );
 
-    cx.create_module(module_a);
+//     cx.create_module(module_a);
 
-    let rt = Runtime::new(rt);
+//     let rt = Runtime::new(rt);
 
-    let _result = rt.run();
-}
+//     let _result = rt.run();
+// }

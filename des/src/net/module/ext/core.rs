@@ -25,7 +25,12 @@ impl AsyncCoreExt {
         let (stx, srx) = unbounded_channel();
 
         Self {
-            rt: Some(std::sync::Arc::new(tokio::runtime::Runtime::new().unwrap())),
+            rt: Some(std::sync::Arc::new(
+                tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .unwrap(),
+            )),
 
             wait_queue_tx: wtx,
             wait_queue_rx: Some(wrx),
