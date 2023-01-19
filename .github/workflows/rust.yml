@@ -15,13 +15,12 @@ jobs:
 
         steps:
             - uses: actions/checkout@v3
-            - name: Install nightly toolchain with clippy available
+            - name: Install nightly toolchain
               uses: actions-rs/toolchain@v1
               with:
                   profile: minimal
                   toolchain: nightly
                   override: true
-                  components: clippy
 
             - name: Build
               run: cargo build --verbose

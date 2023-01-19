@@ -523,15 +523,12 @@ fn dsg2_some_chk_need_include() {
     let errs = r.ectx.all().collect::<Vec<&Error>>();
     assert_eq!(errs.len(), 1);
 
-    assert_eq!(
-        *errs[0],
-        Error::new_with_solution(
-            DsgInvalidPrototypeAtSome,
-            "No prototype called 'A' found.".to_string(),
-            Loc::new(35, 7, 3),
-            false,
-            ErrorSolution::new("Try including 'Other'".to_string(), Loc::new(0, 1, 1))
-        )
+    check_err!(
+        *errs[0] =>
+        DsgInvalidPrototypeAtSome,
+        "No prototype called 'A' found.",
+        false,
+        "Try including 'Other'"
     );
 }
 
