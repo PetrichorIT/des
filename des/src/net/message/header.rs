@@ -52,8 +52,6 @@ impl MessageHeader {
         match self.typ {
             0 => MessageType::UserDefined,
             TYP_WAKEUP | TYP_RESTART => MessageType::Internal,
-            TYP_TCP_CONNECT | TYP_TCP_CONNECT_TIMEOUT | TYP_TCP_PACKET => MessageType::Tcp,
-            TYP_UDP_PACKET => MessageType::Udp,
             _ => unreachable!(),
         }
     }
@@ -107,10 +105,6 @@ impl MessageBody for MessageHeader {
 pub(crate) const TYP_RESTART: u8 = 10;
 pub(crate) const TYP_WAKEUP: u8 = 11;
 pub(crate) const TYP_IO_TICK: u8 = 12;
-pub(crate) const TYP_UDP_PACKET: u8 = 100;
-pub(crate) const TYP_TCP_CONNECT: u8 = 101;
-pub(crate) const TYP_TCP_CONNECT_TIMEOUT: u8 = 102;
-pub(crate) const TYP_TCP_PACKET: u8 = 103;
 pub(crate) const TYP_NOTIFY: u8 = 201;
 
 pub(crate) const TYP_HOOK_PERIODIC: u8 = 200;
@@ -121,12 +115,6 @@ pub enum MessageType {
     /// A user defined message.
     #[default]
     UserDefined,
-    /// A internal TCP message that will be consumed by the IOContext
-    /// if possible.
-    Tcp,
-    /// A internal UDP message that will be consumed by the IOContext
-    /// if possible.
-    Udp,
     /// A custom internal message. Those should never appear in 'handle_message'.
     Internal,
 }
@@ -135,8 +123,6 @@ impl Display for MessageType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::UserDefined => write!(f, "UserDefined"),
-            Self::Tcp => write!(f, "Tcp"),
-            Self::Udp => write!(f, "Udp"),
             Self::Internal => write!(f, "Internal"),
         }
     }
