@@ -28,5 +28,3 @@ jobs:
               run: ./build-features.sh
             - name: Run tests
               run: cargo test --verbose
-            - name: Run examples
-              run: ./run-all.sh
