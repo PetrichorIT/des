@@ -45,33 +45,12 @@ pub fn derive_message_body(
                 Fields::Unit => TokenStream::new(),
             };
 
-            let mut mgenerics = generics.clone();
-            for param in mgenerics.params.iter_mut() {
-                if let GenericParam::Type(param) = param {
-                    if !param.bounds.trailing_punct() && !param.bounds.is_empty() {
-                        param.bounds.push_punct(Add {
-                            spans: [proc_macro2::Span::call_site()],
-                        });
-                    }
-                    let input = quote::quote! { ::des::net::message::MessageBody };
-                    param
-                        .bounds
-                        .push_value(TypeParamBound::Trait(parse2(input).unwrap()))
-                }
-            }
-
-            let mut sgenerics = generics.clone();
-            let where_clause = sgenerics.where_clause.take();
-            for param in sgenerics.params.iter_mut() {
-                if let GenericParam::Type(param) = param {
-                    param.bounds.clear();
-                    param.default = None;
-                }
-            }
+            let generics = generate_impl_generics(generics);
+            let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
 
             let wrapped = WrappedTokenStream(impl_ts);
             Ok(quote! {
-                    impl #mgenerics ::des::net::message::MessageBody for #ident #sgenerics #where_clause {
+                    impl #impl_generics ::des::net::message::MessageBody for #ident #type_generics #where_clause {
                         fn byte_len(&self) -> usize {
                             #wrapped 0
                         }
@@ -143,32 +122,11 @@ pub fn derive_message_body(
                 });
             }
 
-            let mut mgenerics = generics.clone();
-            for param in mgenerics.params.iter_mut() {
-                if let GenericParam::Type(param) = param {
-                    if !param.bounds.trailing_punct() && !param.bounds.is_empty() {
-                        param.bounds.push_punct(Add {
-                            spans: [proc_macro2::Span::call_site()],
-                        });
-                    }
-                    let input = quote::quote! { ::des::net::message::MessageBody };
-                    param
-                        .bounds
-                        .push_value(TypeParamBound::Trait(parse2(input).unwrap()))
-                }
-            }
-
-            let mut sgenerics = generics.clone();
-            let where_clause = sgenerics.where_clause.take();
-            for param in sgenerics.params.iter_mut() {
-                if let GenericParam::Type(param) = param {
-                    param.bounds.clear();
-                    param.default = None;
-                }
-            }
+            let generics = generate_impl_generics(generics);
+            let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
 
             Ok(quote! {
-                impl #mgenerics ::des::net::message::MessageBody for #ident #sgenerics #where_clause {
+                impl #impl_generics ::des::net::message::MessageBody for #ident #type_generics #where_clause {
                     fn byte_len(&self) -> usize {
                         match self {
                             #gts
@@ -183,4 +141,23 @@ pub fn derive_message_body(
             "#[derive(MessageBody)] -- Macro does not support unions".into(),
         )),
     }
+}
+
+fn generate_impl_generics(mut generics: Generics) -> Generics {
+    for param in generics.params.iter_mut() {
+        if let GenericParam::Type(param) = param {
+            if !param.bounds.trailing_punct() && !param.bounds.is_empty() {
+                param.bounds.push_punct(Add {
+                    spans: [proc_macro2::Span::call_site()],
+                });
+            }
+
+            let input = quote::quote! { ::des::net::message::MessageBody };
+            param
+                .bounds
+                .push_value(TypeParamBound::Trait(parse2(input).unwrap()))
+        }
+    }
+
+    generics
 }
