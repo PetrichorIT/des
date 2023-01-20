@@ -10,7 +10,7 @@ use super::module::{ModuleId, ModuleRef};
 #[derive(Debug, Clone)]
 pub struct Topology {
     // A mapping (index --> Module)
-    nodes: Vec<NodeDefinition>,
+    nodes: Vec<TopoNode>,
 }
 
 impl Topology {
@@ -40,7 +40,7 @@ impl Topology {
     ///
     /// The complete set of edges defined per-source.
     ///
-    pub fn edges(&self) -> impl Iterator<Item = &Edge> {
+    pub fn edges(&self) -> impl Iterator<Item = &TopoEdge> {
         self.nodes.iter().flat_map(|def| def.edges.iter())
     }
 
@@ -49,7 +49,7 @@ impl Topology {
     /// or `None` if the nodes does not exist.
     ///
     #[must_use]
-    pub fn edges_for(&self, node: &ModuleRef) -> Option<&Vec<Edge>> {
+    pub fn edges_for(&self, node: &ModuleRef) -> Option<&Vec<TopoEdge>> {
         self.nodes
             .iter()
             .find(|def| def.node.ctx.id == node.ctx.id)
@@ -61,7 +61,7 @@ impl Topology {
     /// or `None` if the nodes does not exist.
     ///
     #[must_use]
-    pub fn edges_mut_for(&mut self, node: &ModuleRef) -> Option<&mut Vec<Edge>> {
+    pub fn edges_mut_for(&mut self, node: &ModuleRef) -> Option<&mut Vec<TopoEdge>> {
         self.nodes
             .iter_mut()
             .find(|def| def.node.ctx.id == node.ctx.id)
@@ -86,7 +86,7 @@ impl Topology {
 
         // Setup nodes
         for module in modules {
-            self.nodes.push(NodeDefinition {
+            self.nodes.push(TopoNode {
                 node: module.clone(),
                 edges: Vec::new(),
             });
@@ -96,7 +96,7 @@ impl Topology {
         for (i, module) in modules.iter().enumerate() {
             // let module = &modules[i];
             let mut outgoing_edges = Vec::new();
-            let gates = module.ctx.gates.borrow();
+            let gates = module.ctx.gates.read();
 
             for start in gates.iter() {
                 let mut cost = 0.0;
@@ -113,7 +113,7 @@ impl Topology {
                 }
 
                 if *current != **start {
-                    outgoing_edges.push(Edge {
+                    outgoing_edges.push(TopoEdge {
                         src_gate: Arc::clone(start),
                         target_gate: current,
                         cost,
@@ -135,7 +135,7 @@ impl Topology {
         P: FnMut(&ModuleRef) -> bool,
     {
         // Remove unwanted nodes
-        let mut nodes: Vec<NodeDefinition> = self
+        let mut nodes: Vec<TopoNode> = self
             .nodes
             .iter()
             .filter(|e| predicate(&e.node))
@@ -160,7 +160,7 @@ impl Topology {
     #[must_use]
     pub fn filter_edges<P>(&self, mut predicate: P) -> Self
     where
-        P: FnMut(&ModuleRef, &Edge) -> bool,
+        P: FnMut(&ModuleRef, &TopoEdge) -> bool,
     {
         let mut nodes = self.nodes.clone();
         for def in &mut nodes {
@@ -182,9 +182,9 @@ impl Topology {
         }
 
         let mut edges_out = String::new();
-        for NodeDefinition { node, edges } in &self.nodes {
+        for TopoNode { node, edges } in &self.nodes {
             let from_node = node.str();
-            for Edge {
+            for TopoEdge {
                 cost,
                 src_gate,
                 target_gate,
@@ -256,7 +256,7 @@ impl Default for Topology {
 /// All edges should share the same `src_gate.owner()`.
 ///
 #[derive(Clone)]
-pub struct NodeDefinition {
+pub struct TopoNode {
     ///
     /// A reference of the described node.
     ///
@@ -264,10 +264,10 @@ pub struct NodeDefinition {
     ///
     /// All edges, starting from this node.
     ///
-    pub edges: Vec<Edge>,
+    pub edges: Vec<TopoEdge>,
 }
 
-impl Debug for NodeDefinition {
+impl Debug for TopoNode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("NodeDefinition")
             .field("node", &self.node.str())
@@ -280,7 +280,7 @@ impl Debug for NodeDefinition {
 /// A single edge in the module graph.
 ///
 #[derive(Debug, Clone, PartialEq)]
-pub struct Edge {
+pub struct TopoEdge {
     ///
     /// The start point of the connection. This gate should be
     /// called with `send(..., thisgate)`.

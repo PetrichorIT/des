@@ -1,125 +1,268 @@
-use des::{
-    net::{BuildContext, __Buildable0},
-    prelude::*,
-};
-use log::*;
+#![cfg(feature = "net")]
+
+use std::sync::Arc;
+use std::sync::Mutex;
+
+use des::logger::*;
+use des::net::BuildContext;
+use des::net::__Buildable0;
+use des::prelude::*;
+use log::LevelFilter;
 use serial_test::serial;
 
 #[test]
 #[serial]
-fn initalize_logger() {
-    ScopedLogger::quiet()
-        .finish()
-        .expect("Failed to set logger");
+fn initialize_logger() {
+    Logger::debug()
+        .try_set_logger()
+        .expect("Failed to create and attach logger")
 }
 
-#[test]
-#[serial]
-fn raw_logger() {
-    ScopedLogger::quiet()
-        .finish()
-        .expect("Failed to set logger");
+#[derive(Debug, Clone, Default)]
+struct DebugOutput {
+    inner: Arc<Mutex<Vec<String>>>,
+}
 
-    info!("Hello World?");
-    info!(target: "Module", "Hello World!");
-
-    let scopes = ScopedLogger::yield_scopes();
-    assert_eq!(scopes.len(), 1);
-
-    let scope = scopes.get("Module").expect("Scoped missnamed");
-    assert_eq!(*scope.target, "Module");
-    assert_eq!(scope.stream.len(), 1);
-
-    let record = scope.stream.front().expect("HUH");
-    assert_eq!(record.time, SimTime::MIN);
-    assert_eq!(*record.target, "Module");
-    assert_eq!(record.level, Level::Info);
-    assert_eq!(record.msg, "Hello World!");
+impl LogOutput for DebugOutput {
+    fn write(&mut self, record: &LogRecord, fmt: LogFormat) -> std::io::Result<()> {
+        println!("{:?}", record);
+        self.inner.lock().unwrap().write(record, fmt)
+    }
 }
 
 #[NdlModule]
-struct SomeModule {}
+struct Counter {
+    i: i32,
+}
 
-impl Module for SomeModule {
+impl Module for Counter {
     fn new() -> Self {
-        SomeModule {}
+        Self { i: 0 }
     }
 
-    fn at_sim_start(&mut self, stage: usize) {
-        info!("at_sim_start_{}", stage);
-        if stage == 1 {
-            schedule_in(Message::new().build(), Duration::from_secs(2));
-        }
-    }
-
-    fn num_sim_start_stages(&self) -> usize {
-        2
+    fn at_sim_start(&mut self, _stage: usize) {
+        schedule_in(Message::new().build(), Duration::from_secs(0));
     }
 
     fn handle_message(&mut self, _msg: Message) {
-        info!("handle_message");
-    }
-
-    fn at_sim_end(&mut self) {
-        info!("at_sim_end");
+        match self.i % 5 {
+            0 => log::trace!("{}", self.i),
+            1 => log::debug!("{}", self.i),
+            2 => log::info!("{}", self.i),
+            3 => log::warn!("{}", self.i),
+            4 => log::error!("{}", self.i),
+            _ => unreachable!(),
+        };
+        self.i += 1;
+        schedule_in(Message::new().build(), Duration::from_secs(1));
     }
 }
 
 #[test]
 #[serial]
-fn module_auto_scopes() {
-    ScopedLogger::quiet()
-        .interal_max_log_level(LevelFilter::Warn)
-        .finish()
-        .expect("Failed to set logger");
-
-    let mut rt = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut rt);
-
-    let module_a =
-        SomeModule::build_named(ObjectPath::root_module("Module A".to_string()), &mut cx);
-    cx.create_module(module_a);
-
-    let module_b =
-        SomeModule::build_named(ObjectPath::root_module("Module B".to_string()), &mut cx);
-    cx.create_module(module_b);
-
-    let module_c =
-        SomeModule::build_named(ObjectPath::root_module("Module C".to_string()), &mut cx);
-    cx.create_module(module_c);
-
-    let runtime = Runtime::new(rt);
-    match runtime.run() {
-        RuntimeResult::Finished { time, profiler, .. } => {
-            // Event Count
-            // 1 SimStart
-            // no 3 x 1Activity
-            // 3 x 1HandleMessage
-            // == 7
-            assert_eq!(profiler.event_count, 4);
-
-            // Time
-            // Delay  2s until handle_message
-            assert_eq!(time.as_secs(), 2);
-
-            let scopes = ScopedLogger::yield_scopes();
-            assert_eq!(scopes.len(), 3);
-            for (trg, scope) in scopes {
-                assert_eq!(trg, *scope.target);
-                assert_eq!(scope.stream.len(), 4);
-
-                assert!(["Module A", "Module B", "Module C"].contains(&&trg[..]));
-
-                let mut last = SimTime::MIN;
-                for msg in scope.stream {
-                    assert_eq!(msg.target, scope.target);
-                    assert!(last <= msg.time);
-                    last = msg.time;
-                }
-            }
-            // println!("{:?}", scopes);
-            // panic!()
+fn one_module_linear_logger() {
+    let output = DebugOutput::default();
+    struct DebugPolicy {
+        output: DebugOutput,
+    }
+    impl LogScopeConfigurationPolicy for DebugPolicy {
+        fn configure(&self, _scope: &str) -> (Box<dyn LogOutput>, LogFormat) {
+            (Box::new(self.output.clone()), LogFormat::NoColor)
         }
-        _ => panic!("Unexpected runtime result"),
+    }
+
+    Logger::debug()
+        .interal_max_log_level(LevelFilter::Warn)
+        .policy(DebugPolicy {
+            output: output.clone(),
+        })
+        .try_set_logger()
+        .unwrap();
+
+    let mut app = NetworkRuntime::new(());
+    let mut cx = BuildContext::new(&mut app);
+
+    let module = Counter::build_named(ObjectPath::root_module("modpath"), &mut cx);
+    cx.create_module(module);
+
+    let rt = Runtime::new_with(
+        app,
+        RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(30))),
+    );
+    let _ = rt.run().unwrap_premature_abort();
+
+    let lock = output.inner.lock().unwrap();
+    assert_eq!(lock.len(), 31);
+    // println!("{lock:?}");
+    for i in 0..31 {
+        let level = match i % 5 {
+            0 => "TRACE",
+            1 => "DEBUG",
+            2 => "INFO",
+            3 => "WARN",
+            4 => "ERROR",
+            _ => unreachable!(),
+        };
+        assert_eq!(
+            lock[i],
+            format!(
+                "[ {:^5} ] {} modpath: {}\n",
+                SimTime::from_duration(Duration::from_secs(i as u64)),
+                level,
+                i
+            )
+        )
+    }
+}
+
+#[test]
+#[serial]
+fn multiple_module_linear_logger() {
+    let output0 = DebugOutput::default();
+    let output1 = DebugOutput::default();
+    struct DebugPolicy {
+        output0: DebugOutput,
+        output1: DebugOutput,
+    }
+    impl LogScopeConfigurationPolicy for DebugPolicy {
+        fn configure(&self, scope: &str) -> (Box<dyn LogOutput>, LogFormat) {
+            match scope {
+                "node0" => (Box::new(self.output0.clone()), LogFormat::NoColor),
+                "node1" => (Box::new(self.output1.clone()), LogFormat::NoColor),
+                _ => unreachable!(),
+            }
+        }
+    }
+
+    Logger::debug()
+        .interal_max_log_level(LevelFilter::Warn)
+        .policy(DebugPolicy {
+            output0: output0.clone(),
+            output1: output1.clone(),
+        })
+        .try_set_logger()
+        .unwrap();
+
+    let mut app = NetworkRuntime::new(());
+    let mut cx = BuildContext::new(&mut app);
+
+    let node0 = Counter::build_named(ObjectPath::root_module("node0"), &mut cx);
+    cx.create_module(node0);
+
+    let node1 = Counter::build_named(ObjectPath::root_module("node1"), &mut cx);
+    cx.create_module(node1);
+
+    let rt = Runtime::new_with(
+        app,
+        RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(30))),
+    );
+    let _ = rt.run().unwrap_premature_abort();
+
+    for (output, path) in [(output0, "node0"), (output1, "node1")] {
+        let lock = output.inner.lock().unwrap();
+        assert_eq!(lock.len(), 31);
+        // println!("{lock:?}");
+        for i in 0..31 {
+            let level = match i % 5 {
+                0 => "TRACE",
+                1 => "DEBUG",
+                2 => "INFO",
+                3 => "WARN",
+                4 => "ERROR",
+                _ => unreachable!(),
+            };
+            assert_eq!(
+                lock[i],
+                format!(
+                    "[ {:^5} ] {} {}: {}\n",
+                    SimTime::from_duration(Duration::from_secs(i as u64)),
+                    level,
+                    path,
+                    i
+                )
+            )
+        }
+    }
+}
+
+#[test]
+#[serial]
+fn multiple_module_linear_logger_filters() {
+    let output0 = DebugOutput::default();
+    let output1 = DebugOutput::default();
+    struct DebugPolicy {
+        output0: DebugOutput,
+        output1: DebugOutput,
+    }
+    impl LogScopeConfigurationPolicy for DebugPolicy {
+        fn configure(&self, scope: &str) -> (Box<dyn LogOutput>, LogFormat) {
+            match scope {
+                "node0" => (Box::new(self.output0.clone()), LogFormat::NoColor),
+                "node1" => (Box::new(self.output1.clone()), LogFormat::NoColor),
+                _ => unreachable!(),
+            }
+        }
+    }
+
+    let logger = Logger::debug()
+        .interal_max_log_level(LevelFilter::Warn)
+        .policy(DebugPolicy {
+            output0: output0.clone(),
+            output1: output1.clone(),
+        })
+        .add_filters("*=info,node0=warn");
+    println!("{:?}", logger);
+
+    logger.try_set_logger().unwrap();
+
+    let mut app = NetworkRuntime::new(());
+    let mut cx = BuildContext::new(&mut app);
+
+    let node0 = Counter::build_named(ObjectPath::root_module("node0"), &mut cx);
+    cx.create_module(node0);
+
+    let node1 = Counter::build_named(ObjectPath::root_module("node1"), &mut cx);
+    cx.create_module(node1);
+
+    let rt = Runtime::new_with(
+        app,
+        RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(30))),
+    );
+    let _ = rt.run().unwrap_premature_abort();
+
+    for (output, path) in [(output0, "node0"), (output1, "node1")] {
+        let lock = output.inner.lock().unwrap();
+        // assert_eq!(lock.len(), 31);
+        // println!("{lock:?}");
+        let mut j = 0;
+        for i in 0..31 {
+            let level = match i % 5 {
+                0 => "TRACE",
+                1 => "DEBUG",
+                2 => "INFO",
+                3 => "WARN",
+                4 => "ERROR",
+                _ => unreachable!(),
+            };
+            if (i % 5) < 2 {
+                continue;
+            }
+            if path == "node0" && (i % 5) < 3 {
+                continue;
+            }
+
+            println!("{j} @ {level}");
+            assert_eq!(
+                lock[j],
+                format!(
+                    "[ {:^5} ] {} {}: {}\n",
+                    SimTime::from_duration(Duration::from_secs(i as u64)),
+                    level,
+                    path,
+                    i
+                )
+            );
+            j += 1;
+        }
     }
 }

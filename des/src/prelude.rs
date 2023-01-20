@@ -19,9 +19,11 @@ pub use crate::runtime::EventSet;
 
 pub use crate::runtime::random;
 pub use crate::runtime::sample;
+
+#[allow(deprecated)]
 pub use crate::runtime::sim_time;
 
-pub use crate::runtime::ScopedLogger;
+pub use crate::logger::Logger;
 
 //
 // # Metrics & Misc
@@ -37,8 +39,10 @@ pub use crate::stats::StdDev;
 //
 
 cfg_net! {
-    pub use crate::net::hooks::create_hook;
-    pub use crate::net::hooks::destroy_hook;
+    pub use crate::net::plugin::add_plugin;
+    pub use crate::net::plugin::remove_plugin;
+    pub use crate::net::plugin::plugin_status;
+    pub use crate::net::plugin::Plugin;
 
     pub use crate::net::message::CustomSizeBody;
     pub use crate::net::message::Message;
@@ -68,7 +72,7 @@ cfg_net! {
     pub use crate::net::module::ModuleReferencingError;
 
     pub use crate::net::module::{
-        child, gate, gates, module_id, module_name, module_path, par, parent, pars, shutdow_and_restart_at, shutdow_and_restart_in, shutdown
+        child, gate, gates, module_id, module_name, module_path, par, par_for, parent, pars, shutdow_and_restart_at, shutdow_and_restart_in, shutdown
     };
 
     pub use crate::net::subsystem::Subsystem;
@@ -79,10 +83,11 @@ cfg_net! {
     pub use crate::net::ObjectPath;
     pub use crate::net::Parameters;
 
-    pub use crate::net::NodeDefinition;
+    pub use crate::net::TopoNode;
     pub use crate::net::Topology;
 
     cfg_async! {
+        pub use ::tokio;
         pub use crate::net::module::AsyncModule;
     }
 

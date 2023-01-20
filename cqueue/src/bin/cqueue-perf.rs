@@ -38,6 +38,16 @@ fn main() {
         .map(|s| s.split("=").collect::<Vec<_>>()[1].parse::<f64>().unwrap())
         .unwrap_or(1.0);
 
+    // let e_size = args
+    //     .iter()
+    //     .find(|s| s.starts_with("size="))
+    //     .map(|s| {
+    //         s.split("=").collect::<Vec<_>>()[1]
+    //             .parse::<usize>()
+    //             .unwrap()
+    //     })
+    //     .unwrap_or(4);
+
     let sample = args
         .iter()
         .find(|s| s.starts_with("sample="))

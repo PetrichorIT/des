@@ -48,12 +48,21 @@ Thus far unsolved issue.
 
 Ideas:
 
--   ModuleRefs should support unuinitalized customs states (this state must be behind the Arc so that the refs autmatically update once step 2 is performed)
--   Allow non-owned gates and make a post-init step to create the gates in step 3 but initialized them only after custom state init
+- ModuleRefs should support unuinitalized customs states (this state must be behind the Arc so that the refs autmatically update once step 2 is performed)
+- Allow non-owned gates and make a post-init step to create the gates in step 3 but initialized them only after custom state init
 
 Note, that both versions should be implemented transparently using and Option.
 use Option::unwrap_unchecked in all major calls to cirumvent performance hits.
 Rational: custom state will only be used in two cases:
 
--   after or at_sim_start -> thus custom state init allready done
--   at Module::new then custom state load order is non-negotiable
+- after or at_sim_start -> thus custom state init allready done
+- at Module::new then custom state load order is non-negotiable
+
+# Unknown cost factor in cqueue_impl
+
+As the flamegraph shows, there is an undifentiferd cost in cqueue_imlp::fetch_next that takes
+as much time, as cqueue::fetch_next does (50 % of time for a total of 6 %)
+
+This feactor is identified as memove with a big event set.
+However 32byte events stes should have that big of a cost factor.
+If they do .. figure out why

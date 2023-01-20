@@ -4,10 +4,9 @@
 use rand::distributions::Uniform;
 use rand::prelude::StdRng;
 use rand::Rng;
-use std::cell::RefCell;
 use std::collections::VecDeque;
-use std::fmt::Display;
-use std::sync::Arc;
+use std::fmt::{Debug, Display};
+use std::sync::{Arc, RwLock};
 
 use crate::net::runtime::ChannelUnbusyNotif;
 use crate::net::{message::Message, MessageAtGateEvent, NetEvents, ObjectPath};
@@ -120,9 +119,8 @@ impl Eq for ChannelMetrics {}
 ///
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-#[derive(Debug)]
 pub struct Channel {
-    inner: RefCell<ChannelInner>,
+    inner: RwLock<ChannelInner>,
 }
 
 #[derive(Debug)]
@@ -143,7 +141,7 @@ struct ChannelInner {
     /// The time the current packet is fully transmitted onto the channel.
     transmission_finish_time: SimTime,
 
-    buffer: VecDeque<(Message, GateRef)>,
+    buffer: VecDeque<(Box<Message>, GateRef)>,
     buffer_len: usize,
 }
 
@@ -151,18 +149,26 @@ impl Channel {
     ///
     /// The object path of the channel.
     ///
+    /// # Panics
+    ///
+    /// Panics if the simulation core was poisoned.
+    ///
     #[must_use]
     pub fn path(&self) -> ObjectPath {
-        self.inner.borrow().path.clone()
+        self.inner.read().unwrap().path.clone()
     }
 
     ///
     /// A description of the channels capabilities,
     /// independent from its current state.
     ///
+    /// # Panics
+    ///
+    /// Panics if the simulation core was poisoned.
+    ///
     #[must_use]
     pub fn metrics(&self) -> ChannelMetrics {
-        self.inner.borrow().metrics
+        self.inner.read().unwrap().metrics
     }
 
     ///
@@ -172,9 +178,13 @@ impl Channel {
     /// Note that being non-busy does not mean that no packet is currently on the medium
     /// it just means that all bits have been put onto the medium.
     ///
+    /// # Panics
+    ///
+    /// Panics if the simulation core was poisoned.
+    ///
     #[must_use]
     pub fn is_busy(&self) -> bool {
-        self.inner.borrow().busy
+        self.inner.read().unwrap().busy
     }
 
     ///
@@ -182,7 +192,7 @@ impl Channel {
     /// in '`sim_time`' time units.
     ///
     pub(crate) fn set_busy_until(&self, sim_time: SimTime) {
-        let mut chan = self.inner.borrow_mut();
+        let mut chan = self.inner.write().unwrap();
         chan.busy = true;
         chan.transmission_finish_time = sim_time;
     }
@@ -191,9 +201,13 @@ impl Channel {
     /// Returns the time when the packet currently being transmitted onto the medium
     /// has been fully transmitted, or [`SimTime::ZERO`] if no packet is currently being transmitted.
     ///
+    /// # Panics
+    ///
+    /// Panics if the simulation core was poisoned.
+    ///
     #[must_use]
     pub fn transmission_finish_time(&self) -> SimTime {
-        self.inner.borrow().transmission_finish_time
+        self.inner.read().unwrap().transmission_finish_time
     }
 
     ///
@@ -203,7 +217,7 @@ impl Channel {
     #[must_use]
     pub fn new(path: ObjectPath, metrics: ChannelMetrics) -> ChannelRef {
         ChannelRef::new(Channel {
-            inner: RefCell::new(ChannelInner {
+            inner: RwLock::new(ChannelInner {
                 path,
                 metrics,
                 busy: false,
@@ -226,7 +240,8 @@ impl Channel {
     #[cfg(feature = "metrics")]
     pub fn calculate_stats(&self) -> crate::stats::ChannelStats {
         self.inner
-            .borrow()
+            .read()
+            .unwrap()
             .stats
             .evaluate(SimTime::now().duration_since(SimTime::MIN))
     }
@@ -245,27 +260,39 @@ impl Channel {
     /// Calcualtes the packet travel duration using the
     /// underlying metric.
     ///
+    /// # Panics
+    ///
+    /// Panics if the simulation core was poisoned.
+    ///
     pub fn calculate_duration(&self, msg: &Message, rng: &mut StdRng) -> Duration {
-        self.inner.borrow().metrics.calculate_duration(msg, rng)
+        self.inner
+            .read()
+            .unwrap()
+            .metrics
+            .calculate_duration(msg, rng)
     }
 
     ///
     /// Calcualtes the busy time of the channel using
     /// the underlying metric.
     ///
+    /// # Panics
+    ///
+    /// Panics if the simulation core was poisoned.
+    ///
     #[must_use]
     pub fn calculate_busy(&self, msg: &Message) -> Duration {
-        self.inner.borrow().metrics.calculate_busy(msg)
+        self.inner.read().unwrap().metrics.calculate_busy(msg)
     }
 
     pub(super) fn send_message<A>(
         self: Arc<Self>,
-        msg: Message,
+        msg: Box<Message>,
         next_gate: &GateRef,
         rt: &mut Runtime<NetworkRuntime<A>>,
     ) {
         let rng_ref = rng();
-        let mut chan = self.inner.borrow_mut();
+        let mut chan = self.inner.write().unwrap();
 
         if chan.busy {
             let msg_size = msg.length();
@@ -336,7 +363,7 @@ impl Channel {
     /// Resets the busy state of a channel.
     ///
     pub(crate) fn unbusy<A>(self: Arc<Self>, rt: &mut Runtime<NetworkRuntime<A>>) {
-        let mut chan = self.inner.borrow_mut();
+        let mut chan = self.inner.write().unwrap();
 
         chan.busy = false;
         chan.transmission_finish_time = SimTime::ZERO;
@@ -346,5 +373,37 @@ impl Channel {
             drop(chan);
             self.send_message(msg, &next_gate, rt);
         }
+    }
+}
+
+#[derive(Debug)]
+#[allow(unused)]
+enum FmtChannelState {
+    Idle,
+    Busy { until: SimTime, buffer: usize },
+}
+
+impl FmtChannelState {
+    fn from(channel: &ChannelInner) -> Self {
+        if channel.busy {
+            Self::Busy {
+                until: channel.transmission_finish_time,
+                buffer: channel.buffer.len(),
+            }
+        } else {
+            Self::Idle
+        }
+    }
+}
+
+impl Debug for Channel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let this = self.inner.read().unwrap();
+
+        f.debug_struct("Channel")
+            .field("path", &this.path)
+            .field("metrics", &this.metrics)
+            .field("state", &FmtChannelState::from(&this))
+            .finish()
     }
 }

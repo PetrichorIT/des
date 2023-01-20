@@ -83,7 +83,7 @@ fn main() {
         while !pending_event.is_empty() {
             let rng_sample = rng_table[e] % num;
             if rng_sample < pending_event.len() {
-                cqueue.add(time + e_delay, pending_event.pop().unwrap())
+                cqueue.add(time + e_delay, pending_event.pop().unwrap());
             } else {
                 break;
             }

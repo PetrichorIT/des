@@ -3,7 +3,230 @@ use rand::distributions::Uniform;
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rand::*;
+use std::alloc::{Allocator, Layout};
+use std::mem::size_of;
 use std::time::Duration;
+
+#[test]
+fn alloc_single_page_one_alloc_one_allocator() {
+    // Layout will allways be big enoght for a Free Node
+
+    let alloc = CQueueLLAllocatorInner::new();
+    let bu32 = Box::new_in(42u32, alloc.handle());
+    assert_eq!(alloc.dbg_alloc_total(), 16);
+    drop(bu32);
+    assert!(alloc.dbg_is_empty());
+    drop(alloc);
+
+    let alloc = CQueueLLAllocatorInner::new();
+    let bu64 = Box::new_in(42u64, alloc.handle());
+    assert_eq!(alloc.dbg_alloc_total(), 16);
+    drop(bu64);
+    assert!(alloc.dbg_is_empty());
+    drop(alloc);
+
+    let alloc = CQueueLLAllocatorInner::new();
+    let bu128 = Box::new_in(42u128, alloc.handle());
+    assert_eq!(alloc.dbg_alloc_total(), 16);
+    drop(bu128);
+    assert!(alloc.dbg_is_empty());
+    drop(alloc);
+
+    // Now layout will grow
+
+    let alloc = CQueueLLAllocatorInner::new();
+    let barray = Box::new_in([42u8; 55], alloc.handle());
+    assert_eq!(alloc.dbg_alloc_total(), 56); // will be aligned for free node, with align 8
+    drop(barray);
+    assert!(alloc.dbg_is_empty());
+    drop(alloc);
+
+    let alloc = CQueueLLAllocatorInner::new();
+    let barray = Box::new_in([42u8; 128], alloc.handle());
+    assert_eq!(alloc.dbg_alloc_total(), 128); // will be aligned for free node, with align 8
+    drop(barray);
+    assert!(alloc.dbg_is_empty());
+    drop(alloc);
+}
+
+#[test]
+fn alloc_single_page_one_alloc_shared_allocator() {
+    // Layout will allways be big enoght for a Free Node
+
+    let alloc = CQueueLLAllocatorInner::new();
+    let bu32 = Box::new_in(42u32, alloc.handle());
+    assert_eq!(alloc.dbg_alloc_total(), 16);
+    drop(bu32);
+    assert!(alloc.dbg_is_empty());
+
+    let bu64 = Box::new_in(42u64, alloc.handle());
+    assert_eq!(alloc.dbg_alloc_total(), 16);
+    drop(bu64);
+    assert!(alloc.dbg_is_empty());
+
+    let bu128 = Box::new_in(42u128, alloc.handle());
+    assert_eq!(alloc.dbg_alloc_total(), 16);
+    drop(bu128);
+    assert!(alloc.dbg_is_empty());
+
+    // Now layout will grow
+
+    let barray = Box::new_in([42u8; 55], alloc.handle());
+    assert_eq!(alloc.dbg_alloc_total(), 56); // will be aligned for free node, with align 8
+    drop(barray);
+    assert!(alloc.dbg_is_empty());
+
+    let barray = Box::new_in([42u8; 128], alloc.handle());
+    assert_eq!(alloc.dbg_alloc_total(), 128); // will be aligned for free node, with align 8
+    drop(barray);
+    assert!(alloc.dbg_is_empty());
+}
+
+#[test]
+fn alloc_single_page_alloc_exceeds_page_size() {
+    let alloc = CQueueLLAllocatorInner::new();
+    assert!(alloc
+        .handle()
+        .allocate(Layout::new::<[u8; 8000]>())
+        .is_err())
+    // let _ = Box::new_in([42u8; 8000], alloc.handle());
+}
+
+#[test]
+fn alloc_single_page_list_alloc() {
+    let alloc = CQueueLLAllocatorInner::new();
+    let mut boxes = Vec::new();
+    for i in 0..10 {
+        boxes.push(Box::new_in([i as u8; 400], alloc.handle()))
+    }
+
+    // 4000 byte
+    assert_eq!(alloc.dbg_alloc_total(), 4000);
+    for i in 0..10 {
+        assert_eq!(boxes[i][0], i as u8);
+    }
+
+    // Drop the last 2000 byte
+    for _ in 0..5 {
+        boxes.pop();
+    }
+
+    assert_eq!(alloc.dbg_alloc_total(), 2000);
+
+    drop(boxes);
+
+    assert!(alloc.dbg_is_empty());
+}
+
+#[test]
+fn alloc_multiple_pages_same_size_allocation() {
+    #[allow(dead_code)]
+    struct A {
+        bytes: [u8; 32],
+        int: u128,
+        s: String,
+    }
+
+    let alloc = CQueueLLAllocatorInner::new();
+    let mut boxes = Vec::new();
+    for _ in 0..100 {
+        boxes.push(Box::new_in(
+            A {
+                bytes: [0; 32],
+                int: 42,
+                s: String::from("Hallow str"),
+            },
+            alloc.handle(),
+        ));
+    }
+
+    assert!(
+        alloc.dbg_alloc_total() >= size_of::<A>() * 100,
+        "alloc: {} expected: {} * 100",
+        alloc.dbg_alloc_total(),
+        size_of::<A>()
+    )
+}
+
+#[test]
+fn alloc_multiple_pages_skip_to_small_elements() {
+    let alloc = CQueueLLAllocatorInner::new();
+    let b1 = Box::new_in([0u8; 2500], alloc.handle());
+    assert_eq!(alloc.dbg_alloc_total(), 2504); // align
+    assert_eq!(alloc.dbg_pages(), 1);
+
+    // remaining bytes of page 1 were skipped
+    // since elements are asssumed to be 2500 bytes big
+
+    let b2 = Box::new_in([0u8; 128], alloc.handle());
+    assert_eq!(alloc.dbg_alloc_total(), 2504 + 128); // align
+    assert_eq!(alloc.dbg_pages(), 2);
+
+    drop(b1);
+    drop(b2);
+
+    assert_eq!(alloc.dbg_alloc_total(), 0);
+    assert_eq!(alloc.dbg_pages(), 2);
+
+    drop(alloc);
+}
+
+#[test]
+fn alloc_16_byteboxes() {
+    struct Word {
+        _opaque: [u8; 16],
+    }
+
+    impl Word {
+        fn new() -> Self {
+            Self { _opaque: [42; 16] }
+        }
+    }
+
+    assert_eq!(std::mem::size_of::<Word>(), 16);
+
+    let alloc = CQueueLLAllocatorInner::new();
+    let mut list = Vec::new();
+    for _ in 1..10 {
+        let b = Box::new_in(Word::new(), alloc.handle());
+        list.push(b)
+    }
+    alloc.info();
+
+    list.remove(2);
+
+    alloc.info();
+
+    drop(list);
+
+    alloc.info();
+
+    for _ in 1..10 {
+        let b = Box::new_in(Word::new(), alloc.handle());
+        std::mem::forget(b);
+    }
+
+    alloc.info();
+}
+
+// #[test]
+// fn clinked_list() {
+//     let mut ls = CacheOptimizedLinkedList::with_capacity(4);
+//     ls.add(1, Duration::from_secs(1), 1);
+//     println!("{:?}", ls);
+//     ls.add(2, Duration::from_secs(2), 2);
+//     println!("{:?}", ls);
+//     ls.add(3, Duration::from_secs(3), 3);
+//     println!("{:?}", ls);
+
+//     while let Some((event, time, _)) = ls.pop_min() {
+//         println!("popped {} at {:?}", event, time);
+//         println!("{:?}", ls)
+//     }
+
+//     ls.add(4, Duration::from_secs(4), 4);
+//     println!("{:?}", ls);
+// }
 
 // #[test]
 // fn linked_list_ordered_in_ordered_out() {
@@ -33,7 +256,7 @@ use std::time::Duration;
 //         (3, Duration::from_secs_f64(3.0)),
 //     ];
 
-//     let dll = DLL::from_iter(events.clone());
+//     let dll = CacheOptimizedLinkedList::from_iter(events.clone());
 //     let event = dll.into_iter().collect::<Vec<_>>();
 
 //     events.sort();
@@ -52,7 +275,7 @@ use std::time::Duration;
 //         (6, Duration::from_secs_f64(6.0)),
 //     ];
 
-//     let dll = DLL::from_iter(events.clone());
+//     let dll = CacheOptimizedLinkedList::from_iter(events.clone());
 //     let event = dll.into_iter().collect::<Vec<_>>();
 
 //     assert_eq!(&events[..], &event);
@@ -69,7 +292,7 @@ use std::time::Duration;
 //         (3, Duration::from_secs_f64(3.0)),
 //     ];
 
-//     let dll = DLL::from_iter(events.clone());
+//     let dll = CacheOptimizedLinkedList::from_iter(events.clone());
 //     let event = dll.into_iter().collect::<Vec<_>>();
 
 //     events.sort_by(|l, r| l.1.cmp(&r.1));
@@ -88,7 +311,7 @@ use std::time::Duration;
 //         (6, Duration::from_secs_f64(6.0)),
 //     ];
 
-//     let mut dll = DLL::from_iter(events.clone());
+//     let mut dll = CacheOptimizedLinkedList::from_iter(events.clone());
 
 //     let mut c = 1;
 //     for item in dll.iter() {
@@ -120,15 +343,15 @@ use std::time::Duration;
 //         (6, Duration::from_secs_f64(6.0)),
 //     ];
 
-//     let dll = DLL::from(events);
-//     let dll2 = DLL::from(events);
+//     let dll = CacheOptimizedLinkedList::from(events);
+//     let dll2 = CacheOptimizedLinkedList::from(events);
 
 //     assert_eq!(dll, dll2)
 // }
 
 // #[test]
 // fn linked_list_unordered_in_eq() {
-//     let dll = DLL::from([
+//     let dll = CacheOptimizedLinkedList::from([
 //         (4, Duration::from_secs_f64(4.0)),
 //         (5, Duration::from_secs_f64(5.0)),
 //         (6, Duration::from_secs_f64(6.0)),
@@ -136,7 +359,8 @@ use std::time::Duration;
 //         (3, Duration::from_secs_f64(3.0)),
 //         (2, Duration::from_secs_f64(2.0)),
 //     ]);
-//     let dll2 = DLL::from([
+
+//     let dll2 = CacheOptimizedLinkedList::from([
 //         (5, Duration::from_secs_f64(5.0)),
 //         (1, Duration::from_secs_f64(1.0)),
 //         (3, Duration::from_secs_f64(3.0)),
@@ -150,7 +374,7 @@ use std::time::Duration;
 
 // #[test]
 // fn linked_list_same_time_in_order() {
-//     let dll = DLL::from([
+//     let dll = CacheOptimizedLinkedList::from([
 //         (1, Duration::from_secs_f64(1.0)),
 //         (2, Duration::from_secs_f64(3.0)),
 //         (3, Duration::from_secs_f64(3.0)),
@@ -165,7 +389,7 @@ use std::time::Duration;
 //     }
 //     assert_eq!(c, 7);
 
-//     let dll = DLL::from([
+//     let dll = CacheOptimizedLinkedList::from([
 //         // (1, Duration::from_secs_f64(1.0)),
 //         (2, Duration::from_secs_f64(3.0)),
 //         (3, Duration::from_secs_f64(3.0)),
@@ -180,7 +404,7 @@ use std::time::Duration;
 //     }
 //     assert_eq!(c, 7);
 
-//     let dll = DLL::from([
+//     let dll = CacheOptimizedLinkedList::from([
 //         (1, Duration::from_secs_f64(1.0)),
 //         (2, Duration::from_secs_f64(3.0)),
 //         (3, Duration::from_secs_f64(3.0)),
@@ -198,7 +422,7 @@ use std::time::Duration;
 
 // #[test]
 // fn linked_list_remove_min() {
-//     let mut dll = DLL::from([
+//     let mut CacheOptimizedLinkedList = CacheOptimizedLinkedList::from([
 //         // (1, Duration::from_secs_f64(1.0)),
 //         // (2, Duration::from_secs_f64(2.0)),
 //         // (3, Duration::from_secs_f64(3.0)),
@@ -207,20 +431,20 @@ use std::time::Duration;
 //         (6, Duration::from_secs_f64(6.0)),
 //     ]);
 
-//     let e1 = dll.add(1, Duration::from_secs_f64(1.0));
-//     let e2 = dll.add(2, Duration::from_secs_f64(2.0));
-//     let e3 = dll.add(3, Duration::from_secs_f64(3.0));
+//     let e1 = CacheOptimizedLinkedList.add(1, Duration::from_secs_f64(1.0));
+//     let e2 = CacheOptimizedLinkedList.add(2, Duration::from_secs_f64(2.0));
+//     let e3 = CacheOptimizedLinkedList.add(3, Duration::from_secs_f64(3.0));
 
-//     assert_eq!(dll.len(), 6);
+//     assert_eq!(CacheOptimizedLinkedList.len(), 6);
 //     e1.cancel();
-//     assert_eq!(dll.len(), 5);
+//     assert_eq!(CacheOptimizedLinkedList.len(), 5);
 //     e3.cancel();
-//     assert_eq!(dll.len(), 4);
+//     assert_eq!(CacheOptimizedLinkedList.len(), 4);
 //     e2.cancel();
-//     assert_eq!(dll.len(), 3);
+//     assert_eq!(CacheOptimizedLinkedList.len(), 3);
 
 //     assert_eq!(
-//         dll.into_iter().collect::<Vec<_>>(),
+//         CacheOptimizedLinkedList.into_iter().collect::<Vec<_>>(),
 //         vec![
 //             (4, Duration::from_secs_f64(4.0)),
 //             (5, Duration::from_secs_f64(5.0)),
@@ -231,7 +455,7 @@ use std::time::Duration;
 
 // #[test]
 // fn linked_list_remove_back() {
-//     let mut dll = DLL::from([
+//     let mut CacheOptimizedLinkedList = CacheOptimizedLinkedList::from([
 //         (1, Duration::from_secs_f64(1.0)),
 //         (2, Duration::from_secs_f64(2.0)),
 //         (3, Duration::from_secs_f64(3.0)),
@@ -240,20 +464,20 @@ use std::time::Duration;
 //         // (6, Duration::from_secs_f64(6.0)),
 //     ]);
 
-//     let e1 = dll.add(4, Duration::from_secs_f64(4.0));
-//     let e2 = dll.add(5, Duration::from_secs_f64(5.0));
-//     let e3 = dll.add(6, Duration::from_secs_f64(6.0));
+//     let e1 = CacheOptimizedLinkedList.add(4, Duration::from_secs_f64(4.0));
+//     let e2 = CacheOptimizedLinkedList.add(5, Duration::from_secs_f64(5.0));
+//     let e3 = CacheOptimizedLinkedList.add(6, Duration::from_secs_f64(6.0));
 
-//     assert_eq!(dll.len(), 6);
+//     assert_eq!(CacheOptimizedLinkedList.len(), 6);
 //     e3.cancel();
-//     assert_eq!(dll.len(), 5);
+//     assert_eq!(CacheOptimizedLinkedList.len(), 5);
 //     e1.cancel();
-//     assert_eq!(dll.len(), 4);
+//     assert_eq!(CacheOptimizedLinkedList.len(), 4);
 //     e2.cancel();
-//     assert_eq!(dll.len(), 3);
+//     assert_eq!(CacheOptimizedLinkedList.len(), 3);
 
 //     assert_eq!(
-//         dll.into_iter().collect::<Vec<_>>(),
+//         CacheOptimizedLinkedList.into_iter().collect::<Vec<_>>(),
 //         vec![
 //             (1, Duration::from_secs_f64(1.0)),
 //             (2, Duration::from_secs_f64(2.0)),
@@ -415,7 +639,7 @@ fn cqueue_zero_bucket_cancel() {
     assert_eq!(cqueue.len_zero(), 10);
 
     // remove element 6
-    handles.remove(6).cancel();
+    cqueue.cancel(handles.remove(6));
     assert_eq!(cqueue.len(), 9);
     assert_eq!(cqueue.len_zero(), 9);
 
@@ -438,7 +662,7 @@ fn cqueue_zero_bucket_cancel() {
         .collect::<Vec<_>>();
     assert_eq!(cqueue.len_zero(), 0);
 
-    handles.remove(3).cancel();
+    cqueue.cancel(handles.remove(3));
 
     let mut c = 0;
     while !cqueue.is_empty() {
@@ -459,7 +683,7 @@ fn cqueue_zero_bucket_cancel() {
         .collect::<Vec<_>>();
     assert_eq!(cqueue.len_zero(), 10);
 
-    handles.remove(0).cancel();
+    cqueue.cancel(handles.remove(0));
 
     let mut c = 1;
     while !cqueue.is_empty() {
@@ -524,7 +748,7 @@ fn cqueue_out_of_order_with_cancel() {
         .into_iter()
         .filter_map(|(h, flg, event)| {
             if flg {
-                h.cancel();
+                cqueue.cancel(h);
                 Some(event)
             } else {
                 None
@@ -619,7 +843,7 @@ fn cqueue_out_of_order_boxes_with_cancel() {
         .into_iter()
         .filter_map(|(h, e, flg)| {
             if flg {
-                h.cancel();
+                cqueue.cancel(h);
                 Some(e)
             } else {
                 None
@@ -640,4 +864,88 @@ fn cqueue_out_of_order_boxes_with_cancel() {
         c += 1;
         lt = t;
     }
+}
+
+#[test]
+fn cqueue_cancel_validity() {
+    let mut cqueue = CQueue::new(32, Duration::new(1, 0));
+    let mut handles = (0..10)
+        .map(|i| Some(cqueue.add(Duration::from_secs(i), i)))
+        .collect::<Vec<_>>();
+    assert_eq!(cqueue.len(), 10);
+
+    // Succesful cancel 0, 9
+    cqueue.cancel(handles[0].take().unwrap());
+    cqueue.cancel(handles[9].take().unwrap());
+
+    assert_eq!(cqueue.len(), 8);
+
+    // Cur [1,2,3,4,5,6,7,8]
+    for i in 1..4 {
+        let event = cqueue.fetch_next();
+        assert_eq!(event.0, i);
+    }
+    assert_eq!(cqueue.len(), 5);
+
+    // Cur [4,5,6,7,8]
+    cqueue.cancel(handles[2].take().unwrap());
+    assert_eq!(cqueue.len(), 5);
+
+    cqueue.cancel(handles[3].take().unwrap());
+    assert_eq!(cqueue.len(), 5);
+
+    // Suc again
+    cqueue.cancel(handles[8].take().unwrap());
+    assert_eq!(cqueue.len(), 4);
+
+    // Cur [4,5,6,7]
+    let mut c = 0;
+    while !cqueue.is_empty() {
+        let _ = cqueue.fetch_next();
+        c += 1;
+    }
+
+    assert_eq!(c, 4)
+}
+
+#[test]
+fn cqueue_cancel_validity_2() {
+    let mut cqueue = CQueue::new(10, Duration::new(3, 0));
+    let mut handles = (0..10)
+        .map(|i| Some(cqueue.add(Duration::from_secs(i), i)))
+        .collect::<Vec<_>>();
+    assert_eq!(cqueue.len(), 10);
+
+    // Succesful cancel 0, 9
+    cqueue.cancel(handles[0].take().unwrap());
+    cqueue.cancel(handles[9].take().unwrap());
+
+    assert_eq!(cqueue.len(), 8);
+
+    // Cur [1,2,3,4,5,6,7,8]
+    for i in 1..4 {
+        let event = cqueue.fetch_next();
+        assert_eq!(event.0, i);
+    }
+    assert_eq!(cqueue.len(), 5);
+
+    // Cur [4,5,6,7,8]
+    cqueue.cancel(handles[2].take().unwrap());
+    assert_eq!(cqueue.len(), 5);
+
+    cqueue.cancel(handles[3].take().unwrap());
+    assert_eq!(cqueue.len(), 5);
+
+    // Suc again
+    cqueue.cancel(handles[8].take().unwrap());
+    assert_eq!(cqueue.len(), 4);
+
+    // Cur [4,5,6,7]
+    let mut c = 0;
+    while !cqueue.is_empty() {
+        let _ = cqueue.fetch_next();
+        c += 1;
+    }
+
+    assert_eq!(c, 4)
 }

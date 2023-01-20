@@ -9,9 +9,9 @@ mod topology;
 
 pub mod channel;
 pub mod gate;
-pub mod hooks;
 pub mod message;
 pub mod module;
+pub mod plugin;
 pub mod subsystem;
 
 pub(crate) use self::runtime::HandleMessageEvent;
@@ -37,5 +37,6 @@ pub use self::common::ObjectPathParseError;
 pub use self::common::ParHandle;
 pub use self::common::Parameters;
 
-pub use self::topology::NodeDefinition;
+pub use self::topology::TopoEdge;
+pub use self::topology::TopoNode;
 pub use self::topology::Topology;

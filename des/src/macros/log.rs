@@ -2,18 +2,18 @@
 
 macro_rules! log_scope {
     () => {
-        $crate::runtime::ScopedLogger::end_scope()
+        $crate::logger::Logger::end_scope()
     };
     ($i: expr) => {
-        $crate::runtime::ScopedLogger::begin_scope($i);
+        $crate::logger::Logger::begin_scope($i);
     };
     ($i: expr, $s: expr) => {
-        $crate::runtime::ScopedLogger::begin_scope(format!("{}: {}", $i, $s));
+        $crate::logger::Logger::begin_scope(format!("{}: {}", $i, $s));
     };
     ($i: expr => { $e:expr }) => {{
-        $crate::runtime::ScopedLogger::begin_scope($i);
+        $crate::logger::Logger::begin_scope($i);
         let ret = $e;
-        $crate::runtime::ScopedLogger::end_scope();
+        $crate::logger::Logger::end_scope();
         ret
     }};
 }

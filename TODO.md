@@ -36,5 +36,3 @@ The subsystem acts as a seperate component on the module path
 # NDL Warnings
 
 e.g. mutiple import of the same subasset (in the same file+)
-
-# Async Module -- Async Hooks

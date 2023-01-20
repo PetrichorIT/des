@@ -3,7 +3,7 @@
 use crate::net::{gate::GateRef, module::ModuleId};
 use crate::time::SimTime;
 use std::fmt::Debug;
-use std::net::{IpAddr, SocketAddr};
+use std::panic::UnwindSafe;
 
 mod func;
 pub use func::*;
@@ -40,6 +40,11 @@ impl Message {
         MessageBuilder::new()
     }
 
+    #[cfg(feature = "async")]
+    pub(crate) fn notify() -> Self {
+        Message::new().typ(TYP_NOTIFY).build()
+    }
+
     /// Returns the length of the complete message
     #[must_use]
     pub fn length(&self) -> usize {
@@ -56,27 +61,25 @@ impl Message {
     }
 
     ///
+    /// The metadata attached to the message.
+    ///
+    #[inline]
+    #[must_use]
+    pub fn header_mut(&mut self) -> &mut MessageHeader {
+        &mut self.header
+    }
+
+    ///
     /// A strinification function that reduces it to its identifering pars.
     ///
     #[must_use]
     pub fn str(&self) -> String {
         format!(
-            "Message {{ {} bytes {} }}",
+            "Message {{ {} bytes {} ({}) }}",
             self.header.length,
-            self.content.as_ref().map_or("no content", AnyBox::ty)
+            self.content.as_ref().map_or("no content", AnyBox::ty),
+            self.header.typ()
         )
-    }
-}
-
-/// # Special accessors
-impl Message {
-    ///
-    /// Registers a hop in the header, thereby decrementing ttl
-    /// while incrementing the hop count.
-    ///
-    pub fn register_hop(&mut self) {
-        self.header.ttl = self.header.ttl.saturating_sub(1);
-        self.header.hop_count += 1;
     }
 }
 
@@ -155,7 +158,7 @@ impl Message {
     /// of type T. If this cannot be guarnteed this is UB.
     /// Note that DES guarntees that the data refernced by ptr will not
     /// be freed until this function is called, and ownership is thereby moved..
-    ///
+    ///D
     /// # Errors
     ///
     /// Returns an error if either there is no content, or
@@ -266,6 +269,9 @@ impl Message {
 // A message only contains primitve data, ptrs that are threadsafe
 // and a untyped contained value.
 unsafe impl Send for Message {}
+unsafe impl Sync for Message {} // TODO: wrong unsafe find better method
+
+impl UnwindSafe for Message {}
 
 ///
 /// A intermediary type for constructing messages.
@@ -350,55 +356,6 @@ impl MessageBuilder {
     #[must_use]
     pub fn send_time(mut self, send_time: SimTime) -> Self {
         self.header.send_time = send_time;
-        self
-    }
-
-    /// Sets the field `src_node` and `src_port`.
-    #[must_use]
-    pub fn src(mut self, src_addr: SocketAddr) -> Self {
-        self.header.src_addr = src_addr;
-        self
-    }
-
-    /// Sets the field `src_node`.
-    #[must_use]
-    pub fn src_node(mut self, src_node: IpAddr) -> Self {
-        self.header.src_addr.set_ip(src_node);
-        self
-    }
-
-    /// Sets the field `src_port`.
-    #[must_use]
-    pub fn src_port(mut self, src_port: u16) -> Self {
-        self.header.src_addr.set_port(src_port);
-        self
-    }
-
-    /// Sets the field `dest_node` and `dest_port`
-    #[must_use]
-    pub fn dest(mut self, dest_addr: SocketAddr) -> Self {
-        self.header.dest_addr = dest_addr;
-        self
-    }
-
-    /// Sets the field `dest_node`.
-    #[must_use]
-    pub fn dest_node(mut self, dest_node: IpAddr) -> Self {
-        self.header.dest_addr.set_ip(dest_node);
-        self
-    }
-
-    /// Sets the field `dest_port`.
-    #[must_use]
-    pub fn dest_port(mut self, dest_port: u16) -> Self {
-        self.header.dest_addr.set_port(dest_port);
-        self
-    }
-
-    /// Sets the field `seq_no`.
-    #[must_use]
-    pub fn seq_no(mut self, seq_no: u32) -> Self {
-        self.header.seq_no = seq_no;
         self
     }
 

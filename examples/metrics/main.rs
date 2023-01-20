@@ -1,4 +1,4 @@
-use des::{prelude::*, runtime::ScopedLogger};
+use des::prelude::*;
 
 #[NdlModule("examples/metrics")]
 #[derive(Debug)]
@@ -37,10 +37,10 @@ impl Module for Alice {
 struct Main {}
 
 fn main() {
-    ScopedLogger::new()
+    Logger::new()
         .active(true)
         .interal_max_log_level(log::LevelFilter::Warn)
-        .finish()
+        .try_set_logger()
         .expect("Failed to set logger");
 
     Main::default().run_with_options(RuntimeOptions::seeded(123).max_itr(1000));

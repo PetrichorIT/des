@@ -4,9 +4,8 @@ use crate::net::{ObjectPath, Topology};
 use crate::runtime::{Application, Runtime};
 use crate::time::SimTime;
 use log::info;
-use std::cell::RefCell;
 use std::fmt::{Debug, Display};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 mod events;
 pub(crate) use events::*;
@@ -40,7 +39,7 @@ pub struct NetworkRuntime<A> {
 
 impl<A> NetworkRuntime<A> {
     ///
-    /// Creates a new instance by wrapping 'inner' into a empty `NetworkRuntime`<A>.
+    /// Creates a new instance by wrapping 'inner' into a empty `NetworkRuntime<A>`.
     ///
     #[must_use]
     pub fn new(inner: A) -> Self {
@@ -119,7 +118,8 @@ impl<A> Application for NetworkRuntime<A> {
         rt.app
             .globals
             .topology
-            .borrow_mut()
+            .lock()
+            .unwrap()
             .build(&rt.app.module_list);
 
         rt.add_event(NetEvents::SimStartNotif(SimStartNotif()), SimTime::now());
@@ -194,23 +194,7 @@ pub struct NetworkRuntimeGlobals {
     ///
     /// The topology of the network from a module viewpoint.
     ///
-    pub topology: RefCell<Topology>,
-
-    ///
-    /// The total duration spend in the module specific handlers.
-    ///
-    #[cfg(feature = "metrics-module-time")]
-    pub time_elapsed: std::time::Duration,
-
-    ///
-    /// The runtime that executes all futures.
-    /// Note that the set of all futures within this runtime can be partitioned into
-    /// subsets required by each module. No future should be used by more than one module.
-    /// (Expect some global values for data collection)
-    ///
-    #[cfg(feature = "async")]
-    #[cfg(feature = "async-sharedrt")]
-    pub runtime: std::sync::Arc<tokio::runtime::Runtime>,
+    pub topology: Mutex<Topology>,
 }
 
 impl NetworkRuntimeGlobals {
@@ -221,16 +205,7 @@ impl NetworkRuntimeGlobals {
     pub fn new() -> Self {
         Self {
             parameters: Parameters::new(),
-            topology: RefCell::new(Topology::new()),
-
-            #[cfg(feature = "metrics-module-time")]
-            time_elapsed: std::time::Duration::ZERO,
-
-            #[cfg(feature = "async")]
-            #[cfg(feature = "async-sharedrt")]
-            runtime: std::sync::Arc::new(
-                tokio::runtime::Runtime::new().expect("Failed to create global runtime"),
-            ),
+            topology: Mutex::new(Topology::new()),
         }
     }
 }

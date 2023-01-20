@@ -17,6 +17,7 @@ use std::{
     any::type_name,
     cell::UnsafeCell,
     fmt::{Debug, Display},
+    sync::{Mutex, MutexGuard, TryLockError},
 };
 
 #[cfg(feature = "metrics")]
@@ -34,9 +35,6 @@ pub use self::limit::*;
 mod bench;
 pub use bench::*;
 
-pub(crate) mod logger;
-pub use self::logger::*;
-
 pub(crate) const FT_NET: bool = cfg!(feature = "net");
 pub(crate) const FT_CQUEUE: bool = cfg!(feature = "cqueue");
 pub(crate) const FT_INTERNAL_METRICS: bool = cfg!(feature = "metrics");
@@ -47,12 +45,16 @@ pub(crate) const SYM_CROSSMARK: char = '\u{02df}';
 
 pub(crate) static RNG: SyncWrap<UnsafeCell<Option<StdRng>>> = SyncWrap::new(UnsafeCell::new(None));
 
+/// A lock the ensures only one runtime exits at a time.
+static SIMULATION_LOCK: Mutex<()> = Mutex::new(());
+
 ///
 /// Returns the current simulation time of the currentlly active
 /// runtime session.
 ///
 #[inline]
 #[must_use]
+#[deprecated]
 pub fn sim_time() -> SimTime {
     SimTime::now()
 }
@@ -134,6 +136,9 @@ where
     // Misc
     quiet: bool,
     profiler: Profiler,
+
+    #[allow(dead_code)]
+    permit: MutexGuard<'static, ()>,
 
     future_event_set: FutureEventSet<A>,
 }
@@ -273,8 +278,42 @@ where
     ///
     #[must_use]
     pub fn new_with(app: A, mut options: RuntimeOptions) -> Self {
+        // Get simulation permit
+
+        let permit = {
+            let lock = SIMULATION_LOCK.try_lock();
+            match lock {
+                Ok(permit) => permit,
+                Err(err) => {
+                    match err {
+                        TryLockError::WouldBlock => {
+                            eprintln!("des::warning ** another runtime allready exists ... waiting for simlock");
+                            let lock = SIMULATION_LOCK.lock();
+                            match lock {
+                                Ok(lock) => lock,
+                                Err(p) => {
+                                    eprintln!("des::error ** another runtime poisoned the simlock ... cleaning up");
+                                    Self::poison_cleanup();
+                                    p.into_inner()
+                                }
+                            }
+                        }
+                        TryLockError::Poisoned(p) => {
+                            eprintln!("des::error ** another runtime poisoned the simlock ... cleaning up");
+                            Self::poison_cleanup();
+                            p.into_inner()
+                        }
+                    }
+                }
+            }
+        };
+
         // Log prep
         // StandardLogger::setup().expect("Failed to create logger");
+        #[cfg(feature = "cqueue")]
+        if std::mem::size_of::<A::EventSet>() > 128 {
+            eprintln!("des::warning ** creating runtime with event-set bigger that 128 bytes * this may lead to performance losses");
+        }
 
         // Set SimTime
         let sim_time = options.min_sim_time.unwrap_or(SimTime::MIN);
@@ -292,6 +331,7 @@ where
 
             event_id: 0,
             itr: 0,
+            permit,
 
             limit: options.custom_limit.unwrap_or_else(|| {
                 match (options.max_itr, options.max_sim_time) {
@@ -342,6 +382,10 @@ where
         this
     }
 
+    fn poison_cleanup() {
+        // NOP
+    }
+
     ///
     /// Processes the next event in the future event list by calling its handler.
     /// Returns `true` if there is another event in queue, false if not.
@@ -353,15 +397,14 @@ where
     pub fn next(&mut self) -> bool {
         debug_assert!(!self.future_event_set.is_empty());
 
-        let node = self.future_event_set.fetch_next(
+        let (event, time) = self.future_event_set.fetch_next(
             #[cfg(feature = "metrics")]
             Arc::clone(&self.profiler.metrics),
         );
 
         self.itr += 1;
 
-        if self.check_break_condition(&node) {
-            let EventNode { time, event, .. } = node;
+        if self.check_break_condition(time) {
             self.future_event_set.add(
                 time,
                 event,
@@ -372,9 +415,9 @@ where
         }
 
         // Let this be the only position where SimTime is changed
-        SimTime::set_now(node.time);
+        SimTime::set_now(time);
 
-        node.handle(self);
+        event.handle(self);
         !self.future_event_set.is_empty()
     }
 
@@ -382,8 +425,8 @@ where
     /// Returns true if the one of the break conditions is met.
     ///
     #[inline]
-    fn check_break_condition(&self, node: &EventNode<A>) -> bool {
-        self.limit.applies(self.itr, node)
+    fn check_break_condition(&self, time: SimTime) -> bool {
+        self.limit.applies(self.itr, time)
     }
 
     ///
@@ -792,7 +835,7 @@ cfg_net! {
 
     impl<A> Runtime<NetworkRuntime<A>> {
         ///
-        /// Adds a message event into a [Runtime<NetworkRuntime<A>>] onto a gate.
+        /// Adds a message event into a [`Runtime<NetworkRuntime<A>>`] onto a gate.
         ///
         pub fn add_message_onto(
             &mut self,
@@ -802,14 +845,14 @@ cfg_net! {
         ) {
             let event = MessageAtGateEvent {
                 gate,
-                message: message.into(),
+                message: Box::new(message.into()),
             };
 
             self.add_event(NetEvents::MessageAtGateEvent(event), time);
         }
 
         ///
-        /// Adds a message event into a [Runtime<NetworkRuntime<A>>] onto a module.
+        /// Adds a message event into a [`Runtime<NetworkRuntime<A>>`] onto a module.
         ///
         pub fn handle_message_on(
             &mut self,
@@ -819,7 +862,7 @@ cfg_net! {
         ) {
             let event = HandleMessageEvent {
                 module: module.into(),
-                message: message.into(),
+                message: Box::new(message.into()),
             };
 
             self.add_event(NetEvents::HandleMessageEvent(event), time);

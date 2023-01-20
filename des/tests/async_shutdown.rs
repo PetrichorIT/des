@@ -1,5 +1,4 @@
 #![cfg(feature = "async")]
-#![cfg(not(feature = "async-sharedrt"))]
 
 use des::net::{BuildContext, __Buildable0};
 use des::prelude::*;
@@ -59,8 +58,8 @@ impl AsyncModule for StatelessModule {
 
 static DROPPED_STATELESS_SHUTDOWN: AtomicUsize = AtomicUsize::new(0);
 
-#[serial]
 #[test]
+#[serial]
 fn stateless_module_shudown() {
     DROPPED_STATELESS_SHUTDOWN.store(0, Ordering::SeqCst);
 
@@ -238,8 +237,8 @@ impl AsyncModule for ShutdownViaHandleModule {
 
 static DROPPED_SHUTDOWN_VIA_HANDLE: AtomicUsize = AtomicUsize::new(0);
 
-#[serial]
 #[test]
+#[serial]
 fn shutdown_via_async_handle() {
     DROPPED_SHUTDOWN_VIA_HANDLE.store(0, Ordering::SeqCst);
 
@@ -287,8 +286,8 @@ impl AsyncModule for RestartViaHandleModule {
 
 static DROPPED_RESTART_VIA_HANDLE: AtomicUsize = AtomicUsize::new(0);
 
-#[serial]
 #[test]
+#[serial]
 fn restart_via_async_handle() {
     DROPPED_RESTART_VIA_HANDLE.store(0, Ordering::SeqCst);
 

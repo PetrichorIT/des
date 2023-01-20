@@ -1,7 +1,7 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::ops::Deref;
+use std::sync::{Mutex, RwLock};
 
 use crate::net::globals;
 
@@ -9,10 +9,10 @@ use crate::net::globals;
 /// The collection of all loaded parameters for modules,
 /// inside a network runtime.
 ///
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct Parameters {
-    tree: RefCell<ParameterTree>,
-    pub(crate) updates: RefCell<Vec<String>>,
+    tree: RwLock<ParameterTree>,
+    pub(crate) updates: Mutex<Vec<String>>,
 }
 
 impl Parameters {
@@ -22,23 +22,10 @@ impl Parameters {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            tree: RefCell::new(ParameterTree::new()),
-            updates: RefCell::new(Vec::new()),
+            tree: RwLock::new(ParameterTree::new()),
+            updates: Mutex::new(Vec::new()),
         }
     }
-
-    // // internal
-    // pub fn set_globals(self) -> std::sync::Arc<crate::net::NetworkRuntimeGlobals> {
-    //     use crate::net::NetworkRuntimeGlobals;
-    //     use std::sync::Arc;
-
-    //     let mut g = NetworkRuntimeGlobals::new();
-    //     g.parameters = self;
-    //     let g = Arc::new(g);
-    //     crate::net::runtime::buf_set_globals(Arc::downgrade(&g));
-
-    //     g
-    // }
 
     ///
     /// Populates the parameter tree using the given raw text
@@ -53,12 +40,12 @@ impl Parameters {
     }
 
     pub(crate) fn insert(&self, key: &str, value: &str) {
-        self.tree.borrow_mut().insert(key, value);
+        self.tree.write().unwrap().insert(key, value);
     }
 
     pub(crate) fn get_def_table(&self, key: &str) -> HashMap<String, String> {
         let mut map = HashMap::new();
-        self.tree.borrow().get(key, &mut map);
+        self.tree.read().unwrap().get(key, &mut map);
         map
     }
 
@@ -139,7 +126,8 @@ where
         if let Some(val) = globals()
             .parameters
             .tree
-            .borrow()
+            .read()
+            .unwrap()
             .get_value(&self.path, &self.key)
         {
             ParHandle {
@@ -175,13 +163,18 @@ where
     ///
     /// Indicates whether the handle contains a value.
     ///
+    /// # Panics
+    ///
+    /// Panics if the globals cannot be fetched.
+    ///
     #[must_use]
     pub fn is_some(&self) -> bool {
         self.value.is_some()
             || globals()
                 .parameters
                 .tree
-                .borrow()
+                .read()
+                .unwrap()
                 .get_value(&self.path, &self.key)
                 .is_some()
     }
@@ -198,6 +191,10 @@ where
     /// Returns the contained value optionally, thereby losing the
     /// ability to set the par.
     ///
+    /// # Panics
+    ///
+    /// Panics if the globals cannot be fetched.
+    ///
     #[must_use]
     pub fn as_optional(self) -> Option<String> {
         match self.value {
@@ -205,7 +202,8 @@ where
             None => globals()
                 .parameters
                 .tree
-                .borrow()
+                .read()
+                .unwrap()
                 .get_value(&self.path, &self.key)
                 .map(str::to_string),
         }
@@ -213,6 +211,10 @@ where
 
     ///
     /// Sets the parameter to the given value.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the globals cannot be fetched.
     ///
     #[allow(clippy::needless_pass_by_value)]
     pub fn set<T>(self, value: T)
@@ -223,10 +225,11 @@ where
         globals()
             .parameters
             .tree
-            .borrow_mut()
+            .write()
+            .unwrap()
             .insert(&format!("{}.{}", self.path, self.key), &str);
 
-        globals().parameters.updates.borrow_mut().push(self.path);
+        globals().parameters.updates.lock().unwrap().push(self.path);
     }
 }
 

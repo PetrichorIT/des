@@ -22,7 +22,7 @@ cfg_not_cqueue! {
         where
             A: Application,
         {
-
+            #[allow(clippy::unused_self)]
             pub(crate) fn descriptor(&self) -> String {
                 "FutureEventSet::BinaryHeap()".to_string()
             }
@@ -57,10 +57,12 @@ cfg_not_cqueue! {
             // but would produce invalid code with feature "metrics"
             //
             #[allow(clippy::let_and_return)]
+            #[allow(clippy::needless_pass_by_value)]
+            #[allow(clippy::cast_precision_loss)]
             pub(crate) fn fetch_next(
                 &mut self,
                 #[cfg(feature = "metrics")]  metrics: Arc<RefCell<RuntimeMetrics>>,
-            ) -> EventNode<A> {
+            ) -> (A::EventSet, SimTime) {
                 // Internal runtime metrics
                 #[cfg(feature = "metrics")]
                 let mut metrics = metrics.borrow_mut();
@@ -96,9 +98,10 @@ cfg_not_cqueue! {
                     metrics.zero_event_prec.collect_at(perc, event.time);
                 }
 
-                event
+                (event.event, event.time)
             }
 
+            #[allow(clippy::needless_pass_by_value)]
             pub(crate) fn add(
                 &mut self,
                 time: SimTime,
@@ -137,15 +140,13 @@ cfg_not_cqueue! {
 
 cfg_cqueue! {
     mod cqueue_impl {
-        use std::marker::PhantomData;
-
         #[cfg(feature = "metrics")]
         use std::{sync::Arc, cell::RefCell};
         #[cfg(feature = "metrics")]
         use crate::stats::{Statistic, RuntimeMetrics};
 
 
-        use crate::{runtime::{Application, EventNode, RuntimeOptions}, time::SimTime};
+        use crate::{runtime::{Application, RuntimeOptions}, time::SimTime};
         use cqueue::{CQueue};
 
 
@@ -190,12 +191,11 @@ cfg_cqueue! {
                 }
             }
 
-            #[inline]
             #[allow(clippy::needless_pass_by_value)]
             pub(crate) fn fetch_next(
                 &mut self,
                 #[cfg(feature = "metrics")]  metrics: Arc<RefCell<RuntimeMetrics>>,
-            ) -> EventNode<A> {
+            ) -> (A::EventSet, SimTime) {
 
                 #[cfg(feature = "metrics")]
                 let mut metrics = metrics.borrow_mut();
@@ -217,12 +217,19 @@ cfg_cqueue! {
                     #[cfg(feature = "metrics-rt-full")]
                     #[allow(clippy::cast_precision_loss)]
                     metrics.event_count.collect(self.len() as f64);
+
+                    #[cfg(feature = "metrics-rt-full")]
+                    {
+                        let (used, total) = self.inner.metrics();
+                        metrics.cqueue_memory_used.collect(used as f64);
+                        metrics.cqueue_memory_total.collect(total as f64);
+                    }
                 }
 
                 let (event, time) = self.inner.fetch_next();
 
-                #[cfg(feature = "metrics")]
-                {
+                // #[cfg(feature = "metrics")]
+                // {
                     // metrics
                     //    .overflow_heap_size
                     //    .collect_at(self.inner.len_overflow() as f64, time);
@@ -237,15 +244,9 @@ cfg_cqueue! {
                     // metrics
                     //     .avg_filled_buckets
                     //    .collect_at(self.inner.len_buckets_filled() as f64, time);
-                }
+                // }
 
-                EventNode {
-                    time: SimTime::from_duration(time),
-                    id: 0,
-                    event,
-
-                    _phantom: PhantomData,
-                }
+                (event, SimTime::from_duration(time))
             }
 
             #[allow(clippy::needless_pass_by_value)]

@@ -47,12 +47,12 @@ name = "t-macro2"
 path = "macro2/main.rs"
 
 [[bin]]
-name = "t-net"
-path = "net/main.rs"
-
-[[bin]]
 name = "t-cqueue"
 path = "cqueue/main.rs"
+
+[[bin]]
+name = "t-multisim"
+path = "multisim/main.rs"
 
 [dependencies]
 async-trait = "*"

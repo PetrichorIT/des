@@ -54,6 +54,7 @@ macro_rules! msg_body_lenable {
     };
 }
 
+msg_body_lenable!(&'static str);
 msg_body_lenable!(String);
 
 // # Basic types
@@ -328,29 +329,6 @@ where
             + self.3.byte_len()
             + self.4.byte_len()
             + self.5.byte_len()
-    }
-}
-
-// # Custom
-
-cfg_async! {
-    impl MessageBody for tokio::sim::net::UdpMessage {
-        fn byte_len(&self) -> usize {
-            // TODO
-            self.content.len() + 16
-        }
-    }
-
-    impl MessageBody for tokio::sim::net::TcpConnectMessage {
-        fn byte_len(&self) -> usize {
-            16
-        }
-    }
-
-    impl MessageBody for tokio::sim::net::TcpMessage {
-        fn byte_len(&self) -> usize {
-            16 + self.content.len()
-        }
     }
 }
 

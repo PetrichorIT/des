@@ -3,9 +3,14 @@ use std::io::Write;
 
 #[cfg(feature = "metrics-rt-full")]
 use super::EventCountVec;
+#[cfg(feature = "metrics-rt-full")]
+use crate::{stats::MeanVec, time::Duration};
 
 /// Metrics that sample the runtime
 pub type RuntimeMetrics = CQueueMetrics;
+
+#[cfg(feature = "metrics-rt-full")]
+const CQUEUE_MEMORY_SLOT_SIZE: Duration = Duration::from_secs(1);
 
 /// Metrics specific to a cqueue.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -20,6 +25,12 @@ pub struct CQueueMetrics {
 
     #[cfg(feature = "metrics-rt-full")]
     pub(crate) event_count: EventCountVec,
+
+    #[cfg(feature = "metrics-rt-full")]
+    pub(crate) cqueue_memory_used: MeanVec,
+
+    #[cfg(feature = "metrics-rt-full")]
+    pub(crate) cqueue_memory_total: MeanVec,
 }
 
 impl CQueueMetrics {
@@ -35,6 +46,12 @@ impl CQueueMetrics {
 
             #[cfg(feature = "metrics-rt-full")]
             event_count: EventCountVec::new(),
+
+            #[cfg(feature = "metrics-rt-full")]
+            cqueue_memory_used: MeanVec::new(CQUEUE_MEMORY_SLOT_SIZE),
+
+            #[cfg(feature = "metrics-rt-full")]
+            cqueue_memory_total: MeanVec::new(CQUEUE_MEMORY_SLOT_SIZE),
         }
     }
 
@@ -46,7 +63,7 @@ impl CQueueMetrics {
 
         let total = self.zero_event_count + self.nonzero_event_count;
         let perc = self.nonzero_event_count as f64 / total as f64;
-        writeln!(f, "\tinstant_event_prec: {}", perc)?;
+        writeln!(f, "\tinstant_event_prec: {perc}")?;
 
         Ok(())
     }
@@ -62,6 +79,12 @@ impl CQueueMetrics {
         #[cfg(feature = "metrics-rt-full")]
         self.event_count.finish();
 
+        #[cfg(feature = "metrics-rt-full")]
+        self.cqueue_memory_used.finish();
+
+        #[cfg(feature = "metrics-rt-full")]
+        self.cqueue_memory_total.finish();
+
         println!("\u{23A2} Metrics");
 
         println!("\u{23A2}  Instant-queue size: {}", self.zero_queue_size);
@@ -74,6 +97,6 @@ impl CQueueMetrics {
 
         let total = self.zero_event_count + self.nonzero_event_count;
         let perc = self.nonzero_event_count as f64 / total as f64;
-        println!("\u{23A2}  Instant event prec: {}", perc);
+        println!("\u{23A2}  Instant event prec: {perc}");
     }
 }

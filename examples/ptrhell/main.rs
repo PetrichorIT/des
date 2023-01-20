@@ -8,6 +8,8 @@ pub use modules::*;
 struct Main();
 
 fn main() {
+    Logger::new().try_set_logger().unwrap();
+
     let app = Main::default().build_rt();
 
     let rt = Runtime::new_with(app, RuntimeOptions::seeded(0x123));

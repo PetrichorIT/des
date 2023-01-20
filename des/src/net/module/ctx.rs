@@ -1,135 +1,138 @@
 use super::{DummyModule, ModuleId, ModuleRef, ModuleRefWeak, ModuleReferencingError};
-use crate::{
-    net::hooks::HookEntry,
-    prelude::{GateRef, ObjectPath},
-};
+use crate::prelude::{GateRef, ObjectPath};
 use std::{
-    cell::{Ref, RefCell},
     collections::HashMap,
     fmt::Debug,
     sync::{atomic::AtomicBool, Arc},
 };
 
-#[cfg(feature = "async")]
-use super::ext::AsyncCoreExt;
-#[cfg(feature = "async")]
-use tokio::sim::SimContext;
+use crate::net::plugin::PluginEntry;
 
-thread_local! {
-    static MOD_CTX: RefCell<Option<Arc<ModuleContext>>> = const { RefCell::new(None) }
+#[cfg(feature = "async")]
+use crate::net::module::core::AsyncCoreExt;
+
+pub(crate) static MOD_CTX: spin::RwLock<Option<Arc<ModuleContext>>> = spin::RwLock::new(None);
+pub(crate) static SETUP_FN: spin::Mutex<fn(&ModuleContext)> = spin::Mutex::new(_default_setup);
+
+#[cfg(not(feature = "async"))]
+pub(crate) fn _default_setup(_: &ModuleContext) {}
+
+#[cfg(feature = "async")]
+pub(crate) fn _default_setup(this: &ModuleContext) {
+    this.add_plugin(
+        crate::net::plugin::TokioTimePlugin::new(this.path.path().to_string()),
+        0,
+        false,
+    );
 }
 
+/// INTERNAL
 pub struct ModuleContext {
     pub(crate) active: AtomicBool,
-
     pub(crate) id: ModuleId,
 
-    /// A human readable identifier for the module.
     pub(crate) path: ObjectPath,
+    pub(crate) gates: spin::RwLock<Vec<GateRef>>,
+    pub(crate) plugins: spin::RwLock<Vec<PluginEntry>>,
 
-    /// A collection of all gates register to the current module
-    pub(crate) gates: RefCell<Vec<GateRef>>,
-
-    /// A collection of hooks
-    pub(crate) hooks: RefCell<Vec<HookEntry>>,
-
-    /// Expensions for async
     #[cfg(feature = "async")]
-    pub(crate) async_ext: RefCell<AsyncCoreExt>,
-
-    /// The reference for the parent module.
+    pub(crate) async_ext: spin::RwLock<AsyncCoreExt>,
     pub(crate) parent: Option<ModuleRefWeak>,
-
-    /// The collection of child nodes for the current module.
-    pub(crate) children: RefCell<HashMap<String, ModuleRef>>,
+    pub(crate) children: spin::RwLock<HashMap<String, ModuleRef>>,
 }
 
 impl ModuleContext {
     /// Creates a new standalone instance
     pub fn standalone(path: ObjectPath) -> ModuleRef {
-        #[cfg(feature = "async")]
-        let ident = path.path().to_string();
-
-        ModuleRef::dummy(Arc::new(Self {
+        let this = ModuleRef::dummy(Arc::new(Self {
             active: AtomicBool::new(true),
 
             id: ModuleId::gen(),
             path,
-            gates: RefCell::new(Vec::new()),
-            hooks: RefCell::new(Vec::new()),
+            gates: spin::RwLock::new(Vec::new()),
+            plugins: spin::RwLock::new(Vec::new()),
 
             parent: None,
-            children: RefCell::new(HashMap::new()),
+            children: spin::RwLock::new(HashMap::new()),
 
             #[cfg(feature = "async")]
-            async_ext: RefCell::new(AsyncCoreExt::new(ident)),
-        }))
+            async_ext: spin::RwLock::new(AsyncCoreExt::new()),
+        }));
+
+        SETUP_FN.lock()(&this);
+
+        this
     }
 
     /// Creates a child
     #[allow(clippy::needless_pass_by_value)]
     pub fn child_of(name: &str, parent: ModuleRef) -> ModuleRef {
         let path = ObjectPath::module_with_parent(name, &parent.ctx.path);
-        #[cfg(feature = "async")]
-        let ident = path.path().to_string();
-
         let this = ModuleRef::dummy(Arc::new(Self {
             active: AtomicBool::new(true),
 
             id: ModuleId::gen(),
             path,
-            gates: RefCell::new(Vec::new()),
-            hooks: RefCell::new(Vec::new()),
+            gates: spin::RwLock::new(Vec::new()),
+            plugins: spin::RwLock::new(Vec::new()),
 
             parent: Some(ModuleRefWeak::new(&parent)),
-            children: RefCell::new(HashMap::new()),
+            children: spin::RwLock::new(HashMap::new()),
 
             #[cfg(feature = "async")]
-            async_ext: RefCell::new(AsyncCoreExt::new(ident)),
+            async_ext: spin::RwLock::new(AsyncCoreExt::new()),
         }));
+
+        SETUP_FN.lock()(&this);
 
         parent
             .ctx
             .children
-            .borrow_mut()
+            .write()
             .insert(name.to_string(), this.clone());
 
         this
     }
 
     pub(crate) fn place(self: Arc<Self>) -> Option<Arc<ModuleContext>> {
-        // println!("Now active module: {}", self.path.path());
-        MOD_CTX.with(|ctx| ctx.borrow_mut().replace(self))
+        MOD_CTX.write().replace(self)
     }
 
     pub(crate) fn take() -> Option<Arc<ModuleContext>> {
-        MOD_CTX.with(|ctx| ctx.take())
+        MOD_CTX.write().take()
     }
 
+    /// INTERNAL
     pub fn id(&self) -> ModuleId {
         self.id
     }
 
+    /// INTERNAL
     pub fn path(&self) -> ObjectPath {
         self.path.clone()
     }
-
+    /// INTERNAL
     pub fn name(&self) -> String {
         self.path.name().to_string()
     }
-
+    /// INTERNAL
     pub fn gates(&self) -> Vec<GateRef> {
-        self.gates.borrow().clone()
+        self.gates.read().clone()
     }
-
+    /// INTERNAL
     pub fn gate(&self, name: &str, pos: usize) -> Option<GateRef> {
         self.gates
-            .borrow()
+            .read()
             .iter()
             .find(|&g| g.name() == name && g.pos() == pos)
             .cloned()
     }
-
+    /// Returns a reference to a parent module
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no parent exists, or is not yet initalized
+    /// (see load order).
     pub fn parent(&self) -> Result<ModuleRef, ModuleReferencingError> {
         if let Some(ref parent) = self.parent {
             let strong = parent
@@ -148,10 +151,13 @@ impl ModuleContext {
             )))
         }
     }
-
+    /// Returns a reference to a child module.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no child with the provided name exists.
     pub fn child(&self, name: &str) -> Result<ModuleRef, ModuleReferencingError> {
-        dbg!(self.path.path(), self.children.borrow());
-        if let Some(child) = self.children.borrow().get(name) {
+        if let Some(child) = self.children.read().get(name) {
             Ok(child.clone())
         } else {
             Err(ModuleReferencingError::NoEntry(format!(
@@ -174,12 +180,11 @@ impl Debug for ModuleContext {
 //     }
 // }
 
-pub(crate) fn with_mod_ctx<R>(f: impl FnOnce(Ref<Arc<ModuleContext>>) -> R) -> R {
-    MOD_CTX.with(|ctx| {
-        let brw = ctx.borrow();
-        let brw = Ref::map(brw, |v| v.as_ref().unwrap());
-        f(brw)
-    })
+pub(crate) fn with_mod_ctx<R>(f: impl FnOnce(&Arc<ModuleContext>) -> R) -> R {
+    let lock = MOD_CTX.read();
+    let r = f(lock.as_ref().unwrap());
+    drop(lock);
+    r
 }
 
 cfg_async! {
@@ -188,68 +193,53 @@ cfg_async! {
     use tokio::sync::mpsc::{UnboundedReceiver, error::SendError};
     use super::ext::WaitingMessage;
 
-    #[cfg(not(feature = "async-sharedrt"))]
     pub(super) fn async_get_rt() -> Option<Arc<Runtime>> {
-        with_mod_ctx(|ctx| Some(Arc::clone(ctx.async_ext.borrow().rt.as_ref()?)))
+        with_mod_ctx(|ctx| Some(Arc::clone(ctx.async_ext.read().rt.as_ref()?)))
     }
 
-    #[cfg(feature = "async-sharedrt")]
-    pub(super) fn async_get_rt() -> Option<Arc<Runtime>> {
-         Some(Arc::clone(&crate::net::globals().runtime))
-    }
-
-    pub(super) fn async_take_sim_ctx() -> SimContext {
-        with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().ctx.take().expect("Sombody stole our sim context"))
-    }
-
-    pub(super) fn async_leave_sim_ctx(sim_ctx: SimContext) {
-        with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().ctx = Some(sim_ctx));
-    }
-
-    #[cfg(not(feature = "async-sharedrt"))]
     pub(super) fn async_ctx_reset() {
-        with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().reset());
+        with_mod_ctx(|ctx| ctx.async_ext.write().reset());
     }
 
     // Wait queue
 
     pub(super) fn async_wait_queue_tx_send(msg: WaitingMessage) -> Result<(), SendError<WaitingMessage>> {
-        with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().wait_queue_tx.send(msg))
+        with_mod_ctx(|ctx| ctx.async_ext.write().wait_queue_tx.send(msg))
     }
 
     pub(super) fn async_wait_queue_rx_take() -> Option<UnboundedReceiver<WaitingMessage>> {
-        with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().wait_queue_rx.take())
+        with_mod_ctx(|ctx| ctx.async_ext.write().wait_queue_rx.take())
     }
 
     pub(super) fn async_set_wait_queue_join(join: JoinHandle<()>) {
-        with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().wait_queue_join = Some(join));
+        with_mod_ctx(|ctx| ctx.async_ext.write().wait_queue_join = Some(join));
     }
 
     // Sim Staart
 
     pub(super) fn async_sim_start_rx_take() -> Option<UnboundedReceiver<usize>> {
-        with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().sim_start_rx.take())
+        with_mod_ctx(|ctx| ctx.async_ext.write().sim_start_rx.take())
     }
 
     pub(super) fn async_set_sim_start_join(join: JoinHandle<()>) {
-        with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().sim_start_join = Some(join));
+        with_mod_ctx(|ctx| ctx.async_ext.write().sim_start_join = Some(join));
     }
 
     pub(super) fn async_sim_start_tx_send(stage: usize) -> Result<(), SendError<usize>>  {
-        with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().sim_start_tx.send(stage))
+        with_mod_ctx(|ctx| ctx.async_ext.write().sim_start_tx.send(stage))
     }
 
     pub(super) fn async_sim_start_join_take() -> Option<JoinHandle<()>> {
-        with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().sim_start_join.take())
+        with_mod_ctx(|ctx| ctx.async_ext.write().sim_start_join.take())
     }
 
     // SIM END
 
     pub(super) fn async_sim_end_join_set(join: JoinHandle<()>)  {
-        with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().sim_end_join = Some(join));
+        with_mod_ctx(|ctx| ctx.async_ext.write().sim_end_join = Some(join));
     }
 
     pub(super) fn async_sim_end_join_take() -> Option<JoinHandle<()>> {
-        with_mod_ctx(|ctx| ctx.async_ext.borrow_mut().sim_end_join.take())
+        with_mod_ctx(|ctx| ctx.async_ext.write().sim_end_join.take())
     }
 }

@@ -67,6 +67,7 @@ impl EventSet<Application> for Events {
 #[derive(Debug)]
 struct ServerDone {
     started: SimTime,
+    _pad: [u8; 300],
 }
 
 impl Event<Application> for ServerDone {
@@ -83,6 +84,7 @@ impl Event<Application> for ServerDone {
                 rt.add_event_in(
                     Events::ServerDone(ServerDone {
                         started: rt.sim_time(),
+                        _pad: [0; 300],
                     }),
                     customer.duration,
                 )
@@ -122,6 +124,7 @@ impl Event<Application> for CustomerArrival {
             rt.add_event_in(
                 Events::ServerDone(ServerDone {
                     started: rt.sim_time(),
+                    _pad: [0; 300],
                 }),
                 customer.duration,
             );

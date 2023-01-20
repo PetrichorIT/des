@@ -2,13 +2,11 @@
 debug = true
 
 [workspace]
-
 members = [
   "cqueue",
   "des",
   "des_macros",
+  "des_macros_core",
   "ndl",
   "examples",
 ]
-
-exclude = ["tests_async"]
