@@ -205,7 +205,7 @@ impl ModuleRef {
     }
 
     pub(crate) fn reset(&self) {
-        self.handler.borrow_mut().reset()
+        self.handler.borrow_mut().reset();
     }
 
     // MARKER: handle_message
@@ -245,7 +245,7 @@ impl ModuleRef {
             with_mod_ctx(|ctx| {
                 for plugin in ctx.plugins.write().iter_mut().rev() {
                     if !plugin.just_created {
-                        plugin.try_defer()
+                        plugin.try_defer();
                     }
                     plugin.just_created = false;
                 }
@@ -288,7 +288,7 @@ impl ModuleRef {
         with_mod_ctx(|ctx| {
             for plugin in ctx.plugins.write().iter_mut().rev() {
                 if !plugin.just_created {
-                    plugin.try_defer_sim_start()
+                    plugin.try_defer_sim_start();
                 }
                 plugin.just_created = false;
             }
@@ -315,7 +315,7 @@ impl ModuleRef {
         with_mod_ctx(|ctx| {
             for plugin in ctx.plugins.write().iter_mut().rev() {
                 if !plugin.just_created {
-                    plugin.try_defer_sim_start()
+                    plugin.try_defer_sim_start();
                 }
                 plugin.just_created = false;
             }
@@ -341,7 +341,7 @@ impl ModuleRef {
         with_mod_ctx(|ctx| {
             for plugin in ctx.plugins.write().iter_mut().rev() {
                 if !plugin.just_created {
-                    plugin.try_defer_sim_end()
+                    plugin.try_defer_sim_end();
                 }
                 plugin.just_created = false;
             }
@@ -368,7 +368,7 @@ impl ModuleRef {
         with_mod_ctx(|ctx| {
             for plugin in ctx.plugins.write().iter_mut().rev() {
                 if !plugin.just_created {
-                    plugin.try_defer_sim_end()
+                    plugin.try_defer_sim_end();
                 }
                 plugin.just_created = false;
             }

@@ -62,7 +62,7 @@ fn matches_path_front(s: &str, rules: &[String]) -> bool {
             rem.is_empty()
         } else {
             // This may only occur if this rule is the last one
-            if rules[1] == "" {
+            if rules[1].is_empty() {
                 debug_assert_eq!(rules.len(), 2);
                 return true;
             }
@@ -71,10 +71,9 @@ fn matches_path_front(s: &str, rules: &[String]) -> bool {
                 rem = &rem[idx..];
                 if matches_path_front(rem, &rules[1..]) {
                     return true;
-                } else {
-                    let pat = rules[1].len();
-                    rem = &rem[pat..];
                 }
+                let pat = rules[1].len();
+                rem = &rem[pat..];
             }
             false
         }
@@ -105,9 +104,9 @@ impl FromStr for Capture {
 
             let split = component
                 .split('*')
-                .map(|s| s.to_string())
+                .map(ToString::to_string)
                 .collect::<Vec<_>>();
-            parts.push(CaptureParts::Path(split))
+            parts.push(CaptureParts::Path(split));
         }
 
         Ok(Self { parts })
@@ -168,7 +167,7 @@ impl FilterPolicy {
                 _ => continue,
             };
 
-            self.filters.push((capture, filter))
+            self.filters.push((capture, filter));
         }
     }
 
@@ -177,7 +176,7 @@ impl FilterPolicy {
         let mut current = base;
         for (capture, filter) in &self.filters {
             if capture.matches(s) {
-                current = current.min(*filter)
+                current = current.min(*filter);
             }
         }
         current

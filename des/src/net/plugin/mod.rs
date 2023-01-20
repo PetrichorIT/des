@@ -38,10 +38,10 @@ pub trait Plugin: UnwindSafe {
     ///
     fn capture(&mut self, msg: Option<Message>) -> Option<Message>;
 
-    /// A message pre-processor executed at the sim_start stage.
+    /// A message pre-processor executed at the sim-start stage.
     fn capture_sim_start(&mut self) {}
 
-    /// A message pre-processor executed at the sim_end stage.
+    /// A message pre-processor executed at the sim-end stage.
     fn capture_sim_end(&mut self) {}
 
     /// A deferred function, executed after the event processing has finished.
@@ -53,10 +53,10 @@ pub trait Plugin: UnwindSafe {
     ///
     fn defer(&mut self);
 
-    /// A message post-processor executed at the sim_start stage.
+    /// A message post-processor executed at the sim-start stage.
     fn defer_sim_start(&mut self) {}
 
-    /// A message post-processor executed at the sim_end stage.
+    /// A message post-processor executed at the sim-end stage.
     fn defer_sim_end(&mut self) {}
 }
 
@@ -146,6 +146,7 @@ pub fn remove_plugin(plugin: PluginHandle) {
 ///
 /// This function panics, if the plugin was ot defined in the context of this module.
 /// Also panics if executed outside of a module context.
+#[must_use]
 pub fn plugin_status(plugin: &PluginHandle) -> PluginStatus {
     with_mod_ctx(|ctx| ctx.plugin_status(plugin))
 }
@@ -185,6 +186,10 @@ impl ModuleContext {
     }
 
     /// Refer to [`remove_plugin`].
+    ///
+    /// # Panics
+    ///
+    /// This function panics, if the handle in invalid.
     #[allow(clippy::needless_pass_by_value)]
     pub fn remove_plugin(&self, handle: PluginHandle) {
         let mut plugins = self
@@ -199,6 +204,10 @@ impl ModuleContext {
     }
 
     /// Refer to [`plugin_status`].
+    ///
+    /// # Panics
+    ///
+    /// This function panics, if the handle in invalid.
     pub fn plugin_status(&self, handle: &PluginHandle) -> PluginStatus {
         let plugins = self
             .plugins
@@ -268,12 +277,12 @@ impl PluginEntry {
             match result {
                 Ok((plugin, msg)) => {
                     self.state = PluginState::Idle(plugin);
-                    return msg;
+                    msg
                 }
                 Err(panic) => {
                     log::error!("Plugin #{} paniced at Plugin::capture", self.id);
                     self.state = PluginState::Paniced(panic);
-                    return None;
+                    None
                 }
             }
         } else {
@@ -292,7 +301,7 @@ impl PluginEntry {
                 Ok(plugin) => self.state = PluginState::Idle(plugin),
                 Err(panic) => {
                     log::error!("Plugin #{} paniced at Plugin::capture_sim_start", self.id);
-                    self.state = PluginState::Paniced(panic)
+                    self.state = PluginState::Paniced(panic);
                 }
             }
         }
@@ -309,7 +318,7 @@ impl PluginEntry {
                 Ok(plugin) => self.state = PluginState::Idle(plugin),
                 Err(panic) => {
                     log::error!("Plugin #{} paniced at Plugin::capture_sim_end", self.id);
-                    self.state = PluginState::Paniced(panic)
+                    self.state = PluginState::Paniced(panic);
                 }
             }
         }
@@ -326,7 +335,7 @@ impl PluginEntry {
                 Ok(plugin) => self.state = PluginState::Idle(plugin),
                 Err(panic) => {
                     log::error!("Plugin #{} paniced at Plugin::defer", self.id);
-                    self.state = PluginState::Paniced(panic)
+                    self.state = PluginState::Paniced(panic);
                 }
             }
         }
@@ -343,7 +352,7 @@ impl PluginEntry {
                 Ok(plugin) => self.state = PluginState::Idle(plugin),
                 Err(panic) => {
                     log::error!("Plugin #{} paniced at Plugin::defer_sim_start", self.id);
-                    self.state = PluginState::Paniced(panic)
+                    self.state = PluginState::Paniced(panic);
                 }
             }
         }
@@ -360,7 +369,7 @@ impl PluginEntry {
                 Ok(plugin) => self.state = PluginState::Idle(plugin),
                 Err(panic) => {
                     log::error!("Plugin #{} paniced at Plugin::defer_sim_end", self.id);
-                    self.state = PluginState::Paniced(panic)
+                    self.state = PluginState::Paniced(panic);
                 }
             }
         }

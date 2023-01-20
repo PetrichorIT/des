@@ -57,7 +57,7 @@ impl<S: Any, F: Fn(&mut S)> PeriodicPlugin<S, F> {
                     .content("PeriodicPlugin::WakupMessage")
                     .build(),
                 self.period,
-            )
+            );
         }
     }
 }

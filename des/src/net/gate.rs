@@ -120,6 +120,10 @@ impl Gate {
     ///
     /// The next gate in the gate chain by reference.
     ///
+    /// # Panics
+    ///
+    /// Panics if the simulation core was poisoned.
+    ///
     #[must_use]
     pub fn previous_gate(&self) -> Option<GateRef> {
         self.previous_gate.lock().unwrap().clone()?.upgrade()
@@ -127,6 +131,10 @@ impl Gate {
 
     ///
     /// The next gate in the gate chain by reference.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the simulation core was poisoned.
     ///
     #[must_use]
     pub fn next_gate(&self) -> Option<GateRef> {
@@ -137,6 +145,10 @@ impl Gate {
     /// A function to link the next gate in the gate chain, by referencing
     /// its identifier.
     ///
+    /// # Panics
+    ///
+    /// Panics if the simulation core was poisoned.
+    ///
     pub fn set_next_gate(self: &GateRef, next_gate: GateRef) {
         *next_gate.previous_gate.lock().unwrap() = Some(Arc::downgrade(self));
         *self.next_gate.lock().unwrap() = Some(next_gate);
@@ -145,6 +157,9 @@ impl Gate {
     ///
     /// Returns the channel attached to this gate, if any exits.
     ///
+    /// # Panics
+    ///
+    /// Panics if the simulation core was poisoned.
     #[must_use]
     pub fn channel(&self) -> Option<ChannelRef> {
         // only provide a read_only interface publicly
@@ -162,6 +177,9 @@ impl Gate {
     ///
     /// Sets the channel attached to this gate.
     ///
+    /// # Panics
+    ///
+    /// Panics if the simulation core was poisoned.
     pub fn set_channel(&self, channel: ChannelRef) {
         *self.channel.lock().unwrap() = Some(channel);
     }
@@ -210,6 +228,9 @@ impl Gate {
     ///
     /// Creats a new gate using the given values.
     ///
+    /// # Panics
+    ///
+    /// Panics if the provided size is not real positive.
     #[must_use]
     pub fn new(
         owner: &ModuleRef,

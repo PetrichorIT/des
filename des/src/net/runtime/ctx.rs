@@ -30,6 +30,11 @@ struct BufferContext {
 ///
 /// Returns the globals of the runtime.
 ///
+/// # Panics
+///
+/// This function panics if the no runtime is currently active.
+/// Note that a runtime is active if a instance of [`NetworkRuntime`] exists.
+///
 #[must_use]
 pub fn globals() -> Arc<NetworkRuntimeGlobals> {
     let ctx = BUF_CTX.lock();
@@ -42,20 +47,20 @@ pub fn globals() -> Arc<NetworkRuntimeGlobals> {
 
 pub(crate) fn buf_send_at(msg: Message, gate: GateRef, send_time: SimTime) {
     let mut ctx = BUF_CTX.lock();
-    ctx.output.push((msg, gate, send_time))
+    ctx.output.push((msg, gate, send_time));
 }
 pub(crate) fn buf_schedule_at(msg: Message, arrival_time: SimTime) {
     let mut ctx = BUF_CTX.lock();
-    ctx.loopback.push((msg, arrival_time))
+    ctx.loopback.push((msg, arrival_time));
 }
 pub(crate) fn buf_schedule_shutdown(restart: Option<SimTime>) {
     let mut ctx = BUF_CTX.lock();
-    ctx.shutdown = Some(restart)
+    ctx.shutdown = Some(restart);
 }
 
 pub(crate) fn buf_set_globals(globals: Weak<NetworkRuntimeGlobals>) {
     let mut ctx = BUF_CTX.lock();
-    ctx.globals = Some(globals)
+    ctx.globals = Some(globals);
 }
 
 pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<NetworkRuntime<A>>) {

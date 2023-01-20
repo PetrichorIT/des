@@ -128,7 +128,8 @@ impl ModuleRef {
             Some(Ref::map(brw, |brw| unsafe {
                 let hpt: *const dyn Module = &**brw;
                 // hpt.cast::<T>()
-                &*(hpt as *const T)
+                // &*(hpt as *const T)
+                &*(hpt.cast::<T>())
             }))
         } else {
             None

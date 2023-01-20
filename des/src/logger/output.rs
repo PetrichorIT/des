@@ -3,8 +3,8 @@ use std::{
     io::{BufWriter, Result, Stderr, Stdout, Write},
 };
 
-use log::Level::*;
-use termcolor::*;
+use log::Level::{Debug, Error, Info, Trace, Warn};
+use termcolor::{BufferWriter, ColorChoice};
 
 use super::{record::LogRecord, LogFormat};
 
@@ -15,6 +15,11 @@ pub trait LogOutput {
     ///
     /// This function may fail if the underlying target cannot be
     /// written.
+    ///
+    /// # Errors
+    ///
+    /// Returns the raw error that occured on the underlying target.
+    ///
     fn write(&mut self, record: &LogRecord, fmt: LogFormat) -> Result<()>;
 }
 
@@ -32,7 +37,7 @@ impl LogOutput for File {
         let bufwrt = BufferWriter::stdout(ColorChoice::Never);
         let mut buffer = bufwrt.buffer();
         LogFormat::NoColor.fmt(record, &mut buffer)?;
-        self.write_all(&buffer.as_slice())?;
+        self.write_all(buffer.as_slice())?;
         Ok(())
     }
 }
@@ -42,7 +47,7 @@ impl LogOutput for BufWriter<File> {
         let bufwrt = BufferWriter::stdout(ColorChoice::Never);
         let mut buffer = bufwrt.buffer();
         LogFormat::NoColor.fmt(record, &mut buffer)?;
-        self.write_all(&buffer.as_slice())?;
+        self.write_all(buffer.as_slice())?;
         Ok(())
     }
 }

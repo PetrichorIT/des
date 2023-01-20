@@ -42,8 +42,8 @@ pub fn send_at(msg: impl Into<Message>, gate: impl IntoModuleGate, send_time: Si
 
     let gate = with_mod_ctx(|ctx| {
         // (1) Cast the gate
-        #[allow(clippy::explicit_auto_deref)]
-        gate.as_gate(&*ctx)
+        #[allow(clippy::explicit_auto_deref)] // IS RIGHT ?
+        gate.as_gate(ctx)
     });
 
     if let Some(gate) = gate {

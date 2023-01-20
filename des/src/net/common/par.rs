@@ -163,6 +163,10 @@ where
     ///
     /// Indicates whether the handle contains a value.
     ///
+    /// # Panics
+    ///
+    /// Panics if the globals cannot be fetched.
+    ///
     #[must_use]
     pub fn is_some(&self) -> bool {
         self.value.is_some()
@@ -187,6 +191,10 @@ where
     /// Returns the contained value optionally, thereby losing the
     /// ability to set the par.
     ///
+    /// # Panics
+    ///
+    /// Panics if the globals cannot be fetched.
+    ///
     #[must_use]
     pub fn as_optional(self) -> Option<String> {
         match self.value {
@@ -203,6 +211,10 @@ where
 
     ///
     /// Sets the parameter to the given value.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the globals cannot be fetched.
     ///
     #[allow(clippy::needless_pass_by_value)]
     pub fn set<T>(self, value: T)

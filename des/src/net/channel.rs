@@ -149,6 +149,10 @@ impl Channel {
     ///
     /// The object path of the channel.
     ///
+    /// # Panics
+    ///
+    /// Panics if the simulation core was poisoned.
+    ///
     #[must_use]
     pub fn path(&self) -> ObjectPath {
         self.inner.read().unwrap().path.clone()
@@ -157,6 +161,10 @@ impl Channel {
     ///
     /// A description of the channels capabilities,
     /// independent from its current state.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the simulation core was poisoned.
     ///
     #[must_use]
     pub fn metrics(&self) -> ChannelMetrics {
@@ -169,6 +177,10 @@ impl Channel {
     ///
     /// Note that being non-busy does not mean that no packet is currently on the medium
     /// it just means that all bits have been put onto the medium.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the simulation core was poisoned.
     ///
     #[must_use]
     pub fn is_busy(&self) -> bool {
@@ -188,6 +200,10 @@ impl Channel {
     ///
     /// Returns the time when the packet currently being transmitted onto the medium
     /// has been fully transmitted, or [`SimTime::ZERO`] if no packet is currently being transmitted.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the simulation core was poisoned.
     ///
     #[must_use]
     pub fn transmission_finish_time(&self) -> SimTime {
@@ -244,6 +260,10 @@ impl Channel {
     /// Calcualtes the packet travel duration using the
     /// underlying metric.
     ///
+    /// # Panics
+    ///
+    /// Panics if the simulation core was poisoned.
+    ///
     pub fn calculate_duration(&self, msg: &Message, rng: &mut StdRng) -> Duration {
         self.inner
             .read()
@@ -255,6 +275,10 @@ impl Channel {
     ///
     /// Calcualtes the busy time of the channel using
     /// the underlying metric.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the simulation core was poisoned.
     ///
     #[must_use]
     pub fn calculate_busy(&self, msg: &Message) -> Duration {
@@ -379,7 +403,7 @@ impl Debug for Channel {
         f.debug_struct("Channel")
             .field("path", &this.path)
             .field("metrics", &this.metrics)
-            .field("state", &FmtChannelState::from(&*this))
+            .field("state", &FmtChannelState::from(&this))
             .finish()
     }
 }

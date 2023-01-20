@@ -6,7 +6,7 @@ use std::{
     sync::{atomic::AtomicBool, Arc},
 };
 
-use crate::net::plugin::*;
+use crate::net::plugin::PluginEntry;
 
 #[cfg(feature = "async")]
 use crate::net::module::core::AsyncCoreExt;
@@ -19,7 +19,11 @@ pub(crate) fn _default_setup(_: &ModuleContext) {}
 
 #[cfg(feature = "async")]
 pub(crate) fn _default_setup(this: &ModuleContext) {
-    this.add_plugin(TokioTimePlugin::new(this.path.path().to_string()), 0, false);
+    this.add_plugin(
+        crate::net::plugin::TokioTimePlugin::new(this.path.path().to_string()),
+        0,
+        false,
+    );
 }
 
 /// INTERNAL
@@ -123,7 +127,12 @@ impl ModuleContext {
             .find(|&g| g.name() == name && g.pos() == pos)
             .cloned()
     }
-    /// INTERNAL
+    /// Returns a reference to a parent module
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no parent exists, or is not yet initalized
+    /// (see load order).
     pub fn parent(&self) -> Result<ModuleRef, ModuleReferencingError> {
         if let Some(ref parent) = self.parent {
             let strong = parent
@@ -142,7 +151,11 @@ impl ModuleContext {
             )))
         }
     }
-    /// INTERNAL
+    /// Returns a reference to a child module.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no child with the provided name exists.
     pub fn child(&self, name: &str) -> Result<ModuleRef, ModuleReferencingError> {
         if let Some(child) = self.children.read().get(name) {
             Ok(child.clone())
@@ -169,7 +182,7 @@ impl Debug for ModuleContext {
 
 pub(crate) fn with_mod_ctx<R>(f: impl FnOnce(&Arc<ModuleContext>) -> R) -> R {
     let lock = MOD_CTX.read();
-    let r = f(&*lock.as_ref().unwrap());
+    let r = f(lock.as_ref().unwrap());
     drop(lock);
     r
 }

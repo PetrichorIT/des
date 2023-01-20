@@ -21,6 +21,7 @@ pub struct TokioTimePlugin {
 
 impl TokioTimePlugin {
     /// Creates a new instance of self
+    #[must_use]
     pub fn new(ident: String) -> Self {
         Self {
             time: Some(TimeContext::new(ident)),
@@ -59,7 +60,7 @@ impl Plugin for TokioTimePlugin {
         // (1) Handle current time events
         SimContext::with_current(|ctx| {
             if let Some(ctx) = ctx.time.as_mut() {
-                ctx.process_now()
+                ctx.process_now();
             }
         });
 

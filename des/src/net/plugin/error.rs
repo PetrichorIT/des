@@ -16,6 +16,7 @@ pub struct PluginError {
 
 impl PluginError {
     /// Returns the kind of the Error.
+    #[must_use]
     pub fn kind(&self) -> PluginErrorKind {
         self.kind
     }
@@ -24,6 +25,7 @@ impl PluginError {
     /// a plugin of type T should have been active and should have provide some service
     /// but did not. This method will figure out what caused the plugin to
     /// not provide its service
+    #[must_use]
     pub fn expected<T: Any>() -> PluginError {
         // let current_plugin = ;
 

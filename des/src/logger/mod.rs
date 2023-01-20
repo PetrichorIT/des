@@ -187,7 +187,7 @@ impl Logger {
     /// Panics if another logger as allready set, or sombody steals the
     /// logger from the static registry in a race condition.
     pub fn set_logger(self) {
-        self.try_set_logger().expect("Failed to set logger")
+        self.try_set_logger().expect("Failed to set logger");
     }
 
     /// Connects the logger to the logging framework.
@@ -270,7 +270,7 @@ impl Log for Logger {
         };
 
         // (4) Get scope or make defeault print based on the target marker.
-        let scope_label = CURRENT_SCOPE.lock().clone();
+        let scope_label = CURRENT_SCOPE.lock();
         if scope_label.is_empty() {
             // if policy(record.target()) {
             // No target scope was given --- not scoped println.
@@ -297,18 +297,18 @@ impl Log for Logger {
         };
 
         // (5) Fetch scope information
-        let scope = scopes.get_mut(scope_label);
+        let scope = scopes.get_mut(*scope_label);
         if let Some(scope) = scope {
             scope.log(format!("{}", record.args()), target_label, record.level());
         } else {
             // TODO: Check target validity
-            let (output, fmt) = self.policy.configure(scope_label);
+            let (output, fmt) = self.policy.configure(*scope_label);
 
             let mut new_scope = LoggerScope {
                 scope: Arc::new(scope_label.to_string()),
                 output,
                 fmt,
-                filter: self.filter.filter_for(scope_label, LevelFilter::max()),
+                filter: self.filter.filter_for(*scope_label, LevelFilter::max()),
             };
 
             new_scope.log(format!("{}", record.args()), target_label, record.level());
@@ -347,7 +347,7 @@ impl LoggerScope {
         };
 
         if let Err(e) = self.output.write(&record, self.fmt) {
-            eprintln!("failed to write to logging output: {e}")
+            eprintln!("failed to write to logging output: {e}");
         }
     }
 }
