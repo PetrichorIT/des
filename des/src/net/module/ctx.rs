@@ -1,5 +1,8 @@
 use super::{DummyModule, ModuleId, ModuleRef, ModuleRefWeak, ModuleReferencingError};
-use crate::prelude::{GateRef, ObjectPath};
+use crate::{
+    net::plugin2,
+    prelude::{GateRef, ObjectPath},
+};
 use std::{
     collections::HashMap,
     fmt::Debug,
@@ -19,10 +22,15 @@ pub(crate) fn _default_setup(_: &ModuleContext) {}
 
 #[cfg(feature = "async")]
 pub(crate) fn _default_setup(this: &ModuleContext) {
-    this.add_plugin(
-        crate::net::plugin::TokioTimePlugin::new(this.path.path().to_string()),
+    // this.add_plugin(
+    //     crate::net::plugin::TokioTimePlugin::new(this.path.path().to_string()),
+    //     0,
+    //     false,
+    // );
+    this.add_plugin2(
+        crate::net::plugin2::TokioTimePlugin::new(this.path.path().to_string()),
         0,
-        false,
+        crate::net::plugin2::PluginPanicPolicy::Abort,
     );
 }
 
@@ -34,6 +42,8 @@ pub struct ModuleContext {
     pub(crate) path: ObjectPath,
     pub(crate) gates: spin::RwLock<Vec<GateRef>>,
     pub(crate) plugins: spin::RwLock<Vec<PluginEntry>>,
+
+    pub(crate) plugins2: spin::RwLock<plugin2::PluginRegistry>,
 
     #[cfg(feature = "async")]
     pub(crate) async_ext: spin::RwLock<AsyncCoreExt>,
@@ -51,6 +61,7 @@ impl ModuleContext {
             path,
             gates: spin::RwLock::new(Vec::new()),
             plugins: spin::RwLock::new(Vec::new()),
+            plugins2: spin::RwLock::new(plugin2::PluginRegistry::new()),
 
             parent: None,
             children: spin::RwLock::new(HashMap::new()),
@@ -75,6 +86,7 @@ impl ModuleContext {
             path,
             gates: spin::RwLock::new(Vec::new()),
             plugins: spin::RwLock::new(Vec::new()),
+            plugins2: spin::RwLock::new(plugin2::PluginRegistry::new()),
 
             parent: Some(ModuleRefWeak::new(&parent)),
             children: spin::RwLock::new(HashMap::new()),
