@@ -20,7 +20,7 @@ pub type MessageId = u16;
 ///
 ///  * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-pub type MessageKind = u32;
+pub type MessageKind = u16;
 
 ///
 /// The metadata attachted to a message, independent of its contents.
