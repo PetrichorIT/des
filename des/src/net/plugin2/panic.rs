@@ -1,4 +1,4 @@
-use super::{Plugin, PluginEntry, PluginRegistry, PluginState};
+use super::{Plugin, PluginEntry, PluginState};
 use std::{any::Any, fmt, panic, sync::Arc};
 
 /// A policy that defines the behaviour if a plugin paniced.
@@ -21,11 +21,14 @@ pub enum PluginPanicPolicy {
 }
 
 impl PluginPanicPolicy {
-    pub(super) fn activate(&self, _registry: &mut PluginRegistry, payload: Box<dyn Any + Send>) {
+    pub(super) fn activate(&self, entry: &mut PluginEntry, payload: Box<dyn Any + Send>) {
         match self {
             Self::Capture => {}
             Self::Abort => panic::resume_unwind(payload),
-            Self::Restart(_) => todo!(),
+            Self::Restart(creation_fn) => {
+                entry.plugin = Some(creation_fn());
+                entry.state = PluginState::JustCreated;
+            }
         }
     }
 }

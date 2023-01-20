@@ -1,342 +1,595 @@
-// #![cfg(feature = "net")]
-// use des::{
-//     net::{
-//         BuildContext, __Buildable0,
-//         plugin::{PeriodicPlugin, PluginError, PluginHandle, PluginStatus},
-//     },
-//     prelude::*,
-// };
-// use serial_test::serial;
-// use std::sync::{
-//     atomic::{AtomicBool, AtomicUsize, Ordering::SeqCst},
-//     Arc,
-// };
+#![cfg(feature = "net")]
+use des::net::{plugin2::*, BuildContext, __Buildable0};
+use des::prelude::*;
+use serial_test::serial;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering::SeqCst;
+use std::sync::Arc;
 
-// mod sample {
-//     use std::sync::atomic::Ordering::SeqCst;
-//     use std::sync::{atomic::AtomicUsize, Arc};
+mod common {
+    use des::net::plugin2::*;
+    use des::prelude::*;
 
-//     use des::prelude::*;
+    pub struct ConsumeAllIncoming;
+    impl Plugin for ConsumeAllIncoming {
+        fn capture_incoming(&mut self, _msg: Message) -> Option<Message> {
+            None
+        }
+    }
 
-//     pub struct ConsumeAll;
-//     impl Plugin for ConsumeAll {
-//         fn capture(&mut self, _: Option<Message>) -> Option<Message> {
-//             None
-//         }
-//         fn defer(&mut self) {}
-//     }
+    pub struct IncrementIncomingId;
+    impl Plugin for IncrementIncomingId {
+        fn capture_incoming(&mut self, mut msg: Message) -> Option<Message> {
+            msg.header_mut().id += 1;
+            Some(msg)
+        }
+    }
 
-//     pub struct PanicOnMessage;
-//     impl Plugin for PanicOnMessage {
-//         fn capture(&mut self, msg: Option<Message>) -> Option<Message> {
-//             if msg.is_some() {
-//                 panic!("PanicOnMessage received message")
-//             } else {
-//                 None
-//             }
-//         }
-//         fn defer(&mut self) {}
-//     }
+    pub struct PanicOnIncoming;
+    impl Plugin for PanicOnIncoming {
+        fn capture_incoming(&mut self, _msg: Message) -> Option<Message> {
+            panic!("common::PanicOnIncoming")
+        }
+    }
+}
 
-//     pub struct ActivitySensor {
-//         pub expected: usize,
-//         pub arc: Arc<AtomicUsize>,
-//     }
+#[NdlModule]
+struct PluginCreation {
+    handles: Vec<PluginHandle>,
+    sum: usize,
+}
+impl Module for PluginCreation {
+    fn new() -> Self {
+        Self {
+            handles: Vec::new(),
+            sum: 0,
+        }
+    }
+    fn at_sim_start(&mut self, _stage: usize) {
+        self.handles
+            .push(add_plugin(common::IncrementIncomingId, 100));
+        assert_eq!(self.handles[0].status(), PluginStatus::Active);
+        for i in 0..100 {
+            schedule_at(
+                Message::new().id(i).build(),
+                SimTime::now() + Duration::from_secs(i as u64),
+            )
+        }
+    }
+    fn handle_message(&mut self, msg: Message) {
+        assert_eq!(SimTime::now().as_secs() + 1, msg.header().id as u64);
+        self.sum += msg.header().id as usize;
+    }
+    fn at_sim_end(&mut self) {
+        assert_eq!(self.sum, (0..100).sum::<usize>() + 100);
+        assert_eq!(self.handles[0].status(), PluginStatus::Active);
+    }
+}
 
-//     impl Plugin for ActivitySensor {
-//         fn capture(&mut self, msg: Option<Message>) -> Option<Message> {
-//             // log::debug!("INC #{}", self.expected);
-//             let real = self.arc.fetch_add(1, SeqCst);
-//             assert_eq!(real, self.expected);
-//             msg
-//         }
+#[test]
+#[serial]
+fn plugin_creation() {
+    // Logger::new().set_logger();
 
-//         fn defer(&mut self) {
-//             // log::debug!("DEC #{}", self.expected);
-//             let real = self.arc.fetch_sub(1, SeqCst);
-//             assert_eq!(real - 1, self.expected);
-//         }
-//     }
+    let mut app = NetworkRuntime::new(());
+    let mut cx = BuildContext::new(&mut app);
 
-//     pub struct IncrementId;
-//     impl Plugin for IncrementId {
-//         fn capture(&mut self, mut msg: Option<Message>) -> Option<Message> {
-//             msg.as_mut()?.header_mut().id += 1;
-//             msg
-//         }
+    let root = PluginCreation::build_named(ObjectPath::root_module("root"), &mut cx);
+    cx.create_module(root);
 
-//         fn defer(&mut self) {}
-//     }
-// }
+    let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
+    let result = rt.run().unwrap();
 
-// #[NdlModule]
-// struct PluginPriority;
-// impl Module for PluginPriority {
-//     fn new() -> Self {
-//         Self
-//     }
+    assert_eq!(result.1, SimTime::from_duration(Duration::from_secs(99)));
+    assert_eq!(result.2.event_count, 101);
+}
 
-//     fn at_sim_start(&mut self, _stage: usize) {
-//         add_plugin(sample::PanicOnMessage, 100);
-//         add_plugin(sample::ConsumeAll, 10);
+struct RecrusivePluginCreationPlugin {
+    level: u16,
+}
+impl Plugin for RecrusivePluginCreationPlugin {
+    fn capture_incoming(&mut self, mut msg: Message) -> Option<Message> {
+        if msg.header().id == self.level {
+            add_plugin(
+                Self {
+                    level: self.level + 1,
+                },
+                self.level as usize + 1,
+            );
+        }
+        msg.header_mut().kind += 1;
+        Some(msg)
+    }
+}
 
-//         for i in 0..100 {
-//             schedule_in(Message::new().build(), Duration::from_secs(i));
-//         }
-//     }
+#[NdlModule]
+struct PluginInPluginCreation;
+impl Module for PluginInPluginCreation {
+    fn new() -> Self {
+        Self {}
+    }
 
-//     fn handle_message(&mut self, _msg: Message) {
-//         panic!("Panic on message plugin let through message")
-//     }
-// }
+    fn at_sim_start(&mut self, _stage: usize) {
+        add_plugin(RecrusivePluginCreationPlugin { level: 1 }, 1);
+        for i in 1..10 {
+            schedule_in(
+                Message::new().id(i).kind(0).build(),
+                Duration::from_secs(i as u64),
+            )
+        }
+    }
 
-// #[test]
-// #[serial]
-// fn plugin_priority() {
-//     // ScopedLogger::new().finish().unwrap();
+    fn handle_message(&mut self, msg: Message) {
+        let id = msg.header().id + 1; // number of modules that are active
+        assert_eq!(msg.header().kind, id,);
+    }
+}
 
-//     let mut app = NetworkRuntime::new(());
-//     let mut cx = BuildContext::new(&mut app);
+#[test]
+#[serial]
+fn plugin_in_plugin_creation() {
+    // Logger::new().set_logger();
 
-//     let module = PluginPriority::build_named(ObjectPath::root_module("root"), &mut cx);
-//     cx.create_module(module);
+    let mut app = NetworkRuntime::new(());
+    let mut cx = BuildContext::new(&mut app);
 
-//     let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
-//     let result = rt.run();
+    let module = PluginInPluginCreation::build_named(ObjectPath::root_module("root"), &mut cx);
+    cx.create_module(module);
 
-//     let RuntimeResult::Finished { time, profiler, .. } = result else {
-//         panic!("Unexpected runtime result")
-//     };
+    let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
+    let result = rt.run();
 
-//     assert_eq!(time, 99.0);
-//     assert_eq!(profiler.event_count, 100 + 1);
-// }
+    let RuntimeResult::Finished { time, profiler, .. } = result else {
+        panic!("Unexpected runtime result")
+    };
 
-// #[NdlModule]
-// struct PluginPriorityDefer {
-//     arc: Arc<AtomicUsize>,
-// }
-// impl Module for PluginPriorityDefer {
-//     fn new() -> Self {
-//         Self {
-//             arc: Arc::new(AtomicUsize::new(0)),
-//         }
-//     }
+    assert_eq!(time, 9.0);
+    assert_eq!(profiler.event_count, 9 + 1);
+}
 
-//     fn at_sim_start(&mut self, _stage: usize) {
-//         add_plugin(
-//             sample::ActivitySensor {
-//                 arc: self.arc.clone(),
-//                 expected: 1,
-//             },
-//             100,
-//         );
-//         add_plugin(
-//             sample::ActivitySensor {
-//                 arc: self.arc.clone(),
-//                 expected: 0,
-//             },
-//             10,
-//         );
-//         add_plugin(
-//             sample::ActivitySensor {
-//                 arc: self.arc.clone(),
-//                 expected: 2,
-//             },
-//             1000,
-//         );
+struct RecrusivePluginCreationPlugin2 {
+    level: u16,
+}
+impl Plugin for RecrusivePluginCreationPlugin2 {
+    fn capture_incoming(&mut self, mut msg: Message) -> Option<Message> {
+        if msg.header().id == self.level {
+            log::info!("new subplugin");
+            add_plugin(
+                Self {
+                    level: self.level - 1,
+                },
+                self.level as usize - 1,
+            );
+        }
+        msg.header_mut().kind += 1;
+        log::info!("inc");
+        Some(msg)
+    }
+}
 
-//         for i in 0..100 {
-//             schedule_in(Message::new().build(), Duration::from_secs(i));
-//         }
-//     }
+#[NdlModule]
+struct PluginInPluginCreation2;
+impl Module for PluginInPluginCreation2 {
+    fn new() -> Self {
+        Self {}
+    }
 
-//     fn handle_message(&mut self, _msg: Message) {}
-// }
+    fn at_sim_start(&mut self, _stage: usize) {
+        add_plugin(RecrusivePluginCreationPlugin2 { level: 10 }, 10);
+        for i in 0..=10 {
+            schedule_in(
+                Message::new().id(10 - i).kind(0).build(),
+                Duration::from_secs(i as u64),
+            )
+        }
+    }
 
-// #[test]
-// #[serial]
-// fn plugin_priority_defer() {
-//     // ScopedLogger::new().finish().unwrap();
+    fn handle_message(&mut self, msg: Message) {
+        let id = 10 - msg.header().id + 1; // number of modules that are active -1 (since one is defered)
+        assert_eq!(msg.header().kind, id);
+    }
+}
 
-//     let mut app = NetworkRuntime::new(());
-//     let mut cx = BuildContext::new(&mut app);
+#[test]
+#[serial]
+fn plugin_in_plugin_creation2() {
+    // Logger::new().set_logger();
 
-//     let module = PluginPriorityDefer::build_named(ObjectPath::root_module("root"), &mut cx);
-//     cx.create_module(module);
+    let mut app = NetworkRuntime::new(());
+    let mut cx = BuildContext::new(&mut app);
 
-//     let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
-//     let result = rt.run();
+    let module = PluginInPluginCreation2::build_named(ObjectPath::root_module("root"), &mut cx);
+    cx.create_module(module);
 
-//     let RuntimeResult::Finished { time, profiler, .. } = result else {
-//         panic!("Unexpected runtime result")
-//     };
+    let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
+    let result = rt.run();
 
-//     assert_eq!(time, 99.0);
-//     assert_eq!(profiler.event_count, 100 + 1);
-// }
+    let RuntimeResult::Finished { time, profiler, .. } = result else {
+        panic!("Unexpected runtime result")
+    };
 
-// #[NdlModule]
-// struct PluginDuplication {
-//     counter: usize,
-// }
-// impl Module for PluginDuplication {
-//     fn new() -> Self {
-//         Self { counter: 0 }
-//     }
+    assert_eq!(time, 10.0);
+    assert_eq!(profiler.event_count, 11 + 1);
+}
 
-//     fn at_sim_start(&mut self, _stage: usize) {
-//         add_plugin(sample::IncrementId, 100);
-//         add_plugin(sample::IncrementId, 1000);
+#[NdlModule]
+struct PluginPriority;
+impl Module for PluginPriority {
+    fn new() -> Self {
+        Self
+    }
 
-//         for i in 0..100 {
-//             schedule_in(Message::new().id(i).build(), Duration::from_secs(i as u64));
-//         }
-//     }
+    fn at_sim_start(&mut self, _stage: usize) {
+        add_plugin(common::PanicOnIncoming, 100);
+        add_plugin(common::ConsumeAllIncoming, 10);
 
-//     fn handle_message(&mut self, msg: Message) {
-//         let id = msg.header().id as usize;
-//         assert_eq!(id, self.counter + 2);
-//         self.counter += 1;
-//     }
+        for i in 0..100 {
+            schedule_in(Message::new().id(i).build(), Duration::from_secs(i as u64));
+        }
+    }
 
-//     fn at_sim_end(&mut self) {
-//         assert_eq!(self.counter, 100)
-//     }
-// }
+    fn handle_message(&mut self, _msg: Message) {
+        panic!("Panic on message plugin let through message")
+    }
+}
 
-// #[test]
-// #[serial]
-// fn plugin_duplication() {
-//     // ScopedLogger::new().finish().unwrap();
+#[test]
+#[serial]
+fn plugin_priority() {
+    // Logger::new().set_logger();
 
-//     let mut app = NetworkRuntime::new(());
-//     let mut cx = BuildContext::new(&mut app);
+    let mut app = NetworkRuntime::new(());
+    let mut cx = BuildContext::new(&mut app);
 
-//     let module = PluginDuplication::build_named(ObjectPath::root_module("root"), &mut cx);
-//     cx.create_module(module);
+    let module = PluginPriority::build_named(ObjectPath::root_module("root"), &mut cx);
+    cx.create_module(module);
 
-//     let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
-//     let result = rt.run();
+    let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
+    let result = rt.run();
 
-//     let RuntimeResult::Finished { time, profiler, .. } = result else {
-//         panic!("Unexpected runtime result")
-//     };
+    let RuntimeResult::Finished { time, profiler, .. } = result else {
+        panic!("Unexpected runtime result")
+    };
 
-//     assert_eq!(time, 99.0);
-//     assert_eq!(profiler.event_count, 100 + 1);
-// }
+    assert_eq!(time, 99.0);
+    assert_eq!(profiler.event_count, 100 + 1);
+}
 
-// #[NdlModule]
-// struct PluginRemoval {
-//     counter: usize,
-//     handle: Option<PluginHandle>,
-// }
-// impl Module for PluginRemoval {
-//     fn new() -> Self {
-//         Self {
-//             counter: 0,
-//             handle: None,
-//         }
-//     }
+struct ActivitySensor {
+    pub expected: usize,
+    pub shared: Arc<AtomicUsize>,
+}
+impl Plugin for ActivitySensor {
+    fn event_start(&mut self) {
+        let real = self.shared.fetch_add(1, SeqCst);
+        assert_eq!(real, self.expected);
+    }
 
-//     fn at_sim_start(&mut self, _stage: usize) {
-//         self.handle = Some(add_plugin(sample::IncrementId, 100));
-//         add_plugin(sample::IncrementId, 1000);
+    fn event_end(&mut self) {
+        let real = self.shared.fetch_sub(1, SeqCst);
+        assert_eq!(real - 1, self.expected);
+    }
+}
 
-//         for i in 0..100 {
-//             schedule_in(Message::new().id(i).build(), Duration::from_secs(i as u64));
-//         }
+#[NdlModule]
+struct PluginPriorityDefer {
+    arc: Arc<AtomicUsize>,
+}
+impl Module for PluginPriorityDefer {
+    fn new() -> Self {
+        Self {
+            arc: Arc::new(AtomicUsize::new(0)),
+        }
+    }
 
-//         schedule_in(Message::new().kind(42).build(), Duration::from_secs(123));
+    fn at_sim_start(&mut self, _stage: usize) {
+        add_plugin(
+            ActivitySensor {
+                shared: self.arc.clone(),
+                expected: 1,
+            },
+            100,
+        );
+        add_plugin(
+            ActivitySensor {
+                shared: self.arc.clone(),
+                expected: 0,
+            },
+            10,
+        );
+        add_plugin(
+            ActivitySensor {
+                shared: self.arc.clone(),
+                expected: 2,
+            },
+            1000,
+        );
 
-//         for i in 0..100 {
-//             schedule_in(
-//                 Message::new().id(200 + i).build(),
-//                 Duration::from_secs(200 + i as u64),
-//             );
-//         }
-//     }
+        for i in 0..100 {
+            schedule_in(Message::new().build(), Duration::from_secs(i));
+        }
+    }
 
-//     fn handle_message(&mut self, msg: Message) {
-//         if msg.header().kind == 42 {
-//             assert_eq!(self.counter, 100);
-//             remove_plugin(self.handle.take().unwrap());
-//             self.counter = 199;
-//             return;
-//         }
+    fn handle_message(&mut self, _msg: Message) {}
+}
 
-//         let id = msg.header().id as usize;
-//         assert_eq!(id, self.counter + 2);
-//         self.counter += 1;
-//     }
+#[test]
+#[serial]
+fn plugin_priority_defer() {
+    // Logger::new().set_logger();
 
-//     fn at_sim_end(&mut self) {
-//         assert_eq!(self.counter, 299);
-//     }
-// }
+    let mut app = NetworkRuntime::new(());
+    let mut cx = BuildContext::new(&mut app);
 
-// #[test]
-// #[serial]
-// fn plugin_removal() {
-//     // ScopedLogger::new().finish().unwrap();
+    let module = PluginPriorityDefer::build_named(ObjectPath::root_module("root"), &mut cx);
+    cx.create_module(module);
 
-//     let mut app = NetworkRuntime::new(());
-//     let mut cx = BuildContext::new(&mut app);
+    let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
+    let result = rt.run();
 
-//     let module = PluginRemoval::build_named(ObjectPath::root_module("root"), &mut cx);
-//     cx.create_module(module);
+    let RuntimeResult::Finished { time, profiler, .. } = result else {
+        panic!("Unexpected runtime result")
+    };
 
-//     let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
-//     let result = rt.run();
+    assert_eq!(time, 99.0);
+    assert_eq!(profiler.event_count, 100 + 1);
+}
 
-//     let RuntimeResult::Finished { time, profiler, .. } = result else {
-//         panic!("Unexpected runtime result")
-//     };
+#[NdlModule]
+struct PluginDuplication {
+    counter: usize,
+}
+impl Module for PluginDuplication {
+    fn new() -> Self {
+        Self { counter: 0 }
+    }
 
-//     assert_eq!(time, 299.0);
-//     assert_eq!(profiler.event_count, 201 + 1);
-// }
+    fn at_sim_start(&mut self, _stage: usize) {
+        add_plugin(common::IncrementIncomingId, 100);
+        add_plugin(common::IncrementIncomingId, 1000);
 
-// #[NdlModule]
-// struct PluginInPluginAdd;
-// impl Module for PluginInPluginAdd {
-//     fn new() -> Self {
-//         Self
-//     }
-//     fn at_sim_start(&mut self, _stage: usize) {
-//         add_plugin(RecursivePlugin, 69);
-//     }
-// }
+        for i in 0..100 {
+            schedule_in(Message::new().id(i).build(), Duration::from_secs(i as u64));
+        }
+    }
 
-// struct RecursivePlugin;
-// impl Plugin for RecursivePlugin {
-//     fn capture_sim_start(&mut self) {
-//         add_plugin(Self, 42);
-//     }
-//     fn capture(&mut self, msg: Option<Message>) -> Option<Message> {
-//         msg
-//     }
-//     fn defer(&mut self) {}
-// }
+    fn handle_message(&mut self, msg: Message) {
+        let id = msg.header().id as usize;
+        assert_eq!(id, self.counter + 2);
+        self.counter += 1;
+    }
 
-// #[test]
-// #[serial]
-// fn plugin_in_plugin_add() {
-//     // ScopedLogger::new().finish().unwrap();
+    fn at_sim_end(&mut self) {
+        assert_eq!(self.counter, 100)
+    }
+}
 
-//     let mut app = NetworkRuntime::new(());
-//     let mut cx = BuildContext::new(&mut app);
+#[test]
+#[serial]
+fn plugin_duplication() {
+    // Logger::new().finish().unwrap();
 
-//     let module = PluginInPluginAdd::build_named(ObjectPath::root_module("root"), &mut cx);
-//     cx.create_module(module);
+    let mut app = NetworkRuntime::new(());
+    let mut cx = BuildContext::new(&mut app);
 
-//     let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
-//     let _result = rt.run();
+    let module = PluginDuplication::build_named(ObjectPath::root_module("root"), &mut cx);
+    cx.create_module(module);
 
-//     // should rach this point;
-//     // panic!("Should not have reached this point");
-// }
+    let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
+    let result = rt.run();
+
+    let RuntimeResult::Finished { time, profiler, .. } = result else {
+        panic!("Unexpected runtime result")
+    };
+
+    assert_eq!(time, 99.0);
+    assert_eq!(profiler.event_count, 100 + 1);
+}
+
+#[NdlModule]
+struct PluginRemoval {
+    counter: usize,
+    handle: Option<PluginHandle>,
+}
+impl Module for PluginRemoval {
+    fn new() -> Self {
+        Self {
+            counter: 0,
+            handle: None,
+        }
+    }
+
+    fn at_sim_start(&mut self, _stage: usize) {
+        self.handle = Some(add_plugin(common::IncrementIncomingId, 100));
+        add_plugin(common::IncrementIncomingId, 1000);
+
+        for i in 0..100 {
+            schedule_in(Message::new().id(i).build(), Duration::from_secs(i as u64));
+        }
+
+        schedule_in(Message::new().kind(42).build(), Duration::from_secs(123));
+
+        for i in 0..100 {
+            schedule_in(
+                Message::new().id(200 + i).build(),
+                Duration::from_secs(200 + i as u64),
+            );
+        }
+    }
+
+    fn handle_message(&mut self, msg: Message) {
+        if msg.header().kind == 42 {
+            assert_eq!(self.counter, 100);
+            self.handle.take().unwrap().remove();
+            self.counter = 199;
+            return;
+        }
+
+        let id = msg.header().id as usize;
+        assert_eq!(id, self.counter + 2);
+        self.counter += 1;
+    }
+
+    fn at_sim_end(&mut self) {
+        assert_eq!(self.counter, 299);
+    }
+}
+
+#[test]
+#[serial]
+fn plugin_removal() {
+    // Logger::new().set_logger();
+
+    let mut app = NetworkRuntime::new(());
+    let mut cx = BuildContext::new(&mut app);
+
+    let module = PluginRemoval::build_named(ObjectPath::root_module("root"), &mut cx);
+    cx.create_module(module);
+
+    let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
+    let result = rt.run();
+
+    let RuntimeResult::Finished { time, profiler, .. } = result else {
+        panic!("Unexpected runtime result")
+    };
+
+    assert_eq!(time, 299.0);
+    assert_eq!(profiler.event_count, 201 + 1);
+}
+
+#[NdlModule]
+struct PanicPolicyAbort;
+impl Module for PanicPolicyAbort {
+    fn new() -> Self {
+        Self
+    }
+
+    fn at_sim_start(&mut self, _stage: usize) {
+        add_plugin_with(common::PanicOnIncoming, 100, PluginPanicPolicy::Abort);
+        for i in 0..10 {
+            schedule_in(Message::new().id(i).build(), Duration::from_secs(i as u64))
+        }
+    }
+
+    fn handle_message(&mut self, _msg: Message) {
+        panic!("Should never reach this point");
+    }
+}
+
+#[test]
+#[serial]
+#[should_panic = "common::PanicOnIncoming"]
+fn plugin_panic_abort() {
+    // Logger::new().set_logger();
+
+    let mut app = NetworkRuntime::new(());
+    let mut cx = BuildContext::new(&mut app);
+
+    let module = PanicPolicyAbort::build_named(ObjectPath::root_module("root"), &mut cx);
+    cx.create_module(module);
+
+    let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
+    let _result = rt.run();
+
+    panic!("Should never have reached this point")
+}
+
+#[NdlModule]
+struct PanicPolicyCapture;
+impl Module for PanicPolicyCapture {
+    fn new() -> Self {
+        Self
+    }
+
+    fn at_sim_start(&mut self, _stage: usize) {
+        add_plugin_with(common::PanicOnIncoming, 100, PluginPanicPolicy::Capture);
+        for i in 0..10 {
+            schedule_in(Message::new().id(i).build(), Duration::from_secs(i as u64))
+        }
+    }
+
+    fn handle_message(&mut self, msg: Message) {
+        assert!(msg.header().id > 0)
+    }
+}
+
+#[test]
+#[serial]
+fn plugin_panic_capture() {
+    // Logger::new().set_logger();
+
+    let mut app = NetworkRuntime::new(());
+    let mut cx = BuildContext::new(&mut app);
+
+    let module = PanicPolicyCapture::build_named(ObjectPath::root_module("root"), &mut cx);
+    cx.create_module(module);
+
+    let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
+    let result = rt.run();
+
+    let result = result.unwrap();
+    assert_eq!(result.1.as_secs(), 9);
+    assert_eq!(result.2.event_count, 10 + 1);
+}
+
+struct PanicAtThree;
+impl Plugin for PanicAtThree {
+    fn capture_incoming(&mut self, msg: Message) -> Option<Message> {
+        if msg.header().id == 3 {
+            panic!("I dont like this number")
+        }
+        Some(msg)
+    }
+}
+
+#[NdlModule]
+struct PanicPolicyRestart {
+    handle: Vec<PluginHandle>,
+}
+impl Module for PanicPolicyRestart {
+    fn new() -> Self {
+        Self { handle: Vec::new() }
+    }
+
+    fn at_sim_start(&mut self, _stage: usize) {
+        let h = add_plugin_with(
+            PanicAtThree,
+            100,
+            PluginPanicPolicy::Restart(Arc::new(|| Box::new(PanicAtThree))),
+        );
+        self.handle.push(h);
+
+        for i in 0..100 {
+            schedule_in(Message::new().id(i).build(), Duration::from_secs(i as u64))
+        }
+    }
+
+    fn handle_message(&mut self, msg: Message) {
+        assert_ne!(msg.header().id, 3);
+        assert_eq!(msg.header().id, SimTime::now().as_secs() as u16);
+
+        assert_eq!(self.handle[0].status(), PluginStatus::Active);
+    }
+}
+
+#[test]
+#[serial]
+fn plugin_panic_restart() {
+    // Logger::new().set_logger();
+
+    let mut app = NetworkRuntime::new(());
+    let mut cx = BuildContext::new(&mut app);
+
+    let module = PanicPolicyRestart::build_named(ObjectPath::root_module("root"), &mut cx);
+    cx.create_module(module);
+
+    let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
+    let result = rt.run();
+
+    let result = result.unwrap();
+    assert_eq!(result.1.as_secs(), 99);
+    assert_eq!(result.2.event_count, 100 + 1);
+}
 
 // #[NdlModule]
 // struct PluginAtShutdown {

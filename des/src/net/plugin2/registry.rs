@@ -113,7 +113,7 @@ impl PluginRegistry {
         assert!(self.up);
         self.inner[self.pos - 1].state = PluginState::Paniced;
         let policy = self.inner[self.pos - 1].policy.clone();
-        policy.activate(self, payload);
+        policy.activate(&mut self.inner[self.pos - 1], payload);
     }
 
     pub(crate) fn begin_downstream(&mut self) {
@@ -144,7 +144,7 @@ impl PluginRegistry {
         assert!(!self.up);
         self.inner[self.pos].state = PluginState::Paniced;
         let policy = self.inner[self.pos].policy.clone();
-        policy.activate(self, payload);
+        policy.activate(&mut self.inner[self.pos], payload);
     }
 }
 
