@@ -11,3 +11,4 @@ cargo run --release --bin t-proto
 cargo run --release --bin t-droptest
 cargo run --release --bin t-macro2
 cargo run --release --bin t-multisim
+cargo run --release --bin t-plugin

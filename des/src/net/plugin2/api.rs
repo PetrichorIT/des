@@ -85,7 +85,7 @@ impl ModuleContext {
     ) -> PluginHandle {
         let entry = PluginEntry {
             id: 0,
-            plugin: Some(Box::new(plugin)),
+            core: Some(Box::new(plugin)),
             state: PluginState::JustCreated,
             typ: TypeId::of::<T>(),
             priority,

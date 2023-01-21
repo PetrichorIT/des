@@ -14,9 +14,6 @@ pub mod module;
 pub mod plugin2;
 pub mod subsystem;
 
-#[allow(unused)]
-pub mod plugin;
-
 pub(crate) use self::runtime::HandleMessageEvent;
 pub(crate) use self::runtime::MessageAtGateEvent;
 pub(crate) use self::runtime::NetEvents;

@@ -100,6 +100,10 @@ impl Module for BufferChanModule {
 #[test]
 #[serial]
 fn channel_buffering_message() {
+    // Logger::new()
+    //     .interal_max_log_level(log::LevelFilter::Trace)
+    //     .set_logger();
+
     let mut rt = NetworkRuntime::new(());
     let mut cx = BuildContext::new(&mut rt);
 

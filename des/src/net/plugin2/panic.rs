@@ -26,7 +26,7 @@ impl PluginPanicPolicy {
             Self::Capture => {}
             Self::Abort => panic::resume_unwind(payload),
             Self::Restart(creation_fn) => {
-                entry.plugin = Some(creation_fn());
+                entry.core = Some(creation_fn());
                 entry.state = PluginState::JustCreated;
             }
         }
@@ -46,6 +46,9 @@ impl fmt::Debug for PluginPanicPolicy {
 /// The status of a plugin.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PluginStatus {
+    /// The plugin is in the process of being created.
+    /// It will be active once the next event arrives.
+    Initalizing,
     /// The plugin is running smoothly.
     Active,
     /// The plugin paniced.
@@ -54,6 +57,7 @@ pub enum PluginStatus {
 
 impl PluginStatus {
     pub(super) fn from_entry(entry: &PluginEntry) -> Self {
+        // TODO:
         if matches!(entry.state, PluginState::Paniced) {
             Self::Paniced
         } else {

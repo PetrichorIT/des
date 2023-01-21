@@ -9,8 +9,6 @@ use std::{
     sync::{atomic::AtomicBool, Arc},
 };
 
-use crate::net::plugin::PluginEntry;
-
 #[cfg(feature = "async")]
 use crate::net::module::core::AsyncCoreExt;
 
@@ -41,7 +39,6 @@ pub struct ModuleContext {
 
     pub(crate) path: ObjectPath,
     pub(crate) gates: spin::RwLock<Vec<GateRef>>,
-    pub(crate) plugins: spin::RwLock<Vec<PluginEntry>>,
 
     pub(crate) plugins2: spin::RwLock<plugin2::PluginRegistry>,
 
@@ -60,7 +57,6 @@ impl ModuleContext {
             id: ModuleId::gen(),
             path,
             gates: spin::RwLock::new(Vec::new()),
-            plugins: spin::RwLock::new(Vec::new()),
             plugins2: spin::RwLock::new(plugin2::PluginRegistry::new()),
 
             parent: None,
@@ -85,7 +81,6 @@ impl ModuleContext {
             id: ModuleId::gen(),
             path,
             gates: spin::RwLock::new(Vec::new()),
-            plugins: spin::RwLock::new(Vec::new()),
             plugins2: spin::RwLock::new(plugin2::PluginRegistry::new()),
 
             parent: Some(ModuleRefWeak::new(&parent)),

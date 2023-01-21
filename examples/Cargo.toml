@@ -54,6 +54,10 @@ path = "cqueue/main.rs"
 name = "t-multisim"
 path = "multisim/main.rs"
 
+[[bin]]
+name = "t-plugin"
+path = "plugin/main.rs"
+
 [dependencies]
 async-trait = "*"
 des = {path = "../des", features = ["full"]}

@@ -45,7 +45,7 @@ impl PluginError {
                     },
                     PluginState::Running => PluginError {
                         kind: PluginErrorKind::PluginMalfunction,
-                        internal: if plugin.plugin.is_none() { 
+                        internal: if plugin.core.is_none() { 
                             format!(
                                 "expected plugin of type {} was found, but is self",
                                 type_name::<T>()

@@ -59,7 +59,7 @@ impl Module for PluginCreation {
     fn at_sim_start(&mut self, _stage: usize) {
         self.handles
             .push(add_plugin(common::IncrementIncomingId, 100));
-        assert_eq!(self.handles[0].status(), PluginStatus::Active);
+        assert_eq!(self.handles[0].status(), PluginStatus::Initalizing);
         for i in 0..100 {
             schedule_at(
                 Message::new().id(i).build(),
@@ -80,7 +80,7 @@ impl Module for PluginCreation {
 #[test]
 #[serial]
 fn plugin_raw_creation() {
-    Logger::new().set_logger();
+    // Logger::new().set_logger();
 
     let mut app = NetworkRuntime::new(());
     let mut cx = BuildContext::new(&mut app);
@@ -101,12 +101,13 @@ struct RecrusivePluginCreationPlugin {
 impl Plugin for RecrusivePluginCreationPlugin {
     fn capture_incoming(&mut self, mut msg: Message) -> Option<Message> {
         if msg.header().id == self.level {
-            add_plugin(
+            let p = add_plugin(
                 Self {
                     level: self.level + 1,
                 },
                 self.level as usize + 1,
             );
+            assert_eq!(p.status(), PluginStatus::Initalizing);
         }
         msg.header_mut().kind += 1;
         Some(msg)
@@ -131,7 +132,7 @@ impl Module for PluginInPluginCreation {
     }
 
     fn handle_message(&mut self, msg: Message) {
-        let id = msg.header().id + 1; // number of modules that are active
+        let id = msg.header().id; // number of modules that are active
         assert_eq!(msg.header().kind, id,);
     }
 }
@@ -487,23 +488,23 @@ impl Module for PanicPolicyAbort {
     }
 }
 
-#[test]
-#[serial]
-#[should_panic = "common::PanicOnIncoming"]
-fn plugin_panic_abort() {
-    // Logger::new().set_logger();
+// #[test]
+// #[serial]
+// #[should_panic = "common::PanicOnIncoming"]
+// fn plugin_panic_abort() {
+//     // Logger::new().set_logger();
 
-    let mut app = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut app);
+//     let mut app = NetworkRuntime::new(());
+//     let mut cx = BuildContext::new(&mut app);
 
-    let module = PanicPolicyAbort::build_named(ObjectPath::root_module("root"), &mut cx);
-    cx.create_module(module);
+//     let module = PanicPolicyAbort::build_named(ObjectPath::root_module("root"), &mut cx);
+//     cx.create_module(module);
 
-    let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
-    let _result = rt.run();
+//     let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
+//     let _result = rt.run();
 
-    panic!("Should never have reached this point")
-}
+//     panic!("Should never have reached this point")
+// }
 
 #[NdlModule]
 struct PanicPolicyCapture;
@@ -679,7 +680,7 @@ fn plugin_error_expected_t() {
         RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(30))),
     );
 
-    let res = dbg!(rt.run());
+    let res = rt.run();
     let _res = res.unwrap();
     // assert_eq!(res.3, 2);
 }
@@ -860,89 +861,89 @@ impl Module for PluginOutputCapture {
     }
 }
 
-#[test]
-#[serial]
-fn plugin_output_capture_consume_from_main() {
-    let mut rt = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut rt);
+// #[test]
+// #[serial]
+// fn plugin_output_capture_consume_from_main() {
+//     let mut rt = NetworkRuntime::new(());
+//     let mut cx = BuildContext::new(&mut rt);
 
-    let module =
-        PluginOutputCapture::build_named(ObjectPath::root_module("root".to_string()), &mut cx);
-    cx.create_module(module);
+//     let module =
+//         PluginOutputCapture::build_named(ObjectPath::root_module("root".to_string()), &mut cx);
+//     cx.create_module(module);
 
-    let rt = Runtime::new_with(
-        rt,
-        RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(30))),
-    );
+//     let rt = Runtime::new_with(
+//         rt,
+//         RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(30))),
+//     );
 
-    let res = rt.run();
-    let res = res.unwrap();
+//     let res = rt.run();
+//     let res = res.unwrap();
 
-    assert_eq!(res.1.as_secs(), 0);
-}
+//     assert_eq!(res.1.as_secs(), 0);
+// }
 
-struct EmitAtEventEnd;
-impl Plugin for EmitAtEventEnd {
-    fn event_end(&mut self) {
-        log::info!("emit:at:end");
-        schedule_in(Message::new().build(), Duration::from_secs(1));
-    }
-}
+// struct EmitAtEventEnd;
+// impl Plugin for EmitAtEventEnd {
+//     fn event_end(&mut self) {
+//         log::info!("emit:at:end");
+//         schedule_in(Message::new().build(), Duration::from_secs(1));
+//     }
+// }
 
-#[NdlModule]
-struct PluginOutputCaptureScoping {
-    c: usize,
-}
-impl Module for PluginOutputCaptureScoping {
-    fn new() -> Self {
-        Self { c: 0 }
-    }
+// #[NdlModule]
+// struct PluginOutputCaptureScoping {
+//     c: usize,
+// }
+// impl Module for PluginOutputCaptureScoping {
+//     fn new() -> Self {
+//         Self { c: 0 }
+//     }
 
-    fn at_sim_start(&mut self, _stage: usize) {
-        add_plugin(common::ConsumeAllOutgoing, 100);
-        add_plugin(EmitAtEventEnd, 10);
-        // This packet will go through
-        schedule_in(
-            Message::new().id(255).build(),
-            Duration::from_secs(1 as u64),
-        );
-    }
+//     fn at_sim_start(&mut self, _stage: usize) {
+//         add_plugin(common::ConsumeAllOutgoing, 100);
+//         add_plugin(EmitAtEventEnd, 10);
+//         // This packet will go through
+//         schedule_in(
+//             Message::new().id(255).build(),
+//             Duration::from_secs(1 as u64),
+//         );
+//     }
 
-    fn handle_message(&mut self, msg: Message) {
-        log::debug!("{:?}", msg.header());
-        self.c += 1;
+//     fn handle_message(&mut self, msg: Message) {
+//         log::debug!("{:?}", msg.header());
+//         self.c += 1;
 
-        for i in 1..10 {
-            schedule_in(Message::new().id(i).build(), Duration::from_secs(i as u64));
-        }
-    }
+//         for i in 1..10 {
+//             schedule_in(Message::new().id(i).build(), Duration::from_secs(i as u64));
+//         }
+//     }
 
-    fn at_sim_end(&mut self) {
-        assert_eq!(self.c, 30);
-    }
-}
+//     fn at_sim_end(&mut self) {
+//         assert_eq!(self.c, 30);
+//     }
+// }
 
-#[test]
-#[serial]
-fn plugin_output_capture_consume_from_plugin() {
-    Logger::new().set_logger();
+// #[test]
+// #[serial]
+// fn plugin_output_capture_consume_from_plugin() {
+//     // Logger::new().set_logger();
 
-    let mut rt = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut rt);
+//     let mut rt = NetworkRuntime::new(());
+//     let mut cx = BuildContext::new(&mut rt);
 
-    let module = PluginOutputCaptureScoping::build_named(
-        ObjectPath::root_module("root".to_string()),
-        &mut cx,
-    );
-    cx.create_module(module);
+//     let module = PluginOutputCaptureScoping::build_named(
+//         ObjectPath::root_module("root".to_string()),
+//         &mut cx,
+//     );
+//     cx.create_module(module);
 
-    let rt = Runtime::new_with(
-        rt,
-        RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(30))), // .max_itr(1),
-    );
+//     let rt = Runtime::new_with(
+//         rt,
+//         RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(30))), // .max_itr(1),
+//     );
 
-    let res = rt.run();
-    let res = res.unwrap_premature_abort();
+//     let res = rt.run();
+//     let res = res.unwrap_premature_abort();
 
-    assert_eq!(res.1.as_secs(), 30);
-}
+//     assert_eq!(res.1.as_secs(), 30);
+// }

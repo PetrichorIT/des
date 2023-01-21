@@ -248,64 +248,10 @@ impl ModuleRef {
     #[allow(clippy::unused_self)]
     pub(crate) fn plugin_downstream(&self) {
         with_mod_ctx(|ctx| ctx.plugins2.write().begin_downstream());
-        'outer: loop {
+        loop {
             let plugin = with_mod_ctx(|ctx| ctx.plugins2.write().next_downstream());
             let Some(plugin) = plugin else { break };
-            let mut plugin = UnwindSafeBox(plugin);
-
-            let mut output = super::ctx::get_output_stream();
-            let mut output_r = Vec::with_capacity(output.len());
-            while let Some((msg, gate, time)) = output.pop() {
-                plugin = match panic::catch_unwind(move || {
-                    let mut plugin = plugin;
-                    let ret = plugin.0.capture_outgoing(msg);
-                    (plugin, ret)
-                }) {
-                    Ok((plugin, ret)) => {
-                        if let Some(ret) = ret {
-                            output_r.push((ret, gate, time));
-                        }
-                        plugin
-                    }
-                    Err(p) => {
-                        // plugin failed, reappend all stream if possible losing only the current message.
-                        with_mod_ctx(|ctx| ctx.plugins2.write().paniced_downstream(p));
-                        super::ctx::append_output_stream(output);
-                        super::ctx::append_output_stream(output_r);
-                        break 'outer;
-                    }
-                };
-            }
-
-            super::ctx::append_output_stream(output_r);
-            drop(output);
-
-            let mut loopback = super::ctx::get_loopback_stream();
-            let mut loopback_r = Vec::with_capacity(loopback.len());
-            while let Some((msg, gate)) = loopback.pop() {
-                plugin = match panic::catch_unwind(move || {
-                    let mut plugin = plugin;
-                    let ret = plugin.0.capture_outgoing(msg);
-                    (plugin, ret)
-                }) {
-                    Ok((plugin, ret)) => {
-                        if let Some(ret) = ret {
-                            loopback_r.push((ret, gate));
-                        }
-                        plugin
-                    }
-                    Err(p) => {
-                        // plugin failed, reappend all stream if possible losing only the current message.
-                        with_mod_ctx(|ctx| ctx.plugins2.write().paniced_downstream(p));
-                        super::ctx::append_loopback_stream(loopback);
-                        super::ctx::append_loopback_stream(loopback_r);
-                        break 'outer;
-                    }
-                };
-            }
-
-            super::ctx::append_loopback_stream(loopback_r);
-            drop(loopback);
+            let plugin = UnwindSafeBox(plugin);
 
             let result = panic::catch_unwind(move || {
                 let mut plugin = plugin;
@@ -315,7 +261,7 @@ impl ModuleRef {
 
             match result {
                 Ok(plugin) => {
-                    with_mod_ctx(|ctx| ctx.plugins2.write().put_back_downstream(plugin.0))
+                    with_mod_ctx(|ctx| ctx.plugins2.write().put_back_downstream(plugin.0, true))
                 }
                 Err(p) => {
                     with_mod_ctx(|ctx| ctx.plugins2.write().paniced_downstream(p));

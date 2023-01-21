@@ -30,41 +30,6 @@ struct BufferContext {
     globals: Option<Weak<NetworkRuntimeGlobals>>,
 }
 
-pub(super) fn get_output_stream() -> OutputBuffer {
-    let mut ctx = BUF_CTX.lock();
-    let mut output = Vec::new();
-    std::mem::swap(&mut output, &mut ctx.output);
-    output
-}
-
-pub(super) fn get_loopback_stream() -> LoopbackBuffer {
-    let mut ctx = BUF_CTX.lock();
-    let mut loopback = Vec::new();
-    std::mem::swap(&mut loopback, &mut ctx.loopback);
-    loopback
-}
-
-pub(super) fn append_output_stream(mut output: OutputBuffer) {
-    let mut ctx = BUF_CTX.lock();
-    // Due this swap, since the parameter buffers are likely bigger.
-    // thus appending to them is cheaper
-    std::mem::swap(&mut output, &mut ctx.output);
-
-    // output and loopback now contain values created during plugin runs
-    ctx.output.append(&mut output);
-}
-
-pub(super) fn append_loopback_stream(mut loopback: LoopbackBuffer) {
-    let mut ctx = BUF_CTX.lock();
-
-    // Due this swap, since the parameter buffers are likely bigger.
-    // thus appending to them is cheaper
-    std::mem::swap(&mut loopback, &mut ctx.loopback);
-
-    // output and loopback now contain values created during plugin runs
-    ctx.loopback.append(&mut loopback);
-}
-
 ///
 /// Returns the globals of the runtime.
 ///
@@ -104,12 +69,6 @@ pub(crate) fn buf_set_globals(globals: Weak<NetworkRuntimeGlobals>) {
 pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<NetworkRuntime<A>>) {
     let self_id = module.ctx.id;
     let mut ctx = BUF_CTX.lock();
-
-    println!(
-        "buf send: {} sched: {}",
-        ctx.output.len(),
-        ctx.loopback.len()
-    );
 
     // Send gate events from the 'send' method calls
     for (mut message, gate, time) in ctx.output.drain(..) {
@@ -157,7 +116,7 @@ pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<NetworkRuntime
 
         // drop all hooks to ensure all messages reach the async impl
         // module.ctx.hooks.borrow_mut().clear(); TODO: Plugin clean
-        module.ctx.plugins.write().clear();
+        module.ctx.plugins2.write().clear();
         SETUP_FN.lock()(&module.ctx);
 
         // Reschedule wakeup
