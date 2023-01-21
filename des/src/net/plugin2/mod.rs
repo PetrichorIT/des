@@ -55,6 +55,7 @@ pub(crate) struct PluginEntry {
     policy: PluginPanicPolicy,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) enum PluginState {
     /// Plugin is not active, but alive, thus self.plugin contains a value.
     Idle,

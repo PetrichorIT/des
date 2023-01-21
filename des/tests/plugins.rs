@@ -17,6 +17,17 @@ mod common {
         }
     }
 
+    pub struct ConsumeAllOutgoing;
+    impl Plugin for ConsumeAllOutgoing {
+        fn capture_outgoing(&mut self, _: Message) -> Option<Message> {
+            None
+        }
+
+        fn event_end(&mut self) {
+            log::info!("consumed_outgoing");
+        }
+    }
+
     pub struct IncrementIncomingId;
     impl Plugin for IncrementIncomingId {
         fn capture_incoming(&mut self, mut msg: Message) -> Option<Message> {
@@ -591,141 +602,6 @@ fn plugin_panic_restart() {
     assert_eq!(result.2.event_count, 100 + 1);
 }
 
-// #[NdlModule]
-// struct PluginAtShutdown {
-//     state: Arc<AtomicUsize>,
-//     restarted: bool,
-// }
-// impl Module for PluginAtShutdown {
-//     fn new() -> Self {
-//         Self {
-//             state: Arc::new(AtomicUsize::new(0)),
-//             restarted: false,
-//         }
-//     }
-
-//     fn reset(&mut self) {
-//         self.restarted = true
-//     }
-
-//     fn at_sim_start(&mut self, _stage: usize) {
-//         add_plugin(
-//             PeriodicPlugin::new(
-//                 |state| {
-//                     state.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-//                     if SimTime::now().as_secs() == 5 {
-//                         shutdow_and_restart_in(Duration::from_secs(2));
-//                     }
-//                 },
-//                 Duration::from_secs(1),
-//                 self.state.clone(),
-//             ),
-//             0,
-//         );
-//     }
-
-//     fn handle_message(&mut self, _: Message) {
-//         panic!("This function should never be called")
-//     }
-
-//     fn at_sim_end(&mut self) {
-//         // at 1,2,3,4,5 .. 8,9,10
-//         assert!(self.restarted);
-//         assert_eq!(self.state.load(std::sync::atomic::Ordering::SeqCst), 5 + 3)
-//     }
-// }
-
-// #[test]
-// #[serial]
-// fn plugin_at_shutdown() {
-//     // Logger::new().set_logger();
-
-//     let mut app = NetworkRuntime::new(());
-//     let mut cx = BuildContext::new(&mut app);
-
-//     let module = PluginAtShutdown::build_named(ObjectPath::root_module("root"), &mut cx);
-//     cx.create_module(module);
-
-//     let rt = Runtime::new_with(
-//         app,
-//         RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(10))),
-//     );
-//     let result = rt.run();
-
-//     let RuntimeResult::PrematureAbort { time, profiler, .. } = result else {
-//         panic!("Unexpected runtime result")
-//     };
-
-//     assert_eq!(time, 10.0);
-//     assert_eq!(profiler.event_count, 12);
-// }
-
-// #[NdlModule]
-// struct PeriodicMultiModule {
-//     state: Arc<AtomicUsize>,
-// }
-
-// impl Module for PeriodicMultiModule {
-//     fn new() -> Self {
-//         PeriodicMultiModule {
-//             state: Arc::new(AtomicUsize::new(0)),
-//         }
-//     }
-
-//     fn at_sim_start(&mut self, _stage: usize) {
-//         add_plugin(
-//             PeriodicPlugin::new(
-//                 |state| {
-//                     state.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-//                 },
-//                 Duration::from_secs(1),
-//                 self.state.clone(),
-//             ),
-//             0,
-//         );
-//         add_plugin(
-//             PeriodicPlugin::new(
-//                 |state| {
-//                     state.fetch_add(2, std::sync::atomic::Ordering::SeqCst);
-//                 },
-//                 Duration::from_secs(2),
-//                 self.state.clone(),
-//             ),
-//             0,
-//         );
-//     }
-
-//     fn handle_message(&mut self, _msg: Message) {
-//         panic!("This function should never be called")
-//     }
-
-//     fn at_sim_end(&mut self) {
-//         assert_eq!(self.state.load(std::sync::atomic::Ordering::SeqCst), 20)
-//     }
-// }
-
-// #[test]
-// #[serial]
-// fn plugin_periodic_plugin() {
-//     // Logger::new().set_logger();
-
-//     let mut rt = NetworkRuntime::new(());
-//     let mut cx = BuildContext::new(&mut rt);
-
-//     let module =
-//         PeriodicMultiModule::build_named(ObjectPath::root_module("root".to_string()), &mut cx);
-//     cx.create_module(module);
-
-//     let rt = Runtime::new_with(
-//         rt,
-//         RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(10))),
-//     );
-
-//     let res = dbg!(rt.run());
-//     let res = res.unwrap_premature_abort();
-//     assert_eq!(res.3, 2);
-// }
-
 struct PluginErrorPlugin(Arc<AtomicBool>);
 impl Plugin for PluginErrorPlugin {
     fn event_start(&mut self) {
@@ -953,4 +829,120 @@ fn plugin_error_malfunction_or_priority() {
 
     let res = rt.run();
     let _res = res.unwrap();
+}
+
+#[NdlModule]
+struct PluginOutputCapture {
+    c: usize,
+}
+impl Module for PluginOutputCapture {
+    fn new() -> Self {
+        Self { c: 0 }
+    }
+
+    fn at_sim_start(&mut self, _stage: usize) {
+        add_plugin(common::ConsumeAllOutgoing, 100);
+        // This packet will go through
+        schedule_in(Message::new().id(0).build(), Duration::from_secs(0 as u64));
+    }
+
+    fn handle_message(&mut self, msg: Message) {
+        self.c += 1;
+        if msg.header().id == 0 {
+            for i in 1..100 {
+                schedule_in(Message::new().id(i).build(), Duration::from_secs(i as u64));
+            }
+        }
+    }
+
+    fn at_sim_end(&mut self) {
+        assert_eq!(self.c, 1);
+    }
+}
+
+#[test]
+#[serial]
+fn plugin_output_capture_consume_from_main() {
+    let mut rt = NetworkRuntime::new(());
+    let mut cx = BuildContext::new(&mut rt);
+
+    let module =
+        PluginOutputCapture::build_named(ObjectPath::root_module("root".to_string()), &mut cx);
+    cx.create_module(module);
+
+    let rt = Runtime::new_with(
+        rt,
+        RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(30))),
+    );
+
+    let res = rt.run();
+    let res = res.unwrap();
+
+    assert_eq!(res.1.as_secs(), 0);
+}
+
+struct EmitAtEventEnd;
+impl Plugin for EmitAtEventEnd {
+    fn event_end(&mut self) {
+        log::info!("emit:at:end");
+        schedule_in(Message::new().build(), Duration::from_secs(1));
+    }
+}
+
+#[NdlModule]
+struct PluginOutputCaptureScoping {
+    c: usize,
+}
+impl Module for PluginOutputCaptureScoping {
+    fn new() -> Self {
+        Self { c: 0 }
+    }
+
+    fn at_sim_start(&mut self, _stage: usize) {
+        add_plugin(common::ConsumeAllOutgoing, 100);
+        add_plugin(EmitAtEventEnd, 10);
+        // This packet will go through
+        schedule_in(
+            Message::new().id(255).build(),
+            Duration::from_secs(1 as u64),
+        );
+    }
+
+    fn handle_message(&mut self, msg: Message) {
+        log::debug!("{:?}", msg.header());
+        self.c += 1;
+
+        for i in 1..10 {
+            schedule_in(Message::new().id(i).build(), Duration::from_secs(i as u64));
+        }
+    }
+
+    fn at_sim_end(&mut self) {
+        assert_eq!(self.c, 30);
+    }
+}
+
+#[test]
+#[serial]
+fn plugin_output_capture_consume_from_plugin() {
+    Logger::new().set_logger();
+
+    let mut rt = NetworkRuntime::new(());
+    let mut cx = BuildContext::new(&mut rt);
+
+    let module = PluginOutputCaptureScoping::build_named(
+        ObjectPath::root_module("root".to_string()),
+        &mut cx,
+    );
+    cx.create_module(module);
+
+    let rt = Runtime::new_with(
+        rt,
+        RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(30))), // .max_itr(1),
+    );
+
+    let res = rt.run();
+    let res = res.unwrap_premature_abort();
+
+    assert_eq!(res.1.as_secs(), 30);
 }

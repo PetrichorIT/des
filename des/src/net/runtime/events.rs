@@ -197,7 +197,6 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
                 super::buf_process(&module, rt);
             }
         }
-
         log_scope!();
     }
 }
@@ -249,25 +248,78 @@ impl ModuleRef {
     #[allow(clippy::unused_self)]
     pub(crate) fn plugin_downstream(&self) {
         with_mod_ctx(|ctx| ctx.plugins2.write().begin_downstream());
-        loop {
+        'outer: loop {
             let plugin = with_mod_ctx(|ctx| ctx.plugins2.write().next_downstream());
             let Some(plugin) = plugin else { break };
-            let plugin = UnwindSafeBox(plugin);
+            let mut plugin = UnwindSafeBox(plugin);
+
+            let mut output = super::ctx::get_output_stream();
+            let mut output_r = Vec::with_capacity(output.len());
+            while let Some((msg, gate, time)) = output.pop() {
+                plugin = match panic::catch_unwind(move || {
+                    let mut plugin = plugin;
+                    let ret = plugin.0.capture_outgoing(msg);
+                    (plugin, ret)
+                }) {
+                    Ok((plugin, ret)) => {
+                        if let Some(ret) = ret {
+                            output_r.push((ret, gate, time));
+                        }
+                        plugin
+                    }
+                    Err(p) => {
+                        // plugin failed, reappend all stream if possible losing only the current message.
+                        with_mod_ctx(|ctx| ctx.plugins2.write().paniced_downstream(p));
+                        super::ctx::append_output_stream(output);
+                        super::ctx::append_output_stream(output_r);
+                        break 'outer;
+                    }
+                };
+            }
+
+            super::ctx::append_output_stream(output_r);
+            drop(output);
+
+            let mut loopback = super::ctx::get_loopback_stream();
+            let mut loopback_r = Vec::with_capacity(loopback.len());
+            while let Some((msg, gate)) = loopback.pop() {
+                plugin = match panic::catch_unwind(move || {
+                    let mut plugin = plugin;
+                    let ret = plugin.0.capture_outgoing(msg);
+                    (plugin, ret)
+                }) {
+                    Ok((plugin, ret)) => {
+                        if let Some(ret) = ret {
+                            loopback_r.push((ret, gate));
+                        }
+                        plugin
+                    }
+                    Err(p) => {
+                        // plugin failed, reappend all stream if possible losing only the current message.
+                        with_mod_ctx(|ctx| ctx.plugins2.write().paniced_downstream(p));
+                        super::ctx::append_loopback_stream(loopback);
+                        super::ctx::append_loopback_stream(loopback_r);
+                        break 'outer;
+                    }
+                };
+            }
+
+            super::ctx::append_loopback_stream(loopback_r);
+            drop(loopback);
 
             let result = panic::catch_unwind(move || {
                 let mut plugin = plugin;
                 plugin.0.event_end();
-                // TODO: downstream message handeling.
                 plugin
             });
 
             match result {
                 Ok(plugin) => {
-                    // All good
-                    with_mod_ctx(|ctx| ctx.plugins2.write().put_back_downstream(plugin.0));
+                    with_mod_ctx(|ctx| ctx.plugins2.write().put_back_downstream(plugin.0))
                 }
                 Err(p) => {
                     with_mod_ctx(|ctx| ctx.plugins2.write().paniced_downstream(p));
+                    continue;
                 }
             }
         }
@@ -321,9 +373,11 @@ impl ModuleRef {
 
     #[cfg(feature = "async")]
     pub(crate) fn finish_sim_start2(&self) {
-        self.plugin_upstream(None);
-        self.handler.borrow_mut().finish_sim_start();
-        self.plugin_downstream();
+        if self.handler.borrow().__indicate_asnyc() {
+            self.plugin_upstream(None);
+            self.handler.borrow_mut().finish_sim_start();
+            self.plugin_downstream();
+        }
     }
 
     pub(crate) fn at_sim_end2(&self) {
@@ -334,9 +388,11 @@ impl ModuleRef {
 
     #[cfg(feature = "async")]
     pub(crate) fn finish_sim_end2(&self) {
-        self.plugin_upstream(None);
-        self.handler.borrow_mut().finish_sim_end();
-        self.plugin_downstream();
+        if self.handler.borrow().__indicate_asnyc() {
+            self.plugin_upstream(None);
+            self.handler.borrow_mut().finish_sim_end();
+            self.plugin_downstream();
+        }
     }
 
     // OLD IMPL

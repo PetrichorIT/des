@@ -124,7 +124,8 @@ impl PluginRegistry {
         assert!(!self.up);
         while self.pos > 0 {
             self.pos -= 1;
-            if self.inner[self.pos].is_active() {
+            dbg!(self.pos);
+            if dbg!(self.inner[self.pos].is_active()) {
                 return self.inner[self.pos].take();
             }
         }
