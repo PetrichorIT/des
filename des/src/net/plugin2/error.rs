@@ -64,6 +64,13 @@ impl PluginError {
                             type_name::<T>()
                         ),
                     },
+                    PluginState::PendingRemoval => PluginError {
+                        kind: PluginErrorKind::PluginNotFound,
+                        internal: format!(
+                            "expected plugin of type {}, but no such plugin exists anymore",
+                            type_name::<T>()
+                        ),
+                    }
                 }
             } else {
                 PluginError {

@@ -72,6 +72,9 @@ pub(crate) enum PluginState {
     /// on the downstream path.
     JustCreated,
 
+    /// To be deleted next turn
+    PendingRemoval,
+
     /// Plugin in not active, because its dead, thus self.plugin is empty.
     Paniced,
 }
@@ -111,55 +114,56 @@ unsafe impl Sync for PluginEntry {}
 /// Can be called from other plugins, also from plugin upstream or downstream
 ///
 pub(crate) fn plugin_output_stream(msg: Message) -> Option<Message> {
-    log::trace!("plugin capture of msg");
-    with_mod_ctx(|ctx| {
-        // (0) Create new downstream
-        let mut plugins = ctx.plugins2.write();
-        let prev = plugins.begin_downstream();
+    // (0) Create new downstream
+    with_mod_ctx(|ctx| ctx.plugins2.write().begin_sub_downstream(None));
 
-        // (1) Move the message allong the downstream, only using active plugins.
-        //
-        // 3 cases:
-        // - call origin is in upstream-plugin (good since all plugins below are ::running with a core stored)
-        // - call origin is main (good since all plugins are ::running with a core stored)
-        // - call origin is in downstream branch
-        //      - good since all plugins below are still ::running with a core and all aboth will be ignored ::idle
-        //      - self is not an issue, since without a core not in itr
-        //      - BUT: begin_downstream poisoined the old downstream info.
-        let mut msg = msg;
-        while let Some(plugin) = plugins.next_downstream() {
-            let plugin = UnwindSafeBox(plugin);
+    // (1) Move the message allong the downstream, only using active plugins.
+    //
+    // 3 cases:
+    // - call origin is in upstream-plugin (good since all plugins below are ::running with a core stored)
+    // - call origin is main (good since all plugins are ::running with a core stored)
+    // - call origin is in downstream branch
+    //      - good since all plugins below are still ::running with a core and all aboth will be ignored ::idle
+    //      - self is not an issue, since without a core not in itr
+    //      - BUT: begin_downstream poisoined the old downstream info.
+    let mut msg = msg;
+    while let Some(plugin) = with_mod_ctx(|ctx| ctx.plugins2.write().next_downstream()) {
+        let plugin = UnwindSafeBox(plugin);
 
-            // (2) Capture the packet
-            let result = catch_unwind(move || {
-                let mut plugin = plugin;
-                let msg = msg;
+        // (2) Capture the packet
+        let result = catch_unwind(move || {
+            let mut plugin = plugin;
+            let msg = msg;
 
-                let ret = plugin.0.capture_outgoing(msg);
-                (plugin, ret)
-            });
+            let ret = plugin.0.capture_outgoing(msg);
+            (plugin, ret)
+        });
 
-            // (3) Continue iteration if possible, readl with panics
-            match result {
-                Ok((r_plugin, r_msg)) => {
-                    plugins.put_back_downstream(r_plugin.0, false);
-                    if let Some(r_msg) = r_msg {
-                        msg = r_msg;
-                    } else {
-                        plugins.resume_downstream_from(prev);
-                        return None;
-                    }
-                }
-                Err(p) => {
-                    plugins.paniced_downstream(p);
-                    plugins.resume_downstream_from(prev);
+        // (3) Continue iteration if possible, readl with panics
+        match result {
+            Ok((r_plugin, r_msg)) => {
+                with_mod_ctx(|ctx| ctx.plugins2.write().put_back_downstream(r_plugin.0, false));
+                if let Some(r_msg) = r_msg {
+                    msg = r_msg;
+                } else {
+                    with_mod_ctx(|ctx| ctx.plugins2.write().close_sub_downstream());
                     return None;
                 }
             }
-        }
+            Err(p) => {
+                with_mod_ctx(|ctx| {
+                    let mut plugins = ctx.plugins2.write();
+                    plugins.paniced_downstream(p);
+                    plugins.close_sub_downstream();
+                });
 
-        plugins.resume_downstream_from(prev);
-        // (4) If the message survives, good.
-        Some(msg)
-    })
+                return None;
+            }
+        }
+    }
+
+    with_mod_ctx(|ctx| ctx.plugins2.write().close_sub_downstream());
+
+    // (4) If the message survives, good.
+    Some(msg)
 }

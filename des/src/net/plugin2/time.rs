@@ -37,7 +37,6 @@ impl UnwindSafe for TokioTimePlugin {}
 
 impl Plugin for TokioTimePlugin {
     fn event_start(&mut self) {
-        log::debug!("tokio::time::event_start");
         // (0) Swap in time context
         let mut time = self.time.take().expect("Plugin lost its time context");
         self.prev = SimContext::with_current(|ctx| {
@@ -59,7 +58,6 @@ impl Plugin for TokioTimePlugin {
     }
 
     fn capture_incoming(&mut self, msg: Message) -> Option<Message> {
-        log::debug!("tokio::time::capture_incoming");
         if msg.header().typ == TYP_WAKEUP {
             self.next_wakeup = SimTime::MAX;
             None
@@ -69,12 +67,10 @@ impl Plugin for TokioTimePlugin {
     }
 
     fn capture_outgoing(&mut self, msg: Message) -> Option<Message> {
-        log::debug!("tokio::time::capture_outgoing");
         Some(msg)
     }
 
     fn event_end(&mut self) {
-        log::debug!("tokio::time::event_end");
         SimContext::with_current(|ctx| {
             let Some(ctx) = ctx.time.as_mut() else { return };
             let Some(next_time) = ctx.next_time_poll() else { return };

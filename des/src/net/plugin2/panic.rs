@@ -48,20 +48,24 @@ impl fmt::Debug for PluginPanicPolicy {
 pub enum PluginStatus {
     /// The plugin is in the process of being created.
     /// It will be active once the next event arrives.
-    Initalizing,
+    StartingUp,
+    /// The plugin is in th process of shutting down.
+    /// It will not exist once the next event arrives.
+    ShutingDown,
     /// The plugin is running smoothly.
     Active,
     /// The plugin paniced.
     Paniced,
+    /// The plugin is gone
+    Gone,
 }
 
 impl PluginStatus {
     pub(super) fn from_entry(entry: &PluginEntry) -> Self {
-        // TODO:
-        if matches!(entry.state, PluginState::Paniced) {
-            Self::Paniced
-        } else {
-            Self::Active
+        match entry.state {
+            PluginState::Paniced => Self::Paniced,
+            PluginState::PendingRemoval => Self::ShutingDown,
+            _ => Self::Active,
         }
     }
 }

@@ -59,7 +59,7 @@ impl Module for PluginCreation {
     fn at_sim_start(&mut self, _stage: usize) {
         self.handles
             .push(add_plugin(common::IncrementIncomingId, 100));
-        assert_eq!(self.handles[0].status(), PluginStatus::Initalizing);
+        assert_eq!(self.handles[0].status(), PluginStatus::StartingUp);
         for i in 0..100 {
             schedule_at(
                 Message::new().id(i).build(),
@@ -107,7 +107,7 @@ impl Plugin for RecrusivePluginCreationPlugin {
                 },
                 self.level as usize + 1,
             );
-            assert_eq!(p.status(), PluginStatus::Initalizing);
+            assert_eq!(p.status(), PluginStatus::StartingUp);
         }
         msg.header_mut().kind += 1;
         Some(msg)
@@ -859,6 +859,261 @@ impl Module for PluginOutputCapture {
     fn at_sim_end(&mut self) {
         assert_eq!(self.c, 1);
     }
+}
+
+#[NdlModule]
+struct PluginRemovalFromMain {
+    handles: Vec<PluginHandle>,
+}
+impl Module for PluginRemovalFromMain {
+    fn new() -> Self {
+        Self {
+            handles: Vec::new(),
+        }
+    }
+
+    fn at_sim_start(&mut self, _stage: usize) {
+        for i in 1..=10 {
+            self.handles
+                .push(add_plugin(common::IncrementIncomingId, i))
+        }
+
+        for i in 0..=10 {
+            schedule_in(
+                Message::new().kind(i).build(),
+                Duration::from_secs(i as u64),
+            )
+        }
+    }
+
+    fn handle_message(&mut self, msg: Message) {
+        let t = SimTime::now().as_secs();
+        let id = 10 - t;
+        assert_eq!(msg.header().id as u64, id);
+        assert_eq!(self.handles.len() as u64, id);
+
+        if let Some(h) = self.handles.pop() {
+            h.remove();
+        }
+    }
+
+    fn at_sim_end(&mut self) {
+        assert!(self.handles.is_empty())
+    }
+}
+
+#[test]
+#[serial]
+fn plugin_removal_from_main() {
+    let mut rt = NetworkRuntime::new(());
+    let mut cx = BuildContext::new(&mut rt);
+
+    let module =
+        PluginRemovalFromMain::build_named(ObjectPath::root_module("root".to_string()), &mut cx);
+    cx.create_module(module);
+
+    let rt = Runtime::new_with(
+        rt,
+        RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(30))),
+    );
+
+    let res = rt.run();
+    let _res = res.unwrap();
+}
+
+struct RemoveChildAtLevel {
+    child: Option<PluginHandle>,
+    level: u16,
+}
+impl Plugin for RemoveChildAtLevel {
+    fn capture_incoming(&mut self, mut msg: Message) -> Option<Message> {
+        if msg.header().id == self.level {
+            log::debug!("killing child");
+            self.child.take().map(PluginHandle::remove);
+        }
+        msg.header_mut().kind += 1;
+        Some(msg)
+    }
+
+    fn capture_outgoing(&mut self, _msg: Message) -> Option<Message> {
+        unreachable!()
+    }
+}
+
+#[NdlModule]
+struct PluginRemovalFromUpstream {
+    handle: Option<PluginHandle>,
+}
+impl Module for PluginRemovalFromUpstream {
+    fn new() -> Self {
+        Self { handle: None }
+    }
+
+    fn at_sim_start(&mut self, _stage: usize) {
+        let mut last = None;
+        for i in 1..=10 {
+            last = Some(add_plugin(
+                RemoveChildAtLevel {
+                    child: last.take(),
+                    level: i,
+                },
+                i as usize,
+            ));
+
+            schedule_in(
+                Message::new().id(i).kind(0).build(),
+                Duration::from_secs(i as u64),
+            );
+        }
+        self.handle = last;
+    }
+
+    fn handle_message(&mut self, mut msg: Message) {
+        log::info!("received: {:?}", msg);
+        let t = SimTime::now().as_secs();
+        if t == 1 {
+            // emualte del of nonexitsting element in the chain
+            msg.header_mut().kind += 1;
+        }
+        let id = 12 - t;
+        assert_eq!(msg.header().kind as u64, id);
+        assert_eq!(self.handle.as_ref().unwrap().status(), PluginStatus::Active);
+    }
+}
+
+#[test]
+#[serial]
+fn plugin_removal_from_upstream() {
+    // Logger::new()
+    //     .interal_max_log_level(log::LevelFilter::Trace)
+    //     .set_logger();
+
+    let mut rt = NetworkRuntime::new(());
+    let mut cx = BuildContext::new(&mut rt);
+
+    let module = PluginRemovalFromUpstream::build_named(
+        ObjectPath::root_module("root".to_string()),
+        &mut cx,
+    );
+    cx.create_module(module);
+
+    let rt = Runtime::new_with(
+        rt,
+        RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(30))),
+    );
+
+    let res = rt.run();
+    let _res = res.unwrap();
+}
+
+struct RemoveChildAtLevelDownstream {
+    child: Option<PluginHandle>,
+    level: u16,
+}
+impl Plugin for RemoveChildAtLevelDownstream {
+    fn capture_outgoing(&mut self, mut msg: Message) -> Option<Message> {
+        if msg.header().id == self.level {
+            log::debug!("killing child");
+            self.child.take().map(PluginHandle::remove);
+        }
+        msg.header_mut().kind += 1;
+        Some(msg)
+    }
+}
+
+#[NdlModule]
+struct PluginRemovalFromDownstream {
+    handle: Option<PluginHandle>,
+    done: bool,
+}
+impl Module for PluginRemovalFromDownstream {
+    fn new() -> Self {
+        Self {
+            handle: None,
+            done: false,
+        }
+    }
+
+    fn at_sim_start(&mut self, _stage: usize) {
+        let mut last = Some(add_plugin(
+            RemoveChildAtLevelDownstream {
+                child: None,
+                level: 200,
+            },
+            1000,
+        ));
+        for i in 1..=10 {
+            last = Some(add_plugin(
+                RemoveChildAtLevelDownstream {
+                    child: last.take(),
+                    level: i,
+                },
+                20 - i as usize,
+            ));
+        }
+        schedule_in(
+            Message::new().kind(42).content("").build(),
+            Duration::from_secs(1),
+        );
+        self.handle = last;
+    }
+
+    fn handle_message(&mut self, msg: Message) {
+        match msg.header().kind {
+            42 => {
+                // we want to trigger a close of downstream parsers.
+                log::info!("starting");
+                schedule_in(
+                    Message::new().id(1).content(true).build(),
+                    Duration::from_secs(1),
+                );
+                return;
+            }
+            1 => {
+                self.done = true;
+            }
+            n => {
+                let t = SimTime::now().as_secs();
+                let kind = 13 - t;
+                assert_eq!(n as u64, kind);
+
+                log::info!("sending");
+                schedule_in(
+                    Message::new().id(msg.header().id + 1).content(true).build(),
+                    Duration::from_secs(1),
+                );
+            }
+        }
+    }
+
+    fn at_sim_end(&mut self) {
+        assert!(self.done)
+    }
+}
+
+#[test]
+#[serial]
+fn plugin_removal_from_downmstream() {
+    Logger::new()
+        .interal_max_log_level(log::LevelFilter::Trace)
+        .set_logger();
+
+    let mut rt = NetworkRuntime::new(());
+    let mut cx = BuildContext::new(&mut rt);
+
+    let module = PluginRemovalFromDownstream::build_named(
+        ObjectPath::root_module("root".to_string()),
+        &mut cx,
+    );
+    cx.create_module(module);
+
+    let rt = Runtime::new_with(
+        rt,
+        RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(30))),
+    );
+
+    let res = rt.run();
+    let _res = res.unwrap();
 }
 
 // #[test]

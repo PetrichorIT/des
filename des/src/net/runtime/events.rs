@@ -247,7 +247,7 @@ impl ModuleRef {
 
     #[allow(clippy::unused_self)]
     pub(crate) fn plugin_downstream(&self) {
-        with_mod_ctx(|ctx| ctx.plugins2.write().begin_downstream());
+        with_mod_ctx(|ctx| ctx.plugins2.write().begin_main_downstream());
         loop {
             let plugin = with_mod_ctx(|ctx| ctx.plugins2.write().next_downstream());
             let Some(plugin) = plugin else { break };
