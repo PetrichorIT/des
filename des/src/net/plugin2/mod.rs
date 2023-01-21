@@ -9,6 +9,9 @@ pub use self::panic::{PluginPanicPolicy, PluginStatus};
 mod api;
 pub use self::api::{add_plugin, add_plugin_with, PluginHandle};
 
+mod error;
+pub use self::error::{PluginError, PluginErrorKind};
+
 mod registry;
 pub(crate) use self::registry::PluginRegistry;
 

@@ -19,6 +19,10 @@ impl PluginRegistry {
         }
     }
 
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &PluginEntry> {
+        self.inner.iter()
+    }
+
     pub(crate) fn add(&mut self, mut entry: PluginEntry) -> usize {
         let id = self.id;
         self.id += 1;
@@ -37,13 +41,11 @@ impl PluginRegistry {
                 self.pos += 1;
                 self.inner.insert(i, entry);
             }
+        } else if i > self.pos {
+            self.inner.insert(i, entry);
         } else {
-            if i > self.pos {
-                self.inner.insert(i, entry)
-            } else {
-                self.pos += 1;
-                self.inner.insert(i, entry);
-            }
+            self.pos += 1;
+            self.inner.insert(i, entry);
         }
 
         id
@@ -64,13 +66,11 @@ impl PluginRegistry {
                 self.pos -= 1;
                 self.inner.remove(i);
             }
+        } else if i > self.pos {
+            self.inner.remove(i);
         } else {
-            if i > self.pos {
-                self.inner.remove(i);
-            } else {
-                self.pos -= 1;
-                self.inner.remove(i);
-            }
+            self.pos -= 1;
+            self.inner.remove(i);
         }
     }
 
@@ -94,9 +94,8 @@ impl PluginRegistry {
                     // Real ptr bump
                     self.pos += 1;
                     break self.inner[self.pos - 1].take();
-                } else {
-                    self.pos += 1;
                 }
+                self.pos += 1;
             } else {
                 break None;
             }
@@ -106,7 +105,7 @@ impl PluginRegistry {
     pub(crate) fn put_back_upstream(&mut self, plugin: Box<dyn Plugin>) {
         assert!(self.up);
         self.inner[self.pos - 1].plugin = Some(plugin);
-        self.inner[self.pos - 1].state = PluginState::Idle;
+        // self.inner[self.pos - 1].state = PluginState::Idle;
     }
 
     pub(crate) fn paniced_upstream(&mut self, payload: Box<dyn Any + Send>) {
@@ -125,10 +124,8 @@ impl PluginRegistry {
         assert!(!self.up);
         while self.pos > 0 {
             self.pos -= 1;
-            if self.inner[self.pos].activate() {
+            if self.inner[self.pos].is_active() {
                 return self.inner[self.pos].take();
-            } else {
-                continue;
             }
         }
         None
@@ -155,6 +152,10 @@ impl PluginEntry {
             self.state = PluginState::Running;
         }
         active
+    }
+
+    pub(self) fn is_active(&self) -> bool {
+        matches!(self.state, PluginState::Running)
     }
 
     pub(self) fn take(&mut self) -> Option<Box<dyn Plugin>> {

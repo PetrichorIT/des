@@ -11,21 +11,21 @@ use std::time::Duration;
 fn alloc_single_page_one_alloc_one_allocator() {
     // Layout will allways be big enoght for a Free Node
 
-    let alloc = CQueueLLAllocatorInner::new();
+    let alloc = CQueueLLAllocatorInner::with_page_size(4096);
     let bu32 = Box::new_in(42u32, alloc.handle());
     assert_eq!(alloc.dbg_alloc_total(), 16);
     drop(bu32);
     assert!(alloc.dbg_is_empty());
     drop(alloc);
 
-    let alloc = CQueueLLAllocatorInner::new();
+    let alloc = CQueueLLAllocatorInner::with_page_size(4096);
     let bu64 = Box::new_in(42u64, alloc.handle());
     assert_eq!(alloc.dbg_alloc_total(), 16);
     drop(bu64);
     assert!(alloc.dbg_is_empty());
     drop(alloc);
 
-    let alloc = CQueueLLAllocatorInner::new();
+    let alloc = CQueueLLAllocatorInner::with_page_size(4096);
     let bu128 = Box::new_in(42u128, alloc.handle());
     assert_eq!(alloc.dbg_alloc_total(), 16);
     drop(bu128);
@@ -34,14 +34,14 @@ fn alloc_single_page_one_alloc_one_allocator() {
 
     // Now layout will grow
 
-    let alloc = CQueueLLAllocatorInner::new();
+    let alloc = CQueueLLAllocatorInner::with_page_size(4096);
     let barray = Box::new_in([42u8; 55], alloc.handle());
     assert_eq!(alloc.dbg_alloc_total(), 56); // will be aligned for free node, with align 8
     drop(barray);
     assert!(alloc.dbg_is_empty());
     drop(alloc);
 
-    let alloc = CQueueLLAllocatorInner::new();
+    let alloc = CQueueLLAllocatorInner::with_page_size(4096);
     let barray = Box::new_in([42u8; 128], alloc.handle());
     assert_eq!(alloc.dbg_alloc_total(), 128); // will be aligned for free node, with align 8
     drop(barray);
@@ -53,7 +53,7 @@ fn alloc_single_page_one_alloc_one_allocator() {
 fn alloc_single_page_one_alloc_shared_allocator() {
     // Layout will allways be big enoght for a Free Node
 
-    let alloc = CQueueLLAllocatorInner::new();
+    let alloc = CQueueLLAllocatorInner::with_page_size(4096);
     let bu32 = Box::new_in(42u32, alloc.handle());
     assert_eq!(alloc.dbg_alloc_total(), 16);
     drop(bu32);
@@ -84,7 +84,7 @@ fn alloc_single_page_one_alloc_shared_allocator() {
 
 #[test]
 fn alloc_single_page_alloc_exceeds_page_size() {
-    let alloc = CQueueLLAllocatorInner::new();
+    let alloc = CQueueLLAllocatorInner::with_page_size(4096);
     assert!(alloc
         .handle()
         .allocate(Layout::new::<[u8; 8000]>())
@@ -94,7 +94,7 @@ fn alloc_single_page_alloc_exceeds_page_size() {
 
 #[test]
 fn alloc_single_page_list_alloc() {
-    let alloc = CQueueLLAllocatorInner::new();
+    let alloc = CQueueLLAllocatorInner::with_page_size(4096);
     let mut boxes = Vec::new();
     for i in 0..10 {
         boxes.push(Box::new_in([i as u8; 400], alloc.handle()))
@@ -127,7 +127,7 @@ fn alloc_multiple_pages_same_size_allocation() {
         s: String,
     }
 
-    let alloc = CQueueLLAllocatorInner::new();
+    let alloc = CQueueLLAllocatorInner::with_page_size(4096);
     let mut boxes = Vec::new();
     for _ in 0..100 {
         boxes.push(Box::new_in(
@@ -150,7 +150,7 @@ fn alloc_multiple_pages_same_size_allocation() {
 
 #[test]
 fn alloc_multiple_pages_skip_to_small_elements() {
-    let alloc = CQueueLLAllocatorInner::new();
+    let alloc = CQueueLLAllocatorInner::with_page_size(4096);
     let b1 = Box::new_in([0u8; 2500], alloc.handle());
     assert_eq!(alloc.dbg_alloc_total(), 2504); // align
     assert_eq!(alloc.dbg_pages(), 1);
@@ -185,7 +185,7 @@ fn alloc_16_byteboxes() {
 
     assert_eq!(std::mem::size_of::<Word>(), 16);
 
-    let alloc = CQueueLLAllocatorInner::new();
+    let alloc = CQueueLLAllocatorInner::with_page_size(4096);
     let mut list = Vec::new();
     for _ in 1..10 {
         let b = Box::new_in(Word::new(), alloc.handle());

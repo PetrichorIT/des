@@ -23,6 +23,12 @@ pub struct PluginHandle {
 
 impl PluginHandle {
     /// Indicates that status of the plugin.
+    /// 
+    /// # Panics 
+    /// 
+    /// This function panics if the plugin describes by this handle does not 
+    /// belong to the current module.
+    #[must_use]
     pub fn status(&self) -> PluginStatus {
         assert_eq!(
             self.mod_id,
@@ -35,6 +41,11 @@ impl PluginHandle {
     }
 
     /// Removes this plugin from the module.
+    /// 
+    /// # Panics 
+    /// 
+    /// This function panics if the plugin describes by this handle does not 
+    /// belong to the current module.
     pub fn remove(self) {
         assert_eq!(
             self.mod_id,

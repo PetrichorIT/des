@@ -213,6 +213,7 @@ impl ModuleRef {
 
     // MARKER: handle_message
 
+    #[allow(clippy::unused_self)]
     pub(crate) fn plugin_upstream(&self, mut msg: Option<Message>) -> Option<Message> {
         with_mod_ctx(|ctx| ctx.plugins2.write().being_upstream());
         loop {
@@ -220,20 +221,20 @@ impl ModuleRef {
             let Some(plugin) = plugin else { break };
             let plugin = UnwindSafeBox(plugin);
 
-            let mut mmsg = msg.take();
+            let mut moved_message = msg.take();
             let result = panic::catch_unwind(move || {
                 let mut plugin = plugin;
 
                 plugin.0.event_start();
-                if let Some(cur) = mmsg {
-                    mmsg = plugin.0.capture_incoming(cur);
+                if let Some(cur) = moved_message {
+                    moved_message = plugin.0.capture_incoming(cur);
                 }
-                (mmsg, plugin)
+                (moved_message, plugin)
             });
 
             match result {
-                Ok((mmsg, plugin)) => {
-                    msg = mmsg;
+                Ok((remaining_msg, plugin)) => {
+                    msg = remaining_msg;
                     with_mod_ctx(|ctx| ctx.plugins2.write().put_back_upstream(plugin.0));
                 }
                 Err(p) => {
@@ -245,6 +246,7 @@ impl ModuleRef {
         msg
     }
 
+    #[allow(clippy::unused_self)]
     pub(crate) fn plugin_downstream(&self) {
         with_mod_ctx(|ctx| ctx.plugins2.write().begin_downstream());
         loop {

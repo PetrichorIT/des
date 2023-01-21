@@ -34,10 +34,14 @@ pub struct CQueueLLAllocatorInner {
 impl CQueueLLAllocatorInner {
     /// Creates an empty LinkedListAllocator.
     pub fn new() -> Self {
+        Self::with_page_size(page_size::get())
+    }
+
+    pub fn with_page_size(page_size: usize) -> Self {
         let mut this = Self {
             head: ListNode::new(0),
             pages: Vec::new(),
-            page_size: page_size::get(),
+            page_size,
             allocated_mem: 0,
         };
 
