@@ -1,6 +1,6 @@
 use std::{any::TypeId, fmt};
 use crate::net::module::{with_mod_ctx, ModuleContext, module_id, ModuleId};
-use super::{Plugin, PluginStatus, PluginEntry, PluginState, PluginPanicPolicy};
+use super::{Plugin, PluginStatus, PluginPanicPolicy, registry::{PluginEntry, PluginState}};
 
 /// Add a plugin
 pub fn add_plugin<T: Plugin>(plugin: T, priority: usize) -> PluginHandle  {

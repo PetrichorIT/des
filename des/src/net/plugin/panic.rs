@@ -1,4 +1,7 @@
-use super::{Plugin, PluginEntry, PluginState};
+use super::{
+    registry::{PluginEntry, PluginState},
+    Plugin,
+};
 use std::{any::Any, fmt, panic, sync::Arc};
 
 /// A policy that defines the behaviour if a plugin paniced.

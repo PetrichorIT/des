@@ -261,7 +261,7 @@ impl ModuleRef {
 
             match result {
                 Ok(plugin) => {
-                    with_mod_ctx(|ctx| ctx.plugins.write().put_back_downstream(plugin.0, true))
+                    with_mod_ctx(|ctx| ctx.plugins.write().put_back_downstream(plugin.0, true));
                 }
                 Err(p) => {
                     with_mod_ctx(|ctx| ctx.plugins.write().paniced_downstream(p));

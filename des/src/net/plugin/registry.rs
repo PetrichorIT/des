@@ -1,6 +1,6 @@
-use std::any::Any;
+use std::any::{Any, TypeId};
 
-use super::{Plugin, PluginEntry, PluginState, PluginStatus};
+use super::{Plugin, PluginPanicPolicy, PluginStatus};
 
 pub(crate) struct PluginRegistry {
     inner: Vec<PluginEntry>,    // a ordered list of all plugins that are active.
@@ -9,6 +9,38 @@ pub(crate) struct PluginRegistry {
 
     up: bool,
     id: usize,
+}
+
+pub(crate) struct PluginEntry {
+    pub(super) id: usize,
+    pub(super) priority: usize,
+
+    pub(super) typ: TypeId,
+    pub(super) core: Option<Box<dyn Plugin>>,
+    pub(super) state: PluginState,
+
+    pub(super) policy: PluginPanicPolicy,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum PluginState {
+    /// Plugin is not active, but alive, thus self.plugin contains a value.
+    Idle,
+
+    /// The plugin is currently being executed. This is only for debug purposes.
+    Running,
+
+    /// Plugin is not acitve, but alive, thus self.plugin contains a value.
+    /// However it could be the case that the plugin should currently be active
+    /// but is not. thus consider this plugin deactived if this state persists
+    /// on the downstream path.
+    JustCreated,
+
+    /// To be deleted next turn
+    PendingRemoval,
+
+    /// Plugin in not active, because its dead, thus self.plugin is empty.
+    Paniced,
 }
 
 impl PluginRegistry {
@@ -58,17 +90,15 @@ impl PluginRegistry {
     }
 
     pub(crate) fn status(&self, id: usize) -> PluginStatus {
-        self.inner
-            .iter()
-            .find(|p| p.id == id)
-            .map(PluginStatus::from_entry)
-            .unwrap_or_else(|| {
+        self.inner.iter().find(|p| p.id == id).map_or_else(
+            || {
                 self.inject
                     .iter()
                     .find(|p| p.id == id)
-                    .map(|_| PluginStatus::StartingUp)
-                    .unwrap_or(PluginStatus::Gone)
-            })
+                    .map_or(PluginStatus::Gone, |_| PluginStatus::StartingUp)
+            },
+            PluginStatus::from_entry,
+        )
     }
 
     pub(crate) fn clear(&mut self) {
@@ -186,3 +216,30 @@ impl PluginEntry {
         self.core.take()
     }
 }
+
+impl PartialEq for PluginEntry {
+    fn eq(&self, other: &Self) -> bool {
+        self.priority == other.priority
+    }
+}
+
+impl Eq for PluginEntry {}
+
+impl PartialOrd for PluginEntry {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for PluginEntry {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.priority.cmp(&other.priority)
+    }
+}
+
+// SAFTEY:
+// Since plugin entries are stored in a cross thread context
+// they must implement this traits. However plugins are not executed
+// in a async context, so this does not really matter.
+unsafe impl Send for PluginEntry {}
+unsafe impl Sync for PluginEntry {}

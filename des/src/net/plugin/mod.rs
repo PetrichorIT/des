@@ -1,5 +1,4 @@
 //! Plugin v2
-use std::any::TypeId;
 use std::panic::catch_unwind;
 
 use crate::prelude::Message;
@@ -44,65 +43,6 @@ pub trait Plugin: 'static {
 }
 
 // # Internals
-
-pub(crate) struct PluginEntry {
-    id: usize,
-    priority: usize,
-
-    typ: TypeId,
-    core: Option<Box<dyn Plugin>>,
-    state: PluginState,
-
-    policy: PluginPanicPolicy,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(crate) enum PluginState {
-    /// Plugin is not active, but alive, thus self.plugin contains a value.
-    Idle,
-
-    /// The plugin is currently being executed. This is only for debug purposes.
-    Running,
-
-    /// Plugin is not acitve, but alive, thus self.plugin contains a value.
-    /// However it could be the case that the plugin should currently be active
-    /// but is not. thus consider this plugin deactived if this state persists
-    /// on the downstream path.
-    JustCreated,
-
-    /// To be deleted next turn
-    PendingRemoval,
-
-    /// Plugin in not active, because its dead, thus self.plugin is empty.
-    Paniced,
-}
-
-impl PartialEq for PluginEntry {
-    fn eq(&self, other: &Self) -> bool {
-        self.priority == other.priority
-    }
-}
-
-impl Eq for PluginEntry {}
-
-impl PartialOrd for PluginEntry {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for PluginEntry {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.priority.cmp(&other.priority)
-    }
-}
-
-// SAFTEY:
-// Since plugin entries are stored in a cross thread context
-// they must implement this traits. However plugins are not executed
-// in a async context, so this does not really matter.
-unsafe impl Send for PluginEntry {}
-unsafe impl Sync for PluginEntry {}
 
 /// Call this function when a message is send (via send / schedule_*)
 /// to process the plugin output stream accordingly.

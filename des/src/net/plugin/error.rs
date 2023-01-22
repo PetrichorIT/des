@@ -1,10 +1,11 @@
-use super::PluginState;
 use crate::net::module::with_mod_ctx;
 use std::{
     any::{type_name, Any, TypeId},
     error::Error,
     fmt::{Debug, Display},
 };
+
+use super::registry::PluginState;
 
 /// A error that occures in reponse to a plugin activity.
 pub struct PluginError {
