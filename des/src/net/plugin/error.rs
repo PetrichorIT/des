@@ -29,7 +29,7 @@ impl PluginError {
         let type_id = TypeId::of::<T>();
 
         with_mod_ctx(|ctx| {
-            let plugins = ctx.plugins2.try_read().expect(
+            let plugins = ctx.plugins.try_read().expect(
                 "Failed to get read loa on plugins at error creation: uncreitain code path",
             );
             let plugin = plugins.iter().find(|plugin| plugin.typ == type_id);

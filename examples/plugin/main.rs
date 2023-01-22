@@ -1,7 +1,7 @@
 use des::{
     net::{
         module::{set_setup_fn, ModuleContext},
-        plugin2::{add_plugin, Plugin, PluginHandle, PluginStatus},
+        plugin::{add_plugin, Plugin, PluginHandle, PluginStatus},
     },
     prelude::*,
 };

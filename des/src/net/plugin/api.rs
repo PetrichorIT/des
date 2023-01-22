@@ -9,7 +9,7 @@ pub fn add_plugin<T: Plugin>(plugin: T, priority: usize) -> PluginHandle  {
 
 /// Add a plugin
 pub fn add_plugin_with<T: Plugin>(plugin: T, priority: usize, policy: PluginPanicPolicy) -> PluginHandle {
-    with_mod_ctx(|ctx| ctx.add_plugin2(plugin, priority, policy))
+    with_mod_ctx(|ctx| ctx.add_plugin(plugin, priority, policy))
 }
 
 /// A handle to a plugin.
@@ -37,7 +37,7 @@ impl PluginHandle {
              self.mod_id, 
              module_id()
         );
-        with_mod_ctx(|ctx| ctx.plugin_status2(self))
+        with_mod_ctx(|ctx| ctx.plugin_status(self))
     }
 
     /// Removes this plugin from the module.
@@ -54,7 +54,7 @@ impl PluginHandle {
              self.mod_id, 
              module_id()
         );
-        with_mod_ctx(|ctx| ctx.remove_plugin2(self));
+        with_mod_ctx(|ctx| ctx.remove_plugin(self));
     }
 }
 
@@ -77,7 +77,7 @@ impl fmt::Debug for PluginHandle {
 
 impl ModuleContext {
     /// Refer to [`add_plugin`].
-    pub fn add_plugin2<T: Plugin + 'static>(
+    pub fn add_plugin<T: Plugin + 'static>(
         &self,
         plugin: T,
         priority: usize,
@@ -92,7 +92,7 @@ impl ModuleContext {
             policy,
         };
 
-        let id = self.plugins2
+        let id = self.plugins
             .try_write()
             .expect("Failed to fetch write lock: add_plugin")
             .add(entry);
@@ -111,8 +111,8 @@ impl ModuleContext {
     ///
     /// This function panics, if the handle in invalid.
     #[allow(clippy::needless_pass_by_value)]
-    pub fn remove_plugin2(&self, handle: PluginHandle) {
-        self.plugins2
+    pub fn remove_plugin(&self, handle: PluginHandle) {
+        self.plugins
             .try_write()
             .expect("Failed to fetch write lock: remove_plugin")
             .remove(handle.id);
@@ -123,8 +123,8 @@ impl ModuleContext {
     /// # Panics
     ///
     /// This function panics, if the handle in invalid.
-    pub fn plugin_status2(&self, handle: &PluginHandle) -> PluginStatus {
-        self.plugins2
+    pub fn plugin_status(&self, handle: &PluginHandle) -> PluginStatus {
+        self.plugins
             .try_write()
             .expect("Failed to fetch write lock: remove_plugin")
             .status(handle.id)

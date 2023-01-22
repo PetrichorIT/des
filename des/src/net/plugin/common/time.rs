@@ -1,11 +1,9 @@
-use std::panic::UnwindSafe;
-
 use tokio::{
     sim::SimContext,
     time::{SimTime, TimeContext},
 };
 
-use super::Plugin;
+use super::super::Plugin;
 use crate::{
     net::message::{Message, TYP_WAKEUP},
     prelude::schedule_at,
@@ -30,10 +28,6 @@ impl TokioTimePlugin {
         }
     }
 }
-
-// # SAFTEY:
-// Once paniced the stored prev varients are no longer used.
-impl UnwindSafe for TokioTimePlugin {}
 
 impl Plugin for TokioTimePlugin {
     fn event_start(&mut self) {

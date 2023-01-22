@@ -9,7 +9,7 @@ use crate::{
         gate::GateServiceType,
         message::{Message, TYP_RESTART},
         module::with_mod_ctx,
-        plugin2::UnwindSafeBox,
+        plugin::UnwindSafeBox,
         runtime::buf_process,
         NetworkRuntime,
     },
@@ -214,9 +214,9 @@ impl ModuleRef {
 
     #[allow(clippy::unused_self)]
     pub(crate) fn plugin_upstream(&self, mut msg: Option<Message>) -> Option<Message> {
-        with_mod_ctx(|ctx| ctx.plugins2.write().being_upstream());
+        with_mod_ctx(|ctx| ctx.plugins.write().being_upstream());
         loop {
-            let plugin = with_mod_ctx(|ctx| ctx.plugins2.write().next_upstream());
+            let plugin = with_mod_ctx(|ctx| ctx.plugins.write().next_upstream());
             let Some(plugin) = plugin else { break };
             let plugin = UnwindSafeBox(plugin);
 
@@ -234,11 +234,11 @@ impl ModuleRef {
             match result {
                 Ok((remaining_msg, plugin)) => {
                     msg = remaining_msg;
-                    with_mod_ctx(|ctx| ctx.plugins2.write().put_back_upstream(plugin.0));
+                    with_mod_ctx(|ctx| ctx.plugins.write().put_back_upstream(plugin.0));
                 }
                 Err(p) => {
                     // Message was consumed.
-                    with_mod_ctx(|ctx| ctx.plugins2.write().paniced_upstream(p));
+                    with_mod_ctx(|ctx| ctx.plugins.write().paniced_upstream(p));
                 }
             }
         }
@@ -247,9 +247,9 @@ impl ModuleRef {
 
     #[allow(clippy::unused_self)]
     pub(crate) fn plugin_downstream(&self) {
-        with_mod_ctx(|ctx| ctx.plugins2.write().begin_main_downstream());
+        with_mod_ctx(|ctx| ctx.plugins.write().begin_main_downstream());
         loop {
-            let plugin = with_mod_ctx(|ctx| ctx.plugins2.write().next_downstream());
+            let plugin = with_mod_ctx(|ctx| ctx.plugins.write().next_downstream());
             let Some(plugin) = plugin else { break };
             let plugin = UnwindSafeBox(plugin);
 
@@ -261,10 +261,10 @@ impl ModuleRef {
 
             match result {
                 Ok(plugin) => {
-                    with_mod_ctx(|ctx| ctx.plugins2.write().put_back_downstream(plugin.0, true))
+                    with_mod_ctx(|ctx| ctx.plugins.write().put_back_downstream(plugin.0, true))
                 }
                 Err(p) => {
-                    with_mod_ctx(|ctx| ctx.plugins2.write().paniced_downstream(p));
+                    with_mod_ctx(|ctx| ctx.plugins.write().paniced_downstream(p));
                     continue;
                 }
             }

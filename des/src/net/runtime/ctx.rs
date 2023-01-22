@@ -116,7 +116,7 @@ pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<NetworkRuntime
 
         // drop all hooks to ensure all messages reach the async impl
         // module.ctx.hooks.borrow_mut().clear(); TODO: Plugin clean
-        module.ctx.plugins2.write().clear();
+        module.ctx.plugins.write().clear();
         SETUP_FN.lock()(&module.ctx);
 
         // Reschedule wakeup

@@ -1,5 +1,5 @@
 #![cfg(feature = "net")]
-use des::net::{plugin2::*, BuildContext, __Buildable0};
+use des::net::{plugin::*, BuildContext, __Buildable0};
 use des::prelude::*;
 use serial_test::serial;
 use std::sync::atomic::Ordering::SeqCst;
@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::Arc;
 
 mod common {
-    use des::net::plugin2::*;
+    use des::net::plugin::*;
     use des::prelude::*;
 
     pub struct ConsumeAllIncoming;

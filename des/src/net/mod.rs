@@ -11,7 +11,7 @@ pub mod channel;
 pub mod gate;
 pub mod message;
 pub mod module;
-pub mod plugin2;
+pub mod plugin;
 pub mod subsystem;
 
 pub(crate) use self::runtime::HandleMessageEvent;
