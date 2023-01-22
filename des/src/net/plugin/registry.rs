@@ -1,4 +1,7 @@
-use std::any::{Any, TypeId};
+use std::{
+    any::{Any, TypeId},
+    fmt,
+};
 
 use super::{Plugin, PluginPanicPolicy, PluginStatus};
 
@@ -126,6 +129,11 @@ impl PluginRegistry {
         }
     }
 
+    pub(crate) fn info(&self) {
+        println!("{:?}", self.inject);
+        println!("{:?}", self.inner);
+    }
+
     pub(crate) fn next_upstream(&mut self) -> Option<Box<dyn Plugin>> {
         assert!(self.up);
         loop {
@@ -234,6 +242,18 @@ impl PartialOrd for PluginEntry {
 impl Ord for PluginEntry {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.priority.cmp(&other.priority)
+    }
+}
+
+impl fmt::Debug for PluginEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PluginEntry")
+            .field("id", &self.id)
+            .field("priority", &self.priority)
+            .field("core", &self.core.is_some())
+            .field("state", &self.state)
+            .field("policy", &self.policy)
+            .finish()
     }
 }
 

@@ -33,6 +33,8 @@ impl PluginError {
             let plugins = ctx.plugins.try_read().expect(
                 "Failed to get read loa on plugins at error creation: uncreitain code path",
             );
+            plugins.info();
+            let cur_plugin_prio = plugins.iter().find(|p| p.state == PluginState::Running && p.core.is_none()).map(|p| p.priority).unwrap_or(usize::MAX);
             let plugin = plugins.iter().find(|plugin| plugin.typ == type_id);
 
             if let Some(plugin) = plugin {
@@ -44,19 +46,31 @@ impl PluginError {
                             type_name::<T>()
                         ),
                     },
-                    PluginState::Running => PluginError {
-                        kind: PluginErrorKind::PluginMalfunction,
-                        internal: if plugin.core.is_none() { 
-                            format!(
-                                "expected plugin of type {} was found, but is self",
-                                type_name::<T>()
-                            )
-                        } else {
-                            format!(
-                                "expected plugin of type {} was found, but malfunctioned",
-                                type_name::<T>()
-                            )
-                        },
+                    PluginState::Running => {
+                        if plugin.priority > cur_plugin_prio {
+                            PluginError {
+                                kind: PluginErrorKind::PluginWithLowerPriority,
+                                internal: format!(
+                                    "expected plugin of type {} was found, but not yet active due to priority",
+                                    type_name::<T>()
+                                ),
+                            }
+                    } else {
+                        PluginError {
+                            kind: PluginErrorKind::PluginMalfunction,
+                            internal: if plugin.core.is_none() { 
+                                format!(
+                                    "expected plugin of type {} was found, but is self",
+                                    type_name::<T>()
+                                )
+                            } else {
+                                format!(
+                                    "expected plugin of type {} was found, but malfunctioned",
+                                    type_name::<T>()
+                                )
+                            },
+                        }
+                    }
                     },
                     PluginState::Paniced => PluginError {
                         kind: PluginErrorKind::PluginPaniced,

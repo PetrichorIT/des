@@ -12,7 +12,7 @@ pub fn add_plugin_with<T: Plugin>(plugin: T, priority: usize, policy: PluginPani
     with_mod_ctx(|ctx| ctx.add_plugin(plugin, priority, policy))
 }
 
-/// A handle to a plugin.
+/// A handle to a plugin on the current module.
 pub struct PluginHandle {
     id: usize,
     mod_id: ModuleId,

@@ -241,10 +241,10 @@ impl ModuleRef {
 
         let mut msg = msg;
         while let Some(moved_message) = msg.take() {
-            log::trace!("capture clause");
+            // log::trace!("capture clause");
             let plugin = with_mod_ctx(|ctx| ctx.plugins.write().next_upstream());
             let Some(plugin) = plugin else {
-                log::info!("noplugin");
+                // log::info!("noplugin");
                 msg = Some(moved_message);
                 break
             };
@@ -258,7 +258,7 @@ impl ModuleRef {
 
             match result {
                 Ok((remaining_msg, plugin)) => {
-                    log::trace!("returned some = {}", remaining_msg.is_some());
+                    // log::trace!("returned some = {}", remaining_msg.is_some());
                     msg = remaining_msg;
                     with_mod_ctx(|ctx| ctx.plugins.write().put_back_upstream(plugin.0));
                 }

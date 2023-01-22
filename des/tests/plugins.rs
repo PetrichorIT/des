@@ -758,7 +758,7 @@ impl Plugin for ExpectedPlugin {
     fn capture_incoming(&mut self, msg: Message) -> Option<Message> {
         // We expect ExpectingPlugin and want a priority error
         let err = PluginError::expected::<ExpectingPlugin>();
-        assert_eq!(err.kind(), PluginErrorKind::PluginWithLowerPriority);
+        assert_eq!(err.kind(), PluginErrorKind::PluginWithLowerPriority, "{err}");
         assert_eq!(
             format!("{err}"),
             "expected plugin of type plugins::ExpectingPlugin was found, but not yet active due to priority (EINACTIVE)"
@@ -1093,10 +1093,10 @@ impl Module for PluginRemovalFromDownstream {
 
 #[test]
 #[serial]
-fn plugin_removal_from_downmstream() {
-    Logger::new()
-        .interal_max_log_level(log::LevelFilter::Trace)
-        .set_logger();
+fn plugin_removal_from_downstream() {
+    // Logger::new()
+    //     .interal_max_log_level(log::LevelFilter::Trace)
+    //     .set_logger();
 
     let mut rt = NetworkRuntime::new(());
     let mut cx = BuildContext::new(&mut rt);
