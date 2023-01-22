@@ -213,31 +213,56 @@ impl ModuleRef {
     // MARKER: handle_message
 
     #[allow(clippy::unused_self)]
-    pub(crate) fn plugin_upstream(&self, mut msg: Option<Message>) -> Option<Message> {
-        with_mod_ctx(|ctx| ctx.plugins.write().being_upstream());
+    pub(crate) fn plugin_upstream(&self, msg: Option<Message>) -> Option<Message> {
+        with_mod_ctx(|ctx| ctx.plugins.write().being_upstream(false));
         loop {
             let plugin = with_mod_ctx(|ctx| ctx.plugins.write().next_upstream());
             let Some(plugin) = plugin else { break };
             let plugin = UnwindSafeBox(plugin);
 
-            let mut moved_message = msg.take();
             let result = panic::catch_unwind(move || {
                 let mut plugin = plugin;
-
                 plugin.0.event_start();
-                if let Some(cur) = moved_message {
-                    moved_message = plugin.0.capture_incoming(cur);
+                plugin
+            });
+
+            match result {
+                Ok(plugin) => {
+                    with_mod_ctx(|ctx| ctx.plugins.write().put_back_upstream(plugin.0));
                 }
-                (moved_message, plugin)
+                Err(p) => {
+                    with_mod_ctx(|ctx| ctx.plugins.write().paniced_upstream(p));
+                }
+            }
+        }
+
+        // Reset the upstream for message parsing
+        with_mod_ctx(|ctx| ctx.plugins.write().being_upstream(true));
+
+        let mut msg = msg;
+        while let Some(moved_message) = msg.take() {
+            log::trace!("capture clause");
+            let plugin = with_mod_ctx(|ctx| ctx.plugins.write().next_upstream());
+            let Some(plugin) = plugin else {
+                log::info!("noplugin");
+                msg = Some(moved_message);
+                break
+            };
+            let plugin = UnwindSafeBox(plugin);
+
+            let result = panic::catch_unwind(move || {
+                let mut plugin = plugin;
+                let ret = plugin.0.capture_incoming(moved_message);
+                (ret, plugin)
             });
 
             match result {
                 Ok((remaining_msg, plugin)) => {
+                    log::trace!("returned some = {}", remaining_msg.is_some());
                     msg = remaining_msg;
                     with_mod_ctx(|ctx| ctx.plugins.write().put_back_upstream(plugin.0));
                 }
                 Err(p) => {
-                    // Message was consumed.
                     with_mod_ctx(|ctx| ctx.plugins.write().paniced_upstream(p));
                 }
             }

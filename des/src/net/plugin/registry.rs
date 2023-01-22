@@ -3,9 +3,9 @@ use std::any::{Any, TypeId};
 use super::{Plugin, PluginPanicPolicy, PluginStatus};
 
 pub(crate) struct PluginRegistry {
-    inner: Vec<PluginEntry>,    // a ordered list of all plugins that are active.
-    inject: Vec<PluginEntry>,   // plugins to be injected at the next upstream
-    pub(super) pos: Vec<usize>, // a list of ptrs to the iterators (last() is the current)
+    inner: Vec<PluginEntry>,  // a ordered list of all plugins that are active.
+    inject: Vec<PluginEntry>, // plugins to be injected at the next upstream
+    pos: Vec<usize>,          // a list of ptrs to the iterators (last() is the current)
 
     up: bool,
     id: usize,
@@ -58,13 +58,13 @@ impl PluginRegistry {
         self.inner.iter()
     }
 
-    pub(super) fn pos(&self) -> usize {
+    pub(crate) fn pos(&self) -> usize {
         // SAFTEY:
         // The contract states that at leat one iterator must exist
         unsafe { *self.pos.last().unwrap_unchecked() }
     }
 
-    pub(super) fn pos_mut(&mut self) -> &mut usize {
+    pub(crate) fn pos_mut(&mut self) -> &mut usize {
         // SAFTEY:
         // The contract states that at leat one iterator must exist
         unsafe { self.pos.last_mut().unwrap_unchecked() }
@@ -107,23 +107,23 @@ impl PluginRegistry {
         self.pos = vec![0];
     }
 
-    pub(crate) fn being_upstream(&mut self) {
+    pub(crate) fn being_upstream(&mut self, capture: bool) {
         self.up = true;
         self.pos = vec![0];
 
-        // Removes values from the removal queue
-        self.inner
-            .retain(|entry| entry.state != PluginState::PendingRemoval);
+        if !capture {
+            // Removes values from the removal queue
+            self.inner
+                .retain(|entry| entry.state != PluginState::PendingRemoval);
 
-        // Add values from inject queue to inner
-        for mut entry in self.inject.drain(..) {
-            entry.state = PluginState::Idle;
-            match self.inner.binary_search(&entry) {
-                Ok(i) | Err(i) => self.inner.insert(i, entry),
+            // Add values from inject queue to inner
+            for mut entry in self.inject.drain(..) {
+                entry.state = PluginState::Idle;
+                match self.inner.binary_search(&entry) {
+                    Ok(i) | Err(i) => self.inner.insert(i, entry),
+                }
             }
         }
-
-        log::trace!("starting upstream with {} entrys", self.inner.len());
     }
 
     pub(crate) fn next_upstream(&mut self) -> Option<Box<dyn Plugin>> {
@@ -201,7 +201,7 @@ impl PluginRegistry {
 
 impl PluginEntry {
     pub(self) fn activate(&mut self) -> bool {
-        let active = matches!(self.state, PluginState::Idle);
+        let active = matches!(self.state, PluginState::Idle | PluginState::Running);
         if active {
             self.state = PluginState::Running;
         }
