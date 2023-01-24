@@ -15,8 +15,9 @@ pub(crate) struct PluginRegistry {
 }
 
 pub(crate) struct PluginEntry {
-    pub(super) id: usize,
-    pub(super) priority: usize,
+    pub(super) id: usize,       // a module-specific unqiue identifier
+    pub(super) gen: usize,      // the number of restarts the plugin has performed
+    pub(super) priority: usize, // 2 bits reserved, public API at least 0b****10
 
     pub(super) typ: TypeId,
     pub(super) core: Option<Box<dyn Plugin>>,
@@ -75,7 +76,7 @@ impl PluginRegistry {
 
     pub(crate) fn add(&mut self, mut entry: PluginEntry) -> usize {
         let id = self.id;
-        self.id += 1;
+        self.id = self.id.wrapping_add(1);
         entry.id = id;
 
         self.inject.push(entry);

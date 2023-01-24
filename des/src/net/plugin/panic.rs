@@ -30,6 +30,7 @@ impl PluginPanicPolicy {
             Self::Abort => panic::resume_unwind(payload),
             Self::Restart(creation_fn) => {
                 entry.core = Some(creation_fn());
+                entry.gen = entry.gen.wrapping_add(1);
                 entry.state = PluginState::JustCreated;
             }
         }

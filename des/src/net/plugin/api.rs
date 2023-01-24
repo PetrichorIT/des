@@ -9,6 +9,7 @@ pub fn add_plugin<T: Plugin>(plugin: T, priority: usize) -> PluginHandle  {
 
 /// Add a plugin
 pub fn add_plugin_with<T: Plugin>(plugin: T, priority: usize, policy: PluginPanicPolicy) -> PluginHandle {
+    let priority = (priority << 2) | 0b010;
     with_mod_ctx(|ctx| ctx.add_plugin(plugin, priority, policy))
 }
 
@@ -85,6 +86,7 @@ impl ModuleContext {
     ) -> PluginHandle {
         let entry = PluginEntry {
             id: 0,
+            gen: 0,
             core: Some(Box::new(plugin)),
             state: PluginState::JustCreated,
             typ: TypeId::of::<T>(),
