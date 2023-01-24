@@ -1,10 +1,7 @@
-use std::time::Duration;
-
-use tokio::time::SimTime;
-
 use crate::{
     net::{message::TYP_PLUGIN_PERIODIC, plugin::Plugin},
     prelude::{schedule_in, Message},
+    time::{Duration, SimTime},
 };
 
 /// A periodic plugin.
