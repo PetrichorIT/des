@@ -2,6 +2,7 @@ use super::{DummyModule, ModuleId, ModuleRef, ModuleRefWeak, ModuleReferencingEr
 use crate::{
     net::plugin,
     prelude::{GateRef, ObjectPath},
+    sync::{SwapLock, SwapLockReadGuard},
 };
 use std::{
     collections::HashMap,
@@ -12,7 +13,7 @@ use std::{
 #[cfg(feature = "async")]
 use crate::net::module::core::AsyncCoreExt;
 
-pub(crate) static MOD_CTX: spin::RwLock<Option<Arc<ModuleContext>>> = spin::RwLock::new(None);
+pub(crate) static MOD_CTX: SwapLock<Option<Arc<ModuleContext>>> = SwapLock::new(None);
 pub(crate) static SETUP_FN: spin::Mutex<fn(&ModuleContext)> = spin::Mutex::new(_default_setup);
 
 #[cfg(not(feature = "async"))]
@@ -102,11 +103,15 @@ impl ModuleContext {
     }
 
     pub(crate) fn place(self: Arc<Self>) -> Option<Arc<ModuleContext>> {
-        MOD_CTX.write().replace(self)
+        let mut this = Some(self);
+        MOD_CTX.swap(&mut this);
+        this
     }
 
     pub(crate) fn take() -> Option<Arc<ModuleContext>> {
-        MOD_CTX.write().take()
+        let mut this = None;
+        MOD_CTX.swap(&mut this);
+        this
     }
 
     /// INTERNAL
@@ -189,9 +194,13 @@ impl Debug for ModuleContext {
 
 pub(crate) fn with_mod_ctx<R>(f: impl FnOnce(&Arc<ModuleContext>) -> R) -> R {
     let lock = MOD_CTX.read();
-    let r = f(lock.as_ref().unwrap());
+    let r = f(&lock);
     drop(lock);
     r
+}
+
+pub(crate) fn with_mod_ctx_lock() -> SwapLockReadGuard<'static, Option<Arc<ModuleContext>>> {
+    MOD_CTX.read()
 }
 
 cfg_async! {

@@ -10,6 +10,7 @@ pub(crate) struct PluginRegistry {
     inject: Vec<PluginEntry>, // plugins to be injected at the next upstream
     pos: Vec<usize>,          // a list of ptrs to the iterators (last() is the current)
 
+    dirty: bool,
     up: bool,
     id: usize,
 }
@@ -53,6 +54,7 @@ impl PluginRegistry {
             inner: Vec::new(),
             inject: Vec::new(),
             pos: vec![0],
+            dirty: false,
             up: true,
             id: 0,
         }
@@ -90,6 +92,7 @@ impl PluginRegistry {
             return;
         };
 
+        self.dirty = true;
         self.inner[i].state = PluginState::PendingRemoval;
     }
 
@@ -109,16 +112,21 @@ impl PluginRegistry {
         self.inner.clear();
         self.inject.clear();
         self.pos = vec![0];
+        self.dirty = false;
     }
 
     pub(crate) fn being_upstream(&mut self, capture: bool) {
         self.up = true;
-        self.pos = vec![0];
+        self.pos.truncate(1);
+        self.pos[0] = 0;
 
         if !capture {
             // Removes values from the removal queue
-            self.inner
-                .retain(|entry| entry.state != PluginState::PendingRemoval);
+            if self.dirty {
+                self.inner
+                    .retain(|entry| entry.state != PluginState::PendingRemoval);
+                self.dirty = false
+            }
 
             // Add values from inject queue to inner
             for mut entry in self.inject.drain(..) {
