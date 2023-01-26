@@ -10,7 +10,7 @@ use crate::{
 /// Overwrite the setup fn all modules run. This function should be used to
 /// add plugins required by all modules.
 pub fn set_setup_fn(f: fn(&ModuleContext)) {
-    *SETUP_FN.lock() = f;
+    *SETUP_FN.write() = f;
 }
 
 /// A runtime-unqiue identifier for this module-core and by extension this module.

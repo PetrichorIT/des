@@ -2,7 +2,7 @@ use super::{DummyModule, ModuleId, ModuleRef, ModuleRefWeak, ModuleReferencingEr
 use crate::{
     net::plugin,
     prelude::{GateRef, ObjectPath},
-    sync::{SwapLock, SwapLockReadGuard},
+    sync::{RwLock, SwapLock, SwapLockReadGuard},
 };
 use std::{
     collections::HashMap,
@@ -14,7 +14,7 @@ use std::{
 use crate::net::module::core::AsyncCoreExt;
 
 pub(crate) static MOD_CTX: SwapLock<Option<Arc<ModuleContext>>> = SwapLock::new(None);
-pub(crate) static SETUP_FN: spin::Mutex<fn(&ModuleContext)> = spin::Mutex::new(_default_setup);
+pub(crate) static SETUP_FN: RwLock<fn(&ModuleContext)> = RwLock::new(_default_setup);
 
 #[cfg(not(feature = "async"))]
 pub(crate) fn _default_setup(_: &ModuleContext) {}
@@ -39,14 +39,14 @@ pub struct ModuleContext {
     pub(crate) id: ModuleId,
 
     pub(crate) path: ObjectPath,
-    pub(crate) gates: spin::RwLock<Vec<GateRef>>,
+    pub(crate) gates: RwLock<Vec<GateRef>>,
 
-    pub(crate) plugins: spin::RwLock<plugin::PluginRegistry>,
+    pub(crate) plugins: RwLock<plugin::PluginRegistry>,
 
     #[cfg(feature = "async")]
-    pub(crate) async_ext: spin::RwLock<AsyncCoreExt>,
+    pub(crate) async_ext: RwLock<AsyncCoreExt>,
     pub(crate) parent: Option<ModuleRefWeak>,
-    pub(crate) children: spin::RwLock<HashMap<String, ModuleRef>>,
+    pub(crate) children: RwLock<HashMap<String, ModuleRef>>,
 }
 
 impl ModuleContext {
@@ -57,17 +57,17 @@ impl ModuleContext {
 
             id: ModuleId::gen(),
             path,
-            gates: spin::RwLock::new(Vec::new()),
-            plugins: spin::RwLock::new(plugin::PluginRegistry::new()),
+            gates: RwLock::new(Vec::new()),
+            plugins: RwLock::new(plugin::PluginRegistry::new()),
 
             parent: None,
-            children: spin::RwLock::new(HashMap::new()),
+            children: RwLock::new(HashMap::new()),
 
             #[cfg(feature = "async")]
-            async_ext: spin::RwLock::new(AsyncCoreExt::new()),
+            async_ext: RwLock::new(AsyncCoreExt::new()),
         }));
 
-        SETUP_FN.lock()(&this);
+        SETUP_FN.read()(&this);
 
         this
     }
@@ -81,17 +81,17 @@ impl ModuleContext {
 
             id: ModuleId::gen(),
             path,
-            gates: spin::RwLock::new(Vec::new()),
-            plugins: spin::RwLock::new(plugin::PluginRegistry::new()),
+            gates: RwLock::new(Vec::new()),
+            plugins: RwLock::new(plugin::PluginRegistry::new()),
 
             parent: Some(ModuleRefWeak::new(&parent)),
-            children: spin::RwLock::new(HashMap::new()),
+            children: RwLock::new(HashMap::new()),
 
             #[cfg(feature = "async")]
-            async_ext: spin::RwLock::new(AsyncCoreExt::new()),
+            async_ext: RwLock::new(AsyncCoreExt::new()),
         }));
 
-        SETUP_FN.lock()(&this);
+        SETUP_FN.read()(&this);
 
         parent
             .ctx

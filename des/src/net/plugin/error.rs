@@ -33,7 +33,7 @@ impl PluginError {
             let plugins = ctx.plugins.try_read().expect(
                 "Failed to get read loa on plugins at error creation: uncreitain code path",
             );
-            plugins.info();
+           
             let cur_plugin_prio = plugins.iter().find(|p| p.state == PluginState::Running && p.core.is_none()).map(|p| p.priority).unwrap_or(usize::MAX);
             let plugin = plugins.iter().find(|plugin| plugin.typ == type_id);
 

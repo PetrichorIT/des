@@ -28,24 +28,25 @@ pub(crate) struct PluginEntry {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u8)]
 pub(crate) enum PluginState {
     /// Plugin is not active, but alive, thus self.plugin contains a value.
-    Idle,
+    Idle = 0,
 
     /// The plugin is currently being executed. This is only for debug purposes.
-    Running,
+    Running = 1,
 
     /// Plugin is not acitve, but alive, thus self.plugin contains a value.
     /// However it could be the case that the plugin should currently be active
     /// but is not. thus consider this plugin deactived if this state persists
     /// on the downstream path.
-    JustCreated,
+    JustCreated = 2,
 
     /// To be deleted next turn
-    PendingRemoval,
+    PendingRemoval = 3,
 
     /// Plugin in not active, because its dead, thus self.plugin is empty.
-    Paniced,
+    Paniced = 4,
 }
 
 impl PluginRegistry {
@@ -111,7 +112,8 @@ impl PluginRegistry {
     pub(crate) fn clear(&mut self) {
         self.inner.clear();
         self.inject.clear();
-        self.pos = vec![0];
+        self.pos.clear();
+        self.pos.push(0);
         self.dirty = false;
     }
 
@@ -138,22 +140,16 @@ impl PluginRegistry {
         }
     }
 
-    pub(crate) fn info(&self) {
-        println!("{:?}", self.inject);
-        println!("{:?}", self.inner);
-    }
-
     pub(crate) fn next_upstream(&mut self) -> Option<Box<dyn Plugin>> {
-        assert!(self.up);
         loop {
-            let pos = self.pos();
+            let pos = self.pos[0];
             if pos < self.inner.len() {
                 if self.inner[pos].activate() {
                     // Real ptr bump
-                    *self.pos_mut() += 1;
+                    self.pos[0] += 1;
                     break self.inner[pos].take();
                 }
-                *self.pos_mut() += 1;
+                self.pos[0] += 1;
             } else {
                 break None;
             }
@@ -161,14 +157,12 @@ impl PluginRegistry {
     }
 
     pub(crate) fn put_back_upstream(&mut self, plugin: Box<dyn Plugin>) {
-        assert!(self.up);
-        let pos = self.pos();
+        let pos = self.pos[0];
         self.inner[pos - 1].core = Some(plugin);
     }
 
     pub(crate) fn paniced_upstream(&mut self, payload: Box<dyn Any + Send>) {
-        assert!(self.up);
-        let pos = self.pos();
+        let pos = self.pos[0];
         self.inner[pos - 1].state = PluginState::Paniced;
         let policy = self.inner[pos - 1].policy.clone();
         policy.activate(&mut self.inner[pos - 1], payload);
@@ -176,7 +170,8 @@ impl PluginRegistry {
 
     pub(crate) fn begin_main_downstream(&mut self) {
         self.up = false;
-        self.pos = vec![self.inner.len()];
+        self.pos.truncate(1);
+        self.pos[0] = self.inner.len();
     }
 
     pub(crate) fn begin_sub_downstream(&mut self, pos: Option<usize>) {
@@ -217,18 +212,22 @@ impl PluginRegistry {
 }
 
 impl PluginEntry {
+    #[inline(always)]
     pub(self) fn activate(&mut self) -> bool {
-        let active = matches!(self.state, PluginState::Idle | PluginState::Running);
+        // let active = matches!(self.state, PluginState::Idle | PluginState::Running);
+        let active = self.state as u8 <= 1;
         if active {
             self.state = PluginState::Running;
         }
         active
     }
 
+    #[inline(always)]
     pub(self) fn is_active(&self) -> bool {
         matches!(self.state, PluginState::Running)
     }
 
+    #[inline(always)]
     pub(self) fn take(&mut self) -> Option<Box<dyn Plugin>> {
         self.core.take()
     }

@@ -23,9 +23,9 @@ default = []
 # Include everything used for default test runs.
 full = ["net", "cqueue", "async"]
 
+multi-threaded = []
 async = ["net", "dep:tokio", "dep:async-trait"]
 cqueue = ["dep:cqueue"]
-
 net = ["dep:des_macros"]
 
 # Different metrics features

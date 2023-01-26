@@ -130,7 +130,7 @@ impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
         let module = self.module;
 
         module.activate();
-        module.handle_message2(message);
+        module.handle_message(message);
         module.deactivate();
 
         buf_process(&module, rt);
@@ -174,7 +174,7 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
                     info!("Calling at_sim_start({}).", stage);
 
                     module.activate();
-                    module.at_sim_start2(stage);
+                    module.at_sim_start(stage);
                     module.deactivate();
 
                     super::buf_process(&module, rt);
@@ -191,7 +191,7 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
                 log_scope!(module.ctx.path.path());
 
                 module.activate();
-                module.finish_sim_start2();
+                module.finish_sim_start();
                 module.deactivate();
 
                 super::buf_process(&module, rt);
@@ -299,7 +299,7 @@ impl ModuleRef {
         }
     }
 
-    pub(crate) fn handle_message2(&self, msg: Message) {
+    pub(crate) fn handle_message(&self, msg: Message) {
         use std::sync::atomic::Ordering::SeqCst;
         if self.ctx.active.load(SeqCst) {
             // (0) Run upstream plugins.
@@ -329,24 +329,24 @@ impl ModuleRef {
             // Do sim start procedure
             let stages = self.num_sim_start_stages();
             for stage in 0..stages {
-                self.at_sim_start2(stage);
+                self.at_sim_start(stage);
             }
 
             #[cfg(feature = "async")]
-            self.finish_sim_start2();
+            self.finish_sim_start();
         } else {
             log::debug!("Ignoring message since module is inactive");
         }
     }
 
-    pub(crate) fn at_sim_start2(&self, stage: usize) {
+    pub(crate) fn at_sim_start(&self, stage: usize) {
         self.plugin_upstream(None);
         self.handler.borrow_mut().at_sim_start(stage);
         self.plugin_downstream();
     }
 
     #[cfg(feature = "async")]
-    pub(crate) fn finish_sim_start2(&self) {
+    pub(crate) fn finish_sim_start(&self) {
         if self.handler.borrow().__indicate_asnyc() {
             self.plugin_upstream(None);
             self.handler.borrow_mut().finish_sim_start();
@@ -354,185 +354,18 @@ impl ModuleRef {
         }
     }
 
-    pub(crate) fn at_sim_end2(&self) {
+    pub(crate) fn at_sim_end(&self) {
         self.plugin_upstream(None);
         self.handler.borrow_mut().at_sim_end();
         self.plugin_downstream();
     }
 
     #[cfg(feature = "async")]
-    pub(crate) fn finish_sim_end2(&self) {
+    pub(crate) fn finish_sim_end(&self) {
         if self.handler.borrow().__indicate_asnyc() {
             self.plugin_upstream(None);
             self.handler.borrow_mut().finish_sim_end();
             self.plugin_downstream();
         }
     }
-
-    // OLD IMPL
-
-    // Handles a message
-    // pub(crate) fn handle_message(&self, msg: Message) {
-    //     use std::sync::atomic::Ordering::SeqCst;
-
-    //     if self.ctx.active.load(SeqCst) {
-    //         // (0) Run all plugins upward
-    //         // Call in order from lowest to highest priority.
-    //         let msg = with_mod_ctx(|ctx| {
-    //             let mut plugins = ctx.plugins.write();
-    //             let mut msg = Some(msg);
-    //             for plugin in plugins.iter_mut() {
-    //                 if !plugin.just_created {
-    //                     msg = plugin.try_capture(msg);
-    //                 }
-    //             }
-    //             msg
-    //         });
-
-    //         // Call handle message, if the message was not consumed
-    //         // - If async and the message was consumed, send a NOTIFY packet to
-    //         //   still call poll until idle, and internal RT management.
-    //         if let Some(msg) = msg {
-    //             self.handler.borrow_mut().handle_message(msg);
-    //         } else {
-    //             #[cfg(feature = "async")]
-    //             if self.handler.borrow().__indicate_asnyc() {
-    //                 self.handler.borrow_mut().handle_message(Message::notify());
-    //             }
-    //         }
-
-    //         // (2) Plugin defer calls
-    //         // Call in reverse order to preserve user-space distance
-    //         with_mod_ctx(|ctx| {
-    //             for plugin in ctx.plugins.write().iter_mut().rev() {
-    //                 if !plugin.just_created {
-    //                     plugin.try_defer();
-    //                 }
-    //                 plugin.just_created = false;
-    //             }
-    //         });
-    //     } else if msg.header().typ == TYP_RESTART {
-    //         log::debug!("Restarting module");
-    //         // restart the module itself.
-    //         self.reset();
-    //         self.ctx.active.store(true, SeqCst);
-
-    //         // Do sim start procedure
-    //         let stages = self.num_sim_start_stages();
-    //         for stage in 0..stages {
-    //             self.at_sim_start(stage);
-    //         }
-
-    //         #[cfg(feature = "async")]
-    //         self.finish_sim_start();
-    //     } else {
-    //         log::debug!("Ignoring message since module is inactive");
-    //     }
-    // }
-
-    // pub(crate) fn at_sim_start(&self, stage: usize) {
-    //     // (0) Run all plugins upward
-    //     // Call in order from lowest to highest priority.
-    //     with_mod_ctx(|ctx| {
-    //         for plugin in ctx.plugins.write().iter_mut() {
-    //             if !plugin.just_created {
-    //                 plugin.try_capture_sim_start();
-    //             }
-    //         }
-    //     });
-
-    //     // (1) Calle the underlining impl
-    //     self.handler.borrow_mut().at_sim_start(stage);
-
-    //     // (2) Plugin defer calls
-    //     // Call in reverse order to preserve user-space distance
-    //     with_mod_ctx(|ctx| {
-    //         for plugin in ctx.plugins.write().iter_mut().rev() {
-    //             if !plugin.just_created {
-    //                 plugin.try_defer_sim_start();
-    //             }
-    //             plugin.just_created = false;
-    //         }
-    //     });
-    // }
-
-    // #[cfg(feature = "async")]
-    // pub(crate) fn finish_sim_start(&self) {
-    //     // (0) Run all plugins upward
-    //     // Call in order from lowest to highest priority.
-    //     with_mod_ctx(|ctx| {
-    //         for plugin in ctx.plugins.write().iter_mut() {
-    //             if !plugin.just_created {
-    //                 plugin.try_capture_sim_start();
-    //             }
-    //         }
-    //     });
-
-    //     // (1) Calle the underlining impl
-    //     self.handler.borrow_mut().finish_sim_start();
-
-    //     // (2) Plugin defer calls
-    //     // Call in reverse order to preserve user-space distance
-    //     with_mod_ctx(|ctx| {
-    //         for plugin in ctx.plugins.write().iter_mut().rev() {
-    //             if !plugin.just_created {
-    //                 plugin.try_defer_sim_start();
-    //             }
-    //             plugin.just_created = false;
-    //         }
-    //     });
-    // }
-
-    // pub(crate) fn at_sim_end(&self) {
-    //     // (0) Run all plugins upward
-    //     // Call in order from lowest to highest priority.
-    //     with_mod_ctx(|ctx| {
-    //         for plugin in ctx.plugins.write().iter_mut() {
-    //             if !plugin.just_created {
-    //                 plugin.try_capture_sim_end();
-    //             }
-    //         }
-    //     });
-
-    //     // (1) Call inner
-    //     self.handler.borrow_mut().at_sim_end();
-
-    //     // (2) Plugin defer calls
-    //     // Call in reverse order to preserve user-space distance
-    //     with_mod_ctx(|ctx| {
-    //         for plugin in ctx.plugins.write().iter_mut().rev() {
-    //             if !plugin.just_created {
-    //                 plugin.try_defer_sim_end();
-    //             }
-    //             plugin.just_created = false;
-    //         }
-    //     });
-    // }
-
-    // #[cfg(feature = "async")]
-    // pub(crate) fn finish_sim_end(&self) {
-    //     // (0) Run all plugins upward
-    //     // Call in order from lowest to highest priority.
-    //     with_mod_ctx(|ctx| {
-    //         for plugin in ctx.plugins.write().iter_mut() {
-    //             if !plugin.just_created {
-    //                 plugin.try_capture_sim_end();
-    //             }
-    //         }
-    //     });
-
-    //     // (1) Call inner
-    //     self.handler.borrow_mut().finish_sim_end();
-
-    //     // (2) Plugin defer calls
-    //     // Call in reverse order to preserve user-space distance
-    //     with_mod_ctx(|ctx| {
-    //         for plugin in ctx.plugins.write().iter_mut().rev() {
-    //             if !plugin.just_created {
-    //                 plugin.try_defer_sim_end();
-    //             }
-    //             plugin.just_created = false;
-    //         }
-    //     });
-    // }
 }

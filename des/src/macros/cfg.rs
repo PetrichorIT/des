@@ -30,6 +30,26 @@ macro_rules! cfg_not_async {
     }
 }
 
+macro_rules! cfg_multi_threaded {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "multi-threaded")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "multi-threaded")))]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_not_multi_threaded {
+    ($($item:item)*) => {
+        $(
+            #[cfg(not(feature = "multi-threaded"))]
+            #[cfg_attr(docsrs, doc(cfg(not(feature = "multi-threaded"))))]
+            $item
+        )*
+    }
+}
+
 macro_rules! cfg_metrics {
     ($($item:item)*) => {
         $(

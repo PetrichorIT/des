@@ -16,23 +16,23 @@ pub use fmt::LogFormat;
 pub use output::LogOutput;
 pub use record::LogRecord;
 
-use crate::time::SimTime;
+use crate::{sync::RwLock, time::SimTime};
 use log::{Level, LevelFilter, Log, SetLoggerError};
 use termcolor::{BufferWriter, ColorChoice};
 
 use self::filter::FilterPolicy;
 
 static SCOPED_LOGGER: LoggerWrap = LoggerWrap::uninitalized();
-static CURRENT_SCOPE: spin::Mutex<&'static str> = spin::Mutex::new("");
+static CURRENT_SCOPE: RwLock<&'static str> = RwLock::new("");
 
 struct LoggerWrap {
-    inner: spin::RwLock<Option<Logger>>,
+    inner: RwLock<Option<Logger>>,
 }
 
 impl LoggerWrap {
     const fn uninitalized() -> Self {
         Self {
-            inner: spin::RwLock::new(None),
+            inner: RwLock::new(None),
         }
     }
 
@@ -78,7 +78,7 @@ impl Log for LoggerWrap {
 /// A logger that collects scope specific messages.
 pub struct Logger {
     active: bool,
-    scopes: spin::Mutex<HashMap<String, LoggerScope>>,
+    scopes: RwLock<HashMap<String, LoggerScope>>,
     policy: Box<dyn LogScopeConfigurationPolicy>,
     interal_max_level: LevelFilter,
     filter: FilterPolicy,
@@ -112,7 +112,7 @@ impl Logger {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            scopes: spin::Mutex::new(HashMap::new()),
+            scopes: RwLock::new(HashMap::new()),
             active: true,
             policy: Box::new(DefaultPolicy),
             interal_max_level: LevelFilter::Warn,
@@ -125,7 +125,7 @@ impl Logger {
     #[doc(hidden)]
     pub fn debug() -> Self {
         Self {
-            scopes: spin::Mutex::new(HashMap::new()),
+            scopes: RwLock::new(HashMap::new()),
             active: true,
             policy: Box::new(DefaultPolicy),
             interal_max_level: LevelFilter::Warn,
@@ -138,13 +138,13 @@ impl Logger {
     pub fn begin_scope(ident: impl AsRef<str>) {
         let ident: *const str = ident.as_ref();
         let ident: &'static str = unsafe { &*ident };
-        *CURRENT_SCOPE.lock() = ident;
+        *CURRENT_SCOPE.write() = ident;
     }
 
     /// Removes the current scope.
     #[doc(hidden)]
     pub fn end_scope() {
-        *CURRENT_SCOPE.lock() = "";
+        *CURRENT_SCOPE.write() = "";
     }
 
     fn reset_contents(&mut self, new: Self) {
@@ -259,7 +259,7 @@ impl Log for Logger {
         }
 
         // (2) Get scopes by ptr
-        let mut scopes = self.scopes.lock();
+        let mut scopes = self.scopes.write();
 
         // (3) Get target pointer
         let target_is_module_path = Some(record.metadata().target()) == record.module_path();
@@ -270,7 +270,7 @@ impl Log for Logger {
         };
 
         // (4) Get scope or make defeault print based on the target marker.
-        let scope_label = CURRENT_SCOPE.lock();
+        let scope_label = CURRENT_SCOPE.read();
         if scope_label.is_empty() {
             // if policy(record.target()) {
             // No target scope was given --- not scoped println.

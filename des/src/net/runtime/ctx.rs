@@ -5,10 +5,11 @@ use crate::net::module::SETUP_FN;
 use crate::net::{gate::GateRef, message::Message, MessageAtGateEvent, NetEvents};
 use crate::prelude::{GateServiceType, ModuleRef};
 use crate::runtime::Runtime;
+use crate::sync::RwLock;
 use crate::time::SimTime;
 use std::sync::{Arc, Weak};
 
-static BUF_CTX: spin::Mutex<BufferContext> = spin::Mutex::new(BufferContext {
+static BUF_CTX: RwLock<BufferContext> = RwLock::new(BufferContext {
     output: Vec::new(),
     loopback: Vec::new(),
     shutdown: None,
@@ -40,7 +41,7 @@ struct BufferContext {
 ///
 #[must_use]
 pub fn globals() -> Arc<NetworkRuntimeGlobals> {
-    let ctx = BUF_CTX.lock();
+    let ctx = BUF_CTX.read();
     ctx.globals
         .as_ref()
         .unwrap()
@@ -49,26 +50,26 @@ pub fn globals() -> Arc<NetworkRuntimeGlobals> {
 }
 
 pub(crate) fn buf_send_at(msg: Message, gate: GateRef, send_time: SimTime) {
-    let mut ctx = BUF_CTX.lock();
+    let mut ctx = BUF_CTX.write();
     ctx.output.push((msg, gate, send_time));
 }
 pub(crate) fn buf_schedule_at(msg: Message, arrival_time: SimTime) {
-    let mut ctx = BUF_CTX.lock();
+    let mut ctx = BUF_CTX.write();
     ctx.loopback.push((msg, arrival_time));
 }
 pub(crate) fn buf_schedule_shutdown(restart: Option<SimTime>) {
-    let mut ctx = BUF_CTX.lock();
+    let mut ctx = BUF_CTX.write();
     ctx.shutdown = Some(restart);
 }
 
 pub(crate) fn buf_set_globals(globals: Weak<NetworkRuntimeGlobals>) {
-    let mut ctx = BUF_CTX.lock();
+    let mut ctx = BUF_CTX.write();
     ctx.globals = Some(globals);
 }
 
 pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<NetworkRuntime<A>>) {
     let self_id = module.ctx.id;
-    let mut ctx = BUF_CTX.lock();
+    let mut ctx = BUF_CTX.write();
 
     // Send gate events from the 'send' method calls
     for (mut message, gate, time) in ctx.output.drain(..) {
@@ -117,7 +118,7 @@ pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<NetworkRuntime
         // drop all hooks to ensure all messages reach the async impl
         // module.ctx.hooks.borrow_mut().clear(); TODO: Plugin clean
         module.ctx.plugins.write().clear();
-        SETUP_FN.lock()(&module.ctx);
+        SETUP_FN.read()(&module.ctx);
 
         // Reschedule wakeup
         if let Some(rest) = rest {

@@ -4,6 +4,7 @@ use des::{
     net::{BuildContext, __Buildable0},
     prelude::*,
 };
+use serial_test::serial;
 
 #[NdlModule]
 #[derive(Debug)]
@@ -86,11 +87,13 @@ impl TestCase {
 }
 
 #[test]
+#[serial]
 fn test_case_build() {
     let _case = TestCase::build();
 }
 
 #[test]
+#[serial]
 fn test_parent_ptr() {
     let case = TestCase::build();
 
@@ -119,6 +122,7 @@ fn test_parent_ptr() {
 }
 
 #[test]
+#[serial]
 fn test_parent_mut_ptr() {
     let case = TestCase::build();
 

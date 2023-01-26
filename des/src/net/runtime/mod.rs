@@ -130,7 +130,7 @@ impl<A> Application for NetworkRuntime<A> {
             log_scope!(module.ctx.path.path());
             info!("Calling 'at_sim_end'");
             module.activate();
-            module.at_sim_end2();
+            module.at_sim_end();
             module.deactivate();
 
             // NOTE: no buf_process since no furthe events will be processed.
@@ -142,7 +142,7 @@ impl<A> Application for NetworkRuntime<A> {
             for module in &mut rt.app.module_list {
                 log_scope!(module.ctx.path.path());
                 module.activate();
-                module.finish_sim_end2();
+                module.finish_sim_end();
                 module.deactivate();
             }
         }

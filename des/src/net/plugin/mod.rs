@@ -89,7 +89,7 @@ pub(crate) use self::registry::PluginRegistry;
 mod util;
 pub(crate) use self::util::UnwindSafeBox;
 
-use super::module::with_mod_ctx;
+use super::module::with_mod_ctx_lock;
 
 mod common;
 pub use self::common::*;
@@ -242,7 +242,10 @@ pub trait Plugin: 'static {
 ///
 pub(crate) fn plugin_output_stream(msg: Message) -> Option<Message> {
     // (0) Create new downstream
-    with_mod_ctx(|ctx| ctx.plugins.write().begin_sub_downstream(None));
+    let ctx = with_mod_ctx_lock();
+    {
+        ctx.plugins.write().begin_sub_downstream(None);
+    }
 
     // (1) Move the message allong the downstream, only using active plugins.
     //
@@ -254,9 +257,13 @@ pub(crate) fn plugin_output_stream(msg: Message) -> Option<Message> {
     //      - self is not an issue, since without a core not in itr
     //      - BUT: begin_downstream poisoined the old downstream info.
     let mut msg = msg;
-    while let Some(plugin) = with_mod_ctx(|ctx| ctx.plugins.write().next_downstream()) {
+    while let Some(plugin) = {
+        let mut lock = ctx.plugins.write();
+        let ret = lock.next_downstream();
+        drop(lock);
+        ret
+    } {
         let plugin = UnwindSafeBox(plugin);
-
         // (2) Capture the packet
         let result = catch_unwind(move || {
             let mut plugin = plugin;
@@ -267,29 +274,26 @@ pub(crate) fn plugin_output_stream(msg: Message) -> Option<Message> {
         });
 
         // (3) Continue iteration if possible, readl with panics
+        let mut plugins = ctx.plugins.write();
         match result {
             Ok((r_plugin, r_msg)) => {
-                with_mod_ctx(|ctx| ctx.plugins.write().put_back_downstream(r_plugin.0, false));
+                plugins.put_back_downstream(r_plugin.0, false);
                 if let Some(r_msg) = r_msg {
                     msg = r_msg;
                 } else {
-                    with_mod_ctx(|ctx| ctx.plugins.write().close_sub_downstream());
+                    plugins.close_sub_downstream();
                     return None;
                 }
             }
             Err(p) => {
-                with_mod_ctx(|ctx| {
-                    let mut plugins = ctx.plugins.write();
-                    plugins.paniced_downstream(p);
-                    plugins.close_sub_downstream();
-                });
-
+                plugins.paniced_downstream(p);
+                plugins.close_sub_downstream();
                 return None;
             }
         }
     }
 
-    with_mod_ctx(|ctx| ctx.plugins.write().close_sub_downstream());
+    ctx.plugins.write().close_sub_downstream();
 
     // (4) If the message survives, good.
     Some(msg)
