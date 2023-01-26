@@ -23,7 +23,7 @@ default = []
 # Include everything used for default test runs.
 full = ["net", "cqueue", "async"]
 
-multi-threaded = []
+multi-threaded = ["dep:spin"]
 async = ["net", "dep:tokio", "dep:async-trait"]
 cqueue = ["dep:cqueue"]
 net = ["dep:des_macros"]
@@ -42,10 +42,12 @@ termcolor = "1.1"
 rand = {version = "*", features = ["std_rng"]}
 sysinfo = "*"
 
-spin = "*"
 
 # All other dependencies are optional
+
 async-trait = {version = "0.1", optional = true}
+spin = { version = "*", optional = true}
+
 cqueue = {path = "../cqueue", optional = true}
 des_macros = {path = "../des_macros", optional = true}
 # tokio = {git = "https://github.com/PetrichorIT/tokio_sim", features = ["sim"], optional = true}
