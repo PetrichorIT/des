@@ -1,9 +1,24 @@
+//! Implements a lock, that only provides write access using the swap
+//! method.
+//!
+//! This ensures that writes will not leak any &mut T accordingly W-W conflicts cannot appear.
+//!
+//! # Contract
+//!
+//! All swap operations must be coordianted from a single thread.
+//! -> simulation core runs on only one thread.
+//!
+//! All read handles must be closed when a swap is performed.
+//! -> Swaps happen inbetween events, while read handles are only handed out in
+//! the event processing itself. Additionaly read handles are not leaked to the user
+//! so we can ensure all are closed at event end.
+
 use std::sync::atomic::Ordering::SeqCst;
 use std::{cell::UnsafeCell, marker::PhantomData, ops::Deref, rc::Rc};
 
 use super::AtomicUsize;
 
-/// A lock that can only be accessed mutably by swapping the contents
+/// A lock that can only be accessed mutably by swapping the contents.
 pub(crate) struct SwapLock<T> {
     inner: UnsafeCell<T>,
     read_count: AtomicUsize,

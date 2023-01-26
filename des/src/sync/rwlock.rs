@@ -1,3 +1,10 @@
+//! Implements are classic non-poisonable RwLock with an
+//! API inspired by spin::RwLock.
+//!
+//! In single-threaded contexts this will be implemented using a RefCell
+//! like structure (with appropiate API).
+//! In multi-threaded contexts, spin::RwLock is used.
+
 cfg_not_multi_threaded! {
     use std::{
         cell::{Cell, UnsafeCell},

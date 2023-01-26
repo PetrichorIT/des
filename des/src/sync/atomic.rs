@@ -1,3 +1,13 @@
+//! A wrapper around atomics.
+//!
+//! While still cheap, atomic operations are more expensive than primitive integer
+//! operations. This difference matters, since some lock use atomics to share state.
+//! In single-threaded contexts this is not nessecary. Accordingly there are
+//! wrappers around a not-really atomic implementation of Atomics for single-thread use.
+//!
+//! Not that this implemation results in 2-3 % performance increase since
+//! atomic based locks are used in every event.
+
 use std::{cell::UnsafeCell, sync::atomic::Ordering};
 
 cfg_not_multi_threaded! {
