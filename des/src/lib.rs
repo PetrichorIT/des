@@ -132,6 +132,8 @@ pub mod runtime;
 pub mod stats;
 pub mod time;
 
+pub(crate) mod sync;
+
 cfg_net! {
     pub mod net;
 }

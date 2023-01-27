@@ -1,11 +1,9 @@
-use std::panic::UnwindSafe;
-
 use tokio::{
     sim::SimContext,
     time::{SimTime, TimeContext},
 };
 
-use super::Plugin;
+use super::super::Plugin;
 use crate::{
     net::message::{Message, TYP_WAKEUP},
     prelude::schedule_at,
@@ -31,20 +29,8 @@ impl TokioTimePlugin {
     }
 }
 
-// # SAFTEY:
-// Once paniced the stored prev varients are no longer used.
-impl UnwindSafe for TokioTimePlugin {}
-
 impl Plugin for TokioTimePlugin {
-    fn capture_sim_start(&mut self) {
-        self.capture(None);
-    }
-
-    fn capture_sim_end(&mut self) {
-        self.capture(None);
-    }
-
-    fn capture(&mut self, msg: Option<Message>) -> Option<Message> {
+    fn event_start(&mut self) {
         // (0) Swap in time context
         let mut time = self.time.take().expect("Plugin lost its time context");
         self.prev = SimContext::with_current(|ctx| {
@@ -63,8 +49,9 @@ impl Plugin for TokioTimePlugin {
                 ctx.process_now();
             }
         });
+    }
 
-        let msg = msg?;
+    fn capture_incoming(&mut self, msg: Message) -> Option<Message> {
         if msg.header().typ == TYP_WAKEUP {
             self.next_wakeup = SimTime::MAX;
             None
@@ -73,15 +60,11 @@ impl Plugin for TokioTimePlugin {
         }
     }
 
-    fn defer_sim_start(&mut self) {
-        self.defer();
+    fn capture_outgoing(&mut self, msg: Message) -> Option<Message> {
+        Some(msg)
     }
 
-    fn defer_sim_end(&mut self) {
-        self.defer();
-    }
-
-    fn defer(&mut self) {
+    fn event_end(&mut self) {
         SimContext::with_current(|ctx| {
             let Some(ctx) = ctx.time.as_mut() else { return };
             let Some(next_time) = ctx.next_time_poll() else { return };

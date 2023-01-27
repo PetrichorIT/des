@@ -32,8 +32,9 @@ cfg_not_async! {
     use std::f64::EPSILON;
     use std::fmt::{Debug, Display};
     use std::ops::{Deref, Div, Sub, SubAssign};
+    use crate::sync::RwLock;
 
-    static SIMTIME: spin::RwLock<SimTime> = spin::RwLock::new(SimTime::ZERO);
+    static SIMTIME: RwLock<SimTime> = RwLock::new(SimTime::ZERO);
 
     ///
     /// A specific point of time in the simulation.

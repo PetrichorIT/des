@@ -250,6 +250,7 @@ impl AsyncModule for TimeSleepModule {
     }
 
     async fn handle_message(&mut self, msg: Message) {
+        log::debug!("recv msg: {}", msg.str());
         let wait_time = msg.header().kind as u64;
         log::info!("<{}> [{}] Waiting for timer", module_name(), SimTime::now());
         tokio::time::sleep(Duration::from_secs(wait_time)).await;
@@ -266,7 +267,9 @@ impl AsyncModule for TimeSleepModule {
 #[test]
 #[serial]
 fn one_module_timers() {
-    // ScopedLogger::new().finish().unwrap();
+    // Logger::new()
+    //     .interal_max_log_level(log::LevelFilter::Trace)
+    //     .set_logger();
 
     let mut rt = NetworkRuntime::new(());
     let mut cx = BuildContext::new(&mut rt);

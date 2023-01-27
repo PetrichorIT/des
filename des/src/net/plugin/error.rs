@@ -1,12 +1,11 @@
+use crate::net::module::with_mod_ctx;
 use std::{
     any::{type_name, Any, TypeId},
     error::Error,
     fmt::{Debug, Display},
 };
 
-use crate::net::module::with_mod_ctx;
-
-use super::PluginState;
+use super::registry::PluginState;
 
 /// A error that occures in reponse to a plugin activity.
 pub struct PluginError {
@@ -28,30 +27,73 @@ impl PluginError {
     #[must_use]
     pub fn expected<T: Any>() -> PluginError {
         // let current_plugin = ;
+        let type_id = TypeId::of::<T>();
 
         with_mod_ctx(|ctx| {
-            let plugins = unsafe { &*ctx.plugins.as_mut_ptr() };
-            let plugin = plugins
-                .iter()
-                .find(|plugin| plugin.typ == TypeId::of::<T>());
+            let plugins = ctx.plugins.try_read().expect(
+                "Failed to get read loa on plugins at error creation: uncreitain code path",
+            );
+           
+            let cur_plugin_prio = plugins.iter().find(|p| p.state == PluginState::Running && p.core.is_none()).map_or(usize::MAX,|p| p.priority);
+            let plugin = plugins.iter().find(|plugin| plugin.typ == type_id);
 
             if let Some(plugin) = plugin {
-                if matches!(plugin.state, PluginState::Paniced(_)) {
-                    PluginError {
-                        kind: PluginErrorKind::PluginPaniced,
-                        internal: format!("expected plugin of type {}", type_name::<T>()),
+                match plugin.state {
+                    PluginState::Idle | PluginState::JustCreated => PluginError {
+                        kind: PluginErrorKind::PluginWithLowerPriority,
+                        internal: format!(
+                            "expected plugin of type {} was found, but not yet active due to priority",
+                            type_name::<T>()
+                        ),
+                    },
+                    PluginState::Running => {
+                        if plugin.priority > cur_plugin_prio {
+                            PluginError {
+                                kind: PluginErrorKind::PluginWithLowerPriority,
+                                internal: format!(
+                                    "expected plugin of type {} was found, but not yet active due to priority",
+                                    type_name::<T>()
+                                ),
+                            }
+                    } else {
+                        PluginError {
+                            kind: PluginErrorKind::PluginMalfunction,
+                            internal: if plugin.core.is_none() { 
+                                format!(
+                                    "expected plugin of type {} was found, but is self",
+                                    type_name::<T>()
+                                )
+                            } else {
+                                format!(
+                                    "expected plugin of type {} was found, but malfunctioned",
+                                    type_name::<T>()
+                                )
+                            },
+                        }
                     }
-                } else {
-                    // TODO: prio tests
-                    PluginError {
-                        kind: PluginErrorKind::PluginMalfunction,
-                        internal: format!("expected plugin of type {}", type_name::<T>()),
+                    },
+                    PluginState::Paniced => PluginError {
+                        kind: PluginErrorKind::PluginPaniced,
+                        internal: format!(
+                            "expected plugin of type {} was found, but paniced",
+                            type_name::<T>()
+                        ),
+                    },
+                    PluginState::PendingRemoval => PluginError {
+                        kind: PluginErrorKind::PluginNotFound,
+                        internal: format!(
+                            "expected plugin of type {}, but no such plugin exists anymore",
+                            type_name::<T>()
+                        ),
                     }
                 }
             } else {
                 PluginError {
                     kind: PluginErrorKind::PluginNotFound,
-                    internal: format!("expected plugin of type {}", type_name::<T>()),
+                    internal: format!(
+                        "expected plugin of type {}, but no such plugin exists",
+                        type_name::<T>()
+                    ),
                 }
             }
         })
@@ -60,13 +102,13 @@ impl PluginError {
 
 impl Debug for PluginError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} -- {}", self.internal, self.kind)
+        write!(f, "{} ({})", self.internal, self.kind)
     }
 }
 
 impl Display for PluginError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} -- {}", self.internal, self.kind)
+        write!(f, "{} ({})", self.internal, self.kind)
     }
 }
 
@@ -95,10 +137,10 @@ impl Display for PluginErrorKind {
             f,
             "{}",
             match self {
-                Self::PluginNotFound => "not found",
-                Self::PluginPaniced => "paniced",
-                Self::PluginWithLowerPriority => "lower priority not active",
-                Self::PluginMalfunction => "malfunctioned",
+                Self::PluginNotFound => "ENOTFOUND",
+                Self::PluginPaniced => "EPANICED",
+                Self::PluginWithLowerPriority => "EINACTIVE",
+                Self::PluginMalfunction => "EMALFUNCTION",
             }
         )
     }

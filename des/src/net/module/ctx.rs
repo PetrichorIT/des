@@ -1,28 +1,35 @@
 use super::{DummyModule, ModuleId, ModuleRef, ModuleRefWeak, ModuleReferencingError};
-use crate::prelude::{GateRef, ObjectPath};
+use crate::{
+    net::plugin,
+    prelude::{GateRef, ObjectPath},
+    sync::{RwLock, SwapLock, SwapLockReadGuard},
+};
 use std::{
     collections::HashMap,
     fmt::Debug,
     sync::{atomic::AtomicBool, Arc},
 };
 
-use crate::net::plugin::PluginEntry;
-
 #[cfg(feature = "async")]
 use crate::net::module::core::AsyncCoreExt;
 
-pub(crate) static MOD_CTX: spin::RwLock<Option<Arc<ModuleContext>>> = spin::RwLock::new(None);
-pub(crate) static SETUP_FN: spin::Mutex<fn(&ModuleContext)> = spin::Mutex::new(_default_setup);
+pub(crate) static MOD_CTX: SwapLock<Option<Arc<ModuleContext>>> = SwapLock::new(None);
+pub(crate) static SETUP_FN: RwLock<fn(&ModuleContext)> = RwLock::new(_default_setup);
 
 #[cfg(not(feature = "async"))]
 pub(crate) fn _default_setup(_: &ModuleContext) {}
 
 #[cfg(feature = "async")]
 pub(crate) fn _default_setup(this: &ModuleContext) {
+    // this.add_plugin(
+    //     crate::net::plugin::TokioTimePlugin::new(this.path.path().to_string()),
+    //     0,
+    //     false,
+    // );
     this.add_plugin(
         crate::net::plugin::TokioTimePlugin::new(this.path.path().to_string()),
         0,
-        false,
+        crate::net::plugin::PluginPanicPolicy::Abort,
     );
 }
 
@@ -32,13 +39,14 @@ pub struct ModuleContext {
     pub(crate) id: ModuleId,
 
     pub(crate) path: ObjectPath,
-    pub(crate) gates: spin::RwLock<Vec<GateRef>>,
-    pub(crate) plugins: spin::RwLock<Vec<PluginEntry>>,
+    pub(crate) gates: RwLock<Vec<GateRef>>,
+
+    pub(crate) plugins: RwLock<plugin::PluginRegistry>,
 
     #[cfg(feature = "async")]
-    pub(crate) async_ext: spin::RwLock<AsyncCoreExt>,
+    pub(crate) async_ext: RwLock<AsyncCoreExt>,
     pub(crate) parent: Option<ModuleRefWeak>,
-    pub(crate) children: spin::RwLock<HashMap<String, ModuleRef>>,
+    pub(crate) children: RwLock<HashMap<String, ModuleRef>>,
 }
 
 impl ModuleContext {
@@ -49,17 +57,17 @@ impl ModuleContext {
 
             id: ModuleId::gen(),
             path,
-            gates: spin::RwLock::new(Vec::new()),
-            plugins: spin::RwLock::new(Vec::new()),
+            gates: RwLock::new(Vec::new()),
+            plugins: RwLock::new(plugin::PluginRegistry::new()),
 
             parent: None,
-            children: spin::RwLock::new(HashMap::new()),
+            children: RwLock::new(HashMap::new()),
 
             #[cfg(feature = "async")]
-            async_ext: spin::RwLock::new(AsyncCoreExt::new()),
+            async_ext: RwLock::new(AsyncCoreExt::new()),
         }));
 
-        SETUP_FN.lock()(&this);
+        SETUP_FN.read()(&this);
 
         this
     }
@@ -73,17 +81,17 @@ impl ModuleContext {
 
             id: ModuleId::gen(),
             path,
-            gates: spin::RwLock::new(Vec::new()),
-            plugins: spin::RwLock::new(Vec::new()),
+            gates: RwLock::new(Vec::new()),
+            plugins: RwLock::new(plugin::PluginRegistry::new()),
 
             parent: Some(ModuleRefWeak::new(&parent)),
-            children: spin::RwLock::new(HashMap::new()),
+            children: RwLock::new(HashMap::new()),
 
             #[cfg(feature = "async")]
-            async_ext: spin::RwLock::new(AsyncCoreExt::new()),
+            async_ext: RwLock::new(AsyncCoreExt::new()),
         }));
 
-        SETUP_FN.lock()(&this);
+        SETUP_FN.read()(&this);
 
         parent
             .ctx
@@ -95,11 +103,15 @@ impl ModuleContext {
     }
 
     pub(crate) fn place(self: Arc<Self>) -> Option<Arc<ModuleContext>> {
-        MOD_CTX.write().replace(self)
+        let mut this = Some(self);
+        MOD_CTX.swap(&mut this);
+        this
     }
 
     pub(crate) fn take() -> Option<Arc<ModuleContext>> {
-        MOD_CTX.write().take()
+        let mut this = None;
+        MOD_CTX.swap(&mut this);
+        this
     }
 
     /// INTERNAL
@@ -182,9 +194,13 @@ impl Debug for ModuleContext {
 
 pub(crate) fn with_mod_ctx<R>(f: impl FnOnce(&Arc<ModuleContext>) -> R) -> R {
     let lock = MOD_CTX.read();
-    let r = f(lock.as_ref().unwrap());
+    let r = f(&lock);
     drop(lock);
     r
+}
+
+pub(crate) fn with_mod_ctx_lock() -> SwapLockReadGuard<'static, Option<Arc<ModuleContext>>> {
+    MOD_CTX.read()
 }
 
 cfg_async! {

@@ -5,8 +5,8 @@ use crate::time::SimTime;
 use std::fmt::Debug;
 use std::panic::UnwindSafe;
 
-mod func;
-pub use func::*;
+mod api;
+pub use api::*;
 
 mod body;
 pub use body::{CustomSizeBody, MessageBody};

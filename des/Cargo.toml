@@ -1,8 +1,4 @@
 [package]
-name = "des"
-#
-# Other manifest items
-#
 authors = ["PetrichorIT <github.com/PetrichorIT>"]
 categories = ["simulation", "asynchronous", "network-programming"]
 description = """
@@ -12,9 +8,10 @@ simulation of asynchronous systems via tokio.
 edition = "2021"
 keywords = ["async", "simulation", "tokio", "net"]
 license = "MIT"
+name = "des"
 readme = "../README.md"
 repository = "https://github.com/PetrichorIT/des"
-version = "0.4.0"
+version = "0.4.1"
 
 [features]
 # Include nothing by default
@@ -25,7 +22,7 @@ full = ["net", "cqueue", "async"]
 
 async = ["net", "dep:tokio", "dep:async-trait"]
 cqueue = ["dep:cqueue"]
-
+multi-threaded = []
 net = ["dep:des_macros"]
 
 # Different metrics features
@@ -40,11 +37,16 @@ termcolor = "1.1"
 # Rand primives must be set since they are bound to the
 # runtime and sould be seedable by the user.
 rand = {version = "*", features = ["std_rng"]}
+# Sysinfo is used for collection information on 
+# system stats for metrics.
 sysinfo = "*"
 
-spin = "*"
+# Spin must be used in the logger event in single-threaded runnin
+# due to issues like #8
+spin = {version = "*"}
 
 # All other dependencies are optional
+
 async-trait = {version = "0.1", optional = true}
 cqueue = {path = "../cqueue", optional = true}
 des_macros = {path = "../des_macros", optional = true}

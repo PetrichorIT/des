@@ -107,7 +107,7 @@ pub(crate) const TYP_WAKEUP: u8 = 11;
 pub(crate) const TYP_IO_TICK: u8 = 12;
 pub(crate) const TYP_NOTIFY: u8 = 201;
 
-pub(crate) const TYP_HOOK_PERIODIC: u8 = 200;
+pub(crate) const TYP_PLUGIN_PERIODIC: u8 = 200;
 
 /// The internal typ of the message set by the des not the user.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
