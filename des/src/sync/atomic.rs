@@ -22,6 +22,7 @@ cfg_not_multi_threaded! {
             }
         }
 
+        #[allow(clippy::mut_from_ref)]
         fn get_v(&self) -> &mut usize {
             unsafe { &mut *self.v.get() }
         }
@@ -39,7 +40,7 @@ cfg_not_multi_threaded! {
         }
 
         pub(crate) fn store(&self, val: usize, _order: Ordering) {
-            *self.get_v() = val
+            *self.get_v() = val;
         }
 
         pub(crate) fn swap(&self, val: usize, _order: Ordering) -> usize {
@@ -80,7 +81,7 @@ cfg_not_multi_threaded! {
         pub(crate) fn fetch_and(&self, val: usize, _order: Ordering) -> usize {
             let v = self.get_v();
             let ret = *v;
-            *v = *v & val;
+            *v &= val;
             ret
         }
 
@@ -94,14 +95,14 @@ cfg_not_multi_threaded! {
         pub(crate) fn fetch_or(&self, val: usize, _order: Ordering) -> usize {
             let v = self.get_v();
             let ret = *v;
-            *v = *v | val;
+            *v |= val;
             ret
         }
 
         pub(crate) fn fetch_xor(&self, val: usize, _order: Ordering) -> usize {
             let v = self.get_v();
             let ret = *v;
-            *v = *v ^ val;
+            *v ^= val;
             ret
         }
     }

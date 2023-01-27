@@ -70,7 +70,7 @@ impl<'a, T> SwapLockReadGuard<'a, T> {
 impl<'a, T> Deref for SwapLockReadGuard<'a, Option<T>> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
-        unsafe { (&*self.lock.inner.get()).as_ref().unwrap_unchecked() }
+        unsafe { (*self.lock.inner.get()).as_ref().unwrap_unchecked() }
     }
 }
 

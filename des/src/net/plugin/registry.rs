@@ -127,7 +127,7 @@ impl PluginRegistry {
             if self.dirty {
                 self.inner
                     .retain(|entry| entry.state != PluginState::PendingRemoval);
-                self.dirty = false
+                self.dirty = false;
             }
 
             // Add values from inject queue to inner
@@ -212,7 +212,7 @@ impl PluginRegistry {
 }
 
 impl PluginEntry {
-    #[inline(always)]
+    #[inline]
     pub(self) fn activate(&mut self) -> bool {
         // let active = matches!(self.state, PluginState::Idle | PluginState::Running);
         let active = self.state as u8 <= 1;
@@ -222,12 +222,12 @@ impl PluginEntry {
         active
     }
 
-    #[inline(always)]
+    #[inline]
     pub(self) fn is_active(&self) -> bool {
         matches!(self.state, PluginState::Running)
     }
 
-    #[inline(always)]
+    #[inline]
     pub(self) fn take(&mut self) -> Option<Box<dyn Plugin>> {
         self.core.take()
     }

@@ -1,7 +1,7 @@
 //! Implements are classic non-poisonable RwLock with an
 //! API inspired by spin::RwLock.
 //!
-//! In single-threaded contexts this will be implemented using a RefCell
+//! In single-threaded contexts this will be implemented using a `RefCell`
 //! like structure (with appropiate API).
 //! In multi-threaded contexts, spin::RwLock is used.
 
@@ -16,12 +16,12 @@ cfg_not_multi_threaded! {
     type BorrowFlag = isize;
     const UNUSED: BorrowFlag = 0;
 
-    #[inline(always)]
+    #[inline]
     fn is_writing(x: BorrowFlag) -> bool {
         x < UNUSED
     }
 
-    #[inline(always)]
+    #[inline]
     fn is_reading(x: BorrowFlag) -> bool {
         x > UNUSED
     }
@@ -102,11 +102,11 @@ cfg_not_multi_threaded! {
     impl<'b> ReadBorrow<'b> {
         fn new(cell: &'b Cell<BorrowFlag>) -> Option<Self> {
             let b = cell.get().wrapping_add(1);
-            if !is_reading(b) {
-                None
-            } else {
+            if is_reading(b) {
                 cell.set(b);
                 Some(Self { cell })
+            } else {
+               None
             }
         }
     }

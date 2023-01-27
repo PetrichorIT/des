@@ -34,7 +34,7 @@ impl PluginError {
                 "Failed to get read loa on plugins at error creation: uncreitain code path",
             );
            
-            let cur_plugin_prio = plugins.iter().find(|p| p.state == PluginState::Running && p.core.is_none()).map(|p| p.priority).unwrap_or(usize::MAX);
+            let cur_plugin_prio = plugins.iter().find(|p| p.state == PluginState::Running && p.core.is_none()).map_or(usize::MAX,|p| p.priority);
             let plugin = plugins.iter().find(|plugin| plugin.typ == type_id);
 
             if let Some(plugin) = plugin {

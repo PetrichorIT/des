@@ -5,45 +5,45 @@
 //! to add shared behaviour (like Routing) to all modules,
 //! independent of the modules defined state and behaviour.
 //!
-//! All plugins must implement the [`Plugin`] trait. To install
-//! them on a module, use the [`add_plugin`] or [`add_plugin_with`]
+//! All plugins must implement the `Plugin` trait. To install
+//! them on a module, use the `add_plugin` or `add_plugin_with`
 //! functions and assign them a priority and panic policy. The
 //! lower the priority value, the closer the plugin is to the network
 //! layer. Plugins can then be controlled and observed using the
-//! [`PluginHandle`] return by the install functions.
+//! `PluginHandle` return by the install functions.
 //!
 //! # Stream manipulation & event lifecycle
 //!
 //! Plugins are intrinsicly linked to the event lifecycle of an
 //! arriving message. Accordingly they provide an API do react
-//! to lifecycle events like [`Plugin::event_start`] and [`Plugin::event_end`].
+//! to lifecycle events like `Plugin::event_start` and `Plugin::event_end`.
 //!
-//! When a message arrives at a module, the [`Plugin::event_start`] method
+//! When a message arrives at a module, the `Plugin::event_start` method
 //! is called on all active plugins, in the order defined by the priorities
 //! (close to networklayer first). Then the incoming message is passed
 //! through the plugins in the same order. Plugins can capture messages
-//! using the [`Plugin::capture_incoming`] method. Using this method
+//! using the `Plugin::capture_incoming` method. Using this method
 //! plugins can **modify**, **delete** or **pass through** messages.
 //! Should they delete a message, no further plugins will be called
-//! using [`Plugin::capture_incoming`]. Additionally no message will be
+//! using `Plugin::capture_incoming`. Additionally no message will be
 //! passed to the main application (defined by the module).
 //!
 //! If the message still exist after passing all plugins, then
-//! it will be passed to the main application though [`Module::handle_message`](crate::net::module::Module::handle_message)
+//! it will be passed to the main application though `Module::handle_message`
 //!
 //! In the process of handeling an incoming message, each plugin and the main application
-//! may send new messages to the networklayer using [`send`](crate::net::message::send)
-//! or [`schedule_in`](crate::net::message::schedule_in). This messages must pass through
+//! may send new messages to the networklayer using `send`
+//! or `schedule_in`. This messages must pass through
 //! all plugins (in reverse priority order). In this process they can be
 //! captured and thus **modified** or **deleted** by all plugins, closer
 //! to the network layer, than the message origin. This is done
-//! using the [`Plugin::capture_outgoing`] method. If messages
+//! using the `Plugin::capture_outgoing` method. If messages
 //! make it through all plugins they will be added to the networklayer,
 //! if not then not.
 //!
 //! After the main application has finished the message processing
 //! the plugins are going to be deactivated in reverse order.
-//! by calling [`Plugin::event_end`]. Sending messages at this stage will
+//! by calling `Plugin::event_end`. Sending messages at this stage will
 //! still create new output-streams through all plugins closer to the networklayer
 //! than the origin.
 //!
@@ -52,12 +52,12 @@
 //! Since plugins are kind of like small subprogramms, crashes of plugins
 //! should not affect the main application itself. Thus if a panic occurs
 //! inside of a plugin, it well be captured and then further processed by
-//! the [`PluginPanicPolicy`] associated with the plugin. Externally
-//! the resulting plugin status can be observed via [`PluginHandle::status`]
+//! the `PluginPanicPolicy` associated with the plugin. Externally
+//! the resulting plugin status can be observed via `PluginHandle::status`
 //!
 //! # Plugin creation and removal
 //!  
-//! When plugins are created using e.g. [`add_plugin`] they are not active
+//! When plugins are created using e.g. `add_plugin` they are not active
 //! right away. Plugins only become active when the next event arrives.
 //! This is the case, because some plugins may depend on some action
 //! they should have performed in the incoming stream, when working on the
@@ -66,7 +66,7 @@
 //! since they were not existent back then. Accordingly plugins only become active once they
 //! can ensure that they existed at all relevent points in the event-lifecycle.
 //!
-//! Accordingly plugins the are removed using [`PluginHandle::remove`]
+//! Accordingly plugins the are removed using `PluginHandle::remove`
 //! still exists for the rest duration of the event, and are only deleted,
 //! once the next event arrives.
 //!  
@@ -102,13 +102,14 @@ pub use self::common::*;
 /// - **Observer**: The plugin does not modifiy the message stream, it just observes it.
 ///    This plugin can be used to get statistics over message streams or to log
 ///    debug output.
-/// - **ScopeProvider**: This plugin provides some kind of scope to all items further
+/// - **Scope-Provider**: This plugin provides some kind of scope to all items further
 ///    from the network layer than itself. A scope can be defined using a static variable
-///    or just consist of a time meassurement between event_start / event_end.
+///    or just consist of a time meassurement between
+///    [`event_start`](Plugin::event_start) / [`event_end`](Plugin::event_end).
 /// - **Capture**: This kind of plugins captures parts of the input stream and redirects
 ///     it in some abitraty way, using other APIs. This pattern can be used to implement buffering
 ///     or mergeing of frameneted IP packets.
-/// - **MetaProvider**: This kind of plugin attches / modifies part of the incoming or
+/// - **Meta-Provider**: This kind of plugin attaches / modifies part of the incoming or
 ///    outgoing message stream to provide some new level of abstraction e.g. a VPN
 ///    or simulated network Interfaces.
 pub trait Plugin: 'static {
@@ -142,7 +143,8 @@ pub trait Plugin: 'static {
     /// A handler for when an the event processing of a message ends.
     ///
     /// This function is called only once per event. The call order
-    /// is the reverse to the call order of [`event_start`].
+    /// is the reverse to the call order of
+    /// [`event_start`](Plugin::event_start).
     ///
     /// Use this function to set up actions, associated
     /// with the end of an event
@@ -172,8 +174,9 @@ pub trait Plugin: 'static {
     /// A capture clause that can modify an incoming message.
     ///
     /// This function is called at most once per event, after all
-    /// plugins have called event_start, but before all
-    /// the main application has processed its message.
+    /// plugins have called
+    /// [`event_start`](Plugin::event_start),
+    /// but before all the main application has processed its message.
     ///
     /// This function receives an incoming message, and can
     /// modify, pass-through or delete a message.
@@ -206,8 +209,10 @@ pub trait Plugin: 'static {
     ///
     /// This function is called once per message send, thus it can be
     /// called in all parts of the event processing. However
-    /// this function is never called before the event_end function
-    /// of this plugin, but allways after the event_start function.
+    /// this function is never called before the
+    /// [`event_end`](Plugin::event_end) function
+    /// of this plugin, but allways after the
+    /// [`event_start`](Plugin::event_start) function.
     ///
     /// This function receives outgoing messages which it can modify
     /// delete or passthrough.

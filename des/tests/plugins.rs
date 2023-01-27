@@ -758,7 +758,11 @@ impl Plugin for ExpectedPlugin {
     fn capture_incoming(&mut self, msg: Message) -> Option<Message> {
         // We expect ExpectingPlugin and want a priority error
         let err = PluginError::expected::<ExpectingPlugin>();
-        assert_eq!(err.kind(), PluginErrorKind::PluginWithLowerPriority, "{err}");
+        assert_eq!(
+            err.kind(),
+            PluginErrorKind::PluginWithLowerPriority,
+            "{err}"
+        );
         assert_eq!(
             format!("{err}"),
             "expected plugin of type plugins::ExpectingPlugin was found, but not yet active due to priority (EINACTIVE)"
@@ -1116,89 +1120,229 @@ fn plugin_removal_from_downstream() {
     let _res = res.unwrap();
 }
 
-// #[test]
-// #[serial]
-// fn plugin_output_capture_consume_from_main() {
-//     let mut rt = NetworkRuntime::new(());
-//     let mut cx = BuildContext::new(&mut rt);
+struct IncrementArcPlugin {
+    arc: Arc<AtomicUsize>,
+}
+impl Plugin for IncrementArcPlugin {
+    fn capture_incoming(&mut self, msg: Message) -> Option<Message> {
+        self.arc.fetch_add(1, SeqCst);
+        Some(msg)
+    }
+}
 
-//     let module =
-//         PluginOutputCapture::build_named(ObjectPath::root_module("root".to_string()), &mut cx);
-//     cx.create_module(module);
+impl Drop for IncrementArcPlugin {
+    fn drop(&mut self) {
+        assert_eq!(self.arc.load(SeqCst), 10)
+    }
+}
 
-//     let rt = Runtime::new_with(
-//         rt,
-//         RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(30))),
-//     );
+#[NdlModule]
+struct PluginAtShutdown {
+    arc: Arc<AtomicUsize>,
+}
+impl Module for PluginAtShutdown {
+    fn new() -> Self {
+        Self {
+            arc: Arc::new(AtomicUsize::new(0)),
+        }
+    }
 
-//     let res = rt.run();
-//     let res = res.unwrap();
+    fn reset(&mut self) {
+        *self = Self::new();
+    }
 
-//     assert_eq!(res.1.as_secs(), 0);
-// }
+    fn at_sim_start(&mut self, _stage: usize) {
+        add_plugin(
+            IncrementArcPlugin {
+                arc: self.arc.clone(),
+            },
+            100,
+        );
 
-// struct EmitAtEventEnd;
-// impl Plugin for EmitAtEventEnd {
-//     fn event_end(&mut self) {
-//         log::info!("emit:at:end");
-//         schedule_in(Message::new().build(), Duration::from_secs(1));
-//     }
-// }
+        if SimTime::now().as_secs() == 0 {
+            // Schedule events at all time points 1..=20
+            for i in 1..=20 {
+                schedule_at(
+                    Message::new().build(),
+                    SimTime::from_duration(Duration::from_secs(i)),
+                )
+            }
+        }
+    }
 
-// #[NdlModule]
-// struct PluginOutputCaptureScoping {
-//     c: usize,
-// }
-// impl Module for PluginOutputCaptureScoping {
-//     fn new() -> Self {
-//         Self { c: 0 }
-//     }
+    fn handle_message(&mut self, _msg: Message) {
+        if SimTime::now().as_secs() == 10 {
+            // will be back online at second 11
+            shutdow_and_restart_in(Duration::from_millis(500));
+        }
+    }
 
-//     fn at_sim_start(&mut self, _stage: usize) {
-//         add_plugin(common::ConsumeAllOutgoing, 100);
-//         add_plugin(EmitAtEventEnd, 10);
-//         // This packet will go through
-//         schedule_in(
-//             Message::new().id(255).build(),
-//             Duration::from_secs(1 as u64),
-//         );
-//     }
+    fn at_sim_end(&mut self) {
+        assert_eq!(self.arc.load(SeqCst), 10);
+    }
+}
 
-//     fn handle_message(&mut self, msg: Message) {
-//         log::debug!("{:?}", msg.header());
-//         self.c += 1;
+#[test]
+#[serial]
+fn plugin_shutdown_non_persistent_data() {
+    // Logger::new()
+    //     .interal_max_log_level(log::LevelFilter::Trace)
+    //     .set_logger();
 
-//         for i in 1..10 {
-//             schedule_in(Message::new().id(i).build(), Duration::from_secs(i as u64));
-//         }
-//     }
+    let mut rt = NetworkRuntime::new(());
+    let mut cx = BuildContext::new(&mut rt);
 
-//     fn at_sim_end(&mut self) {
-//         assert_eq!(self.c, 30);
-//     }
-// }
+    let module =
+        PluginAtShutdown::build_named(ObjectPath::root_module("root".to_string()), &mut cx);
+    cx.create_module(module);
 
-// #[test]
-// #[serial]
-// fn plugin_output_capture_consume_from_plugin() {
-//     // Logger::new().set_logger();
+    let rt = Runtime::new_with(
+        rt,
+        RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(30))),
+    );
 
-//     let mut rt = NetworkRuntime::new(());
-//     let mut cx = BuildContext::new(&mut rt);
+    let res = rt.run();
+    let _res = res.unwrap();
+}
 
-//     let module = PluginOutputCaptureScoping::build_named(
-//         ObjectPath::root_module("root".to_string()),
-//         &mut cx,
-//     );
-//     cx.create_module(module);
+struct IncrementArcPlugin2 {
+    arc: Arc<AtomicUsize>,
+}
+impl Plugin for IncrementArcPlugin2 {
+    fn capture_incoming(&mut self, msg: Message) -> Option<Message> {
+        self.arc.fetch_add(1, SeqCst);
+        Some(msg)
+    }
+}
 
-//     let rt = Runtime::new_with(
-//         rt,
-//         RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(30))), // .max_itr(1),
-//     );
+#[NdlModule]
+struct PluginAtShutdownPersistent {
+    arc: Arc<AtomicUsize>,
+}
+impl Module for PluginAtShutdownPersistent {
+    fn new() -> Self {
+        Self {
+            arc: Arc::new(AtomicUsize::new(0)),
+        }
+    }
 
-//     let res = rt.run();
-//     let res = res.unwrap_premature_abort();
+    fn at_sim_start(&mut self, _stage: usize) {
+        add_plugin(
+            IncrementArcPlugin2 {
+                arc: self.arc.clone(),
+            },
+            100,
+        );
 
-//     assert_eq!(res.1.as_secs(), 30);
-// }
+        if SimTime::now().as_secs() == 0 {
+            // Schedule events at all time points 1..=20
+            for i in 1..=20 {
+                schedule_at(
+                    Message::new().build(),
+                    SimTime::from_duration(Duration::from_secs(i)),
+                )
+            }
+        }
+    }
+
+    fn handle_message(&mut self, _msg: Message) {
+        if SimTime::now().as_secs() == 10 {
+            // will be back online at second 11
+            shutdow_and_restart_in(Duration::from_millis(500));
+        }
+    }
+
+    fn at_sim_end(&mut self) {
+        assert_eq!(self.arc.load(SeqCst), 20);
+    }
+}
+
+#[test]
+#[serial]
+fn plugin_shutdown_persistent_data() {
+    // Logger::new()
+    //     .interal_max_log_level(log::LevelFilter::Trace)
+    //     .set_logger();
+
+    let mut rt = NetworkRuntime::new(());
+    let mut cx = BuildContext::new(&mut rt);
+
+    let module = PluginAtShutdownPersistent::build_named(
+        ObjectPath::root_module("root".to_string()),
+        &mut cx,
+    );
+    cx.create_module(module);
+
+    let rt = Runtime::new_with(
+        rt,
+        RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(30))),
+    );
+
+    let res = rt.run();
+    let _res = res.unwrap();
+}
+
+#[NdlModule]
+struct PluginAtShutdownDowntime {
+    arc: Arc<AtomicUsize>,
+}
+impl Module for PluginAtShutdownDowntime {
+    fn new() -> Self {
+        Self {
+            arc: Arc::new(AtomicUsize::new(0)),
+        }
+    }
+
+    fn at_sim_start(&mut self, _stage: usize) {
+        add_plugin(
+            IncrementArcPlugin2 {
+                arc: self.arc.clone(),
+            },
+            100,
+        );
+
+        if SimTime::now().as_secs() == 0 {
+            // Schedule events at all time points 1..=20
+            for i in 1..=30 {
+                schedule_at(
+                    Message::new().build(),
+                    SimTime::from_duration(Duration::from_secs(i)),
+                )
+            }
+        }
+    }
+
+    fn handle_message(&mut self, _msg: Message) {
+        if SimTime::now().as_secs() == 10 {
+            // will be back online at second 11
+            shutdow_and_restart_in(Duration::from_millis(10_500));
+        }
+    }
+
+    fn at_sim_end(&mut self) {
+        assert_eq!(self.arc.load(SeqCst), 20);
+    }
+}
+
+#[test]
+#[serial]
+fn plugin_shutdown_downtime() {
+    // Logger::new()
+    //     .interal_max_log_level(log::LevelFilter::Trace)
+    //     .set_logger();
+
+    let mut rt = NetworkRuntime::new(());
+    let mut cx = BuildContext::new(&mut rt);
+
+    let module =
+        PluginAtShutdownDowntime::build_named(ObjectPath::root_module("root".to_string()), &mut cx);
+    cx.create_module(module);
+
+    let rt = Runtime::new_with(
+        rt,
+        RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(60))),
+    );
+
+    let res = rt.run();
+    let _res = res.unwrap();
+}
