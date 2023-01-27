@@ -34,11 +34,12 @@ impl<T> SwapLock<T> {
 
     pub(crate) fn swap(&self, other: &mut T) {
         // SAFTEY REASONS
-        assert_eq!(
-            self.read_count.load(SeqCst),
-            0,
-            "Cannot swap context with active readers"
-        );
+        if self.read_count.load(SeqCst) != 0 {
+            panic!(
+                "SwapLock cannot swap, since {} read handles are still alive",
+                self.read_count.load(SeqCst)
+            );
+        }
 
         let inner = unsafe { &mut *self.inner.get() };
         std::mem::swap(inner, other);

@@ -1,11 +1,14 @@
 //! A simulation specific logger.
 
+use log::{Level, LevelFilter, Log, SetLoggerError};
+use spin::RwLock;
 use std::{
     collections::HashMap,
     fmt::Debug,
     io::{stderr, stdout},
     sync::Arc,
 };
+use termcolor::{BufferWriter, ColorChoice};
 
 mod filter;
 mod fmt;
@@ -16,17 +19,18 @@ pub use fmt::LogFormat;
 pub use output::LogOutput;
 pub use record::LogRecord;
 
-use crate::{sync::RwLock, time::SimTime};
-use log::{Level, LevelFilter, Log, SetLoggerError};
-use termcolor::{BufferWriter, ColorChoice};
-
 use self::filter::FilterPolicy;
+use crate::time::SimTime;
 
+// is truly accesed from multiple threads.
 static SCOPED_LOGGER: LoggerWrap = LoggerWrap::uninitalized();
-static CURRENT_SCOPE: RwLock<&'static str> = RwLock::new("");
+
+// is only set on the simulation thread, but read by all
+// use static mut with a file-local saftey contract.
+static mut CURRENT_SCOPE: &'static str = "";
 
 struct LoggerWrap {
-    inner: RwLock<Option<Logger>>,
+    inner: RwLock<Option<Logger>>, // inner: RwLock<Option<Logger>>,
 }
 
 impl LoggerWrap {
@@ -37,41 +41,37 @@ impl LoggerWrap {
     }
 
     fn reset(&self) {
-        let mut lock = self.inner.write();
-        *lock = None;
+        self.inner.write().take();
+        // *lock = None;
     }
 
     fn reset_contents(&self, new: Logger) {
-        let mut lock = self.inner.write();
-        lock.as_mut().unwrap().reset_contents(new);
+        // Check activ;
+        let active = { self.inner.read().as_ref().unwrap().active };
+        if active {
+            self.inner.write().replace(new);
+        }
     }
 
-    fn set(&self, inner: Logger) -> Option<Logger> {
-        let mut lock = self.inner.write();
-        lock.replace(inner)
+    fn set(&self, other: Logger) -> Option<Logger> {
+        self.inner.write().replace(other)
     }
 }
 
 impl Log for LoggerWrap {
     fn enabled(&self, metadata: &log::Metadata) -> bool {
-        unsafe {
-            let lock = self.inner.read();
-            lock.as_ref().unwrap_unchecked().enabled(metadata)
-        }
+        let lock = self.inner.read();
+        lock.as_ref().unwrap().enabled(metadata)
     }
 
     fn log(&self, record: &log::Record) {
-        unsafe {
-            let lock = self.inner.read();
-            lock.as_ref().unwrap_unchecked().log(record);
-        }
+        let lock = self.inner.read();
+        lock.as_ref().unwrap().log(record);
     }
 
     fn flush(&self) {
-        unsafe {
-            let lock = self.inner.read();
-            lock.as_ref().unwrap_unchecked().flush();
-        }
+        let lock = self.inner.read();
+        lock.as_ref().unwrap().flush();
     }
 }
 
@@ -79,6 +79,8 @@ impl Log for LoggerWrap {
 pub struct Logger {
     active: bool,
     scopes: RwLock<HashMap<String, LoggerScope>>,
+    // use std lock to allways deal with multi-threaded access,
+    // (e.g.) from other crates in the test chain
     policy: Box<dyn LogScopeConfigurationPolicy>,
     interal_max_level: LevelFilter,
     filter: FilterPolicy,
@@ -135,22 +137,23 @@ impl Logger {
 
     /// Begins a new scope, returning the currently active scope.
     #[doc(hidden)]
-    pub fn begin_scope(ident: impl AsRef<str>) {
+    pub(crate) fn begin_scope(ident: impl AsRef<str>) {
         let ident: *const str = ident.as_ref();
         let ident: &'static str = unsafe { &*ident };
-        *CURRENT_SCOPE.write() = ident;
+
+        // SAFTEY:
+        // begin_scope can only be called from the simulation itself
+        unsafe {
+            CURRENT_SCOPE = ident;
+        }
     }
 
     /// Removes the current scope.
     #[doc(hidden)]
-    pub fn end_scope() {
-        *CURRENT_SCOPE.write() = "";
-    }
-
-    fn reset_contents(&mut self, new: Self) {
-        if self.active {
-            *self = new;
-        }
+    pub(crate) fn end_scope() {
+        // Saftey:
+        // end_scope can only be called from the simulation itself
+        unsafe { CURRENT_SCOPE = "" }
     }
 
     /// Adds a filter to the policy.
@@ -258,7 +261,7 @@ impl Log for Logger {
             return;
         }
 
-        // (2) Get scopes by ptr
+        // (2) Get scopes
         let mut scopes = self.scopes.write();
 
         // (3) Get target pointer
@@ -270,7 +273,11 @@ impl Log for Logger {
         };
 
         // (4) Get scope or make defeault print based on the target marker.
-        let scope_label = CURRENT_SCOPE.read();
+        // SAFTEY:
+        // the current scope cannot be seen in invalid states,
+        // since begin_scope or end_scope only occures inbetween events
+        // when no other threads are ative
+        let scope_label = unsafe { CURRENT_SCOPE };
         if scope_label.is_empty() {
             // if policy(record.target()) {
             // No target scope was given --- not scoped println.
@@ -297,18 +304,18 @@ impl Log for Logger {
         };
 
         // (5) Fetch scope information
-        let scope = scopes.get_mut(*scope_label);
+        let scope = scopes.get_mut(scope_label);
         if let Some(scope) = scope {
             scope.log(format!("{}", record.args()), target_label, record.level());
         } else {
             // TODO: Check target validity
-            let (output, fmt) = self.policy.configure(*scope_label);
+            let (output, fmt) = self.policy.configure(scope_label);
 
             let mut new_scope = LoggerScope {
                 scope: Arc::new(scope_label.to_string()),
                 output,
                 fmt,
-                filter: self.filter.filter_for(*scope_label, LevelFilter::max()),
+                filter: self.filter.filter_for(scope_label, LevelFilter::max()),
             };
 
             new_scope.log(format!("{}", record.args()), target_label, record.level());

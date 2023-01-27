@@ -22,7 +22,7 @@ full = ["net", "cqueue", "async"]
 
 async = ["net", "dep:tokio", "dep:async-trait"]
 cqueue = ["dep:cqueue"]
-multi-threaded = ["dep:spin"]
+multi-threaded = []
 net = ["dep:des_macros"]
 
 # Different metrics features
@@ -41,11 +41,13 @@ rand = {version = "*", features = ["std_rng"]}
 # system stats for metrics.
 sysinfo = "*"
 
+# Spin must be used in the logger event in single-threaded runnin
+# due to issues like #8
+spin = {version = "*"}
+
 # All other dependencies are optional
 
 async-trait = {version = "0.1", optional = true}
-spin = {version = "*", optional = true}
-
 cqueue = {path = "../cqueue", optional = true}
 des_macros = {path = "../des_macros", optional = true}
 # tokio = {git = "https://github.com/PetrichorIT/tokio_sim", features = ["sim"], optional = true}
