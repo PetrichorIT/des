@@ -5,8 +5,9 @@ debug = true
 members = [
   "cqueue",
   "des",
-  "des_macros",
-  "des_macros_core",
+  "des-macros",
+  "des-macros-core",
+  "des-ndl",
   "ndl",
   "examples",
 ]
