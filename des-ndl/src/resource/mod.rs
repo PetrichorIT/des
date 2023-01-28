@@ -37,7 +37,7 @@ pub(crate) enum AssetIdentifier {
     },
 }
 
-pub(crate) struct Asset<'a> {
+pub struct Asset<'a> {
     map: &'a SourceMap,
     mapping: &'a SourceMappedAsset,
 }

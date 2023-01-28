@@ -1,7 +1,4 @@
-use crate::{
-    lexer::{Token, TokenKind},
-    Base, LiteralKind,
-};
+use crate::lexer::{Base, LiteralKind, Token, TokenKind};
 
 use super::tokenize;
 

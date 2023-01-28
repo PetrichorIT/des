@@ -7,7 +7,9 @@ pub struct Error {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ErrorKind {}
+pub enum ErrorKind {
+    ParseLitError,
+}
 
 impl Error {
     pub fn new<E>(kind: ErrorKind, error: E) -> Self

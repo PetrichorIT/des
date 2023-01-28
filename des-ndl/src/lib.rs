@@ -6,6 +6,6 @@ mod lexer;
 #[allow(unused)]
 mod resource;
 
+pub use self::ast::*;
 pub use self::error::*;
-pub use self::lexer::*;
 pub use self::resource::*;

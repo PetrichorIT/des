@@ -25,7 +25,7 @@ pub fn tokenize(input: &str, start_idx: usize) -> impl Iterator<Item = Token> + 
 /// Note that the [Loc] always references the [SourceMap] buffer
 /// not the relative position in the current asset.
 ///
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Token {
     /// The type of token encountered.
     pub kind: TokenKind,
@@ -124,6 +124,15 @@ pub enum TokenKind {
     Unknown,
 }
 
+impl TokenKind {
+    pub(super) fn is_delim_open(&self) -> bool {
+        matches!(
+            self,
+            TokenKind::OpenParen | TokenKind::OpenBrace | TokenKind::OpenBracket
+        )
+    }
+}
+
 ///
 /// A literal value definition token.
 ///
@@ -145,16 +154,16 @@ pub enum Base {
     Decimal,
 }
 
-impl Base {
-    pub fn radix(&self) -> u32 {
-        match self {
-            Base::Binary => 2,
-            Base::Octal => 8,
-            Base::Decimal => 10,
-            &Base::Hexadecimal => 16,
-        }
-    }
-}
+// impl Base {
+//     pub(crate) fn radix(&self) -> u32 {
+//         match self {
+//             Base::Binary => 2,
+//             Base::Octal => 8,
+//             Base::Decimal => 10,
+//             &Base::Hexadecimal => 16,
+//         }
+//     }
+// }
 
 /// True if `c` is considered a whitespace.
 pub fn is_whitespace(c: char) -> bool {
