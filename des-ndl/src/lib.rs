@@ -7,4 +7,5 @@ mod lexer;
 mod resource;
 
 pub use self::error::*;
+pub use self::lexer::*;
 pub use self::resource::*;
