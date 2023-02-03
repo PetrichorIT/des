@@ -1,15 +1,20 @@
 use self::cursor::Cursor;
 use crate::{
+    ast::parse::{Error, ErrorKind},
     lexer::{self, tokenize, LiteralKind},
-    Asset, Error, ErrorKind, Span,
+    Asset, Span,
 };
 
+pub use stream::DelimSpan;
+pub use stream::Spacing;
 pub use stream::TokenStream;
+pub use stream::TokenTree;
 
 mod cursor;
 mod stream;
 mod symbol;
 
+#[derive(Debug)]
 pub struct Token {
     pub kind: TokenKind,
     pub span: Span,
@@ -21,6 +26,7 @@ impl Token {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum TokenKind {
     Lt,
     Le,
@@ -33,16 +39,47 @@ pub enum TokenKind {
     DotDotDot,
     DotDotEq,
     Comman,
+    Minus,
     Semi,
-    LArrow,
-    RArrow,
+    LDoubleArrow,
+    RDoubleArrow,
+    LSingleArrow,
+    RSingleArrow,
     Colon,
     Slash,
+    Keyword(Keyword),
     OpenDelim(Delimiter),
     CloseDelim(Delimiter),
     Literal(Lit),
     Ident(Ident),
     Annotation(Annotation),
+}
+
+impl TokenKind {
+    fn ident_or_keyword(span: Span, cursor: &mut Cursor) -> TokenKind {
+        let ident = Ident::from_span(span, cursor);
+        match &ident.raw[..] {
+            "module" => TokenKind::Keyword(Keyword::Module),
+            "gates" => TokenKind::Keyword(Keyword::Gates),
+            "submodules" => TokenKind::Keyword(Keyword::Submodules),
+            "connections" => TokenKind::Keyword(Keyword::Connections),
+            "link" => TokenKind::Keyword(Keyword::Link),
+            "include" => TokenKind::Keyword(Keyword::Include),
+            "entry" => TokenKind::Keyword(Keyword::Entry),
+            _ => TokenKind::Ident(ident),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Keyword {
+    Module,
+    Gates,
+    Submodules,
+    Connections,
+    Link,
+    Include,
+    Entry,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -82,12 +119,14 @@ impl Delimiter {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum LitKind {
     Integer { lit: i32 },
     Float { lit: f64 },
     Str { lit: String },
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct Lit {
     pub kind: LitKind,
     pub span: Span,
@@ -123,11 +162,13 @@ impl Lit {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct Ident {
     pub raw: String,
     pub span: Span,
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct Annotation {
     pub ident: Ident,
 }

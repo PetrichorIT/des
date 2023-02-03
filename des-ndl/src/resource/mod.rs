@@ -10,11 +10,13 @@ pub use self::span::*;
 #[cfg(test)]
 mod tests;
 
-pub(crate) struct SourceMap {
+#[derive(Debug)]
+pub struct SourceMap {
     buffer: String,
     assets: Vec<SourceMappedAsset>,
 }
 
+#[derive(Debug)]
 pub(crate) struct SourceMappedAsset {
     pub offset: usize,
     pub len: usize,
@@ -22,7 +24,8 @@ pub(crate) struct SourceMappedAsset {
     pub line_pos_mapping: Vec<usize>,
 }
 
-pub(crate) enum AssetIdentifier {
+#[derive(Debug)]
+pub enum AssetIdentifier {
     Raw {
         alias: String,
     },
@@ -37,20 +40,46 @@ pub(crate) enum AssetIdentifier {
     },
 }
 
+impl From<&str> for AssetIdentifier {
+    fn from(value: &str) -> Self {
+        if value.starts_with("raw:") {
+            return AssetIdentifier::Raw {
+                alias: value[5..].to_string(),
+            };
+        }
+
+        let path = PathBuf::from(&value[9..]);
+        if value.starts_with("include:") {
+            return AssetIdentifier::Included {
+                alias: path.to_str().unwrap().to_string(),
+                path,
+                include: Span::new(0, 0),
+            };
+        }
+
+        AssetIdentifier::Root {
+            alias: path.to_str().unwrap().to_string(),
+            path: path,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 pub struct Asset<'a> {
     map: &'a SourceMap,
     mapping: &'a SourceMappedAsset,
 }
 
 impl SourceMap {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             buffer: String::new(),
             assets: Vec::new(),
         }
     }
 
-    pub(crate) fn load_file(&mut self, ident: AssetIdentifier) -> Result<Asset<'_>> {
+    pub fn load_file(&mut self, ident: impl Into<AssetIdentifier>) -> Result<Asset<'_>> {
+        let ident = ident.into();
         let mut file = File::open(&ident.path()?)?;
         let offset = self.buffer.len();
         let n = file.read_to_string(&mut self.buffer)?;
@@ -64,7 +93,10 @@ impl SourceMap {
         })
     }
 
-    pub(crate) fn load_raw(&mut self, ident: AssetIdentifier, raw: &str) -> Asset<'_> {
+    pub fn load_raw(&mut self, ident: impl Into<AssetIdentifier>, raw: &str) -> Asset<'_> {
+        let ident = ident.into();
+        assert!(matches!(ident, AssetIdentifier::Raw { .. }));
+
         let offset = self.buffer.len();
         let n = raw.len();
         self.buffer.push_str(raw);

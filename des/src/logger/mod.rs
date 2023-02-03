@@ -137,6 +137,7 @@ impl Logger {
 
     /// Begins a new scope, returning the currently active scope.
     #[doc(hidden)]
+    #[allow(unused)]
     pub(crate) fn begin_scope(ident: impl AsRef<str>) {
         let ident: *const str = ident.as_ref();
         let ident: &'static str = unsafe { &*ident };
@@ -150,6 +151,7 @@ impl Logger {
 
     /// Removes the current scope.
     #[doc(hidden)]
+    #[allow(unused)]
     pub(crate) fn end_scope() {
         // Saftey:
         // end_scope can only be called from the simulation itself

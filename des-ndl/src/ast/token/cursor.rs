@@ -1,26 +1,26 @@
 use crate::{
+    ast::parse::Error,
     lexer::{Token, TokenKind},
-    Asset, Error, Span,
+    Asset, Span,
 };
 
 use super::Delimiter;
 
+#[derive(Debug)]
 pub(super) struct Cursor<'a> {
-    ts: &'a [Token],
-    idx: usize,
-    span_pos: usize,
+    pub(super) ts: &'a [Token],
+    pub(super) idx: usize,
+    pub(super) span_pos: usize,
 
     pub(super) asset: &'a Asset<'a>,
 }
 
 impl Cursor<'_> {
     pub(super) fn extract_subcursor(&mut self, delim: Delimiter) -> Result<Cursor<'_>, Error> {
-        self.bump_back(1);
-
         let start = self.idx;
         let start_span = self.span_pos;
 
-        let mut c = 0;
+        let mut c = 1;
         while c > 0 && self.idx < self.ts.len() {
             let k = self.ts[self.idx].kind;
             if k == delim.open() {
@@ -36,7 +36,7 @@ impl Cursor<'_> {
 
         if c == 0 {
             Ok(Cursor {
-                ts: &self.ts[start..self.idx],
+                ts: &self.ts[start..(self.idx - 1)],
                 idx: 0,
                 span_pos: start_span,
                 asset: self.asset,
@@ -48,6 +48,18 @@ impl Cursor<'_> {
 
     pub(super) fn peek_span(&self) -> Span {
         Span::new(self.span_pos, self.ts[self.idx].len)
+    }
+
+    pub(super) fn rem_stream_span(&self) -> Span {
+        Span::new(self.span_pos, self.rem_stream_len())
+    }
+
+    pub(super) fn rem_stream_len(&self) -> usize {
+        let mut len = 0;
+        for token in &self.ts[self.idx..] {
+            len += token.len;
+        }
+        len
     }
 }
 

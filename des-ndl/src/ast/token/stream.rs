@@ -1,16 +1,19 @@
 use super::{Cursor, Delimiter, Token};
-use crate::{ast::token::TokenKind, lexer, Error, Span};
+use crate::{ast::parse::Error, ast::token::TokenKind, lexer, Span};
 use std::sync::Arc;
 
+#[derive(Debug)]
 pub struct TokenStream {
-    pub(super) items: Arc<Vec<TokenTree>>,
+    pub items: Arc<Vec<TokenTree>>,
 }
 
+#[derive(Debug)]
 pub enum TokenTree {
     Token(Token, Spacing),
     Delimited(DelimSpan, Delimiter, TokenStream),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Spacing {
     Alone,
     Joint,
@@ -18,15 +21,20 @@ pub enum Spacing {
 
 impl Spacing {
     fn infer(token: lexer::TokenKind, next: lexer::TokenKind) -> Spacing {
-        todo!()
+        use lexer::TokenKind::*;
+        match (token, next) {
+            (Eq, Eq) => Spacing::Joint,
+            (Plus, Eq) | (Minus, Eq) | (Star, Eq) | (Slash, Eq) => Spacing::Joint,
+            _ => Spacing::Alone,
+        }
     }
 }
 
+#[derive(Debug)]
 pub struct DelimSpan {
-    open: Span,
-    close: Span,
+    pub open: Span,
+    pub close: Span,
 }
-
 impl TokenStream {
     pub(super) fn parse(cursor: &mut Cursor) -> Result<TokenStream, Error> {
         let mut items = Vec::new();
@@ -46,8 +54,13 @@ impl TokenStream {
 
 impl TokenTree {
     pub(super) fn parse(cursor: &mut Cursor) -> Result<TokenTree, Error> {
+        cursor.eat_whitespace();
+
+        // let span = cursor.rem_stream_span();
+        // println!("[TokenTree]\n{}", cursor.asset.slice_for(span));
+
         // will not be a whitespace
-        let Some((token, mut span)) = cursor.next() else {
+        let Some((mut token, mut span)) = cursor.next() else {
             unimplemented!()
         };
 
@@ -55,7 +68,12 @@ impl TokenTree {
             let delim = Delimiter::from(token.kind);
             let open = span;
 
+            // println!(">> {:?}", delim);
+
             let mut sub = cursor.extract_subcursor(delim)?;
+            // let sub_span = sub.rem_stream_span();
+            // println!("[Delim]\n{}", sub.asset.slice_for(sub_span));
+
             let ts = TokenStream::parse(&mut sub)?;
             sub.bump_back(1);
             let close = sub.peek_span();
@@ -63,170 +81,220 @@ impl TokenTree {
             Ok(TokenTree::Delimited(DelimSpan { open, close }, delim, ts))
         } else {
             use crate::lexer::TokenKind::*;
-            // normal token
-            match token.kind {
-                Dot => {
-                    // Check for second dot
-                    let Some(next) = cursor.peek(0) else {
-                        return Ok(TokenTree::Token(Token::new(TokenKind::Dot, span), Spacing::Alone))
-                    };
 
-                    if next.kind != Dot {
-                        return Ok(TokenTree::Token(
-                            Token::new(TokenKind::Dot, span),
-                            Spacing::infer(token.kind, next.kind),
-                        ));
-                    }
+            loop {
+                // normal token
+                return match token.kind {
+                    Dot => {
+                        // Check for second dot
+                        let Some(next) = cursor.peek(0) else {
+                            return Ok(TokenTree::Token(Token::new(TokenKind::Dot, span), Spacing::Alone))
+                        };
 
-                    let (_, s) = cursor.next().unwrap();
-                    span = Span::fromto(span, s);
+                        if next.kind != Dot {
+                            return Ok(TokenTree::Token(
+                                Token::new(TokenKind::Dot, span),
+                                Spacing::infer(token.kind, next.kind),
+                            ));
+                        }
 
-                    // check for third dot.
-                    let Some(next) = cursor.peek(0) else {
-                        return Ok(TokenTree::Token(Token::new(TokenKind::DotDot, span), Spacing::Alone))
-                    };
-
-                    if next.kind == Eq {
                         let (_, s) = cursor.next().unwrap();
                         span = Span::fromto(span, s);
 
-                        return Ok(TokenTree::Token(
-                            Token::new(TokenKind::DotDotEq, span),
+                        // check for third dot.
+                        let Some(next) = cursor.peek(0) else {
+                            return Ok(TokenTree::Token(Token::new(TokenKind::DotDot, span), Spacing::Alone))
+                        };
+
+                        if next.kind == Eq {
+                            let (_, s) = cursor.next().unwrap();
+                            span = Span::fromto(span, s);
+
+                            return Ok(TokenTree::Token(
+                                Token::new(TokenKind::DotDotEq, span),
+                                Spacing::Alone,
+                            ));
+                        }
+
+                        if next.kind != Dot {
+                            return Ok(TokenTree::Token(
+                                Token::new(TokenKind::DotDot, span),
+                                Spacing::infer(token.kind, next.kind),
+                            ));
+                        }
+
+                        let (_, s) = cursor.next().unwrap();
+                        span = Span::fromto(span, s);
+
+                        Ok(TokenTree::Token(
+                            Token::new(TokenKind::DotDotDot, span),
                             Spacing::Alone,
-                        ));
+                        ))
                     }
 
-                    if next.kind != Dot {
-                        return Ok(TokenTree::Token(
-                            Token::new(TokenKind::DotDot, span),
-                            Spacing::infer(token.kind, next.kind),
-                        ));
-                    }
-
-                    let (_, s) = cursor.next().unwrap();
-                    span = Span::fromto(span, s);
-
-                    Ok(TokenTree::Token(
-                        Token::new(TokenKind::DotDotDot, span),
+                    Colon => Ok(TokenTree::Token(
+                        Token::new(TokenKind::Colon, span),
                         Spacing::Alone,
-                    ))
-                }
-
-                Colon => Ok(TokenTree::Token(
-                    Token::new(TokenKind::Colon, span),
-                    Spacing::Alone,
-                )),
-                Slash => Ok(TokenTree::Token(
-                    Token::new(TokenKind::Slash, span),
-                    Spacing::Alone,
-                )),
-                Semi => Ok(TokenTree::Token(
-                    Token::new(TokenKind::Semi, span),
-                    Spacing::Alone,
-                )),
-
-                Eq => {
-                    if cursor.peek(0).map(|t| t.kind) != Some(Eq) {
-                        return Ok(TokenTree::Token(
-                            Token::new(TokenKind::Eq, span),
-                            Spacing::Alone,
-                        ));
-                    }
-
-                    let (_, s) = cursor.next().unwrap();
-                    span = Span::fromto(span, s);
-
-                    if cursor.peek(0).map(|t| t.kind) != Some(Gt) {
-                        return Ok(TokenTree::Token(
-                            Token::new(TokenKind::EqEq, span),
-                            Spacing::Alone,
-                        ));
-                    }
-
-                    let (_, s) = cursor.next().unwrap();
-                    span = Span::fromto(span, s);
-
-                    Ok(TokenTree::Token(
-                        Token::new(TokenKind::RArrow, span),
+                    )),
+                    Slash => Ok(TokenTree::Token(
+                        Token::new(TokenKind::Slash, span),
                         Spacing::Alone,
-                    ))
-                }
-                Lt => {
-                    if cursor.peek(0).map(|t| t.kind) != Some(Eq) {
-                        return Ok(TokenTree::Token(
+                    )),
+                    Semi => Ok(TokenTree::Token(
+                        Token::new(TokenKind::Semi, span),
+                        Spacing::Alone,
+                    )),
+
+                    Eq => {
+                        if cursor.peek(0).map(|t| t.kind) != Some(Eq) {
+                            return Ok(TokenTree::Token(
+                                Token::new(TokenKind::Eq, span),
+                                Spacing::Alone,
+                            ));
+                        }
+
+                        let (_, s) = cursor.next().unwrap();
+                        span = Span::fromto(span, s);
+
+                        if cursor.peek(0).map(|t| t.kind) != Some(Gt) {
+                            return Ok(TokenTree::Token(
+                                Token::new(TokenKind::EqEq, span),
+                                Spacing::Alone,
+                            ));
+                        }
+
+                        let (_, s) = cursor.next().unwrap();
+                        span = Span::fromto(span, s);
+
+                        Ok(TokenTree::Token(
+                            Token::new(TokenKind::RDoubleArrow, span),
+                            Spacing::Alone,
+                        ))
+                    }
+                    Minus => {
+                        if cursor.peek(0).map(|t| t.kind) != Some(Minus) {
+                            return Ok(TokenTree::Token(
+                                Token::new(TokenKind::Minus, span),
+                                Spacing::Alone,
+                            ));
+                        }
+
+                        let (_, s) = cursor.next().unwrap();
+                        span = Span::fromto(span, s);
+
+                        if cursor.peek(0).map(|t| t.kind) != Some(Gt) {
+                            unimplemented!("-- without -->")
+                        }
+
+                        let (_, s) = cursor.next().unwrap();
+                        span = Span::fromto(span, s);
+
+                        Ok(TokenTree::Token(
+                            Token::new(TokenKind::RSingleArrow, span),
+                            Spacing::Alone,
+                        ))
+                    }
+                    Lt => match cursor.peek(0).map(|t| t.kind) {
+                        Some(Eq) => {
+                            let (_, s) = cursor.next().unwrap();
+                            span = Span::fromto(span, s);
+
+                            if cursor.peek(0).map(|t| t.kind) != Some(Eq) {
+                                return Ok(TokenTree::Token(
+                                    Token::new(TokenKind::Le, span),
+                                    Spacing::Alone,
+                                ));
+                            }
+
+                            let (_, s) = cursor.next().unwrap();
+                            span = Span::fromto(span, s);
+
+                            Ok(TokenTree::Token(
+                                Token::new(TokenKind::LDoubleArrow, span),
+                                Spacing::Alone,
+                            ))
+                        }
+                        Some(Minus) => {
+                            let (_, s) = cursor.next().unwrap();
+                            span = Span::fromto(span, s);
+
+                            if cursor.peek(0).map(|t| t.kind) != Some(Minus) {
+                                unimplemented!("<- but not <--")
+                            }
+
+                            let (_, s) = cursor.next().unwrap();
+                            span = Span::fromto(span, s);
+
+                            Ok(TokenTree::Token(
+                                Token::new(TokenKind::LDoubleArrow, span),
+                                Spacing::Alone,
+                            ))
+                        }
+                        _ => Ok(TokenTree::Token(
                             Token::new(TokenKind::Lt, span),
                             Spacing::Alone,
-                        ));
-                    };
+                        )),
+                    },
+                    Gt => {
+                        if cursor.peek(0).map(|t| t.kind) != Some(Eq) {
+                            return Ok(TokenTree::Token(
+                                Token::new(TokenKind::Gt, span),
+                                Spacing::Alone,
+                            ));
+                        };
 
-                    let (_, s) = cursor.next().unwrap();
-                    span = Span::fromto(span, s);
+                        let (_, s) = cursor.next().unwrap();
+                        span = Span::fromto(span, s);
 
-                    if cursor.peek(0).map(|t| t.kind) != Some(Eq) {
-                        return Ok(TokenTree::Token(
-                            Token::new(TokenKind::Le, span),
+                        Ok(TokenTree::Token(
+                            Token::new(TokenKind::Ge, span),
                             Spacing::Alone,
-                        ));
+                        ))
                     }
 
-                    let (_, s) = cursor.next().unwrap();
-                    span = Span::fromto(span, s);
+                    OpenBrace | OpenBracket | OpenParen => {
+                        todo!();
+                    }
+                    CloseBrace | CloseBracket | CloseParen => {
+                        todo!()
+                    }
 
-                    Ok(TokenTree::Token(
-                        Token::new(TokenKind::LArrow, span),
+                    Ident => Ok(TokenTree::Token(
+                        Token::new(
+                            TokenKind::ident_or_keyword(span, cursor),
+                            // TokenKind::Ident(super::Ident::from_span(span, cursor)),
+                            span,
+                        ),
                         Spacing::Alone,
-                    ))
-                }
-                Gt => {
-                    if cursor.peek(0).map(|t| t.kind) != Some(Eq) {
-                        return Ok(TokenTree::Token(
-                            Token::new(TokenKind::Gt, span),
-                            Spacing::Alone,
-                        ));
-                    };
-
-                    let (_, s) = cursor.next().unwrap();
-                    span = Span::fromto(span, s);
-
-                    Ok(TokenTree::Token(
-                        Token::new(TokenKind::Ge, span),
+                    )),
+                    Annotation => Ok(TokenTree::Token(
+                        Token::new(
+                            TokenKind::Annotation(super::Annotation {
+                                ident: super::Ident::from_span(span, cursor),
+                            }),
+                            span,
+                        ),
                         Spacing::Alone,
-                    ))
-                }
+                    )),
 
-                OpenBrace | OpenBracket | OpenParen => {
-                    todo!();
-                }
-                CloseBrace | CloseBracket | CloseParen => {
-                    todo!()
-                }
+                    Literal { kind, .. } => Ok(TokenTree::Token(
+                        Token::new(
+                            TokenKind::Literal(super::Lit::from_span(kind, span, cursor)?),
+                            span,
+                        ),
+                        Spacing::Alone,
+                    )),
 
-                Ident => Ok(TokenTree::Token(
-                    Token::new(
-                        TokenKind::Ident(super::Ident::from_span(span, cursor)),
-                        span,
-                    ),
-                    Spacing::Alone,
-                )),
-                Annotation => Ok(TokenTree::Token(
-                    Token::new(
-                        TokenKind::Annotation(super::Annotation {
-                            ident: super::Ident::from_span(span, cursor),
-                        }),
-                        span,
-                    ),
-                    Spacing::Alone,
-                )),
+                    Comment | Whitespace => {
+                        match cursor.next() {
+                            Some(value) => (token, span) = value,
+                            None => unimplemented!(),
+                        }
+                        continue;
+                    }
 
-                Literal { kind, .. } => Ok(TokenTree::Token(
-                    Token::new(
-                        TokenKind::Literal(super::Lit::from_span(kind, span, cursor)?),
-                        span,
-                    ),
-                    Spacing::Alone,
-                )),
-
-                _ => unimplemented!(),
+                    _ => unimplemented!("missing parser for {token:?}"),
+                };
             }
         }
     }
