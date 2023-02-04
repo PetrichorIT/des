@@ -50,17 +50,17 @@ impl Cursor<'_> {
         Span::new(self.span_pos, self.ts[self.idx].len)
     }
 
-    pub(super) fn rem_stream_span(&self) -> Span {
-        Span::new(self.span_pos, self.rem_stream_len())
-    }
+    // pub(super) fn rem_stream_span(&self) -> Span {
+    //     Span::new(self.span_pos, self.rem_stream_len())
+    // }
 
-    pub(super) fn rem_stream_len(&self) -> usize {
-        let mut len = 0;
-        for token in &self.ts[self.idx..] {
-            len += token.len;
-        }
-        len
-    }
+    // pub(super) fn rem_stream_len(&self) -> usize {
+    //     let mut len = 0;
+    //     for token in &self.ts[self.idx..] {
+    //         len += token.len;
+    //     }
+    //     len
+    // }
 }
 
 impl<'a> Cursor<'a> {

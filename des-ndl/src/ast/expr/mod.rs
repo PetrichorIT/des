@@ -4,8 +4,17 @@ use super::token::*;
 #[macro_use]
 mod macros;
 
+mod delim;
 mod include;
+mod kv;
+mod link;
+mod punctuated;
+
+pub use delim::*;
 pub use include::*;
+pub use kv::*;
+pub use link::*;
+pub use punctuated::*;
 
 // # Tokens
 
@@ -16,8 +25,20 @@ ast_expect_single_token! {
 }
 
 ast_expect_single_token! {
+    pub struct Eq {
+        token: TokenKind::Eq,
+    }
+}
+
+ast_expect_single_token! {
     pub struct Semi {
         token: TokenKind::Semi,
+    }
+}
+
+ast_expect_single_token! {
+    pub struct Comma {
+        token: TokenKind::Comma,
     }
 }
 
@@ -82,6 +103,28 @@ impl Parse for Ident {
             _ => Err(Error::new(
                 ErrorKind::UnexpectedToken,
                 "unexpected token, expected ident",
+            )),
+        }
+    }
+}
+
+impl Parse for Lit {
+    fn parse(input: ParseStream<'_>) -> Result<Self> {
+        match input.ts.peek() {
+            Some(TokenTree::Token(
+                Token {
+                    kind: TokenKind::Literal(lit),
+                    ..
+                },
+                _,
+            )) => {
+                let lit = lit.clone();
+                input.ts.bump();
+                Ok(lit)
+            }
+            _ => Err(Error::new(
+                ErrorKind::UnexpectedToken,
+                "unexpected token, expected literal",
             )),
         }
     }

@@ -1,7 +1,12 @@
 use des_ndl::*;
 
 const TEXT: &str = "
-include str/a/b/c
+{
+    ident,
+    identb,
+    identc,
+    idente,
+}
 ";
 
 fn main() {
@@ -10,7 +15,10 @@ fn main() {
 
     let ts = TokenStream::new(asset).unwrap();
     let buf = ParseBuffer::new(asset, ts);
-    let include = Include::parse(&buf);
+    let expr = Delimited::<Punctuated<Ident, Comma>>::parse_from(Delimiter::Brace, &buf).unwrap();
 
-    println!("{include:#?}")
+    println!("{expr:#?}");
+    // for entry in expr.iter() {
+    //     println!("- {entry:?}")
+    // }
 }

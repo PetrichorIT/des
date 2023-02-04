@@ -3,33 +3,39 @@ use std::{cell::Cell, sync::Arc};
 use crate::ast::token::{TokenStream, TokenTree};
 
 pub struct Cursor {
-    ts: Arc<TokenStream>,
+    ts: Arc<Vec<TokenTree>>,
     idx: Cell<usize>,
 }
 
 impl Cursor {
-    pub(crate) fn root(ts: Arc<TokenStream>) -> Self {
+    pub(crate) fn new(ts: &TokenStream) -> Self {
         Self {
-            ts,
+            ts: ts.items.clone(),
             idx: Cell::new(0),
         }
     }
 
-    pub(crate) fn peek(&self) -> Option<&TokenTree> {
-        if self.idx.get() >= self.ts.items.len() {
-            None
-        } else {
-            Some(&self.ts.items[self.idx.get()])
-        }
+    pub(crate) fn is_empty(&self) -> bool {
+        self.idx.get() >= self.ts.len()
     }
 
-    pub(crate) fn next(&mut self) -> Option<&TokenTree> {
-        let ret = self.peek()?;
-        self.bump();
-        Some(ret)
+    pub(crate) fn peek(&self) -> Option<&TokenTree> {
+        if self.idx.get() >= self.ts.len() {
+            None
+        } else {
+            Some(&self.ts[self.idx.get()])
+        }
     }
 
     pub(crate) fn bump(&self) {
         self.idx.set(self.idx.get() + 1)
+    }
+
+    pub(crate) fn subcursor(&self) -> Option<Cursor> {
+        let cur = &self.ts.get(self.idx.get())?;
+        let TokenTree::Delimited(_, _, sub) = cur else {
+            return None;
+        };
+        Some(Cursor::new(sub))
     }
 }

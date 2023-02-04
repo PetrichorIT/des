@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{borrow::Borrow, sync::Arc};
 
 use super::{cursor::Cursor, *};
 use crate::{Asset, TokenStream};
@@ -11,10 +11,10 @@ pub struct ParseBuffer<'a> {
 }
 
 impl<'a> ParseBuffer<'a> {
-    pub fn new(asset: Asset<'a>, ts: TokenStream) -> Self {
+    pub fn new(asset: Asset<'a>, ts: impl Borrow<TokenStream>) -> Self {
         Self {
             asset,
-            ts: Cursor::root(Arc::new(ts)),
+            ts: Cursor::new(ts.borrow()),
         }
     }
 
@@ -24,5 +24,13 @@ impl<'a> ParseBuffer<'a> {
 
     pub fn call<T>(&self, f: fn(ParseStream<'_>) -> Result<T>) -> Result<T> {
         f(self)
+    }
+
+    pub fn substream(&self) -> Option<ParseBuffer<'a>> {
+        let ts = self.ts.subcursor()?;
+        Some(Self {
+            ts,
+            asset: self.asset,
+        })
     }
 }

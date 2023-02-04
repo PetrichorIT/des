@@ -1,3 +1,5 @@
+use std::fmt;
+
 use self::cursor::Cursor;
 use crate::{
     ast::parse::{Error, ErrorKind},
@@ -38,7 +40,7 @@ pub enum TokenKind {
     DotDot,
     DotDotDot,
     DotDotEq,
-    Comman,
+    Comma,
     Minus,
     Semi,
     LDoubleArrow,
@@ -126,6 +128,16 @@ pub enum LitKind {
     Str { lit: String },
 }
 
+impl fmt::Display for LitKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Integer { lit } => write!(f, "{}", lit),
+            Self::Float { lit } => write!(f, "{}", lit),
+            Self::Str { lit } => write!(f, "\"{}\"", lit),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Lit {
     pub kind: LitKind,
@@ -154,7 +166,10 @@ impl Lit {
             }),
             LiteralKind::Str { .. } => Ok(Lit {
                 kind: LitKind::Str {
-                    lit: source.to_string(),
+                    lit: source
+                        .trim_start_matches('"')
+                        .trim_end_matches('"')
+                        .to_string(),
                 },
                 span,
             }),
@@ -166,6 +181,12 @@ impl Lit {
 pub struct Ident {
     pub raw: String,
     pub span: Span,
+}
+
+impl PartialEq<&str> for Ident {
+    fn eq(&self, other: &&str) -> bool {
+        &self.raw == other
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

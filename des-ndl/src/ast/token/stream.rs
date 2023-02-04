@@ -30,11 +30,12 @@ impl Spacing {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DelimSpan {
     pub open: Span,
     pub close: Span,
 }
+
 impl TokenStream {
     pub(super) fn parse(cursor: &mut Cursor) -> Result<TokenStream, Error> {
         let mut items = Vec::new();
@@ -142,6 +143,10 @@ impl TokenTree {
                     )),
                     Semi => Ok(TokenTree::Token(
                         Token::new(TokenKind::Semi, span),
+                        Spacing::Alone,
+                    )),
+                    Comma => Ok(TokenTree::Token(
+                        Token::new(TokenKind::Comma, span),
                         Spacing::Alone,
                     )),
 
