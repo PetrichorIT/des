@@ -2,7 +2,7 @@ use crate::ast::parse::*;
 
 // Eg <Lit, Comma>,
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Punctuated<T, P> {
     inner: Vec<(T, P)>,
     last: Option<Box<T>>,

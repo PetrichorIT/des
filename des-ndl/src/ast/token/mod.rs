@@ -132,7 +132,7 @@ impl fmt::Display for LitKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Integer { lit } => write!(f, "{}", lit),
-            Self::Float { lit } => write!(f, "{}", lit),
+            Self::Float { lit } => write!(f, "{:.1}", lit),
             Self::Str { lit } => write!(f, "\"{}\"", lit),
         }
     }

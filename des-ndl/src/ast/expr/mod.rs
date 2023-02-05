@@ -43,6 +43,12 @@ ast_expect_single_token! {
 }
 
 ast_expect_single_token! {
+    pub struct Colon {
+        token: TokenKind::Colon,
+    }
+}
+
+ast_expect_single_token! {
     pub struct IncludeToken {
         token: TokenKind::Keyword(Keyword::Include),
     }

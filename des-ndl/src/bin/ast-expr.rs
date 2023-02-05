@@ -1,11 +1,10 @@
 use des_ndl::*;
 
 const TEXT: &str = "
-{
-    ident,
-    identb,
-    identc,
-    idente,
+link FastLink {
+    a: 123,
+    b: 1.0,
+    c: \"str\"
 }
 ";
 
@@ -15,7 +14,7 @@ fn main() {
 
     let ts = TokenStream::new(asset).unwrap();
     let buf = ParseBuffer::new(asset, ts);
-    let expr = Delimited::<Punctuated<Ident, Comma>>::parse_from(Delimiter::Brace, &buf).unwrap();
+    let expr = Link::parse(&buf).unwrap();
 
     println!("{expr:#?}");
     // for entry in expr.iter() {

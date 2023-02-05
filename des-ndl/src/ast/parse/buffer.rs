@@ -1,4 +1,4 @@
-use std::{borrow::Borrow, sync::Arc};
+use std::borrow::Borrow;
 
 use super::{cursor::Cursor, *};
 use crate::{Asset, TokenStream};

@@ -1,6 +1,6 @@
 use crate::ast::parse::*;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KeyValueField<K, V, D> {
     pub key: K,
     pub delim: D,
@@ -37,19 +37,19 @@ mod tests {
         let ts = TokenStream::new(asset).unwrap();
         let buf = ParseBuffer::new(asset, ts);
 
-        let punct = KeyValueField::<Ident, Lit, Eq>::parse(&buf).unwrap();
-        assert_eq!(punct.key, "first");
-        assert_eq!(punct.value.kind, LitKind::Integer { lit: 123 });
+        let kv = KeyValueField::<Ident, Lit, Eq>::parse(&buf).unwrap();
+        assert_eq!(kv.key, "first");
+        assert_eq!(kv.value.kind, LitKind::Integer { lit: 123 });
 
         // # Case 1
         let asset = smap.load_raw("raw:case1", "first = \"first\"");
         let ts = TokenStream::new(asset).unwrap();
         let buf = ParseBuffer::new(asset, ts);
 
-        let punct = KeyValueField::<Ident, Lit, Eq>::parse(&buf).unwrap();
-        assert_eq!(punct.key, "first");
+        let kv = KeyValueField::<Ident, Lit, Eq>::parse(&buf).unwrap();
+        assert_eq!(kv.key, "first");
         assert_eq!(
-            punct.value.kind,
+            kv.value.kind,
             LitKind::Str {
                 lit: "first".to_string()
             }
