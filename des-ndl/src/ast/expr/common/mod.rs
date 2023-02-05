@@ -1,4 +1,5 @@
 use crate::ast::parse::*;
+use crate::Annotation;
 use crate::Keyword;
 use crate::Token;
 use crate::TokenKind;
@@ -123,6 +124,28 @@ impl Parse for Ident {
             _ => Err(Error::new(
                 ErrorKind::UnexpectedToken,
                 "unexpected token, expected ident",
+            )),
+        }
+    }
+}
+
+impl Parse for Annotation {
+    fn parse(input: ParseStream<'_>) -> Result<Self> {
+        match input.ts.peek() {
+            Some(TokenTree::Token(
+                Token {
+                    kind: TokenKind::Annotation(annot),
+                    ..
+                },
+                _,
+            )) => {
+                let annot = annot.clone();
+                input.ts.bump();
+                Ok(annot)
+            }
+            _ => Err(Error::new(
+                ErrorKind::UnexpectedToken,
+                "unexpected token, expected annotation",
             )),
         }
     }

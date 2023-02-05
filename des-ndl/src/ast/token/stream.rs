@@ -270,18 +270,12 @@ impl TokenTree {
                     }
 
                     Ident => Ok(TokenTree::Token(
-                        Token::new(
-                            TokenKind::ident_or_keyword(span, cursor),
-                            // TokenKind::Ident(super::Ident::from_span(span, cursor)),
-                            span,
-                        ),
+                        Token::new(TokenKind::ident_or_keyword(span, cursor), span),
                         Spacing::Alone,
                     )),
                     Annotation => Ok(TokenTree::Token(
                         Token::new(
-                            TokenKind::Annotation(super::Annotation {
-                                ident: super::Ident::from_span(span, cursor),
-                            }),
+                            TokenKind::Annotation(super::Annotation::from_span(span, cursor)),
                             span,
                         ),
                         Spacing::Alone,

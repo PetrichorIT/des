@@ -184,15 +184,10 @@ pub struct Ident {
     pub span: Span,
 }
 
-impl PartialEq<&str> for Ident {
-    fn eq(&self, other: &&str) -> bool {
-        &self.raw == other
-    }
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct Annotation {
-    pub ident: Ident,
+    pub raw: String,
+    pub span: Span,
 }
 
 impl Ident {
@@ -203,6 +198,32 @@ impl Ident {
         }
     }
 }
+
+impl PartialEq<&str> for Ident {
+    fn eq(&self, other: &&str) -> bool {
+        &self.raw == other
+    }
+}
+
+impl Annotation {
+    fn from_span(span: Span, cursor: &Cursor) -> Self {
+        Self {
+            raw: cursor
+                .asset
+                .slice_for(span)
+                .trim_start_matches('@')
+                .to_string(),
+            span,
+        }
+    }
+}
+
+impl PartialEq<&str> for Annotation {
+    fn eq(&self, other: &&str) -> bool {
+        &self.raw == other
+    }
+}
+
 // # main
 
 impl TokenStream {
