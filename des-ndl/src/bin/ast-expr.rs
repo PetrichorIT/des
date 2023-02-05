@@ -14,7 +14,7 @@ fn main() {
 
     let ts = TokenStream::new(asset).unwrap();
     let buf = ParseBuffer::new(asset, ts);
-    let expr = Link::parse(&buf).unwrap();
+    let expr = LinkStmt::parse(&buf).unwrap();
 
     println!("{expr:#?}");
     // for entry in expr.iter() {

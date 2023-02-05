@@ -3,7 +3,7 @@ use crate::ast::parse::Parse;
 use crate::{Delimiter, Ident, Lit, Span};
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Link {
+pub struct LinkStmt {
     pub link_token: LinkToken,
     pub ident: Ident,
     pub inheritance: Option<LinkInheritance>,
@@ -65,7 +65,7 @@ impl<'a> Iterator for Iter<'a> {
 
 // # Parsing
 
-impl Parse for Link {
+impl Parse for LinkStmt {
     fn parse(input: crate::ParseStream<'_>) -> crate::Result<Self> {
         let link_token = LinkToken::parse(input)?;
         let ident = Ident::parse(input)?;
@@ -88,7 +88,6 @@ impl Parse for Option<LinkInheritance> {
             Err(_) => return Ok(None),
         };
 
-        println!("{:#?}", input.ts.peek());
         let symbols = LinkInheritanceSymbols::parse(input).unwrap();
         Ok(Some(LinkInheritance { colon, symbols }))
     }
@@ -99,7 +98,6 @@ impl Parse for LinkInheritanceSymbols {
         let mut items = Vec::new();
         loop {
             let item = Ident::parse(input)?;
-
             match Plus::parse(input) {
                 Ok(delim) => items.push((item, delim)),
                 Err(_) => {
@@ -129,7 +127,7 @@ impl Parse for LinkData {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Link, Parse, ParseBuffer, SourceMap, TokenStream};
+    use crate::{LinkStmt, Parse, ParseBuffer, SourceMap, TokenStream};
 
     #[test]
     fn multiple_lit_parse() {
@@ -140,7 +138,7 @@ mod tests {
         let ts = TokenStream::new(asset).unwrap();
         let buf = ParseBuffer::new(asset, ts);
 
-        let expr = Link::parse(&buf).unwrap();
+        let expr = LinkStmt::parse(&buf).unwrap();
         assert_eq!(expr.ident, "FastLink");
         assert_eq!(expr.link_token.span.pos, 0);
         assert_eq!(
@@ -161,7 +159,7 @@ mod tests {
         let ts = TokenStream::new(asset).unwrap();
         let buf = ParseBuffer::new(asset, ts);
 
-        let expr = Link::parse(&buf).unwrap();
+        let expr = LinkStmt::parse(&buf).unwrap();
         assert_eq!(expr.ident, "FastLink");
         assert_eq!(
             expr.data
@@ -189,7 +187,7 @@ mod tests {
         let ts = TokenStream::new(asset).unwrap();
         let buf = ParseBuffer::new(asset, ts);
 
-        let expr = Link::parse(&buf).unwrap();
+        let expr = LinkStmt::parse(&buf).unwrap();
         assert_eq!(expr.ident, "FastLink");
         assert_eq!(
             expr.inheritance
@@ -219,7 +217,7 @@ mod tests {
         let ts = TokenStream::new(asset).unwrap();
         let buf = ParseBuffer::new(asset, ts);
 
-        let expr = Link::parse(&buf).unwrap();
+        let expr = LinkStmt::parse(&buf).unwrap();
         assert_eq!(expr.ident, "FastLink");
         assert_eq!(
             expr.inheritance

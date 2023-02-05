@@ -3,10 +3,10 @@ use super::{IncludeToken, Semi, Slash};
 use crate::Ident;
 
 #[derive(Debug)]
-pub struct Include {
+pub struct IncludeStmt {
     pub include: IncludeToken,
     pub path: IncludePath,
-    pub semi: Option<Semi>,
+    pub semi: Semi,
 }
 
 #[derive(Debug)]
@@ -32,18 +32,11 @@ impl IncludePath {
 
 // # Parsing
 
-impl Parse for Include {
+impl Parse for IncludeStmt {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         let include = IncludeToken::parse(input)?;
         let path = IncludePath::parse(input)?;
-        let semi = match Semi::parse(input) {
-            Ok(v) => Some(v),
-            Err(_) => {
-                // Soon to be error,
-                log::warn!("missing semi at end of include statement");
-                None
-            }
-        };
+        let semi = Semi::parse(input)?;
         Ok(Self {
             include,
             path,
@@ -67,7 +60,7 @@ impl Parse for IncludePath {
 
 #[cfg(test)]
 mod tests {
-    use super::{Include, Parse, ParseBuffer};
+    use super::{IncludeStmt, Parse, ParseBuffer};
     use crate::{SourceMap, Span, TokenStream};
 
     #[test]
@@ -79,9 +72,9 @@ mod tests {
         let ts = TokenStream::new(asset).unwrap();
         let buf = ParseBuffer::new(asset, ts);
 
-        let include = Include::parse(&buf).unwrap();
+        let include = IncludeStmt::parse(&buf).unwrap();
         assert_eq!(include.include.span, Span::new(0, 7));
-        assert_eq!(include.semi.map(|v| v.span), Some(Span::new(13, 1)));
+        assert_eq!(include.semi.span, Span::new(13, 1));
 
         assert_eq!(include.path.path_len(), 1);
         assert_eq!(include.path.path(), "abcde");
@@ -92,38 +85,32 @@ mod tests {
         let ts = TokenStream::new(asset).unwrap();
         let buf = ParseBuffer::new(asset, ts);
 
-        let include = Include::parse(&buf).unwrap();
+        let include = IncludeStmt::parse(&buf).unwrap();
         assert_eq!(include.include.span, Span::new(offset, 7));
-        assert_eq!(
-            include.semi.map(|v| v.span),
-            Some(Span::new(offset + 27, 1))
-        );
+        assert_eq!(include.semi.span, Span::new(offset + 27, 1));
 
         assert_eq!(include.path.path_len(), 1);
         assert_eq!(include.path.path(), "_abc1321231_123_acd");
 
         // # Case 2
         let offset = 42;
-        let asset = smap.load_raw("raw:case2", "include cdc");
+        let asset = smap.load_raw("raw:case2", "include cdc;");
         let ts = TokenStream::new(asset).unwrap();
         let buf = ParseBuffer::new(asset, ts);
 
-        let include = Include::parse(&buf).unwrap();
+        let include = IncludeStmt::parse(&buf).unwrap();
         assert_eq!(include.include.span, Span::new(offset, 7));
-        assert_eq!(include.semi, None);
-
         assert_eq!(include.path.path_len(), 1);
         assert_eq!(include.path.path(), "cdc");
 
         // # Case 3
-        let offset = 53;
-        let asset = smap.load_raw("raw:case3", "include \n\t\t// AB\n     cdc");
+        let offset = 54;
+        let asset = smap.load_raw("raw:case3", "include \n\t\t// AB\n     cdc;");
         let ts = TokenStream::new(asset).unwrap();
         let buf = ParseBuffer::new(asset, ts);
 
-        let include = Include::parse(&buf).unwrap();
+        let include = IncludeStmt::parse(&buf).unwrap();
         assert_eq!(include.include.span, Span::new(offset, 7));
-        assert_eq!(include.semi, None);
 
         assert_eq!(include.path.path_len(), 1);
         assert_eq!(include.path.path(), "cdc");
@@ -138,9 +125,9 @@ mod tests {
         let ts = TokenStream::new(asset).unwrap();
         let buf = ParseBuffer::new(asset, ts);
 
-        let include = Include::parse(&buf).unwrap();
+        let include = IncludeStmt::parse(&buf).unwrap();
         assert_eq!(include.include.span, Span::new(0, 7));
-        assert_eq!(include.semi.map(|v| v.span), Some(Span::new(13, 1)));
+        assert_eq!(include.semi.span, Span::new(13, 1));
 
         assert_eq!(include.path.path_len(), 3);
         assert_eq!(include.path.path(), "a/b/c");
@@ -151,25 +138,21 @@ mod tests {
         let ts = TokenStream::new(asset).unwrap();
         let buf = ParseBuffer::new(asset, ts);
 
-        let include = Include::parse(&buf).unwrap();
+        let include = IncludeStmt::parse(&buf).unwrap();
         assert_eq!(include.include.span, Span::new(offset, 7));
-        assert_eq!(
-            include.semi.map(|v| v.span),
-            Some(Span::new(offset + 24, 1))
-        );
+        assert_eq!(include.semi.span, Span::new(offset + 24, 1));
 
         assert_eq!(include.path.path_len(), 3);
         assert_eq!(include.path.path(), "a12312/b12312/_c");
 
         // # Case 2
         let offset = 39;
-        let asset = smap.load_raw("raw:case2", "include a12312/b12312/_c");
+        let asset = smap.load_raw("raw:case2", "include a12312/b12312/_c;");
         let ts = TokenStream::new(asset).unwrap();
         let buf = ParseBuffer::new(asset, ts);
 
-        let include = Include::parse(&buf).unwrap();
+        let include = IncludeStmt::parse(&buf).unwrap();
         assert_eq!(include.include.span, Span::new(offset, 7));
-        assert_eq!(include.semi, None);
 
         assert_eq!(include.path.path_len(), 3);
         assert_eq!(include.path.path(), "a12312/b12312/_c");
