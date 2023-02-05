@@ -2,6 +2,7 @@ use std::{cell::Cell, sync::Arc};
 
 use crate::ast::token::{TokenStream, TokenTree};
 
+#[derive(Debug)]
 pub struct Cursor {
     ts: Arc<Vec<TokenTree>>,
     idx: Cell<usize>,

@@ -150,6 +150,11 @@ impl TokenTree {
                         Spacing::Alone,
                     )),
 
+                    Plus => Ok(TokenTree::Token(
+                        Token::new(TokenKind::Plus, span),
+                        Spacing::Alone,
+                    )),
+
                     Eq => {
                         if cursor.peek(0).map(|t| t.kind) != Some(Eq) {
                             return Ok(TokenTree::Token(

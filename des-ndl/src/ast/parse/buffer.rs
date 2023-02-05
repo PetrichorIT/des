@@ -5,6 +5,7 @@ use crate::{Asset, TokenStream};
 
 pub type ParseStream<'a> = &'a ParseBuffer<'a>;
 
+#[derive(Debug)]
 pub struct ParseBuffer<'a> {
     pub asset: Asset<'a>,
     pub ts: Cursor,

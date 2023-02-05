@@ -49,6 +49,18 @@ ast_expect_single_token! {
 }
 
 ast_expect_single_token! {
+    pub struct Plus {
+        token: TokenKind::Plus,
+    }
+}
+
+ast_expect_single_token! {
+    pub struct Minus {
+        token: TokenKind::Minus,
+    }
+}
+
+ast_expect_single_token! {
     pub struct IncludeToken {
         token: TokenKind::Keyword(Keyword::Include),
     }

@@ -1,7 +1,7 @@
 use des_ndl::*;
 
 const TEXT: &str = "
-link FastLink {
+link FastLink: Parent {
     a: 123,
     b: 1.0,
     c: \"str\"
