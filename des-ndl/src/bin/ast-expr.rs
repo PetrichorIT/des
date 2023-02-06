@@ -1,8 +1,20 @@
 use des_ndl::*;
 
 const TEXT: &str = "
-connections {
-    gate <-- fastlink <-- gute
+module A {
+    gates {
+        in @input,
+        out @output,
+    }
+
+    submodules {
+        in: In,
+        out[1]: Out,
+    }
+
+    connections {
+        in --> LaLink --> out
+    }
 }
 ";
 
@@ -12,7 +24,7 @@ fn main() {
 
     let ts = TokenStream::new(asset).unwrap();
     let buf = ParseBuffer::new(asset, ts);
-    let expr = ConnectionsStmt::parse(&buf).unwrap();
+    let expr = ModuleStmt::parse(&buf).unwrap();
 
     println!("{expr:#?}");
     // for entry in expr.iter() {

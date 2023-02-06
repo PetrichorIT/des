@@ -3,6 +3,7 @@ use crate::Annotation;
 use crate::Keyword;
 use crate::Token;
 use crate::TokenKind;
+use crate::TokenStream;
 use crate::TokenTree;
 
 #[macro_use]
@@ -198,6 +199,18 @@ impl Parse for Lit {
                 ErrorKind::UnexpectedToken,
                 "unexpected token, expected literal",
             )),
+        }
+    }
+}
+
+impl Parse for TokenStream {
+    fn parse(input: ParseStream<'_>) -> Result<Self> {
+        if input.ts.state() == 0 {
+            Ok(TokenStream {
+                items: input.ts.raw(),
+            })
+        } else {
+            Err(Error::new(ErrorKind::MissingToken, "missing token"))
         }
     }
 }

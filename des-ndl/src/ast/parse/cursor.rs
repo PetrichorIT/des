@@ -16,6 +16,10 @@ impl Cursor {
         }
     }
 
+    pub(crate) fn raw(&self) -> Arc<Vec<TokenTree>> {
+        self.ts.clone()
+    }
+
     pub(crate) fn state(&self) -> usize {
         self.idx.get()
     }
@@ -35,6 +39,15 @@ impl Cursor {
             Some(&self.ts[self.idx.get()])
         }
     }
+
+    // pub(crate) fn next(&self) -> Option<&TokenTree> {
+    //     if self.idx.get() >= self.ts.len() {
+    //         None
+    //     } else {
+    //         self.bump();
+    //         Some(&self.ts[self.idx.get() - 1])
+    //     }
+    // }
 
     pub(crate) fn bump(&self) {
         self.idx.set(self.idx.get() + 1)

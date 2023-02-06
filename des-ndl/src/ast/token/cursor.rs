@@ -96,12 +96,12 @@ impl<'a> Cursor<'a> {
         }
     }
 
-    pub(super) fn bump_back(&mut self, n: usize) {
-        for _ in 0..n {
-            self.idx -= 1;
-            self.span_pos -= self.ts[self.idx].len;
-        }
-    }
+    // pub(super) fn bump_back(&mut self, n: usize) {
+    //     for _ in 0..n {
+    //         self.idx -= 1;
+    //         self.span_pos -= self.ts[self.idx].len;
+    //     }
+    // }
 
     pub(super) fn peek(&self, offset: usize) -> Option<Token> {
         let idx = self.idx + offset;

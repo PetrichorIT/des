@@ -1,4 +1,6 @@
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+use std::fmt;
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Span {
     pub(crate) pos: usize,
     pub(crate) len: usize,
@@ -22,5 +24,14 @@ impl Span {
             pos: self.pos + self.len,
             len: 0,
         }
+    }
+}
+
+impl fmt::Debug for Span {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct(&format!("Span[{}..(+{})]", self.pos, self.len))
+            // .field("pos", &self.pos)
+            // .field("len", &self.len)
+            .finish()
     }
 }

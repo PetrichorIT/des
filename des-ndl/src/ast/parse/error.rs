@@ -16,7 +16,9 @@ pub enum ErrorKind {
     UnexpectedDelim,
     ExpectedSingleFoundJoint,
     ExpectedDelimited,
+    ExpectedInModuleKeyword,
     ExpectedIdentFoundKeyword,
+    MissingToken,
 }
 
 impl Error {

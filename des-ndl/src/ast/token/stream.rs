@@ -2,12 +2,12 @@ use super::{Cursor, Delimiter, Token};
 use crate::{ast::parse::Error, ast::token::TokenKind, lexer, Span};
 use std::sync::Arc;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TokenStream {
     pub items: Arc<Vec<TokenTree>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum TokenTree {
     Token(Token, Spacing),
     Delimited(DelimSpan, Delimiter, TokenStream),

@@ -16,7 +16,7 @@ mod cursor;
 mod stream;
 mod symbol;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Token {
     pub kind: TokenKind,
     pub span: Span,
