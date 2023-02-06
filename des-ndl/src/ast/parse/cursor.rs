@@ -16,6 +16,14 @@ impl Cursor {
         }
     }
 
+    pub(crate) fn state(&self) -> usize {
+        self.idx.get()
+    }
+
+    pub(crate) fn set_state(&self, state: usize) {
+        self.idx.set(state);
+    }
+
     pub(crate) fn is_empty(&self) -> bool {
         self.idx.get() >= self.ts.len()
     }

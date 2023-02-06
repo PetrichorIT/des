@@ -1,5 +1,5 @@
 use crate::{
-    ast::parse::Error,
+    ast::parse::*,
     lexer::{Token, TokenKind},
     Asset, Span,
 };
@@ -16,7 +16,7 @@ pub(super) struct Cursor<'a> {
 }
 
 impl Cursor<'_> {
-    pub(super) fn extract_subcursor(&mut self, delim: Delimiter) -> Result<Cursor<'_>, Error> {
+    pub(super) fn extract_subcursor(&mut self, delim: Delimiter) -> Result<Cursor<'_>> {
         let start = self.idx;
         let start_span = self.span_pos;
 
@@ -42,12 +42,13 @@ impl Cursor<'_> {
                 asset: self.asset,
             })
         } else {
-            unreachable!()
+            return Err(Error::new(ErrorKind::MissingDelim, "missing delim"));
         }
     }
 
-    pub(super) fn peek_span(&self) -> Span {
-        Span::new(self.span_pos, self.ts[self.idx].len)
+    pub(super) fn end_span(&self) -> Span {
+        assert!(self.is_done());
+        Span::new(self.span_pos, 1)
     }
 
     // pub(super) fn rem_stream_span(&self) -> Span {

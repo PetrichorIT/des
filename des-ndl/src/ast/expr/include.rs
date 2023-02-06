@@ -1,32 +1,20 @@
 use super::super::parse::*;
 use super::{IncludeToken, Semi, Slash};
-use crate::Ident;
+use crate::{Ident, Joined};
 
 #[derive(Debug)]
 pub struct IncludeStmt {
     pub include: IncludeToken,
-    pub path: IncludePath,
+    pub path: Joined<Ident, Slash>,
     pub semi: Semi,
 }
 
-#[derive(Debug)]
-pub struct IncludePath {
-    pub ident: Ident,
-    pub next: Option<(Slash, Box<IncludePath>)>,
-}
-
-impl IncludePath {
+impl Joined<Ident, Slash> {
     pub fn path(&self) -> String {
-        let next = self.next.as_ref().map(|v| v.1.path());
-        if let Some(next) = next {
-            format!("{}/{}", self.ident.raw, next)
-        } else {
-            self.ident.raw.to_string()
-        }
-    }
-
-    pub fn path_len(&self) -> usize {
-        1 + self.next.as_ref().map(|(_, n)| n.path_len()).unwrap_or(0)
+        self.iter()
+            .map(|v| &v.raw[..])
+            .collect::<Vec<_>>()
+            .join("/")
     }
 }
 
@@ -35,26 +23,13 @@ impl IncludePath {
 impl Parse for IncludeStmt {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         let include = IncludeToken::parse(input)?;
-        let path = IncludePath::parse(input)?;
+        let path = Joined::<Ident, Slash>::parse(input)?;
         let semi = Semi::parse(input)?;
         Ok(Self {
             include,
             path,
             semi,
         })
-    }
-}
-
-impl Parse for IncludePath {
-    fn parse(input: ParseStream<'_>) -> Result<Self> {
-        let ident = Ident::parse(input)?;
-        match Slash::parse(input) {
-            Ok(slash) => Ok(IncludePath {
-                ident,
-                next: Some((slash, Box::new(IncludePath::parse(input)?))),
-            }),
-            Err(_) => Ok(IncludePath { ident, next: None }),
-        }
     }
 }
 
@@ -76,7 +51,7 @@ mod tests {
         assert_eq!(include.include.span, Span::new(0, 7));
         assert_eq!(include.semi.span, Span::new(13, 1));
 
-        assert_eq!(include.path.path_len(), 1);
+        assert_eq!(include.path.len(), 1);
         assert_eq!(include.path.path(), "abcde");
 
         // # Case 1
@@ -89,7 +64,7 @@ mod tests {
         assert_eq!(include.include.span, Span::new(offset, 7));
         assert_eq!(include.semi.span, Span::new(offset + 27, 1));
 
-        assert_eq!(include.path.path_len(), 1);
+        assert_eq!(include.path.len(), 1);
         assert_eq!(include.path.path(), "_abc1321231_123_acd");
 
         // # Case 2
@@ -100,7 +75,7 @@ mod tests {
 
         let include = IncludeStmt::parse(&buf).unwrap();
         assert_eq!(include.include.span, Span::new(offset, 7));
-        assert_eq!(include.path.path_len(), 1);
+        assert_eq!(include.path.len(), 1);
         assert_eq!(include.path.path(), "cdc");
 
         // # Case 3
@@ -112,7 +87,7 @@ mod tests {
         let include = IncludeStmt::parse(&buf).unwrap();
         assert_eq!(include.include.span, Span::new(offset, 7));
 
-        assert_eq!(include.path.path_len(), 1);
+        assert_eq!(include.path.len(), 1);
         assert_eq!(include.path.path(), "cdc");
     }
 
@@ -129,7 +104,7 @@ mod tests {
         assert_eq!(include.include.span, Span::new(0, 7));
         assert_eq!(include.semi.span, Span::new(13, 1));
 
-        assert_eq!(include.path.path_len(), 3);
+        assert_eq!(include.path.len(), 3);
         assert_eq!(include.path.path(), "a/b/c");
 
         // # Case 1
@@ -142,7 +117,7 @@ mod tests {
         assert_eq!(include.include.span, Span::new(offset, 7));
         assert_eq!(include.semi.span, Span::new(offset + 24, 1));
 
-        assert_eq!(include.path.path_len(), 3);
+        assert_eq!(include.path.len(), 3);
         assert_eq!(include.path.path(), "a12312/b12312/_c");
 
         // # Case 2
@@ -154,7 +129,7 @@ mod tests {
         let include = IncludeStmt::parse(&buf).unwrap();
         assert_eq!(include.include.span, Span::new(offset, 7));
 
-        assert_eq!(include.path.path_len(), 3);
+        assert_eq!(include.path.len(), 3);
         assert_eq!(include.path.path(), "a12312/b12312/_c");
     }
 }

@@ -85,7 +85,22 @@ pub enum Keyword {
     Entry,
 }
 
+impl fmt::Display for Keyword {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Module => write!(f, "module"),
+            Self::Gates => write!(f, "gates"),
+            Self::Submodules => write!(f, "submodules"),
+            Self::Connections => write!(f, "connections"),
+            Self::Link => write!(f, "link"),
+            Self::Include => write!(f, "include"),
+            Self::Entry => write!(f, "entry"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+
 pub enum Delimiter {
     Parenthesis,
     Brace,

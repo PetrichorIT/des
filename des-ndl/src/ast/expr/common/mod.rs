@@ -10,11 +10,13 @@ mod macros;
 
 mod cluster;
 mod delim;
+mod joined;
 mod kv;
 mod punct;
 
 pub use self::cluster::*;
 pub use self::delim::*;
+pub use self::joined::*;
 pub use self::kv::*;
 pub use self::punct::*;
 
@@ -59,6 +61,18 @@ ast_expect_single_token! {
 ast_expect_single_token! {
     pub struct Minus {
         token: TokenKind::Minus,
+    }
+}
+
+ast_expect_single_token! {
+    pub struct LeftSingleArrow {
+        token: TokenKind::LSingleArrow,
+    }
+}
+
+ast_expect_single_token! {
+    pub struct RightSingleArrow {
+        token: TokenKind::RSingleArrow,
     }
 }
 
@@ -123,6 +137,19 @@ impl Parse for Ident {
                 input.ts.bump();
                 Ok(ident)
             }
+            Some(TokenTree::Token(
+                Token {
+                    kind: TokenKind::Keyword(keyword),
+                    ..
+                },
+                _,
+            )) => Err(Error::new(
+                ErrorKind::ExpectedIdentFoundKeyword,
+                format!(
+                    "unexpected token, expected identifier, found keyword '{}'",
+                    keyword
+                ),
+            )),
             _ => Err(Error::new(
                 ErrorKind::UnexpectedToken,
                 "unexpected token, expected ident",

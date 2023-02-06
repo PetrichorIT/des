@@ -76,8 +76,8 @@ impl TokenTree {
             // println!("[Delim]\n{}", sub.asset.slice_for(sub_span));
 
             let ts = TokenStream::parse(&mut sub)?;
-            sub.bump_back(1);
-            let close = sub.peek_span();
+
+            let close = sub.end_span();
 
             Ok(TokenTree::Delimited(DelimSpan { open, close }, delim, ts))
         } else {
@@ -236,7 +236,7 @@ impl TokenTree {
                             span = Span::fromto(span, s);
 
                             Ok(TokenTree::Token(
-                                Token::new(TokenKind::LDoubleArrow, span),
+                                Token::new(TokenKind::LSingleArrow, span),
                                 Spacing::Alone,
                             ))
                         }

@@ -1,9 +1,8 @@
 use des_ndl::*;
 
 const TEXT: &str = "
-submodules {
-    parent: P,
-    child[6]: Child,
+connections {
+    gate <-- fastlink <-- gute
 }
 ";
 
@@ -13,7 +12,7 @@ fn main() {
 
     let ts = TokenStream::new(asset).unwrap();
     let buf = ParseBuffer::new(asset, ts);
-    let expr = SubmodulesStmt::parse(&buf).unwrap();
+    let expr = ConnectionsStmt::parse(&buf).unwrap();
 
     println!("{expr:#?}");
     // for entry in expr.iter() {

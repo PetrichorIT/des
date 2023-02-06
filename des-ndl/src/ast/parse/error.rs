@@ -8,13 +8,15 @@ pub struct Error {
     internal: Box<dyn error::Error + Send + Sync>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorKind {
     ParseLitError,
+    MissingDelim,
     UnexpectedToken,
     UnexpectedDelim,
     ExpectedSingleFoundJoint,
     ExpectedDelimited,
+    ExpectedIdentFoundKeyword,
 }
 
 impl Error {

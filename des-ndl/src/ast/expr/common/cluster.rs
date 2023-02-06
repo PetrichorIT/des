@@ -1,3 +1,5 @@
+use std::fmt;
+
 use super::{Delimited, Lit};
 use crate::{ast::parse::*, Delimiter, Span, TokenTree};
 
@@ -5,6 +7,12 @@ use crate::{ast::parse::*, Delimiter, Span, TokenTree};
 pub struct ClusterDefinition {
     pub span: Span,
     pub lit: Lit,
+}
+
+impl fmt::Display for ClusterDefinition {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}]", self.lit.kind)
+    }
 }
 
 impl Parse for Option<ClusterDefinition> {

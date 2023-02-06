@@ -1,6 +1,6 @@
 use super::{Colon, Comma, Delimited, KeyValueField, LinkToken, Plus, Punctuated};
 use crate::ast::parse::Parse;
-use crate::{Delimiter, Ident, Lit, Span};
+use crate::{Delimiter, Ident, Joined, Lit, Span};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct LinkStmt {
@@ -13,54 +13,13 @@ pub struct LinkStmt {
 #[derive(Debug, Clone, PartialEq)]
 pub struct LinkInheritance {
     pub colon: Colon,
-    pub symbols: LinkInheritanceSymbols,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-
-pub struct LinkInheritanceSymbols {
-    inner: Vec<(Ident, Plus)>,
-    last: Ident,
+    pub symbols: Joined<Ident, Plus>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct LinkData {
     pub items: Punctuated<KeyValueField<Ident, Lit, Colon>, Comma>,
     pub span: Span,
-}
-
-// # Impl
-
-impl LinkInheritanceSymbols {
-    pub fn iter(&self) -> Iter<'_> {
-        Iter {
-            symbols: self,
-            idx: 0,
-        }
-    }
-}
-
-pub struct Iter<'a> {
-    symbols: &'a LinkInheritanceSymbols,
-    idx: usize,
-}
-
-impl<'a> Iterator for Iter<'a> {
-    type Item = &'a Ident;
-    fn next(&mut self) -> Option<Self::Item> {
-        use std::cmp::Ordering::*;
-        match self.idx.cmp(&self.symbols.inner.len()) {
-            Less => {
-                self.idx += 1;
-                Some(&self.symbols.inner[self.idx - 1].0)
-            }
-            Equal => {
-                self.idx += 1;
-                Some(&self.symbols.last)
-            }
-            Greater => None,
-        }
-    }
 }
 
 // # Parsing
@@ -88,26 +47,8 @@ impl Parse for Option<LinkInheritance> {
             Err(_) => return Ok(None),
         };
 
-        let symbols = LinkInheritanceSymbols::parse(input).unwrap();
+        let symbols = Joined::<Ident, Plus>::parse(input).unwrap();
         Ok(Some(LinkInheritance { colon, symbols }))
-    }
-}
-
-impl Parse for LinkInheritanceSymbols {
-    fn parse(input: crate::ParseStream<'_>) -> crate::Result<Self> {
-        let mut items = Vec::new();
-        loop {
-            let item = Ident::parse(input)?;
-            match Plus::parse(input) {
-                Ok(delim) => items.push((item, delim)),
-                Err(_) => {
-                    return Ok(Self {
-                        inner: items,
-                        last: item,
-                    });
-                }
-            }
-        }
     }
 }
 
