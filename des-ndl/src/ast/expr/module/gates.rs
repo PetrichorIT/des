@@ -1,7 +1,7 @@
 use crate::ast::parse::*;
 use crate::{
-    Annotation, Comma, Delimited, Delimiter, GatesToken, Ident, Lit, Punctuated, Span, TokenKind,
-    TokenTree,
+    Annotation, ClusterDefinition, Comma, Delimited, Delimiter, GatesToken, Ident, Lit, Punctuated,
+    Span, TokenKind, TokenTree,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -14,7 +14,7 @@ pub struct GatesStmt {
 #[derive(Debug, Clone, PartialEq)]
 pub struct GateDefinition {
     pub ident: Ident,
-    pub cluster: Option<GateClusterDefinition>,
+    pub cluster: Option<ClusterDefinition>,
     pub annotation: Option<Annotation>,
 }
 
@@ -41,38 +41,12 @@ impl Parse for GatesStmt {
 impl Parse for GateDefinition {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         let ident = Ident::parse(input)?;
-        let cluster = Option::<GateClusterDefinition>::parse(input)?;
+        let cluster = Option::<ClusterDefinition>::parse(input)?;
         let annotation = Option::<Annotation>::parse(input)?;
         Ok(Self {
             ident,
             cluster,
             annotation,
-        })
-    }
-}
-
-impl Parse for Option<GateClusterDefinition> {
-    fn parse(input: ParseStream<'_>) -> Result<Self> {
-        let Some(peek) = input.ts.peek() else {
-            return Ok(None);
-        };
-        let TokenTree::Delimited(_, delim, _) = peek else {
-            return Ok(None);
-        };
-        if *delim == Delimiter::Bracket {
-            Ok(Some(GateClusterDefinition::parse(input)?))
-        } else {
-            Ok(None)
-        }
-    }
-}
-
-impl Parse for GateClusterDefinition {
-    fn parse(input: ParseStream<'_>) -> Result<Self> {
-        let def = Delimited::<Lit>::parse_from(Delimiter::Bracket, input)?;
-        Ok(GateClusterDefinition {
-            lit: def.inner,
-            span: Span::fromto(def.delim_span.open, def.delim_span.close),
         })
     }
 }

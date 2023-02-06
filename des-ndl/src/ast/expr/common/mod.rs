@@ -8,10 +8,12 @@ use crate::TokenTree;
 #[macro_use]
 mod macros;
 
+mod cluster;
 mod delim;
 mod kv;
 mod punct;
 
+pub use self::cluster::*;
 pub use self::delim::*;
 pub use self::kv::*;
 pub use self::punct::*;

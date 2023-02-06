@@ -1,12 +1,9 @@
 use des_ndl::*;
 
 const TEXT: &str = "
-gates {
-    in @input,
-    out,
-    clusi[5] @input,
-    clusa[1],
-    debug
+submodules {
+    parent: P,
+    child[6]: Child,
 }
 ";
 
@@ -16,7 +13,7 @@ fn main() {
 
     let ts = TokenStream::new(asset).unwrap();
     let buf = ParseBuffer::new(asset, ts);
-    let expr = GatesStmt::parse(&buf).unwrap();
+    let expr = SubmodulesStmt::parse(&buf).unwrap();
 
     println!("{expr:#?}");
     // for entry in expr.iter() {
