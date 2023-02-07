@@ -11,12 +11,14 @@ mod macros;
 
 mod cluster;
 mod delim;
+mod eitheror;
 mod joined;
 mod kv;
 mod punct;
 
 pub use self::cluster::*;
 pub use self::delim::*;
+pub use self::eitheror::*;
 pub use self::joined::*;
 pub use self::kv::*;
 pub use self::punct::*;
@@ -26,6 +28,24 @@ pub use self::punct::*;
 ast_expect_single_token! {
     pub struct Slash {
         token: TokenKind::Slash,
+    }
+}
+
+ast_expect_single_token! {
+    pub struct Dot {
+        token: TokenKind::Dot,
+    }
+}
+
+ast_expect_single_token! {
+    pub struct DotDot {
+        token: TokenKind::DotDot,
+    }
+}
+
+ast_expect_single_token! {
+    pub struct DotDotDot {
+        token: TokenKind::DotDotDot,
     }
 }
 

@@ -6,10 +6,10 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub struct Error {
-    kind: ErrorKind,
-    internal: Box<dyn error::Error + Send + Sync>,
-    span: Option<Span>,
-    hints: Vec<ErrorHint>,
+    pub(crate) kind: ErrorKind,
+    pub(crate) internal: Box<dyn error::Error + Send + Sync>,
+    pub(crate) span: Option<Span>,
+    pub(crate) hints: Vec<ErrorHint>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -24,6 +24,15 @@ pub enum ErrorKind {
     ExpectedIdentFoundKeyword,
     MissingToken,
     UnexpectedEOF,
+    LinkInheritanceDuplicatedSymbols,
+    LinkKnownKeysInvalidValue,
+    ModuleGatesDuplicatedSymbols,
+    ModuleGatesInvalidClusterSize,
+    ModuleSubDuplicatedSymbols,
+    ModuleSubInvalidClusterSize,
+    InvalidAnnotation,
+    InvalidLitTyp,
+    SymbolDuplication,
 }
 
 #[derive(Debug)]

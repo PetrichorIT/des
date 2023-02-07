@@ -1,18 +1,23 @@
+use crate::EitherOr;
+
 use super::super::parse::*;
-use super::{Ident, IncludeToken, Joined, Semi, Slash};
+use super::{DotDot, Ident, IncludeToken, Joined, Semi, Slash};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct IncludeStmt {
     pub include: IncludeToken,
-    pub path: Joined<Ident, Slash>,
+    pub path: Joined<EitherOr<Ident, DotDot>, Slash>,
     pub semi: Semi,
 }
 
-impl Joined<Ident, Slash> {
+impl Joined<EitherOr<Ident, DotDot>, Slash> {
     #[cfg(test)]
     pub fn path(&self) -> String {
         self.iter()
-            .map(|v| &v.raw[..])
+            .map(|v| match v {
+                EitherOr::Either(either) => &either.raw[..],
+                EitherOr::Or(_) => "..",
+            })
             .collect::<Vec<_>>()
             .join("/")
     }
@@ -23,7 +28,7 @@ impl Joined<Ident, Slash> {
 impl Parse for IncludeStmt {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         let include = IncludeToken::parse(input)?;
-        let path = Joined::<Ident, Slash>::parse(input)?;
+        let path = Joined::<_, Slash>::parse(input)?;
         let semi = Semi::parse(input)?;
         Ok(Self {
             include,

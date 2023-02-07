@@ -144,6 +144,16 @@ pub enum LitKind {
     Str { lit: String },
 }
 
+impl LitKind {
+    pub(super) fn typ(&self) -> &'static str {
+        match self {
+            Self::Integer { .. } => "integer",
+            Self::Float { .. } => "float",
+            Self::Str { .. } => "string",
+        }
+    }
+}
+
 impl fmt::Display for LitKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

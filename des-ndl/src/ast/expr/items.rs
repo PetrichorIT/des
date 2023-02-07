@@ -1,5 +1,10 @@
+use std::sync::Arc;
+
 use super::{EntryStmt, IncludeStmt, LinkStmt, ModuleStmt};
-use crate::ast::{parse::*, Keyword, Token, TokenKind, TokenTree};
+use crate::{
+    ast::{parse::*, Keyword, Token, TokenKind, TokenTree},
+    Ident,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct File {
@@ -8,11 +13,25 @@ pub struct File {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Item {
-    Include(IncludeStmt),
-    Link(LinkStmt),
-    Module(ModuleStmt),
-    Entry(EntryStmt),
+    Include(Arc<IncludeStmt>),
+    Link(Arc<LinkStmt>),
+    Module(Arc<ModuleStmt>),
+    Entry(Arc<EntryStmt>),
 }
+
+// # Impl
+
+impl Item {
+    pub fn symbol(&self) -> Option<&Ident> {
+        match self {
+            Item::Include(_) | Item::Entry(_) => None,
+            Item::Module(module) => Some(&module.ident),
+            Item::Link(link) => Some(&link.ident),
+        }
+    }
+}
+
+// # Parse
 
 impl Parse for File {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
@@ -34,10 +53,10 @@ impl Parse for Item {
                 },
                 _,
             )) => match keyword {
-                Keyword::Include => Ok(Item::Include(IncludeStmt::parse(input)?)),
-                Keyword::Link => Ok(Item::Link(LinkStmt::parse(input)?)),
-                Keyword::Module => Ok(Item::Module(ModuleStmt::parse(input)?)),
-                Keyword::Entry => Ok(Item::Entry(EntryStmt::parse(input)?)),
+                Keyword::Include => Ok(Item::Include(Arc::new(IncludeStmt::parse(input)?))),
+                Keyword::Link => Ok(Item::Link(Arc::new(LinkStmt::parse(input)?))),
+                Keyword::Module => Ok(Item::Module(Arc::new(ModuleStmt::parse(input)?))),
+                Keyword::Entry => Ok(Item::Entry(Arc::new(EntryStmt::parse(input)?))),
                 _ => Err(Error::new(
                     ErrorKind::UnexpectedToken,
                     "unexpected keyword, expected top level item",
