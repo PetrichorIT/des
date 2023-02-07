@@ -1,8 +1,7 @@
-mod token;
-pub use token::*;
+pub(crate) mod expr;
+pub(crate) mod parse;
+pub(crate) mod token;
+pub(crate) mod validate;
 
-mod expr;
-pub use expr::*;
-
-mod parse;
-pub use parse::*;
+pub(crate) use expr::*;
+pub(crate) use token::*;

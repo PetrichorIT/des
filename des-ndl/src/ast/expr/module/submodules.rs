@@ -1,7 +1,8 @@
 use crate::ast::parse::*;
-use crate::{
-    ClusterDefinition, Colon, Comma, Delimited, Delimiter, Ident, Punctuated, Span, SubmodulesToken,
+use crate::ast::{
+    ClusterDefinition, Colon, Comma, Delimited, Delimiter, Ident, Punctuated, SubmodulesToken,
 };
+use crate::resource::Span;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SubmodulesStmt {
@@ -51,7 +52,9 @@ impl Parse for SubmoduleDefinition {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Parse, ParseBuffer, SourceMap, SubmodulesStmt, TokenStream};
+    use super::*;
+    use crate::ast::TokenStream;
+    use crate::resource::SourceMap;
 
     #[test]
     fn single_submodules() {

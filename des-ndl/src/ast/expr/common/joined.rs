@@ -1,4 +1,4 @@
-use crate::Parse;
+use crate::ast::parse::*;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Joined<T, P> {
@@ -51,7 +51,7 @@ where
     T: Parse,
     P: Parse,
 {
-    fn parse(input: crate::ParseStream<'_>) -> crate::Result<Self> {
+    fn parse(input: ParseStream<'_>) -> crate::Result<Self> {
         let mut items = Vec::new();
         loop {
             let item = T::parse(input)?;

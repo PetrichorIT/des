@@ -1,8 +1,7 @@
 use super::super::parse::*;
-use super::{IncludeToken, Semi, Slash};
-use crate::{Ident, Joined};
+use super::{Ident, IncludeToken, Joined, Semi, Slash};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct IncludeStmt {
     pub include: IncludeToken,
     pub path: Joined<Ident, Slash>,
@@ -10,6 +9,7 @@ pub struct IncludeStmt {
 }
 
 impl Joined<Ident, Slash> {
+    #[cfg(test)]
     pub fn path(&self) -> String {
         self.iter()
             .map(|v| &v.raw[..])
@@ -36,7 +36,10 @@ impl Parse for IncludeStmt {
 #[cfg(test)]
 mod tests {
     use super::{IncludeStmt, Parse, ParseBuffer};
-    use crate::{SourceMap, Span, TokenStream};
+    use crate::{
+        ast::TokenStream,
+        resource::{SourceMap, Span},
+    };
 
     #[test]
     fn success_single_path_component() {

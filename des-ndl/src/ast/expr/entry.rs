@@ -1,5 +1,5 @@
-use super::{EntryToken, Semi};
-use crate::{ast::parse::*, Ident};
+use super::{EntryToken, Ident, Semi};
+use crate::ast::parse::*;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct EntryStmt {
@@ -23,7 +23,8 @@ impl Parse for EntryStmt {
 
 #[cfg(test)]
 mod tests {
-    use crate::{EntryStmt, Parse, ParseBuffer, SourceMap, TokenStream};
+    use super::*;
+    use crate::{ast::TokenStream, resource::SourceMap};
 
     #[test]
     fn parse_entry_statement() {

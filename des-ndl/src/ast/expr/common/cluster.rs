@@ -1,7 +1,10 @@
 use std::fmt;
 
 use super::{Delimited, Lit};
-use crate::{ast::parse::*, Delimiter, Span, TokenTree};
+use crate::{
+    ast::{parse::*, Delimiter, TokenTree},
+    resource::Span,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ClusterDefinition {

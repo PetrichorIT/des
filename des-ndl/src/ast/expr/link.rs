@@ -1,6 +1,6 @@
 use super::{Colon, Comma, Delimited, KeyValueField, LinkToken, Plus, Punctuated};
-use crate::ast::parse::Parse;
-use crate::{Delimiter, Ident, Joined, Lit, Span};
+use crate::ast::{parse::*, Delimiter, Ident, Joined, Lit};
+use crate::resource::Span;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct LinkStmt {
@@ -25,7 +25,7 @@ pub struct LinkData {
 // # Parsing
 
 impl Parse for LinkStmt {
-    fn parse(input: crate::ParseStream<'_>) -> crate::Result<Self> {
+    fn parse(input: ParseStream<'_>) -> crate::Result<Self> {
         let link_token = LinkToken::parse(input)?;
         let ident = Ident::parse(input)?;
         let inheritance = Option::<LinkInheritance>::parse(input)?;
@@ -41,7 +41,7 @@ impl Parse for LinkStmt {
 }
 
 impl Parse for Option<LinkInheritance> {
-    fn parse(input: crate::ParseStream<'_>) -> crate::Result<Self> {
+    fn parse(input: ParseStream<'_>) -> crate::Result<Self> {
         let colon = match Colon::parse(input) {
             Ok(v) => v,
             Err(_) => return Ok(None),
@@ -53,7 +53,7 @@ impl Parse for Option<LinkInheritance> {
 }
 
 impl Parse for LinkData {
-    fn parse(input: crate::ParseStream<'_>) -> crate::Result<Self> {
+    fn parse(input: ParseStream<'_>) -> crate::Result<Self> {
         let items = Delimited::<Punctuated<KeyValueField<Ident, Lit, Colon>, Comma>>::parse_from(
             Delimiter::Brace,
             input,
@@ -68,7 +68,8 @@ impl Parse for LinkData {
 
 #[cfg(test)]
 mod tests {
-    use crate::{LinkStmt, Parse, ParseBuffer, SourceMap, TokenStream};
+    use crate::ast::{parse::*, LinkStmt, TokenStream};
+    use crate::resource::SourceMap;
 
     #[test]
     fn multiple_lit_parse() {

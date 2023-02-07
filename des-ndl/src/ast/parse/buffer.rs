@@ -1,7 +1,7 @@
 use std::borrow::Borrow;
 
 use super::{cursor::Cursor, *};
-use crate::{Asset, TokenStream};
+use crate::{ast::TokenStream, Asset};
 
 pub type ParseStream<'a> = &'a ParseBuffer<'a>;
 

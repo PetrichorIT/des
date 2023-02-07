@@ -24,9 +24,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        Eq, Ident, KeyValueField, Lit, LitKind, Parse, ParseBuffer, SourceMap, TokenStream,
-    };
+    use crate::ast::{parse::*, Eq, Ident, KeyValueField, Lit, LitKind, TokenStream};
+    use crate::resource::SourceMap;
 
     #[test]
     fn success_single_delim_token() {

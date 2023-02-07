@@ -1,5 +1,5 @@
 use crate::ast::parse::*;
-use crate::{DelimSpan, Delimiter, TokenTree};
+use crate::ast::{DelimSpan, Delimiter, TokenTree};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Delimited<T> {
@@ -34,7 +34,8 @@ impl<T: Parse> Delimited<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{SourceMap, TokenStream, ParseBuffer, Delimited, Delimiter, Ident, Lit};
+    use super::*;
+    use crate::{resource::SourceMap, ast::{TokenStream, Ident, Lit}};
 
     #[test]
     fn success_single_token_delimited() {

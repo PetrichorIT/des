@@ -1,9 +1,10 @@
 use std::{fmt, mem};
 
-use crate::{
-    ast::parse::*, ClusterDefinition, Comma, ConnectionsToken, Delimited, Delimiter, Ident,
-    LeftSingleArrow, Punctuated, RightSingleArrow, Slash, Span,
+use crate::ast::{
+    parse::*, ClusterDefinition, Comma, ConnectionsToken, Delimited, Delimiter, Ident,
+    LeftSingleArrow, Punctuated, RightSingleArrow, Slash,
 };
+use crate::resource::Span;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConnectionsStmt {
@@ -222,7 +223,7 @@ impl Parse for ConnectionArrow {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{SourceMap, TokenStream};
+    use crate::{ast::TokenStream, SourceMap};
 
     #[test]
     fn simple_noncluster_connections() {

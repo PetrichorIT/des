@@ -1,10 +1,8 @@
 mod buffer;
-pub use buffer::*;
-
-mod error;
-pub use error::*;
-
 mod cursor;
+
+pub use crate::error::*;
+pub use buffer::*;
 
 pub trait Parse: Sized {
     fn parse(input: ParseStream<'_>) -> Result<Self>;

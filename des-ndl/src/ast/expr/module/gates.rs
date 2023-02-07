@@ -1,8 +1,9 @@
 use crate::ast::parse::*;
-use crate::{
+use crate::ast::{
     Annotation, ClusterDefinition, Comma, Delimited, Delimiter, GatesToken, Ident, Lit, Punctuated,
-    Span, TokenKind, TokenTree,
+    TokenKind, TokenTree,
 };
+use crate::resource::Span;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct GatesStmt {
@@ -69,7 +70,9 @@ impl Parse for Option<Annotation> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{GatesStmt, Parse, ParseBuffer, SourceMap, TokenStream};
+    use super::*;
+    use crate::ast::TokenStream;
+    use crate::resource::SourceMap;
 
     #[test]
     fn simple_gates() {

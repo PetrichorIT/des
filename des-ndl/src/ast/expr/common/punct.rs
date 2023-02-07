@@ -102,10 +102,9 @@ impl<'a, T, P> Iterator for Iter<'a, T, P> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        Comma, Eq, Ident, KeyValueField, Lit, Parse, ParseBuffer, Punctuated, Semi, SourceMap,
-        TokenStream,
-    };
+    use super::*;
+    use crate::ast::{Comma, Eq, Ident, KeyValueField, Lit, Punctuated, Semi, TokenStream};
+    use crate::resource::SourceMap;
 
     #[test]
     fn success_single_token_patterns() {
