@@ -22,6 +22,26 @@ pub struct LinkData {
     pub span: Span,
 }
 
+// # Spanning
+
+impl Spanned for LinkStmt {
+    fn span(&self) -> crate::Span {
+        Span::fromto(self.link_token.span(), self.data.span())
+    }
+}
+
+impl Spanned for LinkInheritance {
+    fn span(&self) -> Span {
+        Span::fromto(self.colon.span(), self.symbols.span())
+    }
+}
+
+impl Spanned for LinkData {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
 // # Parsing
 
 impl Parse for LinkStmt {

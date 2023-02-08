@@ -144,6 +144,12 @@ ast_expect_single_token! {
 pub use crate::ast::token::Ident;
 pub use crate::ast::token::Lit;
 
+impl Spanned for Ident {
+    fn span(&self) -> crate::Span {
+        self.span
+    }
+}
+
 impl Parse for Ident {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         match input.ts.peek() {
@@ -179,6 +185,12 @@ impl Parse for Ident {
     }
 }
 
+impl Spanned for Annotation {
+    fn span(&self) -> crate::Span {
+        self.span
+    }
+}
+
 impl Parse for Annotation {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         match input.ts.peek() {
@@ -198,6 +210,12 @@ impl Parse for Annotation {
                 "unexpected token, expected annotation",
             )),
         }
+    }
+}
+
+impl Spanned for Lit {
+    fn span(&self) -> crate::Span {
+        self.span
     }
 }
 

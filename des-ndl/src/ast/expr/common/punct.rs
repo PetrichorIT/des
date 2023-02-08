@@ -1,4 +1,4 @@
-use crate::ast::parse::*;
+use crate::{ast::parse::*, Span};
 
 // Eg <Lit, Comma>,
 
@@ -54,7 +54,31 @@ impl<T, P> Punctuated<T, P> {
     }
 }
 
-impl<T: Parse, P: Parse> Parse for Punctuated<T, P> {
+impl<T, P> Spanned for Punctuated<T, P>
+where
+    T: Spanned,
+    P: Spanned,
+{
+    fn span(&self) -> Span {
+        if self.is_empty() {
+            Span::new(0, 0)
+        } else {
+            Span::fromto(
+                self.iter().next().unwrap().span(),
+                self.last
+                    .as_ref()
+                    .map(|v| v.span())
+                    .unwrap_or(self.inner.last().unwrap().1.span()),
+            )
+        }
+    }
+}
+
+impl<T, P> Parse for Punctuated<T, P>
+where
+    T: Parse,
+    P: Parse,
+{
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         let mut this = Self::new();
         while !input.ts.is_empty() {

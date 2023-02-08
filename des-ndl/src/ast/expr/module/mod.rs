@@ -2,6 +2,7 @@ use crate::ast::parse::*;
 use crate::ast::{
     Delimited, Delimiter, Ident, Keyword, ModuleToken, Token, TokenKind, TokenStream, TokenTree,
 };
+use crate::Span;
 
 mod connections;
 mod gates;
@@ -18,6 +19,13 @@ pub struct ModuleStmt {
     pub gates: Option<GatesStmt>,
     pub submodules: Option<SubmodulesStmt>,
     pub connections: Option<ConnectionsStmt>,
+    pub span: Span,
+}
+
+impl Spanned for ModuleStmt {
+    fn span(&self) -> Span {
+        self.span
+    }
 }
 
 impl Parse for ModuleStmt {
@@ -27,6 +35,7 @@ impl Parse for ModuleStmt {
 
         let delim = Delimited::<TokenStream>::parse_from(Delimiter::Brace, input)?;
         let inner = ParseBuffer::new(input.asset, delim.inner);
+        let span = Span::fromto(keyword.span(), delim.delim_span.close);
 
         let mut this = ModuleStmt {
             keyword,
@@ -34,6 +43,7 @@ impl Parse for ModuleStmt {
             gates: None,
             submodules: None,
             connections: None,
+            span,
         };
 
         while !inner.ts.is_empty() {

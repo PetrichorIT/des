@@ -1,6 +1,6 @@
 use crate::ast::parse::*;
 use crate::ast::{
-    Annotation, ClusterDefinition, Comma, Delimited, Delimiter, GatesToken, Ident, Lit, Punctuated,
+    Annotation, ClusterDefinition, Comma, Delimited, Delimiter, GatesToken, Ident, Punctuated,
     TokenKind, TokenTree,
 };
 use crate::resource::Span;
@@ -19,11 +19,28 @@ pub struct GateDefinition {
     pub annotation: Option<Annotation>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct GateClusterDefinition {
-    pub span: Span,
-    pub lit: Lit,
+// # Spanning
+
+impl Spanned for GatesStmt {
+    fn span(&self) -> Span {
+        self.span
+    }
 }
+
+impl Spanned for GateDefinition {
+    fn span(&self) -> Span {
+        Span::fromto(
+            self.ident.span(),
+            self.annotation
+                .as_ref()
+                .map(|v| v.span())
+                .or(self.cluster.as_ref().map(|c| c.span()))
+                .unwrap_or(self.ident.span()),
+        )
+    }
+}
+
+// # Parsing
 
 impl Parse for GatesStmt {
     fn parse(input: ParseStream<'_>) -> Result<Self> {

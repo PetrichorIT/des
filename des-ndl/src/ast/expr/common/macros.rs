@@ -53,5 +53,11 @@ macro_rules! ast_expect_single_token {
                 }
             }
         }
+
+        impl crate::ast::parse::Spanned for $type {
+            fn span(&self) -> crate::resource::Span {
+                self.span
+            }
+        }
     };
 }

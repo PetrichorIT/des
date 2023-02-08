@@ -1,4 +1,4 @@
-use std::{error, fmt};
+use std::{error, fmt, io};
 
 use crate::Span;
 
@@ -33,6 +33,7 @@ pub enum ErrorKind {
     InvalidAnnotation,
     InvalidLitTyp,
     SymbolDuplication,
+    IoError,
 }
 
 #[derive(Debug)]
@@ -54,6 +55,15 @@ impl Error {
         Self {
             kind,
             internal: internal.into(),
+            span: None,
+            hints: Vec::new(),
+        }
+    }
+
+    pub fn from_io(io: io::Error) -> Self {
+        Self {
+            kind: ErrorKind::IoError,
+            internal: Box::new(io),
             span: None,
             hints: Vec::new(),
         }

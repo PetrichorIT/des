@@ -6,6 +6,19 @@ pub enum EitherOr<E, O> {
     Or(O),
 }
 
+impl<E, O> Spanned for EitherOr<E, O>
+where
+    E: Spanned,
+    O: Spanned,
+{
+    fn span(&self) -> crate::Span {
+        match self {
+            EitherOr::Either(either) => either.span(),
+            EitherOr::Or(or) => or.span(),
+        }
+    }
+}
+
 impl<E, O> Parse for EitherOr<E, O>
 where
     E: Parse,

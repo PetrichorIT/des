@@ -31,6 +31,19 @@ impl Item {
     }
 }
 
+// # Spaning
+
+impl Spanned for Item {
+    fn span(&self) -> crate::Span {
+        match self {
+            Self::Entry(entry) => entry.span(),
+            Self::Include(include) => include.span(),
+            Self::Link(link) => link.span(),
+            Self::Module(module) => module.span(),
+        }
+    }
+}
+
 // # Parse
 
 impl Parse for File {

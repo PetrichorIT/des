@@ -12,8 +12,8 @@ mod tests;
 
 #[derive(Debug)]
 pub struct SourceMap {
-    buffer: String,
-    assets: Vec<SourceMappedAsset>,
+    pub(crate) buffer: String,
+    pub(crate) assets: Vec<SourceMappedAsset>,
 }
 
 #[derive(Debug)]
@@ -24,7 +24,7 @@ pub(crate) struct SourceMappedAsset {
     pub line_pos_mapping: Vec<usize>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AssetIdentifier {
     Raw {
         alias: String,
@@ -38,6 +38,16 @@ pub enum AssetIdentifier {
         alias: String,
         include: Span,
     },
+}
+
+impl AssetIdentifier {
+    fn root_path(&self) -> Option<&Path> {
+        match self {
+            Self::Raw { .. } => None,
+            Self::Root { path, .. } => Some(path),
+            Self::Included { path, .. } => Some(path),
+        }
+    }
 }
 
 impl From<&str> for AssetIdentifier {
@@ -110,6 +120,13 @@ impl SourceMap {
         }
     }
 
+    pub(crate) fn span_for(&self, asset: &AssetIdentifier) -> Option<Span> {
+        self.assets
+            .iter()
+            .find(|a| a.ident == *asset)
+            .map(|v| v.span())
+    }
+
     pub(crate) fn slice_for(&self, span: Span) -> &str {
         &self.buffer[span.pos..(span.pos + span.len)]
     }
@@ -167,6 +184,10 @@ impl SourceMappedAsset {
         }
     }
 
+    pub(crate) fn span(&self) -> Span {
+        Span::new(self.offset, self.len)
+    }
+
     pub(crate) fn contains(&self, span: Span) -> bool {
         let end = span.pos + span.len;
         self.offset <= span.pos && end <= self.offset + self.len
@@ -197,6 +218,10 @@ impl AssetIdentifier {
         match self {
             Self::Raw { alias } | Self::Root { alias, .. } | Self::Included { alias, .. } => alias,
         }
+    }
+
+    pub(crate) fn relative_asset_alias(&self, path: &Path) -> String {
+        todo!()
     }
 
     pub(crate) fn path(&self) -> Result<&PathBuf> {

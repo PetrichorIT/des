@@ -1,3 +1,4 @@
+use crate::Span;
 use crate::ast::parse::*;
 use crate::ast::{DelimSpan, Delimiter, TokenTree};
 
@@ -6,6 +7,12 @@ pub struct Delimited<T> {
     pub delim: Delimiter,
     pub delim_span: DelimSpan,
     pub inner: T,
+}
+
+impl<T> Spanned for Delimited<T> {
+    fn span(&self) -> Span {
+        Span::fromto(self.delim_span.open, self.delim_span.close)
+    }
 }
 
 impl<T: Parse> Delimited<T> {

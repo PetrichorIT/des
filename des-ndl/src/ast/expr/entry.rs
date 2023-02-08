@@ -1,11 +1,17 @@
 use super::{EntryToken, Ident, Semi};
-use crate::ast::parse::*;
+use crate::{ast::parse::*, Span};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct EntryStmt {
     pub entry: EntryToken,
     pub symbol: Ident,
     pub semi: Semi,
+}
+
+impl Spanned for EntryStmt {
+    fn span(&self) -> crate::Span {
+        Span::fromto(self.entry.span(), self.semi.span())
+    }
 }
 
 impl Parse for EntryStmt {

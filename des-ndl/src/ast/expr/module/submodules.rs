@@ -19,6 +19,22 @@ pub struct SubmoduleDefinition {
     pub typ: Ident,
 }
 
+// # Spanning
+
+impl Spanned for SubmodulesStmt {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl Spanned for SubmoduleDefinition {
+    fn span(&self) -> Span {
+        Span::fromto(self.ident.span(), self.typ.span())
+    }
+}
+
+// # Parsing
+
 impl Parse for SubmodulesStmt {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         let keyword = SubmodulesToken::parse(input)?;

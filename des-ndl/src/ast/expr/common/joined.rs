@@ -1,4 +1,4 @@
-use crate::ast::parse::*;
+use crate::{ast::parse::*, Span};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Joined<T, P> {
@@ -43,6 +43,21 @@ impl<'a, T, P> Iterator for Iter<'a, T, P> {
             }
             Greater => None,
         }
+    }
+}
+
+impl<T, P> Spanned for Joined<T, P>
+where
+    T: Spanned,
+{
+    fn span(&self) -> crate::Span {
+        Span::fromto(
+            self.items
+                .first()
+                .map(|i| i.0.span())
+                .unwrap_or(self.last.span()),
+            self.last.span(),
+        )
     }
 }
 

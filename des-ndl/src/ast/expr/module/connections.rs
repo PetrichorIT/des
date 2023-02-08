@@ -90,6 +90,63 @@ impl fmt::Display for NonlocalModuleGateReference {
     }
 }
 
+// # Spanning
+
+impl Spanned for ConnectionsStmt {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl Spanned for ConnectionDefinition {
+    fn span(&self) -> Span {
+        // TODO: make fromto also reorder if nessecary
+        Span::fromto(self.source.span(), self.target.span())
+    }
+}
+
+impl Spanned for ModuleGateReference {
+    fn span(&self) -> Span {
+        match self {
+            Self::Local(local) => local.span(),
+            Self::Nonlocal(nonlocal) => nonlocal.span(),
+        }
+    }
+}
+
+impl Spanned for LocalModuleGateReference {
+    fn span(&self) -> Span {
+        Span::fromto(
+            self.gate.span(),
+            self.gate_cluster
+                .as_ref()
+                .map(|v| v.span())
+                .unwrap_or(self.gate.span()),
+        )
+    }
+}
+
+impl Spanned for NonlocalModuleGateReference {
+    fn span(&self) -> Span {
+        Span::fromto(
+            self.submodule.span(),
+            self.gate_cluster
+                .as_ref()
+                .map(|v| v.span())
+                .unwrap_or(self.gate.span()),
+        )
+    }
+}
+
+impl Spanned for ConnectionArrow {
+    fn span(&self) -> Span {
+        match self {
+            Self::Left(left) => left.span(),
+            Self::Right(right) => right.span(),
+        }
+    }
+}
+
 // # Parse
 
 impl Parse for ConnectionsStmt {

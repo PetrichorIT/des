@@ -18,6 +18,12 @@ impl fmt::Display for ClusterDefinition {
     }
 }
 
+impl Spanned for ClusterDefinition {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
 impl Parse for Option<ClusterDefinition> {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         let Some(peek) = input.ts.peek() else {

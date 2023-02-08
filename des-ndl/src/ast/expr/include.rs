@@ -1,4 +1,4 @@
-use crate::EitherOr;
+use crate::{EitherOr, Span};
 
 use super::super::parse::*;
 use super::{DotDot, Ident, IncludeToken, Joined, Semi, Slash};
@@ -11,7 +11,6 @@ pub struct IncludeStmt {
 }
 
 impl Joined<EitherOr<Ident, DotDot>, Slash> {
-    #[cfg(test)]
     pub fn path(&self) -> String {
         self.iter()
             .map(|v| match v {
@@ -20,6 +19,12 @@ impl Joined<EitherOr<Ident, DotDot>, Slash> {
             })
             .collect::<Vec<_>>()
             .join("/")
+    }
+}
+
+impl Spanned for IncludeStmt {
+    fn span(&self) -> crate::Span {
+        Span::fromto(self.include.span(), self.semi.span())
     }
 }
 

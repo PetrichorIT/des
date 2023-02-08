@@ -1,10 +1,20 @@
-use crate::ast::parse::*;
+use crate::{ast::parse::*, Span};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KeyValueField<K, V, D> {
     pub key: K,
     pub delim: D,
     pub value: V,
+}
+
+impl<K, V, D> Spanned for KeyValueField<K, V, D>
+where
+    K: Spanned,
+    V: Spanned,
+{
+    fn span(&self) -> crate::Span {
+        Span::fromto(self.key.span(), self.value.span())
+    }
 }
 
 impl<K, V, D> Parse for KeyValueField<K, V, D>
