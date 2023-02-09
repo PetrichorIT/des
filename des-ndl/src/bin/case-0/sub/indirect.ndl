@@ -1,3 +1,6 @@
 include ../chain;
 
-link Indirect {}
+link Indirect: Chain {
+    contested: "abc",
+    indirect_field: 123
+}

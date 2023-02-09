@@ -6,6 +6,7 @@ use std::{
 use crate::{
     ast::{self, validate::Validate},
     error::*,
+    ir,
     resource::{fs::canon, AssetIdentifier},
     Parse, ParseBuffer, SourceMap, Spanned, TokenStream,
 };
@@ -13,10 +14,13 @@ use crate::{
 #[derive(Debug)]
 pub struct Context {
     pub smap: SourceMap,
+
     pub root: AssetIdentifier,
     pub assets: Vec<AssetIdentifier>,
     pub deps: HashMap<AssetIdentifier, Vec<AssetIdentifier>>,
+
     pub ast: HashMap<AssetIdentifier, ast::File>,
+    pub ir: HashMap<AssetIdentifier, ir::Items>,
 }
 
 impl Context {
@@ -38,8 +42,10 @@ impl Context {
             smap,
             root: ident.clone(),
             assets: vec![ident.clone()],
-            ast: HashMap::from([(ident, file)]),
             deps: HashMap::new(),
+
+            ast: HashMap::from([(ident, file)]),
+            ir: HashMap::new(),
         };
         this.load_includes()?;
 
@@ -51,6 +57,11 @@ impl Context {
         }
 
         this.load_deps(&mut errors);
+        if !errors.is_empty() {
+            return Err(Error::root(errors));
+        }
+
+        this.load_ir(&mut errors);
         if !errors.is_empty() {
             return Err(Error::root(errors));
         }
@@ -143,6 +154,18 @@ impl Context {
         let init = std::iter::once((asset, self.ast.get(asset).unwrap()));
 
         Vec::from_iter(init.chain(iter))
+    }
+
+    pub(crate) fn ir_for_asset(
+        &self,
+        asset: &AssetIdentifier,
+    ) -> Vec<(&AssetIdentifier, &ir::Items)> {
+        self.deps
+            .get(&asset)
+            .unwrap()
+            .into_iter()
+            .map(|k| (k, self.ir.get(k).unwrap()))
+            .collect()
     }
 
     fn load_deps(&mut self, errors: &mut LinkedList<Error>) {

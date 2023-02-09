@@ -1,6 +1,7 @@
 pub(crate) mod ast;
 pub(crate) mod context;
 pub(crate) mod error;
+pub(crate) mod ir;
 pub(crate) mod lexer;
 pub(crate) mod resolve;
 
@@ -22,4 +23,5 @@ pub use self::ast::parse::*;
 pub use self::ast::token::*;
 
 pub use self::context::Context;
+pub use self::ir::*;
 pub use self::resolve::*;

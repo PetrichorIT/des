@@ -201,6 +201,20 @@ impl Lit {
             }),
         }
     }
+
+    pub fn as_float(&self) -> f64 {
+        match self.kind {
+            LitKind::Float { lit } => lit,
+            _ => panic!("unexpected cast"),
+        }
+    }
+
+    pub fn as_integer(&self) -> i32 {
+        match self.kind {
+            LitKind::Integer { lit } => lit,
+            _ => panic!("unexpected cast"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -221,6 +235,12 @@ impl Ident {
             raw: cursor.asset.slice_for(span).to_string(),
             span,
         }
+    }
+}
+
+impl AsRef<str> for Ident {
+    fn as_ref(&self) -> &str {
+        self.raw.as_ref()
     }
 }
 

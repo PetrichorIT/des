@@ -36,6 +36,8 @@ pub enum ErrorKind {
     IoError,
     CyclicDeps,
     RootError,
+    SymbolNotFound,
+    LinkMissingRequiredFields,
 }
 
 #[derive(Debug)]

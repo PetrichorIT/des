@@ -1,3 +1,5 @@
 include direct;
 
-link Main {}
+link Main: Direct {
+    shared: 1.0
+}

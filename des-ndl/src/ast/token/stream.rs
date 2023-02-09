@@ -69,14 +69,8 @@ impl TokenTree {
             let delim = Delimiter::from(token.kind);
             let open = span;
 
-            // println!(">> {:?}", delim);
-
             let mut sub = cursor.extract_subcursor(delim)?;
-            // let sub_span = sub.rem_stream_span();
-            // println!("[Delim]\n{}", sub.asset.slice_for(sub_span));
-
             let ts = TokenStream::parse(&mut sub)?;
-
             let close = sub.end_span();
 
             Ok(TokenTree::Delimited(DelimSpan { open, close }, delim, ts))

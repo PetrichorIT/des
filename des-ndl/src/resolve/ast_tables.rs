@@ -1,7 +1,7 @@
 use std::{collections::LinkedList, sync::Arc};
 
 use crate::{
-    ast::{self, LinkStmt},
+    ast::{Item, LinkStmt},
     resource::AssetIdentifier,
     Context, Error, ErrorHint, ErrorKind, ModuleStmt, Spanned,
 };
@@ -9,18 +9,80 @@ use crate::{
 // # Links
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct LinkSymbolTable {
+pub struct LinkAstTable {
     source: AssetIdentifier,
     links: Vec<Arc<LinkStmt>>,
+    ptr: usize,
 }
 
-impl LinkSymbolTable {
-    pub fn from_ctx(ctx: &Context, asset: AssetIdentifier, errors: &mut LinkedList<Error>) -> Self {
+impl LinkAstTable {
+    pub fn order_local_deps(&mut self) {
+        let local = self.local_mut();
+        let mut s = 0;
+
+        while s < local.len() {
+            // let mut loadable = false;
+            let mut i = s;
+
+            'seacher: while i < local.len() {
+                // check if i depents are in ..s
+                if let Some(ref inh) = local[i].inheritance {
+                    'inner: for dep in inh.symbols.iter() {
+                        let valid = local[..s].iter().any(|l| l.ident.raw == dep.raw);
+
+                        if !valid {
+                            let valid_nonlocal = local[s..].iter().any(|l| l.ident.raw == dep.raw);
+                            if valid_nonlocal {
+                                continue 'inner;
+                            }
+
+                            i += 1;
+                            continue 'seacher;
+                        }
+                    }
+                    // all deps are valid
+                    // loadable = true;
+                    break;
+                } else {
+                    // loadable = true;
+                    break;
+                }
+            }
+
+            // not all deps may be loadable, since nonlocal deps are not repr
+            if s != i && i < local.len() {
+                local.swap(s, i);
+            }
+            s += 1;
+        }
+    }
+
+    pub fn local(&self) -> &[Arc<LinkStmt>] {
+        &self.links[..self.ptr]
+    }
+
+    pub fn local_mut(&mut self) -> &mut [Arc<LinkStmt>] {
+        &mut self.links[..self.ptr]
+    }
+
+    pub fn from_ctx(
+        ctx: &Context,
+        asset: &AssetIdentifier,
+        errors: &mut LinkedList<Error>,
+    ) -> Self {
         let mut links = Vec::new();
 
-        for (_, ast) in ctx.asts_for_asset(&asset) {
+        let asts = ctx.asts_for_asset(&asset);
+        let ptr = asts[0]
+            .1
+            .items
+            .iter()
+            .filter(|i| matches!(i, Item::Link(_)))
+            .count();
+
+        for (_, ast) in asts {
             for item in &ast.items {
-                if let ast::Item::Link(link) = item {
+                if let Item::Link(link) = item {
                     links.push(link.clone())
                 }
             }
@@ -29,8 +91,9 @@ impl LinkSymbolTable {
         Self::check_dup(&links, errors);
 
         Self {
-            source: asset,
+            source: asset.clone(),
             links,
+            ptr,
         }
     }
 
@@ -72,18 +135,18 @@ impl LinkSymbolTable {
 // # Modules
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ModuleSymbolTable {
+pub struct ModuleAstTable {
     source: AssetIdentifier,
     modules: Vec<Arc<ModuleStmt>>,
 }
 
-impl ModuleSymbolTable {
+impl ModuleAstTable {
     pub fn from_ctx(ctx: &Context, asset: AssetIdentifier, errors: &mut LinkedList<Error>) -> Self {
         let mut modules = Vec::new();
 
         for (_, ast) in ctx.asts_for_asset(&asset) {
             for item in &ast.items {
-                if let ast::Item::Module(module) = item {
+                if let Item::Module(module) = item {
                     modules.push(module.clone())
                 }
             }
