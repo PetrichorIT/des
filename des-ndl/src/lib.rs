@@ -1,8 +1,8 @@
 pub(crate) mod ast;
 pub(crate) mod context;
 pub(crate) mod error;
-pub(crate) mod expand;
 pub(crate) mod lexer;
+pub(crate) mod resolve;
 
 #[allow(unused)]
 pub(crate) mod resource;
@@ -20,3 +20,6 @@ pub use self::error::Result;
 pub use self::ast::expr::*;
 pub use self::ast::parse::*;
 pub use self::ast::token::*;
+
+pub use self::context::Context;
+pub use self::resolve::*;

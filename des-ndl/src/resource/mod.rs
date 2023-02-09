@@ -4,6 +4,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+pub(crate) mod fs;
+
 mod span;
 pub use self::span::*;
 
@@ -221,7 +223,10 @@ impl AssetIdentifier {
     }
 
     pub(crate) fn relative_asset_alias(&self, path: &Path) -> String {
-        todo!()
+        let common = fs::common_path(self.path().unwrap(), path);
+        let sub = fs::strip_prefix(path, common);
+        let sub = sub.with_extension("").to_string_lossy().to_string();
+        sub
     }
 
     pub(crate) fn path(&self) -> Result<&PathBuf> {

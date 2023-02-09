@@ -1,4 +1,4 @@
-use std::{error, fmt, io};
+use std::{collections::LinkedList, error, fmt, io};
 
 use crate::Span;
 
@@ -34,6 +34,8 @@ pub enum ErrorKind {
     InvalidLitTyp,
     SymbolDuplication,
     IoError,
+    CyclicDeps,
+    RootError,
 }
 
 #[derive(Debug)]
@@ -60,6 +62,25 @@ impl Error {
         }
     }
 
+    pub fn spanned(mut self, span: Span) -> Self {
+        self.span = Some(span);
+        self
+    }
+
+    pub fn add_hints(mut self, hint: impl Into<ErrorHint>) -> Self {
+        self.hints.push(hint.into());
+        self
+    }
+
+    pub fn root(errors: LinkedList<Error>) -> Self {
+        Self {
+            kind: ErrorKind::RootError,
+            internal: Box::new(Errors { items: errors }),
+            span: None,
+            hints: Vec::new(),
+        }
+    }
+
     pub fn from_io(io: io::Error) -> Self {
         Self {
             kind: ErrorKind::IoError,
@@ -81,5 +102,22 @@ impl error::Error for Error {}
 impl fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         <Self as fmt::Debug>::fmt(self, f)
+    }
+}
+
+// # composite errors
+
+#[derive(Debug)]
+pub struct Errors {
+    pub items: LinkedList<Error>,
+}
+
+impl error::Error for Errors {}
+impl fmt::Display for Errors {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for error in self.items.iter() {
+            <Error as fmt::Display>::fmt(error, f)?;
+        }
+        Ok(())
     }
 }

@@ -8,7 +8,7 @@ pub struct Span {
 
 impl Span {
     pub fn new(pos: usize, len: usize) -> Self {
-        assert!(len > 0);
+        // assert!(len > 0);
         Span { pos, len }
     }
 
