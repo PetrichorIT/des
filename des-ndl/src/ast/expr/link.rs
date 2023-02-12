@@ -1,6 +1,11 @@
-use super::{Colon, Comma, Delimited, KeyValueField, LinkToken, Plus, Punctuated};
-use crate::ast::{parse::*, Delimiter, Ident, Joined, Lit};
-use crate::resource::Span;
+use crate::{
+    ast::{
+        parse::*, Colon, Comma, Delimited, Delimiter, Ident, Joined, KeyValueField, LinkToken, Lit,
+        Plus, Punctuated,
+    },
+    error::*,
+    resource::Span,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct LinkStmt {
@@ -45,7 +50,7 @@ impl Spanned for LinkData {
 // # Parsing
 
 impl Parse for LinkStmt {
-    fn parse(input: ParseStream<'_>) -> crate::Result<Self> {
+    fn parse(input: ParseStream<'_>) -> Result<Self> {
         let link_token = LinkToken::parse(input)?;
         let ident = Ident::parse(input)?;
         let inheritance = Option::<LinkInheritance>::parse(input)?;
@@ -61,7 +66,7 @@ impl Parse for LinkStmt {
 }
 
 impl Parse for Option<LinkInheritance> {
-    fn parse(input: ParseStream<'_>) -> crate::Result<Self> {
+    fn parse(input: ParseStream<'_>) -> Result<Self> {
         let colon = match Colon::parse(input) {
             Ok(v) => v,
             Err(_) => return Ok(None),
@@ -73,7 +78,7 @@ impl Parse for Option<LinkInheritance> {
 }
 
 impl Parse for LinkData {
-    fn parse(input: ParseStream<'_>) -> crate::Result<Self> {
+    fn parse(input: ParseStream<'_>) -> Result<Self> {
         let items = Delimited::<Punctuated<KeyValueField<Ident, Lit, Colon>, Comma>>::parse_from(
             Delimiter::Brace,
             input,

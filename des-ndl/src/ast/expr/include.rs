@@ -1,7 +1,7 @@
-use crate::{EitherOr, Span};
+use crate::Span;
 
-use super::super::parse::*;
-use super::{DotDot, Ident, IncludeToken, Joined, Semi, Slash};
+use crate::ast::{parse::*, DotDot, EitherOr, Ident, IncludeToken, Joined, Semi, Slash};
+use crate::error::*;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct IncludeStmt {

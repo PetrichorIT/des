@@ -1,3 +1,4 @@
+use des_ndl::error::*;
 use des_ndl::*;
 
 fn main() -> Result<()> {

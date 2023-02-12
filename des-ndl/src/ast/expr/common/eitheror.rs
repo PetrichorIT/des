@@ -1,4 +1,4 @@
-use crate::ast::parse::*;
+use crate::{ast::parse::*, error::Result};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EitherOr<E, O> {
@@ -39,8 +39,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::ast::{Ident, Joined, Lit, Slash, TokenStream};
-    use crate::{Comma, SourceMap};
+    use crate::ast::{Comma, Ident, Joined, Lit, Slash, TokenStream};
+    use crate::SourceMap;
 
     use super::*;
 

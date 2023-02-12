@@ -1,4 +1,4 @@
-use crate::{ast::parse::*, Span};
+use crate::{ast::parse::*, error::*, Span};
 
 // Eg <Lit, Comma>,
 

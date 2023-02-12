@@ -1,4 +1,4 @@
-use des_ndl::*;
+use des_ndl::{ast::TokenStream, *};
 
 const TEXT: &str = "
 include str;

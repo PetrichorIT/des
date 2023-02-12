@@ -1,5 +1,5 @@
 use super::{Cursor, Delimiter, Token};
-use crate::{ast::parse::Error, ast::token::TokenKind, lexer, Span};
+use crate::{ast::token::TokenKind, error::Error, lexer, Span};
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]

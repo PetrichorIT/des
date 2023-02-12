@@ -38,6 +38,8 @@ pub enum ErrorKind {
     RootError,
     SymbolNotFound,
     LinkMissingRequiredFields,
+    InvalidConGateServiceTyp,
+    MissingEntryPoint,
 }
 
 #[derive(Debug)]

@@ -1,5 +1,5 @@
 use super::*;
-use crate::{LinkData, LinkInheritance, LinkStmt, LitKind};
+use crate::ast::{LinkData, LinkInheritance, LinkStmt, LitKind};
 
 impl Validate for LinkStmt {
     fn validate(&self, errors: &mut LinkedList<Error>) {
@@ -74,7 +74,10 @@ impl Validate for LinkData {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Parse, ParseBuffer, SourceMap, TokenStream};
+    use crate::{
+        ast::{Parse, ParseBuffer, TokenStream},
+        SourceMap,
+    };
 
     use super::*;
 

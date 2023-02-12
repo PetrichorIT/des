@@ -1,3 +1,4 @@
+use des_ndl::ast::*;
 use des_ndl::*;
 
 const TEXT: &str = "

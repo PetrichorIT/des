@@ -1,0 +1,23 @@
+include sub;
+
+module Main {
+    submodules {
+        left: Node,
+        right: Node,
+        lr: Transit,
+    }
+
+    connections {
+        left/out --> lr/in,
+        lr/out --> right/in
+    }
+}
+
+module Node {
+    gates {
+        in @input,
+        out @output,
+    }
+}
+
+entry Main;

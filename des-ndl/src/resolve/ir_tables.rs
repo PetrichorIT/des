@@ -2,13 +2,13 @@ use std::{collections::LinkedList, sync::Arc};
 
 use crate::{
     context::Context,
-    ir::{Item, Link},
+    error::Error,
+    ir::{Item, Link, Module},
     resource::AssetIdentifier,
-    Error, Module,
 };
 
+#[derive(Debug)]
 pub struct LinkIrTable {
-    source: AssetIdentifier,
     links: Vec<Arc<Link>>,
 }
 
@@ -29,10 +29,11 @@ impl LinkIrTable {
         ctx: &Context,
         asset: &AssetIdentifier,
         _errors: &mut LinkedList<Error>,
+        include_self: bool,
     ) -> Self {
         let mut links = Vec::new();
 
-        for (_, ir) in ctx.ir_for_asset(asset) {
+        for (_, ir) in ctx.ir_for_asset(asset, include_self) {
             for item in ir.items.iter() {
                 if let Item::Link(link) = item {
                     links.push(link.clone())
@@ -42,15 +43,12 @@ impl LinkIrTable {
 
         // no dup checking nessecary since done in ast stage
 
-        Self {
-            source: asset.clone(),
-            links,
-        }
+        Self { links }
     }
 }
 
+#[derive(Debug)]
 pub struct ModuleIrTable {
-    source: AssetIdentifier,
     modules: Vec<Arc<Module>>,
 }
 
@@ -71,10 +69,11 @@ impl ModuleIrTable {
         ctx: &Context,
         asset: &AssetIdentifier,
         _errors: &mut LinkedList<Error>,
+        include_self: bool,
     ) -> Self {
         let mut modules = Vec::new();
 
-        for (_, ir) in ctx.ir_for_asset(asset) {
+        for (_, ir) in ctx.ir_for_asset(asset, include_self) {
             for item in ir.items.iter() {
                 if let Item::Module(module) = item {
                     modules.push(module.clone())
@@ -84,9 +83,6 @@ impl ModuleIrTable {
 
         // no dup checking nessecary since done in ast stage
 
-        Self {
-            source: asset.clone(),
-            modules,
-        }
+        Self { modules }
     }
 }

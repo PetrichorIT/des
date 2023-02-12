@@ -1,10 +1,13 @@
 use std::{fmt, mem};
 
-use crate::ast::{
-    parse::*, ClusterDefinition, Comma, ConnectionsToken, Delimited, Delimiter, Ident,
-    LeftSingleArrow, Punctuated, RightSingleArrow, Slash,
+use crate::{
+    ast::{
+        parse::*, ClusterDefinition, Comma, ConnectionsToken, Delimited, Delimiter, Ident,
+        LeftSingleArrow, Punctuated, RightSingleArrow, Slash,
+    },
+    error::Result,
+    resource::Span,
 };
-use crate::resource::Span;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConnectionsStmt {

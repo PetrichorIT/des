@@ -1,4 +1,4 @@
-use crate::{ast::parse::*, Span};
+use crate::{ast::parse::*, error::Result, Span};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KeyValueField<K, V, D> {

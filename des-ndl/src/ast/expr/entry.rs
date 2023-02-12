@@ -1,5 +1,5 @@
 use super::{EntryToken, Ident, Semi};
-use crate::{ast::parse::*, Span};
+use crate::{ast::parse::*, error::*, Span};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct EntryStmt {

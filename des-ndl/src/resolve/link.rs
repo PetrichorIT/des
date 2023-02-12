@@ -3,7 +3,12 @@ use std::{
     sync::Arc,
 };
 
-use crate::{ir::Link, Error, ErrorKind, LinkIrTable, LinkStmt, RawSymbol};
+use crate::{
+    ast::LinkStmt,
+    error::*,
+    ir::{Link, RawSymbol},
+    resolve::LinkIrTable,
+};
 
 impl Link {
     pub fn from_ast(

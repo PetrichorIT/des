@@ -1,9 +1,11 @@
-use crate::ast::parse::*;
-use crate::ast::{
-    Annotation, ClusterDefinition, Comma, Delimited, Delimiter, GatesToken, Ident, Punctuated,
-    TokenKind, TokenTree,
+use crate::{
+    ast::{
+        parse::*, Annotation, ClusterDefinition, Comma, Delimited, Delimiter, GatesToken, Ident,
+        Punctuated, TokenKind, TokenTree,
+    },
+    error::Result,
+    resource::Span,
 };
-use crate::resource::Span;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct GatesStmt {

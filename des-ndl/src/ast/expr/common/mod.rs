@@ -5,6 +5,7 @@ use crate::ast::Token;
 use crate::ast::TokenKind;
 use crate::ast::TokenStream;
 use crate::ast::TokenTree;
+use crate::error::*;
 
 #[macro_use]
 mod macros;

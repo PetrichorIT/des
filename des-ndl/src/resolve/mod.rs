@@ -1,10 +1,11 @@
 use std::collections::LinkedList;
 use std::sync::Arc;
 
+use crate::ast;
 use crate::context::Context;
+use crate::error::*;
 use crate::ir;
 use crate::resource::AssetIdentifier;
-use crate::Error;
 
 mod ast_tables;
 mod ir_tables;
@@ -25,7 +26,7 @@ impl Context {
             let mut items = Vec::new();
 
             let mut ast_links = LinkAstTable::from_ctx(self, &asset, errors);
-            let mut ir_links = LinkIrTable::from_ctx(self, &asset, errors);
+            let mut ir_links = LinkIrTable::from_ctx(self, &asset, errors, false);
 
             // Resolve links
             // - all nonlocal dependencies are allready ir
@@ -40,12 +41,18 @@ impl Context {
             }
 
             let mut ast_modules = ModuleAstTable::from_ctx(self, &asset, errors);
-            let mut ir_modules = ModuleIrTable::from_ctx(self, &asset, errors);
+            let mut ir_modules = ModuleIrTable::from_ctx(self, &asset, errors, false);
 
             // Resolve mdoules
             // - same
             ast_modules.order_local_deps();
-            for module in ast_modules.local() {}
+            for module in ast_modules.local() {
+                let ir = ir::Module::from_ast(module.clone(), &ir_modules, &ir_links, errors);
+                let ir = Arc::new(ir);
+
+                ir_modules.add(ir.clone());
+                items.push(ir::Item::Module(ir));
+            }
 
             self.ir.insert(asset, ir::Items { items });
         }
@@ -74,5 +81,33 @@ impl Context {
         }
 
         order
+    }
+
+    pub fn load_entry(&mut self, errors: &mut LinkedList<Error>) {
+        let ir_table = ModuleIrTable::from_ctx(self, &self.root, errors, true);
+
+        let asts = self.asts_for_asset(&self.root);
+        for ast in &asts {
+            for item in &ast.1.items {
+                let ast::Item::Entry(entry) = item else {
+                    continue;
+                };
+
+                let Some(symbol) = ir_table.get(&entry.symbol.raw) else {
+                    errors.push_back(Error::new(
+                        ErrorKind::SymbolNotFound,
+                        format!("defined entry symbol '{}' not in scope", entry.symbol.raw)
+                    ));
+                    return;
+                };
+                self.entry = Some(symbol);
+                return;
+            }
+        }
+
+        errors.push_back(Error::new(
+            ErrorKind::MissingEntryPoint,
+            "missing entry point to ndl topology",
+        ));
     }
 }

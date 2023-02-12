@@ -119,7 +119,10 @@ impl Validate for ConnectionsStmt {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Parse, ParseBuffer, SourceMap};
+    use crate::{
+        ast::{Parse, ParseBuffer},
+        SourceMap,
+    };
 
     use super::*;
 

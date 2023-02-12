@@ -1,9 +1,10 @@
 use std::{collections::LinkedList, sync::Arc};
 
 use crate::{
-    ast::{Item, LinkStmt},
+    ast::{Item, LinkStmt, ModuleStmt, Spanned},
+    error::*,
     resource::AssetIdentifier,
-    Context, Error, ErrorHint, ErrorKind, ModuleStmt, Spanned,
+    Context,
 };
 
 // # Links
@@ -204,8 +205,10 @@ impl ModuleAstTable {
             .1
             .items
             .iter()
-            .filter(|i| matches!(i, Item::Link(_)))
+            .filter(|i| matches!(i, Item::Module(_)))
             .count();
+
+        // println!("{asts:#?}");
 
         for (_, ast) in asts {
             for item in &ast.items {

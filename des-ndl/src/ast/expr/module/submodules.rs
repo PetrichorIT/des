@@ -1,8 +1,11 @@
-use crate::ast::parse::*;
-use crate::ast::{
-    ClusterDefinition, Colon, Comma, Delimited, Delimiter, Ident, Punctuated, SubmodulesToken,
+use crate::{
+    ast::{
+        parse::*, ClusterDefinition, Colon, Comma, Delimited, Delimiter, Ident, Punctuated,
+        SubmodulesToken,
+    },
+    error::Result,
+    resource::Span,
 };
-use crate::resource::Span;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SubmodulesStmt {

@@ -1,9 +1,11 @@
 use std::sync::Arc;
 
-use super::{EntryStmt, IncludeStmt, LinkStmt, ModuleStmt};
 use crate::{
-    ast::{parse::*, Keyword, Token, TokenKind, TokenTree},
-    Ident,
+    ast::{
+        parse::*, EntryStmt, Ident, IncludeStmt, Keyword, LinkStmt, ModuleStmt, Token, TokenKind,
+        TokenTree,
+    },
+    error::*,
 };
 
 #[derive(Debug, Clone, PartialEq)]

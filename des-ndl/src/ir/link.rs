@@ -1,4 +1,4 @@
-use crate::{ast, LinkStmt, Spanned};
+use crate::ast::{self, LinkStmt, Spanned};
 use std::{collections::HashMap, fmt, sync::Arc};
 
 use super::*;

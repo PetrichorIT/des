@@ -1,16 +1,19 @@
-use std::{collections::LinkedList, fmt::format, sync::Arc};
+use std::{collections::LinkedList, sync::Arc};
 
 use crate::{
+    ast::ModuleStmt,
     error::*,
-    ir::{Cluster, Gate, Module, RawSymbol, Submodule},
-    Connection, GateServiceType, LinkIrTable, LocalGatesTable, LocalSubmoduleTable, ModuleIrTable,
-    ModuleStmt, Symbol,
+    ir::{
+        Cluster, Connection, ConnectionEndpoint, Gate, GateServiceType, Module, RawSymbol,
+        Submodule, Symbol,
+    },
+    resolve::{LinkIrTable, LocalGatesTable, LocalSubmoduleTable, ModuleIrTable, SharedGatesTable},
 };
 
 impl Module {
     pub fn from_ast(
         ast: Arc<ModuleStmt>,
-        ir_table: &ModuleIrTable,
+        modules: &ModuleIrTable,
         links: &LinkIrTable,
         errors: &mut LinkedList<Error>,
     ) -> Module {
@@ -69,8 +72,8 @@ impl Module {
                     .unwrap_or(Cluster::Standalone);
 
                 // Confirm existence of symbol
-                let typ = ir_table
-                    .get(&submodule.ident.raw)
+                let typ = modules
+                    .get(&submodule.typ.raw)
                     .map(Symbol::from)
                     .unwrap_or_else(|| {
                         errors.push_back(Error::new(
@@ -91,13 +94,65 @@ impl Module {
             }
         }
 
-        let gtable = LocalGatesTable::new(&ir_gates);
-        let smtable = LocalSubmoduleTable::new(&ir_submodules);
+        let local_gtable = LocalGatesTable::new(&ir_gates);
+        let sm_table = LocalSubmoduleTable::new(&ir_submodules);
+        let shared_gtable = SharedGatesTable::new(&local_gtable, &sm_table);
 
         let mut ir_connections: Vec<Connection> =
             Vec::with_capacity(ast.connections.as_ref().map(|s| s.items.len()).unwrap_or(0));
         if let Some(ref connections) = ast.connections {
-            for connection in connections.items.iter() {}
+            for con in connections.items.iter() {
+                let Some(source) = shared_gtable.get(&con.source) else {
+                    errors.push_back(Error::new(
+                        ErrorKind::SymbolNotFound,
+                        format!("did not find symbol '{}'", con.source)
+                    ));
+                    continue;
+                };
+                let Some(target) = shared_gtable.get(&con.target) else {
+                    errors.push_back(Error::new(
+                        ErrorKind::SymbolNotFound,
+                        format!("did not find symbol '{}'", con.target)
+                    ));
+                    continue;
+                };
+
+                // Check input output
+                if source.service_typ == GateServiceType::Input {
+                    errors.push_back(Error::new(
+                        ErrorKind::InvalidConGateServiceTyp,
+                        "invalid gate service type for source",
+                    ));
+                }
+                if target.service_typ == GateServiceType::Output {
+                    errors.push_back(Error::new(
+                        ErrorKind::InvalidConGateServiceTyp,
+                        "invalid gate service type for target",
+                    ));
+                }
+
+                if let Some(ref link) = con.link {
+                    let Some(link) = links.get(&link.raw) else {
+                        errors.push_back(Error::new(
+                            ErrorKind::SymbolNotFound,
+                            format!("did not find symbol '{}'", link.raw)
+                        ));
+                        continue;
+                    };
+
+                    ir_connections.push(Connection {
+                        from: ConnectionEndpoint::from(&con.source),
+                        to: ConnectionEndpoint::from(&con.target),
+                        delay: Some(Symbol::from(link)),
+                    });
+                } else {
+                    ir_connections.push(Connection {
+                        from: ConnectionEndpoint::from(&con.source),
+                        to: ConnectionEndpoint::from(&con.target),
+                        delay: None,
+                    });
+                }
+            }
         }
 
         let ident = RawSymbol {

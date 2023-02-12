@@ -1,14 +1,15 @@
 use std::{
     collections::{HashMap, LinkedList},
     path::Path,
+    sync::Arc,
 };
 
 use crate::{
-    ast::{self, validate::Validate},
+    ast::{self, validate::Validate, Parse, ParseBuffer, Spanned, TokenStream},
     error::*,
     ir,
     resource::{fs::canon, AssetIdentifier},
-    Parse, ParseBuffer, SourceMap, Spanned, TokenStream,
+    SourceMap,
 };
 
 #[derive(Debug)]
@@ -21,6 +22,7 @@ pub struct Context {
 
     pub ast: HashMap<AssetIdentifier, ast::File>,
     pub ir: HashMap<AssetIdentifier, ir::Items>,
+    pub entry: Option<Arc<ir::Module>>,
 }
 
 impl Context {
@@ -46,6 +48,7 @@ impl Context {
 
             ast: HashMap::from([(ident, file)]),
             ir: HashMap::new(),
+            entry: None,
         };
         this.load_includes()?;
 
@@ -62,6 +65,11 @@ impl Context {
         }
 
         this.load_ir(&mut errors);
+        if !errors.is_empty() {
+            return Err(Error::root(errors));
+        }
+
+        this.load_entry(&mut errors);
         if !errors.is_empty() {
             return Err(Error::root(errors));
         }
@@ -159,13 +167,23 @@ impl Context {
     pub(crate) fn ir_for_asset(
         &self,
         asset: &AssetIdentifier,
+        include_self: bool,
     ) -> Vec<(&AssetIdentifier, &ir::Items)> {
-        self.deps
+        let iter = self
+            .deps
             .get(&asset)
             .unwrap()
             .into_iter()
-            .map(|k| (k, self.ir.get(k).unwrap()))
-            .collect()
+            .map(|k| (k, self.ir.get(k).unwrap()));
+
+        if include_self {
+            let asset = self.assets.iter().find(|a| *a == asset).unwrap(); // for lifetimes
+            let init = std::iter::once((asset, self.ir.get(asset).unwrap()));
+
+            Vec::from_iter(init.chain(iter))
+        } else {
+            iter.collect()
+        }
     }
 
     fn load_deps(&mut self, errors: &mut LinkedList<Error>) {

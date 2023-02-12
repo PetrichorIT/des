@@ -1,5 +1,5 @@
 use super::*;
-use crate::{ast::IncludeStmt, EntryStmt};
+use crate::ast::{EntryStmt, IncludeStmt};
 
 impl Validate for IncludeStmt {
     fn validate(&self, _: &mut LinkedList<Error>) {}

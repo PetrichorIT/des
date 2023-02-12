@@ -1,0 +1,16 @@
+link FastLink {
+    jitter: 0.0,
+    latency: 0.1,
+    bitrate: 100000,
+}
+
+module Transit {
+    gates {
+        in,
+        out
+    }
+
+    connections {
+        in --> FastLink --> out
+    }
+}

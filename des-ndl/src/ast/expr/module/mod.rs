@@ -1,8 +1,11 @@
-use crate::ast::parse::*;
-use crate::ast::{
-    Delimited, Delimiter, Ident, Keyword, ModuleToken, Token, TokenKind, TokenStream, TokenTree,
+use crate::{
+    ast::{
+        parse::*, Delimited, Delimiter, Ident, Keyword, ModuleToken, Token, TokenKind, TokenStream,
+        TokenTree,
+    },
+    error::*,
+    Span,
 };
-use crate::Span;
 
 mod connections;
 mod gates;

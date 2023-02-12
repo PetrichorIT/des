@@ -1,5 +1,5 @@
 use crate::{
-    ast::parse::*,
+    error::*,
     lexer::{Token, TokenKind},
     Asset, Span,
 };

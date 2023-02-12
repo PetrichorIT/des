@@ -39,7 +39,10 @@ impl Validate for Item {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Parse, ParseBuffer, SourceMap, TokenStream};
+    use crate::{
+        ast::{Parse, ParseBuffer, TokenStream},
+        SourceMap,
+    };
 
     use super::*;
 

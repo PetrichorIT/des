@@ -2,7 +2,7 @@ use std::fmt;
 
 use self::cursor::Cursor;
 use crate::{
-    ast::parse::{Error, ErrorKind},
+    error::{Error, ErrorKind},
     lexer::{self, tokenize, LiteralKind},
     Asset, Span,
 };

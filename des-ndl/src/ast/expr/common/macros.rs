@@ -11,11 +11,11 @@ macro_rules! ast_expect_single_token {
 
         impl crate::ast::parse::Parse for $type {
             fn parse(input: crate::ast::parse::ParseStream)
-                -> crate::ast::parse::Result<$type> {
+                -> crate::error::Result<$type> {
                 let Some(peek) = input.ts.peek() else {
                     return Err(
-                        crate::ast::parse::Error::new(
-                            crate::ast::parse::ErrorKind::UnexpectedToken,
+                        crate::error::Error::new(
+                            crate::error::ErrorKind::UnexpectedToken,
                             "unexpected token"
                         )
                     );
@@ -24,8 +24,8 @@ macro_rules! ast_expect_single_token {
                 if let crate::ast::token::TokenTree::Token(token, spacing) = peek {
                     if crate::ast::token::Spacing::Alone != *spacing {
                         return Err(
-                            crate::ast::parse::Error::new(
-                                crate::ast::parse::ErrorKind::ExpectedSingleFoundJoint,
+                            crate::error::Error::new(
+                                crate::error::ErrorKind::ExpectedSingleFoundJoint,
                                 "unexpected token"
                             )
                         );
@@ -37,16 +37,16 @@ macro_rules! ast_expect_single_token {
                         ret
                     } else {
                         Err(
-                            crate::ast::parse::Error::new(
-                                crate::ast::parse::ErrorKind::UnexpectedToken,
+                            crate::error::Error::new(
+                                crate::error::ErrorKind::UnexpectedToken,
                                 "unexpected token"
                             )
                         )
                     }
                 } else {
                     Err(
-                        crate::ast::parse::Error::new(
-                            crate::ast::parse::ErrorKind::UnexpectedDelim,
+                        crate::error::Error::new(
+                            crate::error::ErrorKind::UnexpectedDelim,
                             "unexpected delim, expected token"
                         )
                     )

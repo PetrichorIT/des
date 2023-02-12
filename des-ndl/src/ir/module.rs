@@ -1,12 +1,12 @@
 use std::{
-    fmt::{self, Display},
+    fmt::{self, Debug, Display},
     sync::Arc,
 };
 
 use super::*;
-use crate::{ast::ModuleStmt, Annotation, ClusterDefinition};
+use crate::ast::{Annotation, ClusterDefinition, ModuleGateReference, ModuleStmt};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Module {
     pub ast: Arc<ModuleStmt>,
 
@@ -48,7 +48,7 @@ pub enum Cluster {
 pub struct Connection {
     pub from: ConnectionEndpoint,
     pub to: ConnectionEndpoint,
-    pub delay: Option<RawSymbol>,
+    pub delay: Option<Symbol>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -77,6 +77,15 @@ impl From<&ClusterDefinition> for Cluster {
     }
 }
 
+impl From<&Option<ClusterDefinition>> for Cluster {
+    fn from(value: &Option<ClusterDefinition>) -> Self {
+        value
+            .as_ref()
+            .map(Cluster::from)
+            .unwrap_or(Cluster::Standalone)
+    }
+}
+
 impl From<&Annotation> for GateServiceType {
     fn from(value: &Annotation) -> Self {
         match value.raw.as_str() {
@@ -87,11 +96,48 @@ impl From<&Annotation> for GateServiceType {
     }
 }
 
+impl From<&ModuleGateReference> for ConnectionEndpoint {
+    fn from(endp: &ModuleGateReference) -> Self {
+        match endp {
+            ModuleGateReference::Local(local) => ConnectionEndpoint::Local(
+                RawSymbol {
+                    raw: local.gate.raw.clone(),
+                },
+                Cluster::from(&local.gate_cluster),
+            ),
+            ModuleGateReference::Nonlocal(nonlocal) => ConnectionEndpoint::Nonlocal(
+                RawSymbol {
+                    raw: nonlocal.submodule.raw.clone(),
+                },
+                Cluster::from(&nonlocal.submodule_cluster),
+                (
+                    RawSymbol {
+                        raw: nonlocal.gate.raw.clone(),
+                    },
+                    Cluster::from(&nonlocal.gate_cluster),
+                ),
+            ),
+        }
+    }
+}
+
 impl Display for Cluster {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Standalone => Ok(()),
             Self::Clusted(c) => write!(f, "[{c}]"),
         }
+    }
+}
+
+impl Debug for Module {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Module")
+            .field("ident", &self.ident)
+            .field("gates", &self.gates)
+            .field("submodules", &self.submodules)
+            .field("connections", &self.connections)
+            .field("dirty", &self.dirty)
+            .finish()
     }
 }

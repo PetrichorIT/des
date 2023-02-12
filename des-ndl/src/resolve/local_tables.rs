@@ -1,5 +1,6 @@
 use crate::{
-    ir::*, Annotation, ClusterDefinition, Ident, LocalModuleGateReference, ModuleGateReference,
+    ast::{ClusterDefinition, Ident, LocalModuleGateReference, ModuleGateReference},
+    ir::*,
 };
 
 pub struct LocalGatesTable<'a> {
@@ -9,12 +10,6 @@ pub struct LocalGatesTable<'a> {
 impl<'a> LocalGatesTable<'a> {
     pub fn new(gates: &'a [Gate]) -> Self {
         Self { gates }
-    }
-
-    pub fn exists(&self, symbol: RawSymbol, cluster: Cluster) -> bool {
-        self.gates
-            .iter()
-            .any(|g| g.ident == symbol && g.cluster.contains(&cluster))
     }
 
     pub fn get(&self, local: &LocalModuleGateReference) -> Option<&Gate> {
@@ -28,6 +23,10 @@ pub struct SharedGatesTable<'a> {
 }
 
 impl<'a> SharedGatesTable<'a> {
+    pub fn new(local: &'a LocalGatesTable<'a>, submodules: &'a LocalSubmoduleTable<'a>) -> Self {
+        Self { local, submodules }
+    }
+
     pub fn get(&self, mgref: &ModuleGateReference) -> Option<&'a Gate> {
         match mgref {
             ModuleGateReference::Local(mgref) => self.local.get(mgref),
