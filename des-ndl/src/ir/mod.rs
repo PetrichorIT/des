@@ -1,9 +1,11 @@
-mod link;
-mod symbol;
-
 use std::sync::Arc;
 
+mod link;
+mod module;
+mod symbol;
+
 pub use self::link::*;
+pub use self::module::*;
 pub use self::symbol::*;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -14,5 +16,5 @@ pub struct Items {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Item {
     Link(Arc<Link>),
-    Module(),
+    Module(Arc<Module>),
 }

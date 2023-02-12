@@ -7,7 +7,7 @@ use super::*;
 pub struct Link {
     pub ast: Arc<LinkStmt>,
 
-    pub ident: Symbol,
+    pub ident: RawSymbol,
     pub fields: HashMap<String, Literal>,
 
     // common

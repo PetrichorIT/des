@@ -138,13 +138,76 @@ impl LinkAstTable {
 pub struct ModuleAstTable {
     source: AssetIdentifier,
     modules: Vec<Arc<ModuleStmt>>,
+    ptr: usize,
 }
 
 impl ModuleAstTable {
-    pub fn from_ctx(ctx: &Context, asset: AssetIdentifier, errors: &mut LinkedList<Error>) -> Self {
+    pub fn order_local_deps(&mut self) {
+        let local = self.local_mut();
+        let mut s = 0;
+
+        while s < local.len() {
+            // let mut loadable = false;
+            let mut i = s;
+
+            'seacher: while i < local.len() {
+                // check if i depents are in ..s
+                if let Some(ref sbm) = local[i].submodules {
+                    'inner: for dep in sbm.items.iter() {
+                        let dep = &dep.typ;
+                        let valid = local[..s].iter().any(|l| l.ident.raw == dep.raw);
+
+                        if !valid {
+                            let valid_nonlocal = local[s..].iter().any(|l| l.ident.raw == dep.raw);
+                            if valid_nonlocal {
+                                continue 'inner;
+                            }
+
+                            i += 1;
+                            continue 'seacher;
+                        }
+                    }
+                    // all deps are valid
+                    // loadable = true;
+                    break;
+                } else {
+                    // loadable = true;
+                    break;
+                }
+            }
+
+            // not all deps may be loadable, since nonlocal deps are not repr
+            if s != i && i < local.len() {
+                local.swap(s, i);
+            }
+            s += 1;
+        }
+    }
+
+    pub fn local(&self) -> &[Arc<ModuleStmt>] {
+        &self.modules[..self.ptr]
+    }
+
+    pub fn local_mut(&mut self) -> &mut [Arc<ModuleStmt>] {
+        &mut self.modules[..self.ptr]
+    }
+
+    pub fn from_ctx(
+        ctx: &Context,
+        asset: &AssetIdentifier,
+        errors: &mut LinkedList<Error>,
+    ) -> Self {
         let mut modules = Vec::new();
 
-        for (_, ast) in ctx.asts_for_asset(&asset) {
+        let asts = ctx.asts_for_asset(&asset);
+        let ptr = asts[0]
+            .1
+            .items
+            .iter()
+            .filter(|i| matches!(i, Item::Link(_)))
+            .count();
+
+        for (_, ast) in asts {
             for item in &ast.items {
                 if let Item::Module(module) = item {
                     modules.push(module.clone())
@@ -155,8 +218,9 @@ impl ModuleAstTable {
         Self::check_dup(&modules, errors);
 
         Self {
-            source: asset,
+            source: asset.clone(),
             modules,
+            ptr,
         }
     }
 

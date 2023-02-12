@@ -4,7 +4,7 @@ use crate::{
     context::Context,
     ir::{Item, Link},
     resource::AssetIdentifier,
-    Error,
+    Error, Module,
 };
 
 pub struct LinkIrTable {
@@ -45,6 +45,48 @@ impl LinkIrTable {
         Self {
             source: asset.clone(),
             links,
+        }
+    }
+}
+
+pub struct ModuleIrTable {
+    source: AssetIdentifier,
+    modules: Vec<Arc<Module>>,
+}
+
+impl ModuleIrTable {
+    pub fn get(&self, key: impl AsRef<str>) -> Option<Arc<Module>> {
+        let key = key.as_ref();
+        self.modules
+            .iter()
+            .find(|v| v.ident.raw == key)
+            .map(|a| a.clone())
+    }
+
+    pub fn add(&mut self, local: Arc<Module>) {
+        self.modules.push(local)
+    }
+
+    pub fn from_ctx(
+        ctx: &Context,
+        asset: &AssetIdentifier,
+        _errors: &mut LinkedList<Error>,
+    ) -> Self {
+        let mut modules = Vec::new();
+
+        for (_, ir) in ctx.ir_for_asset(asset) {
+            for item in ir.items.iter() {
+                if let Item::Module(module) = item {
+                    modules.push(module.clone())
+                }
+            }
+        }
+
+        // no dup checking nessecary since done in ast stage
+
+        Self {
+            source: asset.clone(),
+            modules,
         }
     }
 }

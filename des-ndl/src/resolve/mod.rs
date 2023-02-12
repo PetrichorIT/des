@@ -9,26 +9,28 @@ use crate::Error;
 mod ast_tables;
 mod ir_tables;
 mod link;
+mod local_tables;
+mod module;
 
 pub use self::ast_tables::*;
 pub use self::ir_tables::*;
 pub use self::link::*;
+pub use self::local_tables::*;
+pub use self::module::*;
 
 impl Context {
     pub fn load_ir(&mut self, errors: &mut LinkedList<Error>) {
         let order = self.ir_load_order();
         for asset in order {
-            let mut ast_links = LinkAstTable::from_ctx(self, &asset, errors);
-            // let ast_modules = LinkAstTable::from_ctx(self, &asset, errors);
+            let mut items = Vec::new();
 
+            let mut ast_links = LinkAstTable::from_ctx(self, &asset, errors);
             let mut ir_links = LinkIrTable::from_ctx(self, &asset, errors);
 
             // Resolve links
             // - all nonlocal dependencies are allready ir
             // - local dependencies may be out of order
             ast_links.order_local_deps();
-
-            let mut items = Vec::new();
             for link in ast_links.local() {
                 let ir = ir::Link::from_ast(link.clone(), &ir_links, errors);
                 let ir = Arc::new(ir);
@@ -36,6 +38,14 @@ impl Context {
                 ir_links.add(ir.clone());
                 items.push(ir::Item::Link(ir));
             }
+
+            let mut ast_modules = ModuleAstTable::from_ctx(self, &asset, errors);
+            let mut ir_modules = ModuleIrTable::from_ctx(self, &asset, errors);
+
+            // Resolve mdoules
+            // - same
+            ast_modules.order_local_deps();
+            for module in ast_modules.local() {}
 
             self.ir.insert(asset, ir::Items { items });
         }

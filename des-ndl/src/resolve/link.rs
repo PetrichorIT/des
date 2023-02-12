@@ -3,7 +3,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::{ir::Link, Error, ErrorKind, LinkIrTable, LinkStmt, Symbol};
+use crate::{ir::Link, Error, ErrorKind, LinkIrTable, LinkStmt, RawSymbol};
 
 impl Link {
     pub fn from_ast(
@@ -15,7 +15,7 @@ impl Link {
         // We can assume
         // - no dup, valid fields (if existent)
         let mut ir = Link {
-            ident: Symbol {
+            ident: RawSymbol {
                 raw: link.ident.raw.clone(),
             },
 
