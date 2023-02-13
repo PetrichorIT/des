@@ -65,11 +65,7 @@ impl Module {
                     continue;
                 }
 
-                let cluster = submodule
-                    .cluster
-                    .as_ref()
-                    .map(Cluster::from)
-                    .unwrap_or(Cluster::Standalone);
+                let cluster = Cluster::from(&submodule.cluster);
 
                 // Confirm existence of symbol
                 let typ = modules
@@ -80,7 +76,7 @@ impl Module {
                             ErrorKind::SymbolNotFound,
                             format!("symbol '{}' was not found", submodule.ident.raw),
                         ));
-                        Symbol::Unresolved
+                        Symbol::Unresolved(submodule.typ.raw.clone())
                     });
 
                 let ident = RawSymbol {

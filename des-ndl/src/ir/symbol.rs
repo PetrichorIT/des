@@ -1,4 +1,4 @@
-use std::{ops::Deref, sync::Arc};
+use std::sync::Arc;
 
 use super::*;
 
@@ -9,33 +9,9 @@ pub struct RawSymbol {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Symbol {
-    Module(MSymbol),
-    Link(LSymbol),
-    Unresolved,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct MSymbol {
-    module: Arc<Module>,
-}
-
-impl Deref for MSymbol {
-    type Target = Module;
-    fn deref(&self) -> &Self::Target {
-        &self.module
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct LSymbol {
-    link: Arc<Link>,
-}
-
-impl Deref for LSymbol {
-    type Target = Link;
-    fn deref(&self) -> &Self::Target {
-        &self.link
-    }
+    Module(Arc<Module>),
+    Link(Arc<Link>),
+    Unresolved(String),
 }
 
 // # Impl
@@ -64,12 +40,12 @@ impl Symbol {
 
 impl From<Arc<Module>> for Symbol {
     fn from(module: Arc<Module>) -> Self {
-        Symbol::Module(MSymbol { module })
+        Symbol::Module(module)
     }
 }
 
 impl From<Arc<Link>> for Symbol {
     fn from(link: Arc<Link>) -> Self {
-        Symbol::Link(LSymbol { link })
+        Symbol::Link(link)
     }
 }

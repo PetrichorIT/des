@@ -20,7 +20,7 @@ pub use self::local_tables::*;
 pub use self::module::*;
 
 impl Context {
-    pub fn load_ir(&mut self, errors: &mut LinkedList<Error>) {
+    pub(super) fn load_ir(&mut self, errors: &mut LinkedList<Error>) {
         let order = self.ir_load_order();
         for asset in order {
             let mut items = Vec::new();
@@ -83,7 +83,7 @@ impl Context {
         order
     }
 
-    pub fn load_entry(&mut self, errors: &mut LinkedList<Error>) {
+    pub(super) fn load_entry(&mut self, errors: &mut LinkedList<Error>) {
         let ir_table = ModuleIrTable::from_ctx(self, &self.root, errors, true);
 
         let asts = self.asts_for_asset(&self.root);

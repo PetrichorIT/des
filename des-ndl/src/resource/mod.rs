@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use std::{
     fs::File,
     io::{Error, ErrorKind, Read, Result},
@@ -210,13 +212,13 @@ impl SourceMappedAsset {
 }
 
 impl AssetIdentifier {
-    pub(crate) fn raw(s: &str) -> Self {
+    pub fn raw(s: &str) -> Self {
         Self::Raw {
             alias: s.to_string(),
         }
     }
 
-    pub(crate) fn alias(&self) -> &str {
+    pub fn alias(&self) -> &str {
         match self {
             Self::Raw { alias } | Self::Root { alias, .. } | Self::Included { alias, .. } => alias,
         }
