@@ -12,12 +12,15 @@ mod ir_tables;
 mod link;
 mod local_tables;
 mod module;
+mod util;
 
 pub use self::ast_tables::*;
 pub use self::ir_tables::*;
 pub use self::link::*;
 pub use self::local_tables::*;
 pub use self::module::*;
+
+pub(crate) use self::util::*;
 
 impl Context {
     pub(super) fn load_ir(&mut self, errors: &mut LinkedList<Error>) {

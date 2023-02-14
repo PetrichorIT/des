@@ -42,8 +42,7 @@ pub struct NonlocalModuleGateReference {
     pub submodule: Ident,
     pub submodule_cluster: Option<ClusterDefinition>,
     pub slash: Slash,
-    pub gate: Ident,
-    pub gate_cluster: Option<ClusterDefinition>,
+    pub gate: LocalModuleGateReference,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -57,6 +56,15 @@ pub enum ConnectionArrow {
 impl ConnectionArrow {
     pub fn is_right(&self) -> bool {
         matches!(self, Self::Right(_))
+    }
+}
+
+impl LocalModuleGateReference {
+    pub fn pos(&self) -> usize {
+        self.gate_cluster
+            .as_ref()
+            .map(|c| c.lit.as_integer() as usize)
+            .unwrap_or(0)
     }
 }
 
@@ -85,10 +93,8 @@ impl fmt::Display for NonlocalModuleGateReference {
         if let Some(cluster) = &self.submodule_cluster {
             write!(f, "{}", cluster)?;
         }
-        write!(f, "/{}", self.gate.raw)?;
-        if let Some(cluster) = &self.gate_cluster {
-            write!(f, "{}", cluster)?;
-        }
+        write!(f, "/{}", self.gate)?;
+
         Ok(())
     }
 }
@@ -131,13 +137,7 @@ impl Spanned for LocalModuleGateReference {
 
 impl Spanned for NonlocalModuleGateReference {
     fn span(&self) -> Span {
-        Span::fromto(
-            self.submodule.span(),
-            self.gate_cluster
-                .as_ref()
-                .map(|v| v.span())
-                .unwrap_or(self.gate.span()),
-        )
+        Span::fromto(self.submodule.span(), self.gate.span())
     }
 }
 
@@ -262,12 +262,12 @@ impl Parse for NonlocalModuleGateReference {
         let slash = Slash::parse(input)?;
         let gate = Ident::parse(input)?;
         let gate_cluster = Option::<ClusterDefinition>::parse(input)?;
+
         Ok(NonlocalModuleGateReference {
             submodule,
             submodule_cluster,
             slash,
-            gate,
-            gate_cluster,
+            gate: LocalModuleGateReference { gate, gate_cluster },
         })
     }
 }

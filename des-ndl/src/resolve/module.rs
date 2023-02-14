@@ -98,55 +98,79 @@ impl Module {
             Vec::with_capacity(ast.connections.as_ref().map(|s| s.items.len()).unwrap_or(0));
         if let Some(ref connections) = ast.connections {
             for con in connections.items.iter() {
-                let Some(source) = shared_gtable.get(&con.source) else {
-                    errors.push_back(Error::new(
-                        ErrorKind::SymbolNotFound,
-                        format!("did not find symbol '{}'", con.source)
-                    ));
-                    continue;
-                };
-                let Some(target) = shared_gtable.get(&con.target) else {
-                    errors.push_back(Error::new(
-                        ErrorKind::SymbolNotFound,
-                        format!("did not find symbol '{}'", con.target)
-                    ));
-                    continue;
-                };
-
-                // Check input output
-                if source.service_typ == GateServiceType::Input {
-                    errors.push_back(Error::new(
-                        ErrorKind::InvalidConGateServiceTyp,
-                        "invalid gate service type for source",
-                    ));
-                }
-                if target.service_typ == GateServiceType::Output {
-                    errors.push_back(Error::new(
-                        ErrorKind::InvalidConGateServiceTyp,
-                        "invalid gate service type for target",
-                    ));
-                }
-
-                if let Some(ref link) = con.link {
+                let delay = if let Some(link) = &con.link {
                     let Some(link) = links.get(&link.raw) else {
                         errors.push_back(Error::new(
                             ErrorKind::SymbolNotFound,
-                            format!("did not find symbol '{}'", link.raw)
+                            format!("Could not resolve link symbol '{}', not in scope", link.raw)
                         ));
-                        continue;
+                        continue
                     };
+                    Some(Symbol::from(link))
+                } else {
+                    None
+                };
+
+                let lhs = shared_gtable.resolve(&con.source);
+                let rhs = shared_gtable.resolve(&con.target);
+
+                let (lhs, rhs) = match (lhs, rhs) {
+                    (Ok(lhs), Ok(rhs)) => (lhs, rhs),
+                    (Err(e), Ok(_)) => {
+                        errors.push_back(e);
+                        continue;
+                    }
+                    (Ok(_), Err(e)) => {
+                        errors.push_back(e);
+                        continue;
+                    }
+                    (Err(e1), Err(e2)) => {
+                        errors.push_back(e1);
+                        errors.push_back(e2);
+                        continue;
+                    }
+                };
+
+                let mut lhs = lhs.collect::<Vec<_>>();
+                let mut rhs = rhs.collect::<Vec<_>>();
+
+                let n = lhs.len().min(rhs.len());
+                for _ in 0..n {
+                    let l = lhs.pop().unwrap();
+                    let r = rhs.pop().unwrap();
+
+                    if l.def.service_typ == GateServiceType::Input {
+                        errors.push_back(Error::new(
+                            ErrorKind::InvalidConGateServiceTyp,
+                            format!("Gate '{}' cannot serve as connection source, since it is of serivce type '{:?}'", l.def.ident.raw, l.def.service_typ)
+                        ));
+                    }
+
+                    if r.def.service_typ == GateServiceType::Output {
+                        errors.push_back(Error::new(
+                            ErrorKind::InvalidConGateServiceTyp,
+                            format!("Gate '{}' cannot serve as connection target, since it is of serivce type '{:?}'", r.def.ident.raw, r.def.service_typ)
+                        ));
+                    }
 
                     ir_connections.push(Connection {
-                        from: ConnectionEndpoint::from(&con.source),
-                        to: ConnectionEndpoint::from(&con.target),
-                        delay: Some(Symbol::from(link)),
+                        from: ConnectionEndpoint::new(&con.source, &l),
+                        to: ConnectionEndpoint::new(&con.target, &r),
+                        delay: delay.clone(),
                     });
-                } else {
-                    ir_connections.push(Connection {
-                        from: ConnectionEndpoint::from(&con.source),
-                        to: ConnectionEndpoint::from(&con.target),
-                        delay: None,
-                    });
+                }
+
+                if lhs.len() > 0 {
+                    errors.push_back(Error::new(
+                        ErrorKind::InvalidConDefSizes,
+                        format!("Invalid connection statement, source domain is bigger than target domain (by {} gates)", lhs.len())
+                    ))
+                }
+                if rhs.len() > 0 {
+                    errors.push_back(Error::new(
+                        ErrorKind::InvalidConDefSizes,
+                        format!("Invalid connection statement, target domain is bigger than source domain (by {} gates)", rhs.len())
+                    ))
                 }
             }
         }

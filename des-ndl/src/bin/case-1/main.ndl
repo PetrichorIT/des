@@ -7,10 +7,7 @@ module Main {
         lr: Transit,
     }
 
-    connections {
-        left/out --> lr/in,
-        lr/out --> right/in
-    }
+    
 }
 
 module Node {

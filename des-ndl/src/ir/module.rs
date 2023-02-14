@@ -4,7 +4,10 @@ use std::{
 };
 
 use super::*;
-use crate::ast::{Annotation, ClusterDefinition, ModuleGateReference, ModuleStmt};
+use crate::{
+    ast::{Annotation, ClusterDefinition, ModuleGateReference, ModuleStmt},
+    ir::GateRef,
+};
 
 #[derive(Clone, PartialEq)]
 pub struct Module {
@@ -59,7 +62,39 @@ pub enum ConnectionEndpoint {
 
 // # Impl
 
+impl ConnectionEndpoint {
+    pub fn new(endp: &ModuleGateReference, gate: &GateRef) -> Self {
+        match endp {
+            ModuleGateReference::Local(local) => ConnectionEndpoint::Local(
+                RawSymbol {
+                    raw: local.gate.raw.clone(),
+                },
+                Cluster::new(gate),
+            ),
+            ModuleGateReference::Nonlocal(nonlocal) => ConnectionEndpoint::Nonlocal(
+                RawSymbol {
+                    raw: nonlocal.submodule.raw.clone(),
+                },
+                Cluster::new(gate),
+                (
+                    RawSymbol {
+                        raw: nonlocal.gate.gate.raw.clone(),
+                    },
+                    Cluster::new(gate),
+                ),
+            ),
+        }
+    }
+}
+
 impl Cluster {
+    pub fn new(gate: &GateRef) -> Self {
+        match gate.pos {
+            Some(pos) => Self::Clusted(pos),
+            None => Self::Standalone,
+        }
+    }
+
     pub fn contains(&self, other: &Self) -> bool {
         match self {
             Self::Standalone => matches!(other, Self::Standalone),
@@ -92,31 +127,6 @@ impl From<&Annotation> for GateServiceType {
             "input" | "in" | "Input" | "In" => GateServiceType::Input,
             "output" | "out" | "Output" | "Out" => GateServiceType::Output,
             _ => unreachable!(),
-        }
-    }
-}
-
-impl From<&ModuleGateReference> for ConnectionEndpoint {
-    fn from(endp: &ModuleGateReference) -> Self {
-        match endp {
-            ModuleGateReference::Local(local) => ConnectionEndpoint::Local(
-                RawSymbol {
-                    raw: local.gate.raw.clone(),
-                },
-                Cluster::from(&local.gate_cluster),
-            ),
-            ModuleGateReference::Nonlocal(nonlocal) => ConnectionEndpoint::Nonlocal(
-                RawSymbol {
-                    raw: nonlocal.submodule.raw.clone(),
-                },
-                Cluster::from(&nonlocal.submodule_cluster),
-                (
-                    RawSymbol {
-                        raw: nonlocal.gate.raw.clone(),
-                    },
-                    Cluster::from(&nonlocal.gate_cluster),
-                ),
-            ),
         }
     }
 }

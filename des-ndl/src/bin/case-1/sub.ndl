@@ -6,8 +6,8 @@ link FastLink {
 
 module Transit {
     gates {
-        in,
-        out
+        in[2],
+        out[2]
     }
 
     connections {

@@ -39,6 +39,8 @@ pub enum ErrorKind {
     SymbolNotFound,
     LinkMissingRequiredFields,
     InvalidConGateServiceTyp,
+    InvalidConDefSizes,
+    InvalidConClusterIndex,
     MissingEntryPoint,
 }
 
