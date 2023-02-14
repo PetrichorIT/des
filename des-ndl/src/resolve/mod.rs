@@ -30,13 +30,14 @@ impl Context {
 
             let mut ast_links = LinkAstTable::from_ctx(self, &asset, errors);
             let mut ir_links = LinkIrTable::from_ctx(self, &asset, errors, false);
+            let global_ast = GlobalAstTable::new(self, &asset);
 
             // Resolve links
             // - all nonlocal dependencies are allready ir
             // - local dependencies may be out of order
             ast_links.order_local_deps();
             for link in ast_links.local() {
-                let ir = ir::Link::from_ast(link.clone(), &ir_links, errors);
+                let ir = ir::Link::from_ast(link.clone(), &ir_links, &global_ast, errors);
                 let ir = Arc::new(ir);
 
                 ir_links.add(ir.clone());
@@ -45,12 +46,19 @@ impl Context {
 
             let mut ast_modules = ModuleAstTable::from_ctx(self, &asset, errors);
             let mut ir_modules = ModuleIrTable::from_ctx(self, &asset, errors, false);
+            let global_ast = GlobalAstTable::new(self, &asset);
 
             // Resolve mdoules
             // - same
             ast_modules.order_local_deps();
             for module in ast_modules.local() {
-                let ir = ir::Module::from_ast(module.clone(), &ir_modules, &ir_links, errors);
+                let ir = ir::Module::from_ast(
+                    module.clone(),
+                    &ir_modules,
+                    &ir_links,
+                    &global_ast,
+                    errors,
+                );
                 let ir = Arc::new(ir);
 
                 ir_modules.add(ir.clone());

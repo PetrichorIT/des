@@ -1,6 +1,8 @@
+use crate::Span;
 use std::{collections::LinkedList, error, fmt, io};
 
-use crate::Span;
+mod root;
+pub use self::root::*;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -13,6 +15,7 @@ pub struct Error {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
 pub enum ErrorKind {
     ParseLitError,
     MissingDelim,
@@ -66,6 +69,10 @@ impl Error {
             span: None,
             hints: Vec::new(),
         }
+    }
+
+    pub fn map(self, f: impl FnOnce(Error) -> Error) -> Error {
+        f(self)
     }
 
     pub fn spanned(mut self, span: Span) -> Self {

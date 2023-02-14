@@ -266,6 +266,7 @@ name = "des-ndl"
 version = "0.1.0"
 dependencies = [
  "log",
+ "termcolor",
  "unic-emoji-char",
  "unicode-xid",
 ]

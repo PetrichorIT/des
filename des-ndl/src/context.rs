@@ -1,6 +1,6 @@
 use std::{
     collections::{HashMap, LinkedList},
-    path::Path,
+    path::{Path, PathBuf},
     sync::Arc,
 };
 
@@ -26,20 +26,56 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn load(path: impl AsRef<Path>) -> Result<Context> {
+    pub fn load(path: impl AsRef<Path>) -> RootResult<Context> {
         let path = path.as_ref().to_path_buf();
 
+        let mut this = Self::load_initial_tree(path)?;
+        let mut errors = LinkedList::new();
+
+        this.ast_validate_assets(&mut errors);
+        if !errors.is_empty() {
+            return Err(RootError::new(errors, this.smap));
+        }
+
+        this.load_deps(&mut errors);
+        if !errors.is_empty() {
+            return Err(RootError::new(errors, this.smap));
+        }
+
+        this.load_ir(&mut errors);
+        if !errors.is_empty() {
+            return Err(RootError::new(errors, this.smap));
+        }
+
+        this.load_entry(&mut errors);
+        if !errors.is_empty() {
+            return Err(RootError::new(errors, this.smap));
+        }
+
+        Ok(this)
+    }
+
+    fn load_initial_tree(path: PathBuf) -> RootResult<Context> {
         let mut smap = SourceMap::new();
         let ident = AssetIdentifier::Root {
             path,
             alias: "root".to_string(),
         };
 
-        let asset = smap.load_file(ident.clone()).map_err(Error::from_io)?;
-        let ts = TokenStream::new(asset)?;
+        let asset = match smap.load_file(ident.clone()).map_err(Error::from_io) {
+            Ok(asset) => asset,
+            Err(e) => return Err(RootError::single(e, smap)),
+        };
+        let ts = match TokenStream::new(asset) {
+            Ok(ts) => ts,
+            Err(e) => return Err(RootError::single(e, smap)),
+        };
         let buf = ParseBuffer::new(asset, ts);
+        let file = match ast::File::parse(&buf) {
+            Ok(file) => file,
+            Err(e) => return Err(RootError::single(e, smap)),
+        };
 
-        let file = ast::File::parse(&buf)?;
         let mut this = Context {
             smap,
             root: ident.clone(),
@@ -50,30 +86,9 @@ impl Context {
             ir: HashMap::new(),
             entry: None,
         };
-        this.load_includes()?;
-
-        let mut errors = LinkedList::new();
-
-        this.ast_validate_assets(&mut errors);
-        if !errors.is_empty() {
-            return Err(Error::root(errors));
+        if let Err(e) = this.load_includes() {
+            return Err(RootError::single(e, this.smap));
         }
-
-        this.load_deps(&mut errors);
-        if !errors.is_empty() {
-            return Err(Error::root(errors));
-        }
-
-        this.load_ir(&mut errors);
-        if !errors.is_empty() {
-            return Err(Error::root(errors));
-        }
-
-        this.load_entry(&mut errors);
-        if !errors.is_empty() {
-            return Err(Error::root(errors));
-        }
-
         Ok(this)
     }
 

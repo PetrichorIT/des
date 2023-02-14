@@ -1,10 +1,10 @@
 use std::{collections::LinkedList, sync::Arc};
 
 use crate::{
-    ast::{Item, LinkStmt, ModuleStmt, Spanned},
+    ast::{self, Item, LinkStmt, ModuleStmt, Spanned},
     error::*,
     resource::AssetIdentifier,
-    Context,
+    Context, SourceMap, Span,
 };
 
 // # Links
@@ -259,5 +259,92 @@ impl ModuleAstTable {
                 errors.push_back(e)
             }
         }
+    }
+}
+
+pub struct GlobalAstTable<'a> {
+    this: AssetIdentifier,
+    smap: &'a SourceMap,
+    modules: Vec<Arc<ModuleStmt>>,
+    links: Vec<Arc<LinkStmt>>,
+}
+
+impl<'a> GlobalAstTable<'a> {
+    pub fn new(ctx: &'a Context, this: &AssetIdentifier) -> GlobalAstTable<'a> {
+        let mut modules = Vec::new();
+        let mut links = Vec::new();
+
+        for file in ctx.ast.values() {
+            for item in &file.items {
+                match item {
+                    ast::Item::Module(module) => modules.push(module.clone()),
+                    ast::Item::Link(link) => links.push(link.clone()),
+                    _ => {}
+                }
+            }
+        }
+
+        GlobalAstTable {
+            this: this.clone(),
+            smap: &ctx.smap,
+            modules,
+            links,
+        }
+    }
+
+    pub fn err_resolve_symbol(&self, symbol: &str, expect_module: bool, mut error: Error) -> Error {
+        for module in &self.modules {
+            if module.ident.raw == symbol {
+                let target_asset = self.smap.asset_for(module.span()).unwrap();
+                let target = target_asset.ident.path().unwrap().to_str().unwrap();
+
+                if expect_module {
+                    let this = self.smap.asset(&self.this).unwrap();
+                    let span = Span::new(this.offset, 0);
+                    let replacement = format!("include {};", this.include_for(target_asset));
+
+                    error.hints.push(ErrorHint::Help(format!(
+                        "similar symbol '{symbol}' was found, but not included ({target})"
+                    )));
+                    error.hints.push(ErrorHint::Solution(ErrorSolution {
+                        description: format!("try including '{symbol}'"),
+                        span,
+                        replacement,
+                    }))
+                } else {
+                    error.hints.push(ErrorHint::Note(format!(
+                        "similar symbol '{symbol}' was found, but it is a module ({target})"
+                    )));
+                }
+            }
+        }
+
+        for link in &self.links {
+            if link.ident.raw == symbol {
+                let target_asset = self.smap.asset_for(link.span()).unwrap();
+                let target = target_asset.ident.path().unwrap().to_str().unwrap();
+
+                if !expect_module {
+                    let this = self.smap.asset(&self.this).unwrap();
+                    let span = Span::new(this.offset, 0);
+                    let replacement = format!("include {};", this.include_for(target_asset));
+
+                    error.hints.push(ErrorHint::Help(format!(
+                        "similar symbol '{symbol}' was found, but not included"
+                    )));
+                    error.hints.push(ErrorHint::Solution(ErrorSolution {
+                        description: format!("try including '{symbol}'"),
+                        span,
+                        replacement,
+                    }))
+                } else {
+                    error.hints.push(ErrorHint::Note(format!(
+                        "similar symbol '{symbol}' was found, but it is a link ({target})"
+                    )));
+                }
+            }
+        }
+
+        error
     }
 }

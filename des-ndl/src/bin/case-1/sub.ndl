@@ -1,4 +1,4 @@
-link FastLink {
+link FastLink: C {
     jitter: 0.0,
     latency: 0.1,
     bitrate: 100000,

@@ -1,0 +1,5 @@
+link C {
+    jitter: 0.0,
+    bitrate: 1,
+    latency: 0.0,
+}

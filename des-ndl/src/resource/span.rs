@@ -12,10 +12,11 @@ impl Span {
         Span { pos, len }
     }
 
-    pub fn fromto(lhs: Span, rhs: Span) -> Self {
-        assert!(lhs.pos < rhs.pos, "A span cannot be created in reverse");
+    pub fn fromto(mut lhs: Span, mut rhs: Span) -> Self {
+        if lhs.pos > rhs.pos {
+            std::mem::swap(&mut lhs, &mut rhs);
+        }
         let len = (rhs.pos + rhs.len) - lhs.pos;
-        assert!(len > 0);
         Self { pos: lhs.pos, len }
     }
 

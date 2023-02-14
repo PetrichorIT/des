@@ -136,21 +136,36 @@ impl SourceMap {
     }
 
     pub(crate) fn slice_padded_for(&self, span: Span) -> &str {
+        // println!("{span:?}");
+
         let asset = self
             .asset_for(span)
             .expect("Failed to assign asset to span");
         let bounds = (asset.offset, asset.offset + asset.len);
+        // println!("{}: {:?}", asset.offset, asset.line_pos_mapping);
 
         let line_start = asset.line_for(span.pos);
         let line_end = asset.line_for(span.pos + span.len);
 
+        // println!("{line_start} {line_end}");
+
         let line_start = line_start.saturating_sub(1);
         let line_end = line_end.saturating_add(1).min(asset.line_pos_mapping.len());
 
-        let start = asset.line_pos_mapping[line_start].max(bounds.0);
-        let end = (asset.line_pos_mapping[line_end] + 1).min(bounds.1);
+        // println!("{line_start} {line_end}");
+
+        let start = *asset
+            .line_pos_mapping
+            .get(line_start.saturating_sub(1))
+            .unwrap_or(&bounds.0)
+            .max(&bounds.0);
+        let end = (asset.line_pos_mapping[line_end] - 1).min(bounds.1);
 
         &self.buffer[start..end]
+    }
+
+    pub(crate) fn asset(&self, ident: &AssetIdentifier) -> Option<&SourceMappedAsset> {
+        self.assets.iter().find(|a| a.ident == *ident)
     }
 
     pub(crate) fn asset_for(&self, span: Span) -> Option<&SourceMappedAsset> {
@@ -159,8 +174,12 @@ impl SourceMap {
                 return Some(asset);
             }
         }
-
         None
+    }
+
+    pub(crate) fn line_for(&self, span: Span) -> Option<usize> {
+        let asset = self.asset_for(span)?;
+        Some(asset.line_for(span.pos))
     }
 }
 
@@ -188,6 +207,33 @@ impl SourceMappedAsset {
         }
     }
 
+    pub fn include_for(&self, other: &SourceMappedAsset) -> String {
+        let s = self.ident.alias();
+        let o = other.ident.alias();
+
+        let s = s.split("/").collect::<Vec<_>>();
+        let o = o.split("/").collect::<Vec<_>>();
+
+        let n = s.len().min(o.len());
+        for i in 0..n {
+            if s[i] != o[i] {
+                let mut include = String::new();
+                let up = n - i;
+                for _ in 0..up {
+                    include.push_str("../");
+                }
+                for k in i..o.len() {
+                    include.push_str(o[k]);
+                    include.push('/');
+                }
+                include.pop();
+                return include;
+            }
+        }
+
+        unreachable!()
+    }
+
     pub(crate) fn span(&self) -> Span {
         Span::new(self.offset, self.len)
     }
@@ -198,16 +244,13 @@ impl SourceMappedAsset {
     }
 
     pub(crate) fn line_for(&self, pos: usize) -> usize {
-        match self.line_pos_mapping.binary_search(&pos) {
-            Ok(n) => n,
-            Err(n) => {
-                if n >= self.line_pos_mapping.len() {
-                    n - 1
-                } else {
-                    n
-                }
+        for i in 0..self.line_pos_mapping.len() {
+            if self.line_pos_mapping[i] > pos {
+                return i;
             }
         }
+
+        self.line_pos_mapping.len()
     }
 }
 

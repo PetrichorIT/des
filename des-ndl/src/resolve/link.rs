@@ -4,16 +4,19 @@ use std::{
 };
 
 use crate::{
-    ast::LinkStmt,
+    ast::{LinkStmt, Spanned},
     error::*,
     ir::{Link, RawSymbol},
     resolve::LinkIrTable,
 };
 
+use super::GlobalAstTable;
+
 impl Link {
     pub fn from_ast(
         link: Arc<LinkStmt>,
         ir_links: &LinkIrTable,
+        globals: &GlobalAstTable,
         errors: &mut LinkedList<Error>,
     ) -> Link {
         let errlen = errors.len();
@@ -44,7 +47,7 @@ impl Link {
                     errors.push_back(Error::new(
                         ErrorKind::SymbolNotFound,
                         "link symbol not found"
-                    ));
+                    ).spanned(inh.span()).map(|e| globals.err_resolve_symbol(&symbol.raw, false, e)));
                     continue;
                 };
                 ir.apply(&dep);

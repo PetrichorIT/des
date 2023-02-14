@@ -1,7 +1,7 @@
 use std::{collections::LinkedList, sync::Arc};
 
 use crate::{
-    ast::ModuleStmt,
+    ast::{ModuleStmt, Spanned},
     error::*,
     ir::{
         Cluster, Connection, ConnectionEndpoint, Gate, GateServiceType, Module, RawSymbol,
@@ -10,11 +10,14 @@ use crate::{
     resolve::{LinkIrTable, LocalGatesTable, LocalSubmoduleTable, ModuleIrTable, SharedGatesTable},
 };
 
+use super::GlobalAstTable;
+
 impl Module {
     pub fn from_ast(
         ast: Arc<ModuleStmt>,
         modules: &ModuleIrTable,
         links: &LinkIrTable,
+        global: &GlobalAstTable,
         errors: &mut LinkedList<Error>,
     ) -> Module {
         let errlen = errors.len();
@@ -72,10 +75,16 @@ impl Module {
                     .get(&submodule.typ.raw)
                     .map(Symbol::from)
                     .unwrap_or_else(|| {
-                        errors.push_back(Error::new(
-                            ErrorKind::SymbolNotFound,
-                            format!("symbol '{}' was not found", submodule.ident.raw),
-                        ));
+                        errors.push_back(
+                            Error::new(
+                                ErrorKind::SymbolNotFound,
+                                format!(
+                                    "did not find submodule symbol '{}', not in scope",
+                                    submodule.typ.raw
+                                ),
+                            )
+                            .spanned(submodule.typ.span()),
+                        );
                         Symbol::Unresolved(submodule.typ.raw.clone())
                     });
 
@@ -102,8 +111,8 @@ impl Module {
                     let Some(link) = links.get(&link.raw) else {
                         errors.push_back(Error::new(
                             ErrorKind::SymbolNotFound,
-                            format!("Could not resolve link symbol '{}', not in scope", link.raw)
-                        ));
+                            format!("did not find link symbol '{}', not in scope", link.raw)
+                        ).spanned(con.span()).map(|e| global.err_resolve_symbol(&link.raw, false, e)));
                         continue
                     };
                     Some(Symbol::from(link))
