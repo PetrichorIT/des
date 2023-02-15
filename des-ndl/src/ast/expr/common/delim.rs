@@ -1,7 +1,8 @@
-use crate::{Span,error::*,ast::{
-    DelimSpan, Delimiter, TokenTree, parse::*
-}};
-
+use crate::{
+    ast::{parse::*, DelimSpan, Delimiter, TokenTree},
+    error::*,
+    Span,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Delimited<T> {
@@ -22,8 +23,18 @@ impl<T: Parse> Delimited<T> {
             return Err(Error::new(ErrorKind::ExpectedDelimited, "expected delimited sequence"));
         };
 
-        let TokenTree::Delimited(span, d, _) = peek else { 
-            return Err(Error::new(ErrorKind::ExpectedDelimited, "expected delimited sequence"));
+        let (span, d) = match peek {
+            TokenTree::Delimited(span, d, _) => (span, d),
+            TokenTree::Token(token, _) => {
+                return Err(Error::new(
+                    ErrorKind::ExpectedDelimited,
+                    format!(
+                        "expected delimited sequence, found {}",
+                        token.kind.token_kind_err_output()
+                    ),
+                )
+                .spanned(peek.span()));
+            }
         };
 
         if *d == delim {
@@ -35,7 +46,11 @@ impl<T: Parse> Delimited<T> {
                 inner: T::parse(&substream)?,
             })
         } else {
-            Err(Error::new(ErrorKind::UnexpectedDelim, "expected other delimited sequence"))
+            Err(Error::new(
+                ErrorKind::UnexpectedDelim,
+                "expected other delimited sequence",
+            )
+            .spanned(Span::fromto(span.open, span.close)))
         }
     }
 }
@@ -43,7 +58,10 @@ impl<T: Parse> Delimited<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{resource::SourceMap, ast::{TokenStream, Ident, Lit}};
+    use crate::{
+        ast::{Ident, Lit, TokenStream},
+        resource::SourceMap,
+    };
 
     #[test]
     fn success_single_token_delimited() {
@@ -78,13 +96,13 @@ mod tests {
         assert_eq!(item.delim, Delimiter::Bracket);
         assert_eq!(item.inner, "ident");
 
-         // # Case 2
-         let asset = smap.load_raw("raw:case2", "[123]");
-         let ts = TokenStream::new(asset).unwrap();
-         let buf = ParseBuffer::new(asset, ts);
- 
-         let item = Delimited::<Lit>::parse_from(Delimiter::Bracket, &buf).unwrap();
-         assert_eq!(item.delim, Delimiter::Bracket);
-         assert_eq!(format!("{}", item.inner.kind), "123");
+        // # Case 2
+        let asset = smap.load_raw("raw:case2", "[123]");
+        let ts = TokenStream::new(asset).unwrap();
+        let buf = ParseBuffer::new(asset, ts);
+
+        let item = Delimited::<Lit>::parse_from(Delimiter::Bracket, &buf).unwrap();
+        assert_eq!(item.delim, Delimiter::Bracket);
+        assert_eq!(format!("{}", item.inner.kind), "123");
     }
 }

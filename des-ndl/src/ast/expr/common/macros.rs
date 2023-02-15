@@ -16,7 +16,7 @@ macro_rules! ast_expect_single_token {
                     return Err(
                         crate::error::Error::new(
                             crate::error::ErrorKind::UnexpectedToken,
-                            "unexpected token"
+                            format!("expected {}, found EOF", $token.token_kind_err_output())
                         )
                     );
                 };
@@ -26,8 +26,8 @@ macro_rules! ast_expect_single_token {
                         return Err(
                             crate::error::Error::new(
                                 crate::error::ErrorKind::ExpectedSingleFoundJoint,
-                                "unexpected token"
-                            )
+                                format!("expected {}, found invalid spacing", $token.token_kind_err_output())
+                            ).spanned(token.span)
                         );
                     }
 
@@ -39,16 +39,16 @@ macro_rules! ast_expect_single_token {
                         Err(
                             crate::error::Error::new(
                                 crate::error::ErrorKind::UnexpectedToken,
-                                "unexpected token"
-                            )
+                                format!("expected {}, found {}", $token.token_kind_err_output(), token.kind.token_kind_err_output())
+                            ).spanned(token.span)
                         )
                     }
                 } else {
                     Err(
                         crate::error::Error::new(
                             crate::error::ErrorKind::UnexpectedDelim,
-                            "unexpected delim, expected token"
-                        )
+                            format!("expected {}, found delim", $token.token_kind_err_output())
+                        ).spanned(peek.span())
                     )
                 }
             }

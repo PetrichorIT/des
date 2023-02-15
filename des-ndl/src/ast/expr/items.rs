@@ -74,16 +74,16 @@ impl Parse for Item {
                 Keyword::Entry => Ok(Item::Entry(Arc::new(EntryStmt::parse(input)?))),
                 _ => Err(Error::new(
                     ErrorKind::UnexpectedToken,
-                    "unexpected keyword, expected top level item",
+                    "expected top-level <keyword>",
                 )),
             },
             Some(_) => Err(Error::new(
                 ErrorKind::UnexpectedToken,
-                "unexpected token, expected top level item",
+                "expected top-level <keyword>",
             )),
             None => Err(Error::new(
                 ErrorKind::UnexpectedEOF,
-                "unexpected end of token stream",
+                "unexpected end of tokenstream",
             )),
         }
     }

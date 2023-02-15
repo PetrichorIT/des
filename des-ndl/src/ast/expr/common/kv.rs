@@ -25,8 +25,14 @@ where
 {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         let key = K::parse(input)?;
-        let delim = D::parse(input)?;
-        let value = V::parse(input)?;
+        let delim = D::parse(input).map_err(|e| {
+            let f = format!("{}", e.internal);
+            e.override_internal(format!("missing delimiter in key-value pair: {f}"))
+        })?;
+        let value = V::parse(input).map_err(|e| {
+            let f = format!("{}", e.internal);
+            e.override_internal(format!("missing value in key-value pair: {f}"))
+        })?;
 
         Ok(Self { key, delim, value })
     }

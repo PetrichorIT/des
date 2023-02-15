@@ -69,7 +69,10 @@ where
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         let mut items = Vec::new();
         loop {
-            let item = T::parse(input)?;
+            let item = T::parse(input).map_err(|e| {
+                let f = format!("{}", e.internal);
+                e.override_internal(format!("failed to parse value in joined statement: {f}"))
+            })?;
             match P::parse(input) {
                 Ok(delim) => items.push((item, delim)),
                 Err(_) => {

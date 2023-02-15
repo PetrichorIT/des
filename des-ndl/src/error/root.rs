@@ -69,19 +69,19 @@ impl Error {
         write!(fmt, "    | ")?;
         fmt.reset()?;
 
-        let mut line_drawn = false;
+        let mut line_drawn = 0;
 
         for c in smap.slice_padded_for(span).chars() {
             write!(fmt, "{}", c)?;
             if c == '\n' {
                 fmt.set_color(ColorSpec::new().set_fg(Some(Color::Blue)).set_bold(true))?;
 
-                if line_drawn {
+                if line_drawn != 1 {
                     write!(fmt, "    | ")?;
                 } else {
                     write!(fmt, "{:>3} | ", line)?;
-                    line_drawn = true
                 }
+                line_drawn += 1;
                 fmt.reset()?;
             }
         }
@@ -128,6 +128,8 @@ impl Error {
                         sasset.ident.path().unwrap().to_str().unwrap(),
                         sline
                     )?;
+
+                    fmt.reset()?;
                 }
             }
         }

@@ -29,6 +29,7 @@ impl Context {
             let asset_str = asset.alias().to_string();
             let asset_path = asset.path().unwrap_or(&PathBuf::new()).clone();
 
+            // Add asset info to all errors.
             errors.with_mapping(
                 move |e| {
                     e.add_hints(ErrorHint::Note(format!(
@@ -37,8 +38,11 @@ impl Context {
                     )))
                 },
                 |errors| {
+                    // Collect all defined items.
                     let mut items = Vec::new();
 
+                    // Link deriving uses ast-link defs for local info, ir_links allready symbolised in
+                    // dependencies and a global ast context for symbol resoloution.
                     let mut ast_links = LinkAstTable::from_ctx(self, &asset, errors);
                     let mut ir_links = LinkIrTable::from_ctx(self, &asset, errors, false);
                     let global_ast = GlobalAstTable::new(self, &asset);
@@ -48,13 +52,34 @@ impl Context {
                     // - local dependencies may be out of order
                     ast_links.order_local_deps();
                     for link in ast_links.local() {
-                        let ir = ir::Link::from_ast(link.clone(), &ir_links, &global_ast, errors);
-                        let ir = Arc::new(ir);
+                        let ident = link.ident.raw.clone();
+                        errors.with_mapping(
+                            move |e| {
+                                e.add_hints(ErrorHint::Note(format!(
+                                    "found in link definition '{}'",
+                                    ident
+                                )))
+                            },
+                            |errors| {
+                                // Use the link_specific symboliser to parse a link;
+                                let ir = ir::Link::from_ast(
+                                    link.clone(),
+                                    &ir_links,
+                                    &global_ast,
+                                    errors,
+                                );
+                                let ir = Arc::new(ir);
 
-                        ir_links.add(ir.clone());
-                        items.push(ir::Item::Link(ir));
+                                // Add the link to the local ir_table to ensure that other links
+                                // in this link can use it in later iterations.
+                                // order is ensure by order_local_deps
+                                ir_links.add(ir.clone());
+                                items.push(ir::Item::Link(ir));
+                            },
+                        );
                     }
 
+                    // Modules use local ast info, and dependency ir info, with global ast-debug info
                     let mut ast_modules = ModuleAstTable::from_ctx(self, &asset, errors);
                     let mut ir_modules = ModuleIrTable::from_ctx(self, &asset, errors, false);
                     let global_ast = GlobalAstTable::new(self, &asset);
@@ -66,9 +91,13 @@ impl Context {
                         let ident = module.ident.raw.clone();
                         errors.with_mapping(
                             move |e| {
-                                e.add_hints(ErrorHint::Note(format!("found in module '{}'", ident)))
+                                e.add_hints(ErrorHint::Note(format!(
+                                    "found in module definition '{}'",
+                                    ident
+                                )))
                             },
                             |errors| {
+                                // Use the local symboliser for modules.
                                 let ir = ir::Module::from_ast(
                                     module.clone(),
                                     &ir_modules,
@@ -79,12 +108,16 @@ impl Context {
 
                                 let ir = Arc::new(ir);
 
+                                // Add the module to the local ir_table to ensure that other modules
+                                // in this module can use it in later iterations.
+                                // order is ensure by order_local_deps
                                 ir_modules.add(ir.clone());
                                 items.push(ir::Item::Module(ir));
                             },
                         )
                     }
 
+                    // Address collected items with asset identifier
                     self.ir.insert(asset, ir::Items { items });
                 },
             );

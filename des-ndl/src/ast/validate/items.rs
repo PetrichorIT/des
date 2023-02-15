@@ -1,5 +1,5 @@
 use super::*;
-use crate::ast::{File, Item};
+use crate::ast::{File, Item, Spanned};
 
 impl Validate for File {
     fn validate(&self, errors: &mut ErrorsMut) {
@@ -11,13 +11,16 @@ impl Validate for File {
             // (1) Symbol duplication
             if let Some(symbol) = item.symbol() {
                 if symbols.contains(&&symbol.raw) {
-                    errors.add(Error::new(
-                        ErrorKind::SymbolDuplication,
-                        format!(
-                            "cannot create new symbol '{}', was allready defined",
-                            symbol.raw
-                        ),
-                    ))
+                    errors.add(
+                        Error::new(
+                            ErrorKind::SymbolDuplication,
+                            format!(
+                                "cannot create new symbol '{}', was allready defined",
+                                symbol.raw
+                            ),
+                        )
+                        .spanned(item.span()),
+                    )
                 } else {
                     symbols.push(&symbol.raw)
                 }

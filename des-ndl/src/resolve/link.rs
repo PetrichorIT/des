@@ -43,7 +43,7 @@ impl Link {
                 let Some(dep) = ir_links.get(symbol) else {
                     errors.add(Error::new(
                         ErrorKind::SymbolNotFound,
-                        "link symbol not found"
+                        format!("did not find link symbol '{}', not in scope", symbol.raw)
                     ).spanned(inh.span()).map(|e| globals.err_resolve_symbol(&symbol.raw, false, e)));
                     continue;
                 };
@@ -65,22 +65,31 @@ impl Link {
         }
 
         if ir.jitter == f64::NEG_INFINITY {
-            errors.add(Error::new(
-                ErrorKind::LinkMissingRequiredFields,
-                "missing required field 'jitter', was not defined locally or in prototypes",
-            ));
+            errors.add(
+                Error::new(
+                    ErrorKind::LinkMissingRequiredFields,
+                    "missing required field 'jitter', was not defined locally or in prototypes",
+                )
+                .spanned(ir.ast.span()),
+            );
         }
         if ir.latency == f64::NEG_INFINITY {
-            errors.add(Error::new(
-                ErrorKind::LinkMissingRequiredFields,
-                "missing required field 'latency', was not defined locally or in prototypes",
-            ));
+            errors.add(
+                Error::new(
+                    ErrorKind::LinkMissingRequiredFields,
+                    "missing required field 'latency', was not defined locally or in prototypes",
+                )
+                .spanned(ir.ast.span()),
+            );
         }
         if ir.bitrate == i32::MIN {
-            errors.add(Error::new(
-                ErrorKind::LinkMissingRequiredFields,
-                "missing required field 'bitrate', was not defined locally or in prototypes",
-            ));
+            errors.add(
+                Error::new(
+                    ErrorKind::LinkMissingRequiredFields,
+                    "missing required field 'bitrate', was not defined locally or in prototypes",
+                )
+                .spanned(ir.ast.span()),
+            );
         }
 
         if errlen < errors.len() {

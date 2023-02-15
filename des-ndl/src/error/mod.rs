@@ -11,10 +11,10 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub struct Error {
-    pub(crate) kind: ErrorKind,
-    pub(crate) internal: Box<dyn error::Error + Send + Sync>,
-    pub(crate) span: Option<Span>,
-    pub(crate) hints: Vec<ErrorHint>,
+    pub kind: ErrorKind,
+    pub internal: Box<dyn error::Error + Send + Sync>,
+    pub span: Option<Span>,
+    pub hints: Vec<ErrorHint>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -78,8 +78,26 @@ impl Error {
         f(self)
     }
 
+    pub fn solution(&self) -> Option<&ErrorSolution> {
+        self.hints.iter().find_map(|h| {
+            if let ErrorHint::Solution(s) = h {
+                Some(s)
+            } else {
+                None
+            }
+        })
+    }
+
     pub fn spanned(mut self, span: Span) -> Self {
         self.span = Some(span);
+        self
+    }
+
+    pub fn override_internal(
+        mut self,
+        internal: impl Into<Box<dyn error::Error + Send + Sync>>,
+    ) -> Self {
+        self.internal = internal.into();
         self
     }
 

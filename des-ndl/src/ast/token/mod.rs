@@ -72,6 +72,37 @@ impl TokenKind {
             _ => TokenKind::Ident(ident),
         }
     }
+
+    pub fn token_kind_err_output(&self) -> &'static str {
+        match self {
+            Self::Lt => "'<'",
+            Self::Le => "'<='",
+            Self::Gt => "'>'",
+            Self::Ge => "'>='",
+            Self::Eq => "'='",
+            Self::EqEq => "'=='",
+            Self::Dot => "'.'",
+            Self::DotDot => "'..'",
+            Self::DotDotDot => "'...'",
+            Self::DotDotEq => "'..='",
+            Self::Comma => "','",
+            Self::Minus => "'-'",
+            Self::Plus => "'+'",
+            Self::Semi => "';'",
+            Self::LDoubleArrow => "'<==''",
+            Self::RDoubleArrow => "'==>'",
+            Self::LSingleArrow => "'<--''",
+            Self::RSingleArrow => "'-->'",
+            Self::Colon => "':'",
+            Self::Slash => "'/'",
+            Self::Keyword(keyword) => keyword.token_kind_err_output(),
+            Self::OpenDelim(_) => "<open_delim>",
+            Self::CloseDelim(_) => "<close_delim>",
+            Self::Literal(_) => "<literal>",
+            Self::Ident(_) => "<ident>",
+            Self::Annotation(_) => "<annotation>",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -85,17 +116,23 @@ pub enum Keyword {
     Entry,
 }
 
+impl Keyword {
+    fn token_kind_err_output(&self) -> &'static str {
+        match self {
+            Self::Module => "'module'",
+            Self::Gates => "'gates'",
+            Self::Submodules => "'submodules'",
+            Self::Connections => "'connections'",
+            Self::Link => "'link'",
+            Self::Include => "'include'",
+            Self::Entry => "'entry'",
+        }
+    }
+}
+
 impl fmt::Display for Keyword {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Module => write!(f, "module"),
-            Self::Gates => write!(f, "gates"),
-            Self::Submodules => write!(f, "submodules"),
-            Self::Connections => write!(f, "connections"),
-            Self::Link => write!(f, "link"),
-            Self::Include => write!(f, "include"),
-            Self::Entry => write!(f, "entry"),
-        }
+        write!(f, "{}", self.token_kind_err_output())
     }
 }
 

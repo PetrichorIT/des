@@ -13,6 +13,15 @@ pub enum TokenTree {
     Delimited(DelimSpan, Delimiter, TokenStream),
 }
 
+impl TokenTree {
+    pub fn span(&self) -> Span {
+        match self {
+            Self::Token(token, _) => token.span,
+            Self::Delimited(delim, _, _) => Span::fromto(delim.open, delim.close),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Spacing {
     Alone,

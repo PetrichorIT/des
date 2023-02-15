@@ -1,5 +1,5 @@
 use super::*;
-use crate::ast::{LinkData, LinkInheritance, LinkStmt, LitKind};
+use crate::ast::{LinkData, LinkInheritance, LinkStmt, LitKind, Spanned};
 
 impl Validate for LinkStmt {
     fn validate(&self, errors: &mut ErrorsMut) {
@@ -13,13 +13,16 @@ impl Validate for LinkInheritance {
         let mut symbols = Vec::with_capacity(self.symbols.len());
         for symbol in self.symbols.iter() {
             if symbols.contains(&&symbol.raw) {
-                errors.add(Error::new(
-                    ErrorKind::LinkInheritanceDuplicatedSymbols,
-                    format!(
-                        "found duplicated symbol '{}' in link inheritence statement",
-                        symbol.raw
-                    ),
-                ));
+                errors.add(
+                    Error::new(
+                        ErrorKind::LinkInheritanceDuplicatedSymbols,
+                        format!(
+                            "found duplicated symbol '{}' in link inheritance statement",
+                            symbol.raw
+                        ),
+                    )
+                    .spanned(self.span()),
+                );
                 continue;
             }
             symbols.push(&symbol.raw);
@@ -35,35 +38,35 @@ impl Validate for LinkData {
             match item.key.raw.as_str() {
                 "jitter" => {
                     if !matches!(item.value.kind, LitKind::Float { .. }) {
-                        errors.add(Error::new(
-                            ErrorKind::LinkKnownKeysInvalidValue,
-                            format!(
-                                "known key 'jitter' expectes a value of type float (not {})",
-                                item.value.kind
-                            ),
-                        ));
+                        errors.add(
+                            Error::new(
+                                ErrorKind::LinkKnownKeysInvalidValue,
+                                "known key 'jitter' expects a value of type float",
+                            )
+                            .spanned(item.span()),
+                        );
                     }
                 }
                 "latency" => {
                     if !matches!(item.value.kind, LitKind::Float { .. }) {
-                        errors.add(Error::new(
-                            ErrorKind::LinkKnownKeysInvalidValue,
-                            format!(
-                                "known key 'latency' expectes a value of type float (not {})",
-                                item.value.kind
-                            ),
-                        ));
+                        errors.add(
+                            Error::new(
+                                ErrorKind::LinkKnownKeysInvalidValue,
+                                "known key 'latency' expects a value of type float ",
+                            )
+                            .spanned(item.span()),
+                        );
                     }
                 }
                 "bitrate" => {
                     if !matches!(item.value.kind, LitKind::Integer { .. }) {
-                        errors.add(Error::new(
-                            ErrorKind::LinkKnownKeysInvalidValue,
-                            format!(
-                                "known key 'birate' expectes a value of type interger (not {})",
-                                item.value.kind
-                            ),
-                        ));
+                        errors.add(
+                            Error::new(
+                                ErrorKind::LinkKnownKeysInvalidValue,
+                                "known key 'bitrate' expects a value of type interger",
+                            )
+                            .spanned(item.span()),
+                        );
                     }
                 }
                 _ => {}

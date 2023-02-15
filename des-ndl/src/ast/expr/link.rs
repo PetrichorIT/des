@@ -52,7 +52,9 @@ impl Spanned for LinkData {
 impl Parse for LinkStmt {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         let link_token = LinkToken::parse(input)?;
-        let ident = Ident::parse(input)?;
+        let ident = Ident::parse(input).map_err(|e| {
+            e.override_internal("unexpected token, expected <ident> for link statement")
+        })?;
         let inheritance = Option::<LinkInheritance>::parse(input)?;
         let data = LinkData::parse(input)?;
 
@@ -72,7 +74,7 @@ impl Parse for Option<LinkInheritance> {
             Err(_) => return Ok(None),
         };
 
-        let symbols = Joined::<Ident, Plus>::parse(input).unwrap();
+        let symbols = Joined::<Ident, Plus>::parse(input)?;
         Ok(Some(LinkInheritance { colon, symbols }))
     }
 }

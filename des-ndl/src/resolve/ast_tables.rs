@@ -110,7 +110,7 @@ impl LinkAstTable {
                 let mut e = Error::new(
                     ErrorKind::SymbolDuplication,
                     format!(
-                        "Found duplicated symbol '{}', {} duplications",
+                        "found duplicated symbol '{}', with {} duplications",
                         links[s].ident.raw,
                         dups.len()
                     ),

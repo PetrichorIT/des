@@ -149,8 +149,10 @@ impl SourceMap {
 
         // println!("{line_start} {line_end}");
 
-        let line_start = line_start.saturating_sub(1);
-        let line_end = line_end.saturating_add(1).min(asset.line_pos_mapping.len());
+        let line_start = line_start.saturating_sub(2);
+        let line_end = line_end
+            .saturating_add(2)
+            .min(asset.line_pos_mapping.len() - 1);
 
         // println!("{line_start} {line_end}");
 
