@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashMap, LinkedList},
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     ast::{LinkStmt, Spanned},
@@ -17,7 +14,7 @@ impl Link {
         link: Arc<LinkStmt>,
         ir_links: &LinkIrTable,
         globals: &GlobalAstTable,
-        errors: &mut LinkedList<Error>,
+        errors: &mut ErrorsMut,
     ) -> Link {
         let errlen = errors.len();
         // We can assume
@@ -44,7 +41,7 @@ impl Link {
                 // All values in scope are allread in IR table
                 // - local elements are non-nessecary in scope, but in order
                 let Some(dep) = ir_links.get(symbol) else {
-                    errors.push_back(Error::new(
+                    errors.add(Error::new(
                         ErrorKind::SymbolNotFound,
                         "link symbol not found"
                     ).spanned(inh.span()).map(|e| globals.err_resolve_symbol(&symbol.raw, false, e)));
@@ -68,19 +65,19 @@ impl Link {
         }
 
         if ir.jitter == f64::NEG_INFINITY {
-            errors.push_back(Error::new(
+            errors.add(Error::new(
                 ErrorKind::LinkMissingRequiredFields,
                 "missing required field 'jitter', was not defined locally or in prototypes",
             ));
         }
         if ir.latency == f64::NEG_INFINITY {
-            errors.push_back(Error::new(
+            errors.add(Error::new(
                 ErrorKind::LinkMissingRequiredFields,
                 "missing required field 'latency', was not defined locally or in prototypes",
             ));
         }
         if ir.bitrate == i32::MIN {
-            errors.push_back(Error::new(
+            errors.add(Error::new(
                 ErrorKind::LinkMissingRequiredFields,
                 "missing required field 'bitrate', was not defined locally or in prototypes",
             ));

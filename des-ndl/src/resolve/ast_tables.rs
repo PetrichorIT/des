@@ -1,4 +1,4 @@
-use std::{collections::LinkedList, sync::Arc};
+use std::sync::Arc;
 
 use crate::{
     ast::{self, Item, LinkStmt, ModuleStmt, Spanned},
@@ -66,11 +66,7 @@ impl LinkAstTable {
         &mut self.links[..self.ptr]
     }
 
-    pub fn from_ctx(
-        ctx: &Context,
-        asset: &AssetIdentifier,
-        errors: &mut LinkedList<Error>,
-    ) -> Self {
+    pub fn from_ctx(ctx: &Context, asset: &AssetIdentifier, errors: &mut ErrorsMut) -> Self {
         let mut links = Vec::new();
 
         let asts = ctx.asts_for_asset(&asset);
@@ -98,7 +94,7 @@ impl LinkAstTable {
         }
     }
 
-    fn check_dup(links: &[Arc<LinkStmt>], errors: &mut LinkedList<Error>) {
+    fn check_dup(links: &[Arc<LinkStmt>], errors: &mut ErrorsMut) {
         if links.len() <= 1 {
             return;
         }
@@ -127,7 +123,7 @@ impl LinkAstTable {
                     )));
                 }
 
-                errors.push_back(e)
+                errors.add(e)
             }
         }
     }
@@ -193,11 +189,7 @@ impl ModuleAstTable {
         &mut self.modules[..self.ptr]
     }
 
-    pub fn from_ctx(
-        ctx: &Context,
-        asset: &AssetIdentifier,
-        errors: &mut LinkedList<Error>,
-    ) -> Self {
+    pub fn from_ctx(ctx: &Context, asset: &AssetIdentifier, errors: &mut ErrorsMut) -> Self {
         let mut modules = Vec::new();
 
         let asts = ctx.asts_for_asset(&asset);
@@ -227,7 +219,7 @@ impl ModuleAstTable {
         }
     }
 
-    fn check_dup(modules: &[Arc<ModuleStmt>], errors: &mut LinkedList<Error>) {
+    fn check_dup(modules: &[Arc<ModuleStmt>], errors: &mut ErrorsMut) {
         if modules.len() <= 1 {
             return;
         }
@@ -256,7 +248,7 @@ impl ModuleAstTable {
                     )));
                 }
 
-                errors.push_back(e)
+                errors.add(e)
             }
         }
     }

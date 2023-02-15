@@ -1,7 +1,10 @@
 use crate::Span;
 use std::{collections::LinkedList, error, fmt, io};
 
+mod errors;
 mod root;
+
+pub use self::errors::*;
 pub use self::root::*;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -82,16 +85,17 @@ impl Error {
 
     pub fn add_hints(mut self, hint: impl Into<ErrorHint>) -> Self {
         self.hints.push(hint.into());
-        self
-    }
-
-    pub fn root(errors: LinkedList<Error>) -> Self {
-        Self {
-            kind: ErrorKind::RootError,
-            internal: Box::new(Errors { items: errors }),
-            span: None,
-            hints: Vec::new(),
+        let mut l = self.hints.len() - 1;
+        for i in 0..self.hints.len() {
+            if i >= l {
+                break;
+            }
+            if let ErrorHint::Solution(_) = self.hints[i] {
+                self.hints.swap(i, l);
+                l -= 1;
+            }
         }
+        self
     }
 
     pub fn from_io(io: io::Error) -> Self {
@@ -119,18 +123,3 @@ impl fmt::Display for ErrorKind {
 }
 
 // # composite errors
-
-#[derive(Debug)]
-pub struct Errors {
-    pub items: LinkedList<Error>,
-}
-
-impl error::Error for Errors {}
-impl fmt::Display for Errors {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for error in self.items.iter() {
-            <Error as fmt::Display>::fmt(error, f)?;
-        }
-        Ok(())
-    }
-}

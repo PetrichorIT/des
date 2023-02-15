@@ -2,7 +2,7 @@ use super::*;
 use crate::ast::*;
 
 impl Validate for ModuleStmt {
-    fn validate(&self, errors: &mut LinkedList<Error>) {
+    fn validate(&self, errors: &mut ErrorsMut) {
         self.gates.as_ref().map(|g| g.validate(errors));
         self.submodules.as_ref().map(|s| s.validate(errors));
         self.connections.as_ref().map(|c| c.validate(errors));
@@ -10,12 +10,12 @@ impl Validate for ModuleStmt {
 }
 
 impl Validate for GatesStmt {
-    fn validate(&self, errors: &mut LinkedList<Error>) {
+    fn validate(&self, errors: &mut ErrorsMut) {
         let mut symbols = Vec::with_capacity(self.items.len());
         for gate_def in self.items.iter() {
             // (0) Duplication checking
             if symbols.contains(&&gate_def.ident.raw) {
-                errors.push_back(Error::new(
+                errors.add(Error::new(
                     ErrorKind::ModuleGatesDuplicatedSymbols,
                     format!(
                         "gate(-cluster) '{}' was defined multiple times",
@@ -30,7 +30,7 @@ impl Validate for GatesStmt {
             match gate_def.annotation.as_ref().map(|a| a.raw.as_ref()) {
                 Some("input") | Some("in") | Some("Input") | Some("In") => { /* NOP */ }
                 Some("output") | Some("out") | Some("Output") | Some("Out") => { /* NOP */ }
-                Some(annot) => errors.push_back(Error::new(
+                Some(annot) => errors.add(Error::new(
                     ErrorKind::InvalidAnnotation,
                     format!(
                         "invalid annotation '{}', gates can only be annoted with input/output",
@@ -46,7 +46,7 @@ impl Validate for GatesStmt {
                     if *lit > 0 {
                         /* GOOD */
                     } else {
-                        errors.push_back(Error::new(
+                        errors.add(Error::new(
                             ErrorKind::ModuleGatesInvalidClusterSize,
                             format!(
                                 "cannot create gate cluster of size '{}', requires positiv integer",
@@ -55,7 +55,7 @@ impl Validate for GatesStmt {
                         ));
                     }
                 } else {
-                    errors.push_back(Error::new(
+                    errors.add(Error::new(
                         ErrorKind::InvalidLitTyp,
                         format!(
                             "invalid literal type {}, expected literal of type integer",
@@ -69,12 +69,12 @@ impl Validate for GatesStmt {
 }
 
 impl Validate for SubmodulesStmt {
-    fn validate(&self, errors: &mut LinkedList<Error>) {
+    fn validate(&self, errors: &mut ErrorsMut) {
         let mut symbols = Vec::with_capacity(self.items.len());
         for gate_def in self.items.iter() {
             // (0) Duplication checking
             if symbols.contains(&&gate_def.ident.raw) {
-                errors.push_back(Error::new(
+                errors.add(Error::new(
                     ErrorKind::ModuleSubDuplicatedSymbols,
                     format!(
                         "submodule(-cluster) '{}' was defined multiple times",
@@ -91,7 +91,7 @@ impl Validate for SubmodulesStmt {
                     if *lit > 0 {
                         /* GOOD */
                     } else {
-                        errors.push_back(Error::new(
+                        errors.add(Error::new(
                             ErrorKind::ModuleSubInvalidClusterSize,
                             format!(
                                 "cannot create submodule cluster of size '{}', requires positiv integer",
@@ -100,7 +100,7 @@ impl Validate for SubmodulesStmt {
                         ));
                     }
                 } else {
-                    errors.push_back(Error::new(
+                    errors.add(Error::new(
                         ErrorKind::InvalidLitTyp,
                         format!(
                             "invalid literal type {}, expected literal of type integer",
@@ -114,7 +114,7 @@ impl Validate for SubmodulesStmt {
 }
 
 impl Validate for ConnectionsStmt {
-    fn validate(&self, _errors: &mut LinkedList<Error>) {}
+    fn validate(&self, _errors: &mut ErrorsMut) {}
 }
 
 #[cfg(test)]
@@ -151,7 +151,7 @@ mod tests {
             }
          }",
         );
-        let mut errors = LinkedList::new();
+        let mut errors = Errors::new().as_mut();
         stmt.validate(&mut errors);
         assert!(errors.is_empty());
 
@@ -170,16 +170,16 @@ mod tests {
             }
          }",
         );
-        let mut errors = LinkedList::new();
+        let mut errors = Errors::new().as_mut();
         stmt.validate(&mut errors);
         assert_eq!(errors.len(), 2);
 
         assert_eq!(
-            errors.pop_front().unwrap().kind,
+            errors.get(0).unwrap().kind,
             ErrorKind::ModuleGatesDuplicatedSymbols
         );
         assert_eq!(
-            errors.pop_front().unwrap().kind,
+            errors.get(1).unwrap().kind,
             ErrorKind::ModuleGatesDuplicatedSymbols
         );
 
@@ -196,18 +196,12 @@ mod tests {
             }
          }",
         );
-        let mut errors = LinkedList::new();
+        let mut errors = Errors::new().as_mut();
         stmt.validate(&mut errors);
         assert_eq!(errors.len(), 2);
 
-        assert_eq!(
-            errors.pop_front().unwrap().kind,
-            ErrorKind::InvalidAnnotation
-        );
-        assert_eq!(
-            errors.pop_front().unwrap().kind,
-            ErrorKind::InvalidAnnotation
-        );
+        assert_eq!(errors.get(0).unwrap().kind, ErrorKind::InvalidAnnotation);
+        assert_eq!(errors.get(1).unwrap().kind, ErrorKind::InvalidAnnotation);
 
         // # Case 3 (literals)
         let stmt = load_module(
@@ -222,12 +216,12 @@ mod tests {
             }
          }",
         );
-        let mut errors = LinkedList::new();
+        let mut errors = Errors::new().as_mut();
         stmt.validate(&mut errors);
         assert_eq!(errors.len(), 2);
 
-        assert_eq!(errors.pop_front().unwrap().kind, ErrorKind::InvalidLitTyp);
-        assert_eq!(errors.pop_front().unwrap().kind, ErrorKind::InvalidLitTyp);
+        assert_eq!(errors.get(0).unwrap().kind, ErrorKind::InvalidLitTyp);
+        assert_eq!(errors.get(1).unwrap().kind, ErrorKind::InvalidLitTyp);
 
         // # Case 3 (cluster-size)
         let stmt = load_module(
@@ -241,11 +235,11 @@ mod tests {
             }
          }",
         );
-        let mut errors = LinkedList::new();
+        let mut errors = Errors::new().as_mut();
         stmt.validate(&mut errors);
         assert_eq!(errors.len(), 1);
         assert_eq!(
-            errors.pop_front().unwrap().kind,
+            errors.get(0).unwrap().kind,
             ErrorKind::ModuleGatesInvalidClusterSize
         );
     }
@@ -267,7 +261,7 @@ mod tests {
             }
          }",
         );
-        let mut errors = LinkedList::new();
+        let mut errors = Errors::new().as_mut();
         stmt.validate(&mut errors);
         assert!(errors.is_empty());
 
@@ -284,16 +278,16 @@ mod tests {
             }
          }",
         );
-        let mut errors = LinkedList::new();
+        let mut errors = Errors::new().as_mut();
         stmt.validate(&mut errors);
         assert_eq!(errors.len(), 2);
 
         assert_eq!(
-            errors.pop_front().unwrap().kind,
+            errors.get(0).unwrap().kind,
             ErrorKind::ModuleSubDuplicatedSymbols
         );
         assert_eq!(
-            errors.pop_front().unwrap().kind,
+            errors.get(1).unwrap().kind,
             ErrorKind::ModuleSubDuplicatedSymbols
         );
 
@@ -309,12 +303,12 @@ mod tests {
             }
          }",
         );
-        let mut errors = LinkedList::new();
+        let mut errors = Errors::new().as_mut();
         stmt.validate(&mut errors);
         assert_eq!(errors.len(), 2);
 
-        assert_eq!(errors.pop_front().unwrap().kind, ErrorKind::InvalidLitTyp);
-        assert_eq!(errors.pop_front().unwrap().kind, ErrorKind::InvalidLitTyp);
+        assert_eq!(errors.get(0).unwrap().kind, ErrorKind::InvalidLitTyp);
+        assert_eq!(errors.get(1).unwrap().kind, ErrorKind::InvalidLitTyp);
 
         // # Case 2 (cluster-size)
         let stmt = load_module(
@@ -327,12 +321,12 @@ mod tests {
             }
          }",
         );
-        let mut errors = LinkedList::new();
+        let mut errors = Errors::new().as_mut();
         stmt.validate(&mut errors);
         assert_eq!(errors.len(), 1);
 
         assert_eq!(
-            errors.pop_front().unwrap().kind,
+            errors.get(0).unwrap().kind,
             ErrorKind::ModuleSubInvalidClusterSize
         );
     }

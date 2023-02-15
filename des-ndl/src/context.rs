@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, LinkedList},
+    collections::HashMap,
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -30,26 +30,26 @@ impl Context {
         let path = path.as_ref().to_path_buf();
 
         let mut this = Self::load_initial_tree(path)?;
-        let mut errors = LinkedList::new();
+        let mut errors = Errors::new().as_mut();
 
         this.ast_validate_assets(&mut errors);
         if !errors.is_empty() {
-            return Err(RootError::new(errors, this.smap));
+            return Err(RootError::new(errors.into_inner(), this.smap));
         }
 
         this.load_deps(&mut errors);
         if !errors.is_empty() {
-            return Err(RootError::new(errors, this.smap));
+            return Err(RootError::new(errors.into_inner(), this.smap));
         }
 
         this.load_ir(&mut errors);
         if !errors.is_empty() {
-            return Err(RootError::new(errors, this.smap));
+            return Err(RootError::new(errors.into_inner(), this.smap));
         }
 
         this.load_entry(&mut errors);
         if !errors.is_empty() {
-            return Err(RootError::new(errors, this.smap));
+            return Err(RootError::new(errors.into_inner(), this.smap));
         }
 
         Ok(this)
@@ -156,7 +156,7 @@ impl Context {
         Ok(())
     }
 
-    fn ast_validate_assets(&mut self, errors: &mut LinkedList<Error>) {
+    fn ast_validate_assets(&mut self, errors: &mut ErrorsMut) {
         for (_asset, ast) in &self.ast {
             ast.validate(errors)
         }
@@ -201,7 +201,7 @@ impl Context {
         }
     }
 
-    fn load_deps(&mut self, errors: &mut LinkedList<Error>) {
+    fn load_deps(&mut self, errors: &mut ErrorsMut) {
         if !self.deps.is_empty() {
             return;
         }
@@ -238,7 +238,7 @@ impl Context {
         // Recusivly add entries (DFS)
         for i in 0..self.assets.len() {
             if let Err(e) = self.load_recursive_deps_for(i, &topo) {
-                errors.push_back(e)
+                errors.add(e)
             }
         }
     }

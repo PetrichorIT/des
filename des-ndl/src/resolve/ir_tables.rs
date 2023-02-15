@@ -1,8 +1,8 @@
-use std::{collections::LinkedList, sync::Arc};
+use std::sync::Arc;
 
 use crate::{
     context::Context,
-    error::Error,
+    error::*,
     ir::{Item, Link, Module},
     resource::AssetIdentifier,
 };
@@ -28,7 +28,7 @@ impl LinkIrTable {
     pub fn from_ctx(
         ctx: &Context,
         asset: &AssetIdentifier,
-        _errors: &mut LinkedList<Error>,
+        _errors: &mut ErrorsMut,
         include_self: bool,
     ) -> Self {
         let mut links = Vec::new();
@@ -68,7 +68,7 @@ impl ModuleIrTable {
     pub fn from_ctx(
         ctx: &Context,
         asset: &AssetIdentifier,
-        _errors: &mut LinkedList<Error>,
+        _errors: &mut ErrorsMut,
         include_self: bool,
     ) -> Self {
         let mut modules = Vec::new();

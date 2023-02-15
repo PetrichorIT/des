@@ -1,4 +1,4 @@
-link FastLink: C {
+link FastLink {
     jitter: 0.0,
     latency: 0.1,
     bitrate: 100000,
@@ -11,6 +11,6 @@ module Transit {
     }
 
     connections {
-        in --> FastLink --> out
+        in --> C --> out
     }
 }

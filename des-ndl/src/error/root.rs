@@ -1,32 +1,30 @@
 use std::{
-    collections::LinkedList,
     error, fmt,
     io::{self, Write},
 };
 
 use termcolor::{Buffer, BufferWriter, Color, ColorChoice, ColorSpec, WriteColor};
 
-use super::{Error, ErrorHint};
+use super::{Error, ErrorHint, Errors};
 use crate::resource::SourceMap;
 
 pub type RootResult<T> = Result<T, RootError>;
 
 #[derive(Debug)]
 pub struct RootError {
-    pub errors: LinkedList<Error>,
+    pub errors: Errors,
     pub smap: SourceMap,
 }
 
 impl RootError {
-    pub fn new(errors: LinkedList<Error>, smap: SourceMap) -> RootError {
+    pub fn new(errors: Errors, smap: SourceMap) -> RootError {
         Self { errors, smap }
     }
 
     pub fn single(error: Error, smap: SourceMap) -> RootError {
-        Self {
-            errors: LinkedList::from([error]),
-            smap,
-        }
+        let mut errors = Errors::new();
+        errors.list.push_back(error);
+        Self { errors, smap }
     }
 }
 
@@ -142,7 +140,7 @@ impl fmt::Display for RootError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let stream = BufferWriter::stderr(ColorChoice::Always);
         let mut buffer = stream.buffer();
-        for error in &self.errors {
+        for error in &*self.errors {
             error.fmt(&self.smap, &mut buffer)?;
         }
         write!(f, "{}", String::from_utf8_lossy(buffer.as_slice()))

@@ -1,4 +1,4 @@
-use std::collections::LinkedList;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::ast;
@@ -23,49 +23,71 @@ pub use self::module::*;
 pub(crate) use self::util::*;
 
 impl Context {
-    pub(super) fn load_ir(&mut self, errors: &mut LinkedList<Error>) {
+    pub(super) fn load_ir(&mut self, errors: &mut ErrorsMut) {
         let order = self.ir_load_order();
         for asset in order {
-            let mut items = Vec::new();
+            let asset_str = asset.alias().to_string();
+            let asset_path = asset.path().unwrap_or(&PathBuf::new()).clone();
 
-            let mut ast_links = LinkAstTable::from_ctx(self, &asset, errors);
-            let mut ir_links = LinkIrTable::from_ctx(self, &asset, errors, false);
-            let global_ast = GlobalAstTable::new(self, &asset);
+            errors.with_mapping(
+                move |e| {
+                    e.add_hints(ErrorHint::Note(format!(
+                        "found in assset '{}' ({:?})",
+                        asset_str, asset_path
+                    )))
+                },
+                |errors| {
+                    let mut items = Vec::new();
 
-            // Resolve links
-            // - all nonlocal dependencies are allready ir
-            // - local dependencies may be out of order
-            ast_links.order_local_deps();
-            for link in ast_links.local() {
-                let ir = ir::Link::from_ast(link.clone(), &ir_links, &global_ast, errors);
-                let ir = Arc::new(ir);
+                    let mut ast_links = LinkAstTable::from_ctx(self, &asset, errors);
+                    let mut ir_links = LinkIrTable::from_ctx(self, &asset, errors, false);
+                    let global_ast = GlobalAstTable::new(self, &asset);
 
-                ir_links.add(ir.clone());
-                items.push(ir::Item::Link(ir));
-            }
+                    // Resolve links
+                    // - all nonlocal dependencies are allready ir
+                    // - local dependencies may be out of order
+                    ast_links.order_local_deps();
+                    for link in ast_links.local() {
+                        let ir = ir::Link::from_ast(link.clone(), &ir_links, &global_ast, errors);
+                        let ir = Arc::new(ir);
 
-            let mut ast_modules = ModuleAstTable::from_ctx(self, &asset, errors);
-            let mut ir_modules = ModuleIrTable::from_ctx(self, &asset, errors, false);
-            let global_ast = GlobalAstTable::new(self, &asset);
+                        ir_links.add(ir.clone());
+                        items.push(ir::Item::Link(ir));
+                    }
 
-            // Resolve mdoules
-            // - same
-            ast_modules.order_local_deps();
-            for module in ast_modules.local() {
-                let ir = ir::Module::from_ast(
-                    module.clone(),
-                    &ir_modules,
-                    &ir_links,
-                    &global_ast,
-                    errors,
-                );
-                let ir = Arc::new(ir);
+                    let mut ast_modules = ModuleAstTable::from_ctx(self, &asset, errors);
+                    let mut ir_modules = ModuleIrTable::from_ctx(self, &asset, errors, false);
+                    let global_ast = GlobalAstTable::new(self, &asset);
 
-                ir_modules.add(ir.clone());
-                items.push(ir::Item::Module(ir));
-            }
+                    // Resolve mdoules
+                    // - same
+                    ast_modules.order_local_deps();
+                    for module in ast_modules.local() {
+                        let ident = module.ident.raw.clone();
+                        errors.with_mapping(
+                            move |e| {
+                                e.add_hints(ErrorHint::Note(format!("found in module '{}'", ident)))
+                            },
+                            |errors| {
+                                let ir = ir::Module::from_ast(
+                                    module.clone(),
+                                    &ir_modules,
+                                    &ir_links,
+                                    &global_ast,
+                                    errors,
+                                );
 
-            self.ir.insert(asset, ir::Items { items });
+                                let ir = Arc::new(ir);
+
+                                ir_modules.add(ir.clone());
+                                items.push(ir::Item::Module(ir));
+                            },
+                        )
+                    }
+
+                    self.ir.insert(asset, ir::Items { items });
+                },
+            );
         }
     }
 
@@ -94,7 +116,7 @@ impl Context {
         order
     }
 
-    pub(super) fn load_entry(&mut self, errors: &mut LinkedList<Error>) {
+    pub(super) fn load_entry(&mut self, errors: &mut ErrorsMut) {
         let ir_table = ModuleIrTable::from_ctx(self, &self.root, errors, true);
 
         let asts = self.asts_for_asset(&self.root);
@@ -105,7 +127,7 @@ impl Context {
                 };
 
                 let Some(symbol) = ir_table.get(&entry.symbol.raw) else {
-                    errors.push_back(Error::new(
+                    errors.add(Error::new(
                         ErrorKind::SymbolNotFound,
                         format!("defined entry symbol '{}' not in scope", entry.symbol.raw)
                     ));
@@ -116,7 +138,7 @@ impl Context {
             }
         }
 
-        errors.push_back(Error::new(
+        errors.add(Error::new(
             ErrorKind::MissingEntryPoint,
             "missing entry point to ndl topology",
         ));

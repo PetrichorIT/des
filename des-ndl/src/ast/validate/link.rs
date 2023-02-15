@@ -2,18 +2,18 @@ use super::*;
 use crate::ast::{LinkData, LinkInheritance, LinkStmt, LitKind};
 
 impl Validate for LinkStmt {
-    fn validate(&self, errors: &mut LinkedList<Error>) {
+    fn validate(&self, errors: &mut ErrorsMut) {
         self.inheritance.as_ref().map(|inh| inh.validate(errors));
         self.data.validate(errors);
     }
 }
 
 impl Validate for LinkInheritance {
-    fn validate(&self, errors: &mut LinkedList<Error>) {
+    fn validate(&self, errors: &mut ErrorsMut) {
         let mut symbols = Vec::with_capacity(self.symbols.len());
         for symbol in self.symbols.iter() {
             if symbols.contains(&&symbol.raw) {
-                errors.push_back(Error::new(
+                errors.add(Error::new(
                     ErrorKind::LinkInheritanceDuplicatedSymbols,
                     format!(
                         "found duplicated symbol '{}' in link inheritence statement",
@@ -28,14 +28,14 @@ impl Validate for LinkInheritance {
 }
 
 impl Validate for LinkData {
-    fn validate(&self, errors: &mut LinkedList<Error>) {
+    fn validate(&self, errors: &mut ErrorsMut) {
         for item in self.items.iter() {
             // Do not make generic to Key<Ident, Lit, _> since known values
             // are only known in linkdata context
             match item.key.raw.as_str() {
                 "jitter" => {
                     if !matches!(item.value.kind, LitKind::Float { .. }) {
-                        errors.push_back(Error::new(
+                        errors.add(Error::new(
                             ErrorKind::LinkKnownKeysInvalidValue,
                             format!(
                                 "known key 'jitter' expectes a value of type float (not {})",
@@ -46,7 +46,7 @@ impl Validate for LinkData {
                 }
                 "latency" => {
                     if !matches!(item.value.kind, LitKind::Float { .. }) {
-                        errors.push_back(Error::new(
+                        errors.add(Error::new(
                             ErrorKind::LinkKnownKeysInvalidValue,
                             format!(
                                 "known key 'latency' expectes a value of type float (not {})",
@@ -57,7 +57,7 @@ impl Validate for LinkData {
                 }
                 "bitrate" => {
                     if !matches!(item.value.kind, LitKind::Integer { .. }) {
-                        errors.push_back(Error::new(
+                        errors.add(Error::new(
                             ErrorKind::LinkKnownKeysInvalidValue,
                             format!(
                                 "known key 'birate' expectes a value of type interger (not {})",
@@ -94,23 +94,23 @@ mod tests {
 
         // # Case 0
         let link = load_link(&mut smap, "raw:case0", "link A: B + C + D + B {}");
-        let mut errors = LinkedList::new();
+        let mut errors = Errors::new().as_mut();
         link.validate(&mut errors);
 
         assert_eq!(errors.len(), 1);
         assert_eq!(
-            errors.front().unwrap().kind,
+            errors.get(0).unwrap().kind,
             ErrorKind::LinkInheritanceDuplicatedSymbols
         );
 
         // # Case 1
         let link = load_link(&mut smap, "raw:case1", "link A: SomeLink + SomeLink {}");
-        let mut errors = LinkedList::new();
+        let mut errors = Errors::new().as_mut();
         link.validate(&mut errors);
 
         assert_eq!(errors.len(), 1);
         assert_eq!(
-            errors.front().unwrap().kind,
+            errors.get(0).unwrap().kind,
             ErrorKind::LinkInheritanceDuplicatedSymbols
         );
     }
@@ -121,23 +121,23 @@ mod tests {
 
         // # Case 0
         let link = load_link(&mut smap, "raw:case0", "link A { jitter: 100 }");
-        let mut errors = LinkedList::new();
+        let mut errors = Errors::new().as_mut();
         link.validate(&mut errors);
 
         assert_eq!(errors.len(), 1);
         assert_eq!(
-            errors.front().unwrap().kind,
+            errors.get(0).unwrap().kind,
             ErrorKind::LinkKnownKeysInvalidValue
         );
 
         // # Case 1
         let link = load_link(&mut smap, "raw:case1", "link A { bitrate: 1.0 }");
-        let mut errors = LinkedList::new();
+        let mut errors = Errors::new().as_mut();
         link.validate(&mut errors);
 
         assert_eq!(errors.len(), 1);
         assert_eq!(
-            errors.front().unwrap().kind,
+            errors.get(0).unwrap().kind,
             ErrorKind::LinkKnownKeysInvalidValue
         );
 
@@ -147,12 +147,12 @@ mod tests {
             "raw:case1",
             "link A { latency: \"str\", bitrate: 1.0 }",
         );
-        let mut errors = LinkedList::new();
+        let mut errors = Errors::new().as_mut();
         link.validate(&mut errors);
 
         assert_eq!(errors.len(), 2);
         assert_eq!(
-            errors.front().unwrap().kind,
+            errors.get(0).unwrap().kind,
             ErrorKind::LinkKnownKeysInvalidValue
         );
     }

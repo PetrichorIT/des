@@ -2,7 +2,7 @@ use super::*;
 use crate::ast::{File, Item};
 
 impl Validate for File {
-    fn validate(&self, errors: &mut LinkedList<Error>) {
+    fn validate(&self, errors: &mut ErrorsMut) {
         let mut symbols = Vec::with_capacity(self.items.len());
         for item in self.items.iter() {
             // (0) Internal validation
@@ -11,7 +11,7 @@ impl Validate for File {
             // (1) Symbol duplication
             if let Some(symbol) = item.symbol() {
                 if symbols.contains(&&symbol.raw) {
-                    errors.push_back(Error::new(
+                    errors.add(Error::new(
                         ErrorKind::SymbolDuplication,
                         format!(
                             "cannot create new symbol '{}', was allready defined",
@@ -27,7 +27,7 @@ impl Validate for File {
 }
 
 impl Validate for Item {
-    fn validate(&self, errors: &mut LinkedList<Error>) {
+    fn validate(&self, errors: &mut ErrorsMut) {
         match self {
             Self::Entry(entry) => entry.validate(errors),
             Self::Include(include) => include.validate(errors),
@@ -55,10 +55,10 @@ mod tests {
         let buf = ParseBuffer::new(asset, ts);
 
         let stmt = File::parse(&buf).unwrap();
-        let mut errors = LinkedList::new();
+        let mut errors = Errors::new().as_mut();
         stmt.validate(&mut errors);
 
         assert_eq!(errors.len(), 1);
-        assert_eq!(errors.front().unwrap().kind, ErrorKind::SymbolDuplication);
+        assert_eq!(errors.get(0).unwrap().kind, ErrorKind::SymbolDuplication);
     }
 }

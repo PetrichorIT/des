@@ -1,4 +1,4 @@
-use std::{collections::LinkedList, sync::Arc};
+use std::sync::Arc;
 
 use crate::{
     ast::{ModuleStmt, Spanned},
@@ -18,7 +18,7 @@ impl Module {
         modules: &ModuleIrTable,
         links: &LinkIrTable,
         global: &GlobalAstTable,
-        errors: &mut LinkedList<Error>,
+        errors: &mut ErrorsMut,
     ) -> Module {
         let errlen = errors.len();
 
@@ -28,7 +28,7 @@ impl Module {
         if let Some(ref gates) = ast.gates {
             for gate in gates.items.iter() {
                 if ir_gates.iter().any(|d| d.ident.raw == gate.ident.raw) {
-                    errors.push_back(Error::new(
+                    errors.add(Error::new(
                         ErrorKind::SymbolDuplication,
                         "gate symbol duplication ( should never appear )",
                     ));
@@ -61,7 +61,7 @@ impl Module {
                     .iter()
                     .any(|d| d.ident.raw == submodule.ident.raw)
                 {
-                    errors.push_back(Error::new(
+                    errors.add(Error::new(
                         ErrorKind::SymbolDuplication,
                         "gate symbol duplication ( should never appear )",
                     ));
@@ -75,7 +75,7 @@ impl Module {
                     .get(&submodule.typ.raw)
                     .map(Symbol::from)
                     .unwrap_or_else(|| {
-                        errors.push_back(
+                        errors.add(
                             Error::new(
                                 ErrorKind::SymbolNotFound,
                                 format!(
@@ -109,7 +109,7 @@ impl Module {
             for con in connections.items.iter() {
                 let delay = if let Some(link) = &con.link {
                     let Some(link) = links.get(&link.raw) else {
-                        errors.push_back(Error::new(
+                        errors.add(Error::new(
                             ErrorKind::SymbolNotFound,
                             format!("did not find link symbol '{}', not in scope", link.raw)
                         ).spanned(con.span()).map(|e| global.err_resolve_symbol(&link.raw, false, e)));
@@ -126,16 +126,16 @@ impl Module {
                 let (lhs, rhs) = match (lhs, rhs) {
                     (Ok(lhs), Ok(rhs)) => (lhs, rhs),
                     (Err(e), Ok(_)) => {
-                        errors.push_back(e);
+                        errors.add(e);
                         continue;
                     }
                     (Ok(_), Err(e)) => {
-                        errors.push_back(e);
+                        errors.add(e);
                         continue;
                     }
                     (Err(e1), Err(e2)) => {
-                        errors.push_back(e1);
-                        errors.push_back(e2);
+                        errors.add(e1);
+                        errors.add(e2);
                         continue;
                     }
                 };
@@ -149,14 +149,14 @@ impl Module {
                     let r = rhs.pop().unwrap();
 
                     if l.def.service_typ == GateServiceType::Input {
-                        errors.push_back(Error::new(
+                        errors.add(Error::new(
                             ErrorKind::InvalidConGateServiceTyp,
                             format!("Gate '{}' cannot serve as connection source, since it is of serivce type '{:?}'", l.def.ident.raw, l.def.service_typ)
                         ));
                     }
 
                     if r.def.service_typ == GateServiceType::Output {
-                        errors.push_back(Error::new(
+                        errors.add(Error::new(
                             ErrorKind::InvalidConGateServiceTyp,
                             format!("Gate '{}' cannot serve as connection target, since it is of serivce type '{:?}'", r.def.ident.raw, r.def.service_typ)
                         ));
@@ -170,13 +170,13 @@ impl Module {
                 }
 
                 if lhs.len() > 0 {
-                    errors.push_back(Error::new(
+                    errors.add(Error::new(
                         ErrorKind::InvalidConDefSizes,
                         format!("Invalid connection statement, source domain is bigger than target domain (by {} gates)", lhs.len())
                     ))
                 }
                 if rhs.len() > 0 {
-                    errors.push_back(Error::new(
+                    errors.add(Error::new(
                         ErrorKind::InvalidConDefSizes,
                         format!("Invalid connection statement, target domain is bigger than source domain (by {} gates)", rhs.len())
                     ))
