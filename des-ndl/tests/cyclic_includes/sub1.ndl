@@ -1,0 +1,3 @@
+include sub3;
+
+module A {}

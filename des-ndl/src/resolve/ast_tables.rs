@@ -4,6 +4,7 @@ use crate::{
     ast::{self, Item, LinkStmt, ModuleStmt, Spanned},
     error::*,
     resource::AssetIdentifier,
+    util::dfs_cycles,
     Context, SourceMap, Span,
 };
 
@@ -17,9 +18,49 @@ pub struct LinkAstTable {
 }
 
 impl LinkAstTable {
-    pub fn order_local_deps(&mut self) {
-        let local = self.local_mut();
+    pub fn order_local_deps(&mut self) -> Result<()> {
+        let (local, nonlocal) = self.local_mut();
         let mut s = 0;
+
+        // Generate topo;
+        let mut topo = vec![Vec::new(); local.len()];
+        for i in 0..local.len() {
+            let Some(ref inh) = local[i].inheritance else {
+                continue;
+            };
+
+            for dep in inh.symbols.iter() {
+                let ldep = local
+                    .iter()
+                    .enumerate()
+                    .find(|(_, l)| l.ident.raw == dep.raw);
+                if let Some(ldep) = ldep {
+                    topo[i].push(ldep.0);
+                } else {
+                    // ignore nonloca dep
+                }
+            }
+        }
+
+        if let Err(cycles) = dfs_cycles(&topo) {
+            let cycle = &cycles[0];
+
+            let s = cycle[0];
+
+            let mut fmt = vec![&local[s].ident.raw[..]];
+            for &e in cycle.iter().rev() {
+                fmt.push(&local[e].ident.raw[..]);
+            }
+
+            return Err(Error::new(
+                ErrorKind::LinkLocalCyclicDeps,
+                format!(
+                    "found cyclic definition of local links: {}",
+                    fmt.join(" <- ")
+                ),
+            )
+            .spanned(local[s].span()));
+        }
 
         while s < local.len() {
             // let mut loadable = false;
@@ -30,9 +71,8 @@ impl LinkAstTable {
                 if let Some(ref inh) = local[i].inheritance {
                     'inner: for dep in inh.symbols.iter() {
                         let valid = local[..s].iter().any(|l| l.ident.raw == dep.raw);
-
                         if !valid {
-                            let valid_nonlocal = local[s..].iter().any(|l| l.ident.raw == dep.raw);
+                            let valid_nonlocal = nonlocal.iter().any(|l| l.ident.raw == dep.raw);
                             if valid_nonlocal {
                                 continue 'inner;
                             }
@@ -54,16 +94,19 @@ impl LinkAstTable {
             if s != i && i < local.len() {
                 local.swap(s, i);
             }
+
             s += 1;
         }
+
+        Ok(())
     }
 
     pub fn local(&self) -> &[Arc<LinkStmt>] {
         &self.links[..self.ptr]
     }
 
-    pub fn local_mut(&mut self) -> &mut [Arc<LinkStmt>] {
-        &mut self.links[..self.ptr]
+    pub fn local_mut(&mut self) -> (&mut [Arc<LinkStmt>], &mut [Arc<LinkStmt>]) {
+        self.links.split_at_mut(self.ptr)
     }
 
     pub fn from_ctx(ctx: &Context, asset: &AssetIdentifier, errors: &mut ErrorsMut) -> Self {
@@ -139,9 +182,49 @@ pub struct ModuleAstTable {
 }
 
 impl ModuleAstTable {
-    pub fn order_local_deps(&mut self) {
-        let local = self.local_mut();
+    pub fn order_local_deps(&mut self) -> Result<()> {
+        let (local, nonlocal) = self.local_mut();
         let mut s = 0;
+
+        // Generate topo;
+        let mut topo = vec![Vec::new(); local.len()];
+        for i in 0..local.len() {
+            let Some(ref submodules) = local[i].submodules else {
+                continue;
+            };
+
+            for dep in submodules.items.iter() {
+                let ldep = local
+                    .iter()
+                    .enumerate()
+                    .find(|(_, l)| l.ident.raw == dep.typ.raw);
+                if let Some(ldep) = ldep {
+                    topo[i].push(ldep.0);
+                } else {
+                    // ignore nonloca dep
+                }
+            }
+        }
+
+        if let Err(cycles) = dfs_cycles(&topo) {
+            let cycle = &cycles[0];
+
+            let s = cycle[0];
+
+            let mut fmt = vec![&local[s].ident.raw[..]];
+            for &e in cycle.iter().rev() {
+                fmt.push(&local[e].ident.raw[..]);
+            }
+
+            return Err(Error::new(
+                ErrorKind::ModuleLocalCyclicDeps,
+                format!(
+                    "found cyclic definition of local modules: {}",
+                    fmt.join(" <- ")
+                ),
+            )
+            .spanned(local[s].span()));
+        }
 
         while s < local.len() {
             // let mut loadable = false;
@@ -155,7 +238,7 @@ impl ModuleAstTable {
                         let valid = local[..s].iter().any(|l| l.ident.raw == dep.raw);
 
                         if !valid {
-                            let valid_nonlocal = local[s..].iter().any(|l| l.ident.raw == dep.raw);
+                            let valid_nonlocal = nonlocal.iter().any(|l| l.ident.raw == dep.raw);
                             if valid_nonlocal {
                                 continue 'inner;
                             }
@@ -179,14 +262,16 @@ impl ModuleAstTable {
             }
             s += 1;
         }
+
+        Ok(())
     }
 
     pub fn local(&self) -> &[Arc<ModuleStmt>] {
         &self.modules[..self.ptr]
     }
 
-    pub fn local_mut(&mut self) -> &mut [Arc<ModuleStmt>] {
-        &mut self.modules[..self.ptr]
+    pub fn local_mut(&mut self) -> (&mut [Arc<ModuleStmt>], &mut [Arc<ModuleStmt>]) {
+        self.modules.split_at_mut(self.ptr)
     }
 
     pub fn from_ctx(ctx: &Context, asset: &AssetIdentifier, errors: &mut ErrorsMut) -> Self {
@@ -291,18 +376,21 @@ impl<'a> GlobalAstTable<'a> {
                 let target = target_asset.ident.path().unwrap().to_str().unwrap();
 
                 if expect_module {
-                    let this = self.smap.asset(&self.this).unwrap();
-                    let span = Span::new(this.offset, 0);
-                    let replacement = format!("include {};", this.include_for(target_asset));
-
                     error.hints.push(ErrorHint::Help(format!(
                         "similar symbol '{symbol}' was found, but not included ({target})"
                     )));
-                    error.hints.push(ErrorHint::Solution(ErrorSolution {
-                        description: format!("try including '{symbol}'"),
-                        span,
-                        replacement,
-                    }))
+
+                    let this = self.smap.asset(&self.this).unwrap();
+                    let span = Span::new(this.offset, 0);
+                    if let Some(include) = this.include_for(target_asset) {
+                        let replacement = format!("include {};", include);
+
+                        error.hints.push(ErrorHint::Solution(ErrorSolution {
+                            description: format!("try including '{symbol}'"),
+                            span,
+                            replacement,
+                        }));
+                    }
                 } else {
                     error.hints.push(ErrorHint::Note(format!(
                         "similar symbol '{symbol}' was found, but it is a module ({target})"
@@ -317,18 +405,21 @@ impl<'a> GlobalAstTable<'a> {
                 let target = target_asset.ident.path().unwrap().to_str().unwrap();
 
                 if !expect_module {
-                    let this = self.smap.asset(&self.this).unwrap();
-                    let span = Span::new(this.offset, 0);
-                    let replacement = format!("include {};", this.include_for(target_asset));
-
                     error.hints.push(ErrorHint::Help(format!(
                         "similar symbol '{symbol}' was found, but not included"
                     )));
-                    error.hints.push(ErrorHint::Solution(ErrorSolution {
-                        description: format!("try including '{symbol}'"),
-                        span,
-                        replacement,
-                    }))
+
+                    let this = self.smap.asset(&self.this).unwrap();
+                    let span = Span::new(this.offset, 0);
+
+                    if let Some(include) = this.include_for(target_asset) {
+                        let replacement = format!("include {};", include);
+                        error.hints.push(ErrorHint::Solution(ErrorSolution {
+                            description: format!("try including '{symbol}'"),
+                            span,
+                            replacement,
+                        }));
+                    }
                 } else {
                     error.hints.push(ErrorHint::Note(format!(
                         "similar symbol '{symbol}' was found, but it is a link ({target})"

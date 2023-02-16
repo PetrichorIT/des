@@ -209,7 +209,7 @@ impl SourceMappedAsset {
         }
     }
 
-    pub fn include_for(&self, other: &SourceMappedAsset) -> String {
+    pub fn include_for(&self, other: &SourceMappedAsset) -> Option<String> {
         let s = self.ident.alias();
         let o = other.ident.alias();
 
@@ -229,11 +229,11 @@ impl SourceMappedAsset {
                     include.push('/');
                 }
                 include.pop();
-                return include;
+                return Some(include);
             }
         }
 
-        unreachable!()
+        None
     }
 
     pub(crate) fn span(&self) -> Span {

@@ -44,9 +44,11 @@ pub enum ErrorKind {
     RootError,
     SymbolNotFound,
     LinkMissingRequiredFields,
+    LinkLocalCyclicDeps,
     InvalidConGateServiceTyp,
     InvalidConDefSizes,
     InvalidConClusterIndex,
+    ModuleLocalCyclicDeps,
     MissingEntryPoint,
 }
 

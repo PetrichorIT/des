@@ -50,33 +50,36 @@ impl Context {
                     // Resolve links
                     // - all nonlocal dependencies are allready ir
                     // - local dependencies may be out of order
-                    ast_links.order_local_deps();
-                    for link in ast_links.local() {
-                        let ident = link.ident.raw.clone();
-                        errors.with_mapping(
-                            move |e| {
-                                e.add_hints(ErrorHint::Note(format!(
-                                    "found in link definition '{}'",
-                                    ident
-                                )))
-                            },
-                            |errors| {
-                                // Use the link_specific symboliser to parse a link;
-                                let ir = ir::Link::from_ast(
-                                    link.clone(),
-                                    &ir_links,
-                                    &global_ast,
-                                    errors,
-                                );
-                                let ir = Arc::new(ir);
+                    if let Err(err) = ast_links.order_local_deps() {
+                        errors.add(err);
+                    } else {
+                        for link in ast_links.local() {
+                            let ident = link.ident.raw.clone();
+                            errors.with_mapping(
+                                move |e| {
+                                    e.add_hints(ErrorHint::Note(format!(
+                                        "found in link definition '{}'",
+                                        ident
+                                    )))
+                                },
+                                |errors| {
+                                    // Use the link_specific symboliser to parse a link;
+                                    let ir = ir::Link::from_ast(
+                                        link.clone(),
+                                        &ir_links,
+                                        &global_ast,
+                                        errors,
+                                    );
+                                    let ir = Arc::new(ir);
 
-                                // Add the link to the local ir_table to ensure that other links
-                                // in this link can use it in later iterations.
-                                // order is ensure by order_local_deps
-                                ir_links.add(ir.clone());
-                                items.push(ir::Item::Link(ir));
-                            },
-                        );
+                                    // Add the link to the local ir_table to ensure that other links
+                                    // in this link can use it in later iterations.
+                                    // order is ensure by order_local_deps
+                                    ir_links.add(ir.clone());
+                                    items.push(ir::Item::Link(ir));
+                                },
+                            );
+                        }
                     }
 
                     // Modules use local ast info, and dependency ir info, with global ast-debug info
@@ -86,35 +89,38 @@ impl Context {
 
                     // Resolve mdoules
                     // - same
-                    ast_modules.order_local_deps();
-                    for module in ast_modules.local() {
-                        let ident = module.ident.raw.clone();
-                        errors.with_mapping(
-                            move |e| {
-                                e.add_hints(ErrorHint::Note(format!(
-                                    "found in module definition '{}'",
-                                    ident
-                                )))
-                            },
-                            |errors| {
-                                // Use the local symboliser for modules.
-                                let ir = ir::Module::from_ast(
-                                    module.clone(),
-                                    &ir_modules,
-                                    &ir_links,
-                                    &global_ast,
-                                    errors,
-                                );
+                    if let Err(e) = ast_modules.order_local_deps() {
+                        errors.add(e)
+                    } else {
+                        for module in ast_modules.local() {
+                            let ident = module.ident.raw.clone();
+                            errors.with_mapping(
+                                move |e| {
+                                    e.add_hints(ErrorHint::Note(format!(
+                                        "found in module definition '{}'",
+                                        ident
+                                    )))
+                                },
+                                |errors| {
+                                    // Use the local symboliser for modules.
+                                    let ir = ir::Module::from_ast(
+                                        module.clone(),
+                                        &ir_modules,
+                                        &ir_links,
+                                        &global_ast,
+                                        errors,
+                                    );
 
-                                let ir = Arc::new(ir);
+                                    let ir = Arc::new(ir);
 
-                                // Add the module to the local ir_table to ensure that other modules
-                                // in this module can use it in later iterations.
-                                // order is ensure by order_local_deps
-                                ir_modules.add(ir.clone());
-                                items.push(ir::Item::Module(ir));
-                            },
-                        )
+                                    // Add the module to the local ir_table to ensure that other modules
+                                    // in this module can use it in later iterations.
+                                    // order is ensure by order_local_deps
+                                    ir_modules.add(ir.clone());
+                                    items.push(ir::Item::Module(ir));
+                                },
+                            )
+                        }
                     }
 
                     // Address collected items with asset identifier

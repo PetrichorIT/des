@@ -9,7 +9,8 @@ use crate::{
     error::*,
     ir,
     resource::{fs::canon, AssetIdentifier},
-    SourceMap,
+    util::dfs_cycles,
+    SourceMap, Span,
 };
 
 #[derive(Debug)]
@@ -207,8 +208,9 @@ impl Context {
         }
 
         let mut topo: Vec<Vec<usize>> = vec![Vec::new(); self.assets.len()];
+        let mut topo_span: Vec<Vec<Span>> = vec![Vec::new(); self.assets.len()];
 
-        // Add raw edges
+        // Build topology from raw edges.
         for i in 0..self.assets.len() {
             let ast = self.ast.get(&self.assets[i]).unwrap();
             for item in ast.items.iter() {
@@ -231,50 +233,53 @@ impl Context {
                     };
 
                     topo[i].push(asset.0);
+                    topo_span[i].push(include.span())
                 }
             }
         }
 
-        // Recusivly add entries (DFS)
-        for i in 0..self.assets.len() {
-            if let Err(e) = self.load_recursive_deps_for(i, &topo) {
-                errors.add(e)
+        // Check for cycles - throw error if found
+        match dfs_cycles(&topo) {
+            Ok(reachability) => {
+                // Add fully expanded dep trees
+                for i in 0..self.assets.len() {
+                    let mut deps = Vec::with_capacity(self.assets.len());
+                    for (j, &reachable) in reachability[i].iter().enumerate() {
+                        if reachable && i != j {
+                            deps.push(self.assets[j].clone());
+                        }
+                    }
+
+                    self.deps.insert(self.assets[i].clone(), deps);
+                }
+            }
+            Err(cycles) => {
+                // Append each elementary cycles as its own error
+                for cycle in cycles {
+                    let s = cycle[0];
+
+                    let mut fmt = vec![self.assets[s].alias()];
+                    for &e in cycle.iter().rev() {
+                        fmt.push(self.assets[e].alias());
+                    }
+
+                    // find inital edge for span
+                    let mut span = Span::new(0, 0);
+                    for j in 0..topo[s].len() {
+                        if topo[s][j] == cycle[1] {
+                            span = topo_span[s][j]
+                        }
+                    }
+
+                    errors.add(
+                        Error::new(
+                            ErrorKind::CyclicDeps,
+                            format!("found cyclic includes: {}", fmt.join(" <- ")),
+                        )
+                        .spanned(span),
+                    )
+                }
             }
         }
-    }
-
-    fn load_recursive_deps_for(&mut self, i: usize, topo: &[Vec<usize>]) -> Result<()> {
-        let mut dep = Vec::new();
-        let mut visited = vec![false; self.assets.len()];
-
-        fn dfs(
-            topo: &[Vec<usize>],
-            o: usize,
-            i: usize,
-            visited: &mut [bool],
-            deps: &mut Vec<AssetIdentifier>,
-            labels: &[AssetIdentifier],
-        ) -> Result<()> {
-            if visited[i] {
-                if i == o {
-                    Err(Error::new(ErrorKind::CyclicDeps, "cyclic deps"))
-                } else {
-                    Ok(())
-                }
-            } else {
-                visited[i] = true;
-                if o != i {
-                    deps.push(labels[i].clone());
-                }
-                for edge in &topo[i] {
-                    dfs(topo, o, *edge, visited, deps, labels)?;
-                }
-                Ok(())
-            }
-        }
-
-        dfs(topo, i, i, &mut visited, &mut dep, &self.assets)?;
-        self.deps.insert(self.assets[i].clone(), dep);
-        Ok(())
     }
 }
