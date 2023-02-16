@@ -20,7 +20,7 @@ impl<T> Spanned for Delimited<T> {
 impl<T: Parse> Delimited<T> {
     pub fn parse_from(delim: Delimiter, input: ParseStream<'_>) -> Result<Delimited<T>> {
         let Some(peek) = input.ts.peek() else {
-            return Err(Error::new(ErrorKind::ExpectedDelimited, "expected delimited sequence"));
+            return Err(Error::new(ErrorKind::ExpectedDelimited, "expected delimited sequence, found EOF").spanned(input.ts.last_span()));
         };
 
         let (span, d) = match peek {
@@ -48,7 +48,7 @@ impl<T: Parse> Delimited<T> {
         } else {
             Err(Error::new(
                 ErrorKind::UnexpectedDelim,
-                "expected other delimited sequence",
+                format!("expected delimited sequence '{delim}', found delimited sequence '{d}'"),
             )
             .spanned(Span::fromto(span.open, span.close)))
         }

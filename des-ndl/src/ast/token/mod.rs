@@ -174,6 +174,17 @@ impl Delimiter {
     }
 }
 
+impl fmt::Display for Delimiter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Parenthesis => write!(f, "( ... )"),
+            Self::Brace => write!(f, "{{ ... }}"),
+            Self::Bracket => write!(f, "[ ... ]"),
+            Self::Invisible => write!(f, "..."),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum LitKind {
     Integer { lit: i32 },

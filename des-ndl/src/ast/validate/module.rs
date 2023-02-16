@@ -3,9 +3,9 @@ use crate::ast::*;
 
 impl Validate for ModuleStmt {
     fn validate(&self, errors: &mut ErrorsMut) {
-        self.gates.as_ref().map(|g| g.validate(errors));
-        self.submodules.as_ref().map(|s| s.validate(errors));
-        self.connections.as_ref().map(|c| c.validate(errors));
+        self.gates.iter().for_each(|s| s.validate(errors));
+        self.submodules.iter().for_each(|s| s.validate(errors));
+        self.connections.iter().for_each(|s| s.validate(errors));
     }
 }
 
@@ -15,13 +15,16 @@ impl Validate for GatesStmt {
         for gate_def in self.items.iter() {
             // (0) Duplication checking
             if symbols.contains(&&gate_def.ident.raw) {
-                errors.add(Error::new(
-                    ErrorKind::ModuleGatesDuplicatedSymbols,
-                    format!(
-                        "gate(-cluster) '{}' was defined multiple times",
-                        gate_def.ident.raw
-                    ),
-                ));
+                errors.add(
+                    Error::new(
+                        ErrorKind::ModuleGatesDuplicatedSymbols,
+                        format!(
+                            "gate(-cluster) '{}' was defined multiple times",
+                            gate_def.ident.raw
+                        ),
+                    )
+                    .spanned(gate_def.span()),
+                );
             } else {
                 symbols.push(&gate_def.ident.raw);
             }
@@ -30,13 +33,16 @@ impl Validate for GatesStmt {
             match gate_def.annotation.as_ref().map(|a| a.raw.as_ref()) {
                 Some("input") | Some("in") | Some("Input") | Some("In") => { /* NOP */ }
                 Some("output") | Some("out") | Some("Output") | Some("Out") => { /* NOP */ }
-                Some(annot) => errors.add(Error::new(
-                    ErrorKind::InvalidAnnotation,
-                    format!(
-                        "invalid annotation '{}', gates can only be annoted with input/output",
-                        annot
-                    ),
-                )),
+                Some(annot) => errors.add(
+                    Error::new(
+                        ErrorKind::InvalidAnnotation,
+                        format!(
+                            "invalid annotation '{}', gates can only be annoted with input/output",
+                            annot
+                        ),
+                    )
+                    .spanned(gate_def.span()),
+                ),
                 None => { /* NOP */ }
             }
 
@@ -46,22 +52,25 @@ impl Validate for GatesStmt {
                     if *lit > 0 {
                         /* GOOD */
                     } else {
-                        errors.add(Error::new(
-                            ErrorKind::ModuleGatesInvalidClusterSize,
-                            format!(
-                                "cannot create gate cluster of size '{}', requires positiv integer",
+                        errors.add(
+                            Error::new(
+                                ErrorKind::ModuleGatesInvalidClusterSize,
+                                format!(
+                                "cannot create gate-cluster of size '{}', requires positiv integer",
                                 lit
                             ),
-                        ));
+                            )
+                            .spanned(cluster.span()),
+                        );
                     }
                 } else {
                     errors.add(Error::new(
                         ErrorKind::InvalidLitTyp,
                         format!(
-                            "invalid literal type {}, expected literal of type integer",
+                            "cannot create gate-cluster with literal of type {}, expected literal of type integer",
                             cluster.lit.kind.typ()
                         ),
-                    ))
+                    ).spanned(cluster.span()))
                 }
             }
         }

@@ -84,6 +84,15 @@ where
         while !input.ts.is_empty() {
             let item = T::parse(input)?;
 
+            /* .map_err(|e| {
+                if matches!(e.kind, ErrorKind::UnexpectedToken | UnexpectedEOF) {
+                    let f = format!("{}", e.internal);
+                    e.override_internal(format!("expected value in punctuated statement: {f}"))
+                } else {
+                    e
+                }
+            }) */
+
             if input.ts.is_empty() {
                 // no tailing delim needed
                 this.last = Some(Box::new(item));

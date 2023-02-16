@@ -19,9 +19,9 @@ pub use submodules::*;
 pub struct ModuleStmt {
     pub keyword: ModuleToken,
     pub ident: Ident,
-    pub gates: Option<GatesStmt>,
-    pub submodules: Option<SubmodulesStmt>,
-    pub connections: Option<ConnectionsStmt>,
+    pub gates: Vec<GatesStmt>,
+    pub submodules: Vec<SubmodulesStmt>,
+    pub connections: Vec<ConnectionsStmt>,
     pub span: Span,
 }
 
@@ -34,7 +34,10 @@ impl Spanned for ModuleStmt {
 impl Parse for ModuleStmt {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         let keyword = ModuleToken::parse(input)?;
-        let ident = Ident::parse(input)?;
+        let ident = Ident::parse(input).map_err(|e| {
+            let f = format!("{}", e.internal);
+            e.override_internal(format!("unexpected token for module symbol: {f}"))
+        })?;
 
         let delim = Delimited::<TokenStream>::parse_from(Delimiter::Brace, input)?;
         let inner = ParseBuffer::new(input.asset, delim.inner);
@@ -43,9 +46,9 @@ impl Parse for ModuleStmt {
         let mut this = ModuleStmt {
             keyword,
             ident,
-            gates: None,
-            submodules: None,
-            connections: None,
+            gates: Vec::new(),
+            submodules: Vec::new(),
+            connections: Vec::new(),
             span,
         };
 
@@ -57,21 +60,24 @@ impl Parse for ModuleStmt {
                         ..
                     },
                     _,
-                )) => this.gates = Some(GatesStmt::parse(&inner)?),
+                )) => this.gates.push(GatesStmt::parse(&inner)?),
+
                 Some(TokenTree::Token(
                     Token {
                         kind: TokenKind::Keyword(Keyword::Submodules),
                         ..
                     },
                     _,
-                )) => this.submodules = Some(SubmodulesStmt::parse(&inner)?),
+                )) => this.submodules.push(SubmodulesStmt::parse(&inner)?),
+
                 Some(TokenTree::Token(
                     Token {
                         kind: TokenKind::Keyword(Keyword::Connections),
                         ..
                     },
                     _,
-                )) => this.connections = Some(ConnectionsStmt::parse(&inner)?),
+                )) => this.connections.push(ConnectionsStmt::parse(&inner)?),
+
                 Some(_other) => {
                     return Err(Error::new(
                         ErrorKind::ExpectedInModuleKeyword,
@@ -102,9 +108,9 @@ mod tests {
 
         let stmt = ModuleStmt::parse(&buf).unwrap();
         assert_eq!(stmt.ident, "A");
-        assert_eq!(stmt.gates, None);
-        assert_eq!(stmt.submodules, None);
-        assert_eq!(stmt.connections, None);
+        assert_eq!(stmt.gates, vec![]);
+        assert_eq!(stmt.submodules, vec![]);
+        assert_eq!(stmt.connections, vec![]);
     }
 
     #[test]
@@ -121,9 +127,9 @@ mod tests {
 
         let stmt = ModuleStmt::parse(&buf).unwrap();
         assert_eq!(stmt.ident, "A");
-        assert!(stmt.gates.is_some());
-        assert!(stmt.submodules.is_some());
-        assert!(stmt.connections.is_some());
+        assert!(stmt.gates.len() > 0);
+        assert!(stmt.submodules.len() > 0);
+        assert!(stmt.connections.len() > 0);
     }
 
     #[test]

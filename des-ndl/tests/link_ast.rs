@@ -49,7 +49,7 @@ fn link_ast_noident() {
 
     check_err!(errs.get(0) =>
         ErrorKind::UnexpectedToken,
-        "unexpected token, expected <ident> for link statement"
+        "unexpected token for link symbol: expected <ident>, found delim"
     );
 }
 

@@ -1,5 +1,10 @@
 use super::{Cursor, Delimiter, Token};
-use crate::{ast::token::TokenKind, error::Error, lexer, Span};
+use crate::{
+    ast::{token::TokenKind, Lit},
+    error::Error,
+    lexer::{self, LiteralKind},
+    Span,
+};
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
@@ -186,6 +191,25 @@ impl TokenTree {
                     }
                     Minus => {
                         if cursor.peek(0).map(|t| t.kind) != Some(Minus) {
+                            if let Some(lexer::Token {
+                                kind: Literal { kind, .. },
+                                len,
+                            }) = cursor.peek(0)
+                            {
+                                if matches!(
+                                    kind,
+                                    LiteralKind::Int { .. } | LiteralKind::Float { .. }
+                                ) {
+                                    span = Span::new(span.pos, span.len + len);
+                                    cursor.bump(1);
+                                    let lit = Lit::from_span(kind, span, cursor)?;
+                                    return Ok(TokenTree::Token(
+                                        Token::new(TokenKind::Literal(lit), span),
+                                        Spacing::Alone,
+                                    ));
+                                }
+                            }
+
                             return Ok(TokenTree::Token(
                                 Token::new(TokenKind::Minus, span),
                                 Spacing::Alone,

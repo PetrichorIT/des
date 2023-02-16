@@ -189,11 +189,8 @@ impl ModuleAstTable {
         // Generate topo;
         let mut topo = vec![Vec::new(); local.len()];
         for i in 0..local.len() {
-            let Some(ref submodules) = local[i].submodules else {
-                continue;
-            };
-
-            for dep in submodules.items.iter() {
+            let submodules = &local[i].submodules;
+            for dep in submodules.iter().map(|s| s.items.iter()).flatten() {
                 let ldep = local
                     .iter()
                     .enumerate()
@@ -232,28 +229,24 @@ impl ModuleAstTable {
 
             'seacher: while i < local.len() {
                 // check if i depents are in ..s
-                if let Some(ref sbm) = local[i].submodules {
-                    'inner: for dep in sbm.items.iter() {
-                        let dep = &dep.typ;
-                        let valid = local[..s].iter().any(|l| l.ident.raw == dep.raw);
+                let sbm = &local[i].submodules;
+                'inner: for dep in sbm.iter().map(|s| s.items.iter()).flatten() {
+                    let dep = &dep.typ;
+                    let valid = local[..s].iter().any(|l| l.ident.raw == dep.raw);
 
-                        if !valid {
-                            let valid_nonlocal = nonlocal.iter().any(|l| l.ident.raw == dep.raw);
-                            if valid_nonlocal {
-                                continue 'inner;
-                            }
-
-                            i += 1;
-                            continue 'seacher;
+                    if !valid {
+                        let valid_nonlocal = nonlocal.iter().any(|l| l.ident.raw == dep.raw);
+                        if valid_nonlocal {
+                            continue 'inner;
                         }
+
+                        i += 1;
+                        continue 'seacher;
                     }
-                    // all deps are valid
-                    // loadable = true;
-                    break;
-                } else {
-                    // loadable = true;
-                    break;
                 }
+                // all deps are valid
+                // loadable = true;
+                break;
             }
 
             // not all deps may be loadable, since nonlocal deps are not repr

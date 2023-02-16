@@ -1,0 +1,8 @@
+module Sub {
+    gates {
+        in @input,
+        out @output,
+    }
+}
+
+module Main

@@ -1,6 +1,9 @@
 use std::{cell::Cell, sync::Arc};
 
-use crate::ast::token::{TokenStream, TokenTree};
+use crate::{
+    ast::token::{TokenStream, TokenTree},
+    Span,
+};
 
 #[derive(Debug)]
 pub struct Cursor {
@@ -48,6 +51,10 @@ impl Cursor {
     //         Some(&self.ts[self.idx.get() - 1])
     //     }
     // }
+
+    pub(crate) fn last_span(&self) -> Span {
+        self.ts.last().unwrap().span()
+    }
 
     pub(crate) fn bump(&self) {
         self.idx.set(self.idx.get() + 1)

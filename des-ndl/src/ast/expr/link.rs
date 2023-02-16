@@ -53,7 +53,8 @@ impl Parse for LinkStmt {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         let link_token = LinkToken::parse(input)?;
         let ident = Ident::parse(input).map_err(|e| {
-            e.override_internal("unexpected token, expected <ident> for link statement")
+            let f = format!("{}", e.internal);
+            e.override_internal(format!("unexpected token for link symbol: {}", f))
         })?;
         let inheritance = Option::<LinkInheritance>::parse(input)?;
         let data = LinkData::parse(input)?;

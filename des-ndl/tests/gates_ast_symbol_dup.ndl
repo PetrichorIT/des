@@ -1,0 +1,8 @@
+module M {
+    gates {
+        influx[5],
+        influx,
+    }
+}
+
+entry M;
