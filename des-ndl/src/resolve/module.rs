@@ -26,10 +26,16 @@ impl Module {
         let mut ir_gates: Vec<Gate> = Vec::with_capacity(ast.gates.len());
         for gate in ast.gates.iter().map(|stmt| stmt.items.iter()).flatten() {
             if ir_gates.iter().any(|d| d.ident.raw == gate.ident.raw) {
-                errors.add(Error::new(
-                    ErrorKind::SymbolDuplication,
-                    "gate symbol duplication ( should never appear )",
-                ));
+                errors.add(
+                    Error::new(
+                        ErrorKind::SymbolDuplication,
+                        format!(
+                            "gate(-cluster) '{}' was defined multiple times",
+                            gate.ident.raw
+                        ),
+                    )
+                    .spanned(gate.span()),
+                );
                 continue;
             }
             ir_gates.push(Gate {
@@ -62,10 +68,16 @@ impl Module {
                 .iter()
                 .any(|d| d.ident.raw == submodule.ident.raw)
             {
-                errors.add(Error::new(
-                    ErrorKind::SymbolDuplication,
-                    "gate symbol duplication ( should never appear )",
-                ));
+                errors.add(
+                    Error::new(
+                        ErrorKind::SymbolDuplication,
+                        format!(
+                            "submodule(-cluster) '{}' was defined multiple times",
+                            submodule.ident.raw
+                        ),
+                    )
+                    .spanned(submodule.span()),
+                );
                 continue;
             }
 
@@ -84,7 +96,8 @@ impl Module {
                                 submodule.typ.raw
                             ),
                         )
-                        .spanned(submodule.typ.span()),
+                        .spanned(submodule.typ.span())
+                        .map(|e| global.err_resolve_symbol(&submodule.typ.raw, true, e)),
                     );
                     Symbol::Unresolved(submodule.typ.raw.clone())
                 });

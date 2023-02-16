@@ -1,0 +1,12 @@
+module M {
+    gates {
+        in @input,
+        out,
+    }
+    gates {
+        influx[5],
+        outflow[1] @out
+    }
+}
+
+entry M;

@@ -1,0 +1,3 @@
+- MISSING: prevent self referential modules
+- remember that in future prototyping will make this more difficult because it must be done on symbol level
+- not in local validation layer

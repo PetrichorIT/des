@@ -80,22 +80,25 @@ impl Validate for GatesStmt {
 impl Validate for SubmodulesStmt {
     fn validate(&self, errors: &mut ErrorsMut) {
         let mut symbols = Vec::with_capacity(self.items.len());
-        for gate_def in self.items.iter() {
+        for submod_def in self.items.iter() {
             // (0) Duplication checking
-            if symbols.contains(&&gate_def.ident.raw) {
-                errors.add(Error::new(
-                    ErrorKind::ModuleSubDuplicatedSymbols,
-                    format!(
-                        "submodule(-cluster) '{}' was defined multiple times",
-                        gate_def.ident.raw
-                    ),
-                ));
+            if symbols.contains(&&submod_def.ident.raw) {
+                errors.add(
+                    Error::new(
+                        ErrorKind::ModuleSubDuplicatedSymbols,
+                        format!(
+                            "submodule(-cluster) '{}' was defined multiple times",
+                            submod_def.ident.raw
+                        ),
+                    )
+                    .spanned(submod_def.span()),
+                );
             } else {
-                symbols.push(&gate_def.ident.raw);
+                symbols.push(&submod_def.ident.raw);
             }
 
             // (2) Literal checking
-            if let Some(cluster) = gate_def.cluster.as_ref() {
+            if let Some(cluster) = submod_def.cluster.as_ref() {
                 if let LitKind::Integer { ref lit } = cluster.lit.kind {
                     if *lit > 0 {
                         /* GOOD */
@@ -106,16 +109,19 @@ impl Validate for SubmodulesStmt {
                                 "cannot create submodule cluster of size '{}', requires positiv integer",
                                 lit
                             ),
-                        ));
+                        ).spanned(cluster.span()));
                     }
                 } else {
-                    errors.add(Error::new(
-                        ErrorKind::InvalidLitTyp,
-                        format!(
-                            "invalid literal type {}, expected literal of type integer",
-                            cluster.lit.kind.typ()
-                        ),
-                    ))
+                    errors.add(
+                        Error::new(
+                            ErrorKind::InvalidLitTyp,
+                            format!(
+                                "invalid literal type {}, expected literal of type integer",
+                                cluster.lit.kind.typ()
+                            ),
+                        )
+                        .spanned(cluster.span()),
+                    )
                 }
             }
         }

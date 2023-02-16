@@ -69,14 +69,14 @@ fn link_ir_inh_with_solutions() {
     check_err!(errs.get(0) =>
         ErrorKind::SymbolNotFound,
         "did not find link symbol 'C', not in scope",
-        "try including 'C'"
+        "try including 'C' from '../sub1'"
 
     );
 
     check_err!(errs.get(1) =>
         ErrorKind::SymbolNotFound,
         "did not find link symbol 'C', not in scope",
-        "try including 'C'"
+        "try including 'C' from '../sub1'"
     );
 }
 

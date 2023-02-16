@@ -379,7 +379,7 @@ impl<'a> GlobalAstTable<'a> {
                         let replacement = format!("include {};", include);
 
                         error.hints.push(ErrorHint::Solution(ErrorSolution {
-                            description: format!("try including '{symbol}'"),
+                            description: format!("try including '{symbol}' from '{include}'"),
                             span,
                             replacement,
                         }));
@@ -408,7 +408,7 @@ impl<'a> GlobalAstTable<'a> {
                     if let Some(include) = this.include_for(target_asset) {
                         let replacement = format!("include {};", include);
                         error.hints.push(ErrorHint::Solution(ErrorSolution {
-                            description: format!("try including '{symbol}'"),
+                            description: format!("try including '{symbol}' from '{include}'"),
                             span,
                             replacement,
                         }));

@@ -1,0 +1,4 @@
+include sub1;
+include sub2;
+
+entry M;
