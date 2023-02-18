@@ -50,9 +50,7 @@ impl Context {
                     // Resolve links
                     // - all nonlocal dependencies are allready ir
                     // - local dependencies may be out of order
-                    if let Err(err) = ast_links.order_local_deps() {
-                        errors.add(err);
-                    } else {
+                    if ast_links.order_local_deps(errors) {
                         for link in ast_links.local() {
                             let ident = link.ident.raw.clone();
                             errors.with_mapping(
@@ -89,9 +87,7 @@ impl Context {
 
                     // Resolve mdoules
                     // - same
-                    if let Err(e) = ast_modules.order_local_deps() {
-                        errors.add(e)
-                    } else {
+                    if ast_modules.order_local_deps(errors) {
                         for module in ast_modules.local() {
                             let ident = module.ident.raw.clone();
                             errors.with_mapping(

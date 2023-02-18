@@ -18,7 +18,9 @@ pub struct LinkAstTable {
 }
 
 impl LinkAstTable {
-    pub fn order_local_deps(&mut self) -> Result<()> {
+    /// Orders local deps in loadable order, returning true on success,
+    /// false on error. Errors are attached to the ErrorsMut object.
+    pub fn order_local_deps(&mut self, errors: &mut ErrorsMut) -> bool {
         let (local, nonlocal) = self.local_mut();
         let mut s = 0;
 
@@ -43,23 +45,27 @@ impl LinkAstTable {
         }
 
         if let Err(cycles) = dfs_cycles(&topo) {
-            let cycle = &cycles[0];
+            for cycle in cycles {
+                let s = cycle[0];
 
-            let s = cycle[0];
+                let mut fmt = vec![&local[s].ident.raw[..]];
+                for &e in cycle.iter().rev() {
+                    fmt.push(&local[e].ident.raw[..]);
+                }
 
-            let mut fmt = vec![&local[s].ident.raw[..]];
-            for &e in cycle.iter().rev() {
-                fmt.push(&local[e].ident.raw[..]);
+                errors.add(
+                    Error::new(
+                        ErrorKind::LinkLocalCyclicDeps,
+                        format!(
+                            "found cyclic definition of local links: {}",
+                            fmt.join(" <- ")
+                        ),
+                    )
+                    .spanned(local[s].span()),
+                );
             }
 
-            return Err(Error::new(
-                ErrorKind::LinkLocalCyclicDeps,
-                format!(
-                    "found cyclic definition of local links: {}",
-                    fmt.join(" <- ")
-                ),
-            )
-            .spanned(local[s].span()));
+            return false;
         }
 
         while s < local.len() {
@@ -98,7 +104,7 @@ impl LinkAstTable {
             s += 1;
         }
 
-        Ok(())
+        true
     }
 
     pub fn local(&self) -> &[Arc<LinkStmt>] {
@@ -182,7 +188,7 @@ pub struct ModuleAstTable {
 }
 
 impl ModuleAstTable {
-    pub fn order_local_deps(&mut self) -> Result<()> {
+    pub fn order_local_deps(&mut self, errors: &mut ErrorsMut) -> bool {
         let (local, nonlocal) = self.local_mut();
         let mut s = 0;
 
@@ -204,23 +210,26 @@ impl ModuleAstTable {
         }
 
         if let Err(cycles) = dfs_cycles(&topo) {
-            let cycle = &cycles[0];
+            for cycle in cycles {
+                let s = cycle[0];
 
-            let s = cycle[0];
+                let mut fmt = vec![&local[s].ident.raw[..]];
+                for &e in cycle.iter().rev() {
+                    fmt.push(&local[e].ident.raw[..]);
+                }
 
-            let mut fmt = vec![&local[s].ident.raw[..]];
-            for &e in cycle.iter().rev() {
-                fmt.push(&local[e].ident.raw[..]);
+                errors.add(
+                    Error::new(
+                        ErrorKind::ModuleLocalCyclicDeps,
+                        format!(
+                            "found cyclic definition of local modules: {}",
+                            fmt.join(" <- ")
+                        ),
+                    )
+                    .spanned(local[s].span()),
+                );
             }
-
-            return Err(Error::new(
-                ErrorKind::ModuleLocalCyclicDeps,
-                format!(
-                    "found cyclic definition of local modules: {}",
-                    fmt.join(" <- ")
-                ),
-            )
-            .spanned(local[s].span()));
+            return false;
         }
 
         while s < local.len() {
@@ -256,7 +265,7 @@ impl ModuleAstTable {
             s += 1;
         }
 
-        Ok(())
+        true
     }
 
     pub fn local(&self) -> &[Arc<ModuleStmt>] {

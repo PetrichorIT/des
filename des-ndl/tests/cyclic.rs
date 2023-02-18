@@ -57,3 +57,32 @@ fn cyclic_local_modules() {
         "found cyclic definition of local modules: A <- B <- C <- A"
     );
 }
+
+#[test]
+fn cyclic_local_selfreferential() {
+    let err = Context::load("tests/cyclic_local_selfreferential.ndl").unwrap_err();
+    println!("{err}");
+
+    let errs = err.errors;
+    assert_eq!(errs.len(), 4);
+
+    check_err!(errs.get(0) =>
+        ErrorKind::LinkLocalCyclicDeps,
+        "found cyclic definition of local links: LDirect <- LDirect"
+    );
+
+    check_err!(errs.get(1) =>
+        ErrorKind::LinkLocalCyclicDeps,
+        "found cyclic definition of local links: LIndirect1 <- LIndirect2 <- LIndirect1"
+    );
+
+    check_err!(errs.get(2) =>
+        ErrorKind::ModuleLocalCyclicDeps,
+        "found cyclic definition of local modules: Direct <- Direct"
+    );
+
+    check_err!(errs.get(3) =>
+        ErrorKind::ModuleLocalCyclicDeps,
+        "found cyclic definition of local modules: IndirectA <- IndirectB <- IndirectA"
+    );
+}
