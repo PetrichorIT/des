@@ -1,10 +1,11 @@
 use super::common::Parameters;
 use super::module::ModuleRef;
 use crate::net::{ObjectPath, Topology};
-use crate::runtime::{Application, Runtime};
+use crate::runtime::{Application, EventLifecycle, Runtime};
 use crate::time::SimTime;
 use log::info;
 use std::fmt::{Debug, Display};
+use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
 mod events;
@@ -107,13 +108,30 @@ impl<A> NetworkRuntime<A> {
     }
 }
 
-impl<A> Application for NetworkRuntime<A> {
+impl<A> Application for NetworkRuntime<A>
+where
+    A: EventLifecycle<NetworkRuntime<A>>,
+{
     type EventSet = NetEvents;
+    type Lifecycle = NetworkRuntimeLifecycle<A>;
+}
 
-    fn at_sim_start(rt: &mut Runtime<Self>) {
+#[doc(hidden)]
+#[derive(Debug)]
+pub struct NetworkRuntimeLifecycle<A: EventLifecycle<NetworkRuntime<A>>> {
+    _phantom: PhantomData<A>,
+}
+
+impl<A> EventLifecycle<NetworkRuntime<A>> for NetworkRuntimeLifecycle<A>
+where
+    A: EventLifecycle<NetworkRuntime<A>>,
+{
+    fn at_sim_start(rt: &mut Runtime<NetworkRuntime<A>>) {
         // Add inital event
         // this is done via an event to get the usual module buffer clearing behavoir
         // while the end ignores all send packets.
+
+        A::at_sim_start(rt);
 
         rt.app
             .globals
@@ -125,7 +143,7 @@ impl<A> Application for NetworkRuntime<A> {
         rt.add_event(NetEvents::SimStartNotif(SimStartNotif()), SimTime::now());
     }
 
-    fn at_sim_end(rt: &mut Runtime<Self>) {
+    fn at_sim_end(rt: &mut Runtime<NetworkRuntime<A>>) {
         for module in &mut rt.app.module_list {
             log_scope!(module.ctx.path.path());
             info!("Calling 'at_sim_end'");
@@ -146,6 +164,8 @@ impl<A> Application for NetworkRuntime<A> {
                 module.deactivate();
             }
         }
+
+        A::at_sim_end(rt);
 
         log_scope!();
     }

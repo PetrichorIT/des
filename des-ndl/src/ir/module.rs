@@ -104,6 +104,20 @@ impl Cluster {
             },
         }
     }
+
+    pub fn as_size(&self) -> usize {
+        match self {
+            Self::Standalone => 1,
+            Self::Clusted(n) => *n,
+        }
+    }
+
+    pub fn as_index(&self) -> usize {
+        match self {
+            Self::Standalone => 0,
+            Self::Clusted(n) => *n,
+        }
+    }
 }
 
 impl From<&ClusterDefinition> for Cluster {

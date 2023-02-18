@@ -1,0 +1,26 @@
+link SomeLink {
+    latency: 0.5,
+    jitter: 0.0,
+    bitrate: 10000,
+}
+
+module Sub {
+    gates {
+        in @input,
+        out @output
+    }
+}
+
+module Main {
+    submodules {
+        a: Sub,
+        b: Sub,
+    }
+
+    connections {
+        a/out --> SomeLink --> b/in,
+        b/out --> SomeLink --> a/in
+    }
+}
+
+entry Main;

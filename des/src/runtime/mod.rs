@@ -120,12 +120,12 @@ where
 /// event nessecary for the simulation. All you have to do is to pass the app into [`Runtime::new`]
 /// to create a runnable instance and the run it.
 ///
-pub struct Runtime<A>
+pub struct Runtime<App>
 where
-    A: Application,
+    App: Application,
 {
     /// The contained runtime application, defining globals and the used event set.
-    pub app: A,
+    pub app: App,
 
     // Rt limits
     limit: RuntimeLimit,
@@ -140,7 +140,7 @@ where
     #[allow(dead_code)]
     permit: MutexGuard<'static, ()>,
 
-    future_event_set: FutureEventSet<A>,
+    future_event_set: FutureEventSet<App>,
 }
 
 impl<A> Runtime<A>
@@ -232,6 +232,7 @@ where
     /// struct App(usize,  String);
     /// # impl Application for App {
     /// #   type EventSet = Events;
+    /// #   type Lifecycle = ();
     /// # }
     /// # enum Events {}
     /// # impl EventSet<App> for Events {
@@ -262,6 +263,7 @@ where
     /// struct App(usize,  String);
     /// # impl Application for App {
     /// #   type EventSet = Events;
+    /// #   type Lifecycle = ();
     /// # }
     /// # enum Events {}
     /// # impl EventSet<App> for Events {
@@ -378,7 +380,7 @@ where
         println!("\u{23A2}  Event limit := {}", this.limit);
         println!("\u{23A3}");
 
-        A::at_sim_start(&mut this);
+        A::Lifecycle::at_sim_start(&mut this);
         this
     }
 
@@ -441,7 +443,9 @@ where
     /// struct MyApp();
     /// impl Application for MyApp {
     ///     type EventSet = MyEventSet;
-    ///
+    ///     type Lifecycle = Self;
+    /// }
+    /// impl EventLifecycle for MyApp {
     ///     fn at_sim_start(rt: &mut Runtime<Self>) {
     ///         rt.add_event(MyEventSet::EventA, SimTime::from(1.0));
     ///         rt.add_event(MyEventSet::EventB, SimTime::from(2.0));
@@ -497,7 +501,7 @@ where
     #[must_use]
     pub fn finish(mut self) -> RuntimeResult<A> {
         // Call the fin-handler on the allocated application
-        A::at_sim_end(&mut self);
+        A::Lifecycle::at_sim_end(&mut self);
         self.profiler.finish(self.itr);
 
         if self.future_event_set.is_empty() {
@@ -565,6 +569,7 @@ where
     /// # struct MyApp();
     /// # impl Application for MyApp {
     /// #     type EventSet = MyEventSet;
+    /// #     type Lifecycle = ();
     /// # }
     /// #
     /// # enum MyEventSet {
@@ -609,6 +614,7 @@ where
     /// # struct MyApp();
     /// # impl Application for MyApp {
     /// #     type EventSet = MyEventSet;
+    /// #     type Lifecycle = ();
     /// # }
     /// #
     /// # enum MyEventSet {
@@ -833,7 +839,8 @@ impl<A> RuntimeResult<A> {
 cfg_net! {
     use crate::net::{gate::GateRef,  HandleMessageEvent, message::Message, MessageAtGateEvent, module::ModuleRef, NetEvents, NetworkRuntime};
 
-    impl<A> Runtime<NetworkRuntime<A>> {
+    impl<A> Runtime<NetworkRuntime<A>> where
+        A: EventLifecycle<NetworkRuntime<A>>,{
         ///
         /// Adds a message event into a [`Runtime<NetworkRuntime<A>>`] onto a gate.
         ///

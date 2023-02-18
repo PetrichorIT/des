@@ -39,6 +39,24 @@ pub enum Literal {
     String(String),
 }
 
+impl Literal {
+    pub fn as_float_casted(&self) -> f64 {
+        match self {
+            Self::Float(f) => *f,
+            Self::Integer(i) => *i as f64,
+            Self::String(s) => s.parse().expect("Force casted as float"),
+        }
+    }
+
+    pub fn as_integer_casted(&self) -> i32 {
+        match self {
+            Self::Integer(i) => *i,
+            Self::Float(f) => *f as i32,
+            Self::String(s) => s.parse().expect("Force casted as integer"),
+        }
+    }
+}
+
 impl From<ast::Lit> for Literal {
     fn from(value: ast::Lit) -> Self {
         match value.kind {

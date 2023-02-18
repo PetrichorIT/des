@@ -1,4 +1,4 @@
-use crate::prelude::{Module, NetworkRuntime};
+use crate::prelude::{EventLifecycle, Module, NetworkRuntime};
 
 use super::module::ModuleContext;
 use super::subsystem::SubsystemRef;
@@ -75,7 +75,7 @@ macro_rules! impl_buildable {
             // (4) Build and attach custom state
             mref.activate();
             let this = <Self as Module>::new();
-            mref.upgrade_dummy(this);
+            mref.upgrade_dummy(Box::new(this));
 
             mref
         }
@@ -95,7 +95,7 @@ macro_rules! impl_buildable {
 
             mref.activate();
             let this = <Self as Module>::new();
-            mref.upgrade_dummy(this);
+            mref.upgrade_dummy(Box::new(this));
 
             mref
         }
@@ -129,7 +129,7 @@ pub trait __Buildable0 {
         // (4) Build and attach custom state
         mref.activate();
         let this = <Self as Module>::new();
-        mref.upgrade_dummy(this);
+        mref.upgrade_dummy(Box::new(this));
 
         mref
     }
@@ -151,7 +151,7 @@ pub trait __Buildable0 {
         // (4) Build and attach custom state
         mref.activate();
         let this = <Self as Module>::new();
-        mref.upgrade_dummy(this);
+        mref.upgrade_dummy(Box::new(this));
 
         mref
     }
@@ -197,3 +197,5 @@ pub trait __Buildable6 {
 pub trait __Buildable7 {
     impl_buildable! { T0, T1, T2, T3, T4, T5, T6 }
 }
+
+impl EventLifecycle<NetworkRuntime<SubsystemRef>> for SubsystemRef {}

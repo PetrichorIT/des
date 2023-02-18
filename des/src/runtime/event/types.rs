@@ -1,68 +1,24 @@
-use crate::runtime::{Runtime, SimTime};
-use std::{
-    cmp,
-    fmt::{Debug, Display},
-    marker::PhantomData,
-};
+use std::cmp;
+use std::fmt::{Debug, Display};
+use std::marker::PhantomData;
+
+use crate::runtime::Runtime;
+use crate::time::SimTime;
 
 ///
 /// A trait that defines an runtime application
 /// that depends on a event set to be processed by the
-/// runtime.
+/// runtime and a lifecylce managment.
 ///
 pub trait Application: Sized {
     ///
     /// The set of events used in the simulation.
     ///
     type EventSet: EventSet<Self>;
-
     ///
-    /// A function that is called only once at the start of the simulation.
+    /// A global type, defining the behavior at sim start / sim end
     ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use des::prelude::*;
-    /// # struct Worker;
-    /// # impl Worker { fn initalize(&mut self) {}}
-    /// # enum MyEventSet { EventA, EventB }
-    /// # impl EventSet<MyApp> for MyEventSet {
-    /// #   fn handle(self, rt: &mut Runtime<MyApp>) {}
-    /// # }
-    /// struct MyApp { workers: Vec<Worker> };
-    /// impl Application for MyApp {
-    ///     type EventSet = MyEventSet;
-    ///     fn at_sim_start(rt: &mut Runtime<Self>) {
-    ///         rt.app.workers.iter_mut().for_each(|w| w.initalize());
-    ///     }
-    /// }
-    /// ```
-    ///
-    fn at_sim_start(_rt: &mut Runtime<Self>) {}
-
-    ///
-    /// A function that is called once the simulation reachted its limit.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use des::prelude::*;
-    /// # struct Worker;
-    /// # impl Worker { fn finish(&mut self) {}}
-    /// # enum MyEventSet { EventA, EventB }
-    /// # impl EventSet<MyApp> for MyEventSet {
-    /// #   fn handle(self, rt: &mut Runtime<MyApp>) {}
-    /// # }
-    /// struct MyApp { workers: Vec<Worker> };
-    /// impl Application for MyApp {
-    ///     type EventSet = MyEventSet;
-    ///     fn at_sim_end(rt: &mut Runtime<Self>) {
-    ///         rt.app.workers.iter_mut().for_each(|w| w.finish());
-    ///     }
-    /// }
-    /// ```
-    ///
-    fn at_sim_end(_rt: &mut Runtime<Self>) {}
+    type Lifecycle: EventLifecycle<Self>;
 }
 
 ///
@@ -75,9 +31,9 @@ pub trait Application: Sized {
 /// to be related (since specific events of the event set require runtime params),
 /// but this type information is willingly elided, to fit into the rust generics system.
 ///
-pub trait EventSet<App>
+pub trait EventSet<A>
 where
-    App: Application<EventSet = Self>,
+    A: Application,
 {
     ///
     /// A function to handle an upcoming event represented as a instance
@@ -86,7 +42,7 @@ where
     /// Since events sets are usually macro-generated this is just a match statement that calls
     /// the handle function on the given variant, as defined by the trait [Event].
     ///
-    fn handle(self, rt: &mut Runtime<App>);
+    fn handle(self, rt: &mut Runtime<A>);
 }
 
 ///
@@ -113,6 +69,75 @@ where
     ///
     fn handle(self, rt: &mut Runtime<App>);
 }
+
+///
+/// A type that defines the lifecycle behaviour of an application A.
+///
+pub trait EventLifecycle<A = Self> {
+    ///
+    /// A function that is called only once at the start of the simulation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use des::prelude::*;
+    /// # struct Worker;
+    /// # impl Worker { fn initalize(&mut self) {}}
+    /// # enum MyEventSet { EventA, EventB }
+    /// # impl EventSet<MyApp> for MyEventSet {
+    /// #   fn handle(self, rt: &mut Runtime<MyApp>) {}
+    /// # }
+    /// struct MyApp { workers: Vec<Worker> };
+    /// impl Application for MyApp {
+    ///     type EventSet = MyEventSet;
+    ///     type Lifecycle = Self;
+    /// }
+    /// impl EventLifecycle for MyApp {
+    ///     fn at_sim_start(rt: &mut Runtime<Self>) {
+    ///         rt.app.workers.iter_mut().for_each(|w| w.initalize());
+    ///     }
+    /// }
+    /// ```
+    ///
+    fn at_sim_start(_rt: &mut Runtime<A>)
+    where
+        A: Application,
+    {
+    }
+
+    ///
+    /// A function that is called once the simulation reachted its limit.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use des::prelude::*;
+    /// # struct Worker;
+    /// # impl Worker { fn finish(&mut self) {}}
+    /// # enum MyEventSet { EventA, EventB }
+    /// # impl EventSet<MyApp> for MyEventSet {
+    /// #   fn handle(self, rt: &mut Runtime<MyApp>) {}
+    /// # }
+    /// struct MyApp { workers: Vec<Worker> };
+    /// impl Application for MyApp {
+    ///     type EventSet = MyEventSet;
+    ///     type Lifecycle = Self;
+    /// }
+    /// impl EventLifecycle for MyApp {
+    ///     fn at_sim_end(rt: &mut Runtime<Self>) {
+    ///         rt.app.workers.iter_mut().for_each(|w| w.finish());
+    ///     }
+    /// }
+    /// ```
+    ///
+    fn at_sim_end(_rt: &mut Runtime<A>)
+    where
+        A: Application,
+    {
+    }
+}
+
+impl<A> EventLifecycle<A> for () {}
 
 ///
 /// A runtime unqiue identifier for a event.

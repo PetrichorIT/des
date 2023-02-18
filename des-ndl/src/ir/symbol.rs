@@ -36,6 +36,20 @@ impl Symbol {
             _ => None,
         }
     }
+
+    pub fn as_link_arc(&self) -> Option<Arc<Link>> {
+        match self {
+            Self::Link(l) => Some(l.clone()),
+            _ => None,
+        }
+    }
+
+    pub fn as_module_arc(&self) -> Option<Arc<Module>> {
+        match self {
+            Self::Module(m) => Some(m.clone()),
+            _ => None,
+        }
+    }
 }
 
 impl From<Arc<Module>> for Symbol {

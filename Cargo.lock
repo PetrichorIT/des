@@ -251,6 +251,7 @@ dependencies = [
  "async-trait",
  "cqueue",
  "des_macros",
+ "des_ndl",
  "futures",
  "log",
  "rand",
@@ -259,16 +260,6 @@ dependencies = [
  "sysinfo",
  "termcolor",
  "tokio",
-]
-
-[[package]]
-name = "des-ndl"
-version = "0.1.0"
-dependencies = [
- "log",
- "termcolor",
- "unic-emoji-char",
- "unicode-xid",
 ]
 
 [[package]]
@@ -291,6 +282,16 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "des_ndl"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "termcolor",
+ "unic-emoji-char",
+ "unicode-xid",
 ]
 
 [[package]]

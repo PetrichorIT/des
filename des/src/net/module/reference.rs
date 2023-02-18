@@ -72,8 +72,8 @@ impl ModuleRef {
 
     #[allow(unused)]
     // Caller must ensure that handler is indeed a dummy
-    pub(crate) fn upgrade_dummy<T: Module>(&self, module: T) {
-        let celled = RefCell::new(Box::new(module));
+    pub(crate) fn upgrade_dummy(&self, module: Box<dyn Module>) {
+        let celled = RefCell::new(module);
         let celled: RefCell<Box<dyn Module>> = celled;
         self.handler.swap(&celled);
     }

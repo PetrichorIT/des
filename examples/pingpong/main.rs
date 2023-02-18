@@ -6,6 +6,8 @@ mod bob;
 #[derive(Debug)]
 struct Application();
 
+impl EventLifecycle<NetworkRuntime<Self>> for Application {}
+
 #[allow(clippy::cmp_owned)]
 fn main() {
     use des::net::{BuildContext, __Buildable0};

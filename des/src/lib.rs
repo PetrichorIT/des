@@ -46,6 +46,7 @@
 //!
 //! impl Application for MyApp {
 //!     type EventSet = MyEventSet;
+//!     type Lifecycle = ();
 //! }
 //!
 //! fn main() {
@@ -136,6 +137,10 @@ pub(crate) mod sync;
 
 cfg_net! {
     pub mod net;
+}
+
+cfg_ndl! {
+    pub mod ndl;
 }
 
 cfg_async! {

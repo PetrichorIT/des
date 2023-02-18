@@ -64,7 +64,7 @@ impl Parse for Item {
             Some(TokenTree::Token(
                 Token {
                     kind: TokenKind::Keyword(keyword),
-                    ..
+                    span,
                 },
                 _,
             )) => match keyword {
@@ -72,19 +72,21 @@ impl Parse for Item {
                 Keyword::Link => Ok(Item::Link(Arc::new(LinkStmt::parse(input)?))),
                 Keyword::Module => Ok(Item::Module(Arc::new(ModuleStmt::parse(input)?))),
                 Keyword::Entry => Ok(Item::Entry(Arc::new(EntryStmt::parse(input)?))),
-                _ => Err(Error::new(
-                    ErrorKind::UnexpectedToken,
-                    "expected top-level <keyword>",
-                )),
+                _ => Err(
+                    Error::new(ErrorKind::UnexpectedToken, "expected top-level <keyword>")
+                        .spanned(*span),
+                ),
             },
-            Some(_) => Err(Error::new(
-                ErrorKind::UnexpectedToken,
-                "expected top-level <keyword>",
-            )),
-            None => Err(Error::new(
-                ErrorKind::UnexpectedEOF,
-                "unexpected end of tokenstream",
-            )),
+
+            Some(t) => Err(
+                Error::new(ErrorKind::UnexpectedToken, "expected top-level <keyword>")
+                    .spanned(t.span()),
+            ),
+
+            None => Err(
+                Error::new(ErrorKind::UnexpectedEOF, "unexpected end of tokenstream")
+                    .spanned(input.ts.last_span()),
+            ),
         }
     }
 }

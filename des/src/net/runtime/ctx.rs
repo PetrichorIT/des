@@ -3,7 +3,7 @@
 use super::{HandleMessageEvent, NetworkRuntime, NetworkRuntimeGlobals};
 use crate::net::module::SETUP_FN;
 use crate::net::{gate::GateRef, message::Message, MessageAtGateEvent, NetEvents};
-use crate::prelude::{GateServiceType, ModuleRef};
+use crate::prelude::{EventLifecycle, GateServiceType, ModuleRef};
 use crate::runtime::Runtime;
 use crate::sync::RwLock;
 use crate::time::SimTime;
@@ -67,7 +67,10 @@ pub(crate) fn buf_set_globals(globals: Weak<NetworkRuntimeGlobals>) {
     ctx.globals = Some(globals);
 }
 
-pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<NetworkRuntime<A>>) {
+pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<NetworkRuntime<A>>)
+where
+    A: EventLifecycle<NetworkRuntime<A>>,
+{
     let self_id = module.ctx.id;
     let mut ctx = BUF_CTX.write();
 
