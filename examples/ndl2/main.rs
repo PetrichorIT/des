@@ -1,7 +1,4 @@
-use des::{
-    ndl::{NdlApplication, Registry},
-    prelude::*,
-};
+use des::{ndl::NdlApplication, prelude::*, registry};
 
 struct Sub;
 impl Module for Sub {
@@ -35,11 +32,7 @@ fn main() {
         .interal_max_log_level(log::LevelFilter::Debug)
         .set_logger();
 
-    let mut registry = Registry::new();
-    registry.add("Sub", Box::new(|| Box::new(Sub::new())));
-    registry.add("Main", Box::new(|| Box::new(Main::new())));
-
-    let ndl = match NdlApplication::new("examples/ndl2/main.ndl", registry) {
+    let ndl = match NdlApplication::new("examples/ndl2/main.ndl", registry![Main, Sub]) {
         Ok(v) => v,
         Err(e) => {
             println!("{e}");

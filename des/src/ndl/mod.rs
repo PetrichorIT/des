@@ -1,6 +1,7 @@
 //! NDL intergration.
 use des_ndl::{
-    error::RootResult,
+    ast::Spanned,
+    error::{Error, ErrorKind, Errors, RootError, RootResult},
     ir::{self, ConnectionEndpoint},
     Context,
 };
@@ -29,27 +30,42 @@ pub struct NdlApplication {
 impl NdlApplication {
     /// Create a new NdlApplication.
     pub fn new(path: impl AsRef<Path>, registry: Registry) -> RootResult<NdlApplication> {
-        let ctx = Context::load(path)?;
-        Ok(NdlApplication {
-            tree: ctx.entry.unwrap(),
-            registry,
-        })
+        let mut ctx = Context::load(path)?;
+        let tree = ctx.entry.take().unwrap();
+        let symbols = ir::Module::all_modules(tree.clone());
+        let mut missing = Vec::new();
+        for symbol in symbols {
+            if registry.get(&symbol.ident.raw).is_none() {
+                missing.push((symbol.ident.raw.clone(), symbol.ast.span()));
+            }
+        }
+
+        if missing.is_empty() {
+            Ok(NdlApplication { tree, registry })
+        } else {
+            let mut errors = Errors::new().as_mut();
+            for (sym, span) in missing {
+                errors.add(
+                    Error::new(
+                        ErrorKind::SymbolNotFound,
+                        format!("Symbol '{sym}' is required, but was not found in registry"),
+                    )
+                    .spanned(span),
+                );
+            }
+            Err(RootError::new(errors.into_inner(), ctx.smap))
+        }
     }
 }
 
 impl EventLifecycle<NetworkRuntime<Self>> for NdlApplication {
     fn at_sim_start(rt: &mut crate::prelude::Runtime<NetworkRuntime<Self>>) {
-        log::info!("building ndl");
-        Self::build_at(
+        let _ = Self::build_at(
             rt,
             rt.app.inner.tree.clone(),
             ObjectPath::root_module("root"),
             None,
         );
-    }
-
-    fn at_sim_end(_rt: &mut crate::prelude::Runtime<NetworkRuntime<Self>>) {
-        log::info!("closing ndl");
     }
 }
 
@@ -91,7 +107,6 @@ impl NdlApplication {
                 ConnectionEndpoint::Local(gate, pos) => ctx.gate(&gate.raw, pos.as_index()),
                 ConnectionEndpoint::Nonlocal(submod, pos, gate) => {
                     let c = ctx.child(&format!("{}{}", submod.raw, pos)).unwrap();
-
                     c.gate(&gate.0.raw, gate.1.as_index())
                 }
             }
@@ -121,7 +136,8 @@ impl NdlApplication {
 
         ctx.activate();
         log_scope!(ctx.path.path());
-        let state = rt.app.inner.registry.get(ty).unwrap()();
+        let f = rt.app.inner.registry.get(ty).unwrap();
+        let state = f();
         ctx.upgrade_dummy(state);
 
         // TODO: is this still usefull or should we just save the entry point?

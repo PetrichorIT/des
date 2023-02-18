@@ -62,6 +62,26 @@ pub enum ConnectionEndpoint {
 
 // # Impl
 
+impl Module {
+    pub fn all_modules(this: Arc<Module>) -> Vec<Arc<Module>> {
+        let mut result = Vec::new();
+        Self::_all_modules(this, &mut result);
+        result
+    }
+
+    fn _all_modules(this: Arc<Module>, result: &mut Vec<Arc<Module>>) {
+        if !result.iter().any(|r| Arc::ptr_eq(r, &this)) {
+            result.push(this.clone());
+            for submod in &this.submodules {
+                let Some(sub) = submod.typ.as_module_arc() else {
+                    continue;
+                };
+                Self::_all_modules(sub, result);
+            }
+        }
+    }
+}
+
 impl ConnectionEndpoint {
     pub fn new(endp: &ModuleGateReference, gate: &GateRef) -> Self {
         match endp {

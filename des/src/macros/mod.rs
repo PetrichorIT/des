@@ -10,6 +10,10 @@ mod event_set;
 #[macro_use]
 mod log;
 
+cfg_ndl! {
+    mod registry;
+}
+
 pub mod support {
 
     use std::ops::{Deref, DerefMut};
