@@ -61,14 +61,18 @@ impl TokenStream {
                 });
             }
 
-            let tree = TokenTree::parse(cursor)?;
+            let Some(tree) = TokenTree::parse(cursor)? else {
+                return Ok(Self {
+                    items: Arc::new(items),
+                });
+            };
             items.push(tree);
         }
     }
 }
 
 impl TokenTree {
-    pub(super) fn parse(cursor: &mut Cursor) -> Result<TokenTree, Error> {
+    pub(super) fn parse(cursor: &mut Cursor) -> Result<Option<TokenTree>, Error> {
         cursor.eat_whitespace();
 
         // let span = cursor.rem_stream_span();
@@ -87,7 +91,7 @@ impl TokenTree {
             let ts = TokenStream::parse(&mut sub)?;
             let close = sub.end_span();
 
-            Ok(TokenTree::Delimited(DelimSpan { open, close }, delim, ts))
+            Ok(TokenTree::Delimited(DelimSpan { open, close }, delim, ts).into())
         } else {
             use crate::lexer::TokenKind::*;
 
@@ -97,14 +101,15 @@ impl TokenTree {
                     Dot => {
                         // Check for second dot
                         let Some(next) = cursor.peek(0) else {
-                            return Ok(TokenTree::Token(Token::new(TokenKind::Dot, span), Spacing::Alone))
+                            return Ok(TokenTree::Token(Token::new(TokenKind::Dot, span), Spacing::Alone).into())
                         };
 
                         if next.kind != Dot {
                             return Ok(TokenTree::Token(
                                 Token::new(TokenKind::Dot, span),
                                 Spacing::infer(token.kind, next.kind),
-                            ));
+                            )
+                            .into());
                         }
 
                         let (_, s) = cursor.next().unwrap();
@@ -112,7 +117,7 @@ impl TokenTree {
 
                         // check for third dot.
                         let Some(next) = cursor.peek(0) else {
-                            return Ok(TokenTree::Token(Token::new(TokenKind::DotDot, span), Spacing::Alone))
+                            return Ok(TokenTree::Token(Token::new(TokenKind::DotDot, span), Spacing::Alone).into())
                         };
 
                         if next.kind == Eq {
@@ -122,53 +127,60 @@ impl TokenTree {
                             return Ok(TokenTree::Token(
                                 Token::new(TokenKind::DotDotEq, span),
                                 Spacing::Alone,
-                            ));
+                            )
+                            .into());
                         }
 
                         if next.kind != Dot {
                             return Ok(TokenTree::Token(
                                 Token::new(TokenKind::DotDot, span),
                                 Spacing::infer(token.kind, next.kind),
-                            ));
+                            )
+                            .into());
                         }
 
                         let (_, s) = cursor.next().unwrap();
                         span = Span::fromto(span, s);
 
-                        Ok(TokenTree::Token(
-                            Token::new(TokenKind::DotDotDot, span),
-                            Spacing::Alone,
-                        ))
+                        Ok(
+                            TokenTree::Token(
+                                Token::new(TokenKind::DotDotDot, span),
+                                Spacing::Alone,
+                            )
+                            .into(),
+                        )
                     }
 
                     Colon => Ok(TokenTree::Token(
                         Token::new(TokenKind::Colon, span),
                         Spacing::Alone,
-                    )),
+                    )
+                    .into()),
                     Slash => Ok(TokenTree::Token(
                         Token::new(TokenKind::Slash, span),
                         Spacing::Alone,
-                    )),
-                    Semi => Ok(TokenTree::Token(
-                        Token::new(TokenKind::Semi, span),
-                        Spacing::Alone,
-                    )),
+                    )
+                    .into()),
+                    Semi => Ok(
+                        TokenTree::Token(Token::new(TokenKind::Semi, span), Spacing::Alone).into(),
+                    ),
                     Comma => Ok(TokenTree::Token(
                         Token::new(TokenKind::Comma, span),
                         Spacing::Alone,
-                    )),
+                    )
+                    .into()),
 
-                    Plus => Ok(TokenTree::Token(
-                        Token::new(TokenKind::Plus, span),
-                        Spacing::Alone,
-                    )),
+                    Plus => Ok(
+                        TokenTree::Token(Token::new(TokenKind::Plus, span), Spacing::Alone).into(),
+                    ),
 
                     Eq => {
                         if cursor.peek(0).map(|t| t.kind) != Some(Eq) {
                             return Ok(TokenTree::Token(
                                 Token::new(TokenKind::Eq, span),
                                 Spacing::Alone,
-                            ));
+                            )
+                            .into());
                         }
 
                         let (_, s) = cursor.next().unwrap();
@@ -178,7 +190,8 @@ impl TokenTree {
                             return Ok(TokenTree::Token(
                                 Token::new(TokenKind::EqEq, span),
                                 Spacing::Alone,
-                            ));
+                            )
+                            .into());
                         }
 
                         let (_, s) = cursor.next().unwrap();
@@ -187,7 +200,8 @@ impl TokenTree {
                         Ok(TokenTree::Token(
                             Token::new(TokenKind::RDoubleArrow, span),
                             Spacing::Alone,
-                        ))
+                        )
+                        .into())
                     }
                     Minus => {
                         if cursor.peek(0).map(|t| t.kind) != Some(Minus) {
@@ -206,14 +220,16 @@ impl TokenTree {
                                     return Ok(TokenTree::Token(
                                         Token::new(TokenKind::Literal(lit), span),
                                         Spacing::Alone,
-                                    ));
+                                    )
+                                    .into());
                                 }
                             }
 
                             return Ok(TokenTree::Token(
                                 Token::new(TokenKind::Minus, span),
                                 Spacing::Alone,
-                            ));
+                            )
+                            .into());
                         }
 
                         let (_, s) = cursor.next().unwrap();
@@ -229,7 +245,8 @@ impl TokenTree {
                         Ok(TokenTree::Token(
                             Token::new(TokenKind::RSingleArrow, span),
                             Spacing::Alone,
-                        ))
+                        )
+                        .into())
                     }
                     Lt => match cursor.peek(0).map(|t| t.kind) {
                         Some(Eq) => {
@@ -240,7 +257,8 @@ impl TokenTree {
                                 return Ok(TokenTree::Token(
                                     Token::new(TokenKind::Le, span),
                                     Spacing::Alone,
-                                ));
+                                )
+                                .into());
                             }
 
                             let (_, s) = cursor.next().unwrap();
@@ -249,7 +267,8 @@ impl TokenTree {
                             Ok(TokenTree::Token(
                                 Token::new(TokenKind::LDoubleArrow, span),
                                 Spacing::Alone,
-                            ))
+                            )
+                            .into())
                         }
                         Some(Minus) => {
                             let (_, s) = cursor.next().unwrap();
@@ -265,28 +284,30 @@ impl TokenTree {
                             Ok(TokenTree::Token(
                                 Token::new(TokenKind::LSingleArrow, span),
                                 Spacing::Alone,
-                            ))
+                            )
+                            .into())
                         }
-                        _ => Ok(TokenTree::Token(
-                            Token::new(TokenKind::Lt, span),
-                            Spacing::Alone,
-                        )),
+                        _ => Ok(
+                            TokenTree::Token(Token::new(TokenKind::Lt, span), Spacing::Alone)
+                                .into(),
+                        ),
                     },
                     Gt => {
                         if cursor.peek(0).map(|t| t.kind) != Some(Eq) {
                             return Ok(TokenTree::Token(
                                 Token::new(TokenKind::Gt, span),
                                 Spacing::Alone,
-                            ));
+                            )
+                            .into());
                         };
 
                         let (_, s) = cursor.next().unwrap();
                         span = Span::fromto(span, s);
 
-                        Ok(TokenTree::Token(
-                            Token::new(TokenKind::Ge, span),
-                            Spacing::Alone,
-                        ))
+                        Ok(
+                            TokenTree::Token(Token::new(TokenKind::Ge, span), Spacing::Alone)
+                                .into(),
+                        )
                     }
 
                     OpenBrace | OpenBracket | OpenParen => {
@@ -299,14 +320,16 @@ impl TokenTree {
                     Ident => Ok(TokenTree::Token(
                         Token::new(TokenKind::ident_or_keyword(span, cursor), span),
                         Spacing::Alone,
-                    )),
+                    )
+                    .into()),
                     Annotation => Ok(TokenTree::Token(
                         Token::new(
                             TokenKind::Annotation(super::Annotation::from_span(span, cursor)),
                             span,
                         ),
                         Spacing::Alone,
-                    )),
+                    )
+                    .into()),
 
                     Literal { kind, .. } => Ok(TokenTree::Token(
                         Token::new(
@@ -314,12 +337,15 @@ impl TokenTree {
                             span,
                         ),
                         Spacing::Alone,
-                    )),
+                    )
+                    .into()),
 
                     Comment | Whitespace => {
                         match cursor.next() {
                             Some(value) => (token, span) = value,
-                            None => unimplemented!(),
+                            None => {
+                                return Ok(None);
+                            }
                         }
                         continue;
                     }

@@ -101,4 +101,16 @@ impl<'a> Cursor<'a> {
             }
         }
     }
+
+    pub fn eat_and_read_while(&mut self, mut predicate: impl FnMut(char) -> bool) -> String {
+        let mut s = String::new();
+        while predicate(self.first()) && !self.is_eof() {
+            match self.bump() {
+                Some('\n') => self.line += 1,
+                Some(c) => s.push(c),
+                _ => unreachable!(),
+            }
+        }
+        s
+    }
 }

@@ -1,0 +1,17 @@
+sim.node[0].dst = 1
+sim.node[0].c = 100
+sim.node[0].expected = 0
+
+sim.node[1].dst = 2
+sim.node[1].c = 200
+sim.node[1].expected = 100
+
+sim.node[2].dst = 3
+sim.node[2].c = 100
+sim.node[2].expected = 200
+
+sim.node[3].dst = 4
+sim.node[3].c = 50
+sim.node[3].expected = 100
+
+sim.node[4].expected = 50

@@ -174,8 +174,8 @@ impl Module {
                 }
 
                 ir_connections.push(Connection {
-                    from: ConnectionEndpoint::new(&con.source, &l),
-                    to: ConnectionEndpoint::new(&con.target, &r),
+                    from: ConnectionEndpoint::from(l),
+                    to: ConnectionEndpoint::from(r),
                     delay: delay.clone(),
                 });
             }

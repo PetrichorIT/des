@@ -2,6 +2,7 @@ use super::*;
 
 #[derive(Debug)]
 pub struct GateRef<'a> {
+    pub submod: Option<(usize, String, Cluster)>,
     pub def: &'a Gate,
     pub pos: Option<usize>,
 }

@@ -1,5 +1,5 @@
-use crate::*;
 use crate::error::*;
+use crate::*;
 use std::cell::RefCell;
 
 ///
@@ -15,6 +15,13 @@ impl TokenStream {
     pub fn new(asset: Asset<'_>, ectx: &mut LexingErrorContext) -> NdlResult<Self> {
         let mut inner = Vec::new();
         for token in tokenize(asset.source(), asset.start_pos()) {
+            if token.kind == TokenKind::CommentNdlv2 {
+                return Ok(Self {
+                    inner: Vec::new(),
+                    head: RefCell::new(0),
+                });
+            }
+
             if token.kind.valid() && !token.kind.reducable() {
                 inner.push(token)
             } else if !token.kind.valid() {

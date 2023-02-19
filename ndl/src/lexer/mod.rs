@@ -71,6 +71,7 @@ impl Token {
 pub enum TokenKind {
     // A single line comment
     Comment,
+    CommentNdlv2,
     /// Any whitespace characters sequence.
     Whitespace,
     /// Any token that can be either type, var name or keyqord
@@ -332,8 +333,12 @@ impl Cursor<'_> {
         debug_assert!(self.prev() == '/' && self.first() == '/');
         self.bump();
 
-        self.eat_while(|c| c != '\n');
-        Comment
+        let s = self.eat_and_read_while(|c| c != '\n');
+        if s.trim() == "ndl.v2" {
+            CommentNdlv2
+        } else {
+            Comment
+        }
     }
 
     fn whitespace(&mut self) -> TokenKind {

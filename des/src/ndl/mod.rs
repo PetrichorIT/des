@@ -23,6 +23,7 @@ pub use self::registry::Registry;
 /// A application for NDL intergration.
 #[derive(Debug)]
 pub struct NdlApplication {
+    handle: Option<ModuleRef>,
     tree: Arc<ir::Module>,
     registry: Registry,
 }
@@ -41,7 +42,11 @@ impl NdlApplication {
         }
 
         if missing.is_empty() {
-            Ok(NdlApplication { tree, registry })
+            Ok(NdlApplication {
+                tree,
+                registry,
+                handle: None,
+            })
         } else {
             let mut errors = Errors::new().as_mut();
             for (sym, span) in missing {
@@ -60,12 +65,12 @@ impl NdlApplication {
 
 impl EventLifecycle<NetworkRuntime<Self>> for NdlApplication {
     fn at_sim_start(rt: &mut crate::prelude::Runtime<NetworkRuntime<Self>>) {
-        let _ = Self::build_at(
+        rt.app.inner.handle = Some(Self::build_at(
             rt,
             rt.app.inner.tree.clone(),
-            ObjectPath::root_module("root"),
+            ObjectPath::root_module("sim"),
             None,
-        );
+        ));
     }
 }
 
@@ -95,10 +100,26 @@ impl NdlApplication {
 
         for submod in &ir.submodules {
             let sty = submod.typ.as_module_arc().unwrap();
-            let new_path = ObjectPath::from_str(&format!("{}.{}", path.path(), submod.ident.raw))
-                .expect("failed to create submod path");
 
-            Self::build_at(rt, sty, new_path, Some(ctx.clone()));
+            match submod.cluster {
+                ir::Cluster::Standalone => {
+                    let a = ObjectPath::from_str(&format!("{}.{}", path.path(), submod.ident.raw))
+                        .expect("failed to create submod path");
+                    // let mut b = path.clone();
+                    // b.push_module(&submod.ident.raw);
+                    // assert_eq!(a, b);
+
+                    Self::build_at(rt, sty, a, Some(ctx.clone()));
+                }
+                ir::Cluster::Clusted(n) => {
+                    for k in 0..n {
+                        let mut npath = path.clone();
+                        npath.push_module(&format!("{}[{}]", submod.ident.raw, k));
+                        Self::build_at(rt, sty.clone(), npath, Some(ctx.clone()));
+                    }
+                }
+            };
+
             // ctx.add_child(&submod.ident.raw, sub);
         }
 

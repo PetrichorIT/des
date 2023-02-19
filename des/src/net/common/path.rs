@@ -179,6 +179,17 @@ impl ObjectPath {
         }
     }
 
+    /// Adds a module
+    pub fn push_module(&mut self, s: &str) {
+        // assert!(self.is_module());
+        let l = self.data.len() + 1;
+        if !self.data.is_empty() {
+            self.data.push('.');
+        }
+        self.data.push_str(s);
+        self.last_element_offset = l;
+    }
+
     ///
     /// Returns the part of the path that does not
     /// include the pointees name.
@@ -454,7 +465,12 @@ impl ObjectPath {
     ///
     #[must_use]
     pub fn module_with_parent(name: &str, parent: &ObjectPath) -> Self {
-        assert!(!name.contains('/') && !name.contains('.'));
+        assert!(
+            !name.contains('/') && !name.contains('.'),
+            "failed with name := {} and parent := {}",
+            name,
+            parent
+        );
         assert!(!parent.is_channel());
 
         let data = format!("{}.{}", parent.data, name);

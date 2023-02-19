@@ -5,7 +5,7 @@ use std::{
 
 use super::*;
 use crate::{
-    ast::{Annotation, ClusterDefinition, ModuleGateReference, ModuleStmt},
+    ast::{Annotation, ClusterDefinition, ModuleStmt},
     ir::GateRef,
 };
 
@@ -82,30 +82,30 @@ impl Module {
     }
 }
 
-impl ConnectionEndpoint {
-    pub fn new(endp: &ModuleGateReference, gate: &GateRef) -> Self {
-        match endp {
-            ModuleGateReference::Local(local) => ConnectionEndpoint::Local(
-                RawSymbol {
-                    raw: local.gate.raw.clone(),
-                },
-                Cluster::new(gate),
-            ),
-            ModuleGateReference::Nonlocal(nonlocal) => ConnectionEndpoint::Nonlocal(
-                RawSymbol {
-                    raw: nonlocal.submodule.raw.clone(),
-                },
-                Cluster::new(gate),
-                (
-                    RawSymbol {
-                        raw: nonlocal.gate.gate.raw.clone(),
-                    },
-                    Cluster::new(gate),
-                ),
-            ),
-        }
-    }
-}
+// impl ConnectionEndpoint {
+//     pub fn new(endp: &ModuleGateReference, gate: &GateRef) -> Self {
+//         match endp {
+//             ModuleGateReference::Local(local) => ConnectionEndpoint::Local(
+//                 RawSymbol {
+//                     raw: local.gate.raw.clone(),
+//                 },
+//                 Cluster::new(gate),
+//             ),
+//             ModuleGateReference::Nonlocal(nonlocal) => ConnectionEndpoint::Nonlocal(
+//                 RawSymbol {
+//                     raw: nonlocal.submodule.raw.clone(),
+//                 },
+//                 Cluster::new(gate),
+//                 (
+//                     RawSymbol {
+//                         raw: nonlocal.gate.gate.raw.clone(),
+//                     },
+//                     Cluster::new(gate),
+//                 ),
+//             ),
+//         }
+//     }
+// }
 
 impl Cluster {
     pub fn new(gate: &GateRef) -> Self {
@@ -136,6 +136,24 @@ impl Cluster {
         match self {
             Self::Standalone => 0,
             Self::Clusted(n) => *n,
+        }
+    }
+}
+
+impl From<GateRef<'_>> for ConnectionEndpoint {
+    fn from(value: GateRef<'_>) -> Self {
+        let gc = Cluster::new(&value);
+        match value.submod {
+            Some((pos, submod, cl)) => ConnectionEndpoint::Nonlocal(
+                RawSymbol { raw: submod },
+                if pos == 0 && cl == Cluster::Standalone {
+                    Cluster::Standalone
+                } else {
+                    Cluster::Clusted(pos)
+                },
+                (value.def.ident.clone(), gc),
+            ),
+            None => ConnectionEndpoint::Local(value.def.ident.clone(), gc),
         }
     }
 }

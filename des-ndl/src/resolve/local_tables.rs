@@ -29,15 +29,21 @@ impl<'a> LocalGatesTable<'a> {
                 ))
             };
         match (&gatec_def.gate_cluster, def.cluster) {
-            (None, Cluster::Standalone) => Ok(Box::new(iter::once(GateRef { def, pos: None }))),
+            (None, Cluster::Standalone) => Ok(Box::new(iter::once(GateRef {
+                def,
+                pos: None,
+                submod: None,
+            }))),
             (None, Cluster::Clusted(cl)) => Ok(Box::new((0..cl).map(|pos| GateRef {
                 def,
                 pos: Some(pos),
+                submod: None,
             }))),
             (Some(c), Cluster::Clusted(cl)) if (c.lit.as_integer() as usize) < cl => {
                 Ok(Box::new(iter::once(GateRef {
                     def,
                     pos: Some(c.lit.as_integer() as usize),
+                    submod: None,
                 })))
             }
             (Some(c), Cluster::Clusted(cl)) => Err(Error::new(
@@ -78,14 +84,22 @@ impl<'a> SharedGatesTable<'a> {
             ModuleGateReference::Nonlocal(submodgate_def) => {
                 let submodules = self.submodules.resolve(submodgate_def)?;
                 let mut gates_iters = Vec::new();
-                for submodule in submodules {
-                    let Some(submodule) = submodule.def.typ.as_module() else {
+                for submodule_ref in submodules {
+                    let Some(submodule) = submodule_ref.def.typ.as_module() else {
                         // type of submodule is not specified, thus ignore this error as transitent.
                         unimplemented!()
                     };
                     let tbl = LocalGatesTable::new(&submodule.gates);
-                    let gates = tbl.resolve(&submodgate_def.gate)?;
-                    gates_iters.push(gates);
+                    let mut gates = tbl.resolve(&submodgate_def.gate)?.collect::<Vec<_>>();
+                    for gate in &mut gates {
+                        gate.submod = Some((
+                            submodule_ref.pos,
+                            submodule_ref.def.ident.raw.clone(),
+                            submodule_ref.def.cluster.clone(),
+                        ));
+                    }
+
+                    gates_iters.push(gates.into_iter());
                 }
 
                 Ok(Box::new(IterIter::new(gates_iters.into_iter())))
