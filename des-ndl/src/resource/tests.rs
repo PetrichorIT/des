@@ -82,3 +82,53 @@ fn source_map_loading() {
         None
     );
 }
+
+const EX0: &'static str = "include str;
+include x;
+
+module M {
+    gates {
+        in[5] @input
+    }
+
+    connections {
+        in -->
+    }
+}
+
+entry M;
+// Comment befor EOF
+";
+
+#[test]
+fn source_map_padded_span() {
+    let mut smap = SourceMap::new();
+    smap.load_raw("raw:ex0", EX0);
+
+    // Full padding.
+    let span = EX0.bytes().enumerate().find(|c| c.1 == b'5').unwrap().0;
+    let span = Span::new(span, 1);
+
+    let (padded_slice, offset) = smap.slice_padded_for(span);
+    assert_eq!(offset, 2);
+    assert_eq!(
+        padded_slice,
+        "module M {\n    gates {\n        in[5] @input\n    }\n"
+    );
+
+    // Trunc end
+    let span = EX0.bytes().enumerate().find(|c| c.1 == b'y').unwrap().0;
+    let span = Span::new(span, 1);
+
+    let (padded_slice, offset) = smap.slice_padded_for(span);
+    assert_eq!(offset, 2);
+    assert_eq!(padded_slice, "}\n\nentry M;\n// Comment befor EOF");
+
+    // Trunc start (offset 1)
+    let span = EX0.bytes().enumerate().find(|c| c.1 == b'x').unwrap().0;
+    let span = Span::new(span, 1);
+
+    let (padded_slice, offset) = smap.slice_padded_for(span);
+    assert_eq!(offset, 1);
+    assert_eq!(padded_slice, "include str;\ninclude x;\n\nmodule M {");
+}

@@ -64,19 +64,24 @@ impl Error {
             line
         )?;
 
+        let (pstr, p) = smap.slice_padded_for(span);
         // Print padded lines
         fmt.set_color(ColorSpec::new().set_fg(Some(Color::Blue)).set_bold(true))?;
-        write!(fmt, "    | ")?;
+        if p == 0 {
+            write!(fmt, "{:>3} | ", line)?;
+        } else {
+            write!(fmt, "    | ")?;
+        }
         fmt.reset()?;
 
-        let mut line_drawn = 0;
+        let mut line_drawn = 1;
 
-        for c in smap.slice_padded_for(span).chars() {
+        for c in pstr.chars() {
             write!(fmt, "{}", c)?;
             if c == '\n' {
                 fmt.set_color(ColorSpec::new().set_fg(Some(Color::Blue)).set_bold(true))?;
 
-                if line_drawn != 1 {
+                if line_drawn != p {
                     write!(fmt, "    | ")?;
                 } else {
                     write!(fmt, "{:>3} | ", line)?;

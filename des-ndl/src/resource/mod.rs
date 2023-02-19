@@ -135,7 +135,7 @@ impl SourceMap {
         &self.buffer[span.pos..(span.pos + span.len)]
     }
 
-    pub(crate) fn slice_padded_for(&self, span: Span) -> &str {
+    pub(crate) fn slice_padded_for(&self, span: Span) -> (&str, usize) {
         // println!("{span:?}");
 
         let asset = self
@@ -146,15 +146,21 @@ impl SourceMap {
 
         let line_start = asset.line_for(span.pos);
         let line_end = asset.line_for(span.pos + span.len);
+        let len = line_end - line_start + 1;
+        let pad = if len > 2 { 1 } else { 2 };
 
-        // println!("{line_start} {line_end}");
+        let lso = line_start;
 
-        let line_start = line_start.saturating_sub(2);
+        let line_start = line_start.saturating_sub(pad);
         let line_end = line_end
-            .saturating_add(2)
+            .saturating_add(pad)
             .min(asset.line_pos_mapping.len() - 1);
 
-        // println!("{line_start} {line_end}");
+        let line_offset = if line_start != 0 {
+            lso - line_start
+        } else {
+            lso - line_start - 1
+        };
 
         let start = *asset
             .line_pos_mapping
@@ -163,7 +169,7 @@ impl SourceMap {
             .max(&bounds.0);
         let end = (asset.line_pos_mapping[line_end] - 1).min(bounds.1);
 
-        &self.buffer[start..end]
+        (&self.buffer[start..end], line_offset)
     }
 
     pub(crate) fn asset(&self, ident: &AssetIdentifier) -> Option<&SourceMappedAsset> {
@@ -306,7 +312,7 @@ impl<'a> Asset<'a> {
         self.map.slice_for(span)
     }
 
-    pub(crate) fn slice_padded_for(&self, span: Span) -> &str {
+    pub(crate) fn slice_padded_for(&self, span: Span) -> (&str, usize) {
         self.map.slice_padded_for(span)
     }
 }
