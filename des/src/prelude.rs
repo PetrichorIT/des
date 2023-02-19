@@ -82,6 +82,11 @@ cfg_net! {
     pub use crate::net::TopoNode;
     pub use crate::net::Topology;
 
+    cfg_ndl! {
+        pub use crate::ndl::NdlApplication;
+        pub use crate::ndl::Registry;
+    }
+
     cfg_async! {
         pub use ::tokio;
         pub use crate::net::module::AsyncModule;

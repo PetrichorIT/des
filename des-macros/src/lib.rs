@@ -37,7 +37,7 @@ pub fn derive_message_body(input: TokenStream) -> TokenStream {
 /// A macro for generating module specific code based on static
 /// analysis and a corresponding ndl definition.
 ///
-/// This macro implements [Deref](std::ops::Deref) and [DerefMut](std::ops::DerefMut)
+/// This macro implements [`Deref`] and [`DerefMut`]
 /// for ModuleCore by either using an exisiting  module core,
 /// or adding one under the key '__core' for structs, or '.0' for enum-structs.
 ///

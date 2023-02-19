@@ -2,48 +2,61 @@
 //!
 //! # The task
 //!
-//! Two nodes 'Ping' and 'Pong' can communicate with each other
-//! using a bidirection channel. 'Ping' sends 30 ping-messages
-//! with at an interval of 1s. 'Pong' receives the messages and
-//! responds with a pong-message, that 'Ping' receives. Both
+//! Two nodes 'Ping' and 'Pong' want to communicate with each other
+//! using a bidirection channel. 'Ping' sends a total of 30 `Ping`-messages
+//! in intervals of 1s. 'Pong' receives these messages and
+//! responds with a `Pong`-Message, that 'Ping' receives. Both
 //! 'Ping' and 'Pong' count the number of messages received and send
 //! by them.
 //!
 //! # The simulation
 //!
-//! This network-simulation is created by using the features `net`.
+//! This network-simulation is created by using the features `net` and `ndl`.
 //!
 //! ### NDL
 //!
-//! When using the more abstract tools provided by the feature `net`,
-//! you must firstly define the topology of network you want to simulate.
-//! This can be done using the `NetworkDescriptionLanguage` [ndl] in a file
-//! ending with '.ndl'. This language describes a network through
-//! modules, gates and channels. At first lets decribe the module required
-//! for our example:
+//! The feature `net` provides the core abstractions for a network-like
+//! simulation. These are Modules, Gates and Channels. Modules represent
+//! network nodes with custom state and behaviour. They are user defined
+//! and can be created by implementing the [`Module`] trait on a type.
+//! Gates act as physical (or logical) ports on a module. They can be
+//! chained together into gate-chains, thus connecting multiple modules.
+//! By default gate-chains act as link with infinite bandwith and zero latency.
+//! If a gate-chain should act as a real physical link would do, Channels
+//! can be attached to a gate chain to define the delay / drop metric of the link.
+//!
+//! While the feature `net` provides the appropiate base abstractions, creating
+//! a network can be tiresome. However, using the feature `ndl`, users
+//! can automatically create networks by defining just the networks
+//! topology using the `NetworkDescriptionLanguage`. Such definitions
+//! can be placed in files ending in '.ndl'. This language desribes networks
+//! as a topology of modules, gates and links, without requiring any custom
+//! logic that will later be associated with the modules. At first let's
+//! describe the network at hand:
 //!
 //! ```text
 //! // 'Main.ndl'
 //! module Ping {
-//!     gates:
-//!         in @input
-//!         out @output
+//!     gates {
+//!         in @input,
+//!         out @output,
+//!     }
 //! }
 //!
 //! module Pong {
-//!     gates:
-//!         in @input
-//!         out @output
+//!     gates {
+//!         in @input,
+//!         out @output,
+//!     }
 //! }
 //! ```
 //!
-//! We define two module, 'Ping' and 'Pong' that both possess two gates. Gates describe a
-//! physical or virtual port of a network node and are used to route messages. Gates
-//! can be connected to each other to forward messages to other modules. This connection
-//! can be enhanced by suppling a channel, that will delay messages on this link.
-//! Such connections can be descirbed in the parent element of a module, which can
-//! be either a module itself, or a subsystem. A subsystem describes either part of the
-//! test case or the complete test case itself. Thus we further define:
+//! We define two module, 'Ping' and 'Pong' that both possesing two gates.
+//! Links in NDL are unidirectional so each modules requires two to facilitate bidirectional
+//! communication. Gates can also be annotated with their typ (input or output) to prevent
+//! unwanted topologies. Using this definition, both modules can be sure, that all incoming
+//! packets must come via the 'in' gate. Now using the basic definition of our two modules
+//! we may create our network.
 //!
 //! ```text
 //! // 'Main.ndl'
@@ -53,52 +66,59 @@
 //!     jitter: 0.0
 //! }
 //!
-//! subsystem MyTestCase {
-//!     nodes:  
-//!         ping: Ping
-//!         pong: Pong
-//!     connections:
-//!         ping/out --> MyLink --> pong/in
-//!         pong/out --> MyLink --> ping/in
+//! module MyNetwork {
+//!     submodules {
+//!         ping: Ping,
+//!         pong: Pong,
+//!     }
+//!     connections {
+//!         ping/out --> MyLink --> pong/in,
+//!         pong/out --> MyLink --> ping/in,
+//!     }
 //! }
+//!
+//! entry MyNetwork;
 //! ```
+//!
+//! The module `MyNetwork` represents the entry point to our simulation. While `MyNetwork` itself could
+//! act as a network node, it is more of an abstract composite node in this example. By declaring
+//! two submodules 'ping' and 'pong' we declare, that each instance of MyNetwork should contain
+//! a `Ping` and a `Pong` instance. In the connections section we define a link (gate-chain)
+//! between the output gate of 'ping' and the input gate if 'pong' (and vice versa).
+//! This gate chain will be augmented using a Channel with the characteristics defined
+//! on `MyLink`. Finally we declare the module `MyNetwork` to be the entry point / root of
+//! our network.
 //!
 //! # The Modules
 //!
 //! Once we have defined the network topology, modules can be defined in rust code.
 //! For that you may define a struct or enum of the with the same name as the described
-//! module. To link the type and the module use the [`NdlModule`](crate::prelude::NdlModule)
-//! macro. Note that you must provide the macro with a relative path to the workspace.
+//! module.
 //!
-//! > Note that the test cases are ignored, since they require access to the filesystem at compile time.
-//!
-//! ```ignore
+//! ```
 //! # use des::prelude::*;
-//! #[NdlModule("src")]
 //! struct Ping {
 //!     pongs_recv: usize,
 //!     pings_send: usize,
 //! }
-//! #[NdlModule("src")]
 //! struct Pong {
 //!     pings_recv: usize,
 //!     pongs_send: usize,
 //! }
 //! ```
 //!
-//! Now DES knows how to construct modules with the correct gates, and which types to use.
-//! However should the modules contain fields, they will need a constructor to build
-//! the inital state. To provide this constructor they must implement the [`NameableModule`](crate::net::NameableModule)
-//! trait. This trait is automatically derived on empty types, but must be manually implemented
-//! for all other case. Note that the [`NdlModule`](crate::prelude::NdlModule) macro attached a new field
-//! `__core` to the type:
+//! To be a module, this type must implement the trait [`Module`]. This trait provides
+//! a number of available functions, but only [`Module::new`] is required on all modules.
+//! This function should be used to create a new instance of the custom state for a
+//! network node. Note that this function is not nessecryly executed within the context
+//! of an event, so dont put complex custom logic here.
 //!
 //! ```rust
 //! # use des::prelude::*;
-//! # #[NdlModule]
 //! # struct Ping { pongs_recv: usize, pings_send: usize }
-//! # #[NdlModule]
 //! # struct Pong { pings_recv: usize, pongs_send: usize }
+//! /* ... */
+//!
 //! impl Module for Ping {
 //!     fn new() -> Self {
 //!         Self {
@@ -108,6 +128,7 @@
 //!     }
 //!     /* ... */
 //! }
+//!
 //! impl Module for Pong {
 //!     fn new() -> Self {
 //!         Self {
@@ -119,9 +140,12 @@
 //! }
 //! ```
 //!
-//! Once module construction is finished you can define the behaviour of the module by implementing
-//! the [`Module`](crate::net::Module) trait. Noteably you can use the [`handle_message`](crate::net::Module::handle_message)
-//! function to react to arriving packets
+//! The `Module` trait also provide some other useful functions, that can be overrided.
+//! [`Module::handle_message`] is called when a packet arrives at the module. This function
+//! is the heart of most network simulations. [`Module::at_sim_start`] provides a way to
+//! handle more complex logic when the simulation is stared, but now within a fully constructed
+//! topology.  [`Module::at_sim_end`] can be used to make module-specific actions once the simulation is finished,
+//! such as writing metrics to a file, or deallocating internal containers.
 //!
 //! ```
 //! # use des::prelude::*;
@@ -183,30 +207,44 @@
 //!
 //! ### The app
 //!
-//! Now that we have defined the modules we can do the same with the test case / the subsystem.
-//! Define a struct with the same name, and bind it using the [`NdlSubsystem`](crate::prelude::NdlSubsystem)
-//! macro.
+//! Now that we have defined the **real** modules we can do the same with the  more abstract modules.
+//! Since we dont have any intersting buisness logic for this module, we just
+//! insert some placeholder code.
 //!
-//! ```ignore
+//! ```
 //! # use des::prelude::*;
-//! #[NdlSubsystem("src")]
-//! #[derive(Debug, Default)]
-//! struct MyTestCase {}
+//! /* ... */
+//!
+//! struct MyTestCase;
+//! impl Module for MyTestCase {
+//!     fn new() -> MyTestCase {
+//!         Self
+//!     }
+//! }
 //! ```
 //!
-//! Now we have defined everything to create the simulation. To do that create a instance of
-//! the application, call the [`build_rt`] function and use the provided [`NetworkRuntime`]
-//! to power a simulation.
+//! Now we have defined everything to create the simulation. To do that create an
+//! [`NdlApplication`] to load our network topology. This application requies
+//! a [`Registry`] of all known modules types, to link the Ndl-Modules to their rust struct.
+//! This application can be used to instantiate a [`NetworkRuntime`] (provided by feature `net`),
+//! which in turn can be passed to the core [`Runtime`] of des. This runtime can than be executed,
+//! to run the simulation to its end.
 //!
-//! ```ignore
+//! ```
 //! # use des::prelude::*;
-//! # #[NdlSubsystem()]
-//! # #[derive(Debug, Default)]
-//! # struct MyTestCase {}
+//! # use des::registry;
+//! # struct Ping;
+//! # impl Module for Ping { fn new() -> Self { Self }}
+//! # struct Pong;
+//! # impl Module for Pong { fn new() -> Self { Self }}
+//! # struct MyTestCase;
+//! # impl Module for MyTestCase { fn new() -> Self { Self }}
+//! /* ... */
+//!
 //! fn main() {
 //!     # return;
-//!     let app = MyTestCase::default().build_rt();
-//!     let rt = Runtime::new(app);
+//!     let app = NdlApplication::new("main.ndl", registry![Ping, Pong, MyTestCase]).unwrap();
+//!     let rt = Runtime::new(NetworkRuntime::new(app));
 //!     let result = rt.run();
 //!     println!("{:?}", result);
 //! }
