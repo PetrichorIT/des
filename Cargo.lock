@@ -250,8 +250,8 @@ version = "0.4.1"
 dependencies = [
  "async-trait",
  "cqueue",
- "des_macros",
- "des_ndl",
+ "des-macros",
+ "des-ndl",
  "futures",
  "log",
  "rand",
@@ -263,17 +263,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "des_macros"
+name = "des-macros"
 version = "0.4.0"
 dependencies = [
- "des_macros_core",
+ "des-macros-core",
  "proc-macro-error",
  "proc-macro2",
  "syn",
 ]
 
 [[package]]
-name = "des_macros_core"
+name = "des-macros-core"
 version = "0.4.0"
 dependencies = [
  "lazy_static",
@@ -285,7 +285,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "des_ndl"
+name = "des-ndl"
 version = "0.1.0"
 dependencies = [
  "log",
