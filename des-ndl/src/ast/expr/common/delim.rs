@@ -53,6 +53,19 @@ impl<T: Parse> Delimited<T> {
             .spanned(Span::fromto(span.open, span.close)))
         }
     }
+
+    pub fn parse_option_from(delim: Delimiter, input: ParseStream<'_>) -> Result<Option<Self>> {
+        let peek = input.ts.peek();
+        if let Some(TokenTree::Delimited(_, d, _)) = peek {
+            if delim == *d {
+                Ok(Some(Self::parse_from(delim, input)?))
+            } else {
+                Ok(None)
+            }
+        } else {
+            Ok(None)
+        }
+    }
 }
 
 #[cfg(test)]

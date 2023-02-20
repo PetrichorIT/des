@@ -31,7 +31,7 @@ fn submodules_ast_baseline() -> RootResult<()> {
 #[test]
 fn submodules_ast_nodelim() {
     let err = Context::load("tests/submodules_ast_nodelim.ndl").unwrap_err();
-    println!("{err}");
+    // println!("{err}");
 
     let errs = err.errors;
     assert_eq!(errs.len(), 1);
@@ -45,7 +45,7 @@ fn submodules_ast_nodelim() {
 #[test]
 fn submodules_ast_wrong_delim() {
     let err = Context::load("tests/submodules_ast_wrong_delim.ndl").unwrap_err();
-    println!("{err}");
+    // println!("{err}");
 
     let errs = err.errors;
     assert_eq!(errs.len(), 1);
@@ -59,7 +59,7 @@ fn submodules_ast_wrong_delim() {
 #[test]
 fn submodules_ast_symbol_dup() {
     let err = Context::load("tests/submodules_ast_symbol_dup.ndl").unwrap_err();
-    println!("{err}");
+    // println!("{err}");
 
     let errs = err.errors;
     assert_eq!(errs.len(), 1);
@@ -73,7 +73,7 @@ fn submodules_ast_symbol_dup() {
 #[test]
 fn submodules_ast_missing_ty() {
     let err = Context::load("tests/submodules_ast_missing_ty.ndl").unwrap_err();
-    println!("{err}");
+    // println!("{err}");
 
     let errs = err.errors;
     assert_eq!(errs.len(), 1);

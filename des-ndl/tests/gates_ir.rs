@@ -35,7 +35,7 @@ fn gates_ir_baseline() -> RootResult<()> {
 #[test]
 fn gates_ir_local_dup() {
     let err = Context::load("tests/gates_ir_local_dup.ndl").unwrap_err();
-    println!("{err}");
+    // println!("{err}");
 
     let errs = err.errors;
     assert_eq!(errs.len(), 1);

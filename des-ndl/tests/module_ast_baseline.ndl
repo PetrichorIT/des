@@ -7,7 +7,7 @@ module Sub {
     }
 }
 
-module Main {
+module Main: Sub {
     submodules {
         sub[2]: Sub
     }

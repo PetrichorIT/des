@@ -31,7 +31,7 @@ fn submodules_ir_baseline() -> RootResult<()> {
 #[test]
 fn submodules_ir_local_dup() {
     let err = Context::load("tests/submodules_ir_local_dup.ndl").unwrap_err();
-    println!("{err}");
+    // println!("{err}");
 
     let errs = err.errors;
     assert_eq!(errs.len(), 1);
@@ -45,7 +45,7 @@ fn submodules_ir_local_dup() {
 #[test]
 fn submodules_ir_unknown_ty() {
     let err = Context::load("tests/submodules_ir_unknown_ty.ndl").unwrap_err();
-    println!("{err}");
+    // println!("{err}");
 
     let errs = err.errors;
     assert_eq!(errs.len(), 1);
@@ -59,7 +59,7 @@ fn submodules_ir_unknown_ty() {
 #[test]
 fn submodules_ir_unknown_ty_soloution() {
     let err = Context::load("tests/submodules_ir_unknown_ty_solution/main.ndl").unwrap_err();
-    println!("{err}");
+    // println!("{err}");
 
     let errs = err.errors;
     assert_eq!(errs.len(), 1);

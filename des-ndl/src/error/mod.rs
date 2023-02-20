@@ -31,6 +31,8 @@ pub enum ErrorKind {
     MissingToken,
     UnexpectedEOF,
     LinkInheritanceDuplicatedSymbols,
+    ModuleInheritanceDuplicatedSymbols,
+    ModuleBothInheritanceAndDyn,
     LinkKnownKeysInvalidValue,
     ModuleGatesDuplicatedSymbols,
     ModuleGatesInvalidClusterSize,
@@ -49,6 +51,8 @@ pub enum ErrorKind {
     InvalidConDefSizes,
     InvalidConClusterIndex,
     ModuleLocalCyclicDeps,
+    ModuleDynConstraintsBroken,
+    ModuleDynNotResolved,
     MissingEntryPoint,
 }
 

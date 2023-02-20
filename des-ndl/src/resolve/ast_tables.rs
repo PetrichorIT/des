@@ -189,22 +189,32 @@ pub struct ModuleAstTable {
 
 impl ModuleAstTable {
     pub fn order_local_deps(&mut self, errors: &mut ErrorsMut) -> bool {
-        let (local, nonlocal) = self.local_mut();
-        let mut s = 0;
+        let (local, _) = self.local_mut();
 
-        // Generate topo;
+        // Generate topo
         let mut topo = vec![Vec::new(); local.len()];
         for i in 0..local.len() {
+            // 1) submodules links
             let submodules = &local[i].submodules;
             for dep in submodules.iter().map(|s| s.items.iter()).flatten() {
                 let ldep = local
                     .iter()
                     .enumerate()
-                    .find(|(_, l)| l.ident.raw == dep.typ.raw);
+                    .find(|(_, l)| l.ident.raw == dep.typ.raw());
                 if let Some(ldep) = ldep {
                     topo[i].push(ldep.0);
-                } else {
-                    // ignore nonloca dep
+                }
+            }
+
+            // 2) inheritance links
+            let Some(inh) = &local[i].inheritance else { continue };
+            for dep in inh.symbols.iter() {
+                let ldep = local
+                    .iter()
+                    .enumerate()
+                    .find(|(_, l)| l.ident.raw == dep.raw);
+                if let Some(ldep) = ldep {
+                    topo[i].push(ldep.0)
                 }
             }
         }
@@ -232,35 +242,24 @@ impl ModuleAstTable {
             return false;
         }
 
+        let mut s = 0;
         while s < local.len() {
-            // let mut loadable = false;
             let mut i = s;
-
-            'seacher: while i < local.len() {
-                // check if i depents are in ..s
-                let sbm = &local[i].submodules;
-                'inner: for dep in sbm.iter().map(|s| s.items.iter()).flatten() {
-                    let dep = &dep.typ;
-                    let valid = local[..s].iter().any(|l| l.ident.raw == dep.raw);
-
-                    if !valid {
-                        let valid_nonlocal = nonlocal.iter().any(|l| l.ident.raw == dep.raw);
-                        if valid_nonlocal {
-                            continue 'inner;
-                        }
-
-                        i += 1;
-                        continue 'seacher;
-                    }
+            while i < local.len() {
+                // Check whether i can be loaded with local[..s]
+                // use local topo
+                let edges = &topo[i];
+                let local_valid = edges.iter().all(|&e| e < s);
+                if !local_valid {
+                    i += 1;
+                    continue;
                 }
-                // all deps are valid
-                // loadable = true;
+
                 break;
             }
 
-            // not all deps may be loadable, since nonlocal deps are not repr
             if s != i && i < local.len() {
-                local.swap(s, i);
+                local.swap(s, i)
             }
             s += 1;
         }

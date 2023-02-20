@@ -151,7 +151,7 @@ impl Context {
         order
     }
 
-    pub(super) fn load_entry(&mut self, errors: &mut ErrorsMut) {
+    pub(super) fn load_entry_and_check_dyn(&mut self, errors: &mut ErrorsMut) {
         let ir_table = ModuleIrTable::from_ctx(self, &self.root, errors, true);
 
         let asts = self.asts_for_asset(&self.root);
@@ -168,6 +168,7 @@ impl Context {
                     ));
                     return;
                 };
+                self.check_dyn(symbol.clone(), errors);
                 self.entry = Some(symbol);
                 return;
             }
@@ -177,5 +178,35 @@ impl Context {
             ErrorKind::MissingEntryPoint,
             "missing entry point to ndl topology",
         ));
+    }
+
+    fn check_dyn(&self, arc: Arc<ir::Module>, errors: &mut ErrorsMut) {
+        let arc2 = arc.clone();
+        errors.with_mapping(
+            move |e| e.add_hints(ErrorHint::Note(format!("in module '{}'", arc.ident.raw))),
+            move |errors| {
+                for submodule in arc2.submodules.iter() {
+                    if submodule.dynamic {
+                        unreachable!();
+                        // errors.add(
+                        //     Error::new(
+                        //         ErrorKind::ModuleDynNotResolved,
+                        //         format!(
+                        //         "dynamic submodule '{}: dyn {}' was not resolved in parent module",
+                        //         submodule.ident.raw,
+                        //         submodule.typ.raw().raw
+                        //     ),
+                        //     )
+                        //     .spanned(submodule.span),
+                        // );
+                        // continue;
+                    }
+
+                    if let Some(sub) = submodule.typ.as_module_arc() {
+                        self.check_dyn(sub, errors)
+                    }
+                }
+            },
+        )
     }
 }

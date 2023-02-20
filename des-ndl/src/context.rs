@@ -48,7 +48,7 @@ impl Context {
             return Err(RootError::new(errors.into_inner(), this.smap));
         }
 
-        this.load_entry(&mut errors);
+        this.load_entry_and_check_dyn(&mut errors);
         if !errors.is_empty() {
             return Err(RootError::new(errors.into_inner(), this.smap));
         }

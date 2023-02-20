@@ -35,7 +35,7 @@ fn gates_ast_baseline() -> RootResult<()> {
 #[test]
 fn gates_ast_nodelim() {
     let err = Context::load("tests/gates_ast_nodelim.ndl").unwrap_err();
-    println!("{err}");
+    // println!("{err}");
 
     let errs = err.errors;
     assert_eq!(errs.len(), 1);
@@ -49,7 +49,7 @@ fn gates_ast_nodelim() {
 #[test]
 fn gates_ast_wrong_delim() {
     let err = Context::load("tests/gates_ast_wrong_delim.ndl").unwrap_err();
-    println!("{err}");
+    // println!("{err}");
 
     let errs = err.errors;
     assert_eq!(errs.len(), 1);
@@ -63,7 +63,7 @@ fn gates_ast_wrong_delim() {
 #[test]
 fn gates_ast_invalid_annotation() {
     let err = Context::load("tests/gates_ast_invalid_annotation.ndl").unwrap_err();
-    println!("{err}");
+    // println!("{err}");
 
     let errs = err.errors;
     assert_eq!(errs.len(), 1);
@@ -77,7 +77,7 @@ fn gates_ast_invalid_annotation() {
 #[test]
 fn gates_ast_symbol_dup() {
     let err = Context::load("tests/gates_ast_symbol_dup.ndl").unwrap_err();
-    println!("{err}");
+    // println!("{err}");
 
     let errs = err.errors;
     assert_eq!(errs.len(), 1);
@@ -91,7 +91,7 @@ fn gates_ast_symbol_dup() {
 #[test]
 fn gates_ast_invalid_cluster() {
     let err = Context::load("tests/gates_ast_invalid_cluster.ndl").unwrap_err();
-    println!("{err}");
+    // println!("{err}");
 
     let errs = err.errors;
     assert_eq!(errs.len(), 4);
@@ -120,7 +120,7 @@ fn gates_ast_invalid_cluster() {
 #[test]
 fn gates_ast_invalid_punct() {
     let err = Context::load("tests/gates_ast_invalid_punct.ndl").unwrap_err();
-    println!("{err}");
+    // println!("{err}");
 
     let errs = err.errors;
     assert_eq!(errs.len(), 1);

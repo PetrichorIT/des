@@ -3,9 +3,47 @@ use crate::ast::*;
 
 impl Validate for ModuleStmt {
     fn validate(&self, errors: &mut ErrorsMut) {
+        let has_inh = self.inheritance.is_some();
+        let has_dyn = self
+            .submodules
+            .iter()
+            .any(|s| s.items.iter().any(|s| s.typ.is_dyn()));
+        if has_inh && has_dyn {
+            errors.add(
+                Error::new(
+                    ErrorKind::ModuleBothInheritanceAndDyn,
+                    "module is defined with both inheritance and dyn members: not supported",
+                )
+                .spanned(self.span()),
+            );
+        }
+
+        self.inheritance.as_ref().map(|inh| inh.validate(errors));
         self.gates.iter().for_each(|s| s.validate(errors));
         self.submodules.iter().for_each(|s| s.validate(errors));
         self.connections.iter().for_each(|s| s.validate(errors));
+    }
+}
+
+impl Validate for ModuleInheritance {
+    fn validate(&self, errors: &mut ErrorsMut) {
+        let mut symbols = Vec::with_capacity(self.symbols.len());
+        for symbol in self.symbols.iter() {
+            if symbols.contains(&&symbol.raw) {
+                errors.add(
+                    Error::new(
+                        ErrorKind::ModuleInheritanceDuplicatedSymbols,
+                        format!(
+                            "found duplicated symbol '{}' in module inheritance statement",
+                            symbol.raw
+                        ),
+                    )
+                    .spanned(self.span()),
+                );
+                continue;
+            }
+            symbols.push(&symbol.raw);
+        }
     }
 }
 

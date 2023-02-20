@@ -1,6 +1,6 @@
 use super::IterIter;
 use crate::{
-    ast::{LocalModuleGateReference, ModuleGateReference, NonlocalModuleGateReference},
+    ast::{LocalModuleGateReference, ModuleGateReference, NonlocalModuleGateReference, Spanned},
     error::*,
     ir::*,
 };
@@ -128,7 +128,7 @@ impl<'a> LocalSubmoduleTable<'a> {
                 return Err(Error::new(
                     ErrorKind::SymbolNotFound,
                     format!("did not find submodule symbol '{}', not in scope", submodgate_def.submodule.raw)
-                ))
+                ).spanned(submodgate_def.span()))
         };
 
         match (&submodgate_def.submodule_cluster, def.cluster) {

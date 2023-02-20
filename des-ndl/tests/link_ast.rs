@@ -42,7 +42,7 @@ fn link_ast_baseline() -> RootResult<()> {
 #[test]
 fn link_ast_noident() {
     let err = Context::load("tests/link_ast_noident.ndl").unwrap_err();
-    println!("{err}");
+    // println!("{err}");
 
     let errs = err.errors;
     assert_eq!(errs.len(), 1);
@@ -56,7 +56,7 @@ fn link_ast_noident() {
 #[test]
 fn link_ast_invalid_inh() {
     let err = Context::load("tests/link_ast_invalid_inh.ndl").unwrap_err();
-    println!("{err}");
+    // println!("{err}");
 
     let errs = err.errors;
     assert_eq!(errs.len(), 1);
@@ -70,7 +70,7 @@ fn link_ast_invalid_inh() {
 #[test]
 fn link_ast_invalid_kv() {
     let err = Context::load("tests/link_ast_invalid_kv.ndl").unwrap_err();
-    println!("{err}");
+    // println!("{err}");
 
     let errs = err.errors;
     assert_eq!(errs.len(), 1);
@@ -84,7 +84,7 @@ fn link_ast_invalid_kv() {
 #[test]
 fn link_ast_invalid_kv2() {
     let err = Context::load("tests/link_ast_invalid_kv2.ndl").unwrap_err();
-    println!("{err}");
+    // println!("{err}");
 
     let errs = err.errors;
     assert_eq!(errs.len(), 1);
@@ -98,7 +98,7 @@ fn link_ast_invalid_kv2() {
 #[test]
 fn link_ast_nodelim() {
     let err = Context::load("tests/link_ast_nodelim.ndl").unwrap_err();
-    println!("{err}");
+    // println!("{err}");
 
     let errs = err.errors;
     assert_eq!(errs.len(), 1);

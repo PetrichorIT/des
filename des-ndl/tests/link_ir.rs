@@ -42,7 +42,7 @@ fn link_ir_baseline() -> RootResult<()> {
 #[test]
 fn link_ir_inh() {
     let err = Context::load("tests/link_ir_inh.ndl").unwrap_err();
-    println!("{err}");
+    // println!("{err}");
 
     let errs = err.errors;
     assert_eq!(errs.len(), 2);
@@ -61,7 +61,7 @@ fn link_ir_inh() {
 #[test]
 fn link_ir_inh_with_solutions() {
     let err = Context::load("tests/link_ir_inh2/main.ndl").unwrap_err();
-    println!("{err}");
+    // println!("{err}");
 
     let errs = err.errors;
     assert_eq!(errs.len(), 2);
@@ -83,7 +83,7 @@ fn link_ir_inh_with_solutions() {
 #[test]
 fn link_ir_inh_dup() {
     let err = Context::load("tests/link_ir_inh_dup.ndl").unwrap_err();
-    println!("{err}");
+    // println!("{err}");
 
     let errs = err.errors;
     assert_eq!(errs.len(), 1);
@@ -97,7 +97,7 @@ fn link_ir_inh_dup() {
 #[test]
 fn link_ir_known_values() {
     let err = Context::load("tests/link_ir_known_values.ndl").unwrap_err();
-    println!("{err}");
+    // println!("{err}");
 
     let errs = err.errors;
     assert_eq!(errs.len(), 1);
@@ -111,7 +111,7 @@ fn link_ir_known_values() {
 #[test]
 fn link_ir_local_dup() {
     let err = Context::load("tests/link_ir_local_dup.ndl").unwrap_err();
-    println!("{err}");
+    // println!("{err}");
 
     let errs = err.errors;
     assert_eq!(errs.len(), 1);
@@ -125,7 +125,7 @@ fn link_ir_local_dup() {
 #[test]
 fn link_ir_nonlocal_dup() {
     let err = Context::load("tests/link_ir_nonlocal_dup/main.ndl").unwrap_err();
-    println!("{err}");
+    // println!("{err}");
 
     let errs = err.errors;
     assert_eq!(errs.len(), 1);
@@ -139,7 +139,7 @@ fn link_ir_nonlocal_dup() {
 #[test]
 fn link_ir_requried_values() {
     let err = Context::load("tests/link_ir_required_values.ndl").unwrap_err();
-    println!("{err}");
+    // println!("{err}");
 
     let errs = err.errors;
     assert_eq!(errs.len(), 2);

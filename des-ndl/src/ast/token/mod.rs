@@ -69,6 +69,7 @@ impl TokenKind {
             "link" => TokenKind::Keyword(Keyword::Link),
             "include" => TokenKind::Keyword(Keyword::Include),
             "entry" => TokenKind::Keyword(Keyword::Entry),
+            "dyn" => TokenKind::Keyword(Keyword::Dyn),
             _ => TokenKind::Ident(ident),
         }
     }
@@ -114,6 +115,7 @@ pub enum Keyword {
     Link,
     Include,
     Entry,
+    Dyn,
 }
 
 impl Keyword {
@@ -126,6 +128,7 @@ impl Keyword {
             Self::Link => "'link'",
             Self::Include => "'include'",
             Self::Entry => "'entry'",
+            Self::Dyn => "'dyn'",
         }
     }
 }

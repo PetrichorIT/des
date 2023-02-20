@@ -11,7 +11,7 @@ pub struct RawSymbol {
 pub enum Symbol {
     Module(Arc<Module>),
     Link(Arc<Link>),
-    Unresolved(String),
+    Unresolved(RawSymbol),
 }
 
 // # Impl
@@ -48,6 +48,14 @@ impl Symbol {
         match self {
             Self::Module(m) => Some(m.clone()),
             _ => None,
+        }
+    }
+
+    pub fn raw(&self) -> &RawSymbol {
+        match self {
+            Self::Link(l) => &l.ident,
+            Self::Module(m) => &m.ident,
+            Self::Unresolved(i) => i,
         }
     }
 }

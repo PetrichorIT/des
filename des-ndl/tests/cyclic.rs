@@ -19,7 +19,7 @@ fn cyclic_baseline() -> RootResult<()> {
 #[test]
 fn cyclic_includes() {
     let err = Context::load("tests/cyclic_includes/main.ndl").unwrap_err();
-    println!("{err}");
+    // println!("{err}");
 
     let errs = err.errors;
     assert_eq!(errs.len(), 1);
@@ -33,7 +33,7 @@ fn cyclic_includes() {
 #[test]
 fn cyclic_local_links() {
     let err = Context::load("tests/cyclic_local_links.ndl").unwrap_err();
-    println!("{err}");
+    // println!("{err}");
 
     let errs = err.errors;
     assert_eq!(errs.len(), 1);
@@ -47,7 +47,7 @@ fn cyclic_local_links() {
 #[test]
 fn cyclic_local_modules() {
     let err = Context::load("tests/cyclic_local_modules.ndl").unwrap_err();
-    println!("{err}");
+    // println!("{err}");
 
     let errs = err.errors;
     assert_eq!(errs.len(), 1);
@@ -61,7 +61,7 @@ fn cyclic_local_modules() {
 #[test]
 fn cyclic_local_selfreferential() {
     let err = Context::load("tests/cyclic_local_selfreferential.ndl").unwrap_err();
-    println!("{err}");
+    // println!("{err}");
 
     let errs = err.errors;
     assert_eq!(errs.len(), 4);
@@ -84,5 +84,45 @@ fn cyclic_local_selfreferential() {
     check_err!(errs.get(3) =>
         ErrorKind::ModuleLocalCyclicDeps,
         "found cyclic definition of local modules: IndirectA <- IndirectB <- IndirectA"
+    );
+}
+
+#[test]
+fn cyclic_module_inh() {
+    let err = Context::load("tests/cyclic_module_inh.ndl").unwrap_err();
+    println!("{err}");
+
+    let errs = err.errors;
+    assert_eq!(errs.len(), 2);
+
+    check_err!(errs.get(0) =>
+        ErrorKind::ModuleLocalCyclicDeps,
+        "found cyclic definition of local modules: A <- C <- B <- A"
+    );
+
+    check_err!(errs.get(1) =>
+        ErrorKind::ModuleLocalCyclicDeps,
+        "found cyclic definition of local modules: H1 <- H2 <- H1"
+    );
+}
+
+#[test]
+fn cyclic_dependable() {
+    let err = Context::load("tests/cyclic_dependable/main.ndl").unwrap_err();
+    println!("{err}");
+
+    let errs = err.errors;
+    assert_eq!(errs.len(), 2);
+
+    check_err!(errs.get(0) =>
+        ErrorKind::ModuleLocalCyclicDeps,
+        "found cyclic definition of local modules: A <- B <- A"
+    );
+
+    // cause cyclic will not be loaded
+    check_err!(errs.get(1) =>
+        ErrorKind::SymbolNotFound,
+        "did not find inheritance symbol 'B', not in scope",
+        "try including 'B' from '../sub'"
     );
 }

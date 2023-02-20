@@ -7,6 +7,7 @@ use super::*;
 use crate::{
     ast::{Annotation, ClusterDefinition, ModuleStmt},
     ir::GateRef,
+    Span,
 };
 
 #[derive(Clone, PartialEq)]
@@ -14,6 +15,7 @@ pub struct Module {
     pub ast: Arc<ModuleStmt>,
 
     pub ident: RawSymbol,
+    pub inherited: Vec<Symbol>,
     pub gates: Vec<Gate>,
     pub submodules: Vec<Submodule>,
     pub connections: Vec<Connection>,
@@ -37,9 +39,11 @@ pub enum GateServiceType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Submodule {
+    pub span: Span,
     pub ident: RawSymbol,
     pub typ: Symbol,
     pub cluster: Cluster,
+    pub dynamic: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -196,6 +200,10 @@ impl Debug for Module {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Module")
             .field("ident", &self.ident)
+            .field(
+                "inherited",
+                &self.inherited.iter().map(|v| v.raw()).collect::<Vec<_>>(),
+            )
             .field("gates", &self.gates)
             .field("submodules", &self.submodules)
             .field("connections", &self.connections)

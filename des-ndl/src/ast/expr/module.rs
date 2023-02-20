@@ -1,7 +1,7 @@
 use crate::{
     ast::{
-        parse::*, Delimited, Delimiter, Ident, Keyword, ModuleToken, Token, TokenKind, TokenStream,
-        TokenTree,
+        parse::*, Colon, Delimited, Delimiter, Ident, Joined, Keyword, ModuleToken, Plus, Token,
+        TokenKind, TokenStream, TokenTree,
     },
     error::*,
     Span,
@@ -19,15 +19,51 @@ pub use submodules::*;
 pub struct ModuleStmt {
     pub keyword: ModuleToken,
     pub ident: Ident,
+    pub inheritance: Option<ModuleInheritance>,
     pub gates: Vec<GatesStmt>,
     pub submodules: Vec<SubmodulesStmt>,
     pub connections: Vec<ConnectionsStmt>,
     pub span: Span,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct ModuleInheritance {
+    pub colon: Colon,
+    pub symbols: Joined<Ident, Plus>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ModuleTypus {
+    Primal,
+    Inherited,
+    Dynamic,
+}
+
+impl ModuleStmt {
+    pub fn typus(&self) -> ModuleTypus {
+        if self.inheritance.is_some() {
+            return ModuleTypus::Inherited;
+        }
+        if self
+            .submodules
+            .iter()
+            .any(|st| st.items.iter().any(|s| s.typ.is_dyn()))
+        {
+            return ModuleTypus::Dynamic;
+        }
+        ModuleTypus::Primal
+    }
+}
+
 impl Spanned for ModuleStmt {
     fn span(&self) -> Span {
         self.span
+    }
+}
+
+impl Spanned for ModuleInheritance {
+    fn span(&self) -> Span {
+        Span::fromto(self.colon.span(), self.symbols.span())
     }
 }
 
@@ -39,6 +75,7 @@ impl Parse for ModuleStmt {
             e.override_internal(format!("unexpected token for module symbol: {f}"))
         })?;
 
+        let inheritance = Option::<ModuleInheritance>::parse(input)?;
         let delim = Delimited::<TokenStream>::parse_from(Delimiter::Brace, input)?;
         let inner = ParseBuffer::new(input.asset, delim.inner);
         let span = Span::fromto(keyword.span(), delim.delim_span.close);
@@ -46,6 +83,7 @@ impl Parse for ModuleStmt {
         let mut this = ModuleStmt {
             keyword,
             ident,
+            inheritance,
             gates: Vec::new(),
             submodules: Vec::new(),
             connections: Vec::new(),
@@ -89,6 +127,18 @@ impl Parse for ModuleStmt {
         }
 
         Ok(this)
+    }
+}
+
+impl Parse for Option<ModuleInheritance> {
+    fn parse(input: ParseStream<'_>) -> Result<Self> {
+        let colon = match Colon::parse(input) {
+            Ok(v) => v,
+            Err(_) => return Ok(None),
+        };
+
+        let symbols = Joined::<Ident, Plus>::parse(input)?;
+        Ok(Some(ModuleInheritance { colon, symbols }))
     }
 }
 
@@ -142,5 +192,18 @@ mod tests {
         let buf = ParseBuffer::new(asset, ts);
 
         let _stmt = ModuleStmt::parse(&buf).unwrap_err();
+    }
+
+    #[test]
+    fn inheritance() {
+        let mut smap = SourceMap::new();
+
+        // # Case 0
+        let asset = smap.load_raw("raw:case0", "module A: B + C { }");
+        let ts = TokenStream::new(asset).unwrap();
+        let buf = ParseBuffer::new(asset, ts);
+
+        let stmt = ModuleStmt::parse(&buf).unwrap();
+        assert!(stmt.inheritance.is_some())
     }
 }

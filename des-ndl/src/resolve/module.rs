@@ -22,8 +22,42 @@ impl Module {
     ) -> Module {
         let errlen = errors.len();
 
+        // load deps;
+        // TODO: check for dirty deps.
+        let mut deps = Vec::new();
+        let mut inherited = Vec::new();
+        if let Some(ref inh) = ast.inheritance {
+            for dep in inh.symbols.iter() {
+                let typ = match modules.get(dep) {
+                    Some(v) => v,
+                    None => {
+                        errors.add(
+                            Error::new(
+                                ErrorKind::SymbolNotFound,
+                                format!(
+                                    "did not find inheritance symbol '{}', not in scope",
+                                    dep.raw
+                                ),
+                            )
+                            .spanned(dep.span())
+                            .map(|e| global.err_resolve_symbol(&dep.raw, true, e)),
+                        );
+                        inherited.push(Symbol::Unresolved(RawSymbol {
+                            raw: dep.raw.clone(),
+                        }));
+                        continue;
+                    }
+                };
+                deps.push(typ.clone());
+                inherited.push(Symbol::from(typ));
+            }
+        }
+
         // Include gate definitions
         let mut ir_gates: Vec<Gate> = Vec::with_capacity(ast.gates.len());
+        for inh in &deps {
+            ir_gates.extend(inh.gates.iter().cloned());
+        }
         for gate in ast.gates.iter().map(|stmt| stmt.items.iter()).flatten() {
             if ir_gates.iter().any(|d| d.ident.raw == gate.ident.raw) {
                 errors.add(
@@ -57,8 +91,10 @@ impl Module {
 
         // Include submodule definition
         let mut ir_submodules: Vec<Submodule> = Vec::with_capacity(ast.submodules.len());
-
-        for submodule in ast
+        for inh in &deps {
+            ir_submodules.extend(inh.submodules.iter().cloned());
+        }
+        for submodule_ast in ast
             .submodules
             .iter()
             .map(|stmt| stmt.items.iter())
@@ -66,26 +102,26 @@ impl Module {
         {
             if ir_submodules
                 .iter()
-                .any(|d| d.ident.raw == submodule.ident.raw)
+                .any(|d| d.ident.raw == submodule_ast.ident.raw)
             {
                 errors.add(
                     Error::new(
                         ErrorKind::SymbolDuplication,
                         format!(
                             "submodule(-cluster) '{}' was defined multiple times",
-                            submodule.ident.raw
+                            submodule_ast.ident.raw
                         ),
                     )
-                    .spanned(submodule.span()),
+                    .spanned(submodule_ast.span()),
                 );
                 continue;
             }
 
-            let cluster = Cluster::from(&submodule.cluster);
+            let cluster = Cluster::from(&submodule_ast.cluster);
 
             // Confirm existence of symbol
             let typ = modules
-                .get(&submodule.typ.raw)
+                .get(&submodule_ast.typ.raw())
                 .map(Symbol::from)
                 .unwrap_or_else(|| {
                     errors.add(
@@ -93,23 +129,130 @@ impl Module {
                             ErrorKind::SymbolNotFound,
                             format!(
                                 "did not find submodule symbol '{}', not in scope",
-                                submodule.typ.raw
+                                submodule_ast.typ.raw()
                             ),
                         )
-                        .spanned(submodule.typ.span())
-                        .map(|e| global.err_resolve_symbol(&submodule.typ.raw, true, e)),
+                        .spanned(submodule_ast.typ.span())
+                        .map(|e| global.err_resolve_symbol(&submodule_ast.typ.raw(), true, e)),
                     );
-                    Symbol::Unresolved(submodule.typ.raw.clone())
+                    Symbol::Unresolved(RawSymbol {
+                        raw: submodule_ast.typ.raw(),
+                    })
                 });
 
-            let ident = RawSymbol {
-                raw: submodule.ident.raw.clone(),
+            let submod_ir = if let Some(ref specs) = submodule_ast.dyn_spec {
+                // since we not monomorphise a new entry, create a new instance
+                if let Some(mut override_ir) = typ.as_module().map(|v| v.clone()) {
+                    // override the existing specs.
+                    for spec in specs.items.iter() {
+                        // found overide <dyn_field> = <value>
+                        let dyn_field = &spec.key.raw;
+                        let Some(dyn_field) = override_ir.submodules.iter_mut().find(|d| d.ident.raw == *dyn_field) else {
+                            // <dyn_field> pointed to an unknown submodule (of the submodule)
+                            errors.add(Error::new(
+                                ErrorKind::SymbolNotFound,
+                                format!("did not find submodule symbol for dyn-spec '{}', not in scope", dyn_field)
+                            ).spanned(spec.key.span()));
+                            continue;
+                        };
+
+                        let typ = modules.get(&spec.value.raw);
+                        if let Some(ref typ) = typ {
+                            if let Some(expected_proto) = dyn_field.typ.as_module_arc() {
+                                // check wheter the provided type is really
+                                // implementing the expected proto
+                                let valid = typ.inherited.iter().any(|s| {
+                                    Arc::ptr_eq(&s.as_module_arc().unwrap(), &expected_proto)
+                                });
+                                if !valid {
+                                    errors.add(
+                                        Error::new(
+                                            ErrorKind::ModuleDynConstraintsBroken,
+                                            format!("module '{}' does not inherit '{}', thus cannot be assigned to dyn field '{}'", typ.ident.raw, expected_proto.ident.raw, spec.key.raw)
+                                        ).spanned(spec.span())
+                                    )
+                                }
+                            }
+                        }
+
+                        let typ = typ.map(Symbol::from).unwrap_or_else(|| {
+                            errors.add(
+                                Error::new(
+                                    ErrorKind::SymbolNotFound,
+                                    format!(
+                                        "did not find dyn-spec submodule symbol '{}', not in scope",
+                                        spec.value.raw
+                                    ),
+                                )
+                                .spanned(spec.value.span())
+                                .map(|e| global.err_resolve_symbol(&spec.value.raw, true, e)),
+                            );
+                            Symbol::Unresolved(RawSymbol {
+                                raw: submodule_ast.typ.raw(),
+                            })
+                        });
+
+                        dyn_field.dynamic = false;
+                        dyn_field.typ = typ;
+                    }
+
+                    let ident = RawSymbol {
+                        raw: submodule_ast.ident.raw.clone(),
+                    };
+                    Submodule {
+                        span: override_ir.ast.span(),
+                        ident,
+                        cluster,
+                        typ: Symbol::from(Arc::new(override_ir)),
+                        dynamic: submodule_ast.typ.is_dyn(),
+                    }
+                } else {
+                    // if the symbol is not resolved either way just add it in its incomplete form
+                    let ident = RawSymbol {
+                        raw: submodule_ast.ident.raw.clone(),
+                    };
+                    Submodule {
+                        span: submodule_ast.span(),
+                        ident,
+                        cluster,
+                        typ,
+                        dynamic: submodule_ast.typ.is_dyn(),
+                    }
+                }
+            } else {
+                let ident = RawSymbol {
+                    raw: submodule_ast.ident.raw.clone(),
+                };
+                Submodule {
+                    span: submodule_ast.span(),
+                    ident,
+                    cluster,
+                    typ,
+                    dynamic: submodule_ast.typ.is_dyn(),
+                }
             };
-            ir_submodules.push(Submodule {
-                ident,
-                cluster,
-                typ,
-            });
+
+            if let Some(s) = submod_ir.typ.as_module() {
+                let mut missing = Vec::new();
+                for dep in s.submodules.iter() {
+                    if dep.dynamic {
+                        missing.push(&dep.ident.raw[..])
+                    }
+                }
+
+                if !missing.is_empty() {
+                    let s = missing.join(", ");
+                    errors.add(Error::new(
+                        ErrorKind::ModuleDynNotResolved,
+                        format!(
+                            "missing specification for dynamic members of submodule '{}': missing fields '{}'",
+                            submod_ir.ident.raw, s
+                        ),
+                    ).spanned(submod_ir.span))
+                }
+            }
+
+            ir_submodules.push(submod_ir);
         }
 
         let local_gtable = LocalGatesTable::new(&ir_gates);
@@ -117,6 +260,9 @@ impl Module {
         let shared_gtable = SharedGatesTable::new(&local_gtable, &sm_table);
 
         let mut ir_connections: Vec<Connection> = Vec::with_capacity(ast.connections.len());
+        for inh in &deps {
+            ir_connections.extend(inh.connections.iter().cloned());
+        }
         for con in ast.connections.iter().map(|s| s.items.iter()).flatten() {
             let delay = if let Some(link) = &con.link {
                 let Some(link) = links.get(&link.raw) else {
@@ -200,6 +346,7 @@ impl Module {
         Module {
             ast,
             ident,
+            inherited,
             gates: ir_gates,
             submodules: ir_submodules,
             connections: ir_connections,

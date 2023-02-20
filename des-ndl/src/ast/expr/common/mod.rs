@@ -156,7 +156,12 @@ ast_expect_single_token! {
 ast_expect_single_token! {
     pub struct EntryToken {
         token: TokenKind::Keyword(Keyword::Entry),
+    }
+}
 
+ast_expect_single_token! {
+    pub struct DynToken {
+        token: TokenKind::Keyword(Keyword::Dyn),
     }
 }
 
