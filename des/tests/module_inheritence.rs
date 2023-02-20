@@ -1,16 +1,16 @@
 #![cfg(feature = "net")]
 
-use des::{
-    net::{BuildContext, __Buildable0},
-    prelude::*,
-};
+use des::prelude::*;
 use serial_test::serial;
 
-#[NdlModule]
+#[macro_use]
+mod common;
+
 #[derive(Debug)]
 struct Parent {
     acummulated_counter: usize,
 }
+impl_build_named!(Parent);
 
 impl Module for Parent {
     fn new() -> Self {
@@ -20,11 +20,11 @@ impl Module for Parent {
     }
 }
 
-#[NdlModule]
 #[derive(Debug)]
 struct Child {
     counter: usize,
 }
+impl_build_named!(Child);
 
 impl Module for Child {
     fn new() -> Self {
@@ -39,9 +39,9 @@ impl Child {
     }
 }
 
-#[NdlModule]
 #[derive(Debug)]
 struct GrandChild {}
+impl_build_named!(GrandChild);
 
 impl Module for GrandChild {
     fn new() -> Self {
@@ -59,23 +59,22 @@ struct TestCase {
 impl TestCase {
     fn build() -> Self {
         let mut app = NetworkRuntime::new(());
-        let mut cx = BuildContext::new(&mut app);
 
-        let parent = Parent::build_named(ObjectPath::root_module("Root".to_string()), &mut cx);
+        let parent = Parent::build_named(ObjectPath::root_module("Root".to_string()), &mut app);
 
         let children = vec![
-            Child::build_named_with_parent("c1", parent.clone(), &mut cx),
-            Child::build_named_with_parent("c2", parent.clone(), &mut cx),
-            Child::build_named_with_parent("c3", parent.clone(), &mut cx),
+            Child::build_named_with_parent("c1", parent.clone(), &mut app),
+            Child::build_named_with_parent("c2", parent.clone(), &mut app),
+            Child::build_named_with_parent("c3", parent.clone(), &mut app),
         ];
 
         let grand_children = vec![
-            GrandChild::build_named_with_parent("left", children[0].clone(), &mut cx),
-            GrandChild::build_named_with_parent("right", children[0].clone(), &mut cx),
-            GrandChild::build_named_with_parent("left", children[1].clone(), &mut cx),
-            GrandChild::build_named_with_parent("right", children[1].clone(), &mut cx),
-            GrandChild::build_named_with_parent("left", children[2].clone(), &mut cx),
-            GrandChild::build_named_with_parent("right", children[2].clone(), &mut cx),
+            GrandChild::build_named_with_parent("left", children[0].clone(), &mut app),
+            GrandChild::build_named_with_parent("right", children[0].clone(), &mut app),
+            GrandChild::build_named_with_parent("left", children[1].clone(), &mut app),
+            GrandChild::build_named_with_parent("right", children[1].clone(), &mut app),
+            GrandChild::build_named_with_parent("left", children[2].clone(), &mut app),
+            GrandChild::build_named_with_parent("right", children[2].clone(), &mut app),
         ];
 
         Self {

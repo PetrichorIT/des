@@ -3,7 +3,6 @@
 //!
 
 mod common;
-mod ndl;
 mod runtime;
 mod topology;
 
@@ -21,16 +20,6 @@ pub(crate) use self::runtime::NetEvents;
 pub use self::runtime::globals;
 pub use self::runtime::NetworkRuntime;
 pub use self::runtime::NetworkRuntimeGlobals;
-
-pub use self::ndl::BuildContext;
-pub use self::ndl::__Buildable0;
-pub use self::ndl::__Buildable1;
-pub use self::ndl::__Buildable2;
-pub use self::ndl::__Buildable3;
-pub use self::ndl::__Buildable4;
-pub use self::ndl::__Buildable5;
-pub use self::ndl::__Buildable6;
-pub use self::ndl::__Buildable7;
 
 pub use self::common::ObjectPath;
 pub use self::common::ObjectPathParseError;

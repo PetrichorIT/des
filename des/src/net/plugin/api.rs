@@ -46,7 +46,6 @@ pub fn add_plugin<T: Plugin>(plugin: T, priority: usize) -> PluginHandle  {
 ///     }
 /// }
 /// 
-/// # #[NdlModule]
 /// # struct M;
 /// # impl Module for M {
 /// #    fn new() -> Self { Self }
@@ -65,15 +64,6 @@ pub fn add_plugin<T: Plugin>(plugin: T, priority: usize) -> PluginHandle  {
 /// // ...
 /// # }
 /// #
-/// # fn main() {
-/// #   use des::net::*;
-/// #   let mut app = NetworkRuntime::new(());
-/// #   let mut cx = BuildContext::new(&mut app);
-/// #   let m = M::build_named(ObjectPath::root_module("root"), &mut cx);
-/// #   cx.create_module(m);
-/// #   let rt = Runtime::new_with(app, RuntimeOptions::seeded(123).max_itr(10));
-/// #   let _ = rt.run();
-/// # }
 /// ```
 pub fn add_plugin_with<T: Plugin>(plugin: T, priority: usize, policy: PluginPanicPolicy) -> PluginHandle {
     let priority = (priority << 2) | 0b011;

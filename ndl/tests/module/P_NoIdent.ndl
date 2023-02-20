@@ -1,5 +1,0 @@
-module {
-    gates:
-        in @input
-        out @output
-}

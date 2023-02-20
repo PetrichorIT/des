@@ -4,9 +4,9 @@ use des::{
         plugin::{add_plugin, Plugin, PluginHandle, PluginStatus},
     },
     prelude::*,
+    registry,
 };
 
-#[NdlModule("examples/plugin")]
 struct A {}
 
 impl Module for A {
@@ -51,7 +51,6 @@ impl Plugin for OutputLogger {
     }
 }
 
-#[NdlModule("examples/plugin")]
 struct B {}
 
 impl Module for B {
@@ -71,8 +70,12 @@ impl Module for B {
     }
 }
 
-#[NdlSubsystem("examples/plugin")]
-struct Main {}
+struct Main;
+impl Module for Main {
+    fn new() -> Self {
+        Self
+    }
+}
 
 fn empty(_: &ModuleContext) {}
 
@@ -81,8 +84,8 @@ fn main() {
 
     set_setup_fn(empty);
 
-    let app = Main {};
-    let app = app.build_rt();
+    let app = NdlApplication::new("examples/plugin/main.ndl", registry![A, B, Main]).unwrap();
+    let app = NetworkRuntime::new(app);
     let rt = Runtime::new(app);
     let _res = rt.run();
 }

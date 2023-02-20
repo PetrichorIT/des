@@ -8,6 +8,5 @@ members = [
   "des-macros",
   "des-macros-core",
   "des-ndl",
-  "ndl",
   "examples",
 ]

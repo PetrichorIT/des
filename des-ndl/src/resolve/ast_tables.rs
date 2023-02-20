@@ -219,6 +219,12 @@ impl ModuleAstTable {
             }
         }
 
+        println!(
+            "v: {:?}",
+            local.iter().map(|v| &v.ident.raw).collect::<Vec<_>>()
+        );
+        println!("topo: {:?}", topo);
+
         if let Err(cycles) = dfs_cycles(&topo) {
             for cycle in cycles {
                 let s = cycle[0];
@@ -242,6 +248,8 @@ impl ModuleAstTable {
             return false;
         }
 
+        let mut topo_remapping = (0..topo.len()).collect::<Vec<_>>();
+
         let mut s = 0;
         while s < local.len() {
             let mut i = s;
@@ -249,7 +257,7 @@ impl ModuleAstTable {
                 // Check whether i can be loaded with local[..s]
                 // use local topo
                 let edges = &topo[i];
-                let local_valid = edges.iter().all(|&e| e < s);
+                let local_valid = edges.iter().all(|&e| topo_remapping[e] < s);
                 if !local_valid {
                     i += 1;
                     continue;
@@ -259,7 +267,12 @@ impl ModuleAstTable {
             }
 
             if s != i && i < local.len() {
-                local.swap(s, i)
+                println!("swapping {s} {i}");
+                local.swap(s, i);
+                topo.swap(s, i);
+                topo_remapping.swap(s, i);
+            } else {
+                println!("noswap");
             }
             s += 1;
         }

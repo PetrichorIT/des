@@ -1,8 +1,0 @@
-prototype A {}
-
-alias B like A
-
-module M {
-    submodules:
-        b: B
-}

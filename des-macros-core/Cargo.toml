@@ -7,7 +7,6 @@ version = "0.4.0"
 
 [dependencies]
 lazy_static = "*"
-ndl = {path = "../ndl"}
 proc-macro-error = "1.0"
 proc-macro2 = "1.0"
 quote = "1.0"

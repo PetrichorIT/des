@@ -1,4 +1,0 @@
-include Other
-include Third
-
-module X {}

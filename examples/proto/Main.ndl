@@ -1,55 +1,66 @@
-prototype Application {
-    gates:
-        in @input
-        out @output
+module Application {
+    gates {
+        in @input,
+        out @output,
+    }
 }
 
-alias AppA like Application
-alias AppB like Application
+module AppA: Application {}
+module AppB: Application {}
 
 module Runner {
-    submodules:
-        app: some Application
+    submodules {
+        app: dyn Application
+    }
 
-    gates:
-        fromAppl @input
-        toAppl @output
+    gates {
+        fromAppl @input,
+        toAppl @output,
 
-        uplink @output
-        downlink @input
+        uplink @output,
+        downlink @input,
+    }
 
-    connections:
-        app/in <-- toAppl
-        app/out --> fromAppl
+    connections {
+        app/in <-- toAppl,
+        app/out --> fromAppl,
+    }
 }
 
 module MultiRunner {
-    submodules:
-        app1: some Application
-        app2: some Application
-        app3: some Application
+    submodules {
+        app1: dyn Application,
+        app2: dyn Application,
+        app3: dyn Application,
+    }
     
-    gates:
-        fromAppl[3] @input
-        toAppl[3] @output
+    gates {
+        fromAppl[3] @input,
+        toAppl[3] @output,
+    }
 
-    connections:
-        app1/in <-- toAppl[0]
-        app1/out --> fromAppl[0]
-        app2/in <-- toAppl[1]
-        app2/out --> fromAppl[1]
-        app3/in <-- toAppl[2]
-        app3/out --> fromAppl[2]
+    connections {
+        app1/in <-- toAppl[0],
+        app1/out --> fromAppl[0],
+        app2/in <-- toAppl[1],
+        app2/out --> fromAppl[1],
+        app3/in <-- toAppl[2],
+        app3/out --> fromAppl[2],
+    }
 }
 
-network Main {
-    nodes:
-        runnerA: Runner { app = AppA }
-        runnerB: Runner { app = AppB }
+module Main {
+    submodules {
+        runnerA: Runner { app = AppA },
+        runnerB: Runner { app = AppB },
 
-        multi: MultiRunner { app1 = AppA, app2 = AppB, app3 = AppA }
+        multi: MultiRunner { app1 = AppA, app2 = AppB, app3 = AppA },
+    }
 
-    connections:
-        runnerA/uplink --> runnerB/downlink
-        runnerA/downlink <-- runnerB/uplink
+    connections {
+        runnerA/uplink --> runnerB/downlink,
+        runnerA/downlink <-- runnerB/uplink,
+    }
 }
+
+entry Main;

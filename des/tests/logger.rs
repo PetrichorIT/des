@@ -4,11 +4,12 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 use des::logger::*;
-use des::net::BuildContext;
-use des::net::__Buildable0;
 use des::prelude::*;
 use log::LevelFilter;
 use serial_test::serial;
+
+#[macro_use]
+mod common;
 
 #[test]
 #[serial]
@@ -22,6 +23,7 @@ fn initialize_logger() {
 struct DebugOutput {
     inner: Arc<Mutex<Vec<String>>>,
 }
+// impl_build_named!(DebugOutput);
 
 impl LogOutput for DebugOutput {
     fn write(&mut self, record: &LogRecord, fmt: LogFormat) -> std::io::Result<()> {
@@ -30,10 +32,10 @@ impl LogOutput for DebugOutput {
     }
 }
 
-#[NdlModule]
 struct Counter {
     i: i32,
 }
+impl_build_named!(Counter);
 
 impl Module for Counter {
     fn new() -> Self {
@@ -80,10 +82,9 @@ fn one_module_linear_logger() {
         .unwrap();
 
     let mut app = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut app);
 
-    let module = Counter::build_named(ObjectPath::root_module("modpath"), &mut cx);
-    cx.create_module(module);
+    let module = Counter::build_named(ObjectPath::root_module("modpath"), &mut app);
+    app.create_module(module);
 
     let rt = Runtime::new_with(
         app,
@@ -144,13 +145,12 @@ fn multiple_module_linear_logger() {
         .unwrap();
 
     let mut app = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut app);
 
-    let node0 = Counter::build_named(ObjectPath::root_module("node0"), &mut cx);
-    cx.create_module(node0);
+    let node0 = Counter::build_named(ObjectPath::root_module("node0"), &mut app);
+    app.create_module(node0);
 
-    let node1 = Counter::build_named(ObjectPath::root_module("node1"), &mut cx);
-    cx.create_module(node1);
+    let node1 = Counter::build_named(ObjectPath::root_module("node1"), &mut app);
+    app.create_module(node1);
 
     let rt = Runtime::new_with(
         app,
@@ -216,13 +216,12 @@ fn multiple_module_linear_logger_filters() {
     logger.try_set_logger().unwrap();
 
     let mut app = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut app);
 
-    let node0 = Counter::build_named(ObjectPath::root_module("node0"), &mut cx);
-    cx.create_module(node0);
+    let node0 = Counter::build_named(ObjectPath::root_module("node0"), &mut app);
+    app.create_module(node0);
 
-    let node1 = Counter::build_named(ObjectPath::root_module("node1"), &mut cx);
-    cx.create_module(node1);
+    let node1 = Counter::build_named(ObjectPath::root_module("node1"), &mut app);
+    app.create_module(node1);
 
     let rt = Runtime::new_with(
         app,

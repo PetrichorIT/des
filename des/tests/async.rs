@@ -7,10 +7,7 @@ use std::sync::{
 };
 
 use async_trait::async_trait;
-use des::{
-    net::{BuildContext, __Buildable0},
-    prelude::*,
-};
+use des::prelude::*;
 use tokio::{
     sync::{
         mpsc::{channel, Sender},
@@ -21,15 +18,17 @@ use tokio::{
 
 use serial_test::serial;
 
+#[macro_use]
+mod common;
+
 // # Test case
 // The module behaves like a sync module, not creating any more
 // futures than the async call itself.
 
-#[NdlModule]
 struct QuasaiSyncModule {
     counter: usize,
 }
-
+impl_build_named!(QuasaiSyncModule);
 #[async_trait]
 impl AsyncModule for QuasaiSyncModule {
     fn new() -> Self {
@@ -46,21 +45,20 @@ impl AsyncModule for QuasaiSyncModule {
 #[serial]
 fn quasai_sync_non_blocking() {
     let mut rt = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut rt);
 
     let module =
-        QuasaiSyncModule::build_named(ObjectPath::root_module("RootModule".to_string()), &mut cx);
+        QuasaiSyncModule::build_named(ObjectPath::root_module("RootModule".to_string()), &mut rt);
 
     let gate_a = module.create_gate("in", GateServiceType::Input);
-    cx.create_module(module);
+    rt.create_module(module);
 
     let module_b = QuasaiSyncModule::build_named(
         ObjectPath::root_module("OtherRootModule".to_string()),
-        &mut cx,
+        &mut rt,
     );
 
     let gate_b = module_b.create_gate("in", GateServiceType::Input);
-    cx.create_module(module_b);
+    rt.create_module(module_b);
 
     let mut rt = Runtime::new(rt);
 
@@ -107,13 +105,12 @@ fn quasai_sync_non_blocking() {
 // tracker
 // The tasks shutdown with a shutdown message
 
-#[NdlModule]
 struct MutipleTasksModule {
     handles: Vec<JoinHandle<()>>,
     sender: Option<Sender<Message>>,
     result: Arc<AtomicUsize>,
 }
-
+impl_build_named!(MutipleTasksModule);
 #[async_trait]
 impl AsyncModule for MutipleTasksModule {
     fn new() -> Self {
@@ -197,13 +194,12 @@ impl AsyncModule for MutipleTasksModule {
 #[serial]
 fn mutiple_active_tasks() {
     let mut rt = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut rt);
 
     let module_a =
-        MutipleTasksModule::build_named(ObjectPath::root_module("RootModule".to_string()), &mut cx);
+        MutipleTasksModule::build_named(ObjectPath::root_module("RootModule".to_string()), &mut rt);
 
     let gate_a = module_a.create_gate("in", GateServiceType::Input);
-    cx.create_module(module_a);
+    rt.create_module(module_a);
 
     let mut rt = Runtime::new(rt);
 
@@ -238,10 +234,10 @@ fn mutiple_active_tasks() {
 // A module sleeps upon receiving a message,
 // This sleeps do NOT interfere with recv()
 
-#[NdlModule]
 struct TimeSleepModule {
     counter: usize,
 }
+impl_build_named!(TimeSleepModule);
 
 #[async_trait]
 impl AsyncModule for TimeSleepModule {
@@ -272,13 +268,12 @@ fn one_module_timers() {
     //     .set_logger();
 
     let mut rt = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut rt);
 
     let module_a =
-        TimeSleepModule::build_named(ObjectPath::root_module("RootModule".to_string()), &mut cx);
+        TimeSleepModule::build_named(ObjectPath::root_module("RootModule".to_string()), &mut rt);
 
     let gate_a = module_a.create_gate("in", GateServiceType::Input);
-    cx.create_module(module_a);
+    rt.create_module(module_a);
 
     let mut rt = Runtime::new(rt);
 
@@ -315,13 +310,12 @@ fn one_module_timers() {
 #[serial]
 fn one_module_delayed_recv() {
     let mut rt = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut rt);
 
     let module_a =
-        TimeSleepModule::build_named(ObjectPath::root_module("RootModule".to_string()), &mut cx);
+        TimeSleepModule::build_named(ObjectPath::root_module("RootModule".to_string()), &mut rt);
 
     let gate_a = module_a.create_gate("in", GateServiceType::Input);
-    cx.create_module(module_a);
+    rt.create_module(module_a);
 
     let mut rt = Runtime::new(rt);
 
@@ -374,19 +368,18 @@ fn one_module_delayed_recv() {
 #[serial]
 fn mutiple_module_delayed_recv() {
     let mut rt = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut rt);
 
     let module_a =
-        TimeSleepModule::build_named(ObjectPath::root_module("RootModule".to_string()), &mut cx);
+        TimeSleepModule::build_named(ObjectPath::root_module("RootModule".to_string()), &mut rt);
     let gate_a = module_a.create_gate("in", GateServiceType::Input);
-    cx.create_module(module_a);
+    rt.create_module(module_a);
 
     let module_b = TimeSleepModule::build_named(
         ObjectPath::root_module("OtherRootModule".to_string()),
-        &mut cx,
+        &mut rt,
     );
     let gate_b = module_b.create_gate("in", GateServiceType::Input);
-    cx.create_module(module_b);
+    rt.create_module(module_b);
 
     let mut rt = Runtime::new(rt);
 
@@ -451,13 +444,12 @@ fn mutiple_module_delayed_recv() {
     }
 }
 
-#[NdlModule]
 struct SemaphoreModule {
     semaphore: Arc<Semaphore>,
     handle: Option<JoinHandle<()>>,
     result: Arc<AtomicBool>,
 }
-
+impl_build_named!(SemaphoreModule);
 #[async_trait]
 impl AsyncModule for SemaphoreModule {
     fn new() -> Self {
@@ -488,19 +480,18 @@ impl AsyncModule for SemaphoreModule {
 #[serial]
 fn semaphore_in_waiting_task() {
     let mut rt = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut rt);
 
     let module_a =
-        SemaphoreModule::build_named(ObjectPath::root_module("RootModule".to_string()), &mut cx);
+        SemaphoreModule::build_named(ObjectPath::root_module("RootModule".to_string()), &mut rt);
     let gate_a = module_a.create_gate("in", GateServiceType::Input);
-    cx.create_module(module_a);
+    rt.create_module(module_a);
 
     let module_b = SemaphoreModule::build_named(
         ObjectPath::root_module("OtherRootModule".to_string()),
-        &mut cx,
+        &mut rt,
     );
     let gate_b = module_b.create_gate("in", GateServiceType::Input);
-    cx.create_module(module_b);
+    rt.create_module(module_b);
 
     let mut rt = Runtime::new(rt);
 
@@ -562,8 +553,8 @@ fn semaphore_in_waiting_task() {
     }
 }
 
-#[NdlModule]
 struct ShouldBlockSimStart {}
+impl_build_named!(ShouldBlockSimStart);
 
 #[async_trait]
 impl AsyncModule for ShouldBlockSimStart {

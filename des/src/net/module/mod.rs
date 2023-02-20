@@ -56,7 +56,6 @@ pub trait Module: Any {
     /// ```
     /// use des::prelude::*;
     ///
-    /// #[NdlModule]
     /// struct MyModule {
     ///     my_prop_1: f64,
     ///     my_prop_2: String,
@@ -89,7 +88,6 @@ pub trait Module: Any {
     /// # type Record = u8;
     /// # fn fetch_config(s: &str, id: ModuleId) -> Config {}
     ///
-    /// #[NdlModule]
     /// struct SomeModule {
     ///     config: Config,
     ///     records: Vec<Record>,

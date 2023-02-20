@@ -88,6 +88,7 @@ impl Context {
                     // Resolve mdoules
                     // - same
                     if ast_modules.order_local_deps(errors) {
+                        // println!("{:#?}", ast_modules.local());
                         for module in ast_modules.local() {
                             let ident = module.ident.raw.clone();
                             errors.with_mapping(
@@ -188,18 +189,6 @@ impl Context {
                 for submodule in arc2.submodules.iter() {
                     if submodule.dynamic {
                         unreachable!();
-                        // errors.add(
-                        //     Error::new(
-                        //         ErrorKind::ModuleDynNotResolved,
-                        //         format!(
-                        //         "dynamic submodule '{}: dyn {}' was not resolved in parent module",
-                        //         submodule.ident.raw,
-                        //         submodule.typ.raw().raw
-                        //     ),
-                        //     )
-                        //     .spanned(submodule.span),
-                        // );
-                        // continue;
                     }
 
                     if let Some(sub) = submodule.typ.as_module_arc() {

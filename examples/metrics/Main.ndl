@@ -1,9 +1,13 @@
 module Alice {
-    gates:
+    gates {
         mygate[5]
+    }
 }
 
-network Main {
-    nodes:
+module Main {
+    submodules {
         alice[1...5]: Alice
+    }
 }
+
+entry Main;

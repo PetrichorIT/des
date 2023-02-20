@@ -149,9 +149,7 @@
 //!
 //! ```
 //! # use des::prelude::*;
-//! # #[NdlModule]
 //! # struct Ping { pongs_recv: usize, pings_send: usize }
-//! # #[NdlModule]
 //! # struct Pong { pings_recv: usize, pongs_send: usize }
 //! const PING: MessageKind = 10;
 //! const PONG: MessageKind = 42;

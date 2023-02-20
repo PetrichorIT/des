@@ -1,7 +1,0 @@
-module X {}
-
-module Y {
-    submodules:
-        a: X
-        a: X
-}

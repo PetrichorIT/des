@@ -124,6 +124,9 @@ impl Module {
                 .get(&submodule_ast.typ.raw())
                 .map(Symbol::from)
                 .unwrap_or_else(|| {
+                    println!("seaching: {}", submodule_ast.typ.raw());
+                    println!("modules: {modules:#?}");
+
                     errors.add(
                         Error::new(
                             ErrorKind::SymbolNotFound,

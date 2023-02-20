@@ -40,7 +40,6 @@ pub trait AsyncModule: Send {
     /// use des::prelude::*;
     /// use async_trait::async_trait;
     ///
-    /// #[NdlModule]
     /// struct MyAsyncModule {
     ///     prop_1: f64,
     ///     prop_2: String,
@@ -81,7 +80,6 @@ pub trait AsyncModule: Send {
     ///     // ...
     /// }
     ///
-    /// #[NdlModule]
     /// struct MyModule {
     ///     config: Config,
     ///     records: Vec<f64>,

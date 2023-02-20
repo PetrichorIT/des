@@ -1,5 +1,5 @@
-bob[1].char = #
-bob[2].char = *
+sim.bob[0].char = #
+sim.bob[1].char = *
 
-bob[1].child.limit = 10
-bob[2].child.limit = 2
+sim.bob[0].child.limit = 10
+sim.bob[1].child.limit = 2

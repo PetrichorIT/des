@@ -15,10 +15,6 @@ path = "metrics2/main.rs"
 required-features = ["des/metrics"]
 
 [[bin]]
-name = "t-pingpong"
-path = "pingpong/main.rs"
-
-[[bin]]
 name = "t-waiter"
 path = "waiter/main.rs"
 
@@ -41,10 +37,6 @@ path = "proto/main.rs"
 [[bin]]
 name = "t-droptest"
 path = "droptest/main.rs"
-
-[[bin]]
-name = "t-macro2"
-path = "macro2/main.rs"
 
 [[bin]]
 name = "t-cqueue"

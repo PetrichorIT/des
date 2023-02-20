@@ -3,7 +3,6 @@ use std::sync::atomic::Ordering;
 use crate::MODULE_LEN;
 use des::prelude::*;
 
-#[NdlModule("examples/droptest")]
 pub struct Alice();
 
 impl Module for Alice {
@@ -33,7 +32,6 @@ impl Drop for Alice {
     }
 }
 
-#[NdlModule("examples/droptest")]
 pub struct Bob();
 
 impl Module for Bob {
@@ -63,7 +61,6 @@ impl Drop for Bob {
     }
 }
 
-#[NdlModule("examples/droptest")]
 pub struct Network();
 
 impl Module for Network {

@@ -1,13 +1,15 @@
 #![cfg(feature = "net")]
-use des::net::__Buildable0;
-use des::{net::BuildContext, prelude::*};
+use des::prelude::*;
 use serial_test::serial;
 
-#[NdlModule]
+#[macro_use]
+mod common;
+
 struct DropChanModule {
     send: usize,
     received: usize,
 }
+impl_build_named!(DropChanModule);
 
 impl Module for DropChanModule {
     fn new() -> Self {
@@ -37,9 +39,8 @@ impl Module for DropChanModule {
 #[serial]
 fn channel_dropping_message() {
     let mut rt = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut rt);
 
-    let module = DropChanModule::build_named(ObjectPath::root_module("root".to_string()), &mut cx);
+    let module = DropChanModule::build_named(ObjectPath::root_module("root".to_string()), &mut rt);
 
     let g_in = module.create_gate("in", GateServiceType::Input);
     let g_out = module.create_gate("out", GateServiceType::Output);
@@ -64,12 +65,12 @@ fn channel_dropping_message() {
     let _ = rt.run();
 }
 
-#[NdlModule]
 #[derive(Debug)]
 struct BufferChanModule {
     send: usize,
     received: usize,
 }
+impl_build_named!(BufferChanModule);
 
 impl Module for BufferChanModule {
     fn new() -> Self {
@@ -105,10 +106,9 @@ fn channel_buffering_message() {
     //     .set_logger();
 
     let mut rt = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut rt);
 
     let module =
-        BufferChanModule::build_named(ObjectPath::root_module("root".to_string()), &mut cx);
+        BufferChanModule::build_named(ObjectPath::root_module("root".to_string()), &mut rt);
 
     let g_in = module.create_gate("in", GateServiceType::Input);
     let g_out = module.create_gate("out", GateServiceType::Output);

@@ -1,8 +1,0 @@
-module X {
-    gates:
-        a[5]
-        b
-
-    connections:
-        a --> b
-}
