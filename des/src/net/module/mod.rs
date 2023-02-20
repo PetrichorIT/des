@@ -24,7 +24,7 @@ cfg_async! {
     pub use self::ext::*;
 }
 
-create_global_uid!(
+guid!(
     /// A runtime-unqiue identifier for a module / submodule inheritence tree.
     /// * This type is only available of DES is build with the `"net"` feature.*
     #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]

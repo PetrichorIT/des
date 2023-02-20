@@ -6,8 +6,8 @@
 /// The inner type must be numeric and initalizable from a numeric interger literal.
 /// Supported types are u* and i*.
 ///
-#[macro_export]
-macro_rules! create_global_uid {
+#[allow(unused)]
+macro_rules! guid {
     ($(
         $(#[$outer:meta])*
         $vis: vis $ident: ident($ty: ty) = $sident: ident;

@@ -20,7 +20,14 @@ use crate::{
 
 pub use self::registry::Registry;
 
-/// A application for NDL intergration.
+/// An application that creates a network-like
+/// simulation from a Ndl-Topology description.
+///
+/// Use this type to manage loading of Ndl-Assets and parameter files.
+/// Upon creation this type can be passed to a [`NetworkRuntime`]
+/// to instanitate a network simulation. When the simulation is executed
+/// this type holds a reference to the network modules itself, which
+/// can then be extraced after from a [`RuntimeResult`].
 #[derive(Debug)]
 pub struct NdlApplication {
     handle: Option<ModuleRef>,
@@ -29,7 +36,28 @@ pub struct NdlApplication {
 }
 
 impl NdlApplication {
-    /// Create a new NdlApplication.
+    /// Returns a handle to the simulated network.
+    ///
+    /// This function returns None, if the network was not yet created.
+    /// After initalizing the [`Runtime`] there should allways be a network.
+    pub fn network(&self) -> Option<&ModuleRef> {
+        self.handle.as_ref()
+    }
+
+    /// Returns a handle to the topology, described by the Ndl-Assets.
+    pub fn topology(&self) -> Arc<ir::Module> {
+        self.tree.clone()
+    }
+
+    /// Creates a new NdlApplication using the provided path as
+    /// root for the Ndl-Assets and the registry of types for binding.
+    ///
+    /// # Errors
+    ///
+    /// This function may fail if either the assets are in any way invalid,
+    /// or the registry does not provide a link to a type, required by the
+    /// assets.
+    ///
     pub fn new(path: impl AsRef<Path>, registry: Registry) -> RootResult<NdlApplication> {
         let mut ctx = Context::load(path)?;
         let tree = ctx.entry.take().unwrap();

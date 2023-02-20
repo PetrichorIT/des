@@ -1,4 +1,32 @@
-/// Creates a NDL registry from the given types.
+/// Creates a registry of types that implement [`Module`],
+/// to link rust structs to NDL modules.
+///
+/// # Example
+///
+/// ```rust
+/// # use des::prelude::*;
+/// # use des::registry;
+/// struct DnsServer;
+/// /* ... */
+/// # impl Module for DnsServer { fn new() -> Self { Self }}
+///
+/// struct Client;
+/// /* ... */
+/// # impl Module for Client { fn new() -> Self { Self }}
+///
+/// struct Server;
+/// # impl Module for Server { fn new() -> Self { Self }}
+/// /* ... */
+///
+/// # use des_ndl::error::RootResult as Result;
+/// fn main() -> Result<()> {
+///     let registry = registry![DnsServer, Client, Server];
+///     # return Ok(());
+///     let app = NdlApplication::new("path/to/ndl", registry)?;
+///     let rt = Runtime::new(NetworkRuntime::new(app));
+///     let r = rt.run();
+/// }
+/// ```
 #[macro_export]
 macro_rules! registry {
     ($($t:ty),*) => {{
@@ -8,4 +36,6 @@ macro_rules! registry {
         )*
         registry
     }};
+
+
 }

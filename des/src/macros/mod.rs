@@ -14,7 +14,7 @@ cfg_ndl! {
     mod registry;
 }
 
-pub mod support {
+pub(crate) mod support {
 
     use std::ops::{Deref, DerefMut};
 

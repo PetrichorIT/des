@@ -122,8 +122,8 @@
 //!
 
 #[macro_use]
-#[doc(hidden)]
-pub mod macros;
+pub(crate) mod macros;
+pub(crate) mod sync;
 
 pub mod prelude;
 
@@ -132,8 +132,6 @@ pub mod logger;
 pub mod runtime;
 pub mod stats;
 pub mod time;
-
-pub(crate) mod sync;
 
 cfg_net! {
     pub mod net;

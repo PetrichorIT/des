@@ -25,9 +25,9 @@
 //!
 //! ```rust
 //! use des::prelude::*;
-//! use des::create_event_set;
+//! use des::event_set;
 //!
-//! create_event_set!(
+//! event_set!(
 //!     enum PingPongEventSet {
 //!         type App = PingPongApp;
 //!     
