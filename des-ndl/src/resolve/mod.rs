@@ -181,6 +181,7 @@ impl Context {
         ));
     }
 
+    #[allow(clippy::only_used_in_recursion)]
     fn check_dyn(&self, arc: Arc<ir::Module>, errors: &mut ErrorsMut) {
         let arc2 = arc.clone();
         errors.with_mapping(

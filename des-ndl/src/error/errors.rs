@@ -62,6 +62,12 @@ impl ErrorsMut {
     }
 }
 
+impl Default for Errors {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Deref for ErrorsMut {
     type Target = Errors;
     fn deref(&self) -> &Self::Target {

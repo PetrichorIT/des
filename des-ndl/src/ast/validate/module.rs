@@ -18,7 +18,9 @@ impl Validate for ModuleStmt {
             );
         }
 
-        self.inheritance.as_ref().map(|inh| inh.validate(errors));
+        if let Some(ref inh) = self.inheritance {
+            inh.validate(errors)
+        }
         self.gates.iter().for_each(|s| s.validate(errors));
         self.submodules.iter().for_each(|s| s.validate(errors));
         self.connections.iter().for_each(|s| s.validate(errors));

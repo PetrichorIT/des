@@ -3,7 +3,9 @@ use crate::ast::{LinkData, LinkInheritance, LinkStmt, LitKind, Spanned};
 
 impl Validate for LinkStmt {
     fn validate(&self, errors: &mut ErrorsMut) {
-        self.inheritance.as_ref().map(|inh| inh.validate(errors));
+        if let Some(ref inh) = self.inheritance {
+            inh.validate(errors)
+        }
         self.data.validate(errors);
     }
 }

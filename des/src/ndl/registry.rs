@@ -15,6 +15,7 @@ pub struct Registry {
 
 impl Registry {
     /// Creates a new empty registry.
+    #[must_use]
     pub fn new() -> Registry {
         Self {
             map: HashMap::new(),
@@ -41,5 +42,11 @@ impl Registry {
 impl fmt::Debug for Registry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Registry").finish()
+    }
+}
+
+impl Default for Registry {
+    fn default() -> Self {
+        Self::new()
     }
 }

@@ -27,7 +27,7 @@ where
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         let old = input.ts.state();
         match E::parse(input) {
-            Ok(either) => return Ok(EitherOr::Either(either)),
+            Ok(either) => Ok(EitherOr::Either(either)),
             Err(_) => {
                 input.ts.set_state(old);
                 let or = O::parse(input)?;

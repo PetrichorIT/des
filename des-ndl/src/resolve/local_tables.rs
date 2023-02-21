@@ -95,7 +95,7 @@ impl<'a> SharedGatesTable<'a> {
                         gate.submod = Some((
                             submodule_ref.pos,
                             submodule_ref.def.ident.raw.clone(),
-                            submodule_ref.def.cluster.clone(),
+                            submodule_ref.def.cluster,
                         ));
                     }
 

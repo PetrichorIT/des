@@ -51,6 +51,7 @@ impl des::runtime::Application for Application {
 }
 
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 enum Events {
     ServerDone(ServerDone),
     CustomerArrival(CustomerArrival),

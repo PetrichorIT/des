@@ -1,3 +1,5 @@
+#![allow(clippy::needless_range_loop)]
+
 pub mod ast;
 pub mod error;
 pub mod ir;

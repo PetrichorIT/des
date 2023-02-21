@@ -9,7 +9,7 @@ fn main() {
         .iter()
         .find(|s| s.starts_with("--cfg-cqueue-n="))
         .map(|s| {
-            s.split("=").collect::<Vec<_>>()[1]
+            s.split('=').collect::<Vec<_>>()[1]
                 .parse::<usize>()
                 .unwrap()
         })
@@ -18,7 +18,7 @@ fn main() {
     let t = Duration::from_secs_f64(
         args.iter()
             .find(|s| s.starts_with("--cfg-cqueue-t="))
-            .map(|s| s.split("=").collect::<Vec<_>>()[1].parse::<f64>().unwrap())
+            .map(|s| s.split('=').collect::<Vec<_>>()[1].parse::<f64>().unwrap())
             .unwrap_or(0.005),
     );
 
@@ -26,7 +26,7 @@ fn main() {
         .iter()
         .find(|s| s.starts_with("num="))
         .map(|s| {
-            s.split("=").collect::<Vec<_>>()[1]
+            s.split('=').collect::<Vec<_>>()[1]
                 .parse::<usize>()
                 .unwrap()
         })
@@ -35,14 +35,14 @@ fn main() {
     let e_delay = args
         .iter()
         .find(|s| s.starts_with("delay="))
-        .map(|s| s.split("=").collect::<Vec<_>>()[1].parse::<f64>().unwrap())
+        .map(|s| s.split('=').collect::<Vec<_>>()[1].parse::<f64>().unwrap())
         .unwrap_or(1.0);
 
     let sample = args
         .iter()
         .find(|s| s.starts_with("sample="))
         .map(|s| {
-            s.split("=").collect::<Vec<_>>()[1]
+            s.split('=').collect::<Vec<_>>()[1]
                 .parse::<usize>()
                 .unwrap()
         })

@@ -22,6 +22,7 @@ pub(crate) fn common_path(lhs: impl AsRef<Path>, rhs: impl AsRef<Path>) -> PathB
     result
 }
 
+#[allow(clippy::while_let_on_iterator)]
 pub(crate) fn strip_prefix(path: impl AsRef<Path>, prefix: impl AsRef<Path>) -> PathBuf {
     let mut lhs = prefix.as_ref().components();
     let mut rhs = path.as_ref().components();

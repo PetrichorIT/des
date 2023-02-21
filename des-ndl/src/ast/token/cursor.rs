@@ -42,7 +42,7 @@ impl Cursor<'_> {
                 asset: self.asset,
             })
         } else {
-            return Err(Error::new(ErrorKind::MissingDelim, "missing delim"));
+            Err(Error::new(ErrorKind::MissingDelim, "missing delim"))
         }
     }
 

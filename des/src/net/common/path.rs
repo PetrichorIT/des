@@ -14,16 +14,19 @@ pub struct ObjectPath {
 
 impl ObjectPath {
     /// Indicates whether the path points to the simulation root.
+    #[must_use]
     pub fn is_root(&self) -> bool {
         self.len == 0
     }
 
     /// Indicates whether the path points to a channel.
+    #[must_use]
     pub fn is_channel(&self) -> bool {
         self.is_channel
     }
 
     /// Indicates whether the path points to a module.
+    #[must_use]
     pub fn is_module(&self) -> bool {
         !self.is_channel
     }
@@ -31,21 +34,26 @@ impl ObjectPath {
     /// Returns the depth of the referenced object.
     ///
     /// Note that depth 0 indicates the root of the simulation.
+    #[must_use]
+    #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
         self.len
     }
 
     /// Returns the last path component, the name of the current module.
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.data[self.last_element_offset..]
     }
 
     /// Returns the entrie path as a &str.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         self.data.as_str()
     }
 
     /// Returns the entrie path as a &str for declaring a logger scope
+    #[must_use]
     pub fn as_logger_scope(&self) -> &str {
         if self.is_root() {
             "@root"
@@ -55,11 +63,13 @@ impl ObjectPath {
     }
 
     /// Returns the entrie path as a &str.
+    #[must_use]
     pub fn as_parent_str(&self) -> &str {
         &self.data[..self.last_element_offset.saturating_sub(1)]
     }
 
     /// Constructs the path to the parent element, if there is any.
+    #[must_use]
     pub fn parent(&self) -> Option<ObjectPath> {
         if self.len == 0 {
             return None;
@@ -73,7 +83,7 @@ impl ObjectPath {
         if let Some(i) = parent.data.rfind('.') {
             parent.last_element_offset = i + 1;
         } else {
-            parent.last_element_offset = 0
+            parent.last_element_offset = 0;
         }
         parent.len -= 1;
         parent.is_channel = false;
@@ -82,6 +92,7 @@ impl ObjectPath {
     }
 
     /// Creates a new object path pointing to the root.
+    #[must_use]
     pub fn new() -> ObjectPath {
         Self {
             data: String::new(),
@@ -92,6 +103,12 @@ impl ObjectPath {
     }
 
     /// Appends another module to the path.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if self allready points to a channel,
+    /// since channels are leaf elements in the object tree.
+    ///
     pub fn append(&mut self, module: impl AsRef<str>) {
         assert!(
             !self.is_channel,
@@ -108,6 +125,12 @@ impl ObjectPath {
     }
 
     /// Append a channel leaf to the path.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if self is pointing to a channel,
+    /// since channels are leaf elements in the object tree.
+    ///
     pub fn append_channel(&mut self, channel: impl AsRef<str>) {
         assert!(
             !self.is_channel,
@@ -126,6 +149,7 @@ impl ObjectPath {
     }
 
     /// Returns a new instance with another module appended to the path.
+    #[must_use]
     pub fn appended(&self, module: impl AsRef<str>) -> Self {
         let mut clone = self.clone();
         clone.append(module);
@@ -133,6 +157,7 @@ impl ObjectPath {
     }
 
     /// Returns a new instance with a channel appended to the path.
+    #[must_use]
     pub fn appended_channel(&self, channel: impl AsRef<str>) -> Self {
         let mut clone = self.clone();
         clone.append_channel(channel);
@@ -191,6 +216,12 @@ impl From<&str> for ObjectPath {
 impl From<String> for ObjectPath {
     fn from(value: String) -> Self {
         Self::from_str(value.as_str()).unwrap()
+    }
+}
+
+impl Default for ObjectPath {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

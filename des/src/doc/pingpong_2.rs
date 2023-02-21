@@ -82,7 +82,7 @@
 //!
 //! The module `MyNetwork` represents the entry point to our simulation. While `MyNetwork` itself could
 //! act as a network node, it is more of an abstract composite node in this example. By declaring
-//! two submodules 'ping' and 'pong' we declare, that each instance of MyNetwork should contain
+//! two submodules 'ping' and 'pong' we declare, that each instance of `MyNetwork` should contain
 //! a `Ping` and a `Pong` instance. In the connections section we define a link (gate-chain)
 //! between the output gate of 'ping' and the input gate if 'pong' (and vice versa).
 //! This gate chain will be augmented using a Channel with the characteristics defined

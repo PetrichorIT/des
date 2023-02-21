@@ -58,7 +58,7 @@ impl Module {
         for inh in &deps {
             ir_gates.extend(inh.gates.iter().cloned());
         }
-        for gate in ast.gates.iter().map(|stmt| stmt.items.iter()).flatten() {
+        for gate in ast.gates.iter().flat_map(|stmt| stmt.items.iter()) {
             if ir_gates.iter().any(|d| d.ident.raw == gate.ident.raw) {
                 errors.add(
                     Error::new(
@@ -94,12 +94,7 @@ impl Module {
         for inh in &deps {
             ir_submodules.extend(inh.submodules.iter().cloned());
         }
-        for submodule_ast in ast
-            .submodules
-            .iter()
-            .map(|stmt| stmt.items.iter())
-            .flatten()
-        {
+        for submodule_ast in ast.submodules.iter().flat_map(|stmt| stmt.items.iter()) {
             if ir_submodules
                 .iter()
                 .any(|d| d.ident.raw == submodule_ast.ident.raw)
@@ -145,7 +140,7 @@ impl Module {
 
             let submod_ir = if let Some(ref specs) = submodule_ast.dyn_spec {
                 // since we not monomorphise a new entry, create a new instance
-                if let Some(mut override_ir) = typ.as_module().map(|v| v.clone()) {
+                if let Some(mut override_ir) = typ.as_module().cloned() {
                     // override the existing specs.
                     for spec in specs.items.iter() {
                         // found overide <dyn_field> = <value>
@@ -266,7 +261,7 @@ impl Module {
         for inh in &deps {
             ir_connections.extend(inh.connections.iter().cloned());
         }
-        for con in ast.connections.iter().map(|s| s.items.iter()).flatten() {
+        for con in ast.connections.iter().flat_map(|s| s.items.iter()) {
             let delay = if let Some(link) = &con.link {
                 let Some(link) = links.get(&link.raw) else {
                         errors.add(Error::new(
@@ -329,13 +324,13 @@ impl Module {
                 });
             }
 
-            if lhs.len() > 0 {
+            if !lhs.is_empty() {
                 errors.add(Error::new(
                         ErrorKind::InvalidConDefSizes,
                         format!("Invalid connection statement, source domain is bigger than target domain (by {} gates)", lhs.len())
                     ))
             }
-            if rhs.len() > 0 {
+            if !rhs.is_empty() {
                 errors.add(Error::new(
                         ErrorKind::InvalidConDefSizes,
                         format!("Invalid connection statement, target domain is bigger than source domain (by {} gates)", rhs.len())

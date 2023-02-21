@@ -59,13 +59,12 @@ pub fn message_body_derive_impl(
 
             let wrapped = WrappedTokenStream(impl_ts);
             Ok(quote! {
-                    impl #impl_generics ::des::net::message::MessageBody for #ident #type_generics #where_clause {
-                        fn byte_len(&self) -> usize {
-                            #wrapped 0
-                        }
+                impl #impl_generics ::des::net::message::MessageBody for #ident #type_generics #where_clause {
+                    fn byte_len(&self) -> usize {
+                        #wrapped 0
                     }
-                }.into()
-            )
+                }
+            })
         }
         Data::Enum(data_enum) => {
             let mut gts = TokenStream::new();
@@ -74,8 +73,7 @@ pub fn message_body_derive_impl(
                     impl ::des::net::message::MessageBody for #ident {
                         fn byte_len(&self) -> usize { 0 }
                     }
-                }
-                .into());
+                });
             }
 
             for variant in data_enum.variants {
@@ -142,8 +140,7 @@ pub fn message_body_derive_impl(
                         }
                     }
                 }
-            }
-            .into())
+            })
         }
         Data::Union(_) => Err(Diagnostic::new(
             Level::Error,

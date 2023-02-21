@@ -27,7 +27,7 @@ static SCOPED_LOGGER: LoggerWrap = LoggerWrap::uninitalized();
 
 // is only set on the simulation thread, but read by all
 // use static mut with a file-local saftey contract.
-static mut CURRENT_SCOPE: &'static str = "";
+static mut CURRENT_SCOPE: &str = "";
 
 struct LoggerWrap {
     inner: RwLock<Option<Logger>>, // inner: RwLock<Option<Logger>>,

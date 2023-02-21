@@ -40,16 +40,18 @@ impl NdlApplication {
     ///
     /// This function returns None, if the network was not yet created.
     /// After initalizing the [`Runtime`] there should allways be a network.
+    #[must_use]
     pub fn network(&self) -> Option<&ModuleRef> {
         self.handle.as_ref()
     }
 
     /// Returns a handle to the topology, described by the Ndl-Assets.
+    #[must_use]
     pub fn topology(&self) -> Arc<ir::Module> {
         self.tree.clone()
     }
 
-    /// Creates a new NdlApplication using the provided path as
+    /// Creates a new `NdlApplication` using the provided path as
     /// root for the Ndl-Assets and the registry of types for binding.
     ///
     /// # Errors
@@ -58,6 +60,7 @@ impl NdlApplication {
     /// or the registry does not provide a link to a type, required by the
     /// assets.
     ///
+    #[allow(clippy::missing_panics_doc)]
     pub fn new(path: impl AsRef<Path>, registry: Registry) -> RootResult<NdlApplication> {
         let mut ctx = Context::load(path)?;
         let tree = ctx.entry.take().unwrap();
@@ -96,17 +99,18 @@ impl EventLifecycle<NetworkRuntime<Self>> for NdlApplication {
         rt.app.inner.handle = Some(Self::build_at(
             rt,
             rt.app.inner.tree.clone(),
-            ObjectPath::new(),
+            &ObjectPath::new(),
             None,
         ));
     }
 }
 
 impl NdlApplication {
+    #[allow(clippy::needless_pass_by_value)]
     fn build_at(
         rt: &mut crate::prelude::Runtime<NetworkRuntime<Self>>,
         ir: Arc<ir::Module>,
-        path: ObjectPath,
+        path: &ObjectPath,
         parent: Option<ModuleRef>,
     ) -> ModuleRef {
         let ident = path.name();
@@ -115,7 +119,7 @@ impl NdlApplication {
         let ctx = if let Some(parent) = parent {
             ModuleContext::child_of(ident, parent)
         } else {
-            ModuleContext::standalone(path.clone())
+            ModuleContext::standalone(ObjectPath::new())
         };
 
         for gate in &ir.gates {
@@ -132,12 +136,12 @@ impl NdlApplication {
             match submod.cluster {
                 ir::Cluster::Standalone => {
                     let new_path = path.appended(&submod.ident.raw);
-                    Self::build_at(rt, sty, new_path, Some(ctx.clone()));
+                    Self::build_at(rt, sty, &new_path, Some(ctx.clone()));
                 }
                 ir::Cluster::Clusted(n) => {
                     for k in 0..n {
                         let new_path = path.appended(&format!("{}[{}]", submod.ident.raw, k));
-                        Self::build_at(rt, sty.clone(), new_path, Some(ctx.clone()));
+                        Self::build_at(rt, sty.clone(), &new_path, Some(ctx.clone()));
                     }
                 }
             };
@@ -201,6 +205,7 @@ impl From<ir::GateServiceType> for GateServiceType {
 }
 
 impl From<&ir::Link> for ChannelMetrics {
+    #[allow(clippy::cast_sign_loss)]
     fn from(value: &ir::Link) -> Self {
         ChannelMetrics {
             bitrate: value.bitrate as usize,
@@ -209,13 +214,11 @@ impl From<&ir::Link> for ChannelMetrics {
             cost: value
                 .fields
                 .get("cost")
-                .map(|l| l.as_float_casted())
-                .unwrap_or(0.0),
+                .map_or(0.0, ir::Literal::as_float_casted),
             queuesize: value
                 .fields
                 .get("queuesize")
-                .map(|l| l.as_integer_casted())
-                .unwrap_or(0) as usize,
+                .map_or(0, ir::Literal::as_integer_casted) as usize,
         }
     }
 }

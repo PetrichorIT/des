@@ -73,7 +73,7 @@ impl From<&str> for AssetIdentifier {
 
         AssetIdentifier::Root {
             alias: path.to_str().unwrap().to_string(),
-            path: path,
+            path,
         }
     }
 }
@@ -94,7 +94,7 @@ impl SourceMap {
 
     pub fn load_file(&mut self, ident: impl Into<AssetIdentifier>) -> Result<Asset<'_>> {
         let ident = ident.into();
-        let mut file = File::open(&ident.path()?)?;
+        let mut file = File::open(ident.path()?)?;
         let offset = self.buffer.len();
         let n = file.read_to_string(&mut self.buffer)?;
 
@@ -177,17 +177,18 @@ impl SourceMap {
     }
 
     pub(crate) fn asset_for(&self, span: Span) -> Option<&SourceMappedAsset> {
-        for asset in &self.assets {
-            if asset.contains(span) {
-                return Some(asset);
-            }
-        }
-        None
+        self.assets.iter().find(|asset| asset.contains(span))
     }
 
     pub(crate) fn line_for(&self, span: Span) -> Option<usize> {
         let asset = self.asset_for(span)?;
         Some(asset.line_for(span.pos))
+    }
+}
+
+impl Default for SourceMap {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -219,8 +220,8 @@ impl SourceMappedAsset {
         let s = self.ident.alias();
         let o = other.ident.alias();
 
-        let s = s.split("/").collect::<Vec<_>>();
-        let o = o.split("/").collect::<Vec<_>>();
+        let s = s.split('/').collect::<Vec<_>>();
+        let o = o.split('/').collect::<Vec<_>>();
 
         let n = s.len().min(o.len());
         for i in 0..n {
@@ -230,8 +231,8 @@ impl SourceMappedAsset {
                 for _ in 0..up {
                     include.push_str("../");
                 }
-                for k in i..o.len() {
-                    include.push_str(o[k]);
+                for &e in o.iter().skip(i) {
+                    include.push_str(e);
                     include.push('/');
                 }
                 include.pop();
@@ -285,8 +286,8 @@ impl AssetIdentifier {
     pub(crate) fn path(&self) -> Result<&PathBuf> {
         match self {
             Self::Raw { .. } => Err(Error::new(ErrorKind::Other, "asset is not io-bound")),
-            Self::Included { path, .. } => Ok(&path),
-            Self::Root { path, .. } => Ok(&path),
+            Self::Included { path, .. } => Ok(path),
+            Self::Root { path, .. } => Ok(path),
         }
     }
 }

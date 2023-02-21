@@ -172,6 +172,7 @@ impl ChannelUnbusyNotif {
 pub struct SimStartNotif();
 
 impl SimStartNotif {
+    #[allow(clippy::unused_self)]
     fn handle<A>(self, rt: &mut Runtime<NetworkRuntime<A>>)
     where
         A: EventLifecycle<NetworkRuntime<A>>,

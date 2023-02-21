@@ -15,10 +15,7 @@ pub struct LinkIrTable {
 impl LinkIrTable {
     pub fn get(&self, key: impl AsRef<str>) -> Option<Arc<Link>> {
         let key = key.as_ref();
-        self.links
-            .iter()
-            .find(|v| v.ident.raw == key)
-            .map(|a| a.clone())
+        self.links.iter().find(|v| v.ident.raw == key).cloned()
     }
 
     pub fn add(&mut self, local: Arc<Link>) {
@@ -55,10 +52,7 @@ pub struct ModuleIrTable {
 impl ModuleIrTable {
     pub fn get(&self, key: impl AsRef<str>) -> Option<Arc<Module>> {
         let key = key.as_ref();
-        self.modules
-            .iter()
-            .find(|v| v.ident.raw == key)
-            .map(|a| a.clone())
+        self.modules.iter().find(|v| v.ident.raw == key).cloned()
     }
 
     pub fn add(&mut self, local: Arc<Module>) {

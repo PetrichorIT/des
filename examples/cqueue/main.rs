@@ -34,7 +34,7 @@ fn main() {
     let event_delay: Duration = args
         .iter()
         .find(|v| v.starts_with("delay="))
-        .map(|s| s.split("=").collect::<Vec<_>>()[1].parse::<f64>().unwrap())
+        .map(|s| s.split('=').collect::<Vec<_>>()[1].parse::<f64>().unwrap())
         .map(Duration::from_secs_f64)
         .unwrap_or(Duration::from_secs(1));
 
@@ -42,7 +42,7 @@ fn main() {
         .iter()
         .find(|v| v.starts_with("num="))
         .map(|s| {
-            s.split("=").collect::<Vec<_>>()[1]
+            s.split('=').collect::<Vec<_>>()[1]
                 .parse::<usize>()
                 .unwrap()
         })

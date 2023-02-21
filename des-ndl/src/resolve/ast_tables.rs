@@ -118,7 +118,7 @@ impl LinkAstTable {
     pub fn from_ctx(ctx: &Context, asset: &AssetIdentifier, errors: &mut ErrorsMut) -> Self {
         let mut links = Vec::new();
 
-        let asts = ctx.asts_for_asset(&asset);
+        let asts = ctx.asts_for_asset(asset);
         let ptr = asts[0]
             .1
             .items
@@ -196,7 +196,7 @@ impl ModuleAstTable {
         for i in 0..local.len() {
             // 1) submodules links
             let submodules = &local[i].submodules;
-            for dep in submodules.iter().map(|s| s.items.iter()).flatten() {
+            for dep in submodules.iter().flat_map(|s| s.items.iter()) {
                 let ldep = local
                     .iter()
                     .enumerate()
@@ -282,7 +282,7 @@ impl ModuleAstTable {
     pub fn from_ctx(ctx: &Context, asset: &AssetIdentifier, errors: &mut ErrorsMut) -> Self {
         let mut modules = Vec::new();
 
-        let asts = ctx.asts_for_asset(&asset);
+        let asts = ctx.asts_for_asset(asset);
         let ptr = asts[0]
             .1
             .items

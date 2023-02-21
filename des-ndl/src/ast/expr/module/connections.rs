@@ -275,8 +275,8 @@ impl Parse for NonlocalModuleGateReference {
 impl Parse for ConnectionArrow {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         LeftSingleArrow::parse(input)
-            .map(|l| ConnectionArrow::Left(l))
-            .or_else(|_| RightSingleArrow::parse(input).map(|r| ConnectionArrow::Right(r)))
+            .map(ConnectionArrow::Left)
+            .or_else(|_| RightSingleArrow::parse(input).map(ConnectionArrow::Right))
     }
 }
 

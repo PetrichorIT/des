@@ -126,7 +126,7 @@ impl<'a, T, P> Iterator for Iter<'a, T, P> {
             }
             Equal => {
                 self.idx += 1;
-                self.punct.last.as_ref().map(|v| &**v)
+                self.punct.last.as_deref()
             }
             Greater => None,
         }

@@ -158,7 +158,7 @@ impl Context {
     }
 
     fn ast_validate_assets(&mut self, errors: &mut ErrorsMut) {
-        for (_asset, ast) in &self.ast {
+        for ast in self.ast.values() {
             ast.validate(errors)
         }
     }
@@ -169,9 +169,9 @@ impl Context {
     ) -> Vec<(&AssetIdentifier, &ast::File)> {
         let iter = self
             .deps
-            .get(&asset)
+            .get(asset)
             .unwrap()
-            .into_iter()
+            .iter()
             .map(|k| (k, self.ast.get(k).unwrap()));
 
         let asset = self.assets.iter().find(|a| *a == asset).unwrap(); // for lifetimes
@@ -187,9 +187,9 @@ impl Context {
     ) -> Vec<(&AssetIdentifier, &ir::Items)> {
         let iter = self
             .deps
-            .get(&asset)
+            .get(asset)
             .unwrap()
-            .into_iter()
+            .iter()
             .map(|k| (k, self.ir.get(k).unwrap()));
 
         if include_self {
