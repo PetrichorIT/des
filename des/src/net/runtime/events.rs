@@ -65,7 +65,7 @@ impl MessageAtGateEvent {
         //
         let mut current_gate = self.gate;
         while let Some(next_gate) = current_gate.next_gate() {
-            log_scope!(current_gate.owner().ctx.path.path());
+            log_scope!(current_gate.owner().ctx.path.as_logger_scope());
 
             // A next gate exists.
             // redirect to next channel
@@ -99,13 +99,13 @@ impl MessageAtGateEvent {
 
         // No next gate exists.
         debug_assert!(current_gate.next_gate().is_none());
-        log_scope!(current_gate.owner().ctx.path.path());
+        log_scope!(current_gate.owner().ctx.path.as_logger_scope());
 
         assert!(
             current_gate.service_type() != GateServiceType::Output,
             "Messages cannot be forwarded to modules on Output gates. (Gate '{}' owned by Module '{}')",
             current_gate.str(),
-            current_gate.owner().str()
+            current_gate.owner().as_str()
         );
 
         info!(
@@ -136,7 +136,7 @@ impl HandleMessageEvent {
     where
         A: EventLifecycle<NetworkRuntime<A>>,
     {
-        log_scope!(self.module.str());
+        log_scope!(self.module.as_logger_scope());
         let mut message = *self.message;
         message.header.receiver_module_id = self.module.ctx.id;
 
@@ -189,7 +189,7 @@ impl SimStartNotif {
             // Direct indexing since rt must be borrowed mutably in handle_buffers.
             for i in 0..rt.app.modules().len() {
                 let module = rt.app.modules()[i].clone();
-                log_scope!(module.ctx.path.path());
+                log_scope!(module.ctx.path.as_logger_scope());
 
                 if stage < module.num_sim_start_stages() {
                     info!("Calling at_sim_start({}).", stage);
@@ -209,7 +209,7 @@ impl SimStartNotif {
 
             for i in 0..rt.app.modules().len() {
                 let module = rt.app.modules()[i].clone();
-                log_scope!(module.ctx.path.path());
+                log_scope!(module.ctx.path.as_logger_scope());
 
                 module.activate();
                 module.finish_sim_start();

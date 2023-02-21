@@ -190,8 +190,12 @@ impl ModuleRef {
 }
 
 impl ModuleRef {
-    pub(crate) fn str(&self) -> &str {
-        self.ctx.path.path()
+    pub(crate) fn as_str(&self) -> &str {
+        self.ctx.path.as_str()
+    }
+
+    pub(crate) fn as_logger_scope(&self) -> &str {
+        self.ctx.path.as_logger_scope()
     }
 
     /// INTERNAL

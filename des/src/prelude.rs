@@ -71,11 +71,6 @@ cfg_net! {
         child, gate, gates, module_id, module_name, module_path, par, par_for, parent, pars, shutdow_and_restart_at, shutdow_and_restart_in, shutdown
     };
 
-    pub use crate::net::subsystem::Subsystem;
-    pub use crate::net::subsystem::SubsystemRef;
-    pub use crate::net::subsystem::SubsystemContext;
-    pub use crate::net::subsystem::SubsystemId;
-
     pub use crate::net::ObjectPath;
     pub use crate::net::Parameters;
 

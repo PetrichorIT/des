@@ -219,12 +219,6 @@ impl ModuleAstTable {
             }
         }
 
-        println!(
-            "v: {:?}",
-            local.iter().map(|v| &v.ident.raw).collect::<Vec<_>>()
-        );
-        println!("topo: {:?}", topo);
-
         if let Err(cycles) = dfs_cycles(&topo) {
             for cycle in cycles {
                 let s = cycle[0];
@@ -267,12 +261,9 @@ impl ModuleAstTable {
             }
 
             if s != i && i < local.len() {
-                println!("swapping {s} {i}");
                 local.swap(s, i);
                 topo.swap(s, i);
                 topo_remapping.swap(s, i);
-            } else {
-                println!("noswap");
             }
             s += 1;
         }

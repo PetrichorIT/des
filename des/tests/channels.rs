@@ -40,13 +40,13 @@ impl Module for DropChanModule {
 fn channel_dropping_message() {
     let mut rt = NetworkRuntime::new(());
 
-    let module = DropChanModule::build_named(ObjectPath::root_module("root".to_string()), &mut rt);
+    let module = DropChanModule::build_named(ObjectPath::from("root".to_string()), &mut rt);
 
     let g_in = module.create_gate("in", GateServiceType::Input);
     let g_out = module.create_gate("out", GateServiceType::Output);
 
     let channel = Channel::new(
-        ObjectPath::channel_with("chan", &module.path()),
+        ObjectPath::appended_channel(&module.path(), "chan"),
         ChannelMetrics {
             bitrate: 1000,
             latency: Duration::from_millis(100),
@@ -107,14 +107,13 @@ fn channel_buffering_message() {
 
     let mut rt = NetworkRuntime::new(());
 
-    let module =
-        BufferChanModule::build_named(ObjectPath::root_module("root".to_string()), &mut rt);
+    let module = BufferChanModule::build_named(ObjectPath::from("root".to_string()), &mut rt);
 
     let g_in = module.create_gate("in", GateServiceType::Input);
     let g_out = module.create_gate("out", GateServiceType::Output);
 
     let channel = Channel::new(
-        ObjectPath::channel_with("chan", &module.path()),
+        ObjectPath::appended_channel(&module.path(), "chan"),
         ChannelMetrics {
             bitrate: 1000,
             latency: Duration::from_millis(100),

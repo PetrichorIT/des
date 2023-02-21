@@ -66,8 +66,7 @@ fn stateless_module_shudown() {
 
     let mut rt = NetworkRuntime::new(());
 
-    let module =
-        StatelessModule::build_named(ObjectPath::root_module("RootModule".to_string()), &mut rt);
+    let module = StatelessModule::build_named(ObjectPath::from("RootModule"), &mut rt);
     let gate = module.create_gate("in", GateServiceType::Input);
 
     rt.create_module(module);
@@ -119,10 +118,7 @@ fn stateless_module_restart() {
 
     let mut rt = NetworkRuntime::new(());
 
-    let module = StatelessModuleRestart::build_named(
-        ObjectPath::root_module("RootModule".to_string()),
-        &mut rt,
-    );
+    let module = StatelessModuleRestart::build_named(ObjectPath::from("RootModule"), &mut rt);
     let gate = module.create_gate("in", GateServiceType::Input);
 
     rt.create_module(module);
@@ -189,8 +185,7 @@ fn statefull_module_restart() {
 
     let mut rt = NetworkRuntime::new(());
 
-    let module =
-        StatefullModule::build_named(ObjectPath::root_module("RootModule".to_string()), &mut rt);
+    let module = StatefullModule::build_named(ObjectPath::from("RootModule"), &mut rt);
     let gate = module.create_gate("in", GateServiceType::Input);
 
     rt.create_module(module);
@@ -240,10 +235,7 @@ fn shutdown_via_async_handle() {
 
     let mut rt = NetworkRuntime::new(());
 
-    let module = ShutdownViaHandleModule::build_named(
-        ObjectPath::root_module("RootModule".to_string()),
-        &mut rt,
-    );
+    let module = ShutdownViaHandleModule::build_named(ObjectPath::from("RootModule"), &mut rt);
     rt.create_module(module);
     let rt = Runtime::new(rt);
 
@@ -287,10 +279,7 @@ fn restart_via_async_handle() {
 
     let mut rt = NetworkRuntime::new(());
 
-    let module = RestartViaHandleModule::build_named(
-        ObjectPath::root_module("RootModule".to_string()),
-        &mut rt,
-    );
+    let module = RestartViaHandleModule::build_named(ObjectPath::from("RootModule"), &mut rt);
     rt.create_module(module);
     let rt = Runtime::new(rt);
 

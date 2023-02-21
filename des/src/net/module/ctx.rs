@@ -27,7 +27,7 @@ pub(crate) fn _default_setup(this: &ModuleContext) {
     //     false,
     // );
     this.add_plugin(
-        crate::net::plugin::TokioTimePlugin::new(this.path.path().to_string()),
+        crate::net::plugin::TokioTimePlugin::new(this.path.as_str().to_string()),
         0,
         crate::net::plugin::PluginPanicPolicy::Abort,
     );
@@ -75,7 +75,7 @@ impl ModuleContext {
     /// Creates a child
     #[allow(clippy::needless_pass_by_value)]
     pub fn child_of(name: &str, parent: ModuleRef) -> ModuleRef {
-        let path = ObjectPath::module_with_parent(name, &parent.ctx.path);
+        let path = ObjectPath::appended(&parent.ctx.path, name);
         let this = ModuleRef::dummy(Arc::new(Self {
             active: AtomicBool::new(true),
 

@@ -227,10 +227,7 @@ impl Channel {
                 buffer_len: 0,
 
                 #[cfg(feature = "metrics")]
-                stats: crate::stats::InProgressChannelStats::new(
-                    ObjectPath::root_module("chan"),
-                    metrics,
-                ),
+                stats: crate::stats::InProgressChannelStats::new(ObjectPath::from("chan"), metrics),
             }),
         })
     }

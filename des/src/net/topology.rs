@@ -178,12 +178,12 @@ impl Topology {
     pub fn dot_output(&self) -> String {
         let mut nodes_out = String::new();
         for def in &self.nodes {
-            nodes_out.push_str(&format!("    \"{}\" [shape=box]\n", def.node.str()));
+            nodes_out.push_str(&format!("    \"{}\" [shape=box]\n", def.node.as_str()));
         }
 
         let mut edges_out = String::new();
         for TopoNode { node, edges } in &self.nodes {
-            let from_node = node.str();
+            let from_node = node.as_str();
             for TopoEdge {
                 cost,
                 src_gate,
@@ -191,7 +191,7 @@ impl Topology {
             } in edges
             {
                 let owner = target_gate.owner();
-                let to_node = owner.str();
+                let to_node = owner.as_str();
                 edges_out.push_str(&format!(
                     "    \"{}\" -> \"{}\" [ headlabel=\"{}\" {} taillabel=\"{}\" ]\n",
                     from_node,
@@ -270,7 +270,7 @@ pub struct TopoNode {
 impl Debug for TopoNode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("NodeDefinition")
-            .field("node", &self.node.str())
+            .field("node", &self.node.as_str())
             .field("edges", &self.edges)
             .finish()
     }

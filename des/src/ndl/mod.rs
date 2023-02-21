@@ -5,7 +5,7 @@ use des_ndl::{
     ir::{self, ConnectionEndpoint},
     Context,
 };
-use std::{path::Path, str::FromStr, sync::Arc};
+use std::{path::Path, sync::Arc};
 
 mod registry;
 
@@ -96,7 +96,7 @@ impl EventLifecycle<NetworkRuntime<Self>> for NdlApplication {
         rt.app.inner.handle = Some(Self::build_at(
             rt,
             rt.app.inner.tree.clone(),
-            ObjectPath::root_module("sim"),
+            ObjectPath::new(),
             None,
         ));
     }
@@ -131,19 +131,13 @@ impl NdlApplication {
 
             match submod.cluster {
                 ir::Cluster::Standalone => {
-                    let a = ObjectPath::from_str(&format!("{}.{}", path.path(), submod.ident.raw))
-                        .expect("failed to create submod path");
-                    // let mut b = path.clone();
-                    // b.push_module(&submod.ident.raw);
-                    // assert_eq!(a, b);
-
-                    Self::build_at(rt, sty, a, Some(ctx.clone()));
+                    let new_path = path.appended(&submod.ident.raw);
+                    Self::build_at(rt, sty, new_path, Some(ctx.clone()));
                 }
                 ir::Cluster::Clusted(n) => {
                     for k in 0..n {
-                        let mut npath = path.clone();
-                        npath.push_module(&format!("{}[{}]", submod.ident.raw, k));
-                        Self::build_at(rt, sty.clone(), npath, Some(ctx.clone()));
+                        let new_path = path.appended(&format!("{}[{}]", submod.ident.raw, k));
+                        Self::build_at(rt, sty.clone(), new_path, Some(ctx.clone()));
                     }
                 }
             };
@@ -175,7 +169,7 @@ impl NdlApplication {
             if let Some(delay) = &con.delay {
                 let link = delay.as_link_arc().unwrap();
                 let channel = Channel::new(
-                    ObjectPath::channel_with("ch", &ctx.path()),
+                    ctx.path().appended_channel("ch"),
                     ChannelMetrics::from(&*link),
                 );
 
@@ -184,7 +178,7 @@ impl NdlApplication {
         }
 
         ctx.activate();
-        log_scope!(ctx.path.path());
+        log_scope!(ctx.path.as_logger_scope());
         let f = rt.app.inner.registry.get(ty).unwrap();
         let state = f();
         ctx.upgrade_dummy(state);

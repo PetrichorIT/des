@@ -60,7 +60,7 @@ impl TestCase {
     fn build() -> Self {
         let mut app = NetworkRuntime::new(());
 
-        let parent = Parent::build_named(ObjectPath::root_module("Root".to_string()), &mut app);
+        let parent = Parent::build_named(ObjectPath::from("Root".to_string()), &mut app);
 
         let children = vec![
             Child::build_named_with_parent("c1", parent.clone(), &mut app),

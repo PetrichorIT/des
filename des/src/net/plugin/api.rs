@@ -160,7 +160,7 @@ impl ModuleContext {
             id,
             mod_id: self.id,
             #[cfg(debug_assertions)]
-            plugin_info: format!("{} @ {}", std::any::type_name::<T>(), self.path.path()),
+            plugin_info: format!("{} @ {}", std::any::type_name::<T>(), self.path.as_str()),
         }
     }
 

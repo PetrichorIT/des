@@ -103,7 +103,7 @@ pub fn shutdow_and_restart_at(restart_at: SimTime) {
 #[must_use]
 pub fn pars() -> HashMap<String, String> {
     let path = self::module_path();
-    globals().parameters.get_def_table(path.path())
+    globals().parameters.get_def_table(path.as_str())
 }
 
 ///
@@ -113,7 +113,7 @@ pub fn pars() -> HashMap<String, String> {
 pub fn par(key: &str) -> ParHandle<Optional> {
     globals()
         .parameters
-        .get_handle(self::module_path().path(), key)
+        .get_handle(self::module_path().as_str(), key)
 }
 
 ///

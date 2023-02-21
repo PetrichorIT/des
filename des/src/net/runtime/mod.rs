@@ -145,7 +145,7 @@ where
 
     fn at_sim_end(rt: &mut Runtime<NetworkRuntime<A>>) {
         for module in &mut rt.app.module_list {
-            log_scope!(module.ctx.path.path());
+            log_scope!(module.ctx.path.as_logger_scope());
             info!("Calling 'at_sim_end'");
             module.activate();
             module.at_sim_end();
@@ -158,7 +158,7 @@ where
         {
             // Ensure all sim_start stages have finished
             for module in &mut rt.app.module_list {
-                log_scope!(module.ctx.path.path());
+                log_scope!(module.ctx.path.as_logger_scope());
                 module.activate();
                 module.finish_sim_end();
                 module.deactivate();
