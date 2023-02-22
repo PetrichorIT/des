@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
 
 use super::{HandleMessageEvent, NetworkRuntime, NetworkRuntimeGlobals};
-use crate::net::module::SETUP_FN;
+use crate::net::module::{MOD_CTX, SETUP_FN};
 use crate::net::{gate::GateRef, message::Message, MessageAtGateEvent, NetEvents};
 use crate::prelude::{EventLifecycle, GateServiceType, ModuleRef};
 use crate::runtime::Runtime;
@@ -65,6 +65,12 @@ pub(crate) fn buf_schedule_shutdown(restart: Option<SimTime>) {
 pub(crate) fn buf_set_globals(globals: Weak<NetworkRuntimeGlobals>) {
     let mut ctx = BUF_CTX.write();
     ctx.globals = Some(globals);
+
+    // SAFTEY:
+    // reseting the MOD_CTX is safe, since simulation lock is aquired.
+    unsafe {
+        MOD_CTX.reset(None);
+    }
 }
 
 pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<NetworkRuntime<A>>)

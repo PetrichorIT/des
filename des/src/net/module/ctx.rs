@@ -1,5 +1,6 @@
 use super::{DummyModule, ModuleId, ModuleRef, ModuleRefWeak, ModuleReferencingError};
 use crate::{
+    logger::{Logger, ScopeToken},
     net::plugin,
     prelude::{GateRef, ObjectPath},
     sync::{RwLock, SwapLock, SwapLockReadGuard},
@@ -39,6 +40,7 @@ pub struct ModuleContext {
     pub(crate) id: ModuleId,
 
     pub(crate) path: ObjectPath,
+    pub(crate) logger_token: ScopeToken,
     pub(crate) gates: RwLock<Vec<GateRef>>,
 
     pub(crate) plugins: RwLock<plugin::PluginRegistry>,
@@ -56,7 +58,9 @@ impl ModuleContext {
             active: AtomicBool::new(true),
 
             id: ModuleId::gen(),
+            logger_token: Logger::register_scope(path.as_logger_scope()),
             path,
+
             gates: RwLock::new(Vec::new()),
             plugins: RwLock::new(plugin::PluginRegistry::new()),
 
@@ -80,7 +84,9 @@ impl ModuleContext {
             active: AtomicBool::new(true),
 
             id: ModuleId::gen(),
+            logger_token: Logger::register_scope(path.as_logger_scope()),
             path,
+
             gates: RwLock::new(Vec::new()),
             plugins: RwLock::new(plugin::PluginRegistry::new()),
 

@@ -32,10 +32,15 @@ impl<T> SwapLock<T> {
         }
     }
 
+    pub(crate) unsafe fn reset(&self, inner: T) {
+        *self.inner.get() = inner;
+        self.read_count.store(0, SeqCst);
+    }
+
     pub(crate) fn swap(&self, other: &mut T) {
         // SAFTEY REASONS
         assert!(
-            self.read_count.load(SeqCst) != 0,
+            self.read_count.load(SeqCst) == 0,
             "SwapLock cannot swap, since {} read handles are still alive",
             self.read_count.load(SeqCst)
         );
@@ -59,6 +64,7 @@ pub(crate) struct SwapLockReadGuard<'a, T> {
 
 impl<'a, T> SwapLockReadGuard<'a, T> {
     fn new(lock: &'a SwapLock<T>) -> Self {
+        let ptr: *const SwapLock<T> = lock;
         lock.read_count.fetch_add(1, SeqCst);
         Self {
             lock,
@@ -76,6 +82,7 @@ impl<'a, T> Deref for SwapLockReadGuard<'a, Option<T>> {
 
 impl<'a, T> Drop for SwapLockReadGuard<'a, T> {
     fn drop(&mut self) {
+        let ptr: *const SwapLock<T> = self.lock;
         self.lock.read_count.fetch_sub(1, SeqCst);
     }
 }

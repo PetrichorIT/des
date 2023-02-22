@@ -3,10 +3,9 @@
 use log::{Level, LevelFilter, Log, SetLoggerError};
 use spin::RwLock;
 use std::{
-    collections::HashMap,
     fmt::Debug,
     io::{stderr, stdout},
-    sync::Arc,
+    sync::{atomic::Ordering, Arc},
 };
 use termcolor::{BufferWriter, ColorChoice};
 
@@ -20,65 +19,76 @@ pub use output::LogOutput;
 pub use record::LogRecord;
 
 use self::filter::FilterPolicy;
+use crate::sync::AtomicUsize;
 use crate::time::SimTime;
 
-// is truly accesed from multiple threads.
-static SCOPED_LOGGER: LoggerWrap = LoggerWrap::uninitalized();
+mod wrap {
+    use super::Logger;
+    use log::*;
+    use spin::RwLock;
+
+    // is truly accesed from multiple threads.
+    pub(super) static SCOPED_LOGGER: LoggerWrap = LoggerWrap::uninitalized();
+
+    pub(super) struct LoggerWrap {
+        pub(super) inner: RwLock<Option<Logger>>, // inner: RwLock<Option<Logger>>,
+    }
+
+    impl LoggerWrap {
+        pub(super) const fn uninitalized() -> Self {
+            Self {
+                inner: RwLock::new(None),
+            }
+        }
+
+        pub(super) fn reset(&self) {
+            self.inner.write().take();
+            // *lock = None;
+        }
+
+        pub(super) fn reset_contents(&self, new: Logger) {
+            // Check activ;
+            let active = { self.inner.read().as_ref().unwrap().active };
+            if active {
+                self.inner.write().replace(new);
+            }
+        }
+
+        pub(super) fn set(&self, other: Logger) -> Option<Logger> {
+            self.inner.write().replace(other)
+        }
+    }
+
+    impl Log for LoggerWrap {
+        fn enabled(&self, metadata: &log::Metadata) -> bool {
+            let lock = self.inner.read();
+            lock.as_ref().unwrap().enabled(metadata)
+        }
+
+        fn log(&self, record: &log::Record) {
+            let lock = self.inner.read();
+            lock.as_ref().unwrap().log(record);
+        }
+
+        fn flush(&self) {
+            let lock = self.inner.read();
+            lock.as_ref().unwrap().flush();
+        }
+    }
+}
+
+/// A token describing a logger scope.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ScopeToken(usize);
 
 // is only set on the simulation thread, but read by all
 // use static mut with a file-local saftey contract.
-static mut CURRENT_SCOPE: &str = "";
-
-struct LoggerWrap {
-    inner: RwLock<Option<Logger>>, // inner: RwLock<Option<Logger>>,
-}
-
-impl LoggerWrap {
-    const fn uninitalized() -> Self {
-        Self {
-            inner: RwLock::new(None),
-        }
-    }
-
-    fn reset(&self) {
-        self.inner.write().take();
-        // *lock = None;
-    }
-
-    fn reset_contents(&self, new: Logger) {
-        // Check activ;
-        let active = { self.inner.read().as_ref().unwrap().active };
-        if active {
-            self.inner.write().replace(new);
-        }
-    }
-
-    fn set(&self, other: Logger) -> Option<Logger> {
-        self.inner.write().replace(other)
-    }
-}
-
-impl Log for LoggerWrap {
-    fn enabled(&self, metadata: &log::Metadata) -> bool {
-        let lock = self.inner.read();
-        lock.as_ref().unwrap().enabled(metadata)
-    }
-
-    fn log(&self, record: &log::Record) {
-        let lock = self.inner.read();
-        lock.as_ref().unwrap().log(record);
-    }
-
-    fn flush(&self) {
-        let lock = self.inner.read();
-        lock.as_ref().unwrap().flush();
-    }
-}
+static CURRENT_SCOPE: AtomicUsize = AtomicUsize::new(usize::MAX);
 
 /// A logger that collects scope specific messages.
 pub struct Logger {
     active: bool,
-    scopes: RwLock<HashMap<String, LoggerScope>>,
+    scopes: RwLock<Vec<LoggerScope>>,
     // use std lock to allways deal with multi-threaded access,
     // (e.g.) from other crates in the test chain
     policy: Box<dyn LogScopeConfigurationPolicy>,
@@ -114,7 +124,7 @@ impl Logger {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            scopes: RwLock::new(HashMap::new()),
+            scopes: RwLock::new(Vec::new()),
             active: true,
             policy: Box::new(DefaultPolicy),
             interal_max_level: LevelFilter::Warn,
@@ -127,7 +137,7 @@ impl Logger {
     #[doc(hidden)]
     pub fn debug() -> Self {
         Self {
-            scopes: RwLock::new(HashMap::new()),
+            scopes: RwLock::new(Vec::new()),
             active: true,
             policy: Box::new(DefaultPolicy),
             interal_max_level: LevelFilter::Warn,
@@ -135,27 +145,43 @@ impl Logger {
         }
     }
 
-    /// Begins a new scope, returning the currently active scope.
-    #[doc(hidden)]
-    #[allow(unused)]
-    pub(crate) fn begin_scope(ident: impl AsRef<str>) {
-        let ident: *const str = ident.as_ref();
-        let ident: &'static str = unsafe { &*ident };
-
-        // SAFTEY:
-        // begin_scope can only be called from the simulation itself
-        unsafe {
-            CURRENT_SCOPE = ident;
-        }
+    ///
+    /// Creates a new scope, reference by the given token.
+    ///
+    pub fn register_scope(scope: &str) -> ScopeToken {
+        wrap::SCOPED_LOGGER
+            .inner
+            .read()
+            .as_ref()
+            .map(|v| v._register_scope(scope))
+            .unwrap_or(ScopeToken(usize::MAX))
     }
 
-    /// Removes the current scope.
-    #[doc(hidden)]
-    #[allow(unused)]
-    pub(crate) fn end_scope() {
-        // Saftey:
-        // end_scope can only be called from the simulation itself
-        unsafe { CURRENT_SCOPE = "" }
+    fn _register_scope(&self, scope: &str) -> ScopeToken {
+        let (output, fmt) = self.policy.configure(scope);
+
+        let new_scope = LoggerScope {
+            scope: Arc::new(scope.to_string()),
+            output,
+            fmt,
+            filter: self.filter.filter_for(scope, LevelFilter::max()),
+        };
+
+        let mut scopes = self.scopes.write();
+        let token = ScopeToken(scopes.len());
+        scopes.push(new_scope);
+
+        token
+    }
+
+    /// Enters into a scope.
+    pub fn enter_scope(scope: ScopeToken) {
+        CURRENT_SCOPE.store(scope.0, Ordering::SeqCst);
+    }
+
+    /// Leaves a scope.
+    pub fn leave_scope() {
+        CURRENT_SCOPE.store(usize::MAX, Ordering::SeqCst);
     }
 
     /// Adds a filter to the policy.
@@ -209,8 +235,9 @@ impl Logger {
     /// in a race condition.
     ///
     pub fn try_set_logger(self) -> Result<(), SetLoggerError> {
-        let old = SCOPED_LOGGER.set(self);
-        match log::set_logger(&SCOPED_LOGGER).map(|()| log::set_max_level(LevelFilter::Trace)) {
+        let old = wrap::SCOPED_LOGGER.set(self);
+        match log::set_logger(&wrap::SCOPED_LOGGER).map(|()| log::set_max_level(LevelFilter::Trace))
+        {
             Ok(()) => Ok(()),
             Err(e) => {
                 // Since a logger was allready set it might either be a
@@ -219,11 +246,11 @@ impl Logger {
 
                 if let Some(v) = old {
                     // Old was Scoped logger so keep the old logger and reset it.
-                    let recently_created = SCOPED_LOGGER.set(v);
-                    SCOPED_LOGGER.reset_contents(recently_created.unwrap());
+                    let recently_created = wrap::SCOPED_LOGGER.set(v);
+                    wrap::SCOPED_LOGGER.reset_contents(recently_created.unwrap());
                     Ok(())
                 } else {
-                    SCOPED_LOGGER.reset();
+                    wrap::SCOPED_LOGGER.reset();
                     Err(e)
                 }
             }
@@ -279,8 +306,8 @@ impl Log for Logger {
         // the current scope cannot be seen in invalid states,
         // since begin_scope or end_scope only occures inbetween events
         // when no other threads are ative
-        let scope_label = unsafe { CURRENT_SCOPE };
-        if scope_label.is_empty() {
+        let scope_token = CURRENT_SCOPE.load(Ordering::SeqCst);
+        if scope_token == usize::MAX {
             // if policy(record.target()) {
             // No target scope was given --- not scoped println.
             let out = match record.level() {
@@ -306,23 +333,11 @@ impl Log for Logger {
         };
 
         // (5) Fetch scope information
-        let scope = scopes.get_mut(scope_label);
+        let scope = scopes.get_mut(scope_token);
         if let Some(scope) = scope {
             scope.log(format!("{}", record.args()), target_label, record.level());
         } else {
-            // TODO: Check target validity
-            let (output, fmt) = self.policy.configure(scope_label);
-
-            let mut new_scope = LoggerScope {
-                scope: Arc::new(scope_label.to_string()),
-                output,
-                fmt,
-                filter: self.filter.filter_for(scope_label, LevelFilter::max()),
-            };
-
-            new_scope.log(format!("{}", record.args()), target_label, record.level());
-
-            scopes.insert(scope_label.to_string(), new_scope);
+            todo!()
         }
     }
 

@@ -25,6 +25,10 @@ impl Module for Main {
         log::debug!("# create main");
         Self
     }
+
+    fn at_sim_end(&mut self) {
+        log::info!(target: "custom", "at sim end")
+    }
 }
 
 fn main() {

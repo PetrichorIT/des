@@ -1,3 +1,4 @@
+use crate::logger::ScopeToken;
 use crate::prelude::{ChannelRef, Gate, GateRef, GateServiceType};
 
 use super::{DummyModule, Module, ModuleContext};
@@ -194,8 +195,8 @@ impl ModuleRef {
         self.ctx.path.as_str()
     }
 
-    pub(crate) fn as_logger_scope(&self) -> &str {
-        self.ctx.path.as_logger_scope()
+    pub(crate) fn as_logger_scope(&self) -> ScopeToken {
+        self.ctx.logger_token
     }
 
     /// INTERNAL
