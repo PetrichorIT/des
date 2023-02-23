@@ -1,10 +1,10 @@
-use crate::{alloc::CQueueLLAllocator, EventHandle};
+use super::{alloc::CQueueLLAllocator, boxed::LocalBox, EventHandle};
 use std::{fmt::Debug, hash::Hash, marker::PhantomData, time::Duration};
 
-pub(super) struct DualLinkedList<E> {
+pub(crate) struct DualLinkedList<E> {
     alloc: CQueueLLAllocator,
-    head: Box<EventNode<E>, CQueueLLAllocator>,
-    tail: Box<EventNode<E>, CQueueLLAllocator>,
+    head: LocalBox<EventNode<E>>,
+    tail: LocalBox<EventNode<E>>,
     len: usize,
 }
 
@@ -54,7 +54,7 @@ impl<T> DualLinkedList<T> {
             while !(*cur).next.is_null() {
                 if (*cur).id == handle.id {
                     // remove
-                    let cur = Box::from_raw_in(cur, self.alloc);
+                    let mut cur = LocalBox::from_raw_in(cur, self.alloc);
                     (*cur.prev).next = cur.next;
                     (*cur.next).prev = cur.prev;
                     self.len -= 1;
@@ -71,7 +71,8 @@ impl<T> DualLinkedList<T> {
     pub(super) fn front_time(&self) -> Duration {
         // SAFTEY:
         // Value is guranteed to be valid since head->next is allways valid
-        let front = unsafe { &mut *self.head.next };
+        let ptr = self.head.next;
+        let front = unsafe { &mut *ptr };
         if front.next.is_null() {
             Duration::MAX
         } else {
@@ -134,7 +135,7 @@ impl<T> DualLinkedList<T> {
 
     /// Removes the element with the earliest time from the queue.
     pub(super) fn pop_min(&mut self) -> Option<(T, Duration)> {
-        let node = unsafe { Box::from_raw_in(self.head.next, self.alloc) };
+        let mut node = unsafe { LocalBox::from_raw_in(self.head.next, self.alloc) };
         if node.next.is_null() {
             // The node that would have been returned is the tail.
             // Thus forgett this Box, since the tail is allready owned by self.
@@ -158,8 +159,7 @@ impl<T> DualLinkedList<T> {
             // Droping the node via into_inner is valid since the only remaining
             // ref (the NodeHandle) will be invalidated by this operation,
             // if nessecary
-            let v = node.into_inner();
-            Some(v)
+            Some(EventNode::into_inner(node))
         }
     }
 
@@ -173,16 +173,6 @@ impl<T> DualLinkedList<T> {
     }
 }
 
-// impl<T: Clone> Clone for DLL<T> {
-//     fn clone(&self) -> Self {
-//         let mut r = Self::new(self.shared_len.clone(), todo!());
-//         for (event, time) in self.into_iter() {
-//             r.add(EventNode::new(event.clone(), *time, r.shared_len.clone()).0);
-//         }
-//         r
-//     }
-// }
-
 impl<T> Debug for DualLinkedList<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let head_ptr: *const EventNode<T> = &*self.head;
@@ -194,12 +184,6 @@ impl<T> Debug for DualLinkedList<T> {
             .finish()
     }
 }
-
-// impl<T> Default for DLL<T> {
-//     fn default() -> Self {
-//         Self::new(Arc::new(AtomicUsize::new(0)), todo!())
-//     }
-// // }
 
 impl<T> Drop for DualLinkedList<T> {
     fn drop(&mut self) {
@@ -246,24 +230,6 @@ impl<T: Hash> Hash for DualLinkedList<T> {
     }
 }
 
-// FROM
-
-// impl<T> FromIterator<(T, Duration)> for DLL<T> {
-//     fn from_iter<I: IntoIterator<Item = (T, Duration)>>(iter: I) -> Self {
-//         let mut r = Self::new(todo!());
-//         for (item, time) in iter {
-//             r.add(EventNode::new(item, time, r.shared_len.clone()).0);
-//         }
-//         r
-//     }
-// }
-
-// impl<T, const N: usize> From<[(T, Duration); N]> for DLL<T> {
-//     fn from(value: [(T, Duration); N]) -> Self {
-//         Self::from_iter(value)
-//     }
-// }
-
 // IMPL: DLL Into Iter
 
 pub struct Iter<'a, T> {
@@ -280,7 +246,7 @@ impl<'a, T> Iterator for Iter<'a, T> {
         // Will point to a valid node since:
         // IA) head->next is a valid node
         // IS) each time the next node is check to be non-null (thus valid)
-        let cur = unsafe { Box::from_raw_in(self.cur, self.alloc) };
+        let cur = unsafe { LocalBox::from_raw_in(self.cur, self.alloc) };
         let result: Option<(*const T, *const Duration)> = {
             if cur.next.is_null() {
                 // is tail
@@ -323,7 +289,7 @@ impl<'a, T> Iterator for IterMut<'a, T> {
         // Will point to a valid node since:
         // IA) head->next is a valid node
         // IS) each time the next node is check to be non-null (thus valid)
-        let mut cur = unsafe { Box::from_raw_in(self.cur, self.alloc) };
+        let mut cur = unsafe { LocalBox::from_raw_in(self.cur, self.alloc) };
         let result: Option<(*mut T, *const Duration)> = {
             if cur.next.is_null() {
                 // is tail
@@ -374,11 +340,8 @@ impl<T> IntoIterator for DualLinkedList<T> {
 // IMPL: Node
 
 impl<T> EventNode<T> {
-    pub(super) fn empty(
-        time: Duration,
-        alloc: CQueueLLAllocator,
-    ) -> Box<EventNode<T>, CQueueLLAllocator> {
-        Box::new_in(
+    pub(super) fn empty(time: Duration, alloc: CQueueLLAllocator) -> LocalBox<EventNode<T>> {
+        LocalBox::new_in(
             Self {
                 value: None,
                 id: 0,
@@ -395,8 +358,8 @@ impl<T> EventNode<T> {
         time: Duration,
         id: usize,
         alloc: CQueueLLAllocator,
-    ) -> Box<EventNode<T>, CQueueLLAllocator> {
-        Box::new_in(
+    ) -> LocalBox<EventNode<T>> {
+        LocalBox::new_in(
             Self {
                 value: Some(value),
                 time,
@@ -409,11 +372,11 @@ impl<T> EventNode<T> {
     }
 
     #[allow(clippy::boxed_local)]
-    fn into_inner(mut self: Box<Self, CQueueLLAllocator>) -> (T, Duration) {
+    fn into_inner(mut this: LocalBox<Self>) -> (T, Duration) {
         // SAFTEY:
         // This function may only be applied to nodes that are
         // neither head nor tail. Such notes allways contain a value
-        (unsafe { self.value.take().unwrap_unchecked() }, self.time)
+        (unsafe { this.value.take().unwrap_unchecked() }, this.time)
     }
 }
 
