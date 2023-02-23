@@ -344,7 +344,14 @@ impl Log for Logger {
     fn flush(&self) {}
 }
 
+// SAFTEY:
+// A logger does not contain any thread specific entries.
+// so this type is sendable.
 unsafe impl Send for Logger {}
+
+// SAFTEY:
+// Since all internal datapoints are either acessed by ownership
+// or fields that are themself Sync.
 unsafe impl Sync for Logger {}
 
 /// A collection of all logging activity in one scope.

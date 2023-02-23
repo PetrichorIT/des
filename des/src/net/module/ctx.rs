@@ -192,11 +192,8 @@ impl Debug for ModuleContext {
     }
 }
 
-// impl Drop for ModuleContext {
-//     fn drop(&mut self) {
-//         println!("<DROP> dropping module ctx '{}'", self.path)
-//     }
-// }
+unsafe impl Send for ModuleContext {}
+unsafe impl Sync for ModuleContext {}
 
 pub(crate) fn with_mod_ctx<R>(f: impl FnOnce(&Arc<ModuleContext>) -> R) -> R {
     let lock = MOD_CTX.read();

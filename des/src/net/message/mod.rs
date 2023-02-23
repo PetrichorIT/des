@@ -26,7 +26,7 @@ pub use header::{MessageHeader, MessageId, MessageKind, MessageType};
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 #[derive(Debug)]
 pub struct Message {
-    pub(crate) header: MessageHeader,
+    pub(crate) header: Box<MessageHeader>,
     pub(crate) content: Option<AnyBox>,
 }
 
@@ -219,7 +219,7 @@ impl Message {
             }
         };
 
-        Ok((content, header))
+        Ok((content, *header))
     }
 }
 
@@ -269,7 +269,6 @@ impl Message {
 // A message only contains primitve data, ptrs that are threadsafe
 // and a untyped contained value.
 unsafe impl Send for Message {}
-unsafe impl Sync for Message {} // TODO: wrong unsafe find better method
 
 impl UnwindSafe for Message {}
 
@@ -277,7 +276,7 @@ impl UnwindSafe for Message {}
 /// A intermediary type for constructing messages.
 ///
 pub struct MessageBuilder {
-    pub(crate) header: MessageHeader,
+    pub(crate) header: Box<MessageHeader>,
     pub(crate) content: Option<AnyBox>,
 }
 
@@ -286,7 +285,7 @@ impl MessageBuilder {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            header: MessageHeader::default(),
+            header: Box::new(MessageHeader::default()),
             content: None,
         }
     }
@@ -305,7 +304,7 @@ impl MessageBuilder {
     #[must_use]
     pub fn header(mut self, meta: MessageHeader) -> Self {
         let old_len = self.header.length;
-        self.header = meta;
+        self.header = Box::new(meta);
         self.header.length = old_len;
         self
     }

@@ -14,3 +14,6 @@ pub(crate) use self::atomic::*;
 
 mod rwlock;
 pub(crate) use self::rwlock::*;
+
+mod mutex;
+pub(crate) use self::mutex::*;
