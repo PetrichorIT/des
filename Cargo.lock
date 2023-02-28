@@ -44,14 +44,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5827cebf4670468b8772dd191856768aedcb1b0278a04f989f7766351917b9dc"
 
 [[package]]
-name = "cqueue"
-version = "0.1.0"
-dependencies = [
- "page_size",
- "rand",
-]
-
-[[package]]
 name = "crossbeam-channel"
 version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -112,7 +104,7 @@ name = "des"
 version = "0.4.1"
 dependencies = [
  "async-trait",
- "cqueue",
+ "des-cqueue",
  "des-macros",
  "des-ndl",
  "futures",
@@ -123,6 +115,14 @@ dependencies = [
  "sysinfo",
  "termcolor",
  "tokio",
+]
+
+[[package]]
+name = "des-cqueue"
+version = "0.1.0"
+dependencies = [
+ "page_size",
+ "rand",
 ]
 
 [[package]]

@@ -147,7 +147,7 @@ cfg_cqueue! {
 
 
         use crate::{runtime::{Application, RuntimeOptions}, time::SimTime};
-        use cqueue::{CQueue};
+        use des_cqueue::CQueue;
 
 
 

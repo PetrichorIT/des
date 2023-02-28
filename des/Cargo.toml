@@ -21,7 +21,7 @@ default = []
 full = ["net" ,"ndl" , "cqueue", "async"]
 
 async = ["net", "dep:tokio", "dep:async-trait"]
-cqueue = ["dep:cqueue"]
+cqueue = ["dep:des-cqueue"]
 multi-threaded = []
 net = ["dep:des-macros"]
 ndl = ["dep:des-ndl"]
@@ -50,7 +50,7 @@ spin = {version = "*"}
 
 async-trait = {version = "0.1", optional = true}
 
-cqueue = {path = "../cqueue", optional = true}
+des-cqueue = {path = "../des-cqueue", optional = true}
 des-macros = {path = "../des-macros", optional = true}
 des-ndl = { path = "../des-ndl", optional = true}
 tokio = {git = "https://github.com/PetrichorIT/tokio_sim", rev = "a61cd6fe6e0648a97ed82ead23394753c94d88b5", features = ["sim"], optional = true}

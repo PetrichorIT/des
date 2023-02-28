@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use cqueue::CQueue;
+use des_cqueue::CQueue;
 use rand::{distributions::Uniform, rngs::SmallRng, Rng, SeedableRng};
 
 fn main() {
