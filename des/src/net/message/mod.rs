@@ -141,7 +141,7 @@ impl Message {
     }
 
     ///
-    /// Performs a [`try_cast`] unwraping the result.
+    /// Performs a [`try_cast`](Message::try_cast)unwraping the result.
     ///
     #[must_use]
     pub fn cast<T: 'static + MessageBody + Send>(self) -> (T, MessageHeader) {
@@ -170,11 +170,11 @@ impl Message {
     }
 
     ///
-    /// Performs a [`try_cast_unsafe`] unwraping the result.
+    /// Performs a [`try_cast_unsafe`](Message::try_cast_unsafe) unwraping the result.
     ///
     /// # Safety
     ///
-    /// See [`try_cast_unsafe`]
+    /// See [`try_cast_unsafe`](Message::try_cast_unsafe)
     #[must_use]
     pub unsafe fn cast_unsafe<T: 'static + MessageBody>(self) -> (T, MessageHeader) {
         self.try_cast_unsafe().expect("Could not cast to type T")
@@ -285,7 +285,7 @@ impl MessageBuilder {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            header: Box::new(MessageHeader::default()),
+            header: Box::default(),
             content: None,
         }
     }

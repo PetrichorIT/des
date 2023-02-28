@@ -35,7 +35,7 @@
 //! your log messages. When a logger is created the user can provide some policies and filters
 //! how scopes are created.
 //!
-//! A 'LogScopeConfigurationPolicy' is a policy object, that can configure abitrary scopes.
+//! A [`LogScopeConfigurationPolicy`] is a policy object, that can configure abitrary scopes.
 //! When a new scope is created this policy receives the scope name as a parameter,
 //! and returns a [`LogOutput`] object and a [`LogFormat`] identifier. The
 //! output object is used to write log messages to some external target. The default target
@@ -84,16 +84,16 @@
 //! ```
 //!
 //! Additionally the user can define filters. Filter restrict which log levels are logged per scope
-//! at runtime, simuilar to the 'max_level_*' features of [`log`], but with much greater control.
+//! at runtime, similar to the featue `max_level_*` features of [`log`], but with much greater control.
 //! Filters can be defined by text, and thus be read from env-vars for custom runtime behaviour.
 //!
-//! Finally an internal log level can be set. By default [`des`] does not log any internal event-handling below
+//! Finally an internal log level can be set. By default [`des`](crate) does not log any internal event-handling below
 //! the WARN level. By setting the internal log level, user can expose internal logs.
 //!
 //! # When do i create scopes ?
 //!
 //! In 99% of cases, never. Scopes are automatically created when using the feature 'net'.
-//! Additionally which scope is active is automatically determined by [`des`]. If you want
+//! Additionally which scope is active is automatically determined by [`des`](crate). If you want
 //! to create 'subscopes' within one network node, provide the logger with a custom target.
 //! This target will be added to the log entry as an extra parameter.
 //!
@@ -139,7 +139,7 @@ use crate::time::SimTime;
 
 mod wrap {
     use super::Logger;
-    use log::*;
+    use log::Log;
     use spin::RwLock;
 
     // is truly accesed from multiple threads.
@@ -268,8 +268,7 @@ impl Logger {
             .inner
             .read()
             .as_ref()
-            .map(|v| v._register_scope(scope))
-            .unwrap_or(ScopeToken(usize::MAX))
+            .map_or(ScopeToken(usize::MAX), |v| v._register_scope(scope))
     }
 
     fn _register_scope(&self, scope: &str) -> ScopeToken {

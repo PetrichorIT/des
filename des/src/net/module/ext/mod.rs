@@ -10,8 +10,8 @@ pub(crate) use self::core::WaitingMessage;
 /// A set of user defined functions for customizing the behaviour
 /// of an asynchronous module.
 ///
-/// This trait is just a async version of [`Module`](crate::net::Module).
-/// Note that this implementation used [`async_trait`] to provide function
+/// This trait is just a async version of [`Module`](crate::net::module::Module).
+/// Note that this implementation used [`async_trait::async_trait`] to provide function
 /// signatures.
 ///
 #[async_trait]
@@ -105,7 +105,7 @@ pub trait AsyncModule: Send {
 
     ///
     /// A function that is called once the module restarts,
-    /// after using [shutdown](super::core::ModuleCore::shutdown).
+    /// after using [shutdown](super::api::shutdown).
     /// This means that all async elements have been pruged,
     /// but the local state of `self` is not yet reset.
     ///

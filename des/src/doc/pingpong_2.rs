@@ -18,8 +18,8 @@
 //! The feature `net` provides the core abstractions for a network-like
 //! simulation. These are Modules, Gates and Channels. Modules represent
 //! network nodes with custom state and behaviour. They are user defined
-//! and can be created by implementing the [`Module`] trait on a type.
-//! Gates act as physical (or logical) ports on a module. They can be
+//! and can be created by implementing the [`Module`](crate::net::module::Module)
+//! trait on a type. Gates act as physical (or logical) ports on a module. They can be
 //! chained together into gate-chains, thus connecting multiple modules.
 //! By default gate-chains act as link with infinite bandwith and zero latency.
 //! If a gate-chain should act as a real physical link would do, Channels
@@ -107,8 +107,9 @@
 //! }
 //! ```
 //!
-//! To be a module, this type must implement the trait [`Module`]. This trait provides
-//! a number of available functions, but only [`Module::new`] is required on all modules.
+//! To be a module, this type must implement the trait [`Module`](crate::net::module::Module).
+//! This trait provides a number of available functions,
+//! but only [`Module::new`](crate::net::module::Module::new)m is required on all modules.
 //! This function should be used to create a new instance of the custom state for a
 //! network node. Note that this function is not nessecryly executed within the context
 //! of an event, so dont put complex custom logic here.
@@ -141,10 +142,13 @@
 //! ```
 //!
 //! The `Module` trait also provide some other useful functions, that can be overrided.
-//! [`Module::handle_message`] is called when a packet arrives at the module. This function
-//! is the heart of most network simulations. [`Module::at_sim_start`] provides a way to
+//! [`Module::handle_message`](crate::net::module::Module::handle_message)
+//!  is called when a packet arrives at the module. This function
+//! is the heart of most network simulations.
+//! [`Module::at_sim_start`](crate::net::module::Module::at_sim_start) provides a way to
 //! handle more complex logic when the simulation is stared, but now within a fully constructed
-//! topology.  [`Module::at_sim_end`] can be used to make module-specific actions once the simulation is finished,
+//! topology.  [`Module::at_sim_end`](crate::net::module::Module::at_sim_end)
+//! can be used to make module-specific actions once the simulation is finished,
 //! such as writing metrics to a file, or deallocating internal containers.
 //!
 //! ```
@@ -222,11 +226,12 @@
 //! ```
 //!
 //! Now we have defined everything to create the simulation. To do that create an
-//! [`NdlApplication`] to load our network topology. This application requies
-//! a [`Registry`] of all known modules types, to link the Ndl-Modules to their rust struct.
-//! This application can be used to instantiate a [`NetworkRuntime`] (provided by feature `net`),
-//! which in turn can be passed to the core [`Runtime`] of des. This runtime can than be executed,
-//! to run the simulation to its end.
+//! [`NdlApplication`](crate::ndl::NdlApplication) to load our network topology. This application requies
+//! a [`Registry`](crate::ndl::Registry) of all known modules types, to link the Ndl-Modules to their rust struct.
+//! This application can be used to instantiate a [`NetworkRuntime`](crate::net::NetworkRuntime)
+//! (provided by feature `net`),
+//! which in turn can be passed to the core [`Runtime`](crate::runtime::Runtime) of [`des`](crate).
+//! This runtime can than be executed, to run the simulation to its end.
 //!
 //! ```
 //! # use des::prelude::*;

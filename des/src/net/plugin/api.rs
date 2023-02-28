@@ -164,7 +164,7 @@ impl ModuleContext {
         }
     }
 
-    /// Refer to [`remove_plugin`].
+    /// Refer to [`PluginHandle::remove`].
     ///
     /// # Panics
     ///
@@ -177,7 +177,7 @@ impl ModuleContext {
             .remove(handle.id);
     }
 
-    /// Refer to [`plugin_status`].
+    /// Refer to [`PluginHandle::status`]
     ///
     /// # Panics
     ///

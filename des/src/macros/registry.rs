@@ -1,4 +1,4 @@
-/// Creates a registry of types that implement [`Module`],
+/// Creates a registry of types that implement [`Module`](crate::net::module::Module),
 /// to link rust structs to NDL modules.
 ///
 /// # Example
@@ -36,6 +36,4 @@ macro_rules! registry {
         )*
         registry
     }};
-
-
 }

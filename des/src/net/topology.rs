@@ -200,14 +200,14 @@ impl Topology {
                     if *cost == 0.0 {
                         String::new()
                     } else {
-                        format!("label=\"{}\"", cost)
+                        format!("label=\"{cost}\"")
                     },
                     src_gate.str()
                 ));
             }
         }
 
-        format!("digraph D {{\n{}\n{}\n}}", nodes_out, edges_out)
+        format!("digraph D {{\n{nodes_out}\n{edges_out}\n}}")
     }
 
     ///
@@ -230,15 +230,15 @@ impl Topology {
         use std::io::Write;
         use std::process::Command;
         let str = self.dot_output();
-        let mut file = File::create(format!("{}.dot", path))?;
-        write!(file, "{}", str)?;
+        let mut file = File::create(format!("{path}.dot"))?;
+        write!(file, "{str}")?;
 
         let output = Command::new("dot")
             .arg("-Tsvg")
-            .arg(format!("{}.dot", path))
+            .arg(format!("{path}.dot"))
             .output()?;
 
-        let mut file = File::create(format!("{}.svg", path))?;
+        let mut file = File::create(format!("{path}.svg"))?;
         write!(file, "{}", String::from_utf8_lossy(&output.stdout))?;
 
         Ok(())

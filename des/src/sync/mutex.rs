@@ -42,9 +42,7 @@ cfg_not_multi_threaded! {
     impl<'a, T> MutexGuard<'a, T> {
         fn new(inner: &'a Mutex<T>) -> Self {
             let lock_failed = inner.locked.compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed).is_err();
-            if lock_failed {
-                panic!("Could not lock mutex on single thread")
-            }
+            assert!(!lock_failed, "Could not lock mutex on single thread");
             Self { inner }
         }
     }

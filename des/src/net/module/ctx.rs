@@ -33,8 +33,7 @@ pub(crate) fn _default_setup(this: &ModuleContext) {
         crate::net::plugin::PluginPanicPolicy::Abort,
     );
 }
-
-/// INTERNAL
+///
 pub struct ModuleContext {
     pub(crate) active: AtomicBool,
     pub(crate) id: ModuleId,

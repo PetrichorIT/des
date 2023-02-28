@@ -16,7 +16,7 @@ pub struct RuntimeOptions {
     ///
     /// The random number generator used internally.
     /// This can be seeded to ensure reproducability.
-    /// Defaults to a [OsRng] which does NOT provide reproducability.
+    /// Defaults to a [OsRng](rand::rngs::OsRng) which does NOT provide reproducability.
     ///
     pub rng: Option<StdRng>,
 

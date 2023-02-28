@@ -50,7 +50,7 @@ where
 /// and associated event set.
 ///
 /// Note that events in an event set dont need to implement this trait,
-/// unless the event set is derived using the [`create_event_set`](crate::create_event_set)
+/// unless the event set is derived using the [`event_set`](crate::event_set)
 /// macros. Nonetheless is it advised to use this trait to better isolate different events
 /// and their associated data.
 ///

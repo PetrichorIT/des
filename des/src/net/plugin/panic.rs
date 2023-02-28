@@ -47,7 +47,7 @@ impl fmt::Debug for PluginPanicPolicy {
     }
 }
 
-/// The status of a plugin, as seen by a [`PluginHandle`].
+/// The status of a plugin, as seen by a [`PluginHandle`](super::PluginHandle).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PluginStatus {
     /// The plugin is in the process of being created.

@@ -22,7 +22,8 @@ pub use self::ctx::*;
 pub struct NetworkRuntime<A> {
     ///
     /// The set of module used in the network simulation.
-    /// All module must be boxed, since they must conform to the [`Module`] trait.
+    /// All module must be boxed, since they must conform to the
+    /// [`Module`](crate::net::module::Module) trait.
     ///
     module_list: Vec<ModuleRef>,
 
@@ -62,7 +63,7 @@ impl<A> NetworkRuntime<A> {
     pub fn include_par_file(&mut self, file: &str) {
         match std::fs::read_to_string(file) {
             Ok(string) => self.globals.parameters.build(&string),
-            Err(e) => eprintln!("Failed to load par file: {}", e),
+            Err(e) => eprintln!("Failed to load par file: {e}"),
         }
     }
 

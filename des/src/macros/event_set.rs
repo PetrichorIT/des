@@ -1,7 +1,7 @@
 ///
 /// A declaritive macro for generating event sets.
 ///
-/// This macro combines an number of types that implement [`Event`]
+/// This macro combines an number of types that implement [`Event`](crate::runtime::Event)
 /// into an `EventSet` for an application 'App'.
 ///
 /// ```rust

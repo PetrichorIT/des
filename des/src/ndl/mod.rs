@@ -27,7 +27,7 @@ pub use self::registry::Registry;
 /// Upon creation this type can be passed to a [`NetworkRuntime`]
 /// to instanitate a network simulation. When the simulation is executed
 /// this type holds a reference to the network modules itself, which
-/// can then be extraced after from a [`RuntimeResult`].
+/// can then be extraced after from a [`RuntimeResult`](crate::runtime::RuntimeResult).
 #[derive(Debug)]
 pub struct NdlApplication {
     handle: Option<ModuleRef>,
@@ -39,7 +39,8 @@ impl NdlApplication {
     /// Returns a handle to the simulated network.
     ///
     /// This function returns None, if the network was not yet created.
-    /// After initalizing the [`Runtime`] there should allways be a network.
+    /// After initalizing the [`Runtime`](crate::runtime::Runtime)
+    /// there should allways be a network.
     #[must_use]
     pub fn network(&self) -> Option<&ModuleRef> {
         self.handle.as_ref()

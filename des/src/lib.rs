@@ -2,12 +2,7 @@
 #![deny(unused_must_use)]
 #![warn(clippy::pedantic)]
 #![warn(missing_docs, missing_debug_implementations, unreachable_pub)]
-#![allow(
-    clippy::uninlined_format_args,
-    clippy::needless_doctest_main,
-    rustdoc::broken_intra_doc_links,
-    clippy::module_name_repetitions
-)]
+#![allow(clippy::needless_doctest_main, clippy::module_name_repetitions)]
 
 //!
 //! A discrete event simulator.
@@ -59,29 +54,26 @@
 //!
 //! This simulation will now provide a [`runtime`](crate::runtime) with
 //! [`time`](crate::time) managment and a future event set to execute events.
-//! If a event is executed [`MyEventSet::handle`](crate::runtime::EventSet:handle)
+//! If a event is executed [`MyEventSet::handle`](crate::runtime::EventSet::handle)
 //! will be called with the runtime as parameter. If new events are to be created
 //! as result of a event execution this mutable reference can be used
 //! to add new events to the future event set.
 //!
 //! The [`Application`](crate::runtime::Application) object (in this case `MyApp`) is used as a global context handle that
 //! it stored inside the runtime. It can be accessed via 'rt.app' and can be used
-//! to record [`metrics`](crate::metrics) during the simulation. Note that the [`EventSet`](crate::runtime::EventSet)
+//! to record [`stats`](crate::stats) during the simulation. Note that the [`EventSet`](crate::runtime::EventSet)
 //! and the [`Application`](crate::runtime::Application) are linked via a trait with generic parameters. This means
 //! that `MyEvents` could implement [`EventSet`](crate::runtime::EventSet) a second time for another application.
 //!
-//! Additionally DES provides access to the [`util`] module to easier crate event-sets ,
-//! aswell as access to a [`prelude`](crate::prelude).
-//!
 //! # Using a module oriented system
 //!
-//! DES is able to provide tools for simulating network-like structures with [Modules](crate::net::Module).
+//! DES is able to provide tools for simulating network-like structures with [Modules](crate::net::module::Module).
 //! These modules are self contained units with their own state, connected via [Channels](crate::net::channel::Channel)
 //! (network links) that are attached to [Gates](crate::net::gate::Gate) (physical ports) on modules.
 //! Modules can send messages (packtes) through these gates / channels to communicated
 //! with other modules. Additionally modules can be created in a tree like structure,
-//! providing links like [`parent`](crate::net::ModuleCore::parent) or
-//! [`child(...)`](crate::net::ModuleCore::child).
+//! providing links like [`parent`](crate::net::module::parent) or
+//! [`child(...)`](crate::net::module::child).
 //!
 //! These tools are available in the [`net`](crate::net) module
 //! when the feature `net` is active.
@@ -114,7 +106,7 @@
 //!
 //! However it supports all synchronisation primitives (excluding Barrier)
 //! through the [`sync`](tokio::sync) module, asynchronous green tasks
-//! through [`task`](tokio::task), custom runtimes through [`runtime`](tokio::rumtime)
+//! through [`task`](tokio::task), custom runtimes through [`runtime`](tokio::runtime)
 //! and simulation specific time primitives through [`sim`](tokio::sim) replacing the
 //! standart [`time`](https://docs.rs/tokio/latest/tokio/time/index.html) module,
 //! aswell as simulation specifc network primitives replacing the standart
