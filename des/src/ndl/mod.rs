@@ -1,4 +1,47 @@
-//! NDL intergration.
+//! Integration of the Network-Description-Language (NDL).
+//!
+//! # What is NDL ?
+//!
+//! NDL is a decriptory language for defining network topologies.
+//! Refer to [`des_ndl`] for more information.
+//!
+//! # How to use it ?
+//!
+//! This submodule provides an [`NdlApplication`] that can be passed to
+//! a network runtime, to build a network based on a given topology.
+//! Users can create such an application by providing the path to the
+//! root file of the NDL description, and by providing a registry of modules.
+//! This registry is used to link names of network nodes in NDL to associated
+//! structs that implmenent [`Module`](crate::net::module::Module).
+//! By proving both parameters, the application will load the topology and check
+//! whether the network can be build. If not an descriptive error will be returned.
+//!
+//! ```
+//! # use des::prelude::*;
+//! # use des::ndl::*;
+//! # use des::registry;
+//! struct ModuleA;
+//! /* ... */
+//!
+//! struct ModuleB;
+//! /* ... */
+//!
+//! # impl Module for ModuleA { fn new() -> Self { Self }}
+//! # impl Module for ModuleB { fn new() -> Self { Self }}
+//! fn main() {
+//!     # return;
+//!     let app = match NdlApplication::new("path/to/ndl.ndl", registry![ModuleA, ModuleB]) {
+//!         Ok(v) => v,
+//!         Err(e) => {
+//!             println!("{e}");
+//!             return;
+//!         },
+//!     };
+//!     let rt = Runtime::new(NetworkRuntime::new(app));
+//!     let _ = rt.run();
+//! }
+//! ```
+
 use des_ndl::{
     ast::Spanned,
     error::{Error, ErrorKind, Errors, RootError, RootResult},
