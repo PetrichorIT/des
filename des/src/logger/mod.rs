@@ -1,4 +1,119 @@
 //! A simulation specific logger.
+//!
+//! # Why ?
+//!
+//! The reason 'des' provides a simulation specific logger is simple.
+//! When creating logs from specific network-nodes in the simulation, its important
+//! that each node has its own stdout/stderr for logging. Obviously thats not
+//! possible with a normal logging implementation, since all simulated nodes still run in the
+//! same process, thus share a stdout/stderr. The logger provided in this submodule
+//! automatically recognizes which module / network-node is active and accordingly
+//! annotates the log entry.
+//!
+//! # How can i set it up ?
+//!
+//! This is a logger implementation based on the default loggin api provided by [`log`].
+//! To use it, create a new Logger at the start of your programm, configure the logger and then
+//! set the logger. When another logger is allready set, this operation will fail, except if the
+//! allready existing logger is also a instance of [`Logger`].
+//!
+//! ```
+//! # use des::prelude::*;
+//! # use des::logger::*;
+//! fn main() {
+//!     Logger::new()
+//!         .add_filters("*.router=warn")
+//!         .try_set_logger()
+//!         .expect("Failed to set logger");
+//!     /* ... */
+//! }
+//! ```
+//!
+//! # What can be configured ?
+//!
+//! This logger works by creating scopes. A scope describes a custom output target for
+//! your log messages. When a logger is created the user can provide some policies and filters
+//! how scopes are created.
+//!
+//! A 'LogScopeConfigurationPolicy' is a policy object, that can configure abitrary scopes.
+//! When a new scope is created this policy receives the scope name as a parameter,
+//! and returns a [`LogOutput`] object and a [`LogFormat`] identifier. The
+//! output object is used to write log messages to some external target. The default target
+//! would be an stdout/stderr pair, but other targets are also valid. For example
+//! logs could be written to a file, a vector of strings, or a TCP stream (not implemented by default).
+//! The format argument is self-explanatory: It defines whether the write expects a output with, or without
+//! color support (usefull if the output is stdout/stderr).
+//!
+//! ```
+//! # use des::prelude::*;
+//! # use des::logger::*;
+//! # use std::io::{self, stdout, stderr};
+//! # use log::Level;
+//! # use std::fs::File;
+//! struct MixedLoggingOutput {
+//!     file: File,
+//! }
+//!
+//! impl LogOutput for MixedLoggingOutput {
+//!     fn write(&mut self, record: &LogRecord, fmt: LogFormat) -> io::Result<()> {
+//!         self.file.write(record, fmt)?;
+//!         if record.level == Level::Error {
+//!             let mut default_output = (stdout(), stderr());
+//!             default_output.write(record, fmt)?;
+//!         }
+//!         Ok(())
+//!     }    
+//! }
+//!
+//! fn main() {
+//!     let p: Box<LogScopeConfigurationPolicyFn> = Box::new(|s| {
+//!         (
+//!             Box::new(MixedLoggingOutput {
+//!                 file: std::fs::File::create(format!("{s}.log")).unwrap(),
+//!             }),
+//!             LogFormat::Color,
+//!         )  
+//!     });
+//!
+//!     Logger::new()
+//!         .policy(p)
+//!         .try_set_logger()
+//!         .expect("Failed to set logger");
+//!     /* ... */
+//! }
+//! ```
+//!
+//! Additionally the user can define filters. Filter restrict which log levels are logged per scope
+//! at runtime, simuilar to the 'max_level_*' features of [`log`], but with much greater control.
+//! Filters can be defined by text, and thus be read from env-vars for custom runtime behaviour.
+//!
+//! Finally an internal log level can be set. By default [`des`] does not log any internal event-handling below
+//! the WARN level. By setting the internal log level, user can expose internal logs.
+//!
+//! # When do i create scopes ?
+//!
+//! In 99% of cases, never. Scopes are automatically created when using the feature 'net'.
+//! Additionally which scope is active is automatically determined by [`des`]. If you want
+//! to create 'subscopes' within one network node, provide the logger with a custom target.
+//! This target will be added to the log entry as an extra parameter.
+//!
+//! # How do i use the logger ?
+//!
+//! Just as you would use every other logger using the [`log`] crate.
+//!
+//! ```
+//! # use des::prelude::*;
+//! struct MyModule;
+//! impl Module for MyModule {
+//!     fn new() -> Self {
+//!         Self
+//!     }
+//!
+//!     fn handle_message(&mut self, m: Message) {
+//!         log::info!("recv: id = {}", m.header().id);
+//!     }
+//! }
+//! ```
 
 use log::{Level, LevelFilter, Log, SetLoggerError};
 use spin::RwLock;
