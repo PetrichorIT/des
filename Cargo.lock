@@ -101,7 +101,7 @@ dependencies = [
 
 [[package]]
 name = "des"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "async-trait",
  "des-cqueue",
@@ -119,7 +119,7 @@ dependencies = [
 
 [[package]]
 name = "des-cqueue"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "page_size",
  "rand",
@@ -127,7 +127,7 @@ dependencies = [
 
 [[package]]
 name = "des-macros"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "des-macros-core",
  "proc-macro-error",
@@ -137,7 +137,7 @@ dependencies = [
 
 [[package]]
 name = "des-macros-core"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "lazy_static",
  "proc-macro-error",
