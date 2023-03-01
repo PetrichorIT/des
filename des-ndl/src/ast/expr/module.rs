@@ -116,11 +116,12 @@ impl Parse for ModuleStmt {
                     _,
                 )) => this.connections.push(ConnectionsStmt::parse(&inner)?),
 
-                Some(_other) => {
+                Some(other) => {
                     return Err(Error::new(
                         ErrorKind::ExpectedInModuleKeyword,
                         "expected keyword 'gates', 'submodules' or 'connections'",
-                    ))
+                    )
+                    .spanned(other.span()))
                 }
                 None => unreachable!(),
             }
