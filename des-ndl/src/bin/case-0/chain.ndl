@@ -1,0 +1,7 @@
+
+link Chain {
+    contested: "ABC",
+    jitter: 0.0,
+    bitrate: 100,
+    latency: 0.1,
+}

@@ -1,7 +1,0 @@
-module X {}
-
-network Main 
-    nodes:
-        a: X
-        b: X
-}

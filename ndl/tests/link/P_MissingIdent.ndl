@@ -1,5 +1,0 @@
-link {
-    bitrate: 1000
-    latency: 0.1
-    jitter: 0.0
-}

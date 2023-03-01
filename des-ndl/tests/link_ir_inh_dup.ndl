@@ -1,0 +1,15 @@
+link C {
+    jitter: 0.0,
+    latency: 0.0,
+    birate: 100,
+}
+
+link B {
+     jitter: 0.0,
+    latency: 0.0,
+    birate: 100,
+}
+
+link A: C + B + C {
+    arg: 1
+}

@@ -1,12 +1,15 @@
 #![cfg(feature = "net")]
-use des::net::{plugin::*, BuildContext, __Buildable0};
+use des::net::plugin::*;
 use des::prelude::*;
 use serial_test::serial;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::Arc;
 
-mod common {
+#[macro_use]
+mod common;
+
+mod lcommon {
     use des::net::plugin::*;
     use des::prelude::*;
 
@@ -44,11 +47,12 @@ mod common {
     }
 }
 
-#[NdlModule]
 struct PluginCreation {
     handles: Vec<PluginHandle>,
     sum: usize,
 }
+impl_build_named!(PluginCreation);
+
 impl Module for PluginCreation {
     fn new() -> Self {
         Self {
@@ -58,7 +62,7 @@ impl Module for PluginCreation {
     }
     fn at_sim_start(&mut self, _stage: usize) {
         self.handles
-            .push(add_plugin(common::IncrementIncomingId, 100));
+            .push(add_plugin(lcommon::IncrementIncomingId, 100));
         assert_eq!(self.handles[0].status(), PluginStatus::StartingUp);
         for i in 0..100 {
             schedule_at(
@@ -83,10 +87,9 @@ fn plugin_raw_creation() {
     // Logger::new().set_logger();
 
     let mut app = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut app);
 
-    let root = PluginCreation::build_named(ObjectPath::root_module("root"), &mut cx);
-    cx.create_module(root);
+    let root = PluginCreation::build_named(ObjectPath::from("root"), &mut app);
+    app.create_module(root);
 
     let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
     let result = rt.run().unwrap();
@@ -114,8 +117,8 @@ impl Plugin for RecrusivePluginCreationPlugin {
     }
 }
 
-#[NdlModule]
 struct PluginInPluginCreation;
+impl_build_named!(PluginInPluginCreation);
 impl Module for PluginInPluginCreation {
     fn new() -> Self {
         Self {}
@@ -143,10 +146,9 @@ fn plugin_in_plugin_creation() {
     // Logger::new().set_logger();
 
     let mut app = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut app);
 
-    let module = PluginInPluginCreation::build_named(ObjectPath::root_module("root"), &mut cx);
-    cx.create_module(module);
+    let module = PluginInPluginCreation::build_named(ObjectPath::from("root"), &mut app);
+    app.create_module(module);
 
     let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
     let result = rt.run();
@@ -179,8 +181,8 @@ impl Plugin for RecrusivePluginCreationPlugin2 {
     }
 }
 
-#[NdlModule]
 struct PluginInPluginCreation2;
+impl_build_named!(PluginInPluginCreation2);
 impl Module for PluginInPluginCreation2 {
     fn new() -> Self {
         Self {}
@@ -208,10 +210,9 @@ fn plugin_in_plugin_creation2() {
     // Logger::new().set_logger();
 
     let mut app = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut app);
 
-    let module = PluginInPluginCreation2::build_named(ObjectPath::root_module("root"), &mut cx);
-    cx.create_module(module);
+    let module = PluginInPluginCreation2::build_named(ObjectPath::from("root"), &mut app);
+    app.create_module(module);
 
     let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
     let result = rt.run();
@@ -224,16 +225,16 @@ fn plugin_in_plugin_creation2() {
     assert_eq!(profiler.event_count, 11 + 1);
 }
 
-#[NdlModule]
 struct PluginPriority;
+impl_build_named!(PluginPriority);
 impl Module for PluginPriority {
     fn new() -> Self {
         Self
     }
 
     fn at_sim_start(&mut self, _stage: usize) {
-        add_plugin(common::PanicOnIncoming, 100);
-        add_plugin(common::ConsumeAllIncoming, 10);
+        add_plugin(lcommon::PanicOnIncoming, 100);
+        add_plugin(lcommon::ConsumeAllIncoming, 10);
 
         for i in 0..100 {
             schedule_in(Message::new().id(i).build(), Duration::from_secs(i as u64));
@@ -251,10 +252,9 @@ fn plugin_priority() {
     // Logger::new().set_logger();
 
     let mut app = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut app);
 
-    let module = PluginPriority::build_named(ObjectPath::root_module("root"), &mut cx);
-    cx.create_module(module);
+    let module = PluginPriority::build_named(ObjectPath::from("root"), &mut app);
+    app.create_module(module);
 
     let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
     let result = rt.run();
@@ -283,10 +283,10 @@ impl Plugin for ActivitySensor {
     }
 }
 
-#[NdlModule]
 struct PluginPriorityDefer {
     arc: Arc<AtomicUsize>,
 }
+impl_build_named!(PluginPriorityDefer);
 impl Module for PluginPriorityDefer {
     fn new() -> Self {
         Self {
@@ -331,10 +331,9 @@ fn plugin_priority_defer() {
     // Logger::new().set_logger();
 
     let mut app = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut app);
 
-    let module = PluginPriorityDefer::build_named(ObjectPath::root_module("root"), &mut cx);
-    cx.create_module(module);
+    let module = PluginPriorityDefer::build_named(ObjectPath::from("root"), &mut app);
+    app.create_module(module);
 
     let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
     let result = rt.run();
@@ -347,18 +346,18 @@ fn plugin_priority_defer() {
     assert_eq!(profiler.event_count, 100 + 1);
 }
 
-#[NdlModule]
 struct PluginDuplication {
     counter: usize,
 }
+impl_build_named!(PluginDuplication);
 impl Module for PluginDuplication {
     fn new() -> Self {
         Self { counter: 0 }
     }
 
     fn at_sim_start(&mut self, _stage: usize) {
-        add_plugin(common::IncrementIncomingId, 100);
-        add_plugin(common::IncrementIncomingId, 1000);
+        add_plugin(lcommon::IncrementIncomingId, 100);
+        add_plugin(lcommon::IncrementIncomingId, 1000);
 
         for i in 0..100 {
             schedule_in(Message::new().id(i).build(), Duration::from_secs(i as u64));
@@ -382,10 +381,9 @@ fn plugin_duplication() {
     // Logger::new().finish().unwrap();
 
     let mut app = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut app);
 
-    let module = PluginDuplication::build_named(ObjectPath::root_module("root"), &mut cx);
-    cx.create_module(module);
+    let module = PluginDuplication::build_named(ObjectPath::from("root"), &mut app);
+    app.create_module(module);
 
     let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
     let result = rt.run();
@@ -398,11 +396,11 @@ fn plugin_duplication() {
     assert_eq!(profiler.event_count, 100 + 1);
 }
 
-#[NdlModule]
 struct PluginRemoval {
     counter: usize,
     handle: Option<PluginHandle>,
 }
+impl_build_named!(PluginRemoval);
 impl Module for PluginRemoval {
     fn new() -> Self {
         Self {
@@ -412,8 +410,8 @@ impl Module for PluginRemoval {
     }
 
     fn at_sim_start(&mut self, _stage: usize) {
-        self.handle = Some(add_plugin(common::IncrementIncomingId, 100));
-        add_plugin(common::IncrementIncomingId, 1000);
+        self.handle = Some(add_plugin(lcommon::IncrementIncomingId, 100));
+        add_plugin(lcommon::IncrementIncomingId, 1000);
 
         for i in 0..100 {
             schedule_in(Message::new().id(i).build(), Duration::from_secs(i as u64));
@@ -453,10 +451,9 @@ fn plugin_removal() {
     // Logger::new().set_logger();
 
     let mut app = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut app);
 
-    let module = PluginRemoval::build_named(ObjectPath::root_module("root"), &mut cx);
-    cx.create_module(module);
+    let module = PluginRemoval::build_named(ObjectPath::from("root"), &mut app);
+    app.create_module(module);
 
     let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
     let result = rt.run();
@@ -469,15 +466,15 @@ fn plugin_removal() {
     assert_eq!(profiler.event_count, 201 + 1);
 }
 
-#[NdlModule]
 struct PanicPolicyAbort;
+impl_build_named!(PanicPolicyAbort);
 impl Module for PanicPolicyAbort {
     fn new() -> Self {
         Self
     }
 
     fn at_sim_start(&mut self, _stage: usize) {
-        add_plugin_with(common::PanicOnIncoming, 100, PluginPanicPolicy::Abort);
+        add_plugin_with(lcommon::PanicOnIncoming, 100, PluginPanicPolicy::Abort);
         for i in 0..10 {
             schedule_in(Message::new().id(i).build(), Duration::from_secs(i as u64))
         }
@@ -488,33 +485,15 @@ impl Module for PanicPolicyAbort {
     }
 }
 
-// #[test]
-// #[serial]
-// #[should_panic = "common::PanicOnIncoming"]
-// fn plugin_panic_abort() {
-//     // Logger::new().set_logger();
-
-//     let mut app = NetworkRuntime::new(());
-//     let mut cx = BuildContext::new(&mut app);
-
-//     let module = PanicPolicyAbort::build_named(ObjectPath::root_module("root"), &mut cx);
-//     cx.create_module(module);
-
-//     let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
-//     let _result = rt.run();
-
-//     panic!("Should never have reached this point")
-// }
-
-#[NdlModule]
 struct PanicPolicyCapture;
+impl_build_named!(PanicPolicyCapture);
 impl Module for PanicPolicyCapture {
     fn new() -> Self {
         Self
     }
 
     fn at_sim_start(&mut self, _stage: usize) {
-        add_plugin_with(common::PanicOnIncoming, 100, PluginPanicPolicy::Capture);
+        add_plugin_with(lcommon::PanicOnIncoming, 100, PluginPanicPolicy::Capture);
         for i in 0..10 {
             schedule_in(Message::new().id(i).build(), Duration::from_secs(i as u64))
         }
@@ -531,10 +510,9 @@ fn plugin_panic_capture() {
     // Logger::new().set_logger();
 
     let mut app = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut app);
 
-    let module = PanicPolicyCapture::build_named(ObjectPath::root_module("root"), &mut cx);
-    cx.create_module(module);
+    let module = PanicPolicyCapture::build_named(ObjectPath::from("root"), &mut app);
+    app.create_module(module);
 
     let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
     let result = rt.run();
@@ -554,10 +532,10 @@ impl Plugin for PanicAtThree {
     }
 }
 
-#[NdlModule]
 struct PanicPolicyRestart {
     handle: Vec<PluginHandle>,
 }
+impl_build_named!(PanicPolicyRestart);
 impl Module for PanicPolicyRestart {
     fn new() -> Self {
         Self { handle: Vec::new() }
@@ -590,10 +568,9 @@ fn plugin_panic_restart() {
     // Logger::new().set_logger();
 
     let mut app = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut app);
 
-    let module = PanicPolicyRestart::build_named(ObjectPath::root_module("root"), &mut cx);
-    cx.create_module(module);
+    let module = PanicPolicyRestart::build_named(ObjectPath::from("root"), &mut app);
+    app.create_module(module);
 
     let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
     let result = rt.run();
@@ -617,11 +594,11 @@ impl Plugin for PluginErrorPlugin {
     }
 }
 
-#[NdlModule]
 struct PluginErrorModule {
     flag: Arc<AtomicBool>,
     done: bool,
 }
+impl_build_named!(PluginErrorModule);
 impl Module for PluginErrorModule {
     fn new() -> Self {
         Self {
@@ -669,11 +646,9 @@ fn plugin_error_expected_t() {
     // Logger::new().set_logger();
 
     let mut rt = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut rt);
 
-    let module =
-        PluginErrorModule::build_named(ObjectPath::root_module("root".to_string()), &mut cx);
-    cx.create_module(module);
+    let module = PluginErrorModule::build_named(ObjectPath::from("root".to_string()), &mut rt);
+    rt.create_module(module);
 
     let rt = Runtime::new_with(
         rt,
@@ -698,11 +673,11 @@ impl Plugin for PluginErrorTriggerPlugin {
     }
 }
 
-#[NdlModule]
 struct PluginErrorTriggerModule {
     flag: Arc<AtomicBool>,
     handles: Vec<PluginHandle>,
 }
+impl_build_named!(PluginErrorTriggerModule);
 impl Module for PluginErrorTriggerModule {
     fn new() -> Self {
         Self {
@@ -737,11 +712,10 @@ fn plugin_error_expected_t_inside_other_plugin() {
     // Logger::new().set_logger();
 
     let mut rt = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut rt);
 
     let module =
-        PluginErrorTriggerModule::build_named(ObjectPath::root_module("root".to_string()), &mut cx);
-    cx.create_module(module);
+        PluginErrorTriggerModule::build_named(ObjectPath::from("root".to_string()), &mut rt);
+    rt.create_module(module);
 
     let rt = Runtime::new_with(
         rt,
@@ -792,10 +766,10 @@ impl Plugin for ExpectingPlugin {
     }
 }
 
-#[NdlModule]
 struct PluginErrorMalfunction {
     done: bool,
 }
+impl_build_named!(PluginErrorMalfunction);
 impl Module for PluginErrorMalfunction {
     fn new() -> Self {
         Self { done: false }
@@ -821,11 +795,9 @@ impl Module for PluginErrorMalfunction {
 #[serial]
 fn plugin_error_malfunction_or_priority() {
     let mut rt = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut rt);
 
-    let module =
-        PluginErrorMalfunction::build_named(ObjectPath::root_module("root".to_string()), &mut cx);
-    cx.create_module(module);
+    let module = PluginErrorMalfunction::build_named(ObjectPath::from("root".to_string()), &mut rt);
+    rt.create_module(module);
 
     let rt = Runtime::new_with(
         rt,
@@ -836,17 +808,17 @@ fn plugin_error_malfunction_or_priority() {
     let _res = res.unwrap();
 }
 
-#[NdlModule]
 struct PluginOutputCapture {
     c: usize,
 }
+impl_build_named!(PluginOutputCapture);
 impl Module for PluginOutputCapture {
     fn new() -> Self {
         Self { c: 0 }
     }
 
     fn at_sim_start(&mut self, _stage: usize) {
-        add_plugin(common::ConsumeAllOutgoing, 100);
+        add_plugin(lcommon::ConsumeAllOutgoing, 100);
         // This packet will go through
         schedule_in(Message::new().id(0).build(), Duration::from_secs(0 as u64));
     }
@@ -865,10 +837,10 @@ impl Module for PluginOutputCapture {
     }
 }
 
-#[NdlModule]
 struct PluginRemovalFromMain {
     handles: Vec<PluginHandle>,
 }
+impl_build_named!(PluginRemovalFromMain);
 impl Module for PluginRemovalFromMain {
     fn new() -> Self {
         Self {
@@ -879,7 +851,7 @@ impl Module for PluginRemovalFromMain {
     fn at_sim_start(&mut self, _stage: usize) {
         for i in 1..=10 {
             self.handles
-                .push(add_plugin(common::IncrementIncomingId, i))
+                .push(add_plugin(lcommon::IncrementIncomingId, i))
         }
 
         for i in 0..=10 {
@@ -910,11 +882,9 @@ impl Module for PluginRemovalFromMain {
 #[serial]
 fn plugin_removal_from_main() {
     let mut rt = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut rt);
 
-    let module =
-        PluginRemovalFromMain::build_named(ObjectPath::root_module("root".to_string()), &mut cx);
-    cx.create_module(module);
+    let module = PluginRemovalFromMain::build_named(ObjectPath::from("root".to_string()), &mut rt);
+    rt.create_module(module);
 
     let rt = Runtime::new_with(
         rt,
@@ -944,10 +914,10 @@ impl Plugin for RemoveChildAtLevel {
     }
 }
 
-#[NdlModule]
 struct PluginRemovalFromUpstream {
     handle: Option<PluginHandle>,
 }
+impl_build_named!(PluginRemovalFromUpstream);
 impl Module for PluginRemovalFromUpstream {
     fn new() -> Self {
         Self { handle: None }
@@ -993,13 +963,10 @@ fn plugin_removal_from_upstream() {
     //     .set_logger();
 
     let mut rt = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut rt);
 
-    let module = PluginRemovalFromUpstream::build_named(
-        ObjectPath::root_module("root".to_string()),
-        &mut cx,
-    );
-    cx.create_module(module);
+    let module =
+        PluginRemovalFromUpstream::build_named(ObjectPath::from("root".to_string()), &mut rt);
+    rt.create_module(module);
 
     let rt = Runtime::new_with(
         rt,
@@ -1025,11 +992,11 @@ impl Plugin for RemoveChildAtLevelDownstream {
     }
 }
 
-#[NdlModule]
 struct PluginRemovalFromDownstream {
     handle: Option<PluginHandle>,
     done: bool,
 }
+impl_build_named!(PluginRemovalFromDownstream);
 impl Module for PluginRemovalFromDownstream {
     fn new() -> Self {
         Self {
@@ -1103,13 +1070,10 @@ fn plugin_removal_from_downstream() {
     //     .set_logger();
 
     let mut rt = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut rt);
 
-    let module = PluginRemovalFromDownstream::build_named(
-        ObjectPath::root_module("root".to_string()),
-        &mut cx,
-    );
-    cx.create_module(module);
+    let module =
+        PluginRemovalFromDownstream::build_named(ObjectPath::from("root".to_string()), &mut rt);
+    rt.create_module(module);
 
     let rt = Runtime::new_with(
         rt,
@@ -1136,10 +1100,10 @@ impl Drop for IncrementArcPlugin {
     }
 }
 
-#[NdlModule]
 struct PluginAtShutdown {
     arc: Arc<AtomicUsize>,
 }
+impl_build_named!(PluginAtShutdown);
 impl Module for PluginAtShutdown {
     fn new() -> Self {
         Self {
@@ -1190,11 +1154,9 @@ fn plugin_shutdown_non_persistent_data() {
     //     .set_logger();
 
     let mut rt = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut rt);
 
-    let module =
-        PluginAtShutdown::build_named(ObjectPath::root_module("root".to_string()), &mut cx);
-    cx.create_module(module);
+    let module = PluginAtShutdown::build_named(ObjectPath::from("root".to_string()), &mut rt);
+    rt.create_module(module);
 
     let rt = Runtime::new_with(
         rt,
@@ -1215,10 +1177,10 @@ impl Plugin for IncrementArcPlugin2 {
     }
 }
 
-#[NdlModule]
 struct PluginAtShutdownPersistent {
     arc: Arc<AtomicUsize>,
 }
+impl_build_named!(PluginAtShutdownPersistent);
 impl Module for PluginAtShutdownPersistent {
     fn new() -> Self {
         Self {
@@ -1265,13 +1227,10 @@ fn plugin_shutdown_persistent_data() {
     //     .set_logger();
 
     let mut rt = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut rt);
 
-    let module = PluginAtShutdownPersistent::build_named(
-        ObjectPath::root_module("root".to_string()),
-        &mut cx,
-    );
-    cx.create_module(module);
+    let module =
+        PluginAtShutdownPersistent::build_named(ObjectPath::from("root".to_string()), &mut rt);
+    rt.create_module(module);
 
     let rt = Runtime::new_with(
         rt,
@@ -1282,10 +1241,10 @@ fn plugin_shutdown_persistent_data() {
     let _res = res.unwrap();
 }
 
-#[NdlModule]
 struct PluginAtShutdownDowntime {
     arc: Arc<AtomicUsize>,
 }
+impl_build_named!(PluginAtShutdownDowntime);
 impl Module for PluginAtShutdownDowntime {
     fn new() -> Self {
         Self {
@@ -1332,11 +1291,10 @@ fn plugin_shutdown_downtime() {
     //     .set_logger();
 
     let mut rt = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut rt);
 
     let module =
-        PluginAtShutdownDowntime::build_named(ObjectPath::root_module("root".to_string()), &mut cx);
-    cx.create_module(module);
+        PluginAtShutdownDowntime::build_named(ObjectPath::from("root".to_string()), &mut rt);
+    rt.create_module(module);
 
     let rt = Runtime::new_with(
         rt,

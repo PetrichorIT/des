@@ -1,6 +1,0 @@
-prototype A {}
-module B {}
-
-alias X like A 
-alias Y like B
-alias Z like C

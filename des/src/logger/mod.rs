@@ -1,12 +1,126 @@
 //! A simulation specific logger.
+//!
+//! # Why ?
+//!
+//! The reason 'des' provides a simulation specific logger is simple.
+//! When creating logs from specific network-nodes in the simulation, its important
+//! that each node has its own stdout/stderr for logging. Obviously thats not
+//! possible with a normal logging implementation, since all simulated nodes still run in the
+//! same process, thus share a stdout/stderr. The logger provided in this submodule
+//! automatically recognizes which module / network-node is active and accordingly
+//! annotates the log entry.
+//!
+//! # How can i set it up ?
+//!
+//! This is a logger implementation based on the default loggin api provided by [`log`].
+//! To use it, create a new Logger at the start of your programm, configure the logger and then
+//! set the logger. When another logger is allready set, this operation will fail, except if the
+//! allready existing logger is also a instance of [`Logger`].
+//!
+//! ```
+//! # use des::prelude::*;
+//! # use des::logger::*;
+//! fn main() {
+//!     Logger::new()
+//!         .add_filters("*.router=warn")
+//!         .try_set_logger()
+//!         .expect("Failed to set logger");
+//!     /* ... */
+//! }
+//! ```
+//!
+//! # What can be configured ?
+//!
+//! This logger works by creating scopes. A scope describes a custom output target for
+//! your log messages. When a logger is created the user can provide some policies and filters
+//! how scopes are created.
+//!
+//! A [`LogScopeConfigurationPolicy`] is a policy object, that can configure abitrary scopes.
+//! When a new scope is created this policy receives the scope name as a parameter,
+//! and returns a [`LogOutput`] object and a [`LogFormat`] identifier. The
+//! output object is used to write log messages to some external target. The default target
+//! would be an stdout/stderr pair, but other targets are also valid. For example
+//! logs could be written to a file, a vector of strings, or a TCP stream (not implemented by default).
+//! The format argument is self-explanatory: It defines whether the write expects a output with, or without
+//! color support (usefull if the output is stdout/stderr).
+//!
+//! ```
+//! # use des::prelude::*;
+//! # use des::logger::*;
+//! # use std::io::{self, stdout, stderr};
+//! # use log::Level;
+//! # use std::fs::File;
+//! struct MixedLoggingOutput {
+//!     file: File,
+//! }
+//!
+//! impl LogOutput for MixedLoggingOutput {
+//!     fn write(&mut self, record: &LogRecord, fmt: LogFormat) -> io::Result<()> {
+//!         self.file.write(record, fmt)?;
+//!         if record.level == Level::Error {
+//!             let mut default_output = (stdout(), stderr());
+//!             default_output.write(record, fmt)?;
+//!         }
+//!         Ok(())
+//!     }    
+//! }
+//!
+//! fn main() {
+//!     let p: Box<LogScopeConfigurationPolicyFn> = Box::new(|s| {
+//!         (
+//!             Box::new(MixedLoggingOutput {
+//!                 file: std::fs::File::create(format!("{s}.log")).unwrap(),
+//!             }),
+//!             LogFormat::Color,
+//!         )  
+//!     });
+//!
+//!     Logger::new()
+//!         .policy(p)
+//!         .try_set_logger()
+//!         .expect("Failed to set logger");
+//!     /* ... */
+//! }
+//! ```
+//!
+//! Additionally the user can define filters. Filter restrict which log levels are logged per scope
+//! at runtime, similar to the featue `max_level_*` features of [`log`], but with much greater control.
+//! Filters can be defined by text, and thus be read from env-vars for custom runtime behaviour.
+//!
+//! Finally an internal log level can be set. By default [`des`](crate) does not log any internal event-handling below
+//! the WARN level. By setting the internal log level, user can expose internal logs.
+//!
+//! # When do i create scopes ?
+//!
+//! In 99% of cases, never. Scopes are automatically created when using the feature 'net'.
+//! Additionally which scope is active is automatically determined by [`des`](crate). If you want
+//! to create 'subscopes' within one network node, provide the logger with a custom target.
+//! This target will be added to the log entry as an extra parameter.
+//!
+//! # How do i use the logger ?
+//!
+//! Just as you would use every other logger using the [`log`] crate.
+//!
+//! ```
+//! # use des::prelude::*;
+//! struct MyModule;
+//! impl Module for MyModule {
+//!     fn new() -> Self {
+//!         Self
+//!     }
+//!
+//!     fn handle_message(&mut self, m: Message) {
+//!         log::info!("recv: id = {}", m.header().id);
+//!     }
+//! }
+//! ```
 
 use log::{Level, LevelFilter, Log, SetLoggerError};
 use spin::RwLock;
 use std::{
-    collections::HashMap,
     fmt::Debug,
     io::{stderr, stdout},
-    sync::Arc,
+    sync::{atomic::Ordering, Arc},
 };
 use termcolor::{BufferWriter, ColorChoice};
 
@@ -20,65 +134,76 @@ pub use output::LogOutput;
 pub use record::LogRecord;
 
 use self::filter::FilterPolicy;
+use crate::sync::AtomicUsize;
 use crate::time::SimTime;
 
-// is truly accesed from multiple threads.
-static SCOPED_LOGGER: LoggerWrap = LoggerWrap::uninitalized();
+mod wrap {
+    use super::Logger;
+    use log::Log;
+    use spin::RwLock;
+
+    // is truly accesed from multiple threads.
+    pub(super) static SCOPED_LOGGER: LoggerWrap = LoggerWrap::uninitalized();
+
+    pub(super) struct LoggerWrap {
+        pub(super) inner: RwLock<Option<Logger>>, // inner: RwLock<Option<Logger>>,
+    }
+
+    impl LoggerWrap {
+        pub(super) const fn uninitalized() -> Self {
+            Self {
+                inner: RwLock::new(None),
+            }
+        }
+
+        pub(super) fn reset(&self) {
+            self.inner.write().take();
+            // *lock = None;
+        }
+
+        pub(super) fn reset_contents(&self, new: Logger) {
+            // Check activ;
+            let active = { self.inner.read().as_ref().unwrap().active };
+            if active {
+                self.inner.write().replace(new);
+            }
+        }
+
+        pub(super) fn set(&self, other: Logger) -> Option<Logger> {
+            self.inner.write().replace(other)
+        }
+    }
+
+    impl Log for LoggerWrap {
+        fn enabled(&self, metadata: &log::Metadata) -> bool {
+            let lock = self.inner.read();
+            lock.as_ref().unwrap().enabled(metadata)
+        }
+
+        fn log(&self, record: &log::Record) {
+            let lock = self.inner.read();
+            lock.as_ref().unwrap().log(record);
+        }
+
+        fn flush(&self) {
+            let lock = self.inner.read();
+            lock.as_ref().unwrap().flush();
+        }
+    }
+}
+
+/// A token describing a logger scope.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ScopeToken(usize);
 
 // is only set on the simulation thread, but read by all
 // use static mut with a file-local saftey contract.
-static mut CURRENT_SCOPE: &'static str = "";
-
-struct LoggerWrap {
-    inner: RwLock<Option<Logger>>, // inner: RwLock<Option<Logger>>,
-}
-
-impl LoggerWrap {
-    const fn uninitalized() -> Self {
-        Self {
-            inner: RwLock::new(None),
-        }
-    }
-
-    fn reset(&self) {
-        self.inner.write().take();
-        // *lock = None;
-    }
-
-    fn reset_contents(&self, new: Logger) {
-        // Check activ;
-        let active = { self.inner.read().as_ref().unwrap().active };
-        if active {
-            self.inner.write().replace(new);
-        }
-    }
-
-    fn set(&self, other: Logger) -> Option<Logger> {
-        self.inner.write().replace(other)
-    }
-}
-
-impl Log for LoggerWrap {
-    fn enabled(&self, metadata: &log::Metadata) -> bool {
-        let lock = self.inner.read();
-        lock.as_ref().unwrap().enabled(metadata)
-    }
-
-    fn log(&self, record: &log::Record) {
-        let lock = self.inner.read();
-        lock.as_ref().unwrap().log(record);
-    }
-
-    fn flush(&self) {
-        let lock = self.inner.read();
-        lock.as_ref().unwrap().flush();
-    }
-}
+static CURRENT_SCOPE: AtomicUsize = AtomicUsize::new(usize::MAX);
 
 /// A logger that collects scope specific messages.
 pub struct Logger {
     active: bool,
-    scopes: RwLock<HashMap<String, LoggerScope>>,
+    scopes: RwLock<Vec<LoggerScope>>,
     // use std lock to allways deal with multi-threaded access,
     // (e.g.) from other crates in the test chain
     policy: Box<dyn LogScopeConfigurationPolicy>,
@@ -114,7 +239,7 @@ impl Logger {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            scopes: RwLock::new(HashMap::new()),
+            scopes: RwLock::new(Vec::new()),
             active: true,
             policy: Box::new(DefaultPolicy),
             interal_max_level: LevelFilter::Warn,
@@ -127,7 +252,7 @@ impl Logger {
     #[doc(hidden)]
     pub fn debug() -> Self {
         Self {
-            scopes: RwLock::new(HashMap::new()),
+            scopes: RwLock::new(Vec::new()),
             active: true,
             policy: Box::new(DefaultPolicy),
             interal_max_level: LevelFilter::Warn,
@@ -135,25 +260,42 @@ impl Logger {
         }
     }
 
-    /// Begins a new scope, returning the currently active scope.
-    #[doc(hidden)]
-    pub(crate) fn begin_scope(ident: impl AsRef<str>) {
-        let ident: *const str = ident.as_ref();
-        let ident: &'static str = unsafe { &*ident };
-
-        // SAFTEY:
-        // begin_scope can only be called from the simulation itself
-        unsafe {
-            CURRENT_SCOPE = ident;
-        }
+    ///
+    /// Creates a new scope, reference by the given token.
+    ///
+    pub fn register_scope(scope: &str) -> ScopeToken {
+        wrap::SCOPED_LOGGER
+            .inner
+            .read()
+            .as_ref()
+            .map_or(ScopeToken(usize::MAX), |v| v._register_scope(scope))
     }
 
-    /// Removes the current scope.
-    #[doc(hidden)]
-    pub(crate) fn end_scope() {
-        // Saftey:
-        // end_scope can only be called from the simulation itself
-        unsafe { CURRENT_SCOPE = "" }
+    fn _register_scope(&self, scope: &str) -> ScopeToken {
+        let (output, fmt) = self.policy.configure(scope);
+
+        let new_scope = LoggerScope {
+            scope: Arc::new(scope.to_string()),
+            output,
+            fmt,
+            filter: self.filter.filter_for(scope, LevelFilter::max()),
+        };
+
+        let mut scopes = self.scopes.write();
+        let token = ScopeToken(scopes.len());
+        scopes.push(new_scope);
+
+        token
+    }
+
+    /// Enters into a scope.
+    pub fn enter_scope(scope: ScopeToken) {
+        CURRENT_SCOPE.store(scope.0, Ordering::SeqCst);
+    }
+
+    /// Leaves a scope.
+    pub fn leave_scope() {
+        CURRENT_SCOPE.store(usize::MAX, Ordering::SeqCst);
     }
 
     /// Adds a filter to the policy.
@@ -207,8 +349,9 @@ impl Logger {
     /// in a race condition.
     ///
     pub fn try_set_logger(self) -> Result<(), SetLoggerError> {
-        let old = SCOPED_LOGGER.set(self);
-        match log::set_logger(&SCOPED_LOGGER).map(|()| log::set_max_level(LevelFilter::Trace)) {
+        let old = wrap::SCOPED_LOGGER.set(self);
+        match log::set_logger(&wrap::SCOPED_LOGGER).map(|()| log::set_max_level(LevelFilter::Trace))
+        {
             Ok(()) => Ok(()),
             Err(e) => {
                 // Since a logger was allready set it might either be a
@@ -217,11 +360,11 @@ impl Logger {
 
                 if let Some(v) = old {
                     // Old was Scoped logger so keep the old logger and reset it.
-                    let recently_created = SCOPED_LOGGER.set(v);
-                    SCOPED_LOGGER.reset_contents(recently_created.unwrap());
+                    let recently_created = wrap::SCOPED_LOGGER.set(v);
+                    wrap::SCOPED_LOGGER.reset_contents(recently_created.unwrap());
                     Ok(())
                 } else {
-                    SCOPED_LOGGER.reset();
+                    wrap::SCOPED_LOGGER.reset();
                     Err(e)
                 }
             }
@@ -277,8 +420,8 @@ impl Log for Logger {
         // the current scope cannot be seen in invalid states,
         // since begin_scope or end_scope only occures inbetween events
         // when no other threads are ative
-        let scope_label = unsafe { CURRENT_SCOPE };
-        if scope_label.is_empty() {
+        let scope_token = CURRENT_SCOPE.load(Ordering::SeqCst);
+        if scope_token == usize::MAX {
             // if policy(record.target()) {
             // No target scope was given --- not scoped println.
             let out = match record.level() {
@@ -304,30 +447,25 @@ impl Log for Logger {
         };
 
         // (5) Fetch scope information
-        let scope = scopes.get_mut(scope_label);
+        let scope = scopes.get_mut(scope_token);
         if let Some(scope) = scope {
             scope.log(format!("{}", record.args()), target_label, record.level());
         } else {
-            // TODO: Check target validity
-            let (output, fmt) = self.policy.configure(scope_label);
-
-            let mut new_scope = LoggerScope {
-                scope: Arc::new(scope_label.to_string()),
-                output,
-                fmt,
-                filter: self.filter.filter_for(scope_label, LevelFilter::max()),
-            };
-
-            new_scope.log(format!("{}", record.args()), target_label, record.level());
-
-            scopes.insert(scope_label.to_string(), new_scope);
+            todo!()
         }
     }
 
     fn flush(&self) {}
 }
 
+// SAFTEY:
+// A logger does not contain any thread specific entries.
+// so this type is sendable.
 unsafe impl Send for Logger {}
+
+// SAFTEY:
+// Since all internal datapoints are either acessed by ownership
+// or fields that are themself Sync.
 unsafe impl Sync for Logger {}
 
 /// A collection of all logging activity in one scope.

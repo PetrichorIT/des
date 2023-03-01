@@ -1,0 +1,11 @@
+module A {}
+
+module M {
+    submodules {
+        a: A,
+        b: A,
+        a[4]: A
+    }
+}
+
+entry M;

@@ -1,16 +1,14 @@
-use des::prelude::*;
+use des::{prelude::*, registry};
 
 mod modules;
 pub use modules::*;
 
-#[NdlSubsystem("examples/ptrhell")]
-#[derive(Debug, Default)]
-struct Main();
-
 fn main() {
     Logger::new().try_set_logger().unwrap();
 
-    let app = Main::default().build_rt();
+    let app = NetworkRuntime::new(
+        NdlApplication::new("examples/ptrhell/main.ndl", registry![Bob, Alice, Network]).unwrap(),
+    );
 
     let rt = Runtime::new_with(app, RuntimeOptions::seeded(0x123));
 

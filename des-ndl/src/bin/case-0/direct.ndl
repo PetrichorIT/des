@@ -1,0 +1,6 @@
+include sub/indirect;
+include chain;
+
+link Direct: Chain + Indirect  {
+    shared: 0.0
+}

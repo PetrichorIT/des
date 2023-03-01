@@ -1,5 +1,6 @@
 use super::{DummyModule, ModuleId, ModuleRef, ModuleRefWeak, ModuleReferencingError};
 use crate::{
+    logger::{Logger, ScopeToken},
     net::plugin,
     prelude::{GateRef, ObjectPath},
     sync::{RwLock, SwapLock, SwapLockReadGuard},
@@ -27,18 +28,18 @@ pub(crate) fn _default_setup(this: &ModuleContext) {
     //     false,
     // );
     this.add_plugin(
-        crate::net::plugin::TokioTimePlugin::new(this.path.path().to_string()),
+        crate::net::plugin::TokioTimePlugin::new(this.path.as_str().to_string()),
         0,
         crate::net::plugin::PluginPanicPolicy::Abort,
     );
 }
-
-/// INTERNAL
+///
 pub struct ModuleContext {
     pub(crate) active: AtomicBool,
     pub(crate) id: ModuleId,
 
     pub(crate) path: ObjectPath,
+    pub(crate) logger_token: ScopeToken,
     pub(crate) gates: RwLock<Vec<GateRef>>,
 
     pub(crate) plugins: RwLock<plugin::PluginRegistry>,
@@ -56,7 +57,9 @@ impl ModuleContext {
             active: AtomicBool::new(true),
 
             id: ModuleId::gen(),
+            logger_token: Logger::register_scope(path.as_logger_scope()),
             path,
+
             gates: RwLock::new(Vec::new()),
             plugins: RwLock::new(plugin::PluginRegistry::new()),
 
@@ -75,12 +78,14 @@ impl ModuleContext {
     /// Creates a child
     #[allow(clippy::needless_pass_by_value)]
     pub fn child_of(name: &str, parent: ModuleRef) -> ModuleRef {
-        let path = ObjectPath::module_with_parent(name, &parent.ctx.path);
+        let path = ObjectPath::appended(&parent.ctx.path, name);
         let this = ModuleRef::dummy(Arc::new(Self {
             active: AtomicBool::new(true),
 
             id: ModuleId::gen(),
+            logger_token: Logger::register_scope(path.as_logger_scope()),
             path,
+
             gates: RwLock::new(Vec::new()),
             plugins: RwLock::new(plugin::PluginRegistry::new()),
 
@@ -186,11 +191,8 @@ impl Debug for ModuleContext {
     }
 }
 
-// impl Drop for ModuleContext {
-//     fn drop(&mut self) {
-//         println!("<DROP> dropping module ctx '{}'", self.path)
-//     }
-// }
+unsafe impl Send for ModuleContext {}
+unsafe impl Sync for ModuleContext {}
 
 pub(crate) fn with_mod_ctx<R>(f: impl FnOnce(&Arc<ModuleContext>) -> R) -> R {
     let lock = MOD_CTX.read();

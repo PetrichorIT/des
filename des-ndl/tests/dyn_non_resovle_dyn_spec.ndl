@@ -1,0 +1,32 @@
+module Basic {
+    gates {
+        in @input,
+        out @output
+    }
+}
+
+module A: Basic {}
+
+module Dyn {
+    submodules {
+        sub: dyn Basic
+    }
+
+    connections {
+        sub/out --> sub/in
+    }
+}
+
+module M {
+    submodules {
+        d: WrongSymbol { sub = A }
+    }
+}
+
+module T {
+    submodules {
+        m: M
+    }
+}
+
+entry M;

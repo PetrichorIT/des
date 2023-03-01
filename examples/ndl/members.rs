@@ -3,7 +3,6 @@ use std::ops::Deref;
 use des::prelude::*;
 use log::info;
 
-#[NdlModule("examples/ndl")]
 pub struct Alice();
 
 impl Module for Alice {
@@ -28,12 +27,21 @@ impl Module for Alice {
     }
 }
 
-#[NdlModule("examples/ndl")]
 pub struct Bob();
 
 impl Module for Bob {
     fn new() -> Self {
         Self()
+    }
+
+    fn at_sim_start(&mut self, _stage: usize) {
+        schedule_in(
+            Message::new()
+                .kind(0xff)
+                .content("Init".to_string())
+                .build(),
+            Duration::ZERO,
+        )
     }
 
     fn handle_message(&mut self, msg: Message) {

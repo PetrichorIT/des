@@ -1,0 +1,9 @@
+module {
+    gates {
+        in @input,
+        out @output,
+    }
+}
+
+module M {}
+entry M;

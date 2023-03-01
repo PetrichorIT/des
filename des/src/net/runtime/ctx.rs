@@ -1,15 +1,15 @@
 #![allow(missing_docs)]
 
 use super::{HandleMessageEvent, NetworkRuntime, NetworkRuntimeGlobals};
-use crate::net::module::SETUP_FN;
+use crate::net::module::{MOD_CTX, SETUP_FN};
 use crate::net::{gate::GateRef, message::Message, MessageAtGateEvent, NetEvents};
-use crate::prelude::{GateServiceType, ModuleRef};
+use crate::prelude::{EventLifecycle, GateServiceType, ModuleRef};
 use crate::runtime::Runtime;
-use crate::sync::RwLock;
+use crate::sync::Mutex;
 use crate::time::SimTime;
 use std::sync::{Arc, Weak};
 
-static BUF_CTX: RwLock<BufferContext> = RwLock::new(BufferContext {
+static BUF_CTX: Mutex<BufferContext> = Mutex::new(BufferContext {
     output: Vec::new(),
     loopback: Vec::new(),
     shutdown: None,
@@ -31,6 +31,9 @@ struct BufferContext {
     globals: Option<Weak<NetworkRuntimeGlobals>>,
 }
 
+unsafe impl Send for BufferContext {}
+unsafe impl Sync for BufferContext {}
+
 ///
 /// Returns the globals of the runtime.
 ///
@@ -41,7 +44,7 @@ struct BufferContext {
 ///
 #[must_use]
 pub fn globals() -> Arc<NetworkRuntimeGlobals> {
-    let ctx = BUF_CTX.read();
+    let ctx = BUF_CTX.lock();
     ctx.globals
         .as_ref()
         .unwrap()
@@ -50,26 +53,35 @@ pub fn globals() -> Arc<NetworkRuntimeGlobals> {
 }
 
 pub(crate) fn buf_send_at(msg: Message, gate: GateRef, send_time: SimTime) {
-    let mut ctx = BUF_CTX.write();
+    let mut ctx = BUF_CTX.lock();
     ctx.output.push((msg, gate, send_time));
 }
 pub(crate) fn buf_schedule_at(msg: Message, arrival_time: SimTime) {
-    let mut ctx = BUF_CTX.write();
+    let mut ctx = BUF_CTX.lock();
     ctx.loopback.push((msg, arrival_time));
 }
 pub(crate) fn buf_schedule_shutdown(restart: Option<SimTime>) {
-    let mut ctx = BUF_CTX.write();
+    let mut ctx = BUF_CTX.lock();
     ctx.shutdown = Some(restart);
 }
 
 pub(crate) fn buf_set_globals(globals: Weak<NetworkRuntimeGlobals>) {
-    let mut ctx = BUF_CTX.write();
+    let mut ctx = BUF_CTX.lock();
     ctx.globals = Some(globals);
+
+    // SAFTEY:
+    // reseting the MOD_CTX is safe, since simulation lock is aquired.
+    unsafe {
+        MOD_CTX.reset(None);
+    }
 }
 
-pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<NetworkRuntime<A>>) {
+pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<NetworkRuntime<A>>)
+where
+    A: EventLifecycle<NetworkRuntime<A>>,
+{
     let self_id = module.ctx.id;
-    let mut ctx = BUF_CTX.write();
+    let mut ctx = BUF_CTX.lock();
 
     // Send gate events from the 'send' method calls
     for (mut message, gate, time) in ctx.output.drain(..) {

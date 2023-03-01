@@ -47,9 +47,11 @@ impl Application {
 
 impl des::runtime::Application for Application {
     type EventSet = Events;
+    type Lifecycle = ();
 }
 
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 enum Events {
     ServerDone(ServerDone),
     CustomerArrival(CustomerArrival),
@@ -70,7 +72,7 @@ struct ServerDone {
     _pad: [u8; 300],
 }
 
-impl Event<Application> for ServerDone {
+impl ServerDone {
     fn handle(self, rt: &mut Runtime<Application>) {
         let busy_interval = rt.sim_time() - self.started;
         rt.app.busy_time += busy_interval;
@@ -101,7 +103,7 @@ struct CustomerArrival {
     idx: usize,
 }
 
-impl Event<Application> for CustomerArrival {
+impl CustomerArrival {
     fn handle(self, rt: &mut Runtime<Application>) {
         if self.idx > rt.app.n {
             return;

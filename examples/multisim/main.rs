@@ -38,7 +38,9 @@ fn create_runtime_and_wait(
     barrier.wait();
 
     // Create runtime
-    let rt = Runtime::new(NetworkRuntime::new(()));
+    let app = NetworkRuntime::new(());
+
+    let rt = Runtime::new(app);
     let prev = active.fetch_add(1, SeqCst);
     assert_eq!(prev, 0);
     counter.fetch_add(1, SeqCst);

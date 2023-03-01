@@ -60,16 +60,18 @@ pub fn send_at(msg: impl Into<Message>, gate: impl IntoModuleGate, send_time: Si
 }
 
 ///
-/// Enqueues a event that will trigger the [`Module::handle_message`] function
-/// in duration seconds, shifted by the processing time delay.
+/// Enqueues a event that will trigger the
+/// [`Module::handle_message`](crate::net::module::Module::handle_message)
+/// function in duration seconds, shifted by the processing time delay.
 ///
 pub fn schedule_in(msg: impl Into<Message>, dur: Duration) {
     self::schedule_at(msg, SimTime::now() + dur);
 }
 
 ///
-/// Enqueues a event that will trigger the [`Module::handle_message`] function
-/// at the given `SimTime`
+/// Enqueues a event that will trigger the
+/// [`Module::handle_message`](crate::net::module::Module::handle_message)
+/// function at the given `SimTime`
 ///
 /// # Panics
 ///

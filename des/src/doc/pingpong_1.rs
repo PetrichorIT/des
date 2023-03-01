@@ -25,9 +25,9 @@
 //!
 //! ```rust
 //! use des::prelude::*;
-//! use des::create_event_set;
+//! use des::event_set;
 //!
-//! create_event_set!(
+//! event_set!(
 //!     enum PingPongEventSet {
 //!         type App = PingPongApp;
 //!     
@@ -44,6 +44,7 @@
 //! # struct PingPongApp { /* ... */ }
 //! # impl Application for PingPongApp {
 //! #    type EventSet = PingPongEventSet;
+//! #    type Lifecycle = ();
 //! # }
 //! # impl Event<PingPongApp> for IntervalEvent { fn handle(self, _rt: &mut Runtime<PingPongApp>) {} }
 //! # impl Event<PingPongApp> for PingArrival { fn handle(self, _rt: &mut Runtime<PingPongApp>) {} }
@@ -71,6 +72,9 @@
 //!
 //! impl Application for PingPongApp {
 //!     type EventSet = PingPongEventSet;
+//!     type Lifecycle = Self;
+//! }
+//! impl EventLifecycle for PingPongApp {
 //!     fn at_sim_end(rt: &mut Runtime<Self>) {
 //!         assert_eq!(rt.app.pings_send, 30);
 //!         assert_eq!(rt.app.pings_recv, 30);
@@ -106,7 +110,7 @@
 //! }
 //! # struct PingPongApp { pings_send: usize }
 //! # struct PingPongEventSet {}
-//! # impl Application for PingPongApp { type EventSet = PingPongEventSet; }
+//! # impl Application for PingPongApp { type EventSet = PingPongEventSet; type Lifecycle = (); }
 //! # impl EventSet<PingPongApp> for PingPongEventSet { fn handle(self, _: &mut Runtime<PingPongApp>) {}}
 //! # impl From<IntervalEvent> for PingPongEventSet { fn from(_: IntervalEvent) -> Self { todo!() }}
 //! # struct PingArrival;
@@ -128,7 +132,7 @@
 //! }
 //! # struct PingPongApp { pings_recv: usize, pongs_send: usize }
 //! # struct PingPongEventSet {}
-//! # impl Application for PingPongApp { type EventSet = PingPongEventSet; }
+//! # impl Application for PingPongApp { type EventSet = PingPongEventSet; type Lifecycle = (); }
 //! # impl EventSet<PingPongApp> for PingPongEventSet { fn handle(self, _: &mut Runtime<PingPongApp>) {}}
 //! # impl From<PingArrival> for PingPongEventSet { fn from(_: PingArrival) -> Self { todo!() }}
 //! # struct PongArrival;
@@ -147,7 +151,7 @@
 //! }
 //! # struct PingPongApp { pongs_recv: usize }
 //! # struct PingPongEventSet {}
-//! # impl Application for PingPongApp { type EventSet = PingPongEventSet; }
+//! # impl Application for PingPongApp { type EventSet = PingPongEventSet;type Lifecycle = ();  }
 //! # impl EventSet<PingPongApp> for PingPongEventSet { fn handle(self, _: &mut Runtime<PingPongApp>) {}}
 //! ```
 //!
@@ -173,7 +177,7 @@
 //! # struct PingPongApp { pings_send: usize, pings_recv: usize, pongs_send: usize, pongs_recv: usize }
 //! # struct PingPongEventSet {}
 //! # struct IntervalEvent;
-//! # impl Application for PingPongApp { type EventSet = PingPongEventSet; }
+//! # impl Application for PingPongApp { type EventSet = PingPongEventSet;type Lifecycle = ();  }
 //! # impl EventSet<PingPongApp> for PingPongEventSet { fn handle(self, _: &mut Runtime<PingPongApp>) {}}
 //! # impl From<IntervalEvent> for PingPongEventSet { fn from(_: IntervalEvent) -> Self { todo!()}}
 //! ````

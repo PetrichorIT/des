@@ -1,0 +1,38 @@
+module Direct {
+    submodules {
+        selfref: Direct
+    }
+}
+
+module IndirectA {
+    submodules {
+        sub: IndirectB
+    }
+}
+
+module IndirectB {
+    submodules {
+        sub: IndirectA
+    }
+}
+
+link LDirect: LDirect {
+    jitter: 0.0,
+    bitrate: 0,
+    latency: 0.0,
+}
+
+link LIndirect1: LIndirect2 {
+    jitter: 0.0,
+    bitrate: 0,
+    latency: 0.0,
+}
+
+link LIndirect2: LIndirect1 {
+    jitter: 0.0,
+    bitrate: 0,
+    latency: 0.0,
+}
+
+module M {}
+entry M;

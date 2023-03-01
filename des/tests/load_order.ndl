@@ -1,29 +1,32 @@
-module TopLevelModule {
-    submodules:
-        a: MidLevelModule
-        b: MidLevelModule
-}
 
 module MidLevelModule {
-    submodules:
+    submodules {
         child: LowLevelModule
+    }
 
-    gates:
-        in @input
-        out @output
+    gates {
+        in @input,
+        out @output,
+    }
 
-    connections:
-        out --> child/in
-        in <-- child/out
+    connections {
+        out --> child/in,
+        in <-- child/out,
+    }
+}
+
+module TopLevelModule {
+    submodules {
+        a: MidLevelModule,
+        b: MidLevelModule,
+    }
 }
 
 module LowLevelModule {
-    gates:
-        in @input
-        out @output
+    gates {
+        in @input,
+        out @output,
+    }
 }
 
-subsystem TestCase {
-    nodes:
-        root: TopLevelModule
-}
+entry TopLevelModule;

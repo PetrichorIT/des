@@ -3,10 +3,10 @@ debug = true
 
 [workspace]
 members = [
-  "cqueue",
   "des",
-  "des_macros",
-  "des_macros_core",
-  "ndl",
+  "des-cqueue",
+  "des-macros",
+  "des-macros-core",
+  "des-ndl",
   "examples",
 ]

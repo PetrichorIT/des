@@ -3,7 +3,6 @@ use std::panic;
 use log::info;
 
 use crate::{
-    create_event_set,
     net::{
         gate::GateRef,
         gate::GateServiceType,
@@ -13,27 +12,37 @@ use crate::{
         runtime::buf_process,
         NetworkRuntime,
     },
-    prelude::{ChannelRef, ModuleRef},
-    runtime::{Event, EventSet, Runtime},
+    prelude::{ChannelRef, EventLifecycle, ModuleRef},
+    runtime::{EventSet, Runtime},
     time::SimTime,
 };
 
-create_event_set!(
-    ///
-    /// The event set for a [`NetworkRuntime`].
-    ///
-    /// * This type is only available of DES is build with the `"net"` feature.
-    #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-    #[derive(Debug)]
-    pub enum NetEvents {
-        type App = NetworkRuntime<A>;
+///
+/// The event set for a [`NetworkRuntime`].
+///
+/// * This type is only available of DES is build with the `"net"` feature.
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
+#[derive(Debug)]
+pub enum NetEvents {
+    MessageAtGateEvent(MessageAtGateEvent),
+    HandleMessageEvent(HandleMessageEvent),
+    ChannelUnbusyNotif(ChannelUnbusyNotif),
+    SimStartNotif(SimStartNotif),
+}
 
-        MessageAtGateEvent(MessageAtGateEvent),
-        HandleMessageEvent(HandleMessageEvent),
-        ChannelUnbusyNotif(ChannelUnbusyNotif),
-        SimStartNotif(SimStartNotif),
-    };
-);
+impl<A> EventSet<NetworkRuntime<A>> for NetEvents
+where
+    A: EventLifecycle<NetworkRuntime<A>>,
+{
+    fn handle(self, rt: &mut Runtime<NetworkRuntime<A>>) {
+        match self {
+            Self::MessageAtGateEvent(event) => event.handle(rt),
+            Self::HandleMessageEvent(event) => event.handle(rt),
+            Self::ChannelUnbusyNotif(event) => event.handle(rt),
+            Self::SimStartNotif(event) => event.handle(rt),
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct MessageAtGateEvent {
@@ -41,8 +50,11 @@ pub struct MessageAtGateEvent {
     pub(crate) message: Box<Message>,
 }
 
-impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
-    fn handle(self, rt: &mut Runtime<NetworkRuntime<A>>) {
+impl MessageAtGateEvent {
+    fn handle<A>(self, rt: &mut Runtime<NetworkRuntime<A>>)
+    where
+        A: EventLifecycle<NetworkRuntime<A>>,
+    {
         let mut message = self.message;
         message.header.last_gate = Some(GateRef::clone(&self.gate));
 
@@ -53,7 +65,7 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
         //
         let mut current_gate = self.gate;
         while let Some(next_gate) = current_gate.next_gate() {
-            log_scope!(current_gate.owner().ctx.path.path());
+            log_scope!(current_gate.owner().ctx.logger_token);
 
             // A next gate exists.
             // redirect to next channel
@@ -87,13 +99,13 @@ impl<A> Event<NetworkRuntime<A>> for MessageAtGateEvent {
 
         // No next gate exists.
         debug_assert!(current_gate.next_gate().is_none());
-        log_scope!(current_gate.owner().ctx.path.path());
+        log_scope!(current_gate.owner().ctx.logger_token);
 
         assert!(
             current_gate.service_type() != GateServiceType::Output,
             "Messages cannot be forwarded to modules on Output gates. (Gate '{}' owned by Module '{}')",
             current_gate.str(),
-            current_gate.owner().str()
+            current_gate.owner().as_str()
         );
 
         info!(
@@ -119,9 +131,12 @@ pub struct HandleMessageEvent {
     pub(crate) message: Box<Message>,
 }
 
-impl<A> Event<NetworkRuntime<A>> for HandleMessageEvent {
-    fn handle(self, rt: &mut Runtime<NetworkRuntime<A>>) {
-        log_scope!(self.module.str());
+impl HandleMessageEvent {
+    fn handle<A>(self, rt: &mut Runtime<NetworkRuntime<A>>)
+    where
+        A: EventLifecycle<NetworkRuntime<A>>,
+    {
+        log_scope!(self.module.as_logger_scope());
         let mut message = *self.message;
         message.header.receiver_module_id = self.module.ctx.id;
 
@@ -144,8 +159,11 @@ pub struct ChannelUnbusyNotif {
     pub(crate) channel: ChannelRef,
 }
 
-impl<A> Event<NetworkRuntime<A>> for ChannelUnbusyNotif {
-    fn handle(self, rt: &mut Runtime<NetworkRuntime<A>>) {
+impl ChannelUnbusyNotif {
+    fn handle<A>(self, rt: &mut Runtime<NetworkRuntime<A>>)
+    where
+        A: EventLifecycle<NetworkRuntime<A>>,
+    {
         self.channel.unbusy(rt);
     }
 }
@@ -153,8 +171,12 @@ impl<A> Event<NetworkRuntime<A>> for ChannelUnbusyNotif {
 #[derive(Debug)]
 pub struct SimStartNotif();
 
-impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
-    fn handle(self, rt: &mut Runtime<NetworkRuntime<A>>) {
+impl SimStartNotif {
+    #[allow(clippy::unused_self)]
+    fn handle<A>(self, rt: &mut Runtime<NetworkRuntime<A>>)
+    where
+        A: EventLifecycle<NetworkRuntime<A>>,
+    {
         // This is a explicit for loop to prevent borrow rt only in the inner block
         // allowing preemtive dropping of 'module' so that rt can be used in
         // 'module_handle_jobs'.
@@ -168,7 +190,7 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
             // Direct indexing since rt must be borrowed mutably in handle_buffers.
             for i in 0..rt.app.modules().len() {
                 let module = rt.app.modules()[i].clone();
-                log_scope!(module.ctx.path.path());
+                log_scope!(module.ctx.logger_token);
 
                 if stage < module.num_sim_start_stages() {
                     info!("Calling at_sim_start({}).", stage);
@@ -188,7 +210,7 @@ impl<A> Event<NetworkRuntime<A>> for SimStartNotif {
 
             for i in 0..rt.app.modules().len() {
                 let module = rt.app.modules()[i].clone();
-                log_scope!(module.ctx.path.path());
+                log_scope!(module.ctx.logger_token);
 
                 module.activate();
                 module.finish_sim_start();

@@ -25,7 +25,7 @@ struct RegisterToRtWithTime {
     id: usize,
 }
 
-impl Event<App> for RegisterToRtWithTime {
+impl RegisterToRtWithTime {
     fn handle(self, rt: &mut Runtime<App>) {
         rt.app
             .event_list
@@ -38,7 +38,7 @@ struct B {
     id: usize,
 }
 
-impl Event<App> for B {
+impl B {
     fn handle(self, rt: &mut Runtime<App>) {
         rt.app
             .event_list
@@ -53,6 +53,7 @@ struct App {
 
 impl Application for App {
     type EventSet = MyEventSet;
+    type Lifecycle = ();
 }
 
 #[test]
@@ -72,7 +73,7 @@ struct RepeatWithDelay {
     repeat: usize,
     repeat_limit: usize,
 }
-impl Event<App> for RepeatWithDelay {
+impl RepeatWithDelay {
     fn handle(mut self, rt: &mut Runtime<App>) {
         if self.repeat <= self.repeat_limit {
             let delay = self.delay;

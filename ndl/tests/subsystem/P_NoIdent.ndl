@@ -1,6 +1,0 @@
-module X {}
-
-network {
-    nodes:
-        sub: X
-}

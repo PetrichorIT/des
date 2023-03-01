@@ -1,0 +1,14 @@
+module A: B {}
+module B: C {}
+module C: A {}
+
+module H1: H2 {}
+module H2 {
+    submodules {
+        h1: H1
+    }
+}
+
+module M {}
+entry M;
+

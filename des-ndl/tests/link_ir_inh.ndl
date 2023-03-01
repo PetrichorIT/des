@@ -1,0 +1,14 @@
+link A: C {
+    jitter: 0.0,
+    latency: 0.0,
+    bitrate: 100,
+}
+
+link B: C {
+    jitter: 0.0,
+    latency: 0.0,
+    bitrate: 100,
+}
+
+module M {}
+entry M;

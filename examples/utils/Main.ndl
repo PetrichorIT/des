@@ -1,41 +1,49 @@
 link Link {
-    bitrate: 100
-    latency: 0.1
-    jitter: 0.1
+    bitrate: 100,
+    latency: 0.1,
+    jitter: 0.1,
 }
 
 link FastLink {
-    bitrate: 10000
-    latency: 0.05
-    jitter: 0.01
+    bitrate: 10000,
+    latency: 0.05,
+    jitter: 0.01,
 }
 
 module Bob {
-    submodules:
-        child: Alice
+    submodules {
+        child: Alice,
+    }
 
-    gates:
-        netIn[3]
-        netOut[3]
-        uplink @output
-        downlink @input
+    gates {
+        netIn[3],
+        netOut[3],
+        uplink @output,
+        downlink @input,
+    }
 
-    connections:
-        netOut --> Link --> child/netIn
-        netIn <-- Link <-- child/netOut
+    connections {
+        netOut --> Link --> child/netIn,
+        netIn <-- Link <-- child/netOut,
+    }
 }
 
 module Alice {
-    gates:
-        netIn[3]
-        netOut[3]
+    gates {
+        netIn[3],
+        netOut[3],
+    }
 }
 
-network A {
-    nodes:
-        bob[1...2]: Bob
+module A {
+    submodules {
+        bob[2]: Bob
+    }
 
-    connections:
-        bob[1]/uplink --> FastLink --> bob[2]/downlink
-        bob[2]/uplink --> FastLink --> bob[1]/downlink
+    connections {
+        bob[0]/uplink --> FastLink --> bob[1]/downlink,
+        bob[1]/uplink --> FastLink --> bob[0]/downlink,
+    }
 }
+
+entry A;

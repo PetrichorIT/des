@@ -1,526 +1,432 @@
-use std::{error::Error, fmt::Display, str::FromStr};
+use core::fmt;
+use std::str::FromStr;
 
 ///
 /// A unqiue identifier for a object, indicating its parental inheritance.
 ///
-/// The format is the following:
-/// subsys/subsys/subsys.module.module#channel
-///
-/// The storage format follows this convention.
-///
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ObjectPath {
     data: String,
-    module_offset: usize,
-    channel_offset: usize,
     last_element_offset: usize,
-    // There are three ptrs:
-    // module_offset, channel_offset, last_element_offset:
-    //
-    // Self is a subsystem IF:
-    // - last_element_offset < module_offset
-    // -> module_offset must be after the last element so module_offset == len()
-    //
-    // Self is a module IF:
-    // - module_offset <= last_element offset
-    //   and last_element_offset < channel_offset
-    //   since that means channel_offset is len()
-    //
-    // Self is channel IF
-    // channel_offset == last_element_offset
-    //
-    // NOTe channel_offset < last_element_offset is invalid.
+    len: usize,
+    is_channel: bool,
 }
 
 impl ObjectPath {
-    ///
-    /// Indicates whether the pointee is a channel.
-    ///
+    /// Indicates whether the path points to the simulation root.
+    #[must_use]
+    pub fn is_root(&self) -> bool {
+        self.len == 0
+    }
+
+    /// Indicates whether the path points to a channel.
     #[must_use]
     pub fn is_channel(&self) -> bool {
-        self.last_element_offset == self.channel_offset
+        self.is_channel
     }
 
-    ///
-    /// Indicates whether the pointee to object is
-    /// a subsystem.
-    ///
-    #[must_use]
-    pub fn is_subsystem(&self) -> bool {
-        self.last_element_offset < self.module_offset
-            && self.last_element_offset < self.channel_offset
-    }
-
-    ///
-    /// Indicates whether the pointee to object is
-    /// a module.
-    ///
+    /// Indicates whether the path points to a module.
     #[must_use]
     pub fn is_module(&self) -> bool {
-        !self.is_subsystem() && !self.is_channel()
+        !self.is_channel
     }
 
+    /// Returns the depth of the referenced object.
     ///
-    /// Returns the local name of the pointee,
-    /// aka. the last path element.
-    ///
+    /// Note that depth 0 indicates the root of the simulation.
+    #[must_use]
+    #[allow(clippy::len_without_is_empty)]
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    /// Returns the last path component, the name of the current module.
     #[must_use]
     pub fn name(&self) -> &str {
         &self.data[self.last_element_offset..]
     }
 
-    ///
-    /// Returns the full path to the pointee.
-    ///
+    /// Returns the entrie path as a &str.
     #[must_use]
-    pub fn path(&self) -> &str {
-        &self.data
+    pub fn as_str(&self) -> &str {
+        self.data.as_str()
     }
 
-    ///
-    /// Returns a pointer to that parent entity
-    /// or `None` if self is a root entity.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// # use des::prelude::*;
-    /// let path = ObjectPath::new("MainNet/SubNet.Module.Submodule".to_string()).unwrap();
-    ///
-    /// assert_eq!(
-    ///     path.parent(),
-    ///     Some(ObjectPath::new("MainNet/SubNet.Module".to_string()).unwrap())
-    /// );
-    /// assert_eq!(
-    ///     path.parent().unwrap().parent(),
-    ///     Some(ObjectPath::new("MainNet/SubNet".to_string()).unwrap())
-    /// );
-    /// assert_eq!(
-    ///     path.parent().unwrap().parent().unwrap().parent(),
-    ///     Some(ObjectPath::new("MainNet".to_string()).unwrap())
-    /// );
-    /// assert_eq!(
-    ///     path.parent().unwrap().parent().unwrap().parent().unwrap().parent(),
-    ///     None
-    /// );
-    /// ```
-    ///
+    /// Returns the entrie path as a &str for declaring a logger scope
+    #[must_use]
+    pub fn as_logger_scope(&self) -> &str {
+        if self.is_root() {
+            "@root"
+        } else {
+            self.as_str()
+        }
+    }
+
+    /// Returns the entrie path as a &str.
+    #[must_use]
+    pub fn as_parent_str(&self) -> &str {
+        &self.data[..self.last_element_offset.saturating_sub(1)]
+    }
+
+    /// Constructs the path to the parent element, if there is any.
     #[must_use]
     pub fn parent(&self) -> Option<ObjectPath> {
-        if self.is_subsystem() {
-            // find last slash in the set
-            if self.last_element_offset == 0 {
-                // Current element is root
-                None
-            } else {
-                let data = self.data[..(self.last_element_offset - 1)].to_string();
-                let last_element_offset = data.rfind('/').unwrap_or(0);
-                Some(ObjectPath {
-                    channel_offset: data.len(),
-                    module_offset: data.len(),
-                    last_element_offset,
-                    data,
-                })
-            }
-        } else if self.is_module() {
-            // Check edge case last module is deleted
-            let next_delim = if self.module_offset == self.last_element_offset {
-                '/'
-            } else {
-                '.'
-            };
-
-            if self.last_element_offset == 0 {
-                // Current element is root
-                None
-            } else {
-                let data = self.data[..(self.last_element_offset - 1)].to_string();
-                let last_element_offset = data.rfind(next_delim).map_or(0, |v| v + 1);
-                let module_offset = if next_delim == '/' {
-                    data.len()
-                } else {
-                    self.module_offset
-                };
-
-                Some(ObjectPath {
-                    module_offset,
-                    last_element_offset,
-                    channel_offset: data.len(),
-                    data,
-                })
-            }
-        } else {
-            // Self is a channel.
-            let next_delim = if self.module_offset >= self.last_element_offset {
-                '/'
-            } else {
-                '.'
-            };
-
-            if self.last_element_offset == 0 {
-                // is root
-                None
-            } else {
-                let data = self.data[..(self.last_element_offset - 1)].to_string();
-                let last_element_offset = data.rfind(next_delim).map_or(0, |v| v + 1);
-                let module_offset = if next_delim == '/' {
-                    data.len()
-                } else {
-                    self.module_offset
-                };
-
-                Some(ObjectPath {
-                    module_offset,
-                    last_element_offset,
-                    channel_offset: data.len(),
-                    data,
-                })
-            }
+        if self.len == 0 {
+            return None;
         }
+
+        let mut parent = self.clone();
+        parent
+            .data
+            .truncate(self.last_element_offset.saturating_sub(1));
+
+        if let Some(i) = parent.data.rfind('.') {
+            parent.last_element_offset = i + 1;
+        } else {
+            parent.last_element_offset = 0;
+        }
+        parent.len -= 1;
+        parent.is_channel = false;
+
+        Some(parent)
     }
 
-    ///
-    /// Returns the part of the path that does not
-    /// include the pointees name.
-    ///
+    /// Creates a new object path pointing to the root.
     #[must_use]
-    pub fn parent_path(&self) -> &str {
-        if self.last_element_offset == 0 {
-            &self.data[..0]
-        } else {
-            &self.data[..(self.last_element_offset - 1)]
-        }
-    }
-
-    ///
-    /// Creates a new pointer given a raw string description of
-    /// the pointer.
-    ///
-    /// # Errors
-    ///
-    /// This operation may fail if:
-    /// - the provided string is empty
-    /// - the string contains a path element with no name (e.g. "Main/.Module")
-    /// - the string describes modules within the subsystem part of the path (e.g. "Main.Subystem/Subsystem.Module")
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// # use des::prelude::*;
-    /// let path = ObjectPath::new("Main/Subnet.Module.Submodule".to_string())
-    ///     .expect("This should not fail");
-    /// assert!(path.is_module());
-    /// assert_eq!(path.path(), "Main/Subnet.Module.Submodule");
-    /// assert_eq!(path.parent_path(), "Main/Subnet.Module");
-    /// assert_eq!(path.name(), "Submodule");
-    ///
-    /// let empty_path = ObjectPath::new("".to_string());
-    /// assert!(empty_path.is_err());
-    ///
-    /// let empty_element = ObjectPath::new("Main/.Module".to_string());
-    /// assert!(empty_element.is_err());
-    ///
-    /// let unordered = ObjectPath::new("Main.Subystem/Subsystem.Module".to_string());
-    /// assert!(unordered.is_err());
-    /// ```
-    pub fn new(data: String) -> Result<Self, ObjectPathParseError> {
-        if data.is_empty() {
-            return Err(ObjectPathParseError::EmptyPath);
-        }
-
-        let dot_left = data.find('.');
-        let dot_right = data.rfind('.');
-        // let slash_left = data.find('/');
-        let slash_right = data.rfind('/');
-
-        let shbang = data.rfind('#');
-
-        let module_offset = dot_left.map_or(data.len(), |v| v + 1);
-        let mut last_element_offset = if dot_right.is_some() {
-            dot_right.map_or(0, |v| v + 1)
-        } else {
-            slash_right.map_or(0, |v| v + 1)
-        };
-
-        // Check interity
-        if let (Some(dot_left), Some(slash_right)) = (dot_left, slash_right) {
-            if dot_left < slash_right {
-                return Err(ObjectPathParseError::UnorderedPath);
-            }
-        }
-
-        // Check all path elements
-        let mut acc = 0;
-        for c in data.chars() {
-            if c == '.' || c == '/' {
-                if acc == 0 {
-                    return Err(ObjectPathParseError::EmptyPathElement);
-                }
-                acc = 0;
-            } else {
-                acc += 1;
-            }
-        }
-
-        // Catch final delims
-        if acc == 0 {
-            return Err(ObjectPathParseError::EmptyPathElement);
-        }
-
-        let channel_offset = if let Some(shbang) = shbang {
-            last_element_offset = shbang + 1;
-            shbang + 1
-        } else {
-            data.len()
-        };
-
-        Ok(ObjectPath {
-            data,
-            module_offset,
-            channel_offset,
-            last_element_offset,
-        })
-    }
-
-    ///
-    /// Creates a new pointer to a top-level subsystem.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// # use des::prelude::*;
-    /// let path = ObjectPath::root_subsystem("MyNetwork".to_string());
-    ///
-    /// assert!(path.is_subsystem());
-    /// assert_eq!(path.path(), "MyNetwork");
-    /// assert_eq!(path.parent_path(), "");
-    /// assert_eq!(path.name(), "MyNetwork");
-    /// assert_eq!(path.parent(), None);
-    /// ```
-    ///
-    /// # Panics
-    ///
-    /// This function panics if the provided name does contain
-    /// seperation characters like '.' or '/'.
-    ///
-    /// ```should_panic
-    /// # use des::prelude::*;
-    /// let path = ObjectPath::root_subsystem("MyNetwork/Subnet.Module".to_string());
-    /// ```
-    ///
-    #[must_use]
-    pub fn root_subsystem(name: String) -> Self {
-        assert!(!name.contains('/') && !name.contains('.'));
-
+    pub fn new() -> ObjectPath {
         Self {
-            module_offset: name.len(),
-            channel_offset: name.len(),
+            data: String::new(),
             last_element_offset: 0,
-            data: name,
+            len: 0,
+            is_channel: false,
         }
     }
 
-    ///
-    /// Creates a new pointer to a top-level module.
-    /// This function cannot be used together with ndl
-    /// since ndl requires a top-level subsystem.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// # use des::prelude::*;
-    /// let path = ObjectPath::root_module("MyModule".to_string());
-    ///
-    /// assert!(path.is_module());
-    /// assert_eq!(path.path(), "MyModule");
-    /// assert_eq!(path.parent_path(), "");
-    /// assert_eq!(path.name(), "MyModule");
-    /// assert_eq!(path.parent(), None);
-    /// ```
+    /// Appends another module to the path.
     ///
     /// # Panics
     ///
-    /// This function panics if the provided name does contain
-    /// seperation characters like '.' or '/'.
+    /// This function panics if self allready points to a channel,
+    /// since channels are leaf elements in the object tree.
     ///
-    /// ```should_panic
-    /// # use des::prelude::*;
-    /// let path = ObjectPath::root_module("MyModule.SubModule".to_string());
-    /// ```
-    ///
-    #[must_use]
-    pub fn root_module(name: impl AsRef<str>) -> Self {
-        let name = name.as_ref().to_string();
-        assert!(!name.contains('/') && !name.contains('.'));
-
-        Self {
-            channel_offset: name.len(),
-            data: name,
-            last_element_offset: 0,
-            module_offset: 0,
+    pub fn append(&mut self, module: impl AsRef<str>) {
+        assert!(
+            !self.is_channel,
+            "Cannot append to a path that points to a channel"
+        );
+        let module = module.as_ref();
+        if self.len != 0 {
+            self.last_element_offset = self.data.len() + 1;
+            self.data.push('.');
         }
+
+        self.data.push_str(module);
+        self.len += 1;
     }
 
-    ///
-    /// Creates a new channel ident.
+    /// Append a channel leaf to the path.
     ///
     /// # Panics
     ///
-    /// Panics if the parent is a channel.
+    /// This function panics if self is pointing to a channel,
+    /// since channels are leaf elements in the object tree.
     ///
-    #[must_use]
-    pub fn channel_with(channel: &str, parent: &ObjectPath) -> Self {
-        assert!(!parent.is_channel());
-
-        let data = format!("{}#{}", parent.data, channel);
-        let last_element_offset = parent.data.len() + 1;
-
-        Self {
-            data,
-            last_element_offset,
-            module_offset: parent.module_offset,
-            channel_offset: last_element_offset,
+    pub fn append_channel(&mut self, channel: impl AsRef<str>) {
+        assert!(
+            !self.is_channel,
+            "Cannot append to a path that points to a channel"
+        );
+        let channel = channel.as_ref();
+        if self.len != 0 {
+            self.last_element_offset = self.data.len() + 1;
+            self.data.push('.');
         }
+        self.data.push('<');
+        self.data.push_str(channel);
+        self.data.push('>');
+        self.is_channel = true;
+        self.len += 1;
     }
 
-    ///
-    /// Creates a new pointer to a subsystem attached to a
-    /// parent subsystem.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// # use des::prelude::*;
-    /// let parent = ObjectPath::root_subsystem("Main".to_string());
-    /// let child = ObjectPath::subsystem_with_parent("Subnet", &parent);
-    ///
-    /// assert!(child.is_subsystem());
-    /// assert_eq!(child.path(), "Main/Subnet");
-    /// assert_eq!(child.parent_path(), "Main");
-    /// assert_eq!(child.name(), "Subnet");
-    /// assert_eq!(child.parent(), Some(parent));
-    /// ```
-    ///
-    /// # Panics
-    ///
-    /// This functions panics should the provided name contain
-    /// seperator characters OR should the provided parent not be
-    /// a submodule pointer.
-    ///
-    /// ```should_panic
-    /// # use des::prelude::*;
-    /// let parent = ObjectPath::root_module("Main".to_string());
-    /// let child = ObjectPath::subsystem_with_parent("Subnet", &parent);
-    /// ```
-    ///
+    /// Returns a new instance with another module appended to the path.
     #[must_use]
-    pub fn subsystem_with_parent(name: &str, parent: &ObjectPath) -> Self {
-        assert!(!name.contains('/') && !name.contains('.'));
-
-        assert!(parent.is_subsystem());
-        let data = format!("{}/{}", parent.data, name);
-        let last_element_offset = parent.data.len() + 1;
-
-        Self {
-            module_offset: data.len(),
-            channel_offset: data.len(),
-            last_element_offset,
-            data,
-        }
+    pub fn appended(&self, module: impl AsRef<str>) -> Self {
+        let mut clone = self.clone();
+        clone.append(module);
+        clone
     }
 
-    ///
-    /// Creates a new pointer to a module attached to some
-    /// parent entity.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// # use des::prelude::*;
-    /// let parent = ObjectPath::root_subsystem("Main".to_string());
-    /// let child = ObjectPath::module_with_parent("Module", &parent);
-    ///
-    /// assert!(child.is_module());
-    /// assert_eq!(child.path(), "Main.Module");
-    /// assert_eq!(child.parent_path(), "Main");
-    /// assert_eq!(child.name(), "Module");
-    /// assert_eq!(child.parent(), Some(parent));
-    /// ```
-    ///
-    /// # Panics
-    ///
-    /// This functions panics should the provided name contain
-    /// seperator characters.
-    ///
+    /// Returns a new instance with a channel appended to the path.
     #[must_use]
-    pub fn module_with_parent(name: &str, parent: &ObjectPath) -> Self {
-        assert!(!name.contains('/') && !name.contains('.'));
-        assert!(!parent.is_channel());
-
-        let data = format!("{}.{}", parent.data, name);
-        let last_element_offset = parent.data.len() + 1;
-
-        let module_offset = if parent.is_module() {
-            parent.module_offset
-        } else {
-            last_element_offset
-        };
-
-        Self {
-            channel_offset: data.len(),
-            data,
-            module_offset,
-            last_element_offset,
-        }
+    pub fn appended_channel(&self, channel: impl AsRef<str>) -> Self {
+        let mut clone = self.clone();
+        clone.append_channel(channel);
+        clone
     }
 }
 
-impl Display for ObjectPath {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.data)
-    }
-}
-
-impl FromStr for ObjectPath {
-    type Err = ObjectPathParseError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::new(s.to_string())
+impl fmt::Display for ObjectPath {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.data.fmt(f)
     }
 }
 
 impl AsRef<str> for ObjectPath {
     fn as_ref(&self) -> &str {
-        self.data.as_ref()
+        self.as_str()
     }
 }
 
-/// An error that has occured upon parsing a String to a `ObjectPath`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ObjectPathParseError {
-    /// The provided string is empty.
-    EmptyPath,
-    /// The provided string contains a path element width width 0.
-    EmptyPathElement,
-    /// The provided string does not contain a path in the form ([subsys]/+.)?[module].+
-    UnorderedPath,
-}
+impl FromStr for ObjectPath {
+    type Err = ();
 
-impl Display for ObjectPathParseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::EmptyPath => write!(f, "Cannot create 'ObjectPath' from an empty string."),
-            Self::EmptyPathElement => write!(
-                f,
-                "Cannot create 'ObjectPathElement' with an empty path element."
-            ),
-            Self::UnorderedPath => {
-                write!(
-                    f,
-                    "Cannot create 'ObjectPath' from invalid unorderd string."
-                )
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut o = 0;
+        let mut last_element_offset = 0;
+        let mut len = 0;
+        for c in s.chars() {
+            if c == '.' {
+                last_element_offset = o + c.len_utf8();
+                len += 1;
             }
+            o += c.len_utf8();
         }
+        if o != last_element_offset {
+            len += 1;
+        }
+
+        let name = &s[last_element_offset..];
+        let is_channel = name.starts_with('<') && name.ends_with('>');
+
+        Ok(Self {
+            data: s.to_string(),
+            last_element_offset,
+            len,
+            is_channel,
+        })
     }
 }
-impl Error for ObjectPathParseError {}
+
+impl From<&str> for ObjectPath {
+    fn from(value: &str) -> Self {
+        Self::from_str(value).unwrap()
+    }
+}
+
+impl From<String> for ObjectPath {
+    fn from(value: String) -> Self {
+        Self::from_str(value.as_str()).unwrap()
+    }
+}
+
+impl Default for ObjectPath {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn manual_appending() {
+        let mut path = ObjectPath::new();
+        path.append("top");
+        path.append("mid");
+        assert_eq!(path.name(), "mid");
+        assert_eq!(path.as_parent_str(), "top");
+        assert_eq!(
+            path,
+            ObjectPath {
+                data: "top.mid".to_string(),
+                len: 2,
+                last_element_offset: 4,
+                is_channel: false,
+            }
+        );
+
+        let mut path = ObjectPath::new();
+        path.append("top");
+        path.append("mid");
+        path.append("low");
+        assert_eq!(path.name(), "low");
+        assert_eq!(path.as_parent_str(), "top.mid");
+        assert_eq!(
+            path,
+            ObjectPath {
+                data: "top.mid.low".to_string(),
+                len: 3,
+                last_element_offset: 8,
+                is_channel: false,
+            }
+        );
+
+        let mut path = ObjectPath::new();
+        path.append("top");
+        assert_eq!(path.name(), "top");
+        assert_eq!(path.as_parent_str(), "");
+        assert_eq!(
+            path,
+            ObjectPath {
+                data: "top".to_string(),
+                len: 1,
+                last_element_offset: 0,
+                is_channel: false,
+            }
+        );
+
+        let path = ObjectPath::new();
+        assert_eq!(path.name(), "");
+        assert_eq!(path.as_parent_str(), "");
+        assert!(path.is_root());
+        assert_eq!(
+            path,
+            ObjectPath {
+                data: "".to_string(),
+                len: 0,
+                last_element_offset: 0,
+                is_channel: false,
+            }
+        );
+    }
+
+    #[test]
+    fn parent_creation() {
+        let mut path = ObjectPath::new();
+        path.append("top");
+        path.append("mid");
+
+        let parent = path.parent();
+        assert_eq!(
+            parent,
+            Some(ObjectPath {
+                data: "top".to_string(),
+                len: 1,
+                last_element_offset: 0,
+                is_channel: false,
+            })
+        );
+
+        let mut path = ObjectPath::new();
+        path.append("top");
+        path.append("mid");
+        path.append("low");
+
+        let parent = path.parent();
+        assert_eq!(
+            parent,
+            Some(ObjectPath {
+                data: "top.mid".to_string(),
+                len: 2,
+                last_element_offset: 4,
+                is_channel: false,
+            })
+        );
+
+        let mut path = ObjectPath::new();
+        path.append("top");
+
+        let parent = path.parent();
+        assert_eq!(
+            parent,
+            Some(ObjectPath {
+                data: "".to_string(),
+                len: 0,
+                last_element_offset: 0,
+                is_channel: false,
+            })
+        );
+
+        let path = ObjectPath::new();
+
+        let parent = path.parent();
+        assert_eq!(parent, None);
+    }
+
+    #[test]
+    fn parsing() {
+        assert_eq!(
+            ObjectPath::from("top.mid"),
+            ObjectPath {
+                data: "top.mid".to_string(),
+                len: 2,
+                last_element_offset: 4,
+                is_channel: false,
+            }
+        );
+
+        assert_eq!(
+            ObjectPath::from("top.mid.low"),
+            ObjectPath {
+                data: "top.mid.low".to_string(),
+                len: 3,
+                last_element_offset: 8,
+                is_channel: false,
+            }
+        );
+
+        assert_eq!(
+            ObjectPath::from("top"),
+            ObjectPath {
+                data: "top".to_string(),
+                len: 1,
+                last_element_offset: 0,
+                is_channel: false,
+            }
+        );
+
+        assert_eq!(
+            ObjectPath::from(""),
+            ObjectPath {
+                data: "".to_string(),
+                len: 0,
+                last_element_offset: 0,
+                is_channel: false,
+            }
+        );
+
+        // emoji is a 4 byte character thus 7 + 4
+        assert_eq!(
+            ObjectPath::from("top.a😀b.low"),
+            ObjectPath {
+                data: "top.a😀b.low".to_string(),
+                len: 3,
+                last_element_offset: 11,
+                is_channel: false,
+            }
+        );
+    }
+
+    #[test]
+    fn channel() {
+        assert_eq!(
+            ObjectPath::from("top.<low>"),
+            ObjectPath {
+                data: "top.<low>".to_string(),
+                len: 2,
+                last_element_offset: 4,
+                is_channel: true,
+            }
+        );
+
+        let path = ObjectPath::from("top.<low>");
+        assert!(path.is_channel());
+        assert_eq!(
+            path.parent(),
+            Some(ObjectPath {
+                data: "top".to_string(),
+                last_element_offset: 0,
+                len: 1,
+                is_channel: false
+            })
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn channel_append_something() {
+        let mut path = ObjectPath::from("top.<low>");
+        path.append("mod");
+    }
+}

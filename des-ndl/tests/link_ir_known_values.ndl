@@ -1,0 +1,5 @@
+link A {
+    jitter: 10,
+    bitrate: 100,
+    latency: 0.0
+}

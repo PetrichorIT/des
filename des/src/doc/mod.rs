@@ -7,7 +7,6 @@
 //!
 //! - A simple discrete-event-simulation using a custom event set [see here](pingpong_1),
 //! - A network-simulation using a generic network layer [see here](pingpong_2),
-//! - An asynchronus network-simulation using TCP sockets [see here](pingpong_3).
 //!
 
 pub mod pingpong_1;

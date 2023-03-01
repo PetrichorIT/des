@@ -1,9 +1,11 @@
 #![cfg(feature = "async")]
 
-use des::net::{BuildContext, __Buildable0};
 use des::prelude::*;
 use serial_test::serial;
 use std::sync::atomic::{AtomicUsize, Ordering};
+
+#[macro_use]
+mod common;
 
 struct DropTest {
     heap: Vec<usize>,
@@ -32,9 +34,8 @@ impl Drop for DropTest {
     }
 }
 
-#[NdlModule]
 struct StatelessModule {}
-
+impl_build_named!(StatelessModule);
 #[async_trait::async_trait]
 impl AsyncModule for StatelessModule {
     fn new() -> Self {
@@ -64,10 +65,8 @@ fn stateless_module_shudown() {
     DROPPED_STATELESS_SHUTDOWN.store(0, Ordering::SeqCst);
 
     let mut rt = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut rt);
 
-    let module =
-        StatelessModule::build_named(ObjectPath::root_module("RootModule".to_string()), &mut cx);
+    let module = StatelessModule::build_named(ObjectPath::from("RootModule"), &mut rt);
     let gate = module.create_gate("in", GateServiceType::Input);
 
     rt.create_module(module);
@@ -82,8 +81,8 @@ fn stateless_module_shudown() {
     assert_eq!(DROPPED_STATELESS_SHUTDOWN.load(Ordering::SeqCst), 1)
 }
 
-#[NdlModule]
 struct StatelessModuleRestart {}
+impl_build_named!(StatelessModuleRestart);
 
 #[async_trait::async_trait]
 impl AsyncModule for StatelessModuleRestart {
@@ -118,12 +117,8 @@ fn stateless_module_restart() {
     DROPPED_STATLESS_RESTART.store(0, Ordering::SeqCst);
 
     let mut rt = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut rt);
 
-    let module = StatelessModuleRestart::build_named(
-        ObjectPath::root_module("RootModule".to_string()),
-        &mut cx,
-    );
+    let module = StatelessModuleRestart::build_named(ObjectPath::from("RootModule"), &mut rt);
     let gate = module.create_gate("in", GateServiceType::Input);
 
     rt.create_module(module);
@@ -143,11 +138,10 @@ fn stateless_module_restart() {
     assert_eq!(DROPPED_STATLESS_RESTART.load(Ordering::SeqCst), 2)
 }
 
-#[NdlModule]
 struct StatefullModule {
     state: usize,
 }
-
+impl_build_named!(StatefullModule);
 #[async_trait::async_trait]
 impl AsyncModule for StatefullModule {
     fn new() -> Self {
@@ -190,10 +184,8 @@ fn statefull_module_restart() {
     DROPPED_STATFULL_RESTART.store(0, Ordering::SeqCst);
 
     let mut rt = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut rt);
 
-    let module =
-        StatefullModule::build_named(ObjectPath::root_module("RootModule".to_string()), &mut cx);
+    let module = StatefullModule::build_named(ObjectPath::from("RootModule"), &mut rt);
     let gate = module.create_gate("in", GateServiceType::Input);
 
     rt.create_module(module);
@@ -213,9 +205,8 @@ fn statefull_module_restart() {
     assert_eq!(DROPPED_STATFULL_RESTART.load(Ordering::SeqCst), 2);
 }
 
-#[NdlModule]
 struct ShutdownViaHandleModule {}
-
+impl_build_named!(ShutdownViaHandleModule);
 #[async_trait::async_trait]
 impl AsyncModule for ShutdownViaHandleModule {
     fn new() -> Self {
@@ -243,12 +234,8 @@ fn shutdown_via_async_handle() {
     DROPPED_SHUTDOWN_VIA_HANDLE.store(0, Ordering::SeqCst);
 
     let mut rt = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut rt);
 
-    let module = ShutdownViaHandleModule::build_named(
-        ObjectPath::root_module("RootModule".to_string()),
-        &mut cx,
-    );
+    let module = ShutdownViaHandleModule::build_named(ObjectPath::from("RootModule"), &mut rt);
     rt.create_module(module);
     let rt = Runtime::new(rt);
 
@@ -256,9 +243,8 @@ fn shutdown_via_async_handle() {
     assert_eq!(DROPPED_SHUTDOWN_VIA_HANDLE.load(Ordering::SeqCst), 1)
 }
 
-#[NdlModule]
 struct RestartViaHandleModule {}
-
+impl_build_named!(RestartViaHandleModule);
 #[async_trait::async_trait]
 impl AsyncModule for RestartViaHandleModule {
     fn new() -> Self {
@@ -292,12 +278,8 @@ fn restart_via_async_handle() {
     DROPPED_RESTART_VIA_HANDLE.store(0, Ordering::SeqCst);
 
     let mut rt = NetworkRuntime::new(());
-    let mut cx = BuildContext::new(&mut rt);
 
-    let module = RestartViaHandleModule::build_named(
-        ObjectPath::root_module("RootModule".to_string()),
-        &mut cx,
-    );
+    let module = RestartViaHandleModule::build_named(ObjectPath::from("RootModule"), &mut rt);
     rt.create_module(module);
     let rt = Runtime::new(rt);
 

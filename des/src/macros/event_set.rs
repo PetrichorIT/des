@@ -1,8 +1,37 @@
 ///
-/// A decl. macro for generating a event set.
+/// A declaritive macro for generating event sets.
 ///
+/// This macro combines an number of types that implement [`Event`](crate::runtime::Event)
+/// into an `EventSet` for an application 'App'.
+///
+/// ```rust
+/// # use des::prelude::*;
+/// # use des::event_set;
+/// struct PingEvent;
+/// struct PongEvent;
+/// /* ... */
+/// # impl Event<App> for PingEvent { fn handle(self, rt: &mut Runtime<App>) { } }
+/// # impl Event<App> for PongEvent { fn handle(self, rt: &mut Runtime<App>) { } }
+///
+/// struct App;
+/// impl Application for App {
+///     /* ... */
+/// #   type EventSet = Events;
+/// #   type Lifecycle = ();
+/// }
+///
+/// event_set! {
+///     #[derive(Debug)]
+///     pub enum Events {
+///         type App = App;
+///         
+///         PingEvent(PingEvent),
+///         PongEvent(PongEvent),
+///     };
+/// }
+/// ```
 #[macro_export]
-macro_rules! create_event_set {
+macro_rules! event_set {
 
     (
         $(#[$outer:meta])*
@@ -10,7 +39,7 @@ macro_rules! create_event_set {
             type App = $ty:ident < $( $N:ident $(: $b0:ident $(+$b:ident)* )? ),* >;
 
             $(
-                $variant: ident($variant_ty: ty),
+                $variant:ident($variant_ty: ty),
             )+
         };
     ) => {
@@ -49,7 +78,7 @@ macro_rules! create_event_set {
             )+
         };
     ) => {
-        create_event_set!(
+        $crate::event_set!(
             $vis enum $ident {
                 type App = $ty<>;
 

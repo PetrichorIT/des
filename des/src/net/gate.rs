@@ -276,7 +276,6 @@ impl Debug for Gate {
 // SAFTY:
 // Gates are never exposed by value to the user so they will be marked
 // as `Send` to fulfill the trait bound for Ptr<Gate> to be `Send`.
-//
 unsafe impl Send for Gate {}
 
 // SOLVED ISSUE: stack overflow when comaring circular ptr

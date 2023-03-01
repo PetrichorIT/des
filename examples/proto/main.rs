@@ -1,7 +1,6 @@
-use des::prelude::*;
+use des::{prelude::*, registry};
 
 #[derive(Debug)]
-#[NdlModule("examples/proto")]
 struct AppA {}
 
 impl Module for AppA {
@@ -16,7 +15,6 @@ impl Module for AppA {
 }
 
 #[derive(Debug)]
-#[NdlModule("examples/proto")]
 struct AppB {}
 
 impl Module for AppB {
@@ -31,7 +29,6 @@ impl Module for AppB {
 }
 
 #[derive(Debug)]
-#[NdlModule("examples/proto")]
 struct Runner {}
 
 impl Module for Runner {
@@ -43,7 +40,6 @@ impl Module for Runner {
 }
 
 #[derive(Debug)]
-#[NdlModule("examples/proto")]
 struct MultiRunner {}
 
 impl Module for MultiRunner {
@@ -73,16 +69,25 @@ impl Module for MultiRunner {
     }
 }
 
-#[NdlSubsystem("examples/proto")]
 #[derive(Debug, Default)]
-struct Main();
+struct Main;
+impl Module for Main {
+    fn new() -> Self {
+        Self
+    }
+}
+
 fn main() {
     Logger::new().try_set_logger().unwrap();
-    let app = Main::default().build_rt();
+    let app = NdlApplication::new(
+        "examples/proto/main.ndl",
+        registry![AppA, AppB, Runner, MultiRunner, Main],
+    )
+    .unwrap();
 
     // println!("{:?}", app.globals().parameters);
 
-    let rt = Runtime::new_with(app, RuntimeOptions::seeded(0x123));
+    let rt = Runtime::new_with(NetworkRuntime::new(app), RuntimeOptions::seeded(0x123));
     let (app, _time, _event_count) = rt.run().unwrap();
 
     let _ = app

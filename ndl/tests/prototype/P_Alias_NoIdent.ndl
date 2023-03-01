@@ -1,9 +1,0 @@
-prototype A {}
-
-alias like A
-
-alias = A
-
-// 
-// Missing the ident.
-//

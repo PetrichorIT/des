@@ -1,6 +1,7 @@
 target
 tmp
 /queue
+.idea
 
 flamegraph*.svg
 perf.*

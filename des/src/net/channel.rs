@@ -10,6 +10,7 @@ use std::sync::{Arc, RwLock};
 
 use crate::net::runtime::ChannelUnbusyNotif;
 use crate::net::{message::Message, MessageAtGateEvent, NetEvents, ObjectPath};
+use crate::prelude::EventLifecycle;
 use crate::runtime::{rng, Runtime};
 use crate::time::{Duration, SimTime};
 
@@ -226,10 +227,7 @@ impl Channel {
                 buffer_len: 0,
 
                 #[cfg(feature = "metrics")]
-                stats: crate::stats::InProgressChannelStats::new(
-                    ObjectPath::root_module("chan"),
-                    metrics,
-                ),
+                stats: crate::stats::InProgressChannelStats::new(ObjectPath::from("chan"), metrics),
             }),
         })
     }
@@ -290,7 +288,9 @@ impl Channel {
         msg: Box<Message>,
         next_gate: &GateRef,
         rt: &mut Runtime<NetworkRuntime<A>>,
-    ) {
+    ) where
+        A: EventLifecycle<NetworkRuntime<A>>,
+    {
         let rng_ref = rng();
         let mut chan = self.inner.write().unwrap();
 
@@ -362,7 +362,10 @@ impl Channel {
     ///
     /// Resets the busy state of a channel.
     ///
-    pub(crate) fn unbusy<A>(self: Arc<Self>, rt: &mut Runtime<NetworkRuntime<A>>) {
+    pub(crate) fn unbusy<A>(self: Arc<Self>, rt: &mut Runtime<NetworkRuntime<A>>)
+    where
+        A: EventLifecycle<NetworkRuntime<A>>,
+    {
         let mut chan = self.inner.write().unwrap();
 
         chan.busy = false;

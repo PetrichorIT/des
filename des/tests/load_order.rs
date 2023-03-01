@@ -1,10 +1,11 @@
 #![cfg(feature = "net")]
 #![allow(unused)]
-
-use des::prelude::*;
+use des::{prelude::*, registry};
 use serial_test::serial;
 
-#[NdlModule("des/tests")]
+#[macro_use]
+mod common;
+
 struct TopLevelModule {
     state: u32,
 }
@@ -16,7 +17,6 @@ impl Module for TopLevelModule {
     }
 }
 
-#[NdlModule("des/tests")]
 struct MidLevelModule {
     state: i64,
 }
@@ -62,7 +62,6 @@ impl Module for MidLevelModule {
     }
 }
 
-#[NdlModule("des/tests")]
 struct LowLevelModule {
     state: u8,
 }
@@ -76,14 +75,17 @@ impl Module for LowLevelModule {
     }
 }
 
-#[NdlSubsystem("des/tests")]
-#[derive(Debug, Default)]
-struct TestCase {}
-
 #[test]
 #[serial]
 fn load_order() {
-    let rt = TestCase::default().build_rt();
+    let rt = NetworkRuntime::new(
+        NdlApplication::new(
+            "tests/load_order.ndl",
+            registry![TopLevelModule, MidLevelModule, LowLevelModule],
+        )
+        .map_err(|e| println!("{e}"))
+        .unwrap(),
+    );
     let rt = Runtime::new(rt);
 
     let _ = rt.run();

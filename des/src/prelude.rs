@@ -15,6 +15,7 @@ pub use crate::time::SimTime;
 
 pub use crate::runtime::Application;
 pub use crate::runtime::Event;
+pub use crate::runtime::EventLifecycle;
 pub use crate::runtime::EventSet;
 
 pub use crate::runtime::random;
@@ -70,16 +71,16 @@ cfg_net! {
         child, gate, gates, module_id, module_name, module_path, par, par_for, parent, pars, shutdow_and_restart_at, shutdow_and_restart_in, shutdown
     };
 
-    pub use crate::net::subsystem::Subsystem;
-    pub use crate::net::subsystem::SubsystemRef;
-    pub use crate::net::subsystem::SubsystemContext;
-    pub use crate::net::subsystem::SubsystemId;
-
     pub use crate::net::ObjectPath;
     pub use crate::net::Parameters;
 
     pub use crate::net::TopoNode;
     pub use crate::net::Topology;
+
+    cfg_ndl! {
+        pub use crate::ndl::NdlApplication;
+        pub use crate::ndl::Registry;
+    }
 
     cfg_async! {
         pub use ::tokio;

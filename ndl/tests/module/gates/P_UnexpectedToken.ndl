@@ -1,6 +1,0 @@
-module A {
-    gates:
-        in @input
-        error/
-        out @output
-}

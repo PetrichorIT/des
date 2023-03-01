@@ -1,0 +1,36 @@
+module Basic {
+    gates {
+        in @input,
+        out @output
+    }
+}
+
+module A: Basic {}
+module B: Basic {}
+
+module Dyn {
+    submodules {
+        sub: dyn Basic
+    }
+
+    connections {
+        sub/out --> sub/in
+    }
+}
+
+module M {
+    submodules {
+        d: Dyn,
+        b: BiggerDyn { b = A }
+    }
+}
+
+module BiggerDyn {
+     submodules {
+        a: dyn Basic,
+        b: dyn Basic,
+        c: dyn Basic,
+    }
+}
+
+entry M;

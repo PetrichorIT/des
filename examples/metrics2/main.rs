@@ -1,6 +1,5 @@
-use des::{prelude::*, runtime::random};
+use des::{prelude::*, registry, runtime::random};
 
-#[NdlModule("examples/metrics2")]
 #[derive(Debug)]
 struct HastyModule {
     peak: f64,
@@ -40,7 +39,6 @@ impl Module for HastyModule {
     }
 }
 
-#[NdlModule("examples/metrics2")]
 #[derive(Debug)]
 struct Collector {}
 
@@ -62,7 +60,6 @@ impl Module for Collector {
     }
 }
 
-#[NdlModule("examples/metrics2")]
 #[derive(Debug)]
 struct Consumer {}
 
@@ -73,11 +70,23 @@ impl Module for Consumer {
     fn handle_message(&mut self, _: Message) {}
 }
 
-#[NdlSubsystem("examples/metrics2")]
 #[derive(Debug, Default)]
-struct TestCase {}
+struct TestCase;
+impl Module for TestCase {
+    fn new() -> Self {
+        Self
+    }
+}
 
 fn main() {
-    let _result = TestCase::default()
-        .run_with_options(RuntimeOptions::seeded(123).max_time(SimTime::from(100.0)));
+    let app = NdlApplication::new(
+        "examples/metrics2/main.ndl",
+        registry![Consumer, TestCase, HastyModule, Collector],
+    )
+    .unwrap();
+    let rt = Runtime::new_with(
+        NetworkRuntime::new(app),
+        RuntimeOptions::seeded(123).max_time(SimTime::from(100.0)),
+    );
+    let _ = rt.run();
 }

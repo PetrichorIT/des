@@ -1,3 +1,4 @@
+use crate::logger::ScopeToken;
 use crate::prelude::{ChannelRef, Gate, GateRef, GateServiceType};
 
 use super::{DummyModule, Module, ModuleContext};
@@ -72,8 +73,9 @@ impl ModuleRef {
 
     #[allow(unused)]
     // Caller must ensure that handler is indeed a dummy
-    pub(crate) fn upgrade_dummy<T: Module>(&self, module: T) {
-        let celled = RefCell::new(Box::new(module));
+    #[doc(hidden)]
+    pub fn upgrade_dummy(&self, module: Box<dyn Module>) {
+        let celled = RefCell::new(module);
         let celled: RefCell<Box<dyn Module>> = celled;
         self.handler.swap(&celled);
     }
@@ -189,8 +191,12 @@ impl ModuleRef {
 }
 
 impl ModuleRef {
-    pub(crate) fn str(&self) -> &str {
-        self.ctx.path.path()
+    pub(crate) fn as_str(&self) -> &str {
+        self.ctx.path.as_str()
+    }
+
+    pub(crate) fn as_logger_scope(&self) -> ScopeToken {
+        self.ctx.logger_token
     }
 
     /// INTERNAL

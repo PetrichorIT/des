@@ -1,0 +1,30 @@
+// ndl.v2
+
+link Delay {
+    jitter: 0.0,
+    latency: 0.1,
+    bitrate: 10000000,
+    queuesize: 1000,
+}
+
+module Node {
+    gates {
+        in @input,
+        out @output
+    }
+}
+
+module Main  {
+    submodules {
+        ring[5]: Node
+    }
+
+    connections {
+        ring[0]/out --> Delay --> ring[1]/in,
+        ring[1]/out --> Delay --> ring[2]/in,
+        ring[2]/out --> Delay --> ring[3]/in,
+        ring[3]/out --> Delay --> ring[4]/in,
+        ring[4]/out --> Delay --> ring[0]/in,
+    }
+}
+entry Main;

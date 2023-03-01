@@ -1,0 +1,8 @@
+module M {
+    gates {
+        in,
+        out,,
+    }
+}
+
+entry M;

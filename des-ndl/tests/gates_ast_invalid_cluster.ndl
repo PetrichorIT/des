@@ -1,0 +1,10 @@
+module M {
+    gates {
+        a[1.0],
+        b["string"],
+        c[0],
+        d[-1]
+    }
+}
+
+entry M;

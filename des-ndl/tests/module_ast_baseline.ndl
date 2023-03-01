@@ -1,0 +1,24 @@
+module Sub {
+    gates {
+        in @input,
+    }
+    gates {
+        out @output,
+    }
+}
+
+module Main: Sub {
+    submodules {
+        sub[2]: Sub
+    }
+    gates {
+        uplink[2],
+        downlink[2],
+    }
+    connections {
+        sub/out --> uplink,
+        sub/in <-- downlink,
+    }
+}
+
+entry Main;

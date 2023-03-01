@@ -1,9 +1,8 @@
 mod par;
 mod path;
 
-pub(crate) use par::Optional;
-pub use par::ParHandle;
-pub use par::Parameters;
+pub(crate) use self::par::Optional;
+pub use self::par::ParHandle;
+pub use self::par::Parameters;
 
-pub use path::ObjectPath;
-pub use path::ObjectPathParseError;
+pub use self::path::ObjectPath;

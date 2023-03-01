@@ -1,6 +1,5 @@
-use des::prelude::*;
+use des::{prelude::*, registry};
 
-#[NdlModule("examples/metrics")]
 #[derive(Debug)]
 struct Alice {
     outvec: OutVec,
@@ -32,9 +31,14 @@ impl Module for Alice {
     }
 }
 
-#[NdlSubsystem("examples/metrics")]
 #[derive(Debug, Default)]
 struct Main {}
+
+impl Module for Main {
+    fn new() -> Self {
+        Self {}
+    }
+}
 
 fn main() {
     Logger::new()
@@ -43,7 +47,12 @@ fn main() {
         .try_set_logger()
         .expect("Failed to set logger");
 
-    Main::default().run_with_options(RuntimeOptions::seeded(123).max_itr(1000));
+    let app = NdlApplication::new("examples/metrics/main.ndl", registry![Alice, Main]).unwrap();
+    let rt = Runtime::new_with(
+        NetworkRuntime::new(app),
+        RuntimeOptions::seeded(123).max_itr(1000),
+    );
+    let _ = rt.run();
 
     let contents =
         std::fs::read_to_string("examples/metrics/results/alice[1]_sample_vec.out").unwrap();

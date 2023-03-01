@@ -106,6 +106,9 @@ cfg_not_multi_threaded! {
             ret
         }
     }
+
+    unsafe impl Send for AtomicUsize {}
+    unsafe impl Sync for AtomicUsize {}
 }
 
 cfg_multi_threaded! {

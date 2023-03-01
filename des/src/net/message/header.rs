@@ -59,8 +59,8 @@ impl MessageHeader {
 
 // # DUP
 impl MessageHeader {
-    pub(super) fn dup(&self) -> Self {
-        Self {
+    pub(super) fn dup(&self) -> Box<Self> {
+        Box::new(Self {
             typ: self.typ,
 
             id: self.id,
@@ -73,7 +73,7 @@ impl MessageHeader {
             last_gate: self.last_gate.as_ref().map(Arc::clone),
 
             length: self.length,
-        }
+        })
     }
 }
 
@@ -127,6 +127,3 @@ impl Display for MessageType {
         }
     }
 }
-
-unsafe impl Send for MessageHeader {}
-unsafe impl Sync for MessageHeader {}

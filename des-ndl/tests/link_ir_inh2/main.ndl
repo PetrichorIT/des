@@ -1,0 +1,5 @@
+include sub1;
+include sub2;
+
+module M {}
+entry M;

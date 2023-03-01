@@ -15,10 +15,6 @@ path = "metrics2/main.rs"
 required-features = ["des/metrics"]
 
 [[bin]]
-name = "t-pingpong"
-path = "pingpong/main.rs"
-
-[[bin]]
 name = "t-waiter"
 path = "waiter/main.rs"
 
@@ -43,10 +39,6 @@ name = "t-droptest"
 path = "droptest/main.rs"
 
 [[bin]]
-name = "t-macro2"
-path = "macro2/main.rs"
-
-[[bin]]
 name = "t-cqueue"
 path = "cqueue/main.rs"
 
@@ -57,6 +49,10 @@ path = "multisim/main.rs"
 [[bin]]
 name = "t-plugin"
 path = "plugin/main.rs"
+
+[[bin]]
+name = "t-ndl2"
+path = "ndl2/main.rs"
 
 [dependencies]
 async-trait = "*"

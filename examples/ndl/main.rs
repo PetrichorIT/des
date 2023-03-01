@@ -1,33 +1,25 @@
-use des::prelude::*;
+use des::{prelude::*, registry};
 
 mod members;
 use members::*;
 
-#[NdlSubsystem("examples/ndl")]
 #[derive(Debug, Default)]
-struct A();
+struct A;
+
+impl Module for A {
+    fn new() -> Self {
+        Self
+    }
+}
 
 fn main() {
     let options = RuntimeOptions::seeded(0x123).include_env();
 
-    let app = A::default().build_rt();
+    let app = NetworkRuntime::new(
+        NdlApplication::new("examples/ndl/main.ndl", registry![A, Alice, Bob]).unwrap(),
+    );
 
-    let ids: Vec<ModuleRef> = (1..=100)
-        .map(|n| app.module(|m| m.name() == format!("bob[{}]", n)).unwrap())
-        .collect();
-
-    let mut rt = Runtime::new_with(app, options);
-
-    for id in ids {
-        let msg = Message::new()
-            .kind(0xff)
-            .content("Init".to_string())
-            .build();
-
-        let arr_time = SimTime::ZERO;
-
-        rt.handle_message_on(id, msg, arr_time);
-    }
+    let rt = Runtime::new_with(app, options);
 
     let (_, time, profile) = rt.run().unwrap();
 
