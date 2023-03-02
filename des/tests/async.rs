@@ -417,7 +417,7 @@ fn mutiple_module_delayed_recv() {
         } => {
             assert_eq!(time, 5.0);
 
-            assert_eq!(profiler.event_count, 15);
+            assert_eq!(profiler.event_count, 13);
 
             // let m1 = app
             //     .module(|m| m.module_core().name() == "RootModule")

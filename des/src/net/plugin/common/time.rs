@@ -53,6 +53,7 @@ impl Plugin for TokioTimePlugin {
 
     fn capture_incoming(&mut self, msg: Message) -> Option<Message> {
         if msg.header().typ == TYP_WAKEUP {
+            // log::trace!("<wakeup> recv");
             self.next_wakeup = SimTime::MAX;
             None
         } else {
@@ -69,8 +70,9 @@ impl Plugin for TokioTimePlugin {
             let Some(ctx) = ctx.time.as_mut() else { return };
             let Some(next_time) = ctx.next_time_poll() else { return };
 
-            if next_time <= self.next_wakeup {
+            if next_time < self.next_wakeup {
                 self.next_wakeup = next_time;
+                // log::trace!("<wakeup> send for {}", next_time);
                 schedule_at(Message::new().typ(TYP_WAKEUP).build(), next_time);
             }
         });
