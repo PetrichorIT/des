@@ -1329,15 +1329,13 @@ impl Module for PluginWithStateModule {
             100,
         );
 
-        assert!(
-            with_plugin_state::<PluginWithState, Vec<usize>, ()>(|s| log::info!("{s:?}")).is_none()
-        );
+        assert!(get_plugin_state::<PluginWithState, Vec<usize>>().is_none());
         schedule_in(Message::new().build(), Duration::from_secs(2));
     }
 
     fn handle_message(&mut self, _msg: Message) {
-        with_plugin_state::<PluginWithState, Vec<usize>, ()>(|s| assert_eq!(s, vec![1, 2, 3]))
-            .unwrap()
+        let s = get_plugin_state::<PluginWithState, Vec<usize>>().unwrap();
+        assert_eq!(s, vec![1, 2, 3])
     }
 }
 

@@ -79,7 +79,7 @@ mod panic;
 pub use self::panic::{PluginPanicPolicy, PluginStatus};
 
 mod api;
-pub use self::api::{add_plugin, add_plugin_with, with_plugin_state, PluginHandle};
+pub use self::api::{add_plugin, add_plugin_with, get_plugin_state, PluginHandle};
 
 mod error;
 pub use self::error::{PluginError, PluginErrorKind};

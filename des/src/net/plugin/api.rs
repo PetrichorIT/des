@@ -74,8 +74,8 @@ pub fn add_plugin_with<T: Plugin>(plugin: T, priority: usize, policy: PluginPani
 /// [`Plugin::state`] if a plugin of type 'P' was found.
 /// 
 /// Returns 'None' otherwise.
-pub fn with_plugin_state<P: Plugin, S: 'static, R>(f: impl FnOnce(S) -> R) -> Option<R> {
-    with_mod_ctx(|ctx| ctx.with_plugin_state::<P, S, R>(f))
+pub fn get_plugin_state<P: Plugin, S: 'static>() -> Option<S> {
+    with_mod_ctx(|ctx| ctx.get_plugin_state::<P, S>())
 }
 
 
@@ -199,24 +199,20 @@ impl ModuleContext {
     }
 
     /// Returns the plugin state mutably.
-    pub fn with_plugin_state<P: Plugin, S: 'static, R>(&self, f: impl FnOnce(S) -> R) -> Option<R> {
-
-
-
-        Some(
-            f(
-               *self.plugins
-                .try_read()
-                .expect("failed to fetch read lock: plugin<T>")
-                .iter()
-                .find(|p| p.typ == TypeId::of::<P>())?
-                .core
-                .as_ref()
-                .unwrap()
-                .state()
-                .downcast::<S>()
-                .unwrap()
-            )
-        )
+    pub fn get_plugin_state<P: Plugin, S: 'static>(&self) -> Option<S> {
+        match self.plugins
+            .try_read()
+            .expect("failed to fetch read lock: get_plugin_state<T>")
+            .iter()
+            .find(|p| p.typ == TypeId::of::<P>())?
+            .core
+            .as_ref()
+            .unwrap()
+            .state()
+            .downcast::<S>() 
+        {
+            Ok(v) => Some(*v),
+            Err(_) => None
+        }
     }
 }
