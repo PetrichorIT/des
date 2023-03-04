@@ -1304,3 +1304,60 @@ fn plugin_shutdown_downtime() {
     let res = rt.run();
     let _res = res.unwrap();
 }
+
+struct PluginWithState {
+    state: Vec<usize>,
+}
+impl Plugin for PluginWithState {
+    fn state(&self) -> Box<dyn std::any::Any> {
+        Box::new(self.state.clone())
+    }
+}
+
+struct PluginWithStateModule;
+impl_build_named!(PluginWithStateModule);
+impl Module for PluginWithStateModule {
+    fn new() -> Self {
+        Self
+    }
+
+    fn at_sim_start(&mut self, _stage: usize) {
+        add_plugin(
+            PluginWithState {
+                state: vec![1, 2, 3],
+            },
+            100,
+        );
+
+        assert!(
+            with_plugin_state::<PluginWithState, Vec<usize>, ()>(|s| log::info!("{s:?}")).is_none()
+        );
+        schedule_in(Message::new().build(), Duration::from_secs(2));
+    }
+
+    fn handle_message(&mut self, _msg: Message) {
+        with_plugin_state::<PluginWithState, Vec<usize>, ()>(|s| assert_eq!(s, vec![1, 2, 3]))
+            .unwrap()
+    }
+}
+
+#[test]
+#[serial]
+fn plugin_with_state() {
+    Logger::new()
+        .interal_max_log_level(log::LevelFilter::Trace)
+        .set_logger();
+
+    let mut rt = NetworkRuntime::new(());
+
+    let module = PluginWithStateModule::build_named(ObjectPath::from("root".to_string()), &mut rt);
+    rt.create_module(module);
+
+    let rt = Runtime::new_with(
+        rt,
+        RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(60))),
+    );
+
+    let res = rt.run();
+    let _res = res.unwrap();
+}

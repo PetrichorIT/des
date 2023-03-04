@@ -5,6 +5,7 @@ use std::{
 
 use super::{Plugin, PluginPanicPolicy, PluginStatus};
 
+#[derive(Debug)]
 pub(crate) struct PluginRegistry {
     inner: Vec<PluginEntry>,  // a ordered list of all plugins that are active.
     inject: Vec<PluginEntry>, // plugins to be injected at the next upstream

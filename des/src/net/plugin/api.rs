@@ -70,6 +70,15 @@ pub fn add_plugin_with<T: Plugin>(plugin: T, priority: usize, policy: PluginPani
     with_mod_ctx(|ctx| ctx.add_plugin(plugin, priority, policy))
 }
 
+/// Runs the provided clousure on the module state retuned by 
+/// [`Plugin::state`] if a plugin of type 'P' was found.
+/// 
+/// Returns 'None' otherwise.
+pub fn with_plugin_state<P: Plugin, S: 'static, R>(f: impl FnOnce(S) -> R) -> Option<R> {
+    with_mod_ctx(|ctx| ctx.with_plugin_state::<P, S, R>(f))
+}
+
+
 /// A handle to a plugin on the current module.
 pub struct PluginHandle {
     id: usize,
@@ -187,5 +196,27 @@ impl ModuleContext {
             .try_write()
             .expect("Failed to fetch write lock: remove_plugin")
             .status(handle.id)
+    }
+
+    /// Returns the plugin state mutably.
+    pub fn with_plugin_state<P: Plugin, S: 'static, R>(&self, f: impl FnOnce(S) -> R) -> Option<R> {
+
+
+
+        Some(
+            f(
+               *self.plugins
+                .try_read()
+                .expect("failed to fetch read lock: plugin<T>")
+                .iter()
+                .find(|p| p.typ == TypeId::of::<P>())?
+                .core
+                .as_ref()
+                .unwrap()
+                .state()
+                .downcast::<S>()
+                .unwrap()
+            )
+        )
     }
 }

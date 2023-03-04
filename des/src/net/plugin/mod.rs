@@ -72,13 +72,14 @@
 //!  
 
 use crate::prelude::Message;
+use std::any::Any;
 use std::panic::catch_unwind;
 
 mod panic;
 pub use self::panic::{PluginPanicPolicy, PluginStatus};
 
 mod api;
-pub use self::api::{add_plugin, add_plugin_with, PluginHandle};
+pub use self::api::{add_plugin, add_plugin_with, with_plugin_state, PluginHandle};
 
 mod error;
 pub use self::error::{PluginError, PluginErrorKind};
@@ -233,6 +234,11 @@ pub trait Plugin: 'static {
     /// ```
     fn capture_outgoing(&mut self, msg: Message) -> Option<Message> {
         Some(msg)
+    }
+
+    /// Returns the state of the plugin.
+    fn state(&self) -> Box<dyn Any> {
+        Box::new(())
     }
 }
 
