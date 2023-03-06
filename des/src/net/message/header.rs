@@ -41,6 +41,9 @@ pub struct MessageHeader {
     pub receiver_module_id: ModuleId, // MAC dest
     pub last_gate: Option<GateRef>,   // Path info
 
+    pub src: [u8; 6],
+    pub dest: [u8; 6],
+
     // The packet length in bytes.
     pub length: u32,
 }
@@ -72,6 +75,9 @@ impl MessageHeader {
             receiver_module_id: self.receiver_module_id,
             last_gate: self.last_gate.as_ref().map(Arc::clone),
 
+            src: self.src,
+            dest: self.dest,
+
             length: self.length,
         })
     }
@@ -90,6 +96,9 @@ impl Default for MessageHeader {
             sender_module_id: ModuleId::NULL,
             receiver_module_id: ModuleId::NULL,
             last_gate: None,
+
+            src: [0; 6],
+            dest: [0; 6],
 
             length: 0,
         }

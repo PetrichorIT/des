@@ -337,6 +337,20 @@ impl MessageBuilder {
         self
     }
 
+    /// Sets the source addr of the message (as eth)
+    #[must_use]
+    pub fn src(mut self, src: [u8; 6]) -> Self {
+        self.header.src = src;
+        self
+    }
+
+    /// Sets the destination addr of the message (as eth)
+    #[must_use]
+    pub fn dest(mut self, dest: [u8; 6]) -> Self {
+        self.header.dest = dest;
+        self
+    }
+
     /// Sets the field `header.last_gate`.
     #[must_use]
     pub fn last_gate(mut self, last_gate: GateRef) -> Self {
