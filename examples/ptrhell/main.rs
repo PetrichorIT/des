@@ -14,6 +14,6 @@ fn main() {
 
     let (_, time, p) = rt.run().unwrap();
 
-    assert_eq!(p.event_count, 9);
+    assert_eq!(p.event_count, 7);
     assert_eq!(time.as_millis(), 387)
 }

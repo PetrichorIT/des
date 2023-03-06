@@ -131,3 +131,58 @@ fn channel_buffering_message() {
     let rt = Runtime::new(rt);
     let _ = rt.run();
 }
+
+struct SendMessageModule;
+impl_build_named!(SendMessageModule);
+impl Module for SendMessageModule {
+    fn new() -> Self {
+        Self
+    }
+
+    fn at_sim_start(&mut self, _stage: usize) {
+        schedule_in(Message::new().kind(10).build(), Duration::from_secs(1));
+    }
+
+    fn handle_message(&mut self, msg: Message) {
+        if msg.header().kind == 10 {
+            send(Message::new().content("Hello world").build(), "out");
+            let gate = gate("out", 0).unwrap();
+            let ch = gate.channel().unwrap();
+            assert!(ch.is_busy());
+        }
+    }
+}
+
+#[test]
+#[serial]
+fn channel_instant_busy() {
+    // Logger::new()
+    //     .interal_max_log_level(log::LevelFilter::Trace)
+    //     .set_logger();
+
+    let mut rt = NetworkRuntime::new(());
+
+    let module = SendMessageModule::build_named(ObjectPath::from("root".to_string()), &mut rt);
+
+    let g_in = module.create_gate("in", GateServiceType::Input);
+    let g_out = module.create_gate("out", GateServiceType::Output);
+
+    let channel = Channel::new(
+        ObjectPath::appended_channel(&module.path(), "chan"),
+        ChannelMetrics {
+            bitrate: 1000,
+            latency: Duration::from_millis(100),
+            jitter: Duration::ZERO,
+            queuesize: 0,
+            cost: 1.0,
+        },
+    );
+
+    g_out.set_channel(channel);
+    g_out.set_next_gate(g_in);
+
+    rt.create_module(module);
+
+    let rt = Runtime::new(rt);
+    let _ = rt.run();
+}

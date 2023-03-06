@@ -10,11 +10,10 @@ use std::sync::{Arc, RwLock};
 
 use crate::net::runtime::ChannelUnbusyNotif;
 use crate::net::{message::Message, MessageAtGateEvent, NetEvents, ObjectPath};
-use crate::prelude::EventLifecycle;
-use crate::runtime::{rng, Runtime};
+use crate::runtime::{rng, EventSink};
 use crate::time::{Duration, SimTime};
 
-use super::{gate::GateRef, NetworkRuntime};
+use super::gate::GateRef;
 
 ///
 /// A readonly reference to a channel.
@@ -142,7 +141,7 @@ struct ChannelInner {
     /// The time the current packet is fully transmitted onto the channel.
     transmission_finish_time: SimTime,
 
-    buffer: VecDeque<(Box<Message>, GateRef)>,
+    buffer: VecDeque<(Message, GateRef)>,
     buffer_len: usize,
 }
 
@@ -283,14 +282,12 @@ impl Channel {
         self.inner.read().unwrap().metrics.calculate_busy(msg)
     }
 
-    pub(super) fn send_message<A>(
+    pub(super) fn send_message<S: EventSink<NetEvents>>(
         self: Arc<Self>,
-        msg: Box<Message>,
+        msg: Message,
         next_gate: &GateRef,
-        rt: &mut Runtime<NetworkRuntime<A>>,
-    ) where
-        A: EventLifecycle<NetworkRuntime<A>>,
-    {
+        sink: &mut S,
+    ) {
         let rng_ref = rng();
         let mut chan = self.inner.write().unwrap();
 
@@ -336,7 +333,7 @@ impl Channel {
             drop(chan);
             self.set_busy_until(transmissin_finish);
 
-            rt.add_event(
+            sink.add(
                 NetEvents::ChannelUnbusyNotif(ChannelUnbusyNotif {
                     channel: self.clone(),
                 }),
@@ -345,7 +342,7 @@ impl Channel {
 
             let next_event_time = SimTime::now() + dur;
 
-            rt.add_event(
+            sink.add(
                 NetEvents::MessageAtGateEvent(MessageAtGateEvent {
                     gate: Arc::clone(next_gate),
                     message: msg,
@@ -359,13 +356,86 @@ impl Channel {
         }
     }
 
+    // pub(super) fn send_message<A>(
+    //     self: Arc<Self>,
+    //     msg: Box<Message>,
+    //     next_gate: &GateRef,
+    //     rt: &mut Runtime<NetworkRuntime<A>>,
+    // ) where
+    //     A: EventLifecycle<NetworkRuntime<A>>,
+    // {
+    //     let rng_ref = rng();
+    //     let mut chan = self.inner.write().unwrap();
+
+    //     if chan.busy {
+    //         let msg_size = msg.length();
+    //         if chan.buffer_len + msg_size > chan.metrics.queuesize {
+    //             log::warn!(
+    //                 "Gate '{}' dropping message [{}] pushed onto busy channel {}",
+    //                 next_gate.previous_gate().unwrap().name(),
+    //                 msg.str(),
+    //                 chan.path
+    //             );
+
+    //             // Register message progress (DROP)
+    //             #[cfg(feature = "metrics")]
+    //             {
+    //                 chan.stats.register_message_dropped(&msg);
+    //             }
+
+    //             drop(msg);
+    //             log_scope!();
+    //         } else {
+    //             log::trace!(
+    //                 "Gate '{}' added message [{}] to queue",
+    //                 next_gate.previous_gate().unwrap().name(),
+    //                 msg.str()
+    //             );
+    //             chan.buffer_len += msg.length();
+    //             // chan.buffer.push_back((msg, Arc::clone(next_gate)));
+    //         }
+    //     } else {
+    //         // Register message progress (SUCC)
+    //         #[cfg(feature = "metrics")]
+    //         {
+    //             chan.stats.register_message_passed(&msg);
+    //         }
+
+    //         let dur = chan.metrics.calculate_duration(&msg, rng_ref);
+    //         let busy = chan.metrics.calculate_busy(&msg);
+
+    //         let transmissin_finish = SimTime::now() + busy;
+
+    //         drop(chan);
+    //         self.set_busy_until(transmissin_finish);
+
+    //         rt.add_event(
+    //             NetEvents::ChannelUnbusyNotif(ChannelUnbusyNotif {
+    //                 channel: self.clone(),
+    //             }),
+    //             transmissin_finish,
+    //         );
+
+    //         let next_event_time = SimTime::now() + dur;
+
+    //         rt.add_event(
+    //             NetEvents::MessageAtGateEvent(MessageAtGateEvent {
+    //                 gate: Arc::clone(next_gate),
+    //                 message: msg,
+    //             }),
+    //             next_event_time,
+    //         );
+
+    //         // must break iteration,
+    //         // but not perform on-module handling
+    //         log_scope!();
+    //     }
+    // }
+
     ///
     /// Resets the busy state of a channel.
     ///
-    pub(crate) fn unbusy<A>(self: Arc<Self>, rt: &mut Runtime<NetworkRuntime<A>>)
-    where
-        A: EventLifecycle<NetworkRuntime<A>>,
-    {
+    pub(crate) fn unbusy<S: EventSink<NetEvents>>(self: Arc<Self>, sink: &mut S) {
         let mut chan = self.inner.write().unwrap();
 
         chan.busy = false;
@@ -374,7 +444,7 @@ impl Channel {
         if let Some((msg, next_gate)) = chan.buffer.pop_front() {
             chan.buffer_len -= msg.length();
             drop(chan);
-            self.send_message(msg, &next_gate, rt);
+            self.send_message(msg, &next_gate, sink);
         }
     }
 }

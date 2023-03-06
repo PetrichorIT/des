@@ -852,7 +852,7 @@ cfg_net! {
         ) {
             let event = MessageAtGateEvent {
                 gate,
-                message: Box::new(message.into()),
+                message: message.into(),
             };
 
             self.add_event(NetEvents::MessageAtGateEvent(event), time);
@@ -869,7 +869,7 @@ cfg_net! {
         ) {
             let event = HandleMessageEvent {
                 module: module.into(),
-                message: Box::new(message.into()),
+                message: message.into(),
             };
 
             self.add_event(NetEvents::HandleMessageEvent(event), time);

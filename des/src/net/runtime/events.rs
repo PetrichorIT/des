@@ -47,7 +47,7 @@ where
 #[derive(Debug)]
 pub struct MessageAtGateEvent {
     pub(crate) gate: GateRef,
-    pub(crate) message: Box<Message>,
+    pub(crate) message: Message,
 }
 
 impl MessageAtGateEvent {
@@ -128,7 +128,7 @@ impl MessageAtGateEvent {
 #[derive(Debug)]
 pub struct HandleMessageEvent {
     pub(crate) module: ModuleRef,
-    pub(crate) message: Box<Message>,
+    pub(crate) message: Message,
 }
 
 impl HandleMessageEvent {
@@ -137,7 +137,7 @@ impl HandleMessageEvent {
         A: EventLifecycle<NetworkRuntime<A>>,
     {
         log_scope!(self.module.as_logger_scope());
-        let mut message = *self.message;
+        let mut message = self.message;
         message.header.receiver_module_id = self.module.ctx.id;
 
         info!("Handling message {:?}", message.str());
