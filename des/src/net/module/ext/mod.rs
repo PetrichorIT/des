@@ -276,6 +276,6 @@ where
 
     fn num_sim_start_stages(&self) -> usize {
         // Needs at least one sim_start stage to setup the recv handle
-        <T as AsyncModule>::num_sim_start_stages(self).min(1)
+        <T as AsyncModule>::num_sim_start_stages(self).max(1)
     }
 }
