@@ -58,6 +58,8 @@ pub(crate) fn buf_send_at(mut msg: Message, gate: GateRef, send_time: SimTime) {
     let mut ctx = BUF_CTX.lock();
     msg.header.sender_module_id = module_id();
 
+    let inital_token = gate.owner().logger_token;
+
     // (0) If delayed send is active, dont skip gate_refs
     if send_time > SimTime::now() {
         ctx.events.push((
@@ -90,6 +92,8 @@ pub(crate) fn buf_send_at(mut msg: Message, gate: GateRef, send_time: SimTime) {
             );
 
             ch.send_message(msg, &next_gate, &mut ctx.events);
+            log_scope!(inital_token);
+
             return;
         } else {
             // We can skip this bridge since it is only a symbolic link
@@ -123,7 +127,7 @@ pub(crate) fn buf_send_at(mut msg: Message, gate: GateRef, send_time: SimTime) {
         SimTime::now(),
     ));
 
-    log_scope!();
+    log_scope!(inital_token);
 }
 
 pub(crate) fn buf_schedule_at(msg: Message, arrival_time: SimTime) {
