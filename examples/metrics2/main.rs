@@ -12,7 +12,7 @@ impl Module for HastyModule {
 
     fn at_sim_start(&mut self, _: usize) {
         self.peak = par("peak")
-            .as_optional()
+            .as_option()
             .unwrap_or_else(|| "10.0".to_string())
             .parse::<f64>()
             .expect("Parse fail");

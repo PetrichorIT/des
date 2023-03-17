@@ -1,8 +1,6 @@
-use std::collections::HashMap;
-
 use super::{with_mod_ctx, ModuleContext, ModuleId, ModuleRef, ModuleReferencingError, SETUP_FN};
 use crate::{
-    net::{common::Optional, globals, runtime::buf_schedule_shutdown, ParHandle},
+    net::runtime::buf_schedule_shutdown,
     prelude::{GateRef, ObjectPath},
     time::{Duration, SimTime},
 };
@@ -95,31 +93,4 @@ pub fn shutdow_and_restart_in(dur: Duration) {
 ///
 pub fn shutdow_and_restart_at(restart_at: SimTime) {
     buf_schedule_shutdown(Some(restart_at));
-}
-
-///
-/// Returns the parameters for the current module.
-///
-#[must_use]
-pub fn pars() -> HashMap<String, String> {
-    let path = self::module_path();
-    globals().parameters.get_def_table(path.as_str())
-}
-
-///
-/// Returns a parameter by reference (not parsed).
-///
-#[must_use]
-pub fn par(key: &str) -> ParHandle<Optional> {
-    globals()
-        .parameters
-        .get_handle(self::module_path().as_str(), key)
-}
-
-///
-/// Returns a parameter by reference (not parsed).
-///
-#[must_use]
-pub fn par_for(key: &str, module: &str) -> ParHandle<Optional> {
-    globals().parameters.get_handle(module, key)
 }

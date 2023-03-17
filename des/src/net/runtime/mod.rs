@@ -1,5 +1,5 @@
-use super::common::Parameters;
 use super::module::ModuleRef;
+use super::par::ParMap;
 use crate::net::{ObjectPath, Topology};
 use crate::runtime::{Application, EventLifecycle, Runtime};
 use crate::time::SimTime;
@@ -210,7 +210,7 @@ pub struct NetworkRuntimeGlobals {
     /// The current state of the parameter tree, derived from *.par
     /// files and parameter changes at runtime.
     ///
-    pub parameters: Parameters,
+    pub parameters: Arc<ParMap>,
 
     ///
     /// The topology of the network from a module viewpoint.
@@ -225,7 +225,7 @@ impl NetworkRuntimeGlobals {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            parameters: Parameters::new(),
+            parameters: Arc::new(ParMap::new()),
             topology: Mutex::new(Topology::new()),
         }
     }

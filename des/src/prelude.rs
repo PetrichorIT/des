@@ -68,11 +68,12 @@ cfg_net! {
     pub use crate::net::module::ModuleReferencingError;
 
     pub use crate::net::module::{
-        child, gate, gates, module_id, module_name, module_path, par, par_for, parent, pars, shutdow_and_restart_at, shutdow_and_restart_in, shutdown
+        child, gate, gates, module_id, module_name, module_path, parent, shutdow_and_restart_at, shutdow_and_restart_in, shutdown
     };
+    pub use crate::net::{par, par_for};
 
     pub use crate::net::ObjectPath;
-    pub use crate::net::Parameters;
+    pub use crate::net::ParMap;
 
     pub use crate::net::TopoNode;
     pub use crate::net::Topology;

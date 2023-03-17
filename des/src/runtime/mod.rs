@@ -6,7 +6,6 @@ use crate::{
     macros::support::SyncWrap,
     time::{Duration, SimTime},
 };
-use log::warn;
 use rand::{
     distributions::Standard,
     prelude::{Distribution, StdRng},
@@ -483,7 +482,12 @@ where
         self.profiler.start();
 
         if self.future_event_set.is_empty() {
-            warn!("Running simulation without any events. Think about adding some inital events.");
+            if !self.quiet {
+                println!("\u{23A1}");
+                println!("\u{23A2} Empty simulation");
+                println!("\u{23A2}  Ended at event #0 after 0s");
+                println!("\u{23A3}");
+            }
             return RuntimeResult::EmptySimulation { app: self.app };
         }
         while self.next() {}

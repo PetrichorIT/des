@@ -31,16 +31,16 @@ mod common {
 
         fn at_sim_start(&mut self, _stage: usize) {
             self.dst = par("dst")
-                .as_optional()
+                .as_option()
                 .map(|s| s.parse::<usize>().unwrap())
                 .unwrap_or(0);
             self.rem = par("c")
-                .as_optional()
+                .as_option()
                 .map(|s| s.parse::<usize>().unwrap())
                 .unwrap_or(0);
             self.delay = Duration::from_secs_f64(
                 par("delay")
-                    .as_optional()
+                    .as_option()
                     .map(|s| s.parse::<f64>().unwrap())
                     .unwrap_or(1.0),
             );
@@ -85,7 +85,7 @@ mod common {
 
         fn at_sim_end(&mut self) {
             if let Some(v) = par("expected")
-                .as_optional()
+                .as_option()
                 .map(|v| v.parse::<usize>().unwrap())
             {
                 assert_eq!(v, self.rcv, "failed at module: {}", module_path());

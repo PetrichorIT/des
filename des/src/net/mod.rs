@@ -2,7 +2,8 @@
 //! Tools for building a module/net oriented simulation.
 //!
 
-mod common;
+mod par;
+mod path;
 mod runtime;
 mod topology;
 
@@ -20,9 +21,8 @@ pub use self::runtime::globals;
 pub use self::runtime::NetworkRuntime;
 pub use self::runtime::NetworkRuntimeGlobals;
 
-pub use self::common::ObjectPath;
-pub use self::common::ParHandle;
-pub use self::common::Parameters;
+pub use self::par::*;
+pub use self::path::ObjectPath;
 
 pub use self::topology::TopoEdge;
 pub use self::topology::TopoNode;
