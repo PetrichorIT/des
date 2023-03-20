@@ -12,7 +12,7 @@ mod body;
 pub use body::*;
 
 mod util;
-use util::*;
+use util::AnyBox;
 
 mod header;
 pub use header::*;

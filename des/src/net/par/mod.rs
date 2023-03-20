@@ -39,7 +39,7 @@ enum ParTreePathMatching {
 
 impl ParMap {
     ///
-    /// Creates a new ParMap
+    /// Creates a new `ParMap`.
     ///
     #[must_use]
     pub fn new() -> ParMap {
@@ -87,9 +87,9 @@ impl ParTree {
 
     fn get_rlock(&self, key: &str, inc: usize) -> Option<String> {
         match key.split_once('.') {
-            Some((comp, rem)) => {
+            Some((comp, remainder)) => {
                 for branch in self.branches.iter().filter(|b| b.matching.matches_r(comp)) {
-                    let Some(ret) =  branch.node.get_rlock(rem, inc) else {
+                    let Some(ret) =  branch.node.get_rlock(remainder, inc) else {
                         continue;
                     } ;
                     return Some(ret);
@@ -129,45 +129,42 @@ impl ParTree {
     }
 
     fn insert(&mut self, key: &str, value: String) -> bool {
-        match key.split_once('.') {
-            Some((comp, rem)) => {
-                if let Some(branch) = self
-                    .branches
-                    .iter_mut()
-                    .find(|b| b.matching.matches_w(comp))
-                {
-                    branch.node.insert(rem, value)
+        if let Some((comp, remainder)) = key.split_once('.') {
+            if let Some(branch) = self
+                .branches
+                .iter_mut()
+                .find(|b| b.matching.matches_w(comp))
+            {
+                branch.node.insert(remainder, value)
+            } else {
+                let mut node = ParTree::new();
+                let ret = node.insert(remainder, value);
+                if comp == "*" {
+                    self.branches.push(ParTreeBranch {
+                        matching: ParTreePathMatching::Any,
+                        node,
+                    });
                 } else {
-                    let mut node = ParTree::new();
-                    let ret = node.insert(rem, value);
-                    if comp == "*" {
-                        self.branches.push(ParTreeBranch {
-                            matching: ParTreePathMatching::Any,
-                            node,
-                        })
-                    } else {
-                        self.branches.push(ParTreeBranch {
-                            matching: ParTreePathMatching::Path(comp.to_string()),
-                            node,
-                        })
-                    }
-                    ret
+                    self.branches.push(ParTreeBranch {
+                        matching: ParTreePathMatching::Path(comp.to_string()),
+                        node,
+                    });
                 }
+                ret
             }
-            None => {
-                // (0) Fetch the entry
-                let entry = self
-                    .pars
-                    .entry(key.to_string())
-                    .or_insert((String::new(), AtomicUsize::new(0)));
+        } else {
+            // (0) Fetch the entry
+            let entry = self
+                .pars
+                .entry(key.to_string())
+                .or_insert((String::new(), AtomicUsize::new(0)));
 
-                // (1) try an inplace update (requires not readers)
-                if entry.1.load(SeqCst) == 0 {
-                    entry.0 = value.to_string();
-                    true
-                } else {
-                    false
-                }
+            // (1) try an inplace update (requires not readers)
+            if entry.1.load(SeqCst) == 0 {
+                entry.0 = value;
+                true
+            } else {
+                false
             }
         }
     }
@@ -189,12 +186,17 @@ impl ParTreePathMatching {
     }
 }
 
+impl Default for ParMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 // # External API
 
 ///
 /// A handle for a requested parameter.
 ///
-#[must_use]
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Par<S = Optional>
 where
@@ -245,12 +247,17 @@ where
     /// Unwraps the handle allowing [Deref] on the contained
     /// value consuming self.
     ///
+    /// # Panics
+    ///
+    /// This function panics of the Par points to no data.
+    ///
+    #[must_use]
     pub fn unwrap(self) -> Par<Exists> {
         let map = ParMap::shared();
         if let Some(value) = map.get_rlock(&self.key, 1) {
             Par {
                 key: self.key.clone(),
-                value: Some(value.clone()),
+                value: Some(value),
                 _phantom: PhantomData,
             }
         } else {
@@ -261,6 +268,7 @@ where
     ///
     /// Indicates whether the handle contains a value.
     ///
+    #[must_use]
     pub fn is_some(&self) -> bool {
         // (0) Shortciruit
         if self.value.is_some() {
@@ -269,14 +277,13 @@ where
 
         // (1) Long way around
         let map = ParMap::shared();
-        let is_some = map.get_rlock(&self.key, 0).is_some();
-
-        is_some
+        map.get_rlock(&self.key, 0).is_some()
     }
 
     ///
     /// Indicates whether the handle contains a value.
     ///
+    #[must_use]
     pub fn is_none(&self) -> bool {
         !self.is_some()
     }
@@ -286,13 +293,10 @@ where
     /// ability to set the par. This does not create a permantent
     /// read lock.
     ///
+    #[must_use]
     pub fn as_option(self) -> Option<String> {
         let map = ParMap::shared();
-        if let Some(value) = map.get_rlock(&self.key, 0) {
-            Some(value.clone())
-        } else {
-            None
-        }
+        map.get_rlock(&self.key, 0)
     }
 
     ///
@@ -302,10 +306,11 @@ where
     ///
     /// Returns an error if other active locks exist for the datapoint.
     ///
+    #[allow(clippy::needless_pass_by_value)]
     pub fn set(self, value: impl ToString) -> Result<Par<Exists>, ParError> {
         let map = ParMap::shared();
         let value = value.to_string();
-        if map.insert(&self.key, value.clone()) {
+        if map.insert(&self.key, value) {
             Ok(Par {
                 key: self.key.clone(),
                 value: map.get_rlock(&self.key, 1),
@@ -322,6 +327,8 @@ impl Par<Exists> {
     /// Uses a custom string parser to parse a string, timming
     /// quotation marks in the process.
     ///
+    #[allow(clippy::missing_panics_doc)]
+    #[must_use]
     pub fn into_inner(&self) -> String {
         let mut parsed = self.value.clone().unwrap();
         // Trim marks
@@ -372,7 +379,7 @@ where
         // (0) Only if Par<Exists>
         if self.value.is_some() {
             let map = ParMap::shared();
-            map.release_rlock(&self.key)
+            map.release_rlock(&self.key);
         }
     }
 }

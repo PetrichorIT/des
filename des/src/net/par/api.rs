@@ -17,6 +17,7 @@ pub fn par(key: impl AsRef<str>) -> Par {
 ///
 /// Returns a parameter by reference (not parsed).
 ///
+#[must_use]
 pub fn par_for(key: impl AsRef<str>, module: impl AsRef<str>) -> Par {
     Par {
         key: format!("{}.{}", module.as_ref(), key.as_ref()),

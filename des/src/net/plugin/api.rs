@@ -74,6 +74,7 @@ pub fn add_plugin_with<T: Plugin>(plugin: T, priority: usize, policy: PluginPani
 /// [`Plugin::state`] if a plugin of type 'P' was found.
 /// 
 /// Returns 'None' otherwise.
+#[must_use]
 pub fn get_plugin_state<P: Plugin, S: 'static>() -> Option<S> {
     with_mod_ctx(|ctx| ctx.get_plugin_state::<P, S>())
 }
@@ -199,6 +200,12 @@ impl ModuleContext {
     }
 
     /// Returns the plugin state mutably.
+    /// 
+    /// # Panics
+    /// 
+    /// Panics if a lock could not be acquired, probably
+    /// due to feature missconfiguration.
+    /// 
     pub fn get_plugin_state<P: Plugin, S: 'static>(&self) -> Option<S> {
         match self.plugins
             .try_read()

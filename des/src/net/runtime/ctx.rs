@@ -93,12 +93,11 @@ pub(crate) fn buf_send_at(mut msg: Message, gate: GateRef, send_time: SimTime) {
 
             ch.send_message(msg, &next_gate, &mut ctx.events);
             log_scope!(inital_token);
-
             return;
-        } else {
-            // We can skip this bridge since it is only a symbolic link
-            current_gate = next_gate;
         }
+
+        // We can skip this bridge since it is only a symbolic link
+        current_gate = next_gate;
     }
 
     debug_assert!(current_gate.next_gate().is_none());
@@ -162,7 +161,7 @@ where
 
     // # NEW
     for (event, time) in ctx.events.drain(..) {
-        rt.add_event(event, time)
+        rt.add_event(event, time);
     }
 
     // Send loopback events from 'scheduleAt'
@@ -170,7 +169,7 @@ where
         rt.add_event(
             NetEvents::HandleMessageEvent(HandleMessageEvent {
                 module: module.clone(),
-                message: message,
+                message,
             }),
             time,
         );
