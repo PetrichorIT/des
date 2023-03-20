@@ -138,7 +138,7 @@ impl<T> Module for T
 where
     T: 'static + AsyncModule,
 {
-    fn __indicate_asnyc(&self) -> bool {
+    fn __indicate_async(&self) -> bool {
         true
     }
 

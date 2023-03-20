@@ -6,9 +6,9 @@ use std::marker::PhantomData;
 /// Returns a parameter by reference (not parsed).
 ///
 #[must_use]
-pub fn par(key: &str) -> Par {
+pub fn par(key: impl AsRef<str>) -> Par {
     Par {
-        key: format!("{}.{key}", module_path()),
+        key: format!("{}.{}", module_path(), key.as_ref()),
         value: None,
         _phantom: PhantomData,
     }
@@ -17,20 +17,10 @@ pub fn par(key: &str) -> Par {
 ///
 /// Returns a parameter by reference (not parsed).
 ///
-pub fn par_for(key: &str, module: &str) -> Par {
+pub fn par_for(key: impl AsRef<str>, module: impl AsRef<str>) -> Par {
     Par {
-        key: format!("{module}.{key}"),
+        key: format!("{}.{}", module.as_ref(), key.as_ref()),
         value: None,
         _phantom: PhantomData,
     }
 }
-
-// ///
-// /// Returns the parameters for the current module.
-// ///
-// #[must_use]
-// pub fn pars() -> HashMap<String, String> {
-//     // let path = self::module_path();
-//     // globals().parameters.get_def_table(path.as_str())
-//     todo!()
-// }

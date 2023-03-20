@@ -115,6 +115,7 @@ pub trait Module: Any {
     /// are done. Used to resolve all async `sim_start_stages`.
     ///
     #[cfg(feature = "async")]
+    #[doc(hidden)]
     fn finish_sim_start(&mut self) {}
 
     ///
@@ -135,11 +136,12 @@ pub trait Module: Any {
     /// are done. Used to resolve all async `sim_end_stages`.
     ///
     #[cfg(feature = "async")]
+    #[doc(hidden)]
     fn finish_sim_end(&mut self) {}
 
     #[cfg(feature = "async")]
     #[doc(hidden)]
-    fn __indicate_asnyc(&self) -> bool {
+    fn __indicate_async(&self) -> bool {
         false
     }
 

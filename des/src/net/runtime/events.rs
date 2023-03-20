@@ -334,7 +334,7 @@ impl ModuleRef {
                 self.handler.borrow_mut().handle_message(msg);
             } else {
                 #[cfg(feature = "async")]
-                if self.handler.borrow().__indicate_asnyc() {
+                if self.handler.borrow().__indicate_async() {
                     self.handler.borrow_mut().handle_message(Message::notify());
                 }
             }
@@ -369,7 +369,7 @@ impl ModuleRef {
 
     #[cfg(feature = "async")]
     pub(crate) fn finish_sim_start(&self) {
-        if self.handler.borrow().__indicate_asnyc() {
+        if self.handler.borrow().__indicate_async() {
             self.plugin_upstream(None);
             self.handler.borrow_mut().finish_sim_start();
             self.plugin_downstream();
@@ -384,7 +384,7 @@ impl ModuleRef {
 
     #[cfg(feature = "async")]
     pub(crate) fn finish_sim_end(&self) {
-        if self.handler.borrow().__indicate_asnyc() {
+        if self.handler.borrow().__indicate_async() {
             self.plugin_upstream(None);
             self.handler.borrow_mut().finish_sim_end();
             self.plugin_downstream();

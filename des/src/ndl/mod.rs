@@ -42,6 +42,14 @@
 //! }
 //! ```
 
+use crate::{
+    net::module::ModuleContext,
+    prelude::{
+        Channel, ChannelMetrics, EventLifecycle, GateServiceType, ModuleRef, NetworkRuntime,
+        ObjectPath,
+    },
+    time::Duration,
+};
 use des_ndl::{
     ast::Spanned,
     error::{Error, ErrorKind, Errors, RootError, RootResult},
@@ -51,17 +59,7 @@ use des_ndl::{
 use std::{path::Path, sync::Arc};
 
 mod registry;
-
-use crate::{
-    net::module::ModuleContext,
-    prelude::{
-        Channel, ChannelMetrics, EventLifecycle, GateServiceType, ModuleRef, NetworkRuntime,
-        ObjectPath,
-    },
-    time::Duration,
-};
-
-pub use self::registry::Registry;
+pub use self::registry::*;
 
 /// An application that creates a network-like
 /// simulation from a Ndl-Topology description.

@@ -9,15 +9,13 @@ mod api;
 pub use api::*;
 
 mod body;
-pub use body::{CustomSizeBody, MessageBody};
+pub use body::*;
 
 mod util;
-use util::AnyBox;
+use util::*;
 
 mod header;
-#[allow(unused_imports)]
-pub(crate) use header::*;
-pub use header::{MessageHeader, MessageId, MessageKind, MessageType};
+pub use header::*;
 
 ///
 /// A generic network message holding a payload.
