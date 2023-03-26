@@ -239,6 +239,24 @@ mod private {
     pub trait ParState {}
 }
 
+impl Par<Optional> {
+    fn new(key: &str, module: &str) -> Par {
+        if module.is_empty() {
+            Par {
+                key: key.to_string(),
+                value: None,
+                _phantom: PhantomData,
+            }
+        } else {
+            Par {
+                key: format!("{module}.{key}"),
+                value: None,
+                _phantom: PhantomData,
+            }
+        }
+    }
+}
+
 impl<S> Par<S>
 where
     S: private::ParState,

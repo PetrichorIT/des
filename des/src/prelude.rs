@@ -75,6 +75,7 @@ cfg_net! {
     pub use crate::net::ObjectPath;
     pub use crate::net::ParMap;
 
+    pub use crate::net::TopoEdge;
     pub use crate::net::TopoNode;
     pub use crate::net::Topology;
 

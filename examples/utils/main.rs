@@ -24,7 +24,7 @@ fn main() {
 
     let topo = app.globals().topology.lock().unwrap().clone();
 
-    assert_eq!(topo.nodes().count(), 4 + 1);
+    assert_eq!(topo.nodes().len(), 4 + 1);
     assert_eq!(topo.edges().count(), 14);
 
     let _ = topo.write_to_svg("examples/utils/graph");

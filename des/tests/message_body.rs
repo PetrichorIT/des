@@ -37,6 +37,7 @@ fn test_string() {
 }
 
 #[test]
+#[allow(unused_allocation)]
 fn test_box() {
     assert_eq!(Box::new(0u8).byte_len(), 1);
     assert_eq!(Box::new(0i128).byte_len(), 16);

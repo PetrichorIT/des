@@ -1,6 +1,7 @@
 use super::module::ModuleRef;
 use super::par::ParMap;
-use crate::net::{ObjectPath, Topology};
+use super::Topology;
+use crate::net::ObjectPath;
 use crate::runtime::{Application, EventLifecycle, Runtime};
 use crate::time::SimTime;
 use log::info;
