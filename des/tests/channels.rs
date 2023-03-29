@@ -38,7 +38,7 @@ impl Module for DropChanModule {
 #[test]
 #[serial]
 fn channel_dropping_message() {
-    let mut rt = NetworkRuntime::new(());
+    let mut rt = NetworkApplication::new(());
 
     let module = DropChanModule::build_named(ObjectPath::from("root".to_string()), &mut rt);
 
@@ -105,7 +105,7 @@ fn channel_buffering_message() {
     //     .interal_max_log_level(log::LevelFilter::Trace)
     //     .set_logger();
 
-    let mut rt = NetworkRuntime::new(());
+    let mut rt = NetworkApplication::new(());
 
     let module = BufferChanModule::build_named(ObjectPath::from("root".to_string()), &mut rt);
 
@@ -160,7 +160,7 @@ fn channel_instant_busy() {
     //     .interal_max_log_level(log::LevelFilter::Trace)
     //     .set_logger();
 
-    let mut rt = NetworkRuntime::new(());
+    let mut rt = NetworkApplication::new(());
 
     let module = SendMessageModule::build_named(ObjectPath::from("root".to_string()), &mut rt);
 

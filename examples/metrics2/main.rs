@@ -85,7 +85,7 @@ fn main() {
     )
     .unwrap();
     let rt = Runtime::new_with(
-        NetworkRuntime::new(app),
+        NetworkApplication::new(app),
         RuntimeOptions::seeded(123).max_time(SimTime::from(100.0)),
     );
     let _ = rt.run();

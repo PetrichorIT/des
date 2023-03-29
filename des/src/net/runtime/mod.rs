@@ -3,7 +3,6 @@ use super::par::ParMap;
 use super::Topology;
 use crate::net::ObjectPath;
 use crate::runtime::{Application, EventLifecycle, Runtime};
-use crate::time::SimTime;
 use log::info;
 use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
@@ -20,7 +19,7 @@ pub use self::ctx::*;
 ///
 /// * This type is only available of DES is build with the `"net"` feature.
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-pub struct NetworkRuntime<A> {
+pub struct NetworkApplication<A> {
     ///
     /// The set of module used in the network simulation.
     /// All module must be boxed, since they must conform to the
@@ -32,7 +31,7 @@ pub struct NetworkRuntime<A> {
     /// The globals provided by the runtime
     /// that cannot be mutated by the users.
     ///
-    globals: Arc<NetworkRuntimeGlobals>,
+    globals: Arc<NetworkApplicationGlobals>,
 
     ///
     /// A inner container for holding user defined global state.
@@ -40,15 +39,15 @@ pub struct NetworkRuntime<A> {
     pub inner: A,
 }
 
-impl<A> NetworkRuntime<A> {
+impl<A> NetworkApplication<A> {
     ///
-    /// Creates a new instance by wrapping 'inner' into a empty `NetworkRuntime<A>`.
+    /// Creates a new instance by wrapping 'inner' into a empty `NetworkApplication<A>`.
     ///
     #[must_use]
     pub fn new(inner: A) -> Self {
         let this = Self {
             module_list: Vec::new(),
-            globals: Arc::new(NetworkRuntimeGlobals::new()),
+            globals: Arc::new(NetworkApplicationGlobals::new()),
 
             inner,
         };
@@ -105,36 +104,39 @@ impl<A> NetworkRuntime<A> {
     }
 
     /// Returns the network runtime globals
-    pub fn globals(&self) -> Arc<NetworkRuntimeGlobals> {
+    pub fn globals(&self) -> Arc<NetworkApplicationGlobals> {
         self.globals.clone()
     }
 }
 
-impl<A> Application for NetworkRuntime<A>
+impl<A> Application for NetworkApplication<A>
 where
-    A: EventLifecycle<NetworkRuntime<A>>,
+    A: EventLifecycle<NetworkApplication<A>>,
 {
     type EventSet = NetEvents;
-    type Lifecycle = NetworkRuntimeLifecycle<A>;
+    type Lifecycle = NetworkApplicationLifecycle<A>;
 }
 
 #[doc(hidden)]
 #[derive(Debug)]
-pub struct NetworkRuntimeLifecycle<A: EventLifecycle<NetworkRuntime<A>>> {
+pub struct NetworkApplicationLifecycle<A: EventLifecycle<NetworkApplication<A>>> {
     _phantom: PhantomData<A>,
 }
 
-impl<A> EventLifecycle<NetworkRuntime<A>> for NetworkRuntimeLifecycle<A>
+impl<A> EventLifecycle<NetworkApplication<A>> for NetworkApplicationLifecycle<A>
 where
-    A: EventLifecycle<NetworkRuntime<A>>,
+    A: EventLifecycle<NetworkApplication<A>>,
 {
-    fn at_sim_start(rt: &mut Runtime<NetworkRuntime<A>>) {
+    fn at_sim_start(rt: &mut Runtime<NetworkApplication<A>>) {
         // Add inital event
         // this is done via an event to get the usual module buffer clearing behavoir
         // while the end ignores all send packets.
 
+        // (0) Start the contained application for lifetime behaviour
+        // - in case of NDL build topology with this call
         A::at_sim_start(rt);
 
+        // (1) Initalize globals acoording to build network topology
         rt.app
             .globals
             .topology
@@ -142,10 +144,58 @@ where
             .unwrap()
             .build(&rt.app.module_list);
 
-        rt.add_event(NetEvents::SimStartNotif(SimStartNotif()), SimTime::now());
+        // (2) Run network-node sim_starting stages
+        // - inline this to ensure this is run before any possible events
+
+        // This is a explicit for loop to prevent borrow rt only in the inner block
+        // allowing preemtive dropping of 'module' so that rt can be used in
+        // 'module_handle_jobs'.
+        let max_stage = rt
+            .app
+            .modules()
+            .iter()
+            .fold(1, |acc, module| acc.max(module.num_sim_start_stages()));
+
+        // (2.1) Call the stages in order, parallel over all modules
+        for stage in 0..max_stage {
+            // Direct indexing since rt must be borrowed mutably in handle_buffers.
+            for i in 0..rt.app.modules().len() {
+                // Use cloned handles to appease the brwchk
+                let module = rt.app.modules()[i].clone();
+                log_scope!(module.ctx.logger_token);
+
+                if stage < module.num_sim_start_stages() {
+                    info!("Calling at_sim_start({}).", stage);
+
+                    module.activate();
+                    module.at_sim_start(stage);
+                    module.deactivate();
+
+                    super::buf_process(&module, rt);
+                }
+            }
+        }
+
+        // (2.2) Ensure all sim_start stages have finished, in an async context
+        #[cfg(feature = "async")]
+        {
+            for i in 0..rt.app.modules().len() {
+                let module = rt.app.modules()[i].clone();
+                log_scope!(module.ctx.logger_token);
+
+                module.activate();
+                module.finish_sim_start();
+                module.deactivate();
+
+                super::buf_process(&module, rt);
+            }
+        }
+
+        // (2.3) Reset the logging scope.
+        log_scope!();
     }
 
-    fn at_sim_end(rt: &mut Runtime<NetworkRuntime<A>>) {
+    fn at_sim_end(rt: &mut Runtime<NetworkApplication<A>>) {
         for module in &mut rt.app.module_list {
             log_scope!(module.ctx.logger_token);
             info!("Calling 'at_sim_end'");
@@ -173,7 +223,7 @@ where
     }
 }
 
-impl<A> Debug for NetworkRuntime<A>
+impl<A> Debug for NetworkApplication<A>
 where
     A: Debug,
 {
@@ -184,7 +234,7 @@ where
             .map(|m| &m.ctx.path)
             .collect::<Vec<&ObjectPath>>();
 
-        f.debug_struct("NetworkRuntime")
+        f.debug_struct("NetworkApplication")
             .field("modules", &modules)
             .field("globals", &self.globals)
             .field("app", &self.inner)
@@ -192,7 +242,7 @@ where
     }
 }
 
-impl<A> Display for NetworkRuntime<A>
+impl<A> Display for NetworkApplication<A>
 where
     A: Display,
 {
@@ -202,11 +252,11 @@ where
 }
 
 ///
-/// The global parameters about a [`NetworkRuntime`] that are publicly
+/// The global parameters about a [`NetworkApplication`] that are publicly
 /// exposed.
 ///
 #[derive(Debug)]
-pub struct NetworkRuntimeGlobals {
+pub struct NetworkApplicationGlobals {
     ///
     /// The current state of the parameter tree, derived from *.par
     /// files and parameter changes at runtime.
@@ -219,7 +269,7 @@ pub struct NetworkRuntimeGlobals {
     pub topology: Mutex<Topology>,
 }
 
-impl NetworkRuntimeGlobals {
+impl NetworkApplicationGlobals {
     ///
     /// Creates a new instance of Self.
     ///
@@ -232,7 +282,7 @@ impl NetworkRuntimeGlobals {
     }
 }
 
-impl Default for NetworkRuntimeGlobals {
+impl Default for NetworkApplicationGlobals {
     fn default() -> Self {
         Self::new()
     }

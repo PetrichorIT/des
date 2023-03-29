@@ -115,7 +115,7 @@ where
 /// # Usage with module system
 ///
 /// If you want to use the module system for network-like simulations
-/// than you must create a [`NetworkRuntime<A>`] as app parameter for the core [`Runtime`].
+/// than you must create a [`NetworkApplication<A>`] as app parameter for the core [`Runtime`].
 /// This network runtime comes preconfigured with an event set and all managment
 /// event nessecary for the simulation. All you have to do is to pass the app into [`Runtime::new`]
 /// to create a runnable instance and the run it.
@@ -697,6 +697,17 @@ pub enum RuntimeResult<A> {
 }
 
 impl<A> RuntimeResult<A> {
+    /// Gets the contained application from the runtime result.
+    ///
+    /// An application is contained in each variant of a runtime result.
+    pub fn into_app(self) -> A {
+        match self {
+            Self::EmptySimulation { app } => app,
+            Self::Finished { app, .. } => app,
+            Self::PrematureAbort { app, .. } => app,
+        }
+    }
+
     ///
     /// Returns the contained [`PrematureAbort`](Self::PrematureAbort) variant
     /// consuming the `self`value.
@@ -842,12 +853,12 @@ impl<A> RuntimeResult<A> {
 }
 
 cfg_net! {
-    use crate::net::{gate::GateRef,  HandleMessageEvent, message::Message, MessageAtGateEvent, module::ModuleRef, NetEvents, NetworkRuntime};
+    use crate::net::{gate::GateRef,  HandleMessageEvent, message::Message, MessageAtGateEvent, module::ModuleRef, NetEvents, NetworkApplication};
 
-    impl<A> Runtime<NetworkRuntime<A>> where
-        A: EventLifecycle<NetworkRuntime<A>>,{
+    impl<A> Runtime<NetworkApplication<A>> where
+        A: EventLifecycle<NetworkApplication<A>>,{
         ///
-        /// Adds a message event into a [`Runtime<NetworkRuntime<A>>`] onto a gate.
+        /// Adds a message event into a [`Runtime<NetworkApplication<A>>`] onto a gate.
         ///
         pub fn add_message_onto(
             &mut self,
@@ -864,7 +875,7 @@ cfg_net! {
         }
 
         ///
-        /// Adds a message event into a [`Runtime<NetworkRuntime<A>>`] onto a module.
+        /// Adds a message event into a [`Runtime<NetworkApplication<A>>`] onto a module.
         ///
         pub fn handle_message_on(
             &mut self,

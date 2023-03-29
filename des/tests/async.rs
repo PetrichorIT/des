@@ -44,7 +44,7 @@ impl AsyncModule for QuasaiSyncModule {
 #[test]
 #[serial]
 fn quasai_sync_non_blocking() {
-    let mut rt = NetworkRuntime::new(());
+    let mut rt = NetworkApplication::new(());
 
     let module = QuasaiSyncModule::build_named(ObjectPath::from("RootModule".to_string()), &mut rt);
 
@@ -74,7 +74,7 @@ fn quasai_sync_non_blocking() {
             profiler,
         } => {
             assert_eq!(time, SimTime::ZERO);
-            assert_eq!(profiler.event_count, 11);
+            assert_eq!(profiler.event_count, 10);
 
             // let m1 = app
             //     .module(|m| m.module_core().name() == "RootModule")
@@ -190,7 +190,7 @@ impl AsyncModule for MutipleTasksModule {
 #[test]
 #[serial]
 fn mutiple_active_tasks() {
-    let mut rt = NetworkRuntime::new(());
+    let mut rt = NetworkApplication::new(());
 
     let module_a =
         MutipleTasksModule::build_named(ObjectPath::from("RootModule".to_string()), &mut rt);
@@ -212,8 +212,8 @@ fn mutiple_active_tasks() {
         } => {
             assert_eq!(time, SimTime::ZERO);
 
-            // SimStart + 2 * (Gate + HandleMessage)
-            assert_eq!(profiler.event_count, 5);
+            //  2 * (Gate + HandleMessage)
+            assert_eq!(profiler.event_count, 4);
 
             // let m1 = app
             //     .module(|m| m.module_core().name() == "RootModule")
@@ -264,7 +264,7 @@ fn one_module_timers() {
     //     .interal_max_log_level(log::LevelFilter::Trace)
     //     .set_logger();
 
-    let mut rt = NetworkRuntime::new(());
+    let mut rt = NetworkApplication::new(());
 
     let module_a =
         TimeSleepModule::build_named(ObjectPath::from("RootModule".to_string()), &mut rt);
@@ -293,7 +293,7 @@ fn one_module_timers() {
             profiler,
         } => {
             assert_eq!(time, 4.0);
-            assert_eq!(profiler.event_count, 7);
+            assert_eq!(profiler.event_count, 6);
         }
         _ => panic!("Expected runtime to finish"),
     }
@@ -306,7 +306,7 @@ fn one_module_timers() {
 #[test]
 #[serial]
 fn one_module_delayed_recv() {
-    let mut rt = NetworkRuntime::new(());
+    let mut rt = NetworkApplication::new(());
 
     let module_a =
         TimeSleepModule::build_named(ObjectPath::from("RootModule".to_string()), &mut rt);
@@ -336,15 +336,13 @@ fn one_module_delayed_recv() {
         } => {
             assert_eq!(time, 4.0);
 
-            // 1) SimStart (0s)
-            // 2) Gate #1 (0s)
-            // 3) HandleMessage #1 (0s)
-            // 4) Gate #2 (2s)
-            // 5) HandleMessage #2 (2s) (will finish sleep but wakeup was added later)
-            // 6) Wakeup aka NOP (2s)
-            // 7) Wakeup - sleep reloved - send in '5 (4s)
-            // 8) Wakeup - NOP - send in '6 (4s) // REMOVE
-            assert_eq!(profiler.event_count, 7);
+            // 1) Gate #1 (0s)
+            // 2) HandleMessage #1 (0s)
+            // 3) Gate #2 (2s)
+            // 4) HandleMessage #2 (2s) (will finish sleep but wakeup was added later)
+            // 5) Wakeup aka NOP (2s)
+            // 6) Wakeup - sleep reloved - send in '5 (4s)
+            assert_eq!(profiler.event_count, 6);
 
             // let m1 = app
             //     .module(|m| m.module_core().name() == "RootModule")
@@ -364,7 +362,7 @@ fn one_module_delayed_recv() {
 #[test]
 #[serial]
 fn mutiple_module_delayed_recv() {
-    let mut rt = NetworkRuntime::new(());
+    let mut rt = NetworkApplication::new(());
 
     let module_a =
         TimeSleepModule::build_named(ObjectPath::from("RootModule".to_string()), &mut rt);
@@ -417,7 +415,7 @@ fn mutiple_module_delayed_recv() {
         } => {
             assert_eq!(time, 5.0);
 
-            assert_eq!(profiler.event_count, 13);
+            assert_eq!(profiler.event_count, 12);
 
             // let m1 = app
             //     .module(|m| m.module_core().name() == "RootModule")
@@ -474,7 +472,7 @@ impl AsyncModule for SemaphoreModule {
 #[test]
 #[serial]
 fn semaphore_in_waiting_task() {
-    let mut rt = NetworkRuntime::new(());
+    let mut rt = NetworkApplication::new(());
 
     let module_a =
         SemaphoreModule::build_named(ObjectPath::from("RootModule".to_string()), &mut rt);
@@ -523,24 +521,7 @@ fn semaphore_in_waiting_task() {
             profiler,
         } => {
             assert_eq!(time, 3.0);
-
-            assert_eq!(profiler.event_count, 11);
-
-            // let m1 = app
-            //     .module(|m| m.module_core().name() == "RootModule")
-            //     .unwrap()
-            //     .self_as::<SemaphoreModule>()
-            //     .unwrap();
-
-            // assert!(m1.result.load(std::sync::atomic::Ordering::SeqCst));
-
-            // let m2 = app
-            //     .module(|m| m.module_core().name() == "OtherRootModule")
-            //     .unwrap()
-            //     .self_as::<SemaphoreModule>()
-            //     .unwrap();
-
-            // assert!(m2.result.load(std::sync::atomic::Ordering::SeqCst));
+            assert_eq!(profiler.event_count, 10);
         }
         _ => panic!("Expected runtime to finish"),
     }
@@ -566,7 +547,7 @@ impl AsyncModule for ShouldBlockSimStart {
 // #[test]
 // #[should_panic = "Join Idle: RuntimeIdle(())"]
 // fn sim_start_deadlock() {
-//     let mut rt = NetworkRuntime::new(());
+//     let mut rt = NetworkApplication::new(());
 //     let mut cx = BuildContext::new(&mut rt);
 
 //     let module_a = ShouldBlockSimStart::build_named(

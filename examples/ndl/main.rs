@@ -15,7 +15,7 @@ impl Module for A {
 fn main() {
     let options = RuntimeOptions::seeded(0x123).include_env();
 
-    let app = NetworkRuntime::new(
+    let app = NetworkApplication::new(
         NdlApplication::new("examples/ndl/main.ndl", registry![A, Alice, Bob]).unwrap(),
     );
 

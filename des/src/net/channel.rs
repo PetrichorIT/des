@@ -360,9 +360,9 @@ impl Channel {
     //     self: Arc<Self>,
     //     msg: Box<Message>,
     //     next_gate: &GateRef,
-    //     rt: &mut Runtime<NetworkRuntime<A>>,
+    //     rt: &mut Runtime<NetworkApplication<A>>,
     // ) where
-    //     A: EventLifecycle<NetworkRuntime<A>>,
+    //     A: EventLifecycle<NetworkApplication<A>>,
     // {
     //     let rng_ref = rng();
     //     let mut chan = self.inner.write().unwrap();

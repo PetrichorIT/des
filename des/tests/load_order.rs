@@ -78,7 +78,7 @@ impl Module for LowLevelModule {
 #[test]
 #[serial]
 fn load_order() {
-    let rt = NetworkRuntime::new(
+    let rt = NetworkApplication::new(
         NdlApplication::new(
             "tests/load_order.ndl",
             registry![TopLevelModule, MidLevelModule, LowLevelModule],

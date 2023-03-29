@@ -25,7 +25,7 @@ const EXAMPLE_NETWORK: &str = "
 #[test]
 #[serial]
 fn non_parse_read() {
-    let rt = NetworkRuntime::new(());
+    let rt = NetworkApplication::new(());
     let par = &rt.globals().parameters;
 
     par.build(EXAMPLE_NETWORK);
@@ -67,7 +67,7 @@ fn non_parse_read() {
 #[test]
 #[serial]
 fn parse_integers() {
-    let rt = NetworkRuntime::new(());
+    let rt = NetworkApplication::new(());
     let par = &rt.globals().parameters;
 
     par.build(EXAMPLE_TYPES);
@@ -118,7 +118,7 @@ fn parse_integers() {
 #[test]
 #[serial]
 fn parse_strings() {
-    let rt = NetworkRuntime::new(());
+    let rt = NetworkApplication::new(());
     let par = &rt.globals().parameters;
     par.build(EXAMPLE_TYPES);
 

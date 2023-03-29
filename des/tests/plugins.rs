@@ -86,7 +86,7 @@ impl Module for PluginCreation {
 fn plugin_raw_creation() {
     // Logger::new().set_logger();
 
-    let mut app = NetworkRuntime::new(());
+    let mut app = NetworkApplication::new(());
 
     let root = PluginCreation::build_named(ObjectPath::from("root"), &mut app);
     app.create_module(root);
@@ -95,7 +95,7 @@ fn plugin_raw_creation() {
     let result = rt.run().unwrap();
 
     assert_eq!(result.1, SimTime::from_duration(Duration::from_secs(99)));
-    assert_eq!(result.2.event_count, 101);
+    assert_eq!(result.2.event_count, 100);
 }
 
 struct RecrusivePluginCreationPlugin {
@@ -145,7 +145,7 @@ impl Module for PluginInPluginCreation {
 fn plugin_in_plugin_creation() {
     // Logger::new().set_logger();
 
-    let mut app = NetworkRuntime::new(());
+    let mut app = NetworkApplication::new(());
 
     let module = PluginInPluginCreation::build_named(ObjectPath::from("root"), &mut app);
     app.create_module(module);
@@ -158,7 +158,7 @@ fn plugin_in_plugin_creation() {
     };
 
     assert_eq!(time, 9.0);
-    assert_eq!(profiler.event_count, 9 + 1);
+    assert_eq!(profiler.event_count, 9);
 }
 
 struct RecrusivePluginCreationPlugin2 {
@@ -209,7 +209,7 @@ impl Module for PluginInPluginCreation2 {
 fn plugin_in_plugin_creation2() {
     // Logger::new().set_logger();
 
-    let mut app = NetworkRuntime::new(());
+    let mut app = NetworkApplication::new(());
 
     let module = PluginInPluginCreation2::build_named(ObjectPath::from("root"), &mut app);
     app.create_module(module);
@@ -222,7 +222,7 @@ fn plugin_in_plugin_creation2() {
     };
 
     assert_eq!(time, 10.0);
-    assert_eq!(profiler.event_count, 11 + 1);
+    assert_eq!(profiler.event_count, 11);
 }
 
 struct PluginPriority;
@@ -251,7 +251,7 @@ impl Module for PluginPriority {
 fn plugin_priority() {
     // Logger::new().set_logger();
 
-    let mut app = NetworkRuntime::new(());
+    let mut app = NetworkApplication::new(());
 
     let module = PluginPriority::build_named(ObjectPath::from("root"), &mut app);
     app.create_module(module);
@@ -264,7 +264,7 @@ fn plugin_priority() {
     };
 
     assert_eq!(time, 99.0);
-    assert_eq!(profiler.event_count, 100 + 1);
+    assert_eq!(profiler.event_count, 100);
 }
 
 struct ActivitySensor {
@@ -330,7 +330,7 @@ impl Module for PluginPriorityDefer {
 fn plugin_priority_defer() {
     // Logger::new().set_logger();
 
-    let mut app = NetworkRuntime::new(());
+    let mut app = NetworkApplication::new(());
 
     let module = PluginPriorityDefer::build_named(ObjectPath::from("root"), &mut app);
     app.create_module(module);
@@ -343,7 +343,7 @@ fn plugin_priority_defer() {
     };
 
     assert_eq!(time, 99.0);
-    assert_eq!(profiler.event_count, 100 + 1);
+    assert_eq!(profiler.event_count, 100);
 }
 
 struct PluginDuplication {
@@ -380,7 +380,7 @@ impl Module for PluginDuplication {
 fn plugin_duplication() {
     // Logger::new().finish().unwrap();
 
-    let mut app = NetworkRuntime::new(());
+    let mut app = NetworkApplication::new(());
 
     let module = PluginDuplication::build_named(ObjectPath::from("root"), &mut app);
     app.create_module(module);
@@ -393,7 +393,7 @@ fn plugin_duplication() {
     };
 
     assert_eq!(time, 99.0);
-    assert_eq!(profiler.event_count, 100 + 1);
+    assert_eq!(profiler.event_count, 100);
 }
 
 struct PluginRemoval {
@@ -450,7 +450,7 @@ impl Module for PluginRemoval {
 fn plugin_removal() {
     // Logger::new().set_logger();
 
-    let mut app = NetworkRuntime::new(());
+    let mut app = NetworkApplication::new(());
 
     let module = PluginRemoval::build_named(ObjectPath::from("root"), &mut app);
     app.create_module(module);
@@ -463,7 +463,7 @@ fn plugin_removal() {
     };
 
     assert_eq!(time, 299.0);
-    assert_eq!(profiler.event_count, 201 + 1);
+    assert_eq!(profiler.event_count, 201);
 }
 
 struct PanicPolicyAbort;
@@ -509,7 +509,7 @@ impl Module for PanicPolicyCapture {
 fn plugin_panic_capture() {
     // Logger::new().set_logger();
 
-    let mut app = NetworkRuntime::new(());
+    let mut app = NetworkApplication::new(());
 
     let module = PanicPolicyCapture::build_named(ObjectPath::from("root"), &mut app);
     app.create_module(module);
@@ -519,7 +519,7 @@ fn plugin_panic_capture() {
 
     let result = result.unwrap();
     assert_eq!(result.1.as_secs(), 9);
-    assert_eq!(result.2.event_count, 10 + 1);
+    assert_eq!(result.2.event_count, 10);
 }
 
 struct PanicAtThree;
@@ -567,7 +567,7 @@ impl Module for PanicPolicyRestart {
 fn plugin_panic_restart() {
     // Logger::new().set_logger();
 
-    let mut app = NetworkRuntime::new(());
+    let mut app = NetworkApplication::new(());
 
     let module = PanicPolicyRestart::build_named(ObjectPath::from("root"), &mut app);
     app.create_module(module);
@@ -577,7 +577,7 @@ fn plugin_panic_restart() {
 
     let result = result.unwrap();
     assert_eq!(result.1.as_secs(), 99);
-    assert_eq!(result.2.event_count, 100 + 1);
+    assert_eq!(result.2.event_count, 100);
 }
 
 struct PluginErrorPlugin(Arc<AtomicBool>);
@@ -645,7 +645,7 @@ impl Module for PluginErrorModule {
 fn plugin_error_expected_t() {
     // Logger::new().set_logger();
 
-    let mut rt = NetworkRuntime::new(());
+    let mut rt = NetworkApplication::new(());
 
     let module = PluginErrorModule::build_named(ObjectPath::from("root".to_string()), &mut rt);
     rt.create_module(module);
@@ -711,7 +711,7 @@ impl Module for PluginErrorTriggerModule {
 fn plugin_error_expected_t_inside_other_plugin() {
     // Logger::new().set_logger();
 
-    let mut rt = NetworkRuntime::new(());
+    let mut rt = NetworkApplication::new(());
 
     let module =
         PluginErrorTriggerModule::build_named(ObjectPath::from("root".to_string()), &mut rt);
@@ -794,7 +794,7 @@ impl Module for PluginErrorMalfunction {
 #[test]
 #[serial]
 fn plugin_error_malfunction_or_priority() {
-    let mut rt = NetworkRuntime::new(());
+    let mut rt = NetworkApplication::new(());
 
     let module = PluginErrorMalfunction::build_named(ObjectPath::from("root".to_string()), &mut rt);
     rt.create_module(module);
@@ -881,7 +881,7 @@ impl Module for PluginRemovalFromMain {
 #[test]
 #[serial]
 fn plugin_removal_from_main() {
-    let mut rt = NetworkRuntime::new(());
+    let mut rt = NetworkApplication::new(());
 
     let module = PluginRemovalFromMain::build_named(ObjectPath::from("root".to_string()), &mut rt);
     rt.create_module(module);
@@ -962,7 +962,7 @@ fn plugin_removal_from_upstream() {
     //     .interal_max_log_level(log::LevelFilter::Trace)
     //     .set_logger();
 
-    let mut rt = NetworkRuntime::new(());
+    let mut rt = NetworkApplication::new(());
 
     let module =
         PluginRemovalFromUpstream::build_named(ObjectPath::from("root".to_string()), &mut rt);
@@ -1069,7 +1069,7 @@ fn plugin_removal_from_downstream() {
     //     .interal_max_log_level(log::LevelFilter::Trace)
     //     .set_logger();
 
-    let mut rt = NetworkRuntime::new(());
+    let mut rt = NetworkApplication::new(());
 
     let module =
         PluginRemovalFromDownstream::build_named(ObjectPath::from("root".to_string()), &mut rt);
@@ -1153,7 +1153,7 @@ fn plugin_shutdown_non_persistent_data() {
     //     .interal_max_log_level(log::LevelFilter::Trace)
     //     .set_logger();
 
-    let mut rt = NetworkRuntime::new(());
+    let mut rt = NetworkApplication::new(());
 
     let module = PluginAtShutdown::build_named(ObjectPath::from("root".to_string()), &mut rt);
     rt.create_module(module);
@@ -1226,7 +1226,7 @@ fn plugin_shutdown_persistent_data() {
     //     .interal_max_log_level(log::LevelFilter::Trace)
     //     .set_logger();
 
-    let mut rt = NetworkRuntime::new(());
+    let mut rt = NetworkApplication::new(());
 
     let module =
         PluginAtShutdownPersistent::build_named(ObjectPath::from("root".to_string()), &mut rt);
@@ -1290,7 +1290,7 @@ fn plugin_shutdown_downtime() {
     //     .interal_max_log_level(log::LevelFilter::Trace)
     //     .set_logger();
 
-    let mut rt = NetworkRuntime::new(());
+    let mut rt = NetworkApplication::new(());
 
     let module =
         PluginAtShutdownDowntime::build_named(ObjectPath::from("root".to_string()), &mut rt);
@@ -1346,7 +1346,7 @@ fn plugin_with_state() {
         .interal_max_log_level(log::LevelFilter::Trace)
         .set_logger();
 
-    let mut rt = NetworkRuntime::new(());
+    let mut rt = NetworkApplication::new(());
 
     let module = PluginWithStateModule::build_named(ObjectPath::from("root".to_string()), &mut rt);
     rt.create_module(module);

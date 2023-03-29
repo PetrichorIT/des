@@ -228,7 +228,7 @@
 //! Now we have defined everything to create the simulation. To do that create an
 //! [`NdlApplication`](crate::ndl::NdlApplication) to load our network topology. This application requies
 //! a [`Registry`](crate::ndl::Registry) of all known modules types, to link the Ndl-Modules to their rust struct.
-//! This application can be used to instantiate a [`NetworkRuntime`](crate::net::NetworkRuntime)
+//! This application can be used to instantiate a [`NetworkApplication`](crate::net::NetworkApplication)
 //! (provided by feature `net`),
 //! which in turn can be passed to the core [`Runtime`](crate::runtime::Runtime) of [`des`](crate).
 //! This runtime can than be executed, to run the simulation to its end.
@@ -247,7 +247,7 @@
 //! fn main() {
 //!     # return;
 //!     let app = NdlApplication::new("main.ndl", registry![Ping, Pong, MyTestCase]).unwrap();
-//!     let rt = Runtime::new(NetworkRuntime::new(app));
+//!     let rt = Runtime::new(NetworkApplication::new(app));
 //!     let result = rt.run();
 //!     println!("{:?}", result);
 //! }

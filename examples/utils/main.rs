@@ -12,7 +12,7 @@ impl Module for A {
 }
 
 fn main() {
-    let mut app = NetworkRuntime::new(
+    let mut app = NetworkApplication::new(
         NdlApplication::new("examples/utils/main.ndl", registry![A, Alice, Bob])
             .map_err(|e| println!("{e}"))
             .unwrap(),

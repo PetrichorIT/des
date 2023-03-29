@@ -37,7 +37,7 @@
 //!             return;
 //!         },
 //!     };
-//!     let rt = Runtime::new(NetworkRuntime::new(app));
+//!     let rt = Runtime::new(NetworkApplication::new(app));
 //!     let _ = rt.run();
 //! }
 //! ```
@@ -45,7 +45,7 @@
 use crate::{
     net::module::ModuleContext,
     prelude::{
-        Channel, ChannelMetrics, EventLifecycle, GateServiceType, ModuleRef, NetworkRuntime,
+        Channel, ChannelMetrics, EventLifecycle, GateServiceType, ModuleRef, NetworkApplication,
         ObjectPath,
     },
     time::Duration,
@@ -65,7 +65,7 @@ pub use self::registry::*;
 /// simulation from a Ndl-Topology description.
 ///
 /// Use this type to manage loading of Ndl-Assets and parameter files.
-/// Upon creation this type can be passed to a [`NetworkRuntime`]
+/// Upon creation this type can be passed to a [`NetworkApplication`]
 /// to instanitate a network simulation. When the simulation is executed
 /// this type holds a reference to the network modules itself, which
 /// can then be extraced after from a [`RuntimeResult`](crate::runtime::RuntimeResult).
@@ -136,8 +136,8 @@ impl NdlApplication {
     }
 }
 
-impl EventLifecycle<NetworkRuntime<Self>> for NdlApplication {
-    fn at_sim_start(rt: &mut crate::prelude::Runtime<NetworkRuntime<Self>>) {
+impl EventLifecycle<NetworkApplication<Self>> for NdlApplication {
+    fn at_sim_start(rt: &mut crate::prelude::Runtime<NetworkApplication<Self>>) {
         rt.app.inner.handle = Some(Self::build_at(
             rt,
             rt.app.inner.tree.clone(),
@@ -150,7 +150,7 @@ impl EventLifecycle<NetworkRuntime<Self>> for NdlApplication {
 impl NdlApplication {
     #[allow(clippy::needless_pass_by_value)]
     fn build_at(
-        rt: &mut crate::prelude::Runtime<NetworkRuntime<Self>>,
+        rt: &mut crate::prelude::Runtime<NetworkApplication<Self>>,
         ir: Arc<ir::Module>,
         path: &ObjectPath,
         parent: Option<ModuleRef>,

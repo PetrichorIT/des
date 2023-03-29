@@ -50,8 +50,8 @@ cfg_net! {
 
     pub use crate::net::message::{send, send_in, send_at, schedule_in, schedule_at};
 
-    pub use crate::net::NetworkRuntime;
-    pub use crate::net::NetworkRuntimeGlobals;
+    pub use crate::net::NetworkApplication;
+    pub use crate::net::NetworkApplicationGlobals;
 
     pub use crate::net::channel::Channel;
     pub use crate::net::channel::ChannelMetrics;

@@ -124,7 +124,7 @@ fn small_network() -> RootResult<()> {
         "tests/ndl/small_network/main.ndl",
         registry![Main, Node, Router, Debugger],
     )?;
-    let mut app = NetworkRuntime::new(ndl);
+    let mut app = NetworkApplication::new(ndl);
     app.include_par_file("tests/ndl/small_network/main.par");
 
     let r = Runtime::new_with(app, RuntimeOptions::seeded(123).max_time(1000.0.into()))
@@ -144,7 +144,7 @@ fn ring_topology() -> RootResult<()> {
         "tests/ndl/ring_topo/main.ndl",
         registry![Main, Node, Router, Debugger],
     )?;
-    let mut app = NetworkRuntime::new(ndl);
+    let mut app = NetworkApplication::new(ndl);
     app.include_par_file("tests/ndl/ring_topo/main.par");
 
     let r = Runtime::new_with(app, RuntimeOptions::seeded(123).max_time(1000.0.into()))

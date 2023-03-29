@@ -2,7 +2,9 @@
 
 use log::info;
 
-use super::{HandleMessageEvent, MessageAtGateEvent, NetworkRuntime, NetworkRuntimeGlobals};
+use super::{
+    HandleMessageEvent, MessageAtGateEvent, NetworkApplication, NetworkApplicationGlobals,
+};
 use crate::net::module::{MOD_CTX, SETUP_FN};
 use crate::net::{gate::GateRef, message::Message, NetEvents};
 use crate::prelude::{module_id, EventLifecycle, GateServiceType, ModuleRef};
@@ -30,7 +32,7 @@ struct BufferContext {
     #[allow(clippy::option_option)]
     shutdown: Option<Option<SimTime>>,
     // globals
-    globals: Option<Weak<NetworkRuntimeGlobals>>,
+    globals: Option<Weak<NetworkApplicationGlobals>>,
 }
 
 unsafe impl Send for BufferContext {}
@@ -42,10 +44,10 @@ unsafe impl Sync for BufferContext {}
 /// # Panics
 ///
 /// This function panics if the no runtime is currently active.
-/// Note that a runtime is active if a instance of [`NetworkRuntime`] exists.
+/// Note that a runtime is active if a instance of [`NetworkApplication`] exists.
 ///
 #[must_use]
-pub fn globals() -> Arc<NetworkRuntimeGlobals> {
+pub fn globals() -> Arc<NetworkApplicationGlobals> {
     let ctx = BUF_CTX.lock();
     ctx.globals
         .as_ref()
@@ -147,7 +149,7 @@ pub(crate) fn buf_schedule_shutdown(restart: Option<SimTime>) {
     ctx.shutdown = Some(restart);
 }
 
-pub(crate) fn buf_set_globals(globals: Weak<NetworkRuntimeGlobals>) {
+pub(crate) fn buf_set_globals(globals: Weak<NetworkApplicationGlobals>) {
     let mut ctx = BUF_CTX.lock();
     ctx.globals = Some(globals);
 
@@ -158,9 +160,9 @@ pub(crate) fn buf_set_globals(globals: Weak<NetworkRuntimeGlobals>) {
     }
 }
 
-pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<NetworkRuntime<A>>)
+pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<NetworkApplication<A>>)
 where
-    A: EventLifecycle<NetworkRuntime<A>>,
+    A: EventLifecycle<NetworkApplication<A>>,
 {
     let mut ctx = BUF_CTX.lock();
 

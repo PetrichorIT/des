@@ -58,7 +58,7 @@ struct TestCase {
 
 impl TestCase {
     fn build() -> Self {
-        let mut app = NetworkRuntime::new(());
+        let mut app = NetworkApplication::new(());
 
         let parent = Parent::build_named(ObjectPath::from("Root".to_string()), &mut app);
 

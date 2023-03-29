@@ -43,7 +43,7 @@ fn main() {
             panic!("exiting due to previouis error")
         }
     };
-    let app = NetworkRuntime::new(ndl);
+    let app = NetworkApplication::new(ndl);
     let rt = Runtime::new_with(app, RuntimeOptions::seeded(123).max_itr(10));
     let _ = rt.run();
 }

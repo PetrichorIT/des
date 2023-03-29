@@ -64,7 +64,7 @@ static DROPPED_STATELESS_SHUTDOWN: AtomicUsize = AtomicUsize::new(0);
 fn stateless_module_shudown() {
     DROPPED_STATELESS_SHUTDOWN.store(0, Ordering::SeqCst);
 
-    let mut rt = NetworkRuntime::new(());
+    let mut rt = NetworkApplication::new(());
 
     let module = StatelessModule::build_named(ObjectPath::from("RootModule"), &mut rt);
     let gate = module.create_gate("in", GateServiceType::Input);
@@ -116,7 +116,7 @@ static DROPPED_STATLESS_RESTART: AtomicUsize = AtomicUsize::new(0);
 fn stateless_module_restart() {
     DROPPED_STATLESS_RESTART.store(0, Ordering::SeqCst);
 
-    let mut rt = NetworkRuntime::new(());
+    let mut rt = NetworkApplication::new(());
 
     let module = StatelessModuleRestart::build_named(ObjectPath::from("RootModule"), &mut rt);
     let gate = module.create_gate("in", GateServiceType::Input);
@@ -183,7 +183,7 @@ static DROPPED_STATFULL_RESTART: AtomicUsize = AtomicUsize::new(0);
 fn statefull_module_restart() {
     DROPPED_STATFULL_RESTART.store(0, Ordering::SeqCst);
 
-    let mut rt = NetworkRuntime::new(());
+    let mut rt = NetworkApplication::new(());
 
     let module = StatefullModule::build_named(ObjectPath::from("RootModule"), &mut rt);
     let gate = module.create_gate("in", GateServiceType::Input);
@@ -233,7 +233,7 @@ static DROPPED_SHUTDOWN_VIA_HANDLE: AtomicUsize = AtomicUsize::new(0);
 fn shutdown_via_async_handle() {
     DROPPED_SHUTDOWN_VIA_HANDLE.store(0, Ordering::SeqCst);
 
-    let mut rt = NetworkRuntime::new(());
+    let mut rt = NetworkApplication::new(());
 
     let module = ShutdownViaHandleModule::build_named(ObjectPath::from("RootModule"), &mut rt);
     rt.create_module(module);
@@ -277,7 +277,7 @@ static DROPPED_RESTART_VIA_HANDLE: AtomicUsize = AtomicUsize::new(0);
 fn restart_via_async_handle() {
     DROPPED_RESTART_VIA_HANDLE.store(0, Ordering::SeqCst);
 
-    let mut rt = NetworkRuntime::new(());
+    let mut rt = NetworkApplication::new(());
 
     let module = RestartViaHandleModule::build_named(ObjectPath::from("RootModule"), &mut rt);
     rt.create_module(module);

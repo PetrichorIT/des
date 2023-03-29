@@ -11,7 +11,7 @@ fn main() {
         .map_err(|e| println!("{e}"))
         .unwrap();
 
-    let rt = Runtime::new_with(NetworkRuntime::new(app), RuntimeOptions::seeded(0x123));
+    let rt = Runtime::new_with(NetworkApplication::new(app), RuntimeOptions::seeded(0x123));
 
     let (app, time, p) = rt.run().unwrap();
     let globals = app.globals();

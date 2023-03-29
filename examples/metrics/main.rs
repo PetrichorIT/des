@@ -49,7 +49,7 @@ fn main() {
 
     let app = NdlApplication::new("examples/metrics/main.ndl", registry![Alice, Main]).unwrap();
     let rt = Runtime::new_with(
-        NetworkRuntime::new(app),
+        NetworkApplication::new(app),
         RuntimeOptions::seeded(123).max_itr(1000),
     );
     let _ = rt.run();

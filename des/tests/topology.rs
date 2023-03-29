@@ -22,8 +22,8 @@ fn topology_load() {
     )
     .map_err(|e| println!("{e}"))
     .unwrap();
-    let rt = Runtime::new(NetworkRuntime::new(app));
-    let (app, _, _) = rt.run().unwrap();
+    let rt = Runtime::new(NetworkApplication::new(app));
+    let app = rt.run().into_app();
     let mut topo = app.globals().topology.lock().unwrap().clone();
 
     topo.filter_nodes(|n| n.module.name() != "node[2]");

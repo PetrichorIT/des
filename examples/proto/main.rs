@@ -87,7 +87,7 @@ fn main() {
 
     // println!("{:?}", app.globals().parameters);
 
-    let rt = Runtime::new_with(NetworkRuntime::new(app), RuntimeOptions::seeded(0x123));
+    let rt = Runtime::new_with(NetworkApplication::new(app), RuntimeOptions::seeded(0x123));
     let (app, _time, _event_count) = rt.run().unwrap();
 
     let _ = app

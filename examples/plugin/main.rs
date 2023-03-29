@@ -85,7 +85,7 @@ fn main() {
     set_setup_fn(empty);
 
     let app = NdlApplication::new("examples/plugin/main.ndl", registry![A, B, Main]).unwrap();
-    let app = NetworkRuntime::new(app);
+    let app = NetworkApplication::new(app);
     let rt = Runtime::new(app);
     let _res = rt.run();
 }
