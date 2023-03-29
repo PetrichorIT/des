@@ -276,6 +276,25 @@ impl Topology {
         }
     }
 
+    /// Checks whether all links are bidirectional,
+    /// thus all links will be recognized as routing ports.
+    pub fn all_links_bidiretional(&self) -> bool {
+        for i in 0..self.nodes.len() {
+            for edge in self.edges_for(i) {
+                let dst_edges = self.edges_for(edge.dst_id);
+                let peer = dst_edges.iter().find(|e| e.dst_id == i);
+                if let Some(peer) = peer {
+                    if peer.cost != edge.cost {
+                        return false;
+                    }
+                } else {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
     /// Creates a .dot output for visualizing the module graph.
     #[must_use]
     pub fn as_dot(&self) -> String {

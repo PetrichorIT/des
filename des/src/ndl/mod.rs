@@ -256,7 +256,7 @@ impl From<&ir::Link> for ChannelMetrics {
             cost: value
                 .fields
                 .get("cost")
-                .map_or(0.0, ir::Literal::as_float_casted),
+                .map_or(1.0, ir::Literal::as_float_casted),
             queuesize: value
                 .fields
                 .get("queuesize")

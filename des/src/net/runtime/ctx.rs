@@ -138,6 +138,11 @@ pub(crate) fn buf_schedule_at(msg: Message, arrival_time: SimTime) {
 }
 
 pub(crate) fn buf_schedule_shutdown(restart: Option<SimTime>) {
+    assert!(
+        restart.map(|r| r >= SimTime::now()).unwrap_or(true),
+        "Restart point cannot be in the past"
+    );
+
     let mut ctx = BUF_CTX.lock();
     ctx.shutdown = Some(restart);
 }
