@@ -35,6 +35,7 @@ mod bench;
 pub use bench::*;
 
 pub(crate) const FT_NET: bool = cfg!(feature = "net");
+pub(crate) const FT_NDL: bool = cfg!(feature = "ndl");
 pub(crate) const FT_CQUEUE: bool = cfg!(feature = "cqueue");
 pub(crate) const FT_INTERNAL_METRICS: bool = cfg!(feature = "metrics");
 pub(crate) const FT_ASYNC: bool = cfg!(feature = "async");
@@ -327,7 +328,7 @@ where
             .unwrap_or_else(|| StdRng::from_rng(OsRng::default()).unwrap());
         *unsafe { &mut *RNG.get() } = Some(rng);
 
-        let mut this = Self {
+        Self {
             future_event_set: FutureEventSet::new_with(&options),
 
             event_id: 0,
@@ -350,87 +351,13 @@ where
             profiler: Profiler::default(),
 
             app,
-        };
-
-        macro_rules! symbol {
-            ($i:ident) => {
-                if $i {
-                    SYM_CHECKMARK
-                } else {
-                    SYM_CROSSMARK
-                }
-            };
         }
-
-        // Startup message
-        println!("\u{23A1}");
-        println!("\u{23A2} Simulation starting");
-        println!(
-            "\u{23A2}  net [{}] metrics [{}] cqueue [{}] async[{}]",
-            symbol!(FT_NET),
-            symbol!(FT_INTERNAL_METRICS),
-            symbol!(FT_CQUEUE),
-            symbol!(FT_ASYNC)
-        );
-        println!(
-            "\u{23A2}  Executor := {}",
-            this.future_event_set.descriptor()
-        );
-        println!("\u{23A2}  Event limit := {}", this.limit);
-        println!("\u{23A3}");
-
-        A::Lifecycle::at_sim_start(&mut this);
-        this
     }
 
     fn poison_cleanup() {
         // NOP
     }
 
-    ///
-    /// Processes the next event in the future event list by calling its handler.
-    /// Returns `true` if there is another event in queue, false if not.
-    ///
-    /// This function requires the caller to guarantee that at least one
-    /// event exists in the future event set.
-    ///
-    #[allow(clippy::should_implement_trait)]
-    pub fn next(&mut self) -> bool {
-        debug_assert!(!self.future_event_set.is_empty());
-
-        let (event, time) = self.future_event_set.fetch_next(
-            #[cfg(feature = "metrics")]
-            Arc::clone(&self.profiler.metrics),
-        );
-
-        self.itr += 1;
-
-        if self.check_break_condition(time) {
-            self.future_event_set.add(
-                time,
-                event,
-                #[cfg(feature = "metrics")]
-                Arc::clone(&self.profiler.metrics),
-            );
-            return false;
-        }
-
-        // Let this be the only position where SimTime is changed
-        SimTime::set_now(time);
-
-        event.handle(self);
-        !self.future_event_set.is_empty()
-    }
-
-    ///
-    /// Returns true if the one of the break conditions is met.
-    ///
-    #[inline]
-    fn check_break_condition(&self, time: SimTime) -> bool {
-        self.limit.applies(self.itr, time)
-    }
-
-    ///
     /// Runs the application until it terminates or a breaking condition
     /// is reached.
     ///
@@ -476,37 +403,115 @@ where
     /// }
     ///
     /// ```
-    ///
     #[must_use]
     pub fn run(mut self) -> RuntimeResult<A> {
-        self.profiler.start();
+        // (0) Start sim-start
+        self.start();
 
-        if self.future_event_set.is_empty() {
-            if !self.quiet {
-                println!("\u{23A1}");
-                println!("\u{23A2} Empty simulation");
-                println!("\u{23A2}  Ended at event #0 after 0s");
-                println!("\u{23A3}");
-            }
-            return RuntimeResult::EmptySimulation { app: self.app };
+        // (1) Event main loop
+        if !self.future_event_set.is_empty() {
+            while self.next() {}
         }
-        while self.next() {}
 
+        // (2) Finish sim-end
         self.finish()
     }
 
+    fn start(&mut self) {
+        macro_rules! symbol {
+            ($i:ident) => {
+                if $i {
+                    SYM_CHECKMARK
+                } else {
+                    SYM_CROSSMARK
+                }
+            };
+        }
+
+        // (0) Publish sim-start message
+        println!("\u{23A1}");
+        println!("\u{23A2} Simulation starting");
+        println!(
+            "\u{23A2}  net [{}] metrics [{}] cqueue [{}] ndl[{}] async[{}]",
+            symbol!(FT_NET),
+            symbol!(FT_INTERNAL_METRICS),
+            symbol!(FT_CQUEUE),
+            symbol!(FT_NDL),
+            symbol!(FT_ASYNC),
+        );
+        println!(
+            "\u{23A2}  Executor := {}",
+            self.future_event_set.descriptor()
+        );
+        println!("\u{23A2}  Event limit := {}", self.limit);
+        println!("\u{23A3}");
+
+        // (1) Start profiler
+        self.profiler.start();
+
+        // (2) sim-starting on application object
+        A::Lifecycle::at_sim_start(self);
+    }
+
+    /// Processes the next event in the future event list by calling its handler.
+    /// Returns `true` if there is another event in queue, false if not.
     ///
+    /// This function requires the caller to guarantee that at least one
+    /// event exists in the future event set.
+    #[allow(clippy::should_implement_trait)]
+    fn next(&mut self) -> bool {
+        debug_assert!(!self.future_event_set.is_empty());
+
+        let (event, time) = self.future_event_set.fetch_next(
+            #[cfg(feature = "metrics")]
+            Arc::clone(&self.profiler.metrics),
+        );
+
+        self.itr += 1;
+
+        if self.limit.applies(self.itr, time) {
+            self.future_event_set.add(
+                time,
+                event,
+                #[cfg(feature = "metrics")]
+                Arc::clone(&self.profiler.metrics),
+            );
+            return false;
+        }
+
+        // Let this be the only position where SimTime is changed
+        SimTime::set_now(time);
+
+        event.handle(self);
+        !self.future_event_set.is_empty()
+    }
+
     /// Decontructs the runtime and returns the application and the final `sim_time`.
     ///
     /// This funtions should only be used when running the simulation with manual calls
     /// to [`next`](Runtime::next).
-    ///
     #[allow(unused_mut)]
     #[must_use]
-    pub fn finish(mut self) -> RuntimeResult<A> {
+    fn finish(mut self) -> RuntimeResult<A> {
         // Call the fin-handler on the allocated application
         A::Lifecycle::at_sim_end(&mut self);
         self.profiler.finish(self.itr);
+
+        if self.future_event_set.is_empty() && self.itr == 0 {
+            if !self.quiet {
+                println!("\u{23A1}");
+                println!("\u{23A2} Empty simulation");
+                println!("\u{23A2}  Ended at event #0 after 0s");
+                #[cfg(feature = "metrics")]
+                {
+                    println!("\u{23A2}");
+                    self.profiler.metrics.borrow_mut().finish();
+                }
+                println!("\u{23A3}");
+            }
+
+            return RuntimeResult::EmptySimulation { app: self.app };
+        }
 
         if self.future_event_set.is_empty() {
             let time = self.sim_time();
@@ -515,13 +520,11 @@ where
                 println!("\u{23A1}");
                 println!("\u{23A2} Simulation ended");
                 println!("\u{23A2}  Ended at event #{} after {}", self.itr, time);
-
                 #[cfg(feature = "metrics")]
                 {
                     println!("\u{23A2}");
                     self.profiler.metrics.borrow_mut().finish();
                 }
-
                 println!("\u{23A3}");
             }
 
@@ -542,13 +545,11 @@ where
                     self.future_event_set.len(),
                     time
                 );
-
                 #[cfg(feature = "metrics")]
                 {
                     println!("\u{23A2}");
                     self.profiler.metrics.borrow_mut().finish();
                 }
-
                 println!("\u{23A3}");
             }
 

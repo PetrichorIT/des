@@ -339,3 +339,46 @@ fn random_event(rt: &mut Runtime<App>) -> MyEventSet {
         MyEventSet::B(B { id: rt.random() })
     }
 }
+
+struct DeferredApplication {
+    started: bool,
+    ended: bool,
+}
+impl EventLifecycle for DeferredApplication {
+    fn at_sim_start(rt: &mut Runtime<Self>) {
+        rt.app.started = true;
+    }
+    fn at_sim_end(rt: &mut Runtime<Self>) {
+        rt.app.ended = true;
+    }
+}
+impl Application for DeferredApplication {
+    type Lifecycle = Self;
+    type EventSet = DeferredES;
+}
+
+struct DeferredES;
+impl EventSet<DeferredApplication> for DeferredES {
+    fn handle(self, _rt: &mut Runtime<DeferredApplication>) {}
+}
+
+#[test]
+#[serial]
+fn deferred_sim_start() {
+    let app = DeferredApplication {
+        started: false,
+        ended: false,
+    };
+    let rt = Runtime::new(app);
+
+    assert_eq!(rt.app.started, false);
+    assert_eq!(rt.app.ended, false);
+
+    let app = match rt.run() {
+        RuntimeResult::EmptySimulation { app } => app,
+        _ => panic!("Which events?"),
+    };
+
+    assert_eq!(app.started, true);
+    assert_eq!(app.ended, true);
+}
