@@ -2,7 +2,10 @@
 
 use des::prelude::*;
 use serial_test::serial;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+};
 
 #[macro_use]
 mod common;
@@ -294,4 +297,242 @@ fn restart_via_async_handle() {
 
     let _ = rt.run().unwrap();
     assert_eq!(DROPPED_RESTART_VIA_HANDLE.load(Ordering::SeqCst), 2)
+}
+
+struct CountDropsMessage {
+    counter: Arc<AtomicUsize>,
+}
+impl MessageBody for CountDropsMessage {
+    fn byte_len(&self) -> usize {
+        1
+    }
+}
+impl Drop for CountDropsMessage {
+    fn drop(&mut self) {
+        self.counter.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+struct WillIgnoreInncomingInDowntime {
+    received: Arc<AtomicUsize>,
+    drops: Arc<AtomicUsize>,
+}
+impl_build_named!(WillIgnoreInncomingInDowntime);
+
+impl Module for WillIgnoreInncomingInDowntime {
+    fn new() -> Self {
+        Self {
+            received: Arc::new(AtomicUsize::new(0)),
+            drops: Arc::new(AtomicUsize::new(0)),
+        }
+    }
+
+    fn at_sim_start(&mut self, _stage: usize) {
+        if SimTime::now().as_secs() == 0 {
+            // schedule events for seconds 1..=10
+            for i in 1..=10 {
+                schedule_in(
+                    Message::new()
+                        .content(CountDropsMessage {
+                            counter: self.drops.clone(),
+                        })
+                        .build(),
+                    Duration::from_secs(i),
+                );
+            }
+        }
+    }
+
+    fn handle_message(&mut self, mut msg: Message) {
+        self.received.fetch_add(1, Ordering::SeqCst);
+        if SimTime::now().as_secs() == 6 {
+            shutdow_and_restart_in(Duration::from_secs_f64(2.5));
+            // will miss incoming messages '7 and '8
+        }
+
+        // Forget the message, aka assign an temp counter
+        msg.content_mut::<CountDropsMessage>().counter = Arc::new(AtomicUsize::new(0));
+    }
+
+    fn at_sim_end(&mut self) {
+        assert_eq!(self.received.load(Ordering::SeqCst), 8);
+        assert_eq!(self.drops.load(Ordering::SeqCst), 2);
+    }
+}
+
+#[test]
+#[serial]
+fn shutdown_will_ignore_incoming() {
+    let mut rt = NetworkApplication::new(());
+
+    let module =
+        WillIgnoreInncomingInDowntime::build_named(ObjectPath::from("RootModule"), &mut rt);
+    rt.register_module(module);
+    let rt = Runtime::new(rt);
+
+    let _ = rt.run().unwrap();
+}
+
+struct EndNode {
+    sent: usize,
+    recv: usize,
+    drops: Arc<AtomicUsize>,
+}
+impl_build_named!(EndNode);
+
+impl Module for EndNode {
+    fn new() -> Self {
+        Self {
+            sent: 0,
+            recv: 0,
+            drops: Arc::new(AtomicUsize::new(0)),
+        }
+    }
+
+    fn at_sim_start(&mut self, _: usize) {
+        schedule_in(Message::new().kind(1).build(), Duration::from_secs(1));
+    }
+
+    fn handle_message(&mut self, mut msg: Message) {
+        match msg.header().kind {
+            1 => {
+                if SimTime::now().as_secs() > 10 {
+                    return;
+                }
+
+                self.sent += 1;
+                send(
+                    Message::new()
+                        .kind(2)
+                        .content(CountDropsMessage {
+                            counter: self.drops.clone(),
+                        })
+                        .build(),
+                    "out",
+                );
+                schedule_in(Message::new().kind(1).build(), Duration::from_secs(1));
+            }
+            2 => {
+                self.recv += 1;
+
+                // forget the message drop counter;
+                msg.content_mut::<CountDropsMessage>().counter = Arc::new(AtomicUsize::new(0));
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    fn at_sim_end(&mut self) {
+        assert_eq!(self.sent, 10);
+        assert_eq!(self.recv, 7);
+
+        assert_eq!(self.drops.load(Ordering::SeqCst), 3);
+    }
+}
+
+struct Transit;
+impl_build_named!(Transit);
+
+impl Module for Transit {
+    fn new() -> Self {
+        Self
+    }
+
+    fn at_sim_start(&mut self, _stage: usize) {
+        if SimTime::now() == SimTime::ZERO {
+            schedule_in(Message::new().build(), Duration::from_secs_f64(5.5));
+        }
+    }
+
+    fn handle_message(&mut self, _msg: Message) {
+        // happens at 5.5 so '6 '7 '8 will be lost
+        shutdow_and_restart_in(Duration::from_secs(3));
+    }
+}
+
+#[test]
+#[serial]
+fn shutdown_will_drop_transiting() {
+    // Logger::new().set_logger();
+    let mut app = NetworkApplication::new(());
+
+    let ping = EndNode::build_named(ObjectPath::from("ping"), &mut app);
+    let pong = EndNode::build_named(ObjectPath::from("pong"), &mut app);
+    let transit = Transit::build_named(ObjectPath::from("transit"), &mut app);
+
+    let ping_in = ping.create_gate("in", GateServiceType::Input);
+    let ping_out = ping.create_gate("out", GateServiceType::Output);
+    let pong_in = pong.create_gate("in", GateServiceType::Input);
+    let pong_out = pong.create_gate("out", GateServiceType::Output);
+
+    let i_to_o = transit.create_gate("i_to_o", GateServiceType::Undefined);
+    let o_to_i = transit.create_gate("i_to_o", GateServiceType::Undefined);
+
+    ping_out.set_next_gate(i_to_o.clone());
+    i_to_o.set_next_gate(pong_in);
+
+    pong_out.set_next_gate(o_to_i.clone());
+    o_to_i.set_next_gate(ping_in);
+
+    app.register_module(ping);
+    app.register_module(pong);
+    app.register_module(transit);
+
+    let rt = Runtime::new_with(app, RuntimeOptions::seeded(123).max_itr(500));
+    let _ = rt.run().unwrap();
+}
+
+#[test]
+#[serial]
+fn shutdown_will_drop_transiting_delayed_channels() {
+    // Logger::new().set_logger();
+    let mut app = NetworkApplication::new(());
+
+    let ping = EndNode::build_named(ObjectPath::from("ping"), &mut app);
+    let pong = EndNode::build_named(ObjectPath::from("pong"), &mut app);
+    let transit = Transit::build_named(ObjectPath::from("transit"), &mut app);
+
+    let ping_in = ping.create_gate("in", GateServiceType::Input);
+    let ping_out = ping.create_gate("out", GateServiceType::Output);
+    let pong_in = pong.create_gate("in", GateServiceType::Input);
+    let pong_out = pong.create_gate("out", GateServiceType::Output);
+
+    let i_to_o = transit.create_gate("i_to_o", GateServiceType::Undefined);
+    let o_to_i = transit.create_gate("i_to_o", GateServiceType::Undefined);
+
+    let ch_to_o = Channel::new(
+        ping.path().appended_channel("to_o"),
+        ChannelMetrics {
+            bitrate: 100_000,
+            latency: Duration::from_secs_f64(0.004),
+            jitter: Duration::ZERO,
+            cost: 1.0,
+            queuesize: 0,
+        },
+    );
+    let ch_to_i = Channel::new(
+        ping.path().appended_channel("to_o"),
+        ChannelMetrics {
+            bitrate: 100_000,
+            latency: Duration::from_secs_f64(0.004),
+            jitter: Duration::ZERO,
+            cost: 1.0,
+            queuesize: 0,
+        },
+    );
+
+    ping_out.set_next_gate(i_to_o.clone());
+    ping_out.set_channel(ch_to_o);
+    i_to_o.set_next_gate(pong_in);
+
+    pong_out.set_next_gate(o_to_i.clone());
+    pong_out.set_channel(ch_to_i);
+    o_to_i.set_next_gate(ping_in);
+
+    app.register_module(ping);
+    app.register_module(pong);
+    app.register_module(transit);
+
+    let rt = Runtime::new_with(app, RuntimeOptions::seeded(123).max_itr(500));
+    let _ = rt.run().unwrap();
 }

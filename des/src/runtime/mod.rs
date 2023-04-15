@@ -868,7 +868,7 @@ cfg_net! {
         ) {
             let event = MessageAtGateEvent {
                 gate,
-                message: message.into(),
+                msg: message.into(),
             };
 
             self.add_event(NetEvents::MessageAtGateEvent(event), time);

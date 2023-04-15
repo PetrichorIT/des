@@ -15,20 +15,20 @@ impl<T, P> Joined<T, P> {
         false
     }
 
-    pub fn iter(&self) -> Iter<'_, T, P> {
-        Iter {
+    pub fn iter(&self) -> JoinedIter<'_, T, P> {
+        JoinedIter {
             joined: self,
             idx: 0,
         }
     }
 }
 
-pub struct Iter<'a, T, P> {
+pub struct JoinedIter<'a, T, P> {
     joined: &'a Joined<T, P>,
     idx: usize,
 }
 
-impl<'a, T, P> Iterator for Iter<'a, T, P> {
+impl<'a, T, P> Iterator for JoinedIter<'a, T, P> {
     type Item = &'a T;
     fn next(&mut self) -> Option<Self::Item> {
         use std::cmp::Ordering::*;

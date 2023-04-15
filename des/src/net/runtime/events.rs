@@ -1,6 +1,6 @@
 use std::panic;
 
-use log::info;
+use log::{info, warn};
 
 use crate::{
     net::{
@@ -13,7 +13,7 @@ use crate::{
         NetworkApplication,
     },
     prelude::{ChannelRef, EventLifecycle, ModuleRef},
-    runtime::{EventSet, Runtime},
+    runtime::{EventSet, EventSink, Runtime},
     time::SimTime,
 };
 
@@ -45,7 +45,98 @@ where
 #[derive(Debug)]
 pub struct MessageAtGateEvent {
     pub(crate) gate: GateRef,
-    pub(crate) message: Message,
+    pub(crate) msg: Message,
+}
+
+impl MessageAtGateEvent {
+    // This function executes an event with a sink not a runtime as an parameter.
+    // That allows for the executing of events not handles by the runtime itself
+    // aka. the calling with an abitrary event sink.
+    pub(crate) fn handle_with_sink(self, sink: &mut impl EventSink<NetEvents>)
+    {
+        let mut msg = self.msg;
+        msg.header.last_gate = Some(self.gate.clone());
+
+        // Follow gates until either the gate chain is terminated,
+        // or a delayed action is required.
+        let mut cur = self.gate;
+        while let Some(next) = cur.next_gate() {
+            log_scope!(cur.owner().ctx.logger_token);
+
+            // Since a next gate exists log the current gate as
+            // transit complete. (do this before drop check to allow for better debugging at drop)
+            msg.header.last_gate = Some(next.clone());
+
+            // Drop message is owner is not active, but notfiy since this is an irregularity.
+            // TODO: maybe move to log::trace if this becomes a common pattern
+            if !cur.owner().is_active() {
+                warn!(
+                    "Gate '{}' dropped message [{}] since owner module {} is inactive",
+                    cur.name(),
+                    msg.str(),
+                    cur.owner().path()
+                );
+
+                drop(msg);
+                return;
+            }
+
+            // Log the current transition to the internal log stream.
+            info!(
+                "Gate '{}' forwarding message [{}] to next gate delayed: {}",
+                cur.name(),
+                msg.str(),
+                cur.channel().is_some()
+            );
+
+            if let Some(ch) = cur.channel_mut() {
+                // since a channel is nessecary for this hop, a delayed
+                // action is nessecary
+                assert_ne!(
+                    cur.service_type(),
+                    GateServiceType::Input,
+                    "Channels cannot start at a input gate"
+                );
+
+                ch.send_message(msg, &next, sink);
+                return;
+            } else {
+                // No channel means next hop is on the same time slot,
+                // so continue.
+                cur = next;
+            }
+        }
+
+        // The loop has ended. This means we are at the end of a gate chain
+        // cur has not been checked for anything
+        log_scope!(cur.owner().ctx.logger_token);
+
+        assert_ne!(
+            cur.service_type(), 
+            GateServiceType::Output,
+            "Messages cannot be forwarded to modules on Output gates. (Gate '{}' owned by Module '{}')",
+            cur.str(),
+            cur.owner().as_str()
+        );
+       
+        info!(
+            "Gate '{}' forwarding message [{}] to module #{}",
+            cur.name(),
+            msg.str(),
+            cur.owner().ctx.id
+        );
+
+        let module = cur.owner();
+        sink.add(
+            NetEvents::HandleMessageEvent(HandleMessageEvent {
+                module,
+                message: msg,
+            }),
+            SimTime::now(),
+        );
+
+        log_scope!();
+    }
 }
 
 impl MessageAtGateEvent {
@@ -53,73 +144,97 @@ impl MessageAtGateEvent {
     where
         A: EventLifecycle<NetworkApplication<A>>,
     {
-        let mut message = self.message;
-        message.header.last_gate = Some(GateRef::clone(&self.gate));
+        self.handle_with_sink(rt);
+        // let mut msg = self.msg;
+        // msg.header.last_gate = Some(GateRef::clone(&self.gate));
 
-        //
-        // Iterate through gates until:
-        // a) a final gate with no next_gate was found, indicating a handle_module_call
-        // b) a delay gate was found, apply the delay and recall in a new event.
-        //
-        let mut current_gate = self.gate;
-        while let Some(next_gate) = current_gate.next_gate() {
-            log_scope!(current_gate.owner().ctx.logger_token);
+        // //
+        // // Iterate through gates until:
+        // // a) a final gate with no next_gate was found, indicating a handle_module_call
+        // // b) a delay gate was found, apply the delay and recall in a new event.
+        // //
+        // let mut current_gate = self.gate;
+        // while let Some(next_gate) = current_gate.next_gate() {
+        //     log_scope!(current_gate.owner().ctx.logger_token);
 
-            // A next gate exists.
-            // redirect to next channel
-            message.header.last_gate = Some(GateRef::clone(&next_gate));
+        //     // A next gate exists.
+        //     // redirect to next channel
+        //     msg.header.last_gate = Some(GateRef::clone(&next_gate));
 
-            info!(
-                "Gate '{}' forwarding message [{}] to next gate delayed: {}",
-                current_gate.name(),
-                message.str(),
-                current_gate.channel().is_some()
-            );
+        //     // Check whether the associated module is active
+        //     let active = current_gate
+        //         .owner()
+        //         .active
+        //         .load(std::sync::atomic::Ordering::SeqCst);
 
-            match current_gate.channel_mut() {
-                Some(channel) => {
-                    // Channel delayed connection
-                    assert!(
-                        current_gate.service_type() != GateServiceType::Input,
-                        "Channels cannot start at a input node"
-                    );
+        //     if !active {
+        //         // Drop the message but do print a warning
+        //         warn!(
+        //             "Gate '{}' dropped message [{}] since owner module {} is inactive",
+        //             current_gate.name(),
+        //             msg.str(),
+        //             current_gate.owner().path()
+        //         );
 
-                    channel.send_message(message, &next_gate, rt);
-                    return;
-                }
-                None => {
-                    // no delay nessecary
-                    // goto next iteration
-                    current_gate = next_gate;
-                }
-            }
-        }
+        //         // not exactly nessecary, but helpful
+        //         drop(msg);
+        //         return;
+        //     }
 
-        // No next gate exists.
-        debug_assert!(current_gate.next_gate().is_none());
-        log_scope!(current_gate.owner().ctx.logger_token);
+        //     info!(
+        //         "Gate '{}' forwarding message [{}] to next gate delayed: {}",
+        //         current_gate.name(),
+        //         msg.str(),
+        //         current_gate.channel().is_some()
+        //     );
 
-        assert!(
-            current_gate.service_type() != GateServiceType::Output,
-            "Messages cannot be forwarded to modules on Output gates. (Gate '{}' owned by Module '{}')",
-            current_gate.str(),
-            current_gate.owner().as_str()
-        );
+        //     match current_gate.channel_mut() {
+        //         Some(channel) => {
+        //             // Channel delayed connection
+        //             assert!(
+        //                 current_gate.service_type() != GateServiceType::Input,
+        //                 "Channels cannot start at a input node"
+        //             );
 
-        info!(
-            "Gate '{}' forwarding message [{}] to module #{}",
-            current_gate.name(),
-            message.str(),
-            current_gate.owner().ctx.id
-        );
+        //             channel.send_message(msg, &next_gate, rt);
+        //             return;
+        //         }
+        //         None => {
+        //             // no delay nessecary
+        //             // goto next iteration
+        //             current_gate = next_gate;
+        //         }
+        //     }
+        // }
 
-        let module = current_gate.owner();
-        rt.add_event(
-            NetEvents::HandleMessageEvent(HandleMessageEvent { module, message }),
-            SimTime::now(),
-        );
+        // // No next gate exists.
+        // debug_assert!(current_gate.next_gate().is_none());
+        // log_scope!(current_gate.owner().ctx.logger_token);
 
-        log_scope!();
+        // assert!(
+        //     current_gate.service_type() != GateServiceType::Output,
+        //     "Messages cannot be forwarded to modules on Output gates. (Gate '{}' owned by Module '{}')",
+        //     current_gate.str(),
+        //     current_gate.owner().as_str()
+        // );
+
+        // info!(
+        //     "Gate '{}' forwarding message [{}] to module #{}",
+        //     current_gate.name(),
+        //     msg.str(),
+        //     current_gate.owner().ctx.id
+        // );
+
+        // let module = current_gate.owner();
+        // rt.add_event(
+        //     NetEvents::HandleMessageEvent(HandleMessageEvent {
+        //         module,
+        //         message: msg,
+        //     }),
+        //     SimTime::now(),
+        // );
+
+        // log_scope!();
     }
 }
 

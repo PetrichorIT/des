@@ -191,6 +191,10 @@ impl ModuleRef {
 }
 
 impl ModuleRef {
+    pub(crate) fn is_active(&self) -> bool {
+        self.ctx.active.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
     pub(crate) fn as_str(&self) -> &str {
         self.ctx.path.as_str()
     }

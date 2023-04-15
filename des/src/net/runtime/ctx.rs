@@ -1,13 +1,11 @@
 #![allow(missing_docs)]
 
-use log::info;
-
 use super::{
     HandleMessageEvent, MessageAtGateEvent, NetworkApplication, NetworkApplicationGlobals,
 };
 use crate::net::module::{MOD_CTX, SETUP_FN};
 use crate::net::{gate::GateRef, message::Message, NetEvents};
-use crate::prelude::{module_id, EventLifecycle, GateServiceType, ModuleRef};
+use crate::prelude::{module_id, EventLifecycle, ModuleRef};
 use crate::runtime::Runtime;
 use crate::sync::Mutex;
 use crate::time::SimTime;
@@ -65,68 +63,16 @@ pub(crate) fn buf_send_at(mut msg: Message, gate: GateRef, send_time: SimTime) {
     // (0) If delayed send is active, dont skip gate_refs
     if send_time > SimTime::now() {
         ctx.events.push((
-            NetEvents::MessageAtGateEvent(MessageAtGateEvent { gate, message: msg }),
+            NetEvents::MessageAtGateEvent(MessageAtGateEvent { gate, msg }),
             send_time,
         ));
         return;
     }
 
-    // (1) Follow the gate chain until either the end or a channel is reached.
-    let mut current_gate = gate;
-    while let Some(next_gate) = current_gate.next_gate() {
-        log_scope!(current_gate.owner().ctx.logger_token);
-
-        // a next gate exists, so forward to the next gate allready
-        msg.header.last_gate = Some(GateRef::clone(&next_gate));
-
-        info!(
-            "Gate '{}' forwarding message [{}] to next gate delayed: {}",
-            current_gate.name(),
-            msg.str(),
-            current_gate.channel().is_some()
-        );
-
-        if let Some(ch) = current_gate.channel_mut() {
-            // Channel delayed connection
-            assert!(
-                current_gate.service_type() != GateServiceType::Input,
-                "Channels cannot start at a input node"
-            );
-
-            ch.send_message(msg, &next_gate, &mut ctx.events);
-            log_scope!(inital_token);
-            return;
-        }
-
-        // We can skip this bridge since it is only a symbolic link
-        current_gate = next_gate;
-    }
-
-    debug_assert!(current_gate.next_gate().is_none());
-    log_scope!(current_gate.owner().ctx.logger_token);
-
-    assert!(
-        current_gate.service_type() != GateServiceType::Output,
-        "Messages cannot be forwarded to modules on Output gates. (Gate '{}' owned by Module '{}')",
-        current_gate.str(),
-        current_gate.owner().as_str()
-    );
-
-    info!(
-        "Gate '{}' forwarding message [{}] to module #{}",
-        current_gate.name(),
-        msg.str(),
-        current_gate.owner().ctx.id
-    );
-
-    let module = current_gate.owner();
-    ctx.events.push((
-        NetEvents::HandleMessageEvent(HandleMessageEvent {
-            module,
-            message: msg,
-        }),
-        SimTime::now(),
-    ));
+    // (0) Else handle the event inlined, for instant effects on the associated
+    // channels.
+    let event = MessageAtGateEvent { gate, msg };
+    event.handle_with_sink(&mut ctx.events);
 
     log_scope!(inital_token);
 }

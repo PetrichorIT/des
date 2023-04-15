@@ -46,8 +46,8 @@ impl<T, P> Punctuated<T, P> {
         self.inner.push((*self.last.take().unwrap(), punct))
     }
 
-    pub fn iter(&self) -> Iter<'_, T, P> {
-        Iter {
+    pub fn iter(&self) -> PunctIter<'_, T, P> {
+        PunctIter {
             punct: self,
             idx: 0,
         }
@@ -110,12 +110,12 @@ where
 
 // # Iter
 
-pub struct Iter<'a, T, P> {
+pub struct PunctIter<'a, T, P> {
     punct: &'a Punctuated<T, P>,
     idx: usize,
 }
 
-impl<'a, T, P> Iterator for Iter<'a, T, P> {
+impl<'a, T, P> Iterator for PunctIter<'a, T, P> {
     type Item = &'a T;
     fn next(&mut self) -> Option<Self::Item> {
         use std::cmp::Ordering::*;

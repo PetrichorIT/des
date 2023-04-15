@@ -22,11 +22,6 @@ pub(crate) fn _default_setup(_: &ModuleContext) {}
 
 #[cfg(feature = "async")]
 pub(crate) fn _default_setup(this: &ModuleContext) {
-    // this.add_plugin(
-    //     crate::net::plugin::TokioTimePlugin::new(this.path.path().to_string()),
-    //     0,
-    //     false,
-    // );
     this.add_plugin(
         crate::net::plugin::TokioTimePlugin::new(this.path.as_str().to_string()),
         0,

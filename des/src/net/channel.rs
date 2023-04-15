@@ -345,7 +345,7 @@ impl Channel {
             sink.add(
                 NetEvents::MessageAtGateEvent(MessageAtGateEvent {
                     gate: Arc::clone(next_gate),
-                    message: msg,
+                    msg,
                 }),
                 next_event_time,
             );
