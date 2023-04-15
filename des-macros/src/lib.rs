@@ -1,9 +1,8 @@
-//!
+#![warn(clippy::pedantic)]
 //! A crate for extending a DES simulation with NDL definitions.
 //!
 //! This crate provide macros for applieing NDL module definitions to
 //! rust structs to automate the module setup process.
-//!
 
 use proc_macro::{self, TokenStream};
 use proc_macro_error::proc_macro_error;

@@ -1,10 +1,13 @@
+#![warn(clippy::pedantic)]
+//! Internal implmentations of proc macros.
+
 use proc_macro2::Span as Span2;
 use proc_macro2::TokenStream;
 use proc_macro_error::{Diagnostic, Level};
 use quote::quote;
 use quote::ToTokens;
 use syn::token::Add;
-use syn::*;
+use syn::{parse2, Data, Fields, GenericParam, Generics, Ident, Index, TypeParamBound};
 
 pub type Result<T> = std::result::Result<T, Diagnostic>;
 
@@ -12,10 +15,20 @@ pub struct WrappedTokenStream(pub TokenStream);
 
 impl ToTokens for WrappedTokenStream {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        tokens.extend::<proc_macro2::TokenStream>(self.0.clone())
+        tokens.extend::<proc_macro2::TokenStream>(self.0.clone());
     }
 }
 
+/// Returns the derived token stream.
+///
+/// # Errors
+///
+/// Internal.
+///
+/// # Panics
+///
+/// Internal.
+#[allow(clippy::needless_pass_by_value, clippy::too_many_lines)]
 pub fn message_body_derive_impl(
     ident: Ident,
     data: Data,
@@ -28,10 +41,10 @@ pub fn message_body_derive_impl(
                     let mut ts = TokenStream::new();
                     for field in named_fields.named {
                         let ty = field.ty;
-                        let fident = field.ident.unwrap();
+                        let field_ident = field.ident.unwrap();
 
                         ts.extend(quote! {
-                            <#ty as ::des::net::message::MessageBody>::byte_len(&self.#fident) +
+                            <#ty as ::des::net::message::MessageBody>::byte_len(&self.#field_ident) +
                         });
                     }
                     ts
@@ -42,10 +55,10 @@ pub fn message_body_derive_impl(
 
                     for (i, field) in unnamed_fields.unnamed.into_iter().enumerate() {
                         let ty = field.ty;
-                        let fident = Index::from(i);
+                        let field_ident = Index::from(i);
 
                         ts.extend(quote! {
-                            <#ty as ::des::net::message::MessageBody>::byte_len(&self.#fident) +
+                            <#ty as ::des::net::message::MessageBody>::byte_len(&self.#field_ident) +
                         });
                     }
 
@@ -77,49 +90,49 @@ pub fn message_body_derive_impl(
             }
 
             for variant in data_enum.variants {
-                let vident = variant.ident;
+                let variant_ident = variant.ident;
 
                 let ts = match variant.fields {
                     Fields::Named(named_fields) => {
-                        let mut pts = TokenStream::new();
+                        let mut prop_ts = TokenStream::new();
                         let mut ts = TokenStream::new();
 
                         for field in named_fields.named {
                             let ty = field.ty;
-                            let fident = field.ident.unwrap();
+                            let field_ident = field.ident.unwrap();
 
-                            pts.extend(quote! { ref #fident, });
+                            prop_ts.extend(quote! { ref #field_ident, });
                             ts.extend(quote! {
-                                <#ty as ::des::net::message::MessageBody>::byte_len(#fident) +
+                                <#ty as ::des::net::message::MessageBody>::byte_len(#field_ident) +
                             });
                         }
 
                         let wrapped = WrappedTokenStream(ts);
                         quote! {
-                            #ident::#vident { #pts } => #wrapped 0
+                            #ident::#variant_ident { #prop_ts } => #wrapped 0
                         }
                     }
                     Fields::Unnamed(unnamed_fields) => {
                         // Does this case ever happen
-                        let mut pts = TokenStream::new();
+                        let mut property_ts = TokenStream::new();
                         let mut ts = TokenStream::new();
 
                         for (i, field) in unnamed_fields.unnamed.into_iter().enumerate() {
                             let ty = field.ty;
-                            let fident = Ident::new(&format!("v{i}"), Span2::call_site());
+                            let field_ident = Ident::new(&format!("v{i}"), Span2::call_site());
 
-                            pts.extend(quote! { #fident,  });
+                            property_ts.extend(quote! { #field_ident,  });
                             ts.extend(quote! {
-                                <#ty as ::des::net::message::MessageBody>::byte_len(#fident) +
+                                <#ty as ::des::net::message::MessageBody>::byte_len(#field_ident) +
                             });
                         }
 
                         let wrapped = WrappedTokenStream(ts);
-                        quote! { #ident::#vident(#pts) => #wrapped 0 }
+                        quote! { #ident::#variant_ident(#property_ts) => #wrapped 0 }
                     }
                     Fields::Unit => {
                         quote! {
-                            #ident::#vident => 0
+                            #ident::#variant_ident => 0
                         }
                     }
                 };
@@ -161,7 +174,7 @@ fn generate_impl_generics(mut generics: Generics) -> Generics {
             let input = quote::quote! { ::des::net::message::MessageBody };
             param
                 .bounds
-                .push_value(TypeParamBound::Trait(parse2(input).unwrap()))
+                .push_value(TypeParamBound::Trait(parse2(input).unwrap()));
         }
     }
 

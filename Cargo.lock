@@ -372,9 +372,9 @@ checksum = "b7e5500299e16ebb147ae15a00a942af264cf3688f47923b8fc2cd5858f23ad3"
 
 [[package]]
 name = "page_size"
-version = "0.4.2"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eebde548fbbf1ea81a99b128872779c437752fb99f217c45245e1a61dcd9edcd"
+checksum = "1b7663cbd190cfd818d08efa8497f6cd383076688c49a391ef7c0d03cd12b561"
 dependencies = [
  "libc",
  "winapi",

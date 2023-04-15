@@ -32,7 +32,7 @@ pub struct CQueueLLAllocatorInner {
 }
 
 impl CQueueLLAllocatorInner {
-    /// Creates an empty LinkedListAllocator.
+    /// Creates an empty `LinkedListAllocator`.
     pub fn new() -> Self {
         Self::with_page_size(page_size::get())
     }
@@ -64,7 +64,7 @@ impl CQueueLLAllocatorInner {
             Layout::from_size_align(self.page_size, self.page_size).expect("page layout invalid"),
         );
         self.pages.push(block);
-        self.add_free_region(block as usize, self.page_size)
+        self.add_free_region(block as usize, self.page_size);
     }
 
     pub fn handle(&self) -> CQueueLLAllocator {
@@ -99,7 +99,7 @@ impl CQueueLLAllocatorInner {
         node.next = self.head.next.take();
         let node_ptr = addr as *mut ListNode;
         node_ptr.write(node);
-        self.head.next = Some(&mut *node_ptr)
+        self.head.next = Some(&mut *node_ptr);
     }
 
     /// Looks for a free region with the given size and alignment and removes
@@ -117,10 +117,9 @@ impl CQueueLLAllocatorInner {
                 let ret = Some((current.next.take().unwrap(), alloc_start));
                 current.next = next;
                 return ret;
-            } else {
-                // region not suitable -> continue with next region
-                current = current.next.as_mut().unwrap();
             }
+            // region not suitable -> continue with next region
+            current = current.next.as_mut().unwrap();
         }
 
         // TODO: maybe add to tail ?
@@ -180,7 +179,7 @@ impl Drop for CQueueLLAllocatorInner {
     fn drop(&mut self) {
         let layout = Layout::from_size_align(self.page_size, self.page_size)
             .expect("failed to generate page layout");
-        for page in self.pages.iter() {
+        for page in &self.pages {
             unsafe { alloc::dealloc(*page, layout) }
         }
     }
@@ -237,7 +236,7 @@ impl CQueueLLAllocator {
         let (size, _) = CQueueLLAllocatorInner::size_align(layout);
         let allocator = unsafe { &mut *self.inner };
         allocator.allocated_mem -= size;
-        allocator.add_free_region(ptr.as_ptr() as usize, size)
+        allocator.add_free_region(ptr.as_ptr() as usize, size);
     }
 }
 

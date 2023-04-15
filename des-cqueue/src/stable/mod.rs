@@ -12,18 +12,18 @@ use linked_list::DualLinkedList;
 ///
 /// This type acts as a sorter for entries of type E
 /// that occure at a given point in time, represented by the
-/// Duration type. This means that the fetch_next
+/// Duration type. This means that the `fetch_next`
 /// method will allways return the entry with the smallest timestamp.
-/// In general, this can be compared to a BinaryHeap where the entries
+/// In general, this can be compared to a `BinaryHeap` where the entries
 /// are a tupel (E, Duration) sorted by the Duration.
 ///
 /// Note however that this datatype is optimized for use in a discrete
 /// event simulation. Thus is supports O(1) inserts and removals, as
-/// well as O(1) fetch_next. Note that this is a amorised analysis
+/// well as O(1) `fetch_next`. Note that this is a amorised analysis
 /// assuming that the parameters are optimal for the given distribution
-/// of event arrival times. Additionaly the CQueue does not allow for
+/// of event arrival times. Additionaly the `CQueue` does not allow for
 /// the insertion of entries with a timestamp smaller that entries
-/// that was last fetched (or Duration::ZERO initally).
+/// that was last fetched (or `Duration::ZERO` initally).
 ///
 #[derive(Debug)]
 pub struct CQueue<E> {
@@ -61,32 +61,38 @@ pub struct EventHandle<E> {
 
 impl<E> CQueue<E> {
     /// Returns a String describing the datatype and its parameters.
+    #[must_use]
     pub fn descriptor(&self) -> String {
         format!("CTimeVDeque({}, {:?})", self.n, self.t)
     }
 
     /// Returns the number of elements in the queue.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.len
     }
 
     /// Returns the number of element in the subset that is
     /// manage by the zero-event-time optimization.
+    #[must_use]
     pub fn len_zero(&self) -> usize {
         self.zero_event_bucket.len()
     }
 
     /// Returns the number of elements in the subset that is
     /// not managed by the zero-event-time optimization.
+    #[must_use]
     pub fn len_nonzero(&self) -> usize {
         self.len() - self.len_zero()
     }
 
     /// Indicates whether the queue is empty.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
+    #[must_use]
     pub fn metrics(&self) -> (usize, usize) {
         let (alloc, total) = self.alloc.metrics();
         let additional = std::mem::size_of::<Self>();
@@ -96,11 +102,13 @@ impl<E> CQueue<E> {
 
     /// Returns the timestamp of the last emitted event.
     /// This acts as a lower bound to the insertion of new events.
+    #[must_use]
     pub fn time(&self) -> Duration {
         self.t_current
     }
 
-    /// Creates a new parameteriszed CQueue.
+    /// Creates a new parameteriszed `CQueue`.
+    #[must_use]
     pub fn new(n: usize, t: Duration) -> Self {
         // essentialy t*n
         let t_all = t.as_nanos() * n as u128;
@@ -179,6 +187,7 @@ impl<E> CQueue<E> {
         }
     }
 
+    #[allow(clippy::needless_pass_by_value)]
     pub fn cancel(&mut self, handle: EventHandle<E>) {
         if handle.time >= self.t_current {
             if handle.time == self.t_current {
@@ -198,7 +207,7 @@ impl<E> CQueue<E> {
                 let index: usize = index as usize;
                 let index = index % self.n;
 
-                if self.buckets[index].cancel(handle) {
+                if self.buckets[index].cancel(&handle) {
                     self.len -= 1;
                 }
             }
@@ -259,7 +268,7 @@ impl<E> Drop for CQueue<E> {
     fn drop(&mut self) {
         // Manually drop the DLL so that the alloc can be dropped last
         for dll in self.buckets.drain(..) {
-            drop(dll)
+            drop(dll);
         }
     }
 }

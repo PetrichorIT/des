@@ -48,7 +48,7 @@ impl<T> DualLinkedList<T> {
         self.len
     }
 
-    pub(super) fn cancel(&mut self, handle: EventHandle<T>) -> bool {
+    pub(super) fn cancel(&mut self, handle: &EventHandle<T>) -> bool {
         let mut cur = self.head.next;
         unsafe {
             while !(*cur).next.is_null() {
@@ -226,7 +226,7 @@ impl<T: Eq> Eq for DualLinkedList<T> {}
 
 impl<T: Hash> Hash for DualLinkedList<T> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.iter().for_each(|v| v.hash(state))
+        self.iter().for_each(|v| v.hash(state));
     }
 }
 

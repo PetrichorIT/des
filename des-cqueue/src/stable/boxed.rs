@@ -4,7 +4,7 @@ use std::{
     ptr::{self, NonNull},
 };
 
-use super::alloc::*;
+use super::alloc::CQueueLLAllocator;
 
 pub struct LocalBox<E> {
     ptr: *mut E,
@@ -14,7 +14,7 @@ pub struct LocalBox<E> {
 impl<E> LocalBox<E> {
     pub fn new_in(value: E, alloc: CQueueLLAllocator) -> LocalBox<E> {
         let bytes = alloc.allocate(Layout::new::<E>()).unwrap();
-        let ptr = bytes as *mut E;
+        let ptr = bytes.cast::<E>();
         unsafe {
             ptr::write_volatile(ptr, value);
         }
@@ -44,7 +44,7 @@ impl<E> Drop for LocalBox<E> {
         unsafe {
             ptr::drop_in_place(self.ptr);
 
-            let ptr = NonNull::new(self.ptr as *mut u8).unwrap();
+            let ptr = NonNull::new(self.ptr.cast::<u8>()).unwrap();
             self.alloc.deallocate(ptr, Layout::new::<E>());
         }
     }

@@ -6,5 +6,5 @@ version = "0.2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-page_size = "0.4.2"
+page_size = "*"
 rand = {version = "*", features = ["small_rng"]}
