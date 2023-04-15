@@ -152,8 +152,17 @@ impl ModuleContext {
                 .upgrade()
                 .expect("Failed to fetch parent, ptr missing in drop");
 
+            if !strong.is_active() {
+                return Err(ModuleReferencingError::CurrentlyInactive(format!(
+                    "The parent module of '{}' is currently shut down, thus cannot be accessed",
+                    self.path,
+                )));
+            }
+
             if strong.try_as_ref::<DummyModule>().is_some() {
-                Err(ModuleReferencingError::NotYetInitalized(format!("The parent ptr of module '{}' is existent but not yet initalized, according to the load order.", self.path)))
+                Err(ModuleReferencingError::NotYetInitalized(
+                    format!("The parent ptr of module '{}' is existent but not yet initalized, according to the load order.", self.path)
+                ))
             } else {
                 Ok(strong)
             }
@@ -171,6 +180,13 @@ impl ModuleContext {
     /// Returns an error if no child with the provided name exists.
     pub fn child(&self, name: &str) -> Result<ModuleRef, ModuleReferencingError> {
         if let Some(child) = self.children.read().get(name) {
+            if !child.is_active() {
+                return Err(ModuleReferencingError::CurrentlyInactive(format!(
+                    "The child module '{}' of '{}' is currently shut down, thus cannot be accessed",
+                    name, self.path,
+                )));
+            }
+
             Ok(child.clone())
         } else {
             Err(ModuleReferencingError::NoEntry(format!(

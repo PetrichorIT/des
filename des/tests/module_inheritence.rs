@@ -142,3 +142,104 @@ fn test_parent_mut_ptr() {
 
     assert_eq!(case.parent.as_ref::<Parent>().acummulated_counter, 6);
 }
+
+struct WillShutdown {
+    _state: usize,
+}
+impl_build_named!(WillShutdown);
+impl Module for WillShutdown {
+    fn new() -> Self {
+        Self { _state: 42 }
+    }
+
+    fn at_sim_start(&mut self, _stage: usize) {
+        if SimTime::now() == SimTime::ZERO {
+            shutdow_and_restart_in(Duration::from_secs_f64(4.5));
+        }
+    }
+
+    fn handle_message(&mut self, _msg: Message) {
+        panic!("This should not happen");
+    }
+}
+
+struct WillTryToAccess;
+impl_build_named!(WillTryToAccess);
+impl Module for WillTryToAccess {
+    fn new() -> Self {
+        Self
+    }
+
+    fn at_sim_start(&mut self, _: usize) {
+        schedule_in(Message::new().build(), Duration::from_secs(1));
+    }
+
+    fn handle_message(&mut self, _msg: Message) {
+        if SimTime::now().as_secs() > 10 {
+            return;
+        }
+
+        // first '1'2'3'4 seconds will get denied, other ones not
+        let root = module_path().name() == "parent";
+
+        if root {
+            let r = child("child");
+            if SimTime::now().as_secs() < 5 {
+                assert!(r.is_err());
+                assert_eq!(
+                    r,
+                    Err(ModuleReferencingError::CurrentlyInactive(
+                        "The child module 'child' of 'parent' is currently shut down, thus cannot be accessed".to_string()
+                    ))
+                );
+            } else {
+                assert!(r.is_ok());
+            }
+        } else {
+            let r = parent();
+            if SimTime::now().as_secs() < 5 {
+                assert!(r.is_err());
+                assert_eq!(
+                    r,
+                    Err(ModuleReferencingError::CurrentlyInactive(
+                        "The parent module of 'parent.child' is currently shut down, thus cannot be accessed".to_string()
+                    ))
+                );
+            } else {
+                assert!(r.is_ok());
+            }
+        }
+
+        schedule_in(Message::new().build(), Duration::from_secs(1));
+    }
+}
+
+#[test]
+#[serial]
+fn shutdown_modules_cannot_be_accessed_parent() {
+    let mut app = NetworkApplication::new(());
+
+    let parent = WillShutdown::build_named(ObjectPath::from("parent"), &mut app);
+    let child = WillTryToAccess::build_named_with_parent("child", parent.clone(), &mut app);
+
+    app.register_module(parent);
+    app.register_module(child);
+
+    let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
+    let _ = rt.run();
+}
+
+#[test]
+#[serial]
+fn shutdown_modules_cannot_be_accessed_child() {
+    let mut app = NetworkApplication::new(());
+
+    let parent = WillTryToAccess::build_named(ObjectPath::from("parent"), &mut app);
+    let child = WillShutdown::build_named_with_parent("child", parent.clone(), &mut app);
+
+    app.register_module(parent);
+    app.register_module(child);
+
+    let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
+    let _ = rt.run();
+}

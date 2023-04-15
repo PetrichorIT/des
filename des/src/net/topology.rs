@@ -278,6 +278,8 @@ impl Topology {
 
     /// Checks whether all links are bidirectional,
     /// thus all links will be recognized as routing ports.
+    #[must_use]
+    #[allow(clippy::float_cmp)]
     pub fn all_links_bidiretional(&self) -> bool {
         for i in 0..self.nodes.len() {
             for edge in self.edges_for(i) {

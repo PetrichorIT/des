@@ -62,8 +62,8 @@ impl MessageHeader {
 
 // # DUP
 impl MessageHeader {
-    pub(super) fn dup(&self) -> Box<Self> {
-        Box::new(Self {
+    pub(super) fn dup(&self) -> Self {
+        Self {
             typ: self.typ,
 
             id: self.id,
@@ -79,7 +79,7 @@ impl MessageHeader {
             dest: self.dest,
 
             length: self.length,
-        })
+        }
     }
 }
 

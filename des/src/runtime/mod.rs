@@ -702,9 +702,9 @@ impl<A> RuntimeResult<A> {
     /// An application is contained in each variant of a runtime result.
     pub fn into_app(self) -> A {
         match self {
-            Self::EmptySimulation { app } => app,
-            Self::Finished { app, .. } => app,
-            Self::PrematureAbort { app, .. } => app,
+            Self::EmptySimulation { app }
+            | Self::Finished { app, .. }
+            | Self::PrematureAbort { app, .. } => app,
         }
     }
 

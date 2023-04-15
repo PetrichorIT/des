@@ -11,12 +11,17 @@ pub enum ModuleReferencingError {
     TypeError(String),
     /// The load order dicates that the parent is not yet ready.
     NotYetInitalized(String),
+    /// The reference module is currently inactive, so should not be accessed.
+    CurrentlyInactive(String),
 }
 
 impl Display for ModuleReferencingError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::NoEntry(str) | Self::TypeError(str) | Self::NotYetInitalized(str) => {
+            Self::NoEntry(str)
+            | Self::TypeError(str)
+            | Self::NotYetInitalized(str)
+            | Self::CurrentlyInactive(str) => {
                 write!(f, "{str}")
             }
         }

@@ -257,7 +257,7 @@ impl Message {
             None
         };
 
-        let header = self.header.dup();
+        let header = Box::new(self.header.dup());
 
         Some(Self { header, content })
     }

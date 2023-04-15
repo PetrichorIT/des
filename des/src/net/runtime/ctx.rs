@@ -87,7 +87,7 @@ pub(crate) fn buf_schedule_at(msg: Message, arrival_time: SimTime) {
 
 pub(crate) fn buf_schedule_shutdown(restart: Option<SimTime>) {
     assert!(
-        restart.map(|r| r >= SimTime::now()).unwrap_or(true),
+        restart.map_or(true, |r| r >= SimTime::now()),
         "Restart point cannot be in the past"
     );
 

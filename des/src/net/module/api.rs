@@ -126,9 +126,13 @@ pub fn module_name() -> String {
 
 /// Returns a handle parent module in the module graph.
 ///
+/// Use this handle to either access the parent modules topological
+/// state, or cast it to access the custom state of the parent.
+///
 /// # Errors
 ///
-/// Returns an error if the module has no parent.
+/// Returns an error if the module has no parent or
+/// the parent is currently shut down.
 ///
 pub fn parent() -> Result<ModuleRef, ModuleReferencingError> {
     with_mod_ctx(|ctx| ctx.parent())
@@ -136,9 +140,13 @@ pub fn parent() -> Result<ModuleRef, ModuleReferencingError> {
 
 /// Returns a handle to the child element, with the provided module name.
 ///
+/// Use this handle to either access and modify the childs modules topological
+/// state, or cast it to access its custom state .
+///
 /// # Errors
 ///
-/// Returns an error if no child was found under the given name.
+/// Returns an error if no child was found under the given name,
+/// or the child is currently shut down.
 ///
 pub fn child(name: &str) -> Result<ModuleRef, ModuleReferencingError> {
     with_mod_ctx(|ctx| ctx.child(name))

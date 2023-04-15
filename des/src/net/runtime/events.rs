@@ -100,11 +100,11 @@ impl MessageAtGateEvent {
 
                 ch.send_message(msg, &next, sink);
                 return;
-            } else {
-                // No channel means next hop is on the same time slot,
-                // so continue.
-                cur = next;
-            }
+            } 
+            
+            // No channel means next hop is on the same time slot,
+            // so continue.
+            cur = next;
         }
 
         // The loop has ended. This means we are at the end of a gate chain
