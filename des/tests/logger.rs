@@ -84,7 +84,7 @@ fn one_module_linear_logger() {
     let mut app = NetworkApplication::new(());
 
     let module = Counter::build_named(ObjectPath::from("modpath"), &mut app);
-    app.create_module(module);
+    app.register_module(module);
 
     let rt = Runtime::new_with(
         app,
@@ -147,10 +147,10 @@ fn multiple_module_linear_logger() {
     let mut app = NetworkApplication::new(());
 
     let node0 = Counter::build_named(ObjectPath::from("node0"), &mut app);
-    app.create_module(node0);
+    app.register_module(node0);
 
     let node1 = Counter::build_named(ObjectPath::from("node1"), &mut app);
-    app.create_module(node1);
+    app.register_module(node1);
 
     let rt = Runtime::new_with(
         app,
@@ -218,10 +218,10 @@ fn multiple_module_linear_logger_filters() {
     let mut app = NetworkApplication::new(());
 
     let node0 = Counter::build_named(ObjectPath::from("node0"), &mut app);
-    app.create_module(node0);
+    app.register_module(node0);
 
     let node1 = Counter::build_named(ObjectPath::from("node1"), &mut app);
-    app.create_module(node1);
+    app.register_module(node1);
 
     let rt = Runtime::new_with(
         app,

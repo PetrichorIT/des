@@ -89,7 +89,7 @@ fn plugin_raw_creation() {
     let mut app = NetworkApplication::new(());
 
     let root = PluginCreation::build_named(ObjectPath::from("root"), &mut app);
-    app.create_module(root);
+    app.register_module(root);
 
     let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
     let result = rt.run().unwrap();
@@ -148,7 +148,7 @@ fn plugin_in_plugin_creation() {
     let mut app = NetworkApplication::new(());
 
     let module = PluginInPluginCreation::build_named(ObjectPath::from("root"), &mut app);
-    app.create_module(module);
+    app.register_module(module);
 
     let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
     let result = rt.run();
@@ -212,7 +212,7 @@ fn plugin_in_plugin_creation2() {
     let mut app = NetworkApplication::new(());
 
     let module = PluginInPluginCreation2::build_named(ObjectPath::from("root"), &mut app);
-    app.create_module(module);
+    app.register_module(module);
 
     let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
     let result = rt.run();
@@ -254,7 +254,7 @@ fn plugin_priority() {
     let mut app = NetworkApplication::new(());
 
     let module = PluginPriority::build_named(ObjectPath::from("root"), &mut app);
-    app.create_module(module);
+    app.register_module(module);
 
     let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
     let result = rt.run();
@@ -333,7 +333,7 @@ fn plugin_priority_defer() {
     let mut app = NetworkApplication::new(());
 
     let module = PluginPriorityDefer::build_named(ObjectPath::from("root"), &mut app);
-    app.create_module(module);
+    app.register_module(module);
 
     let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
     let result = rt.run();
@@ -383,7 +383,7 @@ fn plugin_duplication() {
     let mut app = NetworkApplication::new(());
 
     let module = PluginDuplication::build_named(ObjectPath::from("root"), &mut app);
-    app.create_module(module);
+    app.register_module(module);
 
     let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
     let result = rt.run();
@@ -453,7 +453,7 @@ fn plugin_removal() {
     let mut app = NetworkApplication::new(());
 
     let module = PluginRemoval::build_named(ObjectPath::from("root"), &mut app);
-    app.create_module(module);
+    app.register_module(module);
 
     let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
     let result = rt.run();
@@ -512,7 +512,7 @@ fn plugin_panic_capture() {
     let mut app = NetworkApplication::new(());
 
     let module = PanicPolicyCapture::build_named(ObjectPath::from("root"), &mut app);
-    app.create_module(module);
+    app.register_module(module);
 
     let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
     let result = rt.run();
@@ -570,7 +570,7 @@ fn plugin_panic_restart() {
     let mut app = NetworkApplication::new(());
 
     let module = PanicPolicyRestart::build_named(ObjectPath::from("root"), &mut app);
-    app.create_module(module);
+    app.register_module(module);
 
     let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
     let result = rt.run();
@@ -648,7 +648,7 @@ fn plugin_error_expected_t() {
     let mut rt = NetworkApplication::new(());
 
     let module = PluginErrorModule::build_named(ObjectPath::from("root".to_string()), &mut rt);
-    rt.create_module(module);
+    rt.register_module(module);
 
     let rt = Runtime::new_with(
         rt,
@@ -715,7 +715,7 @@ fn plugin_error_expected_t_inside_other_plugin() {
 
     let module =
         PluginErrorTriggerModule::build_named(ObjectPath::from("root".to_string()), &mut rt);
-    rt.create_module(module);
+    rt.register_module(module);
 
     let rt = Runtime::new_with(
         rt,
@@ -797,7 +797,7 @@ fn plugin_error_malfunction_or_priority() {
     let mut rt = NetworkApplication::new(());
 
     let module = PluginErrorMalfunction::build_named(ObjectPath::from("root".to_string()), &mut rt);
-    rt.create_module(module);
+    rt.register_module(module);
 
     let rt = Runtime::new_with(
         rt,
@@ -884,7 +884,7 @@ fn plugin_removal_from_main() {
     let mut rt = NetworkApplication::new(());
 
     let module = PluginRemovalFromMain::build_named(ObjectPath::from("root".to_string()), &mut rt);
-    rt.create_module(module);
+    rt.register_module(module);
 
     let rt = Runtime::new_with(
         rt,
@@ -966,7 +966,7 @@ fn plugin_removal_from_upstream() {
 
     let module =
         PluginRemovalFromUpstream::build_named(ObjectPath::from("root".to_string()), &mut rt);
-    rt.create_module(module);
+    rt.register_module(module);
 
     let rt = Runtime::new_with(
         rt,
@@ -1073,7 +1073,7 @@ fn plugin_removal_from_downstream() {
 
     let module =
         PluginRemovalFromDownstream::build_named(ObjectPath::from("root".to_string()), &mut rt);
-    rt.create_module(module);
+    rt.register_module(module);
 
     let rt = Runtime::new_with(
         rt,
@@ -1156,7 +1156,7 @@ fn plugin_shutdown_non_persistent_data() {
     let mut rt = NetworkApplication::new(());
 
     let module = PluginAtShutdown::build_named(ObjectPath::from("root".to_string()), &mut rt);
-    rt.create_module(module);
+    rt.register_module(module);
 
     let rt = Runtime::new_with(
         rt,
@@ -1230,7 +1230,7 @@ fn plugin_shutdown_persistent_data() {
 
     let module =
         PluginAtShutdownPersistent::build_named(ObjectPath::from("root".to_string()), &mut rt);
-    rt.create_module(module);
+    rt.register_module(module);
 
     let rt = Runtime::new_with(
         rt,
@@ -1294,7 +1294,7 @@ fn plugin_shutdown_downtime() {
 
     let module =
         PluginAtShutdownDowntime::build_named(ObjectPath::from("root".to_string()), &mut rt);
-    rt.create_module(module);
+    rt.register_module(module);
 
     let rt = Runtime::new_with(
         rt,
@@ -1349,7 +1349,7 @@ fn plugin_with_state() {
     let mut rt = NetworkApplication::new(());
 
     let module = PluginWithStateModule::build_named(ObjectPath::from("root".to_string()), &mut rt);
-    rt.create_module(module);
+    rt.register_module(module);
 
     let rt = Runtime::new_with(
         rt,

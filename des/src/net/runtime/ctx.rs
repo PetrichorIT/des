@@ -166,12 +166,12 @@ where
 {
     let mut ctx = BUF_CTX.lock();
 
-    // # NEW
+    // (0) Add delayed events from 'send'
     for (event, time) in ctx.events.drain(..) {
         rt.add_event(event, time);
     }
 
-    // Send loopback events from 'scheduleAt'
+    // (1) Send loopback events from 'scheduleAt'
     for (message, time) in ctx.loopback.drain(..) {
         rt.add_event(
             NetEvents::HandleMessageEvent(HandleMessageEvent {
@@ -182,10 +182,11 @@ where
         );
     }
 
-    // MARKER: shutdown
+    // (2) Handle shutdown if indicated
     if let Some(rest) = ctx.shutdown.take() {
         use crate::net::message::TYP_RESTART;
 
+        // Mark the modules state
         log::debug!("Shuttind down module and restaring at {:?}", rest);
         module
             .ctx
@@ -200,6 +201,12 @@ where
         // module.ctx.hooks.borrow_mut().clear(); TODO: Plugin clean
         module.ctx.plugins.write().clear();
         SETUP_FN.read()(&module.ctx);
+
+        // Reset the internal state
+        // Note that the module is not active, so it must be manually reactivated
+        module.activate();
+        module.reset();
+        module.deactivate();
 
         // Reschedule wakeup
         if let Some(rest) = rest {

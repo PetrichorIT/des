@@ -230,7 +230,7 @@ impl NdlApplication {
         ctx.upgrade_dummy(state);
 
         // TODO: is this still usefull or should we just save the entry point?
-        rt.app.create_module(ctx.clone());
+        rt.app.register_module(ctx.clone());
 
         ctx
     }

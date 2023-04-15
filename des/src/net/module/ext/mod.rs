@@ -103,15 +103,7 @@ pub trait AsyncModule: Send {
     /// ```
     async fn at_sim_start(&mut self, _stage: usize) {}
 
-    ///
-    /// A function that is called once the module restarts,
-    /// after using [shutdown](super::api::shutdown).
-    /// This means that all async elements have been pruged,
-    /// but the local state of `self` is not yet reset.
-    ///
-    /// Use this function to reset the local state of nessecary.
-    ///
-    fn at_restart(&mut self) {}
+   
 
     ///
     /// A function that is called once the simulation has terminated.

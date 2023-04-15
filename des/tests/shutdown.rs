@@ -36,6 +36,7 @@ impl Drop for DropTest {
 
 struct StatelessModule {}
 impl_build_named!(StatelessModule);
+
 #[async_trait::async_trait]
 impl AsyncModule for StatelessModule {
     fn new() -> Self {
@@ -62,14 +63,17 @@ static DROPPED_STATELESS_SHUTDOWN: AtomicUsize = AtomicUsize::new(0);
 #[test]
 #[serial]
 fn stateless_module_shudown() {
+    println!("0");
+
     DROPPED_STATELESS_SHUTDOWN.store(0, Ordering::SeqCst);
+    println!("1");
 
     let mut rt = NetworkApplication::new(());
 
     let module = StatelessModule::build_named(ObjectPath::from("RootModule"), &mut rt);
     let gate = module.create_gate("in", GateServiceType::Input);
 
-    rt.create_module(module);
+    rt.register_module(module);
     let mut rt = Runtime::new(rt);
     rt.add_message_onto(
         gate,
@@ -77,7 +81,10 @@ fn stateless_module_shudown() {
         SimTime::from_duration(Duration::from_secs(10)),
     );
 
+    println!("2");
     let _ = rt.run().unwrap();
+
+    println!("3");
     assert_eq!(DROPPED_STATELESS_SHUTDOWN.load(Ordering::SeqCst), 1)
 }
 
@@ -121,7 +128,7 @@ fn stateless_module_restart() {
     let module = StatelessModuleRestart::build_named(ObjectPath::from("RootModule"), &mut rt);
     let gate = module.create_gate("in", GateServiceType::Input);
 
-    rt.create_module(module);
+    rt.register_module(module);
     let mut rt = Runtime::new(rt);
     rt.add_message_onto(
         gate.clone(),
@@ -142,11 +149,18 @@ struct StatefullModule {
     state: usize,
 }
 impl_build_named!(StatefullModule);
+
 #[async_trait::async_trait]
 impl AsyncModule for StatefullModule {
     fn new() -> Self {
         Self { state: 0 }
     }
+
+    fn reset(&mut self) {
+        assert_eq!(self.state, 10);
+        self.state = 5;
+    }
+
     async fn at_sim_start(&mut self, _: usize) {
         self.state = 10;
         tokio::spawn(async {
@@ -166,11 +180,6 @@ impl AsyncModule for StatefullModule {
         }
     }
 
-    fn at_restart(&mut self) {
-        assert_eq!(self.state, 10);
-        self.state = 5;
-    }
-
     async fn at_sim_end(&mut self) {
         assert_eq!(self.state, 5)
     }
@@ -188,7 +197,7 @@ fn statefull_module_restart() {
     let module = StatefullModule::build_named(ObjectPath::from("RootModule"), &mut rt);
     let gate = module.create_gate("in", GateServiceType::Input);
 
-    rt.create_module(module);
+    rt.register_module(module);
     let mut rt = Runtime::new(rt);
     rt.add_message_onto(
         gate.clone(),
@@ -236,7 +245,7 @@ fn shutdown_via_async_handle() {
     let mut rt = NetworkApplication::new(());
 
     let module = ShutdownViaHandleModule::build_named(ObjectPath::from("RootModule"), &mut rt);
-    rt.create_module(module);
+    rt.register_module(module);
     let rt = Runtime::new(rt);
 
     let _ = rt.run().unwrap();
@@ -280,7 +289,7 @@ fn restart_via_async_handle() {
     let mut rt = NetworkApplication::new(());
 
     let module = RestartViaHandleModule::build_named(ObjectPath::from("RootModule"), &mut rt);
-    rt.create_module(module);
+    rt.register_module(module);
     let rt = Runtime::new(rt);
 
     let _ = rt.run().unwrap();

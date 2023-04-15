@@ -172,7 +172,8 @@ impl ModuleRef {
     }
 
     pub(crate) fn reset(&self) {
-        self.handler.borrow_mut().reset();
+        let mut brw = self.handler.borrow_mut();
+        brw.reset();
     }
 
     // MARKER: handle_message
@@ -288,7 +289,7 @@ impl ModuleRef {
             // TODO: verify
             log::debug!("Restarting module");
             // restart the module itself.
-            self.reset();
+            // self.reset();
             self.ctx.active.store(true, SeqCst);
 
             // Do sim start procedure

@@ -72,7 +72,7 @@ impl<A> NetworkApplication<A> {
     /// Returns a mutable refernce to the boxed module.
     /// This reference should be short lived since it blocks any other reference to self.
     ///
-    pub fn create_module(&mut self, module: ModuleRef) {
+    pub fn register_module(&mut self, module: ModuleRef) {
         self.module_list.push(module);
     }
 
@@ -80,7 +80,7 @@ impl<A> NetworkApplication<A> {
     /// Returns a reference to the list of all modules.
     ///
     #[must_use]
-    pub fn modules(&self) -> &Vec<ModuleRef> {
+    pub fn modules(&self) -> &[ModuleRef] {
         &self.module_list
     }
 

@@ -59,7 +59,7 @@ fn channel_dropping_message() {
     g_out.set_channel(channel);
     g_out.set_next_gate(g_in);
 
-    rt.create_module(module);
+    rt.register_module(module);
 
     let rt = Runtime::new(rt);
     let _ = rt.run();
@@ -126,7 +126,7 @@ fn channel_buffering_message() {
     g_out.set_channel(channel);
     g_out.set_next_gate(g_in);
 
-    rt.create_module(module);
+    rt.register_module(module);
 
     let rt = Runtime::new(rt);
     let _ = rt.run();
@@ -181,7 +181,7 @@ fn channel_instant_busy() {
     g_out.set_channel(channel);
     g_out.set_next_gate(g_in);
 
-    rt.create_module(module);
+    rt.register_module(module);
 
     let rt = Runtime::new(rt);
     let _ = rt.run();

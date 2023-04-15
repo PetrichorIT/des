@@ -1,7 +1,7 @@
 use super::{DummyModule, ModuleId, ModuleRef, ModuleRefWeak, ModuleReferencingError};
 use crate::{
     logger::{Logger, ScopeToken},
-    net::plugin,
+    net::plugin::PluginRegistry,
     prelude::{GateRef, ObjectPath},
     sync::{RwLock, SwapLock, SwapLockReadGuard},
 };
@@ -33,6 +33,7 @@ pub(crate) fn _default_setup(this: &ModuleContext) {
         crate::net::plugin::PluginPanicPolicy::Abort,
     );
 }
+
 ///
 pub struct ModuleContext {
     pub(crate) active: AtomicBool,
@@ -42,7 +43,7 @@ pub struct ModuleContext {
     pub(crate) logger_token: ScopeToken,
     pub(crate) gates: RwLock<Vec<GateRef>>,
 
-    pub(crate) plugins: RwLock<plugin::PluginRegistry>,
+    pub(crate) plugins: RwLock<PluginRegistry>,
 
     #[cfg(feature = "async")]
     pub(crate) async_ext: RwLock<AsyncCoreExt>,
@@ -61,7 +62,7 @@ impl ModuleContext {
             path,
 
             gates: RwLock::new(Vec::new()),
-            plugins: RwLock::new(plugin::PluginRegistry::new()),
+            plugins: RwLock::new(PluginRegistry::new()),
 
             parent: None,
             children: RwLock::new(HashMap::new()),
@@ -87,7 +88,7 @@ impl ModuleContext {
             path,
 
             gates: RwLock::new(Vec::new()),
-            plugins: RwLock::new(plugin::PluginRegistry::new()),
+            plugins: RwLock::new(PluginRegistry::new()),
 
             parent: Some(ModuleRefWeak::new(&parent)),
             children: RwLock::new(HashMap::new()),

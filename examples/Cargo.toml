@@ -54,6 +54,7 @@ path = "plugin/main.rs"
 name = "t-ndl2"
 path = "ndl2/main.rs"
 
+
 [dependencies]
 async-trait = "*"
 des = {path = "../des", features = ["full"]}
