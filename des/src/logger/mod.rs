@@ -32,12 +32,13 @@
 //! # What can be configured ?
 //!
 //! This logger works by creating scopes. A scope describes a custom output target for
-//! your log messages. When a logger is created the user can provide some policies and filters
-//! how scopes are created.
+//! your log messages. When a logger is created the user can provide some policies that
+//! define how scopes are defined. Scopes can be considered their own independent loggers
+//! with custom rules.
 //!
 //! A [`LogScopeConfigurationPolicy`] is a policy object, that can configure abitrary scopes.
 //! When a new scope is created this policy receives the scope name as a parameter,
-//! and returns a [`LogOutput`] object and a [`LogFormat`] identifier. The
+//! and returns a [`LogOutput`] object, a [`LogFormat`] identifie and a [`LevelFilter`]. The
 //! output object is used to write log messages to some external target. The default target
 //! would be an stdout/stderr pair, but other targets are also valid. For example
 //! logs could be written to a file, a vector of strings, or a TCP stream (not implemented by default).
@@ -49,6 +50,7 @@
 //! # use des::logger::*;
 //! # use std::io::{self, stdout, stderr};
 //! # use log::Level;
+//! # use log::LevelFilter;
 //! # use std::fs::File;
 //! struct MixedLoggingOutput {
 //!     file: File,
@@ -72,6 +74,7 @@
 //!                 file: std::fs::File::create(format!("{s}.log")).unwrap(),
 //!             }),
 //!             LogFormat::Color,
+//!             LevelFilter::Info,
 //!         )  
 //!     });
 //!
@@ -83,16 +86,16 @@
 //! }
 //! ```
 //!
-//! Additionally the user can define filters. Filter restrict which log levels are logged per scope
-//! at runtime, similar to the featue `max_level_*` features of [`log`], but with much greater control.
-//! Filters can be defined by text, and thus be read from env-vars for custom runtime behaviour.
+//! Additionally the user can define filters. Filter restrict which log records are accepted based on
+//! the `target` parameter. This can be usefull when working with large libraries, that may
+//! need a way to classify log messages within one scope.
 //!
 //! Finally an internal log level can be set. By default [`des`](crate) does not log any internal event-handling below
 //! the WARN level. By setting the internal log level, user can expose internal logs.
 //!
 //! # When do i create scopes ?
 //!
-//! In 99% of cases, never. Scopes are automatically created when using the feature 'net'.
+//! In 99% of cases, not at all. Scopes are automatically created when using the feature 'net'.
 //! Additionally which scope is active is automatically determined by [`des`](crate). If you want
 //! to create 'subscopes' within one network node, provide the logger with a custom target.
 //! This target will be added to the log entry as an extra parameter.
@@ -115,7 +118,7 @@
 //! }
 //! ```
 
-use log::{Level, LevelFilter, Log, SetLoggerError};
+use log::{Level, LevelFilter, Log, SetLoggerError, STATIC_MAX_LEVEL};
 use spin::RwLock;
 use std::{
     fmt::Debug,
@@ -133,7 +136,7 @@ pub use fmt::LogFormat;
 pub use output::LogOutput;
 pub use record::LogRecord;
 
-use self::filter::FilterPolicy;
+use self::filter::TargetFilters;
 use crate::sync::AtomicUsize;
 use crate::time::SimTime;
 
@@ -208,29 +211,34 @@ pub struct Logger {
     // (e.g.) from other crates in the test chain
     policy: Box<dyn LogScopeConfigurationPolicy>,
     interal_max_level: LevelFilter,
-    filter: FilterPolicy,
+    filter: TargetFilters,
 }
 
 /// An object to define a logger configuration policy.
 pub trait LogScopeConfigurationPolicy {
     /// Configures a new logging scope with an output target and a
     /// base format.
-    fn configure(&self, scope: &str) -> (Box<dyn LogOutput>, LogFormat);
+    fn configure(&self, scope: &str) -> (Box<dyn LogOutput>, LogFormat, LevelFilter);
 }
 
 impl LogScopeConfigurationPolicy for Box<LogScopeConfigurationPolicyFn> {
-    fn configure(&self, scope: &str) -> (Box<dyn LogOutput>, LogFormat) {
+    fn configure(&self, scope: &str) -> (Box<dyn LogOutput>, LogFormat, LevelFilter) {
         self(scope)
     }
 }
 
 /// A configuration function to create the log policy for a given scope.
-pub type LogScopeConfigurationPolicyFn = dyn Fn(&str) -> (Box<dyn LogOutput>, LogFormat);
+pub type LogScopeConfigurationPolicyFn =
+    dyn Fn(&str) -> (Box<dyn LogOutput>, LogFormat, LevelFilter);
 
 struct DefaultPolicy;
 impl LogScopeConfigurationPolicy for DefaultPolicy {
-    fn configure(&self, _scope: &str) -> (Box<dyn LogOutput>, LogFormat) {
-        (Box::new((stdout(), stderr())), LogFormat::Color)
+    fn configure(&self, _scope: &str) -> (Box<dyn LogOutput>, LogFormat, LevelFilter) {
+        (
+            Box::new((stdout(), stderr())),
+            LogFormat::Color,
+            STATIC_MAX_LEVEL,
+        )
     }
 }
 
@@ -243,7 +251,7 @@ impl Logger {
             active: true,
             policy: Box::new(DefaultPolicy),
             interal_max_level: LevelFilter::Warn,
-            filter: FilterPolicy::new(true),
+            filter: TargetFilters::new(true),
         }
     }
 
@@ -256,7 +264,7 @@ impl Logger {
             active: true,
             policy: Box::new(DefaultPolicy),
             interal_max_level: LevelFilter::Warn,
-            filter: FilterPolicy::new(false),
+            filter: TargetFilters::new(false),
         }
     }
 
@@ -272,13 +280,13 @@ impl Logger {
     }
 
     fn _register_scope(&self, scope: &str) -> ScopeToken {
-        let (output, fmt) = self.policy.configure(scope);
+        let (output, fmt, filter) = self.policy.configure(scope);
 
         let new_scope = LoggerScope {
             scope: Arc::new(scope.to_string()),
             output,
             fmt,
-            filter: self.filter.filter_for(scope, LevelFilter::max()),
+            filter,
         };
 
         let mut scopes = self.scopes.write();
@@ -409,10 +417,20 @@ impl Log for Logger {
 
         // (3) Get target pointer
         let target_is_module_path = Some(record.metadata().target()) == record.module_path();
-        let target_label = if target_is_module_path {
+        let target = if target_is_module_path {
+            ""
+        } else {
+            record.metadata().target()
+        };
+
+        let filter = self.filter.filter_for(target, STATIC_MAX_LEVEL);
+        if record.level() > filter {
+            return;
+        }
+        let target_label = if target == "" {
             String::new()
         } else {
-            format!(" ({})", record.metadata().target())
+            format!(" ({target})")
         };
 
         // (4) Get scope or make defeault print based on the target marker.

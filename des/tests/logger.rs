@@ -6,6 +6,7 @@ use std::sync::Mutex;
 use des::logger::*;
 use des::prelude::*;
 use log::LevelFilter;
+use log::STATIC_MAX_LEVEL;
 use serial_test::serial;
 
 #[macro_use]
@@ -68,8 +69,12 @@ fn one_module_linear_logger() {
         output: DebugOutput,
     }
     impl LogScopeConfigurationPolicy for DebugPolicy {
-        fn configure(&self, _scope: &str) -> (Box<dyn LogOutput>, LogFormat) {
-            (Box::new(self.output.clone()), LogFormat::NoColor)
+        fn configure(&self, _scope: &str) -> (Box<dyn LogOutput>, LogFormat, LevelFilter) {
+            (
+                Box::new(self.output.clone()),
+                LogFormat::NoColor,
+                STATIC_MAX_LEVEL,
+            )
         }
     }
 
@@ -126,10 +131,18 @@ fn multiple_module_linear_logger() {
         output1: DebugOutput,
     }
     impl LogScopeConfigurationPolicy for DebugPolicy {
-        fn configure(&self, scope: &str) -> (Box<dyn LogOutput>, LogFormat) {
+        fn configure(&self, scope: &str) -> (Box<dyn LogOutput>, LogFormat, LevelFilter) {
             match scope {
-                "node0" => (Box::new(self.output0.clone()), LogFormat::NoColor),
-                "node1" => (Box::new(self.output1.clone()), LogFormat::NoColor),
+                "node0" => (
+                    Box::new(self.output0.clone()),
+                    LogFormat::NoColor,
+                    STATIC_MAX_LEVEL,
+                ),
+                "node1" => (
+                    Box::new(self.output1.clone()),
+                    LogFormat::NoColor,
+                    STATIC_MAX_LEVEL,
+                ),
                 _ => unreachable!(),
             }
         }
@@ -195,10 +208,18 @@ fn multiple_module_linear_logger_filters() {
         output1: DebugOutput,
     }
     impl LogScopeConfigurationPolicy for DebugPolicy {
-        fn configure(&self, scope: &str) -> (Box<dyn LogOutput>, LogFormat) {
+        fn configure(&self, scope: &str) -> (Box<dyn LogOutput>, LogFormat, LevelFilter) {
             match scope {
-                "node0" => (Box::new(self.output0.clone()), LogFormat::NoColor),
-                "node1" => (Box::new(self.output1.clone()), LogFormat::NoColor),
+                "node0" => (
+                    Box::new(self.output0.clone()),
+                    LogFormat::NoColor,
+                    LevelFilter::Warn,
+                ),
+                "node1" => (
+                    Box::new(self.output1.clone()),
+                    LogFormat::NoColor,
+                    LevelFilter::Info,
+                ),
                 _ => unreachable!(),
             }
         }
@@ -209,8 +230,7 @@ fn multiple_module_linear_logger_filters() {
         .policy(DebugPolicy {
             output0: output0.clone(),
             output1: output1.clone(),
-        })
-        .add_filters("*=info,node0=warn");
+        });
     println!("{:?}", logger);
 
     logger.try_set_logger().unwrap();
@@ -251,16 +271,14 @@ fn multiple_module_linear_logger_filters() {
             }
 
             println!("{j} @ {level}");
-            assert_eq!(
-                lock[j],
-                format!(
-                    "[ {:^5} ] {} {}: {}\n",
-                    SimTime::from_duration(Duration::from_secs(i as u64)),
-                    level,
-                    path,
-                    i
-                )
+            let expected = format!(
+                "[ {:^5} ] {} {}: {}\n",
+                SimTime::from_duration(Duration::from_secs(i as u64)),
+                level,
+                path,
+                i
             );
+            assert_eq!(lock[j], expected, "{i} {j}");
             j += 1;
         }
     }
