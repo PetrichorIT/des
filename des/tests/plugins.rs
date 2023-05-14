@@ -1342,9 +1342,9 @@ impl Module for PluginWithStateModule {
 #[test]
 #[serial]
 fn plugin_with_state() {
-    Logger::new()
-        .interal_max_log_level(log::LevelFilter::Trace)
-        .set_logger();
+    // Logger::new()
+    //     .interal_max_log_level(log::LevelFilter::Trace)
+    //     .set_logger();
 
     let mut rt = NetworkApplication::new(());
 

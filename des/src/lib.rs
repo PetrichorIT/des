@@ -89,7 +89,7 @@
 //! These tools are build onto of the feature `net` and
 //! help with asynchronously managing module activity. With this feature
 //! active, network-primitives like `TcpListener` or `UdpSocket`,
-//! as well as time-primitives like `tokio::time::sleep` can be
+//! as well as time-primitives like `des::time::sleep` can be
 //! used.
 //!
 //! ```toml
@@ -107,7 +107,7 @@
 //! However it supports all synchronisation primitives (excluding Barrier)
 //! through the [`sync`](tokio::sync) module, asynchronous green tasks
 //! through [`task`](tokio::task), custom runtimes through [`runtime`](tokio::runtime)
-//! and simulation specific time primitives through [`sim`](tokio::sim) replacing the
+//! and simulation specific time primitives through [`time`](crate::time) replacing the
 //! standart [`time`](https://docs.rs/tokio/latest/tokio/time/index.html) module,
 //! aswell as simulation specifc network primitives replacing the standart
 //! [`net`](https://docs.rs/tokio/latest/tokio/net/index.html) module.

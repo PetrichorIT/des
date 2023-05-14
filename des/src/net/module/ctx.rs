@@ -17,17 +17,7 @@ use crate::net::module::core::AsyncCoreExt;
 pub(crate) static MOD_CTX: SwapLock<Option<Arc<ModuleContext>>> = SwapLock::new(None);
 pub(crate) static SETUP_FN: RwLock<fn(&ModuleContext)> = RwLock::new(_default_setup);
 
-#[cfg(not(feature = "async"))]
 pub(crate) fn _default_setup(_: &ModuleContext) {}
-
-#[cfg(feature = "async")]
-pub(crate) fn _default_setup(this: &ModuleContext) {
-    this.add_plugin(
-        crate::net::plugin::TokioTimePlugin::new(this.path.as_str().to_string()),
-        0,
-        crate::net::plugin::PluginPanicPolicy::Abort,
-    );
-}
 
 ///
 pub struct ModuleContext {
@@ -220,11 +210,12 @@ pub(crate) fn with_mod_ctx_lock() -> SwapLockReadGuard<'static, Option<Arc<Modul
 cfg_async! {
     use tokio::runtime::Runtime;
     use tokio::task::JoinHandle;
+    use tokio::task::LocalSet;
     use tokio::sync::mpsc::{UnboundedReceiver, error::SendError};
     use super::ext::WaitingMessage;
 
-    pub(super) fn async_get_rt() -> Option<Arc<Runtime>> {
-        with_mod_ctx(|ctx| Some(Arc::clone(ctx.async_ext.read().rt.as_ref()?)))
+    pub(crate) fn async_get_rt() -> Option<(Arc<Runtime>, Arc<LocalSet>)> {
+        with_mod_ctx(|ctx| Some(ctx.async_ext.read().rt.clone()?))
     }
 
     pub(super) fn async_ctx_reset() {

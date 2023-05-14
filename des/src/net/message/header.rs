@@ -30,8 +30,6 @@ pub type MessageKind = u16;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[allow(missing_docs)]
 pub struct MessageHeader {
-    pub(crate) typ: u8,
-
     pub id: MessageId,     // Custom
     pub kind: MessageKind, // Ethertype
     pub creation_time: SimTime,
@@ -48,24 +46,10 @@ pub struct MessageHeader {
     pub length: u32,
 }
 
-impl MessageHeader {
-    /// Returns the type of the message
-    #[must_use]
-    pub fn typ(&self) -> MessageType {
-        match self.typ {
-            0 => MessageType::UserDefined,
-            TYP_WAKEUP | TYP_RESTART => MessageType::Internal,
-            _ => unreachable!(),
-        }
-    }
-}
-
 // # DUP
 impl MessageHeader {
     pub(super) fn dup(&self) -> Self {
         Self {
-            typ: self.typ,
-
             id: self.id,
             kind: self.kind,
             creation_time: SimTime::now(),
@@ -86,8 +70,6 @@ impl MessageHeader {
 impl Default for MessageHeader {
     fn default() -> Self {
         Self {
-            typ: 0,
-
             id: 0,
             kind: 0,
             creation_time: SimTime::now(),
@@ -110,13 +92,6 @@ impl MessageBody for MessageHeader {
         64 // TODO  compute correct header size
     }
 }
-
-pub(crate) const TYP_RESTART: u8 = 10;
-pub(crate) const TYP_WAKEUP: u8 = 11;
-pub(crate) const TYP_IO_TICK: u8 = 12;
-pub(crate) const TYP_NOTIFY: u8 = 201;
-
-pub(crate) const TYP_PLUGIN_PERIODIC: u8 = 200;
 
 /// The internal typ of the message set by the des not the user.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]

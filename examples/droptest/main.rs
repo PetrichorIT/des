@@ -24,6 +24,6 @@ fn main() {
     // // Assume full drop.
     assert_eq!(MODULE_LEN.load(Ordering::SeqCst), 0);
 
-    assert_eq!(p.event_count, 7);
+    assert_eq!(p.event_count, 6);
     assert_eq!(time.as_millis(), 387)
 }

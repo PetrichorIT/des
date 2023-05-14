@@ -169,7 +169,7 @@ where
 
                     module.activate();
                     module.at_sim_start(stage);
-                    module.deactivate();
+                    module.deactivate(rt);
 
                     super::buf_process(&module, rt);
                 }
@@ -185,7 +185,7 @@ where
 
                 module.activate();
                 module.finish_sim_start();
-                module.deactivate();
+                module.deactivate(rt);
 
                 super::buf_process(&module, rt);
             }
@@ -196,12 +196,12 @@ where
     }
 
     fn at_sim_end(rt: &mut Runtime<NetworkApplication<A>>) {
-        for module in &mut rt.app.module_list {
+        for module in rt.app.module_list.iter().cloned().collect::<Vec<_>>() {
             log_scope!(module.ctx.logger_token);
             info!("Calling 'at_sim_end'");
             module.activate();
             module.at_sim_end();
-            module.deactivate();
+            module.deactivate(rt);
 
             // NOTE: no buf_process since no furthe events will be processed.
         }
@@ -209,11 +209,11 @@ where
         #[cfg(feature = "async")]
         {
             // Ensure all sim_start stages have finished
-            for module in &mut rt.app.module_list {
+            for module in rt.app.module_list.iter().cloned().collect::<Vec<_>>() {
                 log_scope!(module.ctx.logger_token);
                 module.activate();
                 module.finish_sim_end();
-                module.deactivate();
+                module.deactivate(rt);
             }
         }
 

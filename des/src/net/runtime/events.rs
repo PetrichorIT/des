@@ -1,12 +1,12 @@
 use std::panic;
+use std::sync::atomic::Ordering::SeqCst;
 
 use log::{info, warn};
-
 use crate::{
     net::{
         gate::GateRef,
         gate::GateServiceType,
-        message::{Message, TYP_RESTART},
+        message::{Message},
         module::with_mod_ctx_lock,
         plugin::UnwindSafeBox,
         runtime::buf_process,
@@ -27,6 +27,9 @@ pub enum NetEvents {
     MessageAtGateEvent(MessageAtGateEvent),
     HandleMessageEvent(HandleMessageEvent),
     ChannelUnbusyNotif(ChannelUnbusyNotif),
+    ModuleRestartEvent(ModuleRestartEvent),
+    #[cfg(feature = "async")]
+    AsyncWakeupEvent(AsyncWakeupEvent),
 }
 
 impl<A> EventSet<NetworkApplication<A>> for NetEvents
@@ -38,6 +41,9 @@ where
             Self::MessageAtGateEvent(event) => event.handle(rt),
             Self::HandleMessageEvent(event) => event.handle(rt),
             Self::ChannelUnbusyNotif(event) => event.handle(rt),
+            Self::ModuleRestartEvent(event) => event.handle(rt),
+            #[cfg(feature = "async")]
+            Self::AsyncWakeupEvent(event) => event.handle(rt),
         }
     }
 }
@@ -145,96 +151,6 @@ impl MessageAtGateEvent {
         A: EventLifecycle<NetworkApplication<A>>,
     {
         self.handle_with_sink(rt);
-        // let mut msg = self.msg;
-        // msg.header.last_gate = Some(GateRef::clone(&self.gate));
-
-        // //
-        // // Iterate through gates until:
-        // // a) a final gate with no next_gate was found, indicating a handle_module_call
-        // // b) a delay gate was found, apply the delay and recall in a new event.
-        // //
-        // let mut current_gate = self.gate;
-        // while let Some(next_gate) = current_gate.next_gate() {
-        //     log_scope!(current_gate.owner().ctx.logger_token);
-
-        //     // A next gate exists.
-        //     // redirect to next channel
-        //     msg.header.last_gate = Some(GateRef::clone(&next_gate));
-
-        //     // Check whether the associated module is active
-        //     let active = current_gate
-        //         .owner()
-        //         .active
-        //         .load(std::sync::atomic::Ordering::SeqCst);
-
-        //     if !active {
-        //         // Drop the message but do print a warning
-        //         warn!(
-        //             "Gate '{}' dropped message [{}] since owner module {} is inactive",
-        //             current_gate.name(),
-        //             msg.str(),
-        //             current_gate.owner().path()
-        //         );
-
-        //         // not exactly nessecary, but helpful
-        //         drop(msg);
-        //         return;
-        //     }
-
-        //     info!(
-        //         "Gate '{}' forwarding message [{}] to next gate delayed: {}",
-        //         current_gate.name(),
-        //         msg.str(),
-        //         current_gate.channel().is_some()
-        //     );
-
-        //     match current_gate.channel_mut() {
-        //         Some(channel) => {
-        //             // Channel delayed connection
-        //             assert!(
-        //                 current_gate.service_type() != GateServiceType::Input,
-        //                 "Channels cannot start at a input node"
-        //             );
-
-        //             channel.send_message(msg, &next_gate, rt);
-        //             return;
-        //         }
-        //         None => {
-        //             // no delay nessecary
-        //             // goto next iteration
-        //             current_gate = next_gate;
-        //         }
-        //     }
-        // }
-
-        // // No next gate exists.
-        // debug_assert!(current_gate.next_gate().is_none());
-        // log_scope!(current_gate.owner().ctx.logger_token);
-
-        // assert!(
-        //     current_gate.service_type() != GateServiceType::Output,
-        //     "Messages cannot be forwarded to modules on Output gates. (Gate '{}' owned by Module '{}')",
-        //     current_gate.str(),
-        //     current_gate.owner().as_str()
-        // );
-
-        // info!(
-        //     "Gate '{}' forwarding message [{}] to module #{}",
-        //     current_gate.name(),
-        //     msg.str(),
-        //     current_gate.owner().ctx.id
-        // );
-
-        // let module = current_gate.owner();
-        // rt.add_event(
-        //     NetEvents::HandleMessageEvent(HandleMessageEvent {
-        //         module,
-        //         message: msg,
-        //     }),
-        //     SimTime::now(),
-        // );
-
-        // log_scope!();
     }
 }
 
@@ -259,10 +175,60 @@ impl HandleMessageEvent {
 
         module.activate();
         module.handle_message(message);
-        module.deactivate();
+        module.deactivate(rt);
 
         buf_process(&module, rt);
 
+        log_scope!();
+    }
+}
+
+#[derive(Debug)]
+pub struct ModuleRestartEvent {
+    pub(crate) module: ModuleRef
+}
+
+impl ModuleRestartEvent {
+    fn handle<A>(self, rt: &mut Runtime<NetworkApplication<A>>)
+    where
+        A: EventLifecycle<NetworkApplication<A>>,
+    {
+        log_scope!(self.module.as_logger_scope());
+        info!("ModuleRestartEvent");
+
+
+        let module = self.module;
+        module.activate();
+        module.module_restart();
+        module.deactivate(rt);
+
+        buf_process(&module, rt);
+        log_scope!();
+    }
+}
+
+#[cfg(feature = "async")]
+#[derive(Debug)]
+pub struct AsyncWakeupEvent {
+    pub(crate) module: ModuleRef
+}
+
+#[cfg(feature = "async")]
+impl AsyncWakeupEvent {
+    fn handle<A>(self, rt: &mut Runtime<NetworkApplication<A>>)
+    where
+        A: EventLifecycle<NetworkApplication<A>>,
+    {
+        log_scope!(self.module.as_logger_scope());
+        info!("Async Wakeup");
+
+
+        let module = self.module;
+        module.activate();
+        module.async_wakeup();
+        module.deactivate(rt);
+
+        buf_process(&module, rt);
         log_scope!();
     }
 }
@@ -380,8 +346,48 @@ impl ModuleRef {
         }
     }
 
+    #[cfg(feature = "async")]
+    pub(crate) fn async_wakeup(&self) {
+        if self.ctx.active.load(SeqCst) {
+            let _ = self.plugin_upstream(None);
+            if self.handler.borrow().__indicate_async() {
+                Self::run_without_event()
+            }
+            self.plugin_downstream();
+        }else {
+            log::debug!("Ignoring message since module is inactive");
+        }
+    } 
+
+    #[cfg(feature = "async")]
+    fn run_without_event() {  
+        use tokio::task::yield_now;
+        use crate::net::module::async_get_rt;
+        let Some(rt) = async_get_rt() else {
+            return
+        };
+        rt.1.block_on(&rt.0, yield_now());
+    }
+
+
+    pub(crate) fn module_restart(&self) {
+         // TODO: verify
+         log::debug!("Restarting module");
+         // restart the module itself.
+         // self.reset();
+         self.ctx.active.store(true, SeqCst);
+
+         // Do sim start procedure
+         let stages = self.num_sim_start_stages();
+         for stage in 0..stages {
+             self.at_sim_start(stage);
+         }
+
+         #[cfg(feature = "async")]
+         self.finish_sim_start();
+    }
+
     pub(crate) fn handle_message(&self, msg: Message) {
-        use std::sync::atomic::Ordering::SeqCst;
         if self.ctx.active.load(SeqCst) {
             // (0) Run upstream plugins.
             let msg = self.plugin_upstream(Some(msg));
@@ -394,27 +400,12 @@ impl ModuleRef {
             } else {
                 #[cfg(feature = "async")]
                 if self.handler.borrow().__indicate_async() {
-                    self.handler.borrow_mut().handle_message(Message::notify());
+                    Self::run_without_event()
                 }
             }
 
             // (2) Plugin downstram operations
             self.plugin_downstream();
-        } else if msg.header().typ == TYP_RESTART {
-            // TODO: verify
-            log::debug!("Restarting module");
-            // restart the module itself.
-            // self.reset();
-            self.ctx.active.store(true, SeqCst);
-
-            // Do sim start procedure
-            let stages = self.num_sim_start_stages();
-            for stage in 0..stages {
-                self.at_sim_start(stage);
-            }
-
-            #[cfg(feature = "async")]
-            self.finish_sim_start();
         } else {
             log::debug!("Ignoring message since module is inactive");
         }

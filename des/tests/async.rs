@@ -7,7 +7,7 @@ use std::sync::{
 };
 
 use async_trait::async_trait;
-use des::prelude::*;
+use des::{prelude::*, time::sleep};
 use tokio::{
     sync::{
         mpsc::{channel, Sender},
@@ -75,22 +75,6 @@ fn quasai_sync_non_blocking() {
         } => {
             assert_eq!(time, SimTime::ZERO);
             assert_eq!(profiler.event_count, 10);
-
-            // let m1 = app
-            //     .module(|m| m.module_core().name() == "RootModule")
-            //     .unwrap()
-            //     .self_as::<QuasaiSyncModule>()
-            //     .unwrap();
-
-            // assert_eq!(m1.counter, 1 + 2);
-
-            // let m2 = app
-            //     .module(|m| m.module_core().name() == "OtherRootModule")
-            //     .unwrap()
-            //     .self_as::<QuasaiSyncModule>()
-            //     .unwrap();
-
-            // assert_eq!(m2.counter, 1 + 2 + 3)
         }
         _ => panic!("Expected runtime to finish"),
     }
@@ -246,7 +230,7 @@ impl AsyncModule for TimeSleepModule {
         log::debug!("recv msg: {}", msg.str());
         let wait_time = msg.header().kind as u64;
         log::info!("<{}> [{}] Waiting for timer", module_name(), SimTime::now());
-        tokio::time::sleep(Duration::from_secs(wait_time)).await;
+        sleep(Duration::from_secs(wait_time)).await;
         log::info!(
             "<{}> [{}] Done waiting for id: {}",
             module_name(),
@@ -342,7 +326,7 @@ fn one_module_delayed_recv() {
             // 4) HandleMessage #2 (2s) (will finish sleep but wakeup was added later)
             // 5) Wakeup aka NOP (2s)
             // 6) Wakeup - sleep reloved - send in '5 (4s)
-            assert_eq!(profiler.event_count, 6);
+            assert_eq!(profiler.event_count, 7);
 
             // let m1 = app
             //     .module(|m| m.module_core().name() == "RootModule")
@@ -415,7 +399,7 @@ fn mutiple_module_delayed_recv() {
         } => {
             assert_eq!(time, 5.0);
 
-            assert_eq!(profiler.event_count, 12);
+            assert_eq!(profiler.event_count, 15);
 
             // let m1 = app
             //     .module(|m| m.module_core().name() == "RootModule")

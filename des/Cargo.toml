@@ -11,7 +11,7 @@ license = "MIT"
 name = "des"
 readme = "../README.md"
 repository = "https://github.com/PetrichorIT/des"
-version = "0.5.0"
+version = "0.5.1"
 
 [features]
 # Include nothing by default
@@ -46,6 +46,8 @@ sysinfo = "*"
 # due to issues like #8
 spin = {version = "*"}
 
+pin-project-lite = "0.2"
+
 # All other dependencies are optional
 
 async-trait = {version = "0.1", optional = true}
@@ -53,8 +55,7 @@ async-trait = {version = "0.1", optional = true}
 des-cqueue = {path = "../des-cqueue", optional = true}
 des-macros = {path = "../des-macros", optional = true}
 des-ndl = { path = "../des-ndl", optional = true}
-tokio = {git = "https://github.com/PetrichorIT/tokio_sim", branch = "inet-stable", features = ["sim"], optional = true}
-# tokio = { path = "../../tokio_sim/tokio", features = ["sim"], optional = true }
+tokio = { version = "*", features = ["rt", "sync", "macros", "io-util"], optional = true}
 
 [dev-dependencies]
 futures = "0.3"
