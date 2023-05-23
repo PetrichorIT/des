@@ -1,5 +1,7 @@
 use crate::logger::ScopeToken;
+use crate::net::NetEvents;
 use crate::prelude::{ChannelRef, Gate, GateRef, GateServiceType};
+use crate::runtime::EventSink;
 
 use super::{DummyModule, Module, ModuleContext};
 use std::any::{Any, TypeId};
@@ -205,13 +207,51 @@ impl ModuleRef {
 
     /// INTERNAL
     #[doc(hidden)]
+    #[allow(unused)]
     pub fn activate(&self) {
-        ModuleContext::place(Arc::clone(&self.ctx));
+        let prev = ModuleContext::place(Arc::clone(&self.ctx));
+
+        #[cfg(feature = "async")]
+        {
+            use crate::time::{Driver, SimTime};
+
+            if let Some(prev) = prev {
+                prev.async_ext.write().driver = Driver::unset();
+            }
+
+            let driver = self.ctx.async_ext.write().driver.take();
+            driver.map(|mut d| {
+                d.bump().into_iter().for_each(|s| s.wake_all());
+                d.next_wakeup = SimTime::MAX;
+                d.set();
+            });
+        }
     }
 
     // INTERNAL
     #[doc(hidden)]
-    pub fn deactivate(&self) {
+    #[allow(unused)]
+    pub(crate) fn deactivate(&self, rt: &mut impl EventSink<NetEvents>) {
+        #[cfg(feature = "async")]
+        {
+            use crate::net::AsyncWakeupEvent;
+            use crate::time::Driver;
+
+            let mut ext = self.ctx.async_ext.write();
+            let mut driver = Driver::unset().unwrap();
+            if let Some(next_wakeup) = driver.next() {
+                if next_wakeup < driver.next_wakeup {
+                    driver.next_wakeup = next_wakeup;
+                    rt.add(
+                        NetEvents::AsyncWakeupEvent(AsyncWakeupEvent {
+                            module: self.clone(),
+                        }),
+                        next_wakeup,
+                    )
+                }
+            }
+            ext.driver = Some(driver);
+        }
         let _ = ModuleContext::take();
     }
 

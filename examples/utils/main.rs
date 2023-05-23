@@ -29,6 +29,6 @@ fn main() {
 
     let _ = topo.write_to_svg("examples/utils/graph");
 
-    assert_eq!(p.event_count, 49);
+    assert_eq!(p.event_count, 48);
     assert_eq!(time.as_secs(), 83)
 }

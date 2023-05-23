@@ -4,6 +4,7 @@ use super::{
     HandleMessageEvent, MessageAtGateEvent, NetworkApplication, NetworkApplicationGlobals,
 };
 use crate::net::module::{MOD_CTX, SETUP_FN};
+use crate::net::ModuleRestartEvent;
 use crate::net::{gate::GateRef, message::Message, NetEvents};
 use crate::prelude::{module_id, EventLifecycle, ModuleRef};
 use crate::runtime::Runtime;
@@ -129,11 +130,9 @@ where
     }
 
     // (2) Handle shutdown if indicated
-    if let Some(rest) = ctx.shutdown.take() {
-        use crate::net::message::TYP_RESTART;
-
+    if let Some(restart) = ctx.shutdown.take() {
         // Mark the modules state
-        log::debug!("Shuttind down module and restaring at {:?}", rest);
+        log::debug!("Shuttind down module and restaring at {:?}", restart);
         module
             .ctx
             .active
@@ -152,16 +151,15 @@ where
         // Note that the module is not active, so it must be manually reactivated
         module.activate();
         module.reset();
-        module.deactivate();
+        module.deactivate(rt);
 
         // Reschedule wakeup
-        if let Some(rest) = rest {
+        if let Some(restart) = restart {
             rt.add_event(
-                NetEvents::HandleMessageEvent(HandleMessageEvent {
+                NetEvents::ModuleRestartEvent(ModuleRestartEvent {
                     module: module.clone(),
-                    message: Message::new().typ(TYP_RESTART).build(),
                 }),
-                rest,
+                restart,
             );
         }
     }

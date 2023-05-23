@@ -13,14 +13,6 @@ use crate::{
 /// To cirumvent that, a common setup function is provided that initalizes some plugins
 /// on all modules.
 ///
-/// When feature 'net' is enabled, but feature 'async' is not, this function is a NOP.
-/// With feature 'async' enabled, this function will initalize a `TokioTimePlugin`
-/// on async modules.
-///
-/// When users override this function, they must ensure that the `TokioTimePlugin`
-/// will still be initalized within the new setup fn, should the simulation require
-/// async time-primitives.
-///
 /// # Example
 ///
 /// ```rust
@@ -33,11 +25,6 @@ use crate::{
 /// }
 ///
 /// fn setup(this: &ModuleContext) {
-///     this.add_plugin(
-///         TokioTimePlugin::new(this.path().as_str().to_string()),
-///         0,
-///         PluginPanicPolicy::Abort,
-///     );
 ///     this.add_plugin(
 ///         MyDebugPlugin,
 ///         10,

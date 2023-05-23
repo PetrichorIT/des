@@ -92,9 +92,6 @@ pub(crate) use self::util::UnwindSafeBox;
 
 use super::module::with_mod_ctx_lock;
 
-mod common;
-pub use self::common::*;
-
 /// A subprogramm between the module application and the network layer.
 ///
 /// Plugins can follow different patterns based on the provided

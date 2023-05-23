@@ -1,11 +1,18 @@
-use crate::{net::message::Message, time::SimTime};
+use std::sync::Arc;
+
+use crate::{
+    net::message::Message,
+    time::{Driver, SimTime},
+};
 use tokio::{
+    runtime::{Builder, Runtime},
     sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
-    task::JoinHandle,
+    task::{JoinHandle, LocalSet},
 };
 
 pub(crate) struct AsyncCoreExt {
-    pub(crate) rt: Option<std::sync::Arc<tokio::runtime::Runtime>>,
+    pub(crate) rt: Option<(Arc<Runtime>, Arc<LocalSet>)>,
+    pub(crate) driver: Option<Driver>,
 
     pub(crate) wait_queue_tx: UnboundedSender<WaitingMessage>,
     pub(crate) wait_queue_rx: Option<UnboundedReceiver<WaitingMessage>>,
@@ -25,12 +32,11 @@ impl AsyncCoreExt {
         let (stx, srx) = unbounded_channel();
 
         Self {
-            rt: Some(std::sync::Arc::new(
-                tokio::runtime::Builder::new_current_thread()
-                    .enable_all()
-                    .build()
-                    .unwrap(),
+            rt: Some((
+                Arc::new(Builder::new_current_thread().enable_all().build().unwrap()),
+                Arc::new(LocalSet::new()),
             )),
+            driver: Some(Driver::new()),
 
             wait_queue_tx: wtx,
             wait_queue_rx: Some(wrx),
@@ -45,7 +51,10 @@ impl AsyncCoreExt {
     }
 
     pub(crate) fn reset(&mut self) {
-        self.rt = Some(std::sync::Arc::new(tokio::runtime::Runtime::new().unwrap()));
+        self.rt = Some((
+            Arc::new(Builder::new_current_thread().build().unwrap()),
+            Arc::new(LocalSet::new()),
+        ));
 
         // let (tx, rx) = unbounded_channel();
         let (wtx, wrx) = unbounded_channel();

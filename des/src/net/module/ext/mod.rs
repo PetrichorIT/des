@@ -1,7 +1,7 @@
-use crate::net::message::TYP_NOTIFY;
 use crate::net::{message::Message, module::Module};
 use crate::time::SimTime;
 use async_trait::async_trait;
+use tokio::task::yield_now;
 
 pub(crate) mod core;
 pub(crate) use self::core::WaitingMessage;
@@ -155,15 +155,14 @@ where
 
         // (2) Ignore notifty message only relevant for a
         // call to poll_until_idle
-        if msg.header().typ != TYP_NOTIFY {
-            super::async_wait_queue_tx_send(WaitingMessage {
-                msg,
-                time: SimTime::now(),
-            })
-            .expect("Failed to forward message to 'handle_message'");
-        }
+        super::async_wait_queue_tx_send(WaitingMessage {
+            msg,
+            time: SimTime::now(),
+        })
+        .expect("Failed to forward message to 'handle_message'");
+    
 
-        rt.poll_until_idle();
+        rt.1.block_on(&rt.0, yield_now());
     }
 
     fn at_sim_start(&mut self, stage: usize) {
@@ -190,7 +189,7 @@ where
 
             let mut rx = super::async_wait_queue_rx_take().expect("We have been robbed");
 
-            super::async_set_wait_queue_join(rt.spawn(async move {
+            super::async_set_wait_queue_join(rt.1.spawn_local(async move {
                 while let Some(wmsg) = rx.recv().await {
                     let WaitingMessage { msg, .. } = wmsg;
                     <T as AsyncModule>::handle_message(self_ref, msg).await;
@@ -210,7 +209,7 @@ where
             let mut srx =
                 super::async_sim_start_rx_take().expect("We have been robbed at sim start");
 
-            super::async_set_sim_start_join(rt.spawn(async move {
+            super::async_set_sim_start_join(rt.1.spawn_local(async move {
                 while let Some(stage) = srx.recv().await {
                     if stage == usize::MAX {
                         srx.close();
@@ -223,7 +222,7 @@ where
 
         super::async_sim_start_tx_send(stage).expect("Failed to send to unbounded sender");
 
-        rt.poll_until_idle();
+        rt.1.block_on(&rt.0, yield_now());
     }
 
     fn finish_sim_start(&mut self) {
@@ -234,12 +233,14 @@ where
         super::async_sim_start_tx_send(usize::MAX)
             .expect("Failed to send close signal to sim_start_task");
 
-        rt.poll_until_idle();
+            rt.1.block_on(&rt.0, yield_now());
 
         // The join must succeed else saftey invariant cannot be archived.
-        rt.block_or_idle_on(super::async_sim_start_join_take().expect("Crime"))
-            .expect("Join Idle")
-            .expect("Join Error");
+        let handle = super::async_sim_start_join_take().expect("Crime");
+        let _g = rt.0.enter();
+        assert!(handle.is_finished());
+        rt.0.block_on(handle).unwrap();
+        drop(_g);
     }
 
     fn at_sim_end(&mut self) {
@@ -251,19 +252,21 @@ where
         let self_ptr: *mut T = self;
         let self_ref: &'static mut T = unsafe { &mut *self_ptr };
 
-        super::async_sim_end_join_set(rt.spawn(<T as AsyncModule>::at_sim_end(self_ref)));
+        super::async_sim_end_join_set(rt.1.spawn_local(<T as AsyncModule>::at_sim_end(self_ref)));
 
-        rt.poll_until_idle();  
+        rt.1.block_on(&rt.0, yield_now());
     }
 
     fn finish_sim_end(&mut self) {
         let Some(rt) = super::async_get_rt() else { return };
 
-        rt.poll_until_idle();
+        rt.1.block_on(&rt.0, yield_now());
 
-        rt.block_or_idle_on(super::async_sim_end_join_take().expect("Theif"))
-            .expect("Join Idle")
-            .expect("Join Error");
+        let handle = super::async_sim_end_join_take().expect("Crime");
+        let _g = rt.0.enter();
+        assert!(handle.is_finished());
+        rt.0.block_on(handle).unwrap();
+        drop(_g);
     }
 
     fn num_sim_start_stages(&self) -> usize {

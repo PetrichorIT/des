@@ -1,6 +1,6 @@
 #![cfg(feature = "async")]
 
-use des::prelude::*;
+use des::{prelude::*, time::sleep};
 use serial_test::serial;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -50,7 +50,7 @@ impl AsyncModule for StatelessModule {
         tokio::spawn(async {
             let mut drop_test = DropTest::new(&DROPPED_STATELESS_SHUTDOWN);
             loop {
-                tokio::sim::time::sleep(Duration::from_secs(1)).await;
+                sleep(Duration::from_secs(1)).await;
                 drop_test.step();
             }
         });
@@ -104,7 +104,7 @@ impl AsyncModule for StatelessModuleRestart {
         tokio::spawn(async {
             let mut drop_test = DropTest::new(&DROPPED_STATLESS_RESTART);
             loop {
-                tokio::sim::time::sleep(Duration::from_secs(1)).await;
+                sleep(Duration::from_secs(1)).await;
                 drop_test.step();
             }
         });
@@ -169,7 +169,7 @@ impl AsyncModule for StatefullModule {
         tokio::spawn(async {
             let mut drop_test = DropTest::new(&DROPPED_STATFULL_RESTART);
             loop {
-                tokio::sim::time::sleep(Duration::from_secs(1)).await;
+                sleep(Duration::from_secs(1)).await;
                 drop_test.step();
             }
         });
@@ -229,7 +229,7 @@ impl AsyncModule for ShutdownViaHandleModule {
         tokio::spawn(async move {
             let mut drop_test = DropTest::new(&DROPPED_SHUTDOWN_VIA_HANDLE);
             loop {
-                tokio::sim::time::sleep(Duration::from_secs(1)).await;
+                sleep(Duration::from_secs(1)).await;
                 if drop_test.step() > 10 {
                     shutdown()
                 }
@@ -267,7 +267,7 @@ impl AsyncModule for RestartViaHandleModule {
         tokio::spawn(async move {
             let mut drop_test = DropTest::new(&DROPPED_RESTART_VIA_HANDLE);
             loop {
-                tokio::sim::time::sleep(Duration::from_secs(1)).await;
+                sleep(Duration::from_secs(1)).await;
                 let v = drop_test.step();
 
                 if v == 10 {

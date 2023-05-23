@@ -38,11 +38,6 @@ impl Message {
         MessageBuilder::new()
     }
 
-    #[cfg(feature = "async")]
-    pub(crate) fn notify() -> Self {
-        Message::new().typ(TYP_NOTIFY).build()
-    }
-
     /// Returns the length of the complete message
     #[must_use]
     pub fn length(&self) -> usize {
@@ -73,10 +68,9 @@ impl Message {
     #[must_use]
     pub fn str(&self) -> String {
         format!(
-            "Message {{ {} bytes {} ({}) }}",
+            "Message {{ {} bytes {}  }}",
             self.header.length,
             self.content.as_ref().map_or("no content", AnyBox::ty),
-            self.header.typ()
         )
     }
 }
@@ -286,13 +280,6 @@ impl MessageBuilder {
             header: Box::default(),
             content: None,
         }
-    }
-
-    /// Only internal use
-    #[allow(unused)]
-    pub(crate) fn typ(mut self, typ: u8) -> Self {
-        self.header.typ = typ;
-        self
     }
 
     /// Sets the field `header`.
