@@ -41,11 +41,11 @@ impl Module for Main {
 }
 
 fn main() {
-    Logger::new()
-        .active(true)
-        .interal_max_log_level(log::LevelFilter::Warn)
-        .try_set_logger()
-        .expect("Failed to set logger");
+    // Logger::new()
+    //     .active(true)
+    //     .interal_max_log_level(log::LevelFilter::Warn)
+    //     .try_set_logger()
+    //     .expect("Failed to set logger");
 
     let app = NdlApplication::new("examples/metrics/main.ndl", registry![Alice, Main]).unwrap();
     let rt = Runtime::new_with(

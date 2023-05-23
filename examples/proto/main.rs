@@ -78,7 +78,7 @@ impl Module for Main {
 }
 
 fn main() {
-    Logger::new().try_set_logger().unwrap();
+    // Logger::new().try_set_logger().unwrap();
     let app = NdlApplication::new(
         "examples/proto/main.ndl",
         registry![AppA, AppB, Runner, MultiRunner, Main],

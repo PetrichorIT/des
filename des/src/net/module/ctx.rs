@@ -1,6 +1,5 @@
 use super::{DummyModule, ModuleId, ModuleRef, ModuleRefWeak, ModuleReferencingError};
 use crate::{
-    logger::{Logger, ScopeToken},
     net::plugin::PluginRegistry,
     prelude::{GateRef, ObjectPath},
     sync::{RwLock, SwapLock, SwapLockReadGuard},
@@ -25,10 +24,11 @@ pub struct ModuleContext {
     pub(crate) id: ModuleId,
 
     pub(crate) path: ObjectPath,
-    pub(crate) logger_token: ScopeToken,
     pub(crate) gates: RwLock<Vec<GateRef>>,
-
     pub(crate) plugins: RwLock<PluginRegistry>,
+
+    #[cfg(feature = "tracing")]
+    pub(crate) tracing_span: tracing::span::Span,
 
     #[cfg(feature = "async")]
     pub(crate) async_ext: RwLock<AsyncCoreExt>,
@@ -40,10 +40,15 @@ impl ModuleContext {
     /// Creates a new standalone instance
     pub fn standalone(path: ObjectPath) -> ModuleRef {
         let this = ModuleRef::dummy(Arc::new(Self {
-            active: AtomicBool::new(true),
+            #[cfg(feature = "tracing")]
+            tracing_span: tracing::span!(
+                tracing::Level::TRACE,
+                "--des-module",
+                module = ?path.as_str()
+            ),
 
+            active: AtomicBool::new(true),
             id: ModuleId::gen(),
-            logger_token: Logger::register_scope(path.as_logger_scope()),
             path,
 
             gates: RwLock::new(Vec::new()),
@@ -66,10 +71,16 @@ impl ModuleContext {
     pub fn child_of(name: &str, parent: ModuleRef) -> ModuleRef {
         let path = ObjectPath::appended(&parent.ctx.path, name);
         let this = ModuleRef::dummy(Arc::new(Self {
+            #[cfg(feature = "tracing")]
+            tracing_span: tracing::span!(
+                tracing::Level::TRACE,
+                "--des-module",
+                module = ?path.as_str()
+            ),
+
             active: AtomicBool::new(true),
 
             id: ModuleId::gen(),
-            logger_token: Logger::register_scope(path.as_logger_scope()),
             path,
 
             gates: RwLock::new(Vec::new()),

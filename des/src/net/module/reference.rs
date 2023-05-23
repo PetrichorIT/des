@@ -1,4 +1,3 @@
-use crate::logger::ScopeToken;
 use crate::net::NetEvents;
 use crate::prelude::{ChannelRef, Gate, GateRef, GateServiceType};
 use crate::runtime::EventSink;
@@ -201,8 +200,9 @@ impl ModuleRef {
         self.ctx.path.as_str()
     }
 
-    pub(crate) fn as_logger_scope(&self) -> ScopeToken {
-        self.ctx.logger_token
+    #[cfg(feature = "tracing")]
+    pub(crate) fn tracing_span(&self) -> &tracing::span::Span {
+        &self.ctx.tracing_span
     }
 
     /// INTERNAL

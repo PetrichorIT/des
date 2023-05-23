@@ -32,9 +32,9 @@ impl Module for Main {
 }
 
 fn main() {
-    Logger::new()
-        .interal_max_log_level(log::LevelFilter::Debug)
-        .set_logger();
+    // Logger::new()
+    //     .interal_max_log_level(log::LevelFilter::Debug)
+    //     .set_logger();
 
     let ndl = match NdlApplication::new("examples/ndl2/main.ndl", registry![Main, Sub]) {
         Ok(v) => v,

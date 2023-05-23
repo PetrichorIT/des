@@ -227,11 +227,11 @@ impl AsyncModule for TimeSleepModule {
     }
 
     async fn handle_message(&mut self, msg: Message) {
-        log::debug!("recv msg: {}", msg.str());
+        tracing::debug!("recv msg: {}", msg.str());
         let wait_time = msg.header().kind as u64;
-        log::info!("<{}> [{}] Waiting for timer", module_name(), SimTime::now());
+        tracing::info!("<{}> [{}] Waiting for timer", module_name(), SimTime::now());
         sleep(Duration::from_secs(wait_time)).await;
-        log::info!(
+        tracing::info!(
             "<{}> [{}] Done waiting for id: {}",
             module_name(),
             SimTime::now(),
