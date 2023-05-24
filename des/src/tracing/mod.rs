@@ -161,7 +161,6 @@ impl<P: ScopeConfigurationPolicy> Subscriber<P> {
         while let Ok((id, scope_name)) = rx.try_recv() {
             let mut scopes = self.scopes.write();
             let cfg = self.policy.configure(&scope_name);
-            println!("token :: {:?}", (id.0, &scope_name));
             let _a = scopes.insert(
                 id.0,
                 Scope {
@@ -175,7 +174,6 @@ impl<P: ScopeConfigurationPolicy> Subscriber<P> {
                 },
             );
             assert!(_a.is_none());
-            println!("{:?}", scopes.keys());
         }
     }
 }
