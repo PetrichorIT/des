@@ -200,7 +200,6 @@ impl ModuleRef {
         self.ctx.path.as_str()
     }
 
-    #[cfg(feature = "tracing")]
     pub(crate) fn scope_token(&self) -> crate::tracing::ScopeToken {
         self.ctx.scope_token
     }

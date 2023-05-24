@@ -13,7 +13,7 @@ use crate::{
     },
     prelude::{ChannelRef, EventLifecycle, ModuleRef},
     runtime::{EventSet, EventSink, Runtime},
-    time::SimTime,
+    time::SimTime, tracing::enter_scope,
 };
 
 ///
@@ -66,8 +66,7 @@ impl MessageAtGateEvent {
         // or a delayed action is required.
         let mut cur = self.gate;
         while let Some(next) = cur.next_gate() {
-            #[cfg(feature = "tracing")]
-            crate::tracing::enter_scope(cur.owner().scope_token());
+            enter_scope(cur.owner().scope_token());
 
             // Since a next gate exists log the current gate as
             // transit complete. (do this before drop check to allow for better debugging at drop)
@@ -117,8 +116,7 @@ impl MessageAtGateEvent {
 
         // The loop has ended. This means we are at the end of a gate chain
         // cur has not been checked for anything
-        #[cfg(feature = "tracing")]
-        crate::tracing::enter_scope(cur.owner().scope_token());
+        enter_scope(cur.owner().scope_token());
 
         assert_ne!(
             cur.service_type(), 
@@ -169,8 +167,7 @@ impl HandleMessageEvent {
     where
         A: EventLifecycle<NetworkApplication<A>>,
     {
-        #[cfg(feature = "tracing")]
-        crate::tracing::enter_scope(self.module.scope_token());
+       enter_scope(self.module.scope_token());
 
         let mut message = self.message;
         message.header.receiver_module_id = self.module.ctx.id;
@@ -198,8 +195,7 @@ impl ModuleRestartEvent {
     where
         A: EventLifecycle<NetworkApplication<A>>,
     {
-        #[cfg(feature = "tracing")]
-        crate::tracing::enter_scope(self.module.scope_token());
+        enter_scope(self.module.scope_token());
 
         #[cfg(feature = "tracing")]
         tracing::info!("ModuleRestartEvent");
@@ -225,8 +221,7 @@ impl AsyncWakeupEvent {
     where
         A: EventLifecycle<NetworkApplication<A>>,
     {
-        #[cfg(feature = "tracing")]
-        crate::tracing::enter_scope(self.module.scope_token());
+        enter_scope(self.module.scope_token());
 
         #[cfg(feature = "tracing")]
         tracing::info!("Async Wakeup");

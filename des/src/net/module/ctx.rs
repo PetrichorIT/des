@@ -5,6 +5,7 @@ use crate::{
     net::plugin::PluginRegistry,
     prelude::{GateRef, ObjectPath},
     sync::{RwLock, SwapLock, SwapLockReadGuard},
+    tracing::{new_scope, ScopeToken},
 };
 use std::{
     fmt::Debug,
@@ -28,8 +29,7 @@ pub struct ModuleContext {
     pub(crate) gates: RwLock<Vec<GateRef>>,
     pub(crate) plugins: RwLock<PluginRegistry>,
 
-    #[cfg(feature = "tracing")]
-    pub(crate) scope_token: crate::tracing::ScopeToken,
+    pub(crate) scope_token: ScopeToken,
 
     #[cfg(feature = "async")]
     pub(crate) async_ext: RwLock<AsyncCoreExt>,
@@ -41,8 +41,7 @@ impl ModuleContext {
     /// Creates a new standalone instance
     pub fn standalone(path: ObjectPath) -> ModuleRef {
         let this = ModuleRef::dummy(Arc::new(Self {
-            #[cfg(feature = "tracing")]
-            scope_token: crate::tracing::new_scope(path.as_str()),
+            scope_token: new_scope(path.as_str()),
 
             active: AtomicBool::new(true),
             id: ModuleId::gen(),
@@ -68,8 +67,7 @@ impl ModuleContext {
     pub fn child_of(name: &str, parent: ModuleRef) -> ModuleRef {
         let path = ObjectPath::appended(&parent.ctx.path, name);
         let this = ModuleRef::dummy(Arc::new(Self {
-            #[cfg(feature = "tracing")]
-            scope_token: crate::tracing::new_scope(path.as_str()),
+            scope_token: new_scope(path.as_str()),
 
             active: AtomicBool::new(true),
 

@@ -24,10 +24,6 @@ pub use crate::runtime::sample;
 #[allow(deprecated)]
 pub use crate::runtime::sim_time;
 
-cfg_tracing! {
-    // TODO
-}
-
 //
 // # Metrics & Misc
 //

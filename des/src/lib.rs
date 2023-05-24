@@ -123,10 +123,7 @@ pub mod doc;
 pub mod runtime;
 pub mod stats;
 pub mod time;
-
-cfg_tracing! {
-    pub mod tracing;
-}
+pub mod tracing;
 
 cfg_net! {
     pub mod net;

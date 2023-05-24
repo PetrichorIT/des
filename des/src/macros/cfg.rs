@@ -99,13 +99,3 @@ macro_rules! cfg_not_cqueue {
         )*
     }
 }
-
-macro_rules! cfg_tracing {
-    ($($item:item)*) => {
-        $(
-            #[cfg(feature = "tracing")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "tracing")))]
-            $item
-        )*
-    }
-}

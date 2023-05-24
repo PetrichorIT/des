@@ -59,7 +59,6 @@ pub(crate) fn buf_send_at(mut msg: Message, gate: GateRef, send_time: SimTime) {
     let mut ctx = BUF_CTX.lock();
     msg.header.sender_module_id = module_id();
 
-    #[cfg(feature = "tracing")]
     crate::tracing::enter_scope(gate.owner().scope_token());
 
     // (0) If delayed send is active, dont skip gate_refs

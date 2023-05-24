@@ -18,14 +18,14 @@ version = "0.5.1"
 default = []
 
 # Include everything used for default test runs.
-full = ["net", "ndl", "cqueue", "async", "tracing"]
+full = ["net", "ndl", "cqueue", "async",]
 
 async = ["net", "dep:tokio", "dep:async-trait"]
 cqueue = ["dep:des-cqueue"]
 multi-threaded = []
 net = ["dep:des-macros"]
 ndl = ["dep:des-ndl"]
-tracing = ["dep:tracing"]
+tracing = []
 
 # Different metrics features
 metrics = []
@@ -42,16 +42,16 @@ sysinfo = "*"
 # Spin must be used in the logger event in single-threaded runnin
 # due to issues like #8
 spin = {version = "*"}
-
+tracing = { version = "*" }
+termcolor = "*"
+fxhash = "0.2"
 pin-project-lite = "0.2"
 
 # All other dependencies are optional
 
 async-trait = {version = "0.1", optional = true}
 tokio = { version = "*", features = ["rt", "sync", "macros", "io-util"], optional = true}
-tracing = { version = "*", optional = true}
-termcolor = "*"
-fxhash = "0.2"
+
 
 des-cqueue = {path = "../des-cqueue", optional = true}
 des-macros = {path = "../des-macros", optional = true}

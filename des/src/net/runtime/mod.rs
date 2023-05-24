@@ -3,6 +3,7 @@ use super::par::ParMap;
 use super::Topology;
 use crate::net::ObjectPath;
 use crate::runtime::{Application, EventLifecycle, Runtime};
+use crate::tracing::{enter_scope, leave_scope};
 use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
@@ -161,8 +162,7 @@ where
             for i in 0..rt.app.modules().len() {
                 // Use cloned handles to appease the brwchk
                 let module = rt.app.modules()[i].clone();
-                #[cfg(feature = "tracing")]
-                crate::tracing::enter_scope(module.scope_token());
+                enter_scope(module.scope_token());
 
                 if stage < module.num_sim_start_stages() {
                     #[cfg(feature = "tracing")]
@@ -182,8 +182,7 @@ where
         {
             for i in 0..rt.app.modules().len() {
                 let module = rt.app.modules()[i].clone();
-                #[cfg(feature = "tracing")]
-                crate::tracing::enter_scope(module.scope_token());
+                enter_scope(module.scope_token());
 
                 module.activate();
                 module.finish_sim_start();
@@ -193,16 +192,14 @@ where
             }
         }
 
-        #[cfg(feature = "tracing")]
-        crate::tracing::leave_scope();
+        leave_scope();
 
         // (2.3) Reset the logging scope.
     }
 
     fn at_sim_end(rt: &mut Runtime<NetworkApplication<A>>) {
         for module in rt.app.module_list.iter().cloned().collect::<Vec<_>>() {
-            #[cfg(feature = "tracing")]
-            crate::tracing::enter_scope(module.scope_token());
+            enter_scope(module.scope_token());
 
             #[cfg(feature = "tracing")]
             tracing::info!("Calling 'at_sim_end'");
@@ -217,8 +214,7 @@ where
         {
             // Ensure all sim_start stages have finished
             for module in rt.app.module_list.iter().cloned().collect::<Vec<_>>() {
-                #[cfg(feature = "tracing")]
-                crate::tracing::enter_scope(module.scope_token());
+                enter_scope(module.scope_token());
 
                 module.activate();
                 module.finish_sim_end();
@@ -226,8 +222,7 @@ where
             }
         }
 
-        #[cfg(feature = "tracing")]
-        crate::tracing::leave_scope();
+        leave_scope();
 
         A::at_sim_end(rt);
     }
