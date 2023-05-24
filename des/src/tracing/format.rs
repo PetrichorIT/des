@@ -6,12 +6,17 @@ use crate::prelude::SimTime;
 
 use super::output::TracingRecord;
 
+/// A formatter for a tracing subscriber scope.
 pub trait TracingFormatter {
+    /// Formats an emitted tracing event onto a buffer.
     fn fmt(&mut self, out: &mut Buffer, record: TracingRecord<'_>) -> Result<()>;
 
+    /// Formats a new span for later use
     fn fmt_new_span(&mut self, out: &mut Buffer, span: &Attributes<'_>) -> Result<()>;
 
+    /// HELPER
     fn fmt_time(&mut self, out: &mut Buffer, time: SimTime) -> Result<()>;
+    /// HELPER
     fn fmt_scope(
         &mut self,
         out: &mut Buffer,
@@ -19,11 +24,14 @@ pub trait TracingFormatter {
         target: Option<&str>,
         level: Level,
     ) -> Result<()>;
+    /// HELPER
     fn fmt_spans(&mut self, out: &mut Buffer, spans: &[&str]) -> Result<()>;
+    /// HELPER
     fn fmt_event(&mut self, out: &mut Buffer, events: &Event<'_>) -> Result<()>;
 }
 
-#[derive(Clone, Copy)]
+/// A formatter intenden for a ANIS terminal.
+#[derive(Debug)]
 pub struct ColorfulTracingFormatter;
 impl TracingFormatter for ColorfulTracingFormatter {
     fn fmt(&mut self, out: &mut Buffer, record: TracingRecord<'_>) -> Result<()> {

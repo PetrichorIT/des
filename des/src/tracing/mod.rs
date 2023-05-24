@@ -1,31 +1,34 @@
-#![allow(missing_docs, missing_debug_implementations, unreachable_pub)]
+//! Structured event tracing with custom context
 
 mod filter;
 mod format;
 mod output;
 mod policy;
 
-use self::{
-    filter::TargetFilters,
-    output::TracingRecord,
-    policy::{DefaultScopeConfigurationPolicy, ScopeConfigurationPolicy},
-};
+use self::{filter::TargetFilters, policy::DefaultScopeConfigurationPolicy};
 use crate::{
     prelude::SimTime,
     sync::{Mutex, RwLock},
 };
 use fxhash::{FxBuildHasher, FxHashMap};
-use std::sync::{
-    atomic::{AtomicU64, Ordering},
-    mpsc::{channel, Receiver, Sender},
+use std::{
+    fmt::Debug,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        mpsc::{channel, Receiver, Sender},
+    },
 };
 use termcolor::BufferWriter;
 use tracing::{
     level_filters::STATIC_MAX_LEVEL, metadata::LevelFilter, span, subscriber::SetGlobalDefaultError,
 };
 
+pub use self::format::ColorfulTracingFormatter;
 pub use self::format::TracingFormatter;
 pub use self::output::TracingOutput;
+pub use self::output::TracingRecord;
+pub use self::policy::ScopeConfiguration;
+pub use self::policy::ScopeConfigurationPolicy;
 
 /// A token describing a logger scope.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -37,6 +40,11 @@ static SCOPE_CURRENT_TOKEN: AtomicU64 = AtomicU64::new(u64::MAX);
 static SCOPE_TOKEN_NEXT: AtomicU64 = AtomicU64::new(0);
 static SCOPES: Mutex<Option<Sender<(ScopeToken, String)>>> = Mutex::new(None);
 
+/// Creates a new scope attached to the tracing subscriber.
+///
+/// This function is intended for internal use, but remains
+/// public, since it may be usefull in rare scenarios
+#[doc(hidden)]
 pub fn new_scope(s: &str) -> ScopeToken {
     let token = ScopeToken(SCOPE_TOKEN_NEXT.fetch_add(1, Ordering::SeqCst));
     let lock = SCOPES.lock();
@@ -46,10 +54,20 @@ pub fn new_scope(s: &str) -> ScopeToken {
     token
 }
 
+/// Indicates that the begin of a scope, that was allread registerd.
+///
+/// This function is intended for internal use, but remains
+/// public, since it may be usefull in rare scenarios
+#[doc(hidden)]
 pub fn enter_scope(token: ScopeToken) {
     SCOPE_CURRENT_TOKEN.store(token.0, Ordering::SeqCst);
 }
 
+/// Indicates that no scope is currently active.
+///
+/// This function is intended for internal use, but remains
+/// public, since it may be usefull in rare scenarios
+#[doc(hidden)]
 pub fn leave_scope() {
     SCOPE_CURRENT_TOKEN.store(u64::MAX, Ordering::SeqCst);
 }
@@ -63,7 +81,6 @@ pub fn leave_scope() {
 ///
 /// This subscriber should only be used in combination with a
 /// des `Runtime` that executes a `NetworkApplication`.
-
 pub struct Subscriber<P: ScopeConfigurationPolicy> {
     policy: P,
     scopes: RwLock<FxHashMap<u64, Scope>>,
@@ -87,10 +104,11 @@ struct Scope {
 }
 
 struct SpanInfo {
-    pub formatted: String,
+    formatted: String,
 }
 
 impl<P: ScopeConfigurationPolicy> Subscriber<P> {
+    /// Creates a new tracing Subscriber with the given policy.
     pub fn new(policy: P) -> Self {
         let (scopes_tx, scopes_rx) = channel();
 
@@ -110,16 +128,22 @@ impl<P: ScopeConfigurationPolicy> Subscriber<P> {
         }
     }
 
+    /// Sets the maximum log level of the subscriber.
+    ///
+    /// All trace events not at least reaching this level,
+    /// will be discarded.
     pub fn with_max_level(mut self, level: LevelFilter) -> Self {
         self.max_log_level = level;
         self
     }
 
+    /// Adds a target filter in textual repr to the subscriber.
     pub fn with_filter(mut self, filter: impl AsRef<str>) -> Self {
         self.filters.parse_str(filter.as_ref());
         self
     }
 
+    /// Sets the tracer as the global default.
     pub fn init(self) -> Result<(), SetGlobalDefaultError>
     where
         P: 'static,
@@ -266,3 +290,9 @@ impl SpanInfo {
 
 unsafe impl<P: ScopeConfigurationPolicy> Send for Subscriber<P> {}
 unsafe impl<P: ScopeConfigurationPolicy> Sync for Subscriber<P> {}
+
+impl<P: ScopeConfigurationPolicy> Debug for Subscriber<P> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Subscriber").finish()
+    }
+}

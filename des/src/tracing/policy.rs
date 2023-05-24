@@ -5,9 +5,12 @@ use super::{
     output::TracingOutput,
 };
 
-/// A cfg
+/// A configuration for a single scope, defining the output
+/// and formatting behaviour of the scope.
 pub struct ScopeConfiguration {
+    /// The output device for the scope.
     pub output: Box<dyn TracingOutput>,
+    /// A formatter used to write to the output device.
     pub fmt: Box<dyn TracingFormatter>,
 }
 
@@ -26,7 +29,9 @@ impl Default for ScopeConfiguration {
     }
 }
 
+/// A policy for configuring loggin scopes
 pub trait ScopeConfigurationPolicy {
+    /// Creates a new cfg for a new scope.
     fn configure(&self, scope: &str) -> ScopeConfiguration;
 }
 
@@ -36,6 +41,9 @@ impl<T: Fn(&str) -> ScopeConfiguration> ScopeConfigurationPolicy for Box<T> {
     }
 }
 
+/// A configuration policy that applies the default scope configuration
+/// to all scopes.
+#[derive(Debug)]
 pub struct DefaultScopeConfigurationPolicy;
 impl ScopeConfigurationPolicy for DefaultScopeConfigurationPolicy {
     fn configure(&self, _: &str) -> ScopeConfiguration {

@@ -7,11 +7,19 @@ use crate::prelude::SimTime;
 
 use super::format::TracingFormatter;
 
+/// A processes tracing event.
+#[derive(Debug)]
 pub struct TracingRecord<'a> {
+    /// The simulation time the event originated in.
     pub time: SimTime,
+    /// The associated module scope, if existent
     pub scope: Option<&'a str>,
+    /// The provided target parameters, if the target differs
+    /// from the module path.
     pub target: Option<&'a str>,
+    /// A textual repr of all active spans.
     pub spans: &'a [&'a str],
+    /// The source event
     pub event: &'a Event<'a>,
 }
 
