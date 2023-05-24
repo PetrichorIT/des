@@ -59,8 +59,8 @@ pub(crate) fn buf_send_at(mut msg: Message, gate: GateRef, send_time: SimTime) {
     let mut ctx = BUF_CTX.lock();
     msg.header.sender_module_id = module_id();
 
-    let owner = gate.owner();
-    let _g = owner.tracing_span().enter();
+    #[cfg(feature = "tracing")]
+    crate::tracing::enter_scope(gate.owner().scope_token());
 
     // (0) If delayed send is active, dont skip gate_refs
     if send_time > SimTime::now() {
@@ -131,6 +131,7 @@ where
     // (2) Handle shutdown if indicated
     if let Some(restart) = ctx.shutdown.take() {
         // Mark the modules state
+        #[cfg(feature = "tracing")]
         tracing::debug!("Shuttind down module and restaring at {:?}", restart);
         module
             .ctx

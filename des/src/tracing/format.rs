@@ -102,10 +102,7 @@ impl TracingFormatter for ColorfulTracingFormatter {
     fn fmt_spans(&mut self, out: &mut Buffer, spans: &[&str]) -> Result<()> {
         out.set_color(ColorSpec::new().set_bold(true))?;
         for span in spans {
-            write!(out, "{}", span)?;
-        }
-        if !spans.is_empty() {
-            write!(out, " ")?;
+            write!(out, "{} ", span)?;
         }
         out.reset()
     }

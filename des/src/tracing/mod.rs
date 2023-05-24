@@ -10,16 +10,49 @@ use self::{
     output::TracingRecord,
     policy::{DefaultScopeConfigurationPolicy, ScopeConfigurationPolicy},
 };
-use crate::{prelude::SimTime, sync::RwLock};
-use std::{collections::HashMap, sync::atomic::AtomicU64};
+use crate::{
+    prelude::SimTime,
+    sync::{Mutex, RwLock},
+};
+use fxhash::{FxBuildHasher, FxHashMap};
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    mpsc::{channel, Receiver, Sender},
+};
 use termcolor::BufferWriter;
 use tracing::{
-    field::Visit, level_filters::STATIC_MAX_LEVEL, metadata::LevelFilter, span,
-    subscriber::SetGlobalDefaultError,
+    level_filters::STATIC_MAX_LEVEL, metadata::LevelFilter, span, subscriber::SetGlobalDefaultError,
 };
 
 pub use self::format::TracingFormatter;
 pub use self::output::TracingOutput;
+
+/// A token describing a logger scope.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ScopeToken(u64);
+
+// is only set on the simulation thread, but read by all
+// use static mut with a file-local saftey contract.
+static SCOPE_CURRENT_TOKEN: AtomicU64 = AtomicU64::new(u64::MAX);
+static SCOPE_TOKEN_NEXT: AtomicU64 = AtomicU64::new(0);
+static SCOPES: Mutex<Option<Sender<(ScopeToken, String)>>> = Mutex::new(None);
+
+pub fn new_scope(s: &str) -> ScopeToken {
+    let token = ScopeToken(SCOPE_TOKEN_NEXT.fetch_add(1, Ordering::SeqCst));
+    let lock = SCOPES.lock();
+    if let Some(scopes) = &*lock {
+        scopes.send((token, s.to_string())).expect("Failed to send");
+    }
+    token
+}
+
+pub fn enter_scope(token: ScopeToken) {
+    SCOPE_CURRENT_TOKEN.store(token.0, Ordering::SeqCst);
+}
+
+pub fn leave_scope() {
+    SCOPE_CURRENT_TOKEN.store(u64::MAX, Ordering::SeqCst);
+}
 
 /// A subscriber to tracing events emitted by `des`.
 ///
@@ -33,13 +66,16 @@ pub use self::output::TracingOutput;
 
 pub struct Subscriber<P: ScopeConfigurationPolicy> {
     policy: P,
-    scopes: RwLock<HashMap<u64, Scope>>,
+    scopes: RwLock<FxHashMap<u64, Scope>>,
     filters: TargetFilters,
     max_log_level: LevelFilter,
 
+    scopes_tx: Sender<(ScopeToken, String)>,
+    scopes_rx: Mutex<Receiver<(ScopeToken, String)>>,
+
     //
     span_id: AtomicU64,
-    spans: RwLock<HashMap<span::Id, SpanInfo>>,
+    spans: RwLock<FxHashMap<span::Id, SpanInfo>>,
     stack: RwLock<Vec<span::Id>>,
     active_scope: AtomicU64,
 }
@@ -54,18 +90,21 @@ struct SpanInfo {
     pub formatted: String,
 }
 
-const SPAN_ID_MASK: u64 = 0x80_00_00_00_00_00_00_00;
-
 impl<P: ScopeConfigurationPolicy> Subscriber<P> {
     pub fn new(policy: P) -> Self {
+        let (scopes_tx, scopes_rx) = channel();
+
         Self {
             policy,
-            scopes: RwLock::new(HashMap::new()),
+            scopes: RwLock::new(FxHashMap::with_hasher(FxBuildHasher::default())),
             filters: TargetFilters::new(true),
             max_log_level: STATIC_MAX_LEVEL,
 
+            scopes_tx,
+            scopes_rx: Mutex::new(scopes_rx),
+
             span_id: AtomicU64::new(1),
-            spans: RwLock::new(HashMap::new()),
+            spans: RwLock::new(FxHashMap::with_hasher(FxBuildHasher::default())),
             stack: RwLock::new(Vec::new()),
             active_scope: AtomicU64::new(0),
         }
@@ -85,51 +124,35 @@ impl<P: ScopeConfigurationPolicy> Subscriber<P> {
     where
         P: 'static,
     {
-        tracing::subscriber::set_global_default(self)
+        let tx = self.scopes_tx.clone();
+        tracing::subscriber::set_global_default(self)?;
+        let _ = SCOPES.lock().replace(tx);
+        Ok(())
     }
 }
 
 impl<P: ScopeConfigurationPolicy> Subscriber<P> {
-    fn register_new_scope(&self, span: &span::Attributes<'_>) -> span::Id {
-        let id = self
-            .span_id
-            .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
-            | SPAN_ID_MASK;
-
-        struct PathExtractor<'a> {
-            path: &'a mut String,
+    fn check_scopes(&self) {
+        let rx = self.scopes_rx.lock();
+        while let Ok((id, scope_name)) = rx.try_recv() {
+            let mut scopes = self.scopes.write();
+            let cfg = self.policy.configure(&scope_name);
+            println!("token :: {:?}", (id.0, &scope_name));
+            let _a = scopes.insert(
+                id.0,
+                Scope {
+                    path: if scope_name.is_empty() {
+                        "@root".into()
+                    } else {
+                        scope_name
+                    },
+                    output: cfg.output,
+                    fmt: cfg.fmt,
+                },
+            );
+            assert!(_a.is_none());
+            println!("{:?}", scopes.keys());
         }
-        impl Visit for PathExtractor<'_> {
-            fn record_debug(
-                &mut self,
-                _field: &tracing::field::Field,
-                value: &dyn std::fmt::Debug,
-            ) {
-                use std::fmt::Write;
-                write!(self.path, "{:?}", value).unwrap();
-            }
-        }
-
-        let mut path = String::new();
-        span.values().record(&mut PathExtractor { path: &mut path });
-        let path = path.trim_matches('"').to_string();
-        let path = if path.is_empty() {
-            String::from("@root")
-        } else {
-            path
-        };
-
-        let cfg = self.policy.configure(&path);
-        self.scopes.write().insert(
-            id.clone(),
-            Scope {
-                output: cfg.output,
-                fmt: cfg.fmt,
-                path,
-            },
-        );
-
-        span::Id::from_u64(id)
     }
 }
 
@@ -139,21 +162,17 @@ impl<P: ScopeConfigurationPolicy + 'static> tracing::Subscriber for Subscriber<P
     }
 
     fn new_span(&self, span: &span::Attributes<'_>) -> span::Id {
-        if span.metadata().name() == "--des-module" {
-            self.register_new_scope(span)
-        } else {
-            let id = span::Id::from_u64(
-                self.span_id
-                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
-            );
-            let scope_id = self.active_scope.load(std::sync::atomic::Ordering::SeqCst);
-            let mut scopes = self.scopes.write();
-            let scope = scopes.get_mut(&scope_id).unwrap();
+        let id = span::Id::from_u64(
+            self.span_id
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
+        );
+        let scope_id = self.active_scope.load(std::sync::atomic::Ordering::SeqCst);
+        let mut scopes = self.scopes.write();
+        let scope = scopes.get_mut(&scope_id).unwrap();
 
-            let info = SpanInfo::from_attrs(span, &mut *scope.fmt);
-            self.spans.write().insert(id.clone(), info);
-            id
-        }
+        let info = SpanInfo::from_attrs(span, &mut *scope.fmt);
+        self.spans.write().insert(id.clone(), info);
+        id
     }
 
     fn record(&self, _: &span::Id, _: &span::Record<'_>) {
@@ -171,14 +190,17 @@ impl<P: ScopeConfigurationPolicy + 'static> tracing::Subscriber for Subscriber<P
         } else {
             Some(event.metadata().target())
         };
+
         if let Some(target) = target {
             let allowed_max_level = self.filters.filter_for(target, LevelFilter::TRACE);
             if allowed_max_level < *event.metadata().level() {
                 return;
             }
         }
+
         // (0) Identify current scope
-        let scope_id = self.active_scope.load(std::sync::atomic::Ordering::SeqCst);
+        self.check_scopes();
+        let scope_id = SCOPE_CURRENT_TOKEN.load(Ordering::SeqCst);
         let mut scopes = self.scopes.write();
         let scope = scopes.get_mut(&scope_id);
 
@@ -209,31 +231,16 @@ impl<P: ScopeConfigurationPolicy + 'static> tracing::Subscriber for Subscriber<P
     }
 
     fn enter(&self, span: &span::Id) {
-        let is_scope = span.into_u64() & SPAN_ID_MASK != 0;
-        if is_scope {
-            self.active_scope
-                .store(span.into_u64(), std::sync::atomic::Ordering::SeqCst);
-        } else {
-            self.stack.write().push(span.clone());
-        }
+        self.stack.write().push(span.clone());
     }
 
     fn exit(&self, span: &span::Id) {
-        let is_scope = span.into_u64() & SPAN_ID_MASK != 0;
-        if is_scope {
-            self.active_scope
-                .store(0, std::sync::atomic::Ordering::SeqCst);
-        } else {
-            assert_eq!(self.stack.write().pop(), Some(span.clone()))
-        }
+        assert_eq!(self.stack.write().pop(), Some(span.clone()))
     }
 
     fn try_close(&self, id: span::Id) -> bool {
         // 0
-        let is_scope = id.into_u64() & SPAN_ID_MASK != 0;
-        if !is_scope {
-            self.scopes.write().remove(&id.into_u64());
-        }
+        self.spans.write().remove(&id);
         false
     }
 }

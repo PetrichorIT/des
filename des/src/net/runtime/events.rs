@@ -67,9 +67,7 @@ impl MessageAtGateEvent {
         let mut cur = self.gate;
         while let Some(next) = cur.next_gate() {
             #[cfg(feature = "tracing")]
-            let owner = cur.owner();
-            #[cfg(feature = "tracing")]
-            let _g = owner.tracing_span().enter();
+            crate::tracing::enter_scope(cur.owner().scope_token());
 
             // Since a next gate exists log the current gate as
             // transit complete. (do this before drop check to allow for better debugging at drop)
@@ -78,6 +76,7 @@ impl MessageAtGateEvent {
             // Drop message is owner is not active, but notfiy since this is an irregularity.
             // TODO: maybe move to log::trace if this becomes a common pattern
             if !cur.owner().is_active() {
+                #[cfg(feature = "tracing")]
                 tracing::warn!(
                     "Gate '{}' dropped message [{}] since owner module {} is inactive",
                     cur.name(),
@@ -90,6 +89,7 @@ impl MessageAtGateEvent {
             }
 
             // Log the current transition to the internal log stream.
+            #[cfg(feature = "tracing")]
             tracing::info!(
                 "Gate '{}' forwarding message [{}] to next gate delayed: {}",
                 cur.name(),
@@ -118,9 +118,7 @@ impl MessageAtGateEvent {
         // The loop has ended. This means we are at the end of a gate chain
         // cur has not been checked for anything
         #[cfg(feature = "tracing")]
-        let owner = cur.owner();
-        #[cfg(feature = "tracing")]
-        let _g = owner.tracing_span().enter();
+        crate::tracing::enter_scope(cur.owner().scope_token());
 
         assert_ne!(
             cur.service_type(), 
@@ -130,6 +128,7 @@ impl MessageAtGateEvent {
             cur.owner().as_str()
         );
        
+        #[cfg(feature = "tracing")]
         tracing::info!(
             "Gate '{}' forwarding message [{}] to module #{}",
             cur.name(),
@@ -171,11 +170,12 @@ impl HandleMessageEvent {
         A: EventLifecycle<NetworkApplication<A>>,
     {
         #[cfg(feature = "tracing")]
-        let _g = self.module.tracing_span().enter();
+        crate::tracing::enter_scope(self.module.scope_token());
 
         let mut message = self.message;
         message.header.receiver_module_id = self.module.ctx.id;
 
+        #[cfg(feature = "tracing")]
         tracing::info!("Handling message {:?}", message.str());
 
         let module = &self.module;
@@ -199,8 +199,9 @@ impl ModuleRestartEvent {
         A: EventLifecycle<NetworkApplication<A>>,
     {
         #[cfg(feature = "tracing")]
-        let _g = self.module.tracing_span().enter();
+        crate::tracing::enter_scope(self.module.scope_token());
 
+        #[cfg(feature = "tracing")]
         tracing::info!("ModuleRestartEvent");
 
         let module = &self.module;
@@ -225,8 +226,9 @@ impl AsyncWakeupEvent {
         A: EventLifecycle<NetworkApplication<A>>,
     {
         #[cfg(feature = "tracing")]
-        let _g = self.module.tracing_span().enter();
+        crate::tracing::enter_scope(self.module.scope_token());
 
+        #[cfg(feature = "tracing")]
         tracing::info!("Async Wakeup");
 
         let module = &self.module;
@@ -360,6 +362,7 @@ impl ModuleRef {
             }
             self.plugin_downstream();
         }else {
+            #[cfg(feature = "tracing")]
             tracing::debug!("Ignoring message since module is inactive");
         }
     } 
@@ -377,6 +380,7 @@ impl ModuleRef {
 
     pub(crate) fn module_restart(&self) {
          // TODO: verify
+         #[cfg(feature = "tracing")]
          tracing::debug!("Restarting module");
          // restart the module itself.
          // self.reset();
@@ -412,6 +416,7 @@ impl ModuleRef {
             // (2) Plugin downstram operations
             self.plugin_downstream();
         } else {
+            #[cfg(feature = "tracing")]
             tracing::debug!("Ignoring message since module is inactive");
         }
     }

@@ -25,7 +25,7 @@ impl Module for Alice {
     fn handle_message(&mut self, _: Message) {
         self.outvec.collect(rand::random::<f64>());
         if SimTime::now() == 42.0 {
-            log::trace!("Message");
+            tracing::trace!("Message");
         }
         schedule_in(Message::new().build(), Duration::from_secs_f64(1.0))
     }

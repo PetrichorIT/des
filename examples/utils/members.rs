@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use des::prelude::*;
 
-use log::info;
+use tracing::info;
 
 #[derive(Debug)]
 pub struct Alice();

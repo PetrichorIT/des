@@ -1,3 +1,5 @@
+use fxhash::{FxBuildHasher, FxHashMap};
+
 use super::{DummyModule, ModuleId, ModuleRef, ModuleRefWeak, ModuleReferencingError};
 use crate::{
     net::plugin::PluginRegistry,
@@ -5,7 +7,6 @@ use crate::{
     sync::{RwLock, SwapLock, SwapLockReadGuard},
 };
 use std::{
-    collections::HashMap,
     fmt::Debug,
     sync::{atomic::AtomicBool, Arc},
 };
@@ -28,12 +29,12 @@ pub struct ModuleContext {
     pub(crate) plugins: RwLock<PluginRegistry>,
 
     #[cfg(feature = "tracing")]
-    pub(crate) tracing_span: tracing::span::Span,
+    pub(crate) scope_token: crate::tracing::ScopeToken,
 
     #[cfg(feature = "async")]
     pub(crate) async_ext: RwLock<AsyncCoreExt>,
     pub(crate) parent: Option<ModuleRefWeak>,
-    pub(crate) children: RwLock<HashMap<String, ModuleRef>>,
+    pub(crate) children: RwLock<FxHashMap<String, ModuleRef>>,
 }
 
 impl ModuleContext {
@@ -41,11 +42,7 @@ impl ModuleContext {
     pub fn standalone(path: ObjectPath) -> ModuleRef {
         let this = ModuleRef::dummy(Arc::new(Self {
             #[cfg(feature = "tracing")]
-            tracing_span: tracing::span!(
-                tracing::Level::TRACE,
-                "--des-module",
-                module = ?path.as_str()
-            ),
+            scope_token: crate::tracing::new_scope(path.as_str()),
 
             active: AtomicBool::new(true),
             id: ModuleId::gen(),
@@ -55,7 +52,7 @@ impl ModuleContext {
             plugins: RwLock::new(PluginRegistry::new()),
 
             parent: None,
-            children: RwLock::new(HashMap::new()),
+            children: RwLock::new(FxHashMap::with_hasher(FxBuildHasher::default())),
 
             #[cfg(feature = "async")]
             async_ext: RwLock::new(AsyncCoreExt::new()),
@@ -72,11 +69,7 @@ impl ModuleContext {
         let path = ObjectPath::appended(&parent.ctx.path, name);
         let this = ModuleRef::dummy(Arc::new(Self {
             #[cfg(feature = "tracing")]
-            tracing_span: tracing::span!(
-                tracing::Level::TRACE,
-                "--des-module",
-                module = ?path.as_str()
-            ),
+            scope_token: crate::tracing::new_scope(path.as_str()),
 
             active: AtomicBool::new(true),
 
@@ -87,7 +80,7 @@ impl ModuleContext {
             plugins: RwLock::new(PluginRegistry::new()),
 
             parent: Some(ModuleRefWeak::new(&parent)),
-            children: RwLock::new(HashMap::new()),
+            children: RwLock::new(FxHashMap::with_hasher(FxBuildHasher::default())),
 
             #[cfg(feature = "async")]
             async_ext: RwLock::new(AsyncCoreExt::new()),

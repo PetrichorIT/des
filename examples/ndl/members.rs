@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use des::prelude::*;
-use log::info;
+use tracing::info;
 
 pub struct Alice();
 

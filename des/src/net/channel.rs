@@ -294,6 +294,7 @@ impl Channel {
         if chan.busy {
             let msg_size = msg.length();
             if chan.buffer_len + msg_size > chan.metrics.queuesize {
+                #[cfg(feature = "tracing")]
                 tracing::warn!(
                     "Gate '{}' dropping message [{}] pushed onto busy channel {}",
                     next_gate.previous_gate().unwrap().name(),
@@ -303,12 +304,11 @@ impl Channel {
 
                 // Register message progress (DROP)
                 #[cfg(feature = "metrics")]
-                {
-                    chan.stats.register_message_dropped(&msg);
-                }
+                chan.stats.register_message_dropped(&msg);
 
                 drop(msg);
             } else {
+                #[cfg(feature = "tracing")]
                 tracing::trace!(
                     "Gate '{}' added message [{}] to queue",
                     next_gate.previous_gate().unwrap().name(),

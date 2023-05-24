@@ -45,6 +45,7 @@ pub trait Module: Any {
 
     /// Resets the custom state when a module is restarted.
     fn reset(&mut self) {
+        #[cfg(feature = "tracing")]
         tracing::warn!("Module has been shutdown and restarted, but reset() was not defined. This may lead to invalid custom state.");
     }
 

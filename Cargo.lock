@@ -26,6 +26,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
+name = "byteorder"
+version = "1.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "14c189c53d098945499cdfa7ecc63567cf3886b3332b312a5b4585d8d3a6a610"
+
+[[package]]
 name = "bytes"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -108,6 +114,7 @@ dependencies = [
  "des-macros",
  "des-ndl",
  "futures",
+ "fxhash",
  "pin-project-lite",
  "rand",
  "serial_test",
@@ -133,7 +140,7 @@ dependencies = [
  "des-macros-core",
  "proc-macro-error",
  "proc-macro2",
- "syn 1.0.109",
+ "syn 2.0.15",
 ]
 
 [[package]]
@@ -144,14 +151,13 @@ dependencies = [
  "proc-macro-error",
  "proc-macro2",
  "quote",
- "syn 1.0.109",
+ "syn 2.0.15",
 ]
 
 [[package]]
 name = "des-ndl"
 version = "0.1.0"
 dependencies = [
- "log",
  "termcolor",
  "unic-emoji-char",
  "unicode-xid",
@@ -169,7 +175,6 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "des",
- "log",
  "rand",
  "tracing",
  "tracing-subscriber",
@@ -262,6 +267,15 @@ dependencies = [
  "pin-project-lite",
  "pin-utils",
  "slab",
+]
+
+[[package]]
+name = "fxhash"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c31b6d751ae2c7f11320402d34e41349dd1016f8d5d45e48c4312bc8625af50c"
+dependencies = [
+ "byteorder",
 ]
 
 [[package]]
@@ -602,7 +616,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72b64191b275b66ffe2469e8af2c1cfe3bafa67b529ead792a6d0160888b4237"
 dependencies = [
  "proc-macro2",
- "quote",
  "unicode-ident",
 ]
 

@@ -6,7 +6,7 @@ use proc_macro2::TokenStream;
 use proc_macro_error::{Diagnostic, Level};
 use quote::quote;
 use quote::ToTokens;
-use syn::token::Add;
+use syn::token::Plus;
 use syn::{parse2, Data, Fields, GenericParam, Generics, Ident, Index, TypeParamBound};
 
 pub type Result<T> = std::result::Result<T, Diagnostic>;
@@ -166,7 +166,7 @@ fn generate_impl_generics(mut generics: Generics) -> Generics {
     for param in generics.params.iter_mut() {
         if let GenericParam::Type(param) = param {
             if !param.bounds.trailing_punct() && !param.bounds.is_empty() {
-                param.bounds.push_punct(Add {
+                param.bounds.push_punct(Plus {
                     spans: [proc_macro2::Span::call_site()],
                 });
             }

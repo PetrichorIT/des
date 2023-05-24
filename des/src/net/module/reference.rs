@@ -201,8 +201,8 @@ impl ModuleRef {
     }
 
     #[cfg(feature = "tracing")]
-    pub(crate) fn tracing_span(&self) -> &tracing::span::Span {
-        &self.ctx.tracing_span
+    pub(crate) fn scope_token(&self) -> crate::tracing::ScopeToken {
+        self.ctx.scope_token
     }
 
     /// INTERNAL

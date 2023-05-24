@@ -90,6 +90,7 @@ impl PluginRegistry {
     pub(crate) fn remove(&mut self, id: usize) {
         let i = self.inner.iter().enumerate().find(|(_, p)| p.id == id);
         let Some((i, _)) = i else {
+            #[cfg(feature = "tracing")]
             tracing::error!("Could not remove plugin for handle '{}: may be removed due to panic policy", id);
             return;
         };

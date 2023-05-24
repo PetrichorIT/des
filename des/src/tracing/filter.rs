@@ -1,11 +1,12 @@
-use std::{collections::HashMap, fmt::Debug};
+use fxhash::{FxBuildHasher, FxHashMap};
+use std::fmt::Debug;
 use tracing::metadata::LevelFilter;
 
 const ENV_RUST_LOG: &str = "RUST_LOG";
 
 #[derive(Debug, Clone)]
 pub(super) struct TargetFilters {
-    matches: HashMap<String, LevelFilter>,
+    matches: FxHashMap<String, LevelFilter>,
     fallback: Vec<(String, LevelFilter)>,
 }
 
@@ -13,7 +14,7 @@ impl TargetFilters {
     /// Creates a new filter policy from env
     pub(super) fn new(parse_env: bool) -> Self {
         let mut this = TargetFilters {
-            matches: HashMap::new(),
+            matches: FxHashMap::with_hasher(FxBuildHasher::default()),
             fallback: Vec::new(),
         };
         if parse_env {
