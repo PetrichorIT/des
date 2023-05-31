@@ -1,6 +1,7 @@
 use crate::net::NetEvents;
 use crate::prelude::{ChannelRef, Gate, GateRef, GateServiceType};
 use crate::runtime::EventSink;
+use crate::tracing::{enter_scope, leave_scope};
 
 use super::{DummyModule, Module, ModuleContext};
 use std::any::{Any, TypeId};
@@ -208,6 +209,7 @@ impl ModuleRef {
     #[doc(hidden)]
     #[allow(unused)]
     pub fn activate(&self) {
+        enter_scope(self.scope_token());
         let prev = ModuleContext::place(Arc::clone(&self.ctx));
 
         #[cfg(feature = "async")]
@@ -220,8 +222,11 @@ impl ModuleRef {
 
             let driver = self.ctx.async_ext.write().driver.take();
             driver.map(|mut d| {
-                d.bump().into_iter().for_each(|s| s.wake_all());
-                d.next_wakeup = SimTime::MAX;
+                let bumpable = d.bump();
+                if d.next_wakeup <= SimTime::now() {
+                    d.next_wakeup = SimTime::MAX;
+                }
+                bumpable.into_iter().for_each(|s| s.wake_all());
                 d.set();
             });
         }
@@ -240,6 +245,13 @@ impl ModuleRef {
             let mut driver = Driver::unset().unwrap();
             if let Some(next_wakeup) = driver.next() {
                 if next_wakeup < driver.next_wakeup {
+                    #[cfg(feature = "tracing")]
+                    tracing::trace!(
+                        "scheduling new wakeup at {} (prev {})",
+                        next_wakeup,
+                        driver.next_wakeup
+                    );
+
                     driver.next_wakeup = next_wakeup;
                     rt.add(
                         NetEvents::AsyncWakeupEvent(AsyncWakeupEvent {
@@ -251,7 +263,9 @@ impl ModuleRef {
             }
             ext.driver = Some(driver);
         }
+
         let _ = ModuleContext::take();
+        leave_scope();
     }
 
     /// Creates a gate on the current module, returning its ID.

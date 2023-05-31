@@ -94,7 +94,6 @@ pub struct Subscriber<P: ScopeConfigurationPolicy> {
     span_id: AtomicU64,
     spans: RwLock<FxHashMap<span::Id, SpanInfo>>,
     stack: RwLock<Vec<span::Id>>,
-    active_scope: AtomicU64,
 }
 
 struct Scope {
@@ -124,7 +123,6 @@ impl<P: ScopeConfigurationPolicy> Subscriber<P> {
             span_id: AtomicU64::new(1),
             spans: RwLock::new(FxHashMap::with_hasher(FxBuildHasher::default())),
             stack: RwLock::new(Vec::new()),
-            active_scope: AtomicU64::new(0),
         }
     }
 
@@ -184,12 +182,15 @@ impl<P: ScopeConfigurationPolicy + 'static> tracing::Subscriber for Subscriber<P
     }
 
     fn new_span(&self, span: &span::Attributes<'_>) -> span::Id {
+        self.check_scopes();
+
         let id = span::Id::from_u64(
             self.span_id
                 .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
         );
-        let scope_id = self.active_scope.load(std::sync::atomic::Ordering::SeqCst);
+        let scope_id = SCOPE_CURRENT_TOKEN.load(std::sync::atomic::Ordering::SeqCst);
         let mut scopes = self.scopes.write();
+
         let scope = scopes.get_mut(&scope_id).unwrap();
 
         let info = SpanInfo::from_attrs(span, &mut *scope.fmt);
@@ -248,7 +249,8 @@ impl<P: ScopeConfigurationPolicy + 'static> tracing::Subscriber for Subscriber<P
             record.scope = Some(&*path);
             output.write(&mut **fmt, record).unwrap();
         } else {
-            todo!()
+            // todo!()
+            println!(":: {:?}", event)
         }
     }
 

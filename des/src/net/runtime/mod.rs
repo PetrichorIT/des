@@ -162,8 +162,6 @@ where
             for i in 0..rt.app.modules().len() {
                 // Use cloned handles to appease the brwchk
                 let module = rt.app.modules()[i].clone();
-                enter_scope(module.scope_token());
-
                 if stage < module.num_sim_start_stages() {
                     #[cfg(feature = "tracing")]
                     tracing::info!("Calling at_sim_start({}).", stage);
@@ -182,7 +180,6 @@ where
         {
             for i in 0..rt.app.modules().len() {
                 let module = rt.app.modules()[i].clone();
-                enter_scope(module.scope_token());
 
                 module.activate();
                 module.finish_sim_start();

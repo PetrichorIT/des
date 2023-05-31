@@ -224,7 +224,7 @@ impl AsyncWakeupEvent {
         enter_scope(self.module.scope_token());
 
         #[cfg(feature = "tracing")]
-        tracing::info!("Async Wakeup");
+        tracing::info!("async wakeup");
 
         let module = &self.module;
         module.activate();
