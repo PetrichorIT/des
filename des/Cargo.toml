@@ -18,8 +18,9 @@ version = "0.5.1"
 default = []
 
 # Include everything used for default test runs.
-full = ["net", "ndl", "cqueue", "async",]
+full = ["net", "ndl", "cqueue", "async", "macros"]
 
+macros = ["dep:des-macros", "dep:futures"]
 async = ["net", "dep:tokio", "dep:async-trait"]
 cqueue = ["dep:des-cqueue"]
 multi-threaded = []
@@ -51,7 +52,7 @@ pin-project-lite = "0.2"
 
 async-trait = {version = "0.1", optional = true}
 tokio = { version = "*", features = ["rt", "sync", "macros", "io-util"], optional = true}
-
+futures = { version = "*", optional = true}
 
 des-cqueue = {path = "../des-cqueue", optional = true}
 des-macros = {path = "../des-macros", optional = true}

@@ -20,6 +20,16 @@ macro_rules! cfg_ndl {
     }
 }
 
+macro_rules! cfg_macros {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "macros")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
+            $item
+        )*
+    }
+}
+
 macro_rules! cfg_async {
     ($($item:item)*) => {
         $(

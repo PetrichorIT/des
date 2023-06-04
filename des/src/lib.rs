@@ -114,7 +114,9 @@
 //!
 
 #[macro_use]
-pub(crate) mod macros;
+#[doc(hidden)]
+pub mod macros;
+
 pub(crate) mod sync;
 
 pub mod prelude;
@@ -133,11 +135,8 @@ cfg_ndl! {
     pub mod ndl;
 }
 
-cfg_async! {
-    ///
-    /// A modified version of tokio with added simulation support.
-    ///
-    pub use ::tokio as tokio;
+cfg_macros! {
+    pub use des_macros::*;
 }
 
 // # Features
