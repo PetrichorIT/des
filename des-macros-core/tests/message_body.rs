@@ -10,7 +10,7 @@ fn struct_unit() {
     let Ok(DeriveInput { ident, data, generics, .. }) = parse2(input) else {
         panic!("Failed to parse input steam")
     };
-    let Ok(output) = des_macros_core::message_body_derive_impl(ident, data, generics) else {
+    let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
         panic!("Failed with diagnostic")
     };
 
@@ -40,7 +40,7 @@ fn struct_named() {
     let Ok(DeriveInput { ident, data, generics, .. }) = parse2(input) else {
         panic!("Failed to parse input steam")
     };
-    let Ok(output) = des_macros_core::message_body_derive_impl(ident, data, generics) else {
+    let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
         panic!("Failed with diagnostic")
     };
 
@@ -73,7 +73,7 @@ fn struct_named_generic_nonbounded() {
     let Ok(DeriveInput { ident, data, generics ,.. }) = parse2(input) else {
         panic!("Failed to parse input steam")
     };
-    let Ok(output) = des_macros_core::message_body_derive_impl(ident, data, generics) else {
+    let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
         panic!("Failed with diagnostic")
     };
 
@@ -106,7 +106,7 @@ fn struct_named_generic_bounded() {
     let Ok(DeriveInput { ident, data, generics ,.. }) = parse2(input) else {
         panic!("Failed to parse input steam")
     };
-    let Ok(output) = des_macros_core::message_body_derive_impl(ident, data, generics) else {
+    let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
         panic!("Failed with diagnostic")
     };
 
@@ -139,7 +139,7 @@ fn struct_named_generic_where_clause() {
     let Ok(DeriveInput { ident, data, generics ,.. }) = parse2(input) else {
         panic!("Failed to parse input steam")
     };
-    let Ok(output) = des_macros_core::message_body_derive_impl(ident, data, generics) else {
+    let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
         panic!("Failed with diagnostic")
     };
 
@@ -169,7 +169,7 @@ fn struct_unnamed() {
     let Ok(DeriveInput { ident, data, generics, .. }) = parse2(input) else {
         panic!("Failed to parse input steam")
     };
-    let Ok(output) = des_macros_core::message_body_derive_impl(ident, data, generics) else {
+    let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
         panic!("Failed with diagnostic")
     };
 
@@ -198,7 +198,7 @@ fn struct_unnamed_generic_nonbounded() {
     let Ok(DeriveInput { ident, data, generics ,.. }) = parse2(input) else {
         panic!("Failed to parse input steam")
     };
-    let Ok(output) = des_macros_core::message_body_derive_impl(ident, data, generics) else {
+    let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
         panic!("Failed with diagnostic")
     };
 
@@ -227,7 +227,7 @@ fn struct_unnamed_generic_bounded() {
     let Ok(DeriveInput { ident, data, generics ,.. }) = parse2(input) else {
         panic!("Failed to parse input steam")
     };
-    let Ok(output) = des_macros_core::message_body_derive_impl(ident, data, generics) else {
+    let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
         panic!("Failed with diagnostic")
     };
 
@@ -256,7 +256,7 @@ fn struct_unnamed_generic_where_clause() {
     let Ok(DeriveInput { ident, data, generics ,.. }) = parse2(input) else {
         panic!("Failed to parse input steam")
     };
-    let Ok(output) = des_macros_core::message_body_derive_impl(ident, data, generics) else {
+    let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
         panic!("Failed with diagnostic")
     };
 
@@ -290,7 +290,7 @@ fn enum_unit_fields() {
     let Ok(DeriveInput { ident, data, generics ,.. }) = parse2(input) else {
         panic!("Failed to parse input steam")
     };
-    let Ok(output) = des_macros_core::message_body_derive_impl(ident, data, generics) else {
+    let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
         panic!("Failed with diagnostic")
     };
 
@@ -324,7 +324,7 @@ fn enum_unnamed_fields() {
     let Ok(DeriveInput { ident, data, generics ,.. }) = parse2(input) else {
         panic!("Failed to parse input steam")
     };
-    let Ok(output) = des_macros_core::message_body_derive_impl(ident, data, generics) else {
+    let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
         panic!("Failed with diagnostic")
     };
 
@@ -362,7 +362,7 @@ fn enum_unnamed_fields_generic_unbounded() {
     let Ok(DeriveInput { ident, data, generics ,.. }) = parse2(input) else {
         panic!("Failed to parse input steam")
     };
-    let Ok(output) = des_macros_core::message_body_derive_impl(ident, data, generics) else {
+    let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
         panic!("Failed with diagnostic")
     };
 
@@ -400,7 +400,7 @@ fn enum_unnamed_fields_generic_bounded() {
     let Ok(DeriveInput { ident, data, generics ,.. }) = parse2(input) else {
         panic!("Failed to parse input steam")
     };
-    let Ok(output) = des_macros_core::message_body_derive_impl(ident, data, generics) else {
+    let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
         panic!("Failed with diagnostic")
     };
 
@@ -437,7 +437,7 @@ fn enum_unnamed_fields_generic_where_clause() {
     let Ok(DeriveInput { ident, data, generics ,.. }) = parse2(input) else {
         panic!("Failed to parse input steam")
     };
-    let Ok(output) = des_macros_core::message_body_derive_impl(ident, data, generics) else {
+    let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
         panic!("Failed with diagnostic")
     };
 
@@ -476,7 +476,7 @@ fn enum_named_fields() {
     let Ok(DeriveInput { ident, data, generics ,.. }) = parse2(input) else {
         panic!("Failed to parse input steam")
     };
-    let Ok(output) = des_macros_core::message_body_derive_impl(ident, data, generics) else {
+    let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
         panic!("Failed with diagnostic")
     };
 
@@ -511,7 +511,7 @@ fn enum_named_fields_generic_unbounded() {
     let Ok(DeriveInput { ident, data, generics ,.. }) = parse2(input) else {
         panic!("Failed to parse input steam")
     };
-    let Ok(output) = des_macros_core::message_body_derive_impl(ident, data, generics) else {
+    let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
         panic!("Failed with diagnostic")
     };
 
@@ -546,7 +546,7 @@ fn enum_named_fields_generic_bounded() {
     let Ok(DeriveInput { ident, data, generics ,.. }) = parse2(input) else {
         panic!("Failed to parse input steam")
     };
-    let Ok(output) = des_macros_core::message_body_derive_impl(ident, data, generics) else {
+    let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
         panic!("Failed with diagnostic")
     };
 
@@ -581,7 +581,7 @@ fn enum_named_fields_generic_where_clause() {
     let Ok(DeriveInput { ident, data, generics ,.. }) = parse2(input) else {
         panic!("Failed to parse input steam")
     };
-    let Ok(output) = des_macros_core::message_body_derive_impl(ident, data, generics) else {
+    let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
         panic!("Failed with diagnostic")
     };
 

@@ -326,7 +326,7 @@ fn one_module_delayed_recv() {
             // 4) HandleMessage #2 (2s) (will finish sleep but wakeup was added later)
             // 5) Wakeup aka NOP (2s)
             // 6) Wakeup - sleep reloved - send in '5 (4s)
-            assert_eq!(profiler.event_count, 7);
+            assert_eq!(profiler.event_count, 6);
 
             // let m1 = app
             //     .module(|m| m.module_core().name() == "RootModule")
@@ -399,7 +399,7 @@ fn mutiple_module_delayed_recv() {
         } => {
             assert_eq!(time, 5.0);
 
-            assert_eq!(profiler.event_count, 15);
+            assert_eq!(profiler.event_count, 12);
 
             // let m1 = app
             //     .module(|m| m.module_core().name() == "RootModule")

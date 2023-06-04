@@ -1,9 +1,9 @@
-use proc_macro::{TokenStream, TokenTree};
 use proc_macro2::Span;
+use proc_macro2::{TokenStream, TokenTree};
 use quote::quote;
 use syn::{parse::Parser, Ident};
 
-pub(crate) fn declare_output_enum(input: TokenStream) -> TokenStream {
+pub fn declare_output_enum(input: TokenStream) -> TokenStream {
     // passed in is: `(_ _ _)` with one `_` per branch
     let branches = match input.into_iter().next() {
         Some(TokenTree::Group(group)) => group.stream().into_iter().count(),
@@ -42,11 +42,11 @@ pub(crate) fn declare_output_enum(input: TokenStream) -> TokenStream {
     })
 }
 
-pub(crate) fn clean_pattern_macro(input: TokenStream) -> TokenStream {
+pub fn clean_pattern_macro(input: TokenStream) -> TokenStream {
     // If this isn't a pattern, we return the token stream as-is. The select!
     // macro is using it in a location requiring a pattern, so an error will be
     // emitted there.
-    let mut input: syn::Pat = match syn::Pat::parse_single.parse(input.clone()) {
+    let mut input: syn::Pat = match syn::Pat::parse_single.parse2(input.clone()) {
         Ok(it) => it,
         Err(_) => return input,
     };

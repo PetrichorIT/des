@@ -8,8 +8,6 @@ use proc_macro::{self, TokenStream};
 use proc_macro_error::proc_macro_error;
 use syn::{parse_macro_input, DeriveInput};
 
-mod select;
-
 ///
 /// A macro for deriving the `MessageBody` trait.
 ///
@@ -25,7 +23,7 @@ pub fn derive_message_body(input: TokenStream) -> TokenStream {
         ..
     } = parse_macro_input!(input);
 
-    match des_macros_core::message_body_derive_impl(ident, data, generics) {
+    match des_macros_core::message_body::derive_impl(ident, data, generics) {
         Ok(ts) => ts.into(),
         Err(e) => e.abort(),
     }
@@ -36,7 +34,7 @@ pub fn derive_message_body(input: TokenStream) -> TokenStream {
 #[proc_macro]
 #[doc(hidden)]
 pub fn select_priv_declare_output_enum(input: TokenStream) -> TokenStream {
-    select::declare_output_enum(input)
+    des_macros_core::select::declare_output_enum(input.into()).into()
 }
 
 /// Implementation detail of the `select!` macro. This macro is **not** intended
@@ -44,5 +42,5 @@ pub fn select_priv_declare_output_enum(input: TokenStream) -> TokenStream {
 #[proc_macro]
 #[doc(hidden)]
 pub fn select_priv_clean_pattern(input: TokenStream) -> TokenStream {
-    select::clean_pattern_macro(input)
+    des_macros_core::select::clean_pattern_macro(input.into()).into()
 }
