@@ -28,19 +28,3 @@ impl<T> DerefMut for SyncWrap<T> {
 // This wrapper should only be used to make statics thread safe,
 // since by design event simulation is single-threded (in the same context).
 unsafe impl<T> Sync for SyncWrap<T> {}
-
-// SELECT
-
-pub use std::future::Future;
-pub use std::pin::Pin;
-pub use std::task::Poll;
-
-pub use futures::future::maybe_done;
-pub use futures::future::poll_fn;
-
-use crate::runtime;
-
-#[doc(hidden)]
-pub fn thread_rng_n(n: u32) -> u32 {
-    runtime::random::<u32>() % n
-}

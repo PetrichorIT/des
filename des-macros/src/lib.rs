@@ -28,19 +28,3 @@ pub fn derive_message_body(input: TokenStream) -> TokenStream {
         Err(e) => e.abort(),
     }
 }
-
-/// Implementation detail of the `select!` macro. This macro is **not** intended
-/// to be used as part of the public API and is permitted to change.
-#[proc_macro]
-#[doc(hidden)]
-pub fn select_priv_declare_output_enum(input: TokenStream) -> TokenStream {
-    des_macros_core::select::declare_output_enum(input.into()).into()
-}
-
-/// Implementation detail of the `select!` macro. This macro is **not** intended
-/// to be used as part of the public API and is permitted to change.
-#[proc_macro]
-#[doc(hidden)]
-pub fn select_priv_clean_pattern(input: TokenStream) -> TokenStream {
-    des_macros_core::select::clean_pattern_macro(input.into()).into()
-}
