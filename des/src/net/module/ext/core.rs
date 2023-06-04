@@ -2,16 +2,17 @@ use std::sync::Arc;
 
 use crate::{
     net::message::Message,
+    prelude::random,
     time::{Driver, SimTime},
 };
 use tokio::{
-    runtime::{Builder, Runtime},
+    runtime::{Builder, RngSeed, Runtime},
     sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
     task::{JoinHandle, LocalSet},
 };
 
 pub(crate) struct AsyncCoreExt {
-    pub(crate) rt: Option<(Arc<Runtime>, Arc<LocalSet>)>,
+    pub(crate) rt: Rt,
     pub(crate) driver: Option<Driver>,
 
     pub(crate) wait_queue_tx: UnboundedSender<WaitingMessage>,
@@ -25,6 +26,12 @@ pub(crate) struct AsyncCoreExt {
     pub(crate) sim_end_join: Option<JoinHandle<()>>,
 }
 
+pub(crate) enum Rt {
+    Builder(Builder),
+    Runtime((Arc<Runtime>, Arc<LocalSet>)),
+    Shutdown,
+}
+
 impl AsyncCoreExt {
     pub(crate) fn new() -> AsyncCoreExt {
         // let (tx, rx) = unbounded_channel();
@@ -32,10 +39,7 @@ impl AsyncCoreExt {
         let (stx, srx) = unbounded_channel();
 
         Self {
-            rt: Some((
-                Arc::new(Builder::new_current_thread().enable_all().build().unwrap()),
-                Arc::new(LocalSet::new()),
-            )),
+            rt: Rt::Builder(Builder::new_current_thread()),
             driver: Some(Driver::new()),
 
             wait_queue_tx: wtx,
@@ -51,8 +55,13 @@ impl AsyncCoreExt {
     }
 
     pub(crate) fn reset(&mut self) {
-        self.rt = Some((
-            Arc::new(Builder::new_current_thread().build().unwrap()),
+        self.rt = Rt::Runtime((
+            Arc::new(
+                Builder::new_current_thread()
+                    .rng_seed(RngSeed::from_bytes(&random::<u64>().to_le_bytes()))
+                    .build()
+                    .expect("Failed to build tokio runtime"),
+            ),
             Arc::new(LocalSet::new()),
         ));
 
@@ -72,6 +81,32 @@ impl AsyncCoreExt {
         self.sim_start_join = None;
 
         self.sim_end_join = None;
+    }
+}
+
+impl Rt {
+    pub(crate) fn current(&mut self) -> Option<(Arc<Runtime>, Arc<LocalSet>)> {
+        match self {
+            Rt::Builder(builder) => {
+                let seed = RngSeed::from_bytes(&random::<u64>().to_le_bytes());
+                *self = Rt::Runtime((
+                    Arc::new(
+                        builder
+                            .rng_seed(seed)
+                            .build()
+                            .expect("Failed to build tokio runtime"),
+                    ),
+                    Arc::new(LocalSet::new()),
+                ));
+                self.current()
+            }
+            Rt::Runtime(tupel) => Some(tupel.clone()),
+            Rt::Shutdown => None,
+        }
+    }
+
+    pub(crate) fn shutdown(&mut self) {
+        *self = Self::Shutdown;
     }
 }
 

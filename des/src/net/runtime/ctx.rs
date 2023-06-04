@@ -139,7 +139,7 @@ where
 
         // drop the rt, to prevent all async activity from happening.
         #[cfg(feature = "async")]
-        drop(module.ctx.async_ext.write().rt.take());
+        module.ctx.async_ext.write().rt.shutdown();
 
         // drop all hooks to ensure all messages reach the async impl
         // module.ctx.hooks.borrow_mut().clear(); TODO: Plugin clean

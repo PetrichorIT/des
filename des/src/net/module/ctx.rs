@@ -41,6 +41,9 @@ impl ModuleContext {
     /// Creates a new standalone instance
     pub fn standalone(path: ObjectPath) -> ModuleRef {
         let this = ModuleRef::dummy(Arc::new(Self {
+            #[cfg(feature = "async")]
+            async_ext: RwLock::new(AsyncCoreExt::new()),
+
             scope_token: new_scope(path.as_str()),
 
             active: AtomicBool::new(true),
@@ -52,9 +55,6 @@ impl ModuleContext {
 
             parent: None,
             children: RwLock::new(FxHashMap::with_hasher(FxBuildHasher::default())),
-
-            #[cfg(feature = "async")]
-            async_ext: RwLock::new(AsyncCoreExt::new()),
         }));
 
         SETUP_FN.read()(&this);
@@ -67,6 +67,8 @@ impl ModuleContext {
     pub fn child_of(name: &str, parent: ModuleRef) -> ModuleRef {
         let path = ObjectPath::appended(&parent.ctx.path, name);
         let this = ModuleRef::dummy(Arc::new(Self {
+            #[cfg(feature = "async")]
+            async_ext: RwLock::new(AsyncCoreExt::new()),
             scope_token: new_scope(path.as_str()),
 
             active: AtomicBool::new(true),
@@ -79,9 +81,6 @@ impl ModuleContext {
 
             parent: Some(ModuleRefWeak::new(&parent)),
             children: RwLock::new(FxHashMap::with_hasher(FxBuildHasher::default())),
-
-            #[cfg(feature = "async")]
-            async_ext: RwLock::new(AsyncCoreExt::new()),
         }));
 
         SETUP_FN.read()(&this);
@@ -217,7 +216,7 @@ cfg_async! {
     use super::ext::WaitingMessage;
 
     pub(crate) fn async_get_rt() -> Option<(Arc<Runtime>, Arc<LocalSet>)> {
-        with_mod_ctx(|ctx| Some(ctx.async_ext.read().rt.clone()?))
+        with_mod_ctx(|ctx| ctx.async_ext.write().rt.current())
     }
 
     pub(super) fn async_ctx_reset() {
