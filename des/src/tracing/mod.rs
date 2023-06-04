@@ -24,6 +24,7 @@ use tracing::{
 };
 
 pub use self::format::ColorfulTracingFormatter;
+pub use self::format::NoColorFormatter;
 pub use self::format::TracingFormatter;
 pub use self::output::TracingOutput;
 pub use self::output::TracingRecord;
@@ -249,8 +250,7 @@ impl<P: ScopeConfigurationPolicy + 'static> tracing::Subscriber for Subscriber<P
             record.scope = Some(&*path);
             output.write(&mut **fmt, record).unwrap();
         } else {
-            // todo!()
-            println!(":: {:?}", event)
+            // TODO: todo!()
         }
     }
 
