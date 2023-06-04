@@ -482,7 +482,15 @@ where
         // Let this be the only position where SimTime is changed
         SimTime::set_now(time);
 
+        // {
+        //     #[cfg(feature = "tracing")]
+        //     let span = tracing::span!(tracing::Level::TRACE, "event", id = self.itr);
+        //     #[cfg(feature = "tracing")]
+        //     let _g = span.enter();
+
         event.handle(self);
+        // }
+
         !self.future_event_set.is_empty()
     }
 

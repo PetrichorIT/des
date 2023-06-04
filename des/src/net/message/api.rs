@@ -55,7 +55,8 @@ pub fn send_at(msg: impl Into<Message>, gate: impl IntoModuleGate, send_time: Si
 
         buf_send_at(msg, gate, send_time);
     } else {
-        log::error!("Error: Could not find gate in current module");
+        #[cfg(feature = "tracing")]
+        tracing::error!("Error: Could not find gate in current module");
     }
 }
 

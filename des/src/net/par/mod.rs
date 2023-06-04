@@ -1,10 +1,11 @@
-use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::sync::atomic::{AtomicUsize, Ordering::SeqCst};
 use std::sync::{Arc, RwLock};
 
 mod api;
+use fxhash::{FxBuildHasher, FxHashMap};
+
 pub use self::api::*;
 
 use super::globals;
@@ -22,7 +23,7 @@ pub struct ParMap {
 #[derive(Debug)]
 struct ParTree {
     branches: Vec<ParTreeBranch>,
-    pars: HashMap<String, (String, AtomicUsize)>,
+    pars: FxHashMap<String, (String, AtomicUsize)>,
 }
 
 #[derive(Debug)]
@@ -81,7 +82,7 @@ impl ParTree {
     fn new() -> ParTree {
         ParTree {
             branches: Vec::new(),
-            pars: HashMap::new(),
+            pars: FxHashMap::with_hasher(FxBuildHasher::default()),
         }
     }
 

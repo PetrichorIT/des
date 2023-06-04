@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use fxhash::{FxBuildHasher, FxHashMap};
 use std::fmt;
 
 use crate::net::module::Module;
@@ -10,7 +10,7 @@ type ModuleCreationFn = dyn Fn() -> Box<dyn Module>;
 /// This registry is used to link Rust-Structs to Ndl-Modules.
 /// Create a registry with the [`registry`](crate::registry) macro.
 pub struct Registry {
-    map: HashMap<String, Box<ModuleCreationFn>>,
+    map: FxHashMap<String, Box<ModuleCreationFn>>,
 }
 
 impl Registry {
@@ -18,7 +18,7 @@ impl Registry {
     #[must_use]
     pub fn new() -> Registry {
         Self {
-            map: HashMap::new(),
+            map: FxHashMap::with_hasher(FxBuildHasher::default()),
         }
     }
 

@@ -45,7 +45,7 @@ mod common {
                     .unwrap_or(1.0),
             );
 
-            log::info!(
+            tracing::info!(
                 "sim_start(dst := {}, c := {}, delay := {})",
                 self.dst,
                 self.rem,

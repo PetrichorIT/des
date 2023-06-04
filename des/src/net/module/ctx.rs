@@ -1,12 +1,13 @@
+use fxhash::{FxBuildHasher, FxHashMap};
+
 use super::{DummyModule, ModuleId, ModuleRef, ModuleRefWeak, ModuleReferencingError};
 use crate::{
-    logger::{Logger, ScopeToken},
     net::plugin::PluginRegistry,
     prelude::{GateRef, ObjectPath},
     sync::{RwLock, SwapLock, SwapLockReadGuard},
+    tracing::{new_scope, ScopeToken},
 };
 use std::{
-    collections::HashMap,
     fmt::Debug,
     sync::{atomic::AtomicBool, Arc},
 };
@@ -25,32 +26,32 @@ pub struct ModuleContext {
     pub(crate) id: ModuleId,
 
     pub(crate) path: ObjectPath,
-    pub(crate) logger_token: ScopeToken,
     pub(crate) gates: RwLock<Vec<GateRef>>,
-
     pub(crate) plugins: RwLock<PluginRegistry>,
+
+    pub(crate) scope_token: ScopeToken,
 
     #[cfg(feature = "async")]
     pub(crate) async_ext: RwLock<AsyncCoreExt>,
     pub(crate) parent: Option<ModuleRefWeak>,
-    pub(crate) children: RwLock<HashMap<String, ModuleRef>>,
+    pub(crate) children: RwLock<FxHashMap<String, ModuleRef>>,
 }
 
 impl ModuleContext {
     /// Creates a new standalone instance
     pub fn standalone(path: ObjectPath) -> ModuleRef {
         let this = ModuleRef::dummy(Arc::new(Self {
-            active: AtomicBool::new(true),
+            scope_token: new_scope(path.as_str()),
 
+            active: AtomicBool::new(true),
             id: ModuleId::gen(),
-            logger_token: Logger::register_scope(path.as_logger_scope()),
             path,
 
             gates: RwLock::new(Vec::new()),
             plugins: RwLock::new(PluginRegistry::new()),
 
             parent: None,
-            children: RwLock::new(HashMap::new()),
+            children: RwLock::new(FxHashMap::with_hasher(FxBuildHasher::default())),
 
             #[cfg(feature = "async")]
             async_ext: RwLock::new(AsyncCoreExt::new()),
@@ -66,17 +67,18 @@ impl ModuleContext {
     pub fn child_of(name: &str, parent: ModuleRef) -> ModuleRef {
         let path = ObjectPath::appended(&parent.ctx.path, name);
         let this = ModuleRef::dummy(Arc::new(Self {
+            scope_token: new_scope(path.as_str()),
+
             active: AtomicBool::new(true),
 
             id: ModuleId::gen(),
-            logger_token: Logger::register_scope(path.as_logger_scope()),
             path,
 
             gates: RwLock::new(Vec::new()),
             plugins: RwLock::new(PluginRegistry::new()),
 
             parent: Some(ModuleRefWeak::new(&parent)),
-            children: RwLock::new(HashMap::new()),
+            children: RwLock::new(FxHashMap::with_hasher(FxBuildHasher::default())),
 
             #[cfg(feature = "async")]
             async_ext: RwLock::new(AsyncCoreExt::new()),

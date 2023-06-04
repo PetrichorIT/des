@@ -294,7 +294,8 @@ impl Channel {
         if chan.busy {
             let msg_size = msg.length();
             if chan.buffer_len + msg_size > chan.metrics.queuesize {
-                log::warn!(
+                #[cfg(feature = "tracing")]
+                tracing::warn!(
                     "Gate '{}' dropping message [{}] pushed onto busy channel {}",
                     next_gate.previous_gate().unwrap().name(),
                     msg.str(),
@@ -303,14 +304,12 @@ impl Channel {
 
                 // Register message progress (DROP)
                 #[cfg(feature = "metrics")]
-                {
-                    chan.stats.register_message_dropped(&msg);
-                }
+                chan.stats.register_message_dropped(&msg);
 
                 drop(msg);
-                log_scope!();
             } else {
-                log::trace!(
+                #[cfg(feature = "tracing")]
+                tracing::trace!(
                     "Gate '{}' added message [{}] to queue",
                     next_gate.previous_gate().unwrap().name(),
                     msg.str()
@@ -352,85 +351,8 @@ impl Channel {
 
             // must break iteration,
             // but not perform on-module handling
-            log_scope!();
         }
     }
-
-    // pub(super) fn send_message<A>(
-    //     self: Arc<Self>,
-    //     msg: Box<Message>,
-    //     next_gate: &GateRef,
-    //     rt: &mut Runtime<NetworkApplication<A>>,
-    // ) where
-    //     A: EventLifecycle<NetworkApplication<A>>,
-    // {
-    //     let rng_ref = rng();
-    //     let mut chan = self.inner.write().unwrap();
-
-    //     if chan.busy {
-    //         let msg_size = msg.length();
-    //         if chan.buffer_len + msg_size > chan.metrics.queuesize {
-    //             log::warn!(
-    //                 "Gate '{}' dropping message [{}] pushed onto busy channel {}",
-    //                 next_gate.previous_gate().unwrap().name(),
-    //                 msg.str(),
-    //                 chan.path
-    //             );
-
-    //             // Register message progress (DROP)
-    //             #[cfg(feature = "metrics")]
-    //             {
-    //                 chan.stats.register_message_dropped(&msg);
-    //             }
-
-    //             drop(msg);
-    //             log_scope!();
-    //         } else {
-    //             log::trace!(
-    //                 "Gate '{}' added message [{}] to queue",
-    //                 next_gate.previous_gate().unwrap().name(),
-    //                 msg.str()
-    //             );
-    //             chan.buffer_len += msg.length();
-    //             // chan.buffer.push_back((msg, Arc::clone(next_gate)));
-    //         }
-    //     } else {
-    //         // Register message progress (SUCC)
-    //         #[cfg(feature = "metrics")]
-    //         {
-    //             chan.stats.register_message_passed(&msg);
-    //         }
-
-    //         let dur = chan.metrics.calculate_duration(&msg, rng_ref);
-    //         let busy = chan.metrics.calculate_busy(&msg);
-
-    //         let transmissin_finish = SimTime::now() + busy;
-
-    //         drop(chan);
-    //         self.set_busy_until(transmissin_finish);
-
-    //         rt.add_event(
-    //             NetEvents::ChannelUnbusyNotif(ChannelUnbusyNotif {
-    //                 channel: self.clone(),
-    //             }),
-    //             transmissin_finish,
-    //         );
-
-    //         let next_event_time = SimTime::now() + dur;
-
-    //         rt.add_event(
-    //             NetEvents::MessageAtGateEvent(MessageAtGateEvent {
-    //                 gate: Arc::clone(next_gate),
-    //                 message: msg,
-    //             }),
-    //             next_event_time,
-    //         );
-
-    //         // must break iteration,
-    //         // but not perform on-module handling
-    //         log_scope!();
-    //     }
-    // }
 
     ///
     /// Resets the busy state of a channel.

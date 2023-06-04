@@ -3,7 +3,7 @@ use des::{ndl::NdlApplication, prelude::*, registry};
 struct Sub;
 impl Module for Sub {
     fn new() -> Self {
-        log::debug!("# create sub");
+        tracing::debug!("# create sub");
         Self
     }
 
@@ -15,26 +15,26 @@ impl Module for Sub {
 
     fn handle_message(&mut self, msg: Message) {
         send(msg, "out");
-        log::info!("EY");
+        tracing::info!("EY");
     }
 }
 
 struct Main;
 impl Module for Main {
     fn new() -> Self {
-        log::debug!("# create main");
+        tracing::debug!("# create main");
         Self
     }
 
     fn at_sim_end(&mut self) {
-        log::info!(target: "custom", "at sim end")
+        tracing::info!(target: "custom", "at sim end")
     }
 }
 
 fn main() {
-    Logger::new()
-        .interal_max_log_level(log::LevelFilter::Debug)
-        .set_logger();
+    // Logger::new()
+    //     .interal_max_log_level(log::LevelFilter::Debug)
+    //     .set_logger();
 
     let ndl = match NdlApplication::new("examples/ndl2/main.ndl", registry![Main, Sub]) {
         Ok(v) => v,

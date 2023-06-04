@@ -27,7 +27,7 @@ mod lcommon {
         }
 
         fn event_end(&mut self) {
-            log::info!("consumed_outgoing");
+            tracing::info!("consumed_outgoing");
         }
     }
 
@@ -167,7 +167,7 @@ struct RecrusivePluginCreationPlugin2 {
 impl Plugin for RecrusivePluginCreationPlugin2 {
     fn capture_incoming(&mut self, mut msg: Message) -> Option<Message> {
         if msg.header().id == self.level {
-            log::info!("new subplugin");
+            tracing::info!("new subplugin");
             add_plugin(
                 Self {
                     level: self.level - 1,
@@ -176,7 +176,7 @@ impl Plugin for RecrusivePluginCreationPlugin2 {
             );
         }
         msg.header_mut().kind += 1;
-        log::info!("inc");
+        tracing::info!("inc");
         Some(msg)
     }
 }
@@ -902,7 +902,7 @@ struct RemoveChildAtLevel {
 impl Plugin for RemoveChildAtLevel {
     fn capture_incoming(&mut self, mut msg: Message) -> Option<Message> {
         if msg.header().id == self.level {
-            log::debug!("killing child");
+            tracing::debug!("killing child");
             self.child.take().map(PluginHandle::remove);
         }
         msg.header_mut().kind += 1;
@@ -943,7 +943,7 @@ impl Module for PluginRemovalFromUpstream {
     }
 
     fn handle_message(&mut self, mut msg: Message) {
-        log::info!("received: {:?}", msg);
+        tracing::info!("received: {:?}", msg);
         let t = SimTime::now().as_secs();
         if t == 1 {
             // emualte del of nonexitsting element in the chain
@@ -984,7 +984,7 @@ struct RemoveChildAtLevelDownstream {
 impl Plugin for RemoveChildAtLevelDownstream {
     fn capture_outgoing(&mut self, mut msg: Message) -> Option<Message> {
         if msg.header().id == self.level {
-            log::debug!("killing child");
+            tracing::debug!("killing child");
             self.child.take().map(PluginHandle::remove);
         }
         msg.header_mut().kind += 1;
@@ -1033,7 +1033,7 @@ impl Module for PluginRemovalFromDownstream {
         match msg.header().kind {
             42 => {
                 // we want to trigger a close of downstream parsers.
-                log::info!("starting");
+                tracing::info!("starting");
                 schedule_in(
                     Message::new().id(1).content(true).build(),
                     Duration::from_secs(1),
@@ -1048,7 +1048,7 @@ impl Module for PluginRemovalFromDownstream {
                 let kind = 13 - t;
                 assert_eq!(n as u64, kind);
 
-                log::info!("sending");
+                tracing::info!("sending");
                 schedule_in(
                     Message::new().id(msg.header().id + 1).content(true).build(),
                     Duration::from_secs(1),

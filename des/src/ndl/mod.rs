@@ -224,7 +224,7 @@ impl NdlApplication {
         }
 
         ctx.activate();
-        log_scope!(ctx.logger_token);
+        // log_scope!(ctx.logger_token);
         let f = rt.app.inner.registry.get(ty).unwrap();
         let state = f();
         ctx.upgrade_dummy(state);

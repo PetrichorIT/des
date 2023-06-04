@@ -131,7 +131,7 @@ pub trait Plugin: 'static {
     ///
     /// impl Plugin for LoggerPlugin {
     ///     fn event_start(&mut self) {
-    ///         log::trace!("receiving {}th message", self.counter);
+    ///         tracing::trace!("receiving {}th message", self.counter);
     ///         self.counter += 1;   
     ///     }
     /// }
@@ -163,7 +163,7 @@ pub trait Plugin: 'static {
     ///     }
     ///     fn event_end(&mut self) {
     ///        let t = SimTime::now().duration_since(self.started);
-    ///        log::trace!("took {:?}", t);   
+    ///        tracing::trace!("took {:?}", t);   
     ///     }
     /// }
     /// ```

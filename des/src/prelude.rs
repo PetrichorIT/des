@@ -24,8 +24,6 @@ pub use crate::runtime::sample;
 #[allow(deprecated)]
 pub use crate::runtime::sim_time;
 
-pub use crate::logger::Logger;
-
 //
 // # Metrics & Misc
 //
@@ -85,7 +83,6 @@ cfg_net! {
     }
 
     cfg_async! {
-        pub use ::tokio;
         pub use crate::net::module::AsyncModule;
     }
 

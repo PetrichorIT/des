@@ -12,12 +12,12 @@ impl Module for Alice {
         let msg = Message::new().kind(1).content(42usize).build();
         send(msg, ("netOut", 0));
 
-        log::info!("SimStared");
+        tracing::info!("SimStared");
     }
 
     fn handle_message(&mut self, msg: Message) {
         let (msg, head) = msg.cast::<usize>();
-        log::info!(target: "inet", "Received msg: {} - {:?}", msg, head);
+        tracing::info!(target: "inet", "Received msg: {} - {:?}", msg, head);
     }
 }
 

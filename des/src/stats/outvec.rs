@@ -2,7 +2,6 @@ use crate::{
     stats::{Statistic, StdDev},
     time::SimTime,
 };
-use log::error;
 use std::{
     fmt::Debug,
     fs::{remove_file, File, OpenOptions},
@@ -91,9 +90,14 @@ impl OutVec {
             let path = format!("results/{}.out", self.path());
             match remove_file(&path) {
                 Ok(_) => (),
+
+                #[cfg(feature = "tracing")]
                 Err(e) => {
-                    error!(target: "metrics (OutVec)", "Failed to remove metrics file '{}' after clear: {}", path, e);
+                    tracing::error!(target: "metrics (OutVec)", "Failed to remove metrics file '{}' after clear: {}", path, e);
                 }
+
+                #[cfg(not(feature = "tracing"))]
+                Err(_) => {}
             }
         }
 
@@ -120,10 +124,15 @@ impl OutVec {
 
         let file = match file {
             Ok(file) => file,
+
+            #[cfg(feature = "tracing")]
             Err(e) => {
-                error!(target: "metrics (OutVec)", "Failed to write metrics to file '{}': {}", path, e);
+                tracing::error!(target: "metrics (OutVec)", "Failed to write metrics to file '{}': {}", path, e);
                 return;
             }
+
+            #[cfg(not(feature = "tracing"))]
+            Err(_) => return,
         };
 
         let mut writer = BufWriter::new(file);

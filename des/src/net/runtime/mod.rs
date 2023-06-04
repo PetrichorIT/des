@@ -3,7 +3,7 @@ use super::par::ParMap;
 use super::Topology;
 use crate::net::ObjectPath;
 use crate::runtime::{Application, EventLifecycle, Runtime};
-use log::info;
+use crate::tracing::{enter_scope, leave_scope};
 use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
@@ -162,10 +162,9 @@ where
             for i in 0..rt.app.modules().len() {
                 // Use cloned handles to appease the brwchk
                 let module = rt.app.modules()[i].clone();
-                log_scope!(module.ctx.logger_token);
-
                 if stage < module.num_sim_start_stages() {
-                    info!("Calling at_sim_start({}).", stage);
+                    #[cfg(feature = "tracing")]
+                    tracing::info!("Calling at_sim_start({}).", stage);
 
                     module.activate();
                     module.at_sim_start(stage);
@@ -181,7 +180,6 @@ where
         {
             for i in 0..rt.app.modules().len() {
                 let module = rt.app.modules()[i].clone();
-                log_scope!(module.ctx.logger_token);
 
                 module.activate();
                 module.finish_sim_start();
@@ -191,14 +189,17 @@ where
             }
         }
 
+        leave_scope();
+
         // (2.3) Reset the logging scope.
-        log_scope!();
     }
 
     fn at_sim_end(rt: &mut Runtime<NetworkApplication<A>>) {
         for module in rt.app.module_list.iter().cloned().collect::<Vec<_>>() {
-            log_scope!(module.ctx.logger_token);
-            info!("Calling 'at_sim_end'");
+            enter_scope(module.scope_token());
+
+            #[cfg(feature = "tracing")]
+            tracing::info!("Calling 'at_sim_end'");
             module.activate();
             module.at_sim_end();
             module.deactivate(rt);
@@ -210,16 +211,17 @@ where
         {
             // Ensure all sim_start stages have finished
             for module in rt.app.module_list.iter().cloned().collect::<Vec<_>>() {
-                log_scope!(module.ctx.logger_token);
+                enter_scope(module.scope_token());
+
                 module.activate();
                 module.finish_sim_end();
                 module.deactivate(rt);
             }
         }
 
-        A::at_sim_end(rt);
+        leave_scope();
 
-        log_scope!();
+        A::at_sim_end(rt);
     }
 }
 

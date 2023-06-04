@@ -5,6 +5,7 @@ use des::{
     },
     prelude::*,
     registry,
+    tracing::Subscriber,
 };
 
 struct A {}
@@ -20,7 +21,9 @@ impl Module for A {
     }
 
     fn handle_message(&mut self, msg: Message) {
-        log::info!("recv: {} {}", msg.str(), msg.content::<i32>())
+        let span = ::tracing::span!(::tracing::Level::INFO, "a-recv", age = 2, size = 3);
+        let _g = span.enter();
+        tracing::info!("recv: {} {}", msg.str(), msg.content::<i32>())
     }
 }
 
@@ -32,7 +35,7 @@ struct OutputLogger {
 }
 impl Plugin for OutputLogger {
     fn capture_outgoing(&mut self, msg: Message) -> Option<Message> {
-        log::info!("sending: {}", msg.str());
+        tracing::info!(target: "output-logger-plugin", "sending: {}", msg.str());
         match self.handle.take() {
             Some(h) => {
                 assert_eq!(h.status(), PluginStatus::Active);
@@ -80,7 +83,12 @@ impl Module for Main {
 fn empty(_: &ModuleContext) {}
 
 fn main() {
-    Logger::new().set_logger();
+    // Logger::new().set_logger();
+    // tracing_subscriber::fmt()
+    //     .with_max_level(LevelFilter::TRACE)
+    //     .init();
+
+    Subscriber::default().init().unwrap();
 
     set_setup_fn(empty);
 

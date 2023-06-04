@@ -18,23 +18,21 @@ version = "0.5.1"
 default = []
 
 # Include everything used for default test runs.
-full = ["net" ,"ndl" , "cqueue", "async"]
+full = ["net", "ndl", "cqueue", "async", "macros"]
 
+macros = ["dep:des-macros", "dep:futures"]
 async = ["net", "dep:tokio", "dep:async-trait"]
 cqueue = ["dep:des-cqueue"]
 multi-threaded = []
 net = ["dep:des-macros"]
 ndl = ["dep:des-ndl"]
+tracing = []
 
 # Different metrics features
 metrics = []
 metrics-rt-full = ["metrics"]
 
 [dependencies]
-# An internal logging impl can be very usefull. 
-log = {version = "0.4"}
-termcolor = "1.1"
-
 # Rand primives must be set since they are bound to the
 # runtime and sould be seedable by the user.
 rand = {version = "*", features = ["std_rng"]}
@@ -45,17 +43,22 @@ sysinfo = "*"
 # Spin must be used in the logger event in single-threaded runnin
 # due to issues like #8
 spin = {version = "*"}
-
+tracing = { version = "*" }
+termcolor = "*"
+fxhash = "0.2"
 pin-project-lite = "0.2"
 
 # All other dependencies are optional
 
 async-trait = {version = "0.1", optional = true}
+tokio = { version = "*", features = ["rt", "sync", "macros", "io-util"], optional = true}
+futures = { version = "*", optional = true}
 
 des-cqueue = {path = "../des-cqueue", optional = true}
 des-macros = {path = "../des-macros", optional = true}
 des-ndl = { path = "../des-ndl", optional = true}
-tokio = { version = "*", features = ["rt", "sync", "macros", "io-util"], optional = true}
+
+
 
 [dev-dependencies]
 futures = "0.3"

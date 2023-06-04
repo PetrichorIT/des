@@ -1,7 +1,6 @@
 use std::panic;
 use std::sync::atomic::Ordering::SeqCst;
 
-use log::{info, warn};
 use crate::{
     net::{
         gate::GateRef,
@@ -14,7 +13,7 @@ use crate::{
     },
     prelude::{ChannelRef, EventLifecycle, ModuleRef},
     runtime::{EventSet, EventSink, Runtime},
-    time::SimTime,
+    time::SimTime, tracing::enter_scope,
 };
 
 ///
@@ -67,7 +66,7 @@ impl MessageAtGateEvent {
         // or a delayed action is required.
         let mut cur = self.gate;
         while let Some(next) = cur.next_gate() {
-            log_scope!(cur.owner().ctx.logger_token);
+            enter_scope(cur.owner().scope_token());
 
             // Since a next gate exists log the current gate as
             // transit complete. (do this before drop check to allow for better debugging at drop)
@@ -76,7 +75,8 @@ impl MessageAtGateEvent {
             // Drop message is owner is not active, but notfiy since this is an irregularity.
             // TODO: maybe move to log::trace if this becomes a common pattern
             if !cur.owner().is_active() {
-                warn!(
+                #[cfg(feature = "tracing")]
+                tracing::warn!(
                     "Gate '{}' dropped message [{}] since owner module {} is inactive",
                     cur.name(),
                     msg.str(),
@@ -88,7 +88,8 @@ impl MessageAtGateEvent {
             }
 
             // Log the current transition to the internal log stream.
-            info!(
+            #[cfg(feature = "tracing")]
+            tracing::info!(
                 "Gate '{}' forwarding message [{}] to next gate delayed: {}",
                 cur.name(),
                 msg.str(),
@@ -115,7 +116,7 @@ impl MessageAtGateEvent {
 
         // The loop has ended. This means we are at the end of a gate chain
         // cur has not been checked for anything
-        log_scope!(cur.owner().ctx.logger_token);
+        enter_scope(cur.owner().scope_token());
 
         assert_ne!(
             cur.service_type(), 
@@ -125,7 +126,8 @@ impl MessageAtGateEvent {
             cur.owner().as_str()
         );
        
-        info!(
+        #[cfg(feature = "tracing")]
+        tracing::info!(
             "Gate '{}' forwarding message [{}] to module #{}",
             cur.name(),
             msg.str(),
@@ -141,7 +143,7 @@ impl MessageAtGateEvent {
             SimTime::now(),
         );
 
-        log_scope!();
+
     }
 }
 
@@ -165,21 +167,21 @@ impl HandleMessageEvent {
     where
         A: EventLifecycle<NetworkApplication<A>>,
     {
-        log_scope!(self.module.as_logger_scope());
+       enter_scope(self.module.scope_token());
+
         let mut message = self.message;
         message.header.receiver_module_id = self.module.ctx.id;
 
-        info!("Handling message {:?}", message.str());
+        #[cfg(feature = "tracing")]
+        tracing::info!("Handling message {:?}", message.str());
 
-        let module = self.module;
+        let module = &self.module;
 
         module.activate();
         module.handle_message(message);
         module.deactivate(rt);
 
         buf_process(&module, rt);
-
-        log_scope!();
     }
 }
 
@@ -193,17 +195,17 @@ impl ModuleRestartEvent {
     where
         A: EventLifecycle<NetworkApplication<A>>,
     {
-        log_scope!(self.module.as_logger_scope());
-        info!("ModuleRestartEvent");
+        enter_scope(self.module.scope_token());
 
+        #[cfg(feature = "tracing")]
+        tracing::info!("ModuleRestartEvent");
 
-        let module = self.module;
+        let module = &self.module;
         module.activate();
         module.module_restart();
         module.deactivate(rt);
 
         buf_process(&module, rt);
-        log_scope!();
     }
 }
 
@@ -219,17 +221,17 @@ impl AsyncWakeupEvent {
     where
         A: EventLifecycle<NetworkApplication<A>>,
     {
-        log_scope!(self.module.as_logger_scope());
-        info!("Async Wakeup");
+        enter_scope(self.module.scope_token());
 
+        #[cfg(feature = "tracing")]
+        tracing::info!("async wakeup");
 
-        let module = self.module;
+        let module = &self.module;
         module.activate();
         module.async_wakeup();
         module.deactivate(rt);
 
         buf_process(&module, rt);
-        log_scope!();
     }
 }
 
@@ -355,7 +357,8 @@ impl ModuleRef {
             }
             self.plugin_downstream();
         }else {
-            log::debug!("Ignoring message since module is inactive");
+            #[cfg(feature = "tracing")]
+            tracing::debug!("Ignoring message since module is inactive");
         }
     } 
 
@@ -372,7 +375,8 @@ impl ModuleRef {
 
     pub(crate) fn module_restart(&self) {
          // TODO: verify
-         log::debug!("Restarting module");
+         #[cfg(feature = "tracing")]
+         tracing::debug!("Restarting module");
          // restart the module itself.
          // self.reset();
          self.ctx.active.store(true, SeqCst);
@@ -407,7 +411,8 @@ impl ModuleRef {
             // (2) Plugin downstram operations
             self.plugin_downstream();
         } else {
-            log::debug!("Ignoring message since module is inactive");
+            #[cfg(feature = "tracing")]
+            tracing::debug!("Ignoring message since module is inactive");
         }
     }
 

@@ -38,6 +38,13 @@ cargo build -p des --features multi-threaded --features net
 echo "[des] multi-threaded + net + async"
 cargo build -p des --features multi-threaded --features net --features async
 
+echo "[des] tracing"
+cargo build -p des --features tracing
+echo "[des] tracing + net"
+cargo build -p des --features tracing --features net
+echo "[des] tracing + net + async + ndl"
+cargo build -p des --features tracing --features net --features async --features ndl
+
 
 # 'tests' build
 # ... dependent on target 'des'

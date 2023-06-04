@@ -25,7 +25,7 @@ impl Module for Alice {
     fn handle_message(&mut self, _: Message) {
         self.outvec.collect(rand::random::<f64>());
         if SimTime::now() == 42.0 {
-            log::trace!("Message");
+            tracing::trace!("Message");
         }
         schedule_in(Message::new().build(), Duration::from_secs_f64(1.0))
     }
@@ -41,11 +41,11 @@ impl Module for Main {
 }
 
 fn main() {
-    Logger::new()
-        .active(true)
-        .interal_max_log_level(log::LevelFilter::Warn)
-        .try_set_logger()
-        .expect("Failed to set logger");
+    // Logger::new()
+    //     .active(true)
+    //     .interal_max_log_level(log::LevelFilter::Warn)
+    //     .try_set_logger()
+    //     .expect("Failed to set logger");
 
     let app = NdlApplication::new("examples/metrics/main.ndl", registry![Alice, Main]).unwrap();
     let rt = Runtime::new_with(
