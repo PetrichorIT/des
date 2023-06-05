@@ -105,6 +105,7 @@ struct Scope {
 
 struct SpanInfo {
     formatted: String,
+    sc: usize,
 }
 
 impl<P: ScopeConfigurationPolicy> Subscriber<P> {
@@ -263,9 +264,21 @@ impl<P: ScopeConfigurationPolicy + 'static> tracing::Subscriber for Subscriber<P
     }
 
     fn try_close(&self, id: span::Id) -> bool {
-        // 0
-        self.spans.write().remove(&id);
+        let mut spans = self.spans.write();
+        let Some(span) = spans.get_mut(&id) else {
+            return false;
+        };
+        span.sc -= 1;
+        if span.sc == 0 {
+            spans.remove(&id);
+        }
+
         false
+    }
+
+    fn clone_span(&self, id: &span::Id) -> span::Id {
+        self.spans.write().get_mut(id).map(|info| info.sc += 1);
+        id.clone()
     }
 }
 
@@ -283,7 +296,7 @@ impl SpanInfo {
 
         Self {
             formatted: String::from_utf8_lossy(buffer.as_slice()).into_owned(),
-            // level: *attr.metadata().level(),
+            sc: 1,
         }
     }
 }

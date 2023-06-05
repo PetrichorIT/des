@@ -41,7 +41,7 @@ impl TracingFormatter for ColorfulTracingFormatter {
         impl Visit for Vis<'_> {
             fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
                 use std::fmt::Write;
-                write!(self.s, "{} = {:?},", field.name(), value).unwrap();
+                write!(self.s, "{}={:?}, ", field.name(), value).unwrap();
             }
         }
 
@@ -56,7 +56,7 @@ impl TracingFormatter for ColorfulTracingFormatter {
 
             let mut s = String::new();
             span.values().record(&mut Vis { s: &mut s });
-            write!(out, "{{{}}}", s.trim_end_matches(','))?;
+            write!(out, "{{ {} }}", s.trim_end_matches(", "))?;
             out.reset()
         }
     }
@@ -96,8 +96,14 @@ impl ColorfulTracingFormatter {
 
     fn fmt_spans(&mut self, out: &mut Buffer, spans: &[&str]) -> Result<()> {
         out.set_color(ColorSpec::new().set_bold(true))?;
-        for span in spans {
-            write!(out, "{} ", span)?;
+        let end = spans.len();
+        for (i, span) in spans.into_iter().enumerate() {
+            write!(out, "{}", span)?;
+            if i + 1 < end {
+                write!(out, ":")?;
+            } else {
+                write!(out, " ")?;
+            }
         }
         out.reset()
     }
