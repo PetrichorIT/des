@@ -1,5 +1,5 @@
 use crate::time::SimTime;
-use std::fmt::Display;
+use std::{fmt::Display, mem};
 
 ///
 /// A composed limit that terminates the event execution of
@@ -47,6 +47,17 @@ impl RuntimeLimit {
             }
             Self::CombinedOr(lhs, rhs) => {
                 lhs.applies(itr_count, time) || rhs.applies(itr_count, time)
+            }
+        }
+    }
+
+    pub(crate) fn add(&mut self, limit: RuntimeLimit) {
+        match self {
+            Self::None => *self = limit,
+            _ => {
+                let mut other = Self::None;
+                mem::swap(&mut other, self);
+                *self = Self::CombinedAnd(Box::new(other), Box::new(limit));
             }
         }
     }

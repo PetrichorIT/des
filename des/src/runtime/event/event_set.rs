@@ -1,7 +1,9 @@
 cfg_not_cqueue! {
     mod default_impl {
-        use crate::{runtime::{Application, EventNode, RuntimeOptions}, time::SimTime};
+        use crate::{runtime::{Application, EventNode}, time::SimTime};
         use std::collections::{BinaryHeap, VecDeque};
+        use crate::runtime::Builder;
+
 
         #[cfg(feature = "metrics")]
         use crate::stats::{Statistic, RuntimeMetrics};
@@ -43,12 +45,12 @@ cfg_not_cqueue! {
                 self.heap.len()
             }
 
-            pub(crate) fn new_with(options: &RuntimeOptions) -> Self {
+            pub(crate) fn new_with(options: &Builder) -> Self {
                 Self {
                     heap: BinaryHeap::with_capacity(64),
                     zero_queue: VecDeque::with_capacity(32),
 
-                    last_event_simtime: options.min_sim_time.unwrap_or(SimTime::MIN),
+                    last_event_simtime: options.start_time,
                 }
             }
 
@@ -146,7 +148,7 @@ cfg_cqueue! {
         use crate::stats::{Statistic, RuntimeMetrics};
 
 
-        use crate::{runtime::{Application, RuntimeOptions}, time::SimTime};
+        use crate::{runtime::{Application, Builder}, time::SimTime};
         use des_cqueue::CQueue;
 
 
@@ -185,7 +187,7 @@ cfg_cqueue! {
                 self.inner.is_empty()
             }
 
-            pub(crate) fn new_with(options: &RuntimeOptions) -> Self {
+            pub(crate) fn new_with(options: &Builder) -> Self {
                 Self {
                     inner: CQueue::new(options.cqueue_num_buckets, options.cqueue_bucket_timespan),
                 }

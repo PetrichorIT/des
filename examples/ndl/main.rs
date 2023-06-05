@@ -13,13 +13,11 @@ impl Module for A {
 }
 
 fn main() {
-    let options = RuntimeOptions::seeded(0x123).include_env();
-
     let app = NetworkApplication::new(
         NdlApplication::new("examples/ndl/main.ndl", registry![A, Alice, Bob]).unwrap(),
     );
 
-    let rt = Runtime::new_with(app, options);
+    let rt = Builder::seeded(0x123).build(app);
 
     let (_, time, profile) = rt.run().unwrap();
 

@@ -61,7 +61,7 @@ fn channel_dropping_message() {
 
     rt.register_module(module);
 
-    let rt = Runtime::new(rt);
+    let rt = Builder::seeded(123).build(rt);
     let _ = rt.run();
 }
 
@@ -128,7 +128,7 @@ fn channel_buffering_message() {
 
     rt.register_module(module);
 
-    let rt = Runtime::new(rt);
+    let rt = Builder::seeded(123).build(rt);
     let _ = rt.run();
 }
 
@@ -183,6 +183,6 @@ fn channel_instant_busy() {
 
     rt.register_module(module);
 
-    let rt = Runtime::new(rt);
+    let rt = Builder::seeded(123).build(rt);
     let _ = rt.run();
 }

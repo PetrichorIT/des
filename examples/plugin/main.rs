@@ -94,6 +94,6 @@ fn main() {
 
     let app = NdlApplication::new("examples/plugin/main.ndl", registry![A, B, Main]).unwrap();
     let app = NetworkApplication::new(app);
-    let rt = Runtime::new(app);
+    let rt = Builder::new().build(app);
     let _res = rt.run();
 }

@@ -23,7 +23,7 @@
 ///     let registry = registry![DnsServer, Client, Server];
 ///     # return Ok(());
 ///     let app = NdlApplication::new("path/to/ndl", registry)?;
-///     let rt = Runtime::new(NetworkApplication::new(app));
+///     let rt = Builder::new().build(NetworkApplication::new(app));
 ///     let r = rt.run();
 /// }
 /// ```

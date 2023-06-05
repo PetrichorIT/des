@@ -10,7 +10,7 @@ fn main() {
         NdlApplication::new("examples/ptrhell/main.ndl", registry![Bob, Alice, Network]).unwrap(),
     );
 
-    let rt = Runtime::new_with(app, RuntimeOptions::seeded(0x123));
+    let rt = Builder::seeded(0x123).build(app);
 
     let (_, time, p) = rt.run().unwrap();
 

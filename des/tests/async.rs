@@ -57,7 +57,7 @@ fn quasai_sync_non_blocking() {
     let gate_b = module_b.create_gate("in", GateServiceType::Input);
     rt.register_module(module_b);
 
-    let mut rt = Runtime::new(rt);
+    let mut rt = Builder::seeded(123).build(rt);
 
     rt.add_message_onto(gate_a.clone(), Message::new().id(1).build(), SimTime::ZERO);
     rt.add_message_onto(gate_a, Message::new().id(2).build(), SimTime::ZERO);
@@ -182,7 +182,7 @@ fn mutiple_active_tasks() {
     let gate_a = module_a.create_gate("in", GateServiceType::Input);
     rt.register_module(module_a);
 
-    let mut rt = Runtime::new(rt);
+    let mut rt = Builder::seeded(123).build(rt);
 
     rt.add_message_onto(gate_a.clone(), Message::new().id(1).build(), SimTime::ZERO);
     rt.add_message_onto(gate_a, Message::new().id(2).build(), SimTime::ZERO);
@@ -256,7 +256,7 @@ fn one_module_timers() {
     let gate_a = module_a.create_gate("in", GateServiceType::Input);
     rt.register_module(module_a);
 
-    let mut rt = Runtime::new(rt);
+    let mut rt = Builder::seeded(123).build(rt);
 
     rt.add_message_onto(
         gate_a.clone(),
@@ -298,7 +298,7 @@ fn one_module_delayed_recv() {
     let gate_a = module_a.create_gate("in", GateServiceType::Input);
     rt.register_module(module_a);
 
-    let mut rt = Runtime::new(rt);
+    let mut rt = Builder::seeded(123).build(rt);
 
     rt.add_message_onto(
         gate_a.clone(),
@@ -358,7 +358,7 @@ fn mutiple_module_delayed_recv() {
     let gate_b = module_b.create_gate("in", GateServiceType::Input);
     rt.register_module(module_b);
 
-    let mut rt = Runtime::new(rt);
+    let mut rt = Builder::seeded(123).build(rt);
 
     // # Module 1
     //  |0  |1  |2  |3  |4  |5  |6
@@ -468,7 +468,7 @@ fn semaphore_in_waiting_task() {
     let gate_b = module_b.create_gate("in", GateServiceType::Input);
     rt.register_module(module_b);
 
-    let mut rt = Runtime::new(rt);
+    let mut rt = Builder::seeded(123).build(rt);
 
     rt.add_message_onto(
         gate_a.clone(),

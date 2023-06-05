@@ -48,10 +48,9 @@ fn main() {
     //     .expect("Failed to set logger");
 
     let app = NdlApplication::new("examples/metrics/main.ndl", registry![Alice, Main]).unwrap();
-    let rt = Runtime::new_with(
-        NetworkApplication::new(app),
-        RuntimeOptions::seeded(123).max_itr(1000),
-    );
+    let rt = Builder::seeded(123)
+        .max_itr(1000)
+        .build(NetworkApplication::new(app));
     let _ = rt.run();
 
     let contents =

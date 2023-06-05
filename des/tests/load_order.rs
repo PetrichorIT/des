@@ -86,7 +86,7 @@ fn load_order() {
         .map_err(|e| println!("{e}"))
         .unwrap(),
     );
-    let rt = Runtime::new(rt);
+    let rt = Builder::new().build(rt);
 
     let _ = rt.run();
 }

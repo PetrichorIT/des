@@ -37,7 +37,7 @@
 //!             return;
 //!         },
 //!     };
-//!     let rt = Runtime::new(NetworkApplication::new(app));
+//!     let rt = Builder::new().build(NetworkApplication::new(app));
 //!     let _ = rt.run();
 //! }
 //! ```

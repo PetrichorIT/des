@@ -59,7 +59,7 @@ impl Application for App {
 #[test]
 #[serial]
 fn zero_event_runtime() {
-    let rt = Runtime::<App>::new(App {
+    let rt = Builder::seeded(123).build(App {
         event_list: Vec::new(),
     });
 
@@ -86,7 +86,7 @@ impl RepeatWithDelay {
 #[test]
 #[serial]
 fn one_event_runtime() {
-    let mut rt = Runtime::<App>::new(App {
+    let mut rt = Builder::new().build(App {
         event_list: Vec::new(),
     });
     rt.add_event(
@@ -135,12 +135,9 @@ fn ensure_event_order() {
 
     events.shuffle(&mut rng);
 
-    let mut rt: Runtime<App> = Runtime::new_with(
-        App {
-            event_list: Vec::with_capacity(128),
-        },
-        RuntimeOptions::seeded(123),
-    );
+    let mut rt: Runtime<App> = Builder::seeded(123).build(App {
+        event_list: Vec::with_capacity(128),
+    });
 
     for (event, time) in events {
         rt.add_event(event, time);
@@ -202,12 +199,9 @@ fn ensure_event_order_same_time() {
         ),
     ];
 
-    let mut rt: Runtime<App> = Runtime::new_with(
-        App {
-            event_list: Vec::with_capacity(32),
-        },
-        RuntimeOptions::seeded(123),
-    );
+    let mut rt: Runtime<App> = Builder::seeded(123).build(App {
+        event_list: Vec::with_capacity(32),
+    });
 
     for (event, time) in events {
         rt.add_event(event, time);
@@ -248,12 +242,9 @@ const N: usize = 100_000;
 #[test]
 #[serial]
 fn full_test_n_100_000() {
-    let mut rt: Runtime<App> = Runtime::new_with(
-        App {
-            event_list: Vec::with_capacity(N),
-        },
-        RuntimeOptions::seeded(123),
-    );
+    let mut rt: Runtime<App> = Builder::seeded(123).build(App {
+        event_list: Vec::with_capacity(N),
+    });
 
     let mut events = Vec::with_capacity(N);
 
@@ -369,7 +360,7 @@ fn deferred_sim_start() {
         started: false,
         ended: false,
     };
-    let rt = Runtime::new(app);
+    let rt = Builder::seeded(123).build(app);
 
     assert_eq!(rt.app.started, false);
     assert_eq!(rt.app.ended, false);

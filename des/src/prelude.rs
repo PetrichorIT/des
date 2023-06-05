@@ -6,8 +6,8 @@
 // # Generic core exports
 //
 
+pub use crate::runtime::Builder;
 pub use crate::runtime::Runtime;
-pub use crate::runtime::RuntimeOptions;
 pub use crate::runtime::RuntimeResult;
 
 pub use crate::time::Duration;

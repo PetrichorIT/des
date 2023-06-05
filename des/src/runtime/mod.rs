@@ -6,17 +6,12 @@ use crate::{
     macros::support::SyncWrap,
     time::{Duration, SimTime},
 };
-use rand::{
-    distributions::Standard,
-    prelude::{Distribution, StdRng},
-    rngs::OsRng,
-    Rng, SeedableRng,
-};
+use rand::{distributions::Standard, prelude::Distribution, Rng, RngCore};
 use std::{
     any::type_name,
     cell::UnsafeCell,
     fmt::{Debug, Display},
-    sync::{Mutex, MutexGuard, TryLockError},
+    sync::MutexGuard,
 };
 
 #[cfg(feature = "metrics")]
@@ -25,14 +20,14 @@ use std::sync::Arc;
 mod event;
 pub use self::event::*;
 
-mod options;
-pub use self::options::*;
-
 mod limit;
 pub use self::limit::*;
 
 mod bench;
 pub use bench::*;
+
+mod builder;
+pub use builder::*;
 
 pub(crate) const FT_NET: bool = cfg!(feature = "net");
 pub(crate) const FT_NDL: bool = cfg!(feature = "ndl");
@@ -43,10 +38,8 @@ pub(crate) const FT_ASYNC: bool = cfg!(feature = "async");
 pub(crate) const SYM_CHECKMARK: char = '\u{2713}';
 pub(crate) const SYM_CROSSMARK: char = '\u{02df}';
 
-pub(crate) static RNG: SyncWrap<UnsafeCell<Option<StdRng>>> = SyncWrap::new(UnsafeCell::new(None));
-
-/// A lock the ensures only one runtime exits at a time.
-static SIMULATION_LOCK: Mutex<()> = Mutex::new(());
+pub(crate) static RNG: SyncWrap<UnsafeCell<Option<Box<dyn RngCore>>>> =
+    SyncWrap::new(UnsafeCell::new(None));
 
 ///
 /// Returns the current simulation time of the currentlly active
@@ -68,7 +61,7 @@ pub fn sim_time() -> SimTime {
 /// This will be done once the `Runtime` was created.
 ///
 #[must_use]
-pub fn rng() -> &'static mut StdRng {
+pub fn rng() -> &'static mut dyn RngCore {
     unsafe { &mut *RNG.get() }
         .as_mut()
         .expect("RNG not yet initalized")
@@ -117,7 +110,7 @@ where
 /// If you want to use the module system for network-like simulations
 /// than you must create a [`NetworkApplication<A>`] as app parameter for the core [`Runtime`].
 /// This network runtime comes preconfigured with an event set and all managment
-/// event nessecary for the simulation. All you have to do is to pass the app into [`Runtime::new`]
+/// event nessecary for the simulation. All you have to do is to pass the app into [`Builder::build`]
 /// to create a runnable instance and the run it.
 ///
 pub struct Runtime<App>
@@ -240,13 +233,13 @@ where
     /// # }
     ///
     /// let app = App(42, String::from("Hello there!"));
-    /// let rt = Runtime::new(app);
+    /// let rt = Builder::new().build(app);
     /// ```
     ///
-    #[must_use]
-    pub fn new(app: A) -> Self {
-        Self::new_with(app, RuntimeOptions::default())
-    }
+    // #[must_use]
+    // pub fn new(app: A) -> Self {
+    //     Self::new_with(app, RuntimeOptions::default())
+    // }
 
     ///
     /// Creates a new [`Runtime`] Instance using an application as core,
@@ -271,88 +264,17 @@ where
     /// # }
     ///
     /// let app = App(42, String::from("Hello there!"));
-    /// let rt = Runtime::new_with(app, RuntimeOptions::seeded(42).max_itr(69));
+    /// let rt = Builder::seeded(42).max_itr(69).build(app);
     /// ```
     ///
     /// # Panics
     ///
     /// Panics if no RNG can be created from the OS-RNG.
     ///
-    #[must_use]
-    pub fn new_with(app: A, mut options: RuntimeOptions) -> Self {
-        // Get simulation permit
-
-        let permit = {
-            let lock = SIMULATION_LOCK.try_lock();
-            match lock {
-                Ok(permit) => permit,
-                Err(err) => {
-                    match err {
-                        TryLockError::WouldBlock => {
-                            eprintln!("des::warning ** another runtime allready exists ... waiting for simlock");
-                            let lock = SIMULATION_LOCK.lock();
-                            match lock {
-                                Ok(lock) => lock,
-                                Err(p) => {
-                                    eprintln!("des::error ** another runtime poisoned the simlock ... cleaning up");
-                                    Self::poison_cleanup();
-                                    p.into_inner()
-                                }
-                            }
-                        }
-                        TryLockError::Poisoned(p) => {
-                            eprintln!("des::error ** another runtime poisoned the simlock ... cleaning up");
-                            Self::poison_cleanup();
-                            p.into_inner()
-                        }
-                    }
-                }
-            }
-        };
-
-        // Log prep
-        // StandardLogger::setup().expect("Failed to create logger");
-        #[cfg(feature = "cqueue")]
-        if std::mem::size_of::<A::EventSet>() > 128 {
-            eprintln!("des::warning ** creating runtime with event-set bigger that 128 bytes * this may lead to performance losses");
-        }
-
-        // Set SimTime
-        let sim_time = options.min_sim_time.unwrap_or(SimTime::MIN);
-        SimTime::set_now(sim_time);
-
-        // Set RNG
-        let rng = options
-            .rng
-            .take()
-            .unwrap_or_else(|| StdRng::from_rng(OsRng::default()).unwrap());
-        *unsafe { &mut *RNG.get() } = Some(rng);
-
-        Self {
-            future_event_set: FutureEventSet::new_with(&options),
-
-            event_id: 0,
-            itr: 0,
-            permit,
-
-            limit: options.custom_limit.unwrap_or_else(|| {
-                match (options.max_itr, options.max_sim_time) {
-                    (None, None) => RuntimeLimit::None,
-                    (Some(i), None) => RuntimeLimit::EventCount(i),
-                    (None, Some(t)) => RuntimeLimit::SimTime(t),
-                    (Some(i), Some(t)) => RuntimeLimit::CombinedOr(
-                        Box::new(RuntimeLimit::EventCount(i)),
-                        Box::new(RuntimeLimit::SimTime(t)),
-                    ),
-                }
-            }),
-
-            quiet: options.quiet,
-            profiler: Profiler::default(),
-
-            app,
-        }
-    }
+    // #[must_use]
+    // pub fn new_with(app: A, mut options: RuntimeOptions) -> Self {
+    //     todo!()
+    // }
 
     fn poison_cleanup() {
         // NOP
@@ -391,7 +313,7 @@ where
     /// }
     ///
     ///
-    /// let runtime = Runtime::new(MyApp());
+    /// let runtime = Builder::new().build(MyApp());
     /// let result = runtime.run();
     ///
     /// match result {
@@ -594,10 +516,9 @@ where
     /// # }
     /// #
     /// fn main() {
-    ///     let mut runtime = Runtime::new_with(
-    ///         MyApp(),
-    ///         RuntimeOptions::seeded(1).min_time(SimTime::from(10.0))
-    ///     );
+    ///     let mut runtime = Builder::seeded(1)
+    ///         .start_time(10.0.into())
+    ///         .build(MyApp());
     ///     runtime.add_event_in(MyEventSet::EventA, Duration::new(12, 0));
     ///
     ///     match runtime.run() {
@@ -639,10 +560,9 @@ where
     /// # }
     /// #
     /// fn main() {
-    ///     let mut runtime = Runtime::new_with(
-    ///         MyApp(),
-    ///         RuntimeOptions::seeded(1).min_time(SimTime::from(10.0))
-    ///     );
+    ///     let mut runtime = Builder::seeded(1)
+    ///         .start_time(10.0.into())
+    ///         .build(MyApp());
     ///     runtime.add_event(MyEventSet::EventA, SimTime::from(12.0));
     ///
     ///     match runtime.run() {

@@ -3,7 +3,7 @@
 
 use rand::distributions::Uniform;
 use rand::prelude::StdRng;
-use rand::Rng;
+use rand::{Rng, RngCore};
 use std::collections::VecDeque;
 use std::fmt::{Debug, Display};
 use std::sync::{Arc, RwLock};
@@ -72,7 +72,7 @@ impl ChannelMetrics {
     /// Calcualtes the duration a message travels on a link.
     ///
     #[allow(clippy::if_same_then_else)]
-    pub fn calculate_duration(&self, msg: &Message, rng: &mut StdRng) -> Duration {
+    pub fn calculate_duration(&self, msg: &Message, rng: &mut dyn RngCore) -> Duration {
         if self.bitrate == 0 {
             return Duration::ZERO;
         }

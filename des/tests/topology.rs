@@ -22,7 +22,7 @@ fn topology_load() {
     )
     .map_err(|e| println!("{e}"))
     .unwrap();
-    let rt = Runtime::new(NetworkApplication::new(app));
+    let rt = Builder::new().build(NetworkApplication::new(app));
     let app = rt.run().into_app();
     let mut topo = app.globals().topology.lock().unwrap().clone();
 

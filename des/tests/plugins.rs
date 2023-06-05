@@ -91,7 +91,7 @@ fn plugin_raw_creation() {
     let root = PluginCreation::build_named(ObjectPath::from("root"), &mut app);
     app.register_module(root);
 
-    let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
+    let rt = Builder::seeded(123).build(app);
     let result = rt.run().unwrap();
 
     assert_eq!(result.1, SimTime::from_duration(Duration::from_secs(99)));
@@ -150,7 +150,7 @@ fn plugin_in_plugin_creation() {
     let module = PluginInPluginCreation::build_named(ObjectPath::from("root"), &mut app);
     app.register_module(module);
 
-    let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
+    let rt = Builder::seeded(123).build(app);
     let result = rt.run();
 
     let RuntimeResult::Finished { time, profiler, .. } = result else {
@@ -214,7 +214,7 @@ fn plugin_in_plugin_creation2() {
     let module = PluginInPluginCreation2::build_named(ObjectPath::from("root"), &mut app);
     app.register_module(module);
 
-    let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
+    let rt = Builder::seeded(123).build(app);
     let result = rt.run();
 
     let RuntimeResult::Finished { time, profiler, .. } = result else {
@@ -256,7 +256,7 @@ fn plugin_priority() {
     let module = PluginPriority::build_named(ObjectPath::from("root"), &mut app);
     app.register_module(module);
 
-    let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
+    let rt = Builder::seeded(123).build(app);
     let result = rt.run();
 
     let RuntimeResult::Finished { time, profiler, .. } = result else {
@@ -335,7 +335,7 @@ fn plugin_priority_defer() {
     let module = PluginPriorityDefer::build_named(ObjectPath::from("root"), &mut app);
     app.register_module(module);
 
-    let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
+    let rt = Builder::seeded(123).build(app);
     let result = rt.run();
 
     let RuntimeResult::Finished { time, profiler, .. } = result else {
@@ -385,7 +385,7 @@ fn plugin_duplication() {
     let module = PluginDuplication::build_named(ObjectPath::from("root"), &mut app);
     app.register_module(module);
 
-    let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
+    let rt = Builder::seeded(123).build(app);
     let result = rt.run();
 
     let RuntimeResult::Finished { time, profiler, .. } = result else {
@@ -455,7 +455,7 @@ fn plugin_removal() {
     let module = PluginRemoval::build_named(ObjectPath::from("root"), &mut app);
     app.register_module(module);
 
-    let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
+    let rt = Builder::seeded(123).build(app);
     let result = rt.run();
 
     let RuntimeResult::Finished { time, profiler, .. } = result else {
@@ -514,7 +514,7 @@ fn plugin_panic_capture() {
     let module = PanicPolicyCapture::build_named(ObjectPath::from("root"), &mut app);
     app.register_module(module);
 
-    let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
+    let rt = Builder::seeded(123).build(app);
     let result = rt.run();
 
     let result = result.unwrap();
@@ -572,7 +572,7 @@ fn plugin_panic_restart() {
     let module = PanicPolicyRestart::build_named(ObjectPath::from("root"), &mut app);
     app.register_module(module);
 
-    let rt = Runtime::new_with(app, RuntimeOptions::seeded(123));
+    let rt = Builder::seeded(123).build(app);
     let result = rt.run();
 
     let result = result.unwrap();
@@ -650,10 +650,7 @@ fn plugin_error_expected_t() {
     let module = PluginErrorModule::build_named(ObjectPath::from("root".to_string()), &mut rt);
     rt.register_module(module);
 
-    let rt = Runtime::new_with(
-        rt,
-        RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(30))),
-    );
+    let rt = Builder::seeded(123).build(rt);
 
     let res = rt.run();
     let _res = res.unwrap();
@@ -717,10 +714,7 @@ fn plugin_error_expected_t_inside_other_plugin() {
         PluginErrorTriggerModule::build_named(ObjectPath::from("root".to_string()), &mut rt);
     rt.register_module(module);
 
-    let rt = Runtime::new_with(
-        rt,
-        RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(30))),
-    );
+    let rt = Builder::seeded(123).build(rt);
 
     let res = rt.run();
     let _res = res.unwrap();
@@ -799,10 +793,7 @@ fn plugin_error_malfunction_or_priority() {
     let module = PluginErrorMalfunction::build_named(ObjectPath::from("root".to_string()), &mut rt);
     rt.register_module(module);
 
-    let rt = Runtime::new_with(
-        rt,
-        RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(30))),
-    );
+    let rt = Builder::seeded(123).build(rt);
 
     let res = rt.run();
     let _res = res.unwrap();
@@ -886,10 +877,7 @@ fn plugin_removal_from_main() {
     let module = PluginRemovalFromMain::build_named(ObjectPath::from("root".to_string()), &mut rt);
     rt.register_module(module);
 
-    let rt = Runtime::new_with(
-        rt,
-        RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(30))),
-    );
+    let rt = Builder::seeded(123).build(rt);
 
     let res = rt.run();
     let _res = res.unwrap();
@@ -968,10 +956,7 @@ fn plugin_removal_from_upstream() {
         PluginRemovalFromUpstream::build_named(ObjectPath::from("root".to_string()), &mut rt);
     rt.register_module(module);
 
-    let rt = Runtime::new_with(
-        rt,
-        RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(30))),
-    );
+    let rt = Builder::seeded(123).build(rt);
 
     let res = rt.run();
     let _res = res.unwrap();
@@ -1075,10 +1060,7 @@ fn plugin_removal_from_downstream() {
         PluginRemovalFromDownstream::build_named(ObjectPath::from("root".to_string()), &mut rt);
     rt.register_module(module);
 
-    let rt = Runtime::new_with(
-        rt,
-        RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(30))),
-    );
+    let rt = Builder::seeded(123).build(rt);
 
     let res = rt.run();
     let _res = res.unwrap();
@@ -1158,10 +1140,7 @@ fn plugin_shutdown_non_persistent_data() {
     let module = PluginAtShutdown::build_named(ObjectPath::from("root".to_string()), &mut rt);
     rt.register_module(module);
 
-    let rt = Runtime::new_with(
-        rt,
-        RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(30))),
-    );
+    let rt = Builder::seeded(123).build(rt);
 
     let res = rt.run();
     let _res = res.unwrap();
@@ -1232,10 +1211,7 @@ fn plugin_shutdown_persistent_data() {
         PluginAtShutdownPersistent::build_named(ObjectPath::from("root".to_string()), &mut rt);
     rt.register_module(module);
 
-    let rt = Runtime::new_with(
-        rt,
-        RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(30))),
-    );
+    let rt = Builder::seeded(123).build(rt);
 
     let res = rt.run();
     let _res = res.unwrap();
@@ -1296,10 +1272,7 @@ fn plugin_shutdown_downtime() {
         PluginAtShutdownDowntime::build_named(ObjectPath::from("root".to_string()), &mut rt);
     rt.register_module(module);
 
-    let rt = Runtime::new_with(
-        rt,
-        RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(60))),
-    );
+    let rt = Builder::seeded(123).build(rt);
 
     let res = rt.run();
     let _res = res.unwrap();
@@ -1351,10 +1324,7 @@ fn plugin_with_state() {
     let module = PluginWithStateModule::build_named(ObjectPath::from("root".to_string()), &mut rt);
     rt.register_module(module);
 
-    let rt = Runtime::new_with(
-        rt,
-        RuntimeOptions::seeded(123).max_time(SimTime::from_duration(Duration::from_secs(60))),
-    );
+    let rt = Builder::seeded(123).build(rt);
 
     let res = rt.run();
     let _res = res.unwrap();

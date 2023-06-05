@@ -46,8 +46,7 @@
 //!
 //! fn main() {
 //!     let app = MyApp::default();
-//!     let rt = Runtime::new(app);
-//!
+//!     let rt = Builder::new().build(app);
 //!     let result = rt.run();
 //! }
 //! ```

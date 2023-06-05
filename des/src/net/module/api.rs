@@ -224,7 +224,7 @@ pub fn shutdown() {
 /// fn main() {
 ///     let app = /* ... */
 /// #    NetworkApplication::new(());
-///     let rt = Runtime::new(app).run();
+///     let rt = Builder::new().build(app).run();
 ///     // outputs 'Start at 0s with volatile := 0 and persistent := 0'
 ///     // outputs 'Start at 10s with volatile := 0 and persistent := 1024'
 /// }
