@@ -14,9 +14,6 @@ use std::{
     sync::MutexGuard,
 };
 
-#[cfg(feature = "metrics")]
-use std::sync::Arc;
-
 mod event;
 pub use self::event::*;
 
@@ -29,6 +26,8 @@ pub use bench::*;
 mod builder;
 pub use builder::*;
 
+mod metrics;
+
 pub(crate) const FT_NET: bool = cfg!(feature = "net");
 pub(crate) const FT_NDL: bool = cfg!(feature = "ndl");
 pub(crate) const FT_CQUEUE: bool = cfg!(feature = "cqueue");
@@ -40,17 +39,6 @@ pub(crate) const SYM_CROSSMARK: char = '\u{02df}';
 
 pub(crate) static RNG: SyncWrap<UnsafeCell<Option<Box<dyn RngCore>>>> =
     SyncWrap::new(UnsafeCell::new(None));
-
-///
-/// Returns the current simulation time of the currentlly active
-/// runtime session.
-///
-#[inline]
-#[must_use]
-#[deprecated]
-pub fn sim_time() -> SimTime {
-    SimTime::now()
-}
 
 ///
 /// Returns a reference to a given rng.
@@ -384,20 +372,12 @@ where
     fn next(&mut self) -> bool {
         debug_assert!(!self.future_event_set.is_empty());
 
-        let (event, time) = self.future_event_set.fetch_next(
-            #[cfg(feature = "metrics")]
-            Arc::clone(&self.profiler.metrics),
-        );
+        let (event, time) = self.future_event_set.fetch_next();
 
         self.itr += 1;
 
         if self.limit.applies(self.itr, time) {
-            self.future_event_set.add(
-                time,
-                event,
-                #[cfg(feature = "metrics")]
-                Arc::clone(&self.profiler.metrics),
-            );
+            self.future_event_set.add(time, event);
             return false;
         }
 
@@ -432,11 +412,6 @@ where
                 println!("\u{23A1}");
                 println!("\u{23A2} Empty simulation");
                 println!("\u{23A2}  Ended at event #0 after 0s");
-                #[cfg(feature = "metrics")]
-                {
-                    println!("\u{23A2}");
-                    self.profiler.metrics.borrow_mut().finish();
-                }
                 println!("\u{23A3}");
             }
 
@@ -450,11 +425,6 @@ where
                 println!("\u{23A1}");
                 println!("\u{23A2} Simulation ended");
                 println!("\u{23A2}  Ended at event #{} after {}", self.itr, time);
-                #[cfg(feature = "metrics")]
-                {
-                    println!("\u{23A2}");
-                    self.profiler.metrics.borrow_mut().finish();
-                }
                 println!("\u{23A3}");
             }
 
@@ -475,11 +445,6 @@ where
                     self.future_event_set.len(),
                     time
                 );
-                #[cfg(feature = "metrics")]
-                {
-                    println!("\u{23A2}");
-                    self.profiler.metrics.borrow_mut().finish();
-                }
                 println!("\u{23A3}");
             }
 
@@ -576,12 +541,7 @@ where
     /// ```
     ///
     pub fn add_event(&mut self, event: impl Into<A::EventSet>, time: SimTime) {
-        self.future_event_set.add(
-            time,
-            event,
-            #[cfg(feature = "metrics")]
-            Arc::clone(&self.profiler.metrics),
-        );
+        self.future_event_set.add(time, event);
     }
 }
 

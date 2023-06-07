@@ -131,10 +131,6 @@ struct ChannelInner {
     /// The capabilities of the channel.
     metrics: ChannelMetrics,
 
-    /// The stats to track the channels activity.
-    #[cfg(feature = "metrics")]
-    stats: crate::stats::InProgressChannelStats,
-
     /// A indicator whether a channel is busy transmitting a packet.
     busy: bool,
 
@@ -224,34 +220,9 @@ impl Channel {
                 transmission_finish_time: SimTime::ZERO,
                 buffer: VecDeque::new(),
                 buffer_len: 0,
-
-                #[cfg(feature = "metrics")]
-                stats: crate::stats::InProgressChannelStats::new(ObjectPath::from("chan"), metrics),
             }),
         })
     }
-
-    ///
-    /// Calculates the stats for a given channel
-    ///
-    #[cfg(feature = "metrics")]
-    pub fn calculate_stats(&self) -> crate::stats::ChannelStats {
-        self.inner
-            .read()
-            .unwrap()
-            .stats
-            .evaluate(SimTime::now().duration_since(SimTime::MIN))
-    }
-
-    // #[cfg(feature = "metrics")]
-    // pub(crate) fn register_message_passed(&self, msg: &Message) {
-    //     self.inner.borrow_mut().stats.register_message_passed(msg)
-    // }
-
-    // #[cfg(feature = "metrics")]
-    // pub(crate) fn register_message_dropped(&self, msg: &Message) {
-    //     self.inner.borrow_mut().stats.register_message_dropped(msg)
-    // }
 
     ///
     /// Calcualtes the packet travel duration using the
@@ -302,10 +273,6 @@ impl Channel {
                     chan.path
                 );
 
-                // Register message progress (DROP)
-                #[cfg(feature = "metrics")]
-                chan.stats.register_message_dropped(&msg);
-
                 drop(msg);
             } else {
                 #[cfg(feature = "tracing")]
@@ -318,12 +285,6 @@ impl Channel {
                 chan.buffer.push_back((msg, Arc::clone(next_gate)));
             }
         } else {
-            // Register message progress (SUCC)
-            #[cfg(feature = "metrics")]
-            {
-                chan.stats.register_message_passed(&msg);
-            }
-
             let dur = chan.metrics.calculate_duration(&msg, rng_ref);
             let busy = chan.metrics.calculate_busy(&msg);
 

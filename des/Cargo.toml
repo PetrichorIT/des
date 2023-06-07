@@ -28,21 +28,17 @@ net = ["dep:des-macros"]
 ndl = ["dep:des-ndl"]
 tracing = []
 
-# Different metrics features
-metrics = []
-metrics-rt-full = ["metrics"]
-
 [dependencies]
 # Rand primives must be set since they are bound to the
 # runtime and sould be seedable by the user.
-rand = {version = "*", features = ["std_rng"]}
+rand = { version = "*", features = ["std_rng"] }
 # Sysinfo is used for collection information on 
 # system stats for metrics.
 sysinfo = "*"
 
 # Spin must be used in the logger event in single-threaded runnin
 # due to issues like #8
-spin = {version = "*"}
+spin = { version = "*" }
 tracing = { version = "*" }
 termcolor = "*"
 fxhash = "0.2"
@@ -50,14 +46,18 @@ pin-project-lite = "0.2"
 
 # All other dependencies are optional
 
-async-trait = {version = "0.1", optional = true}
-tokio = { version = "*", features = ["rt", "sync", "macros", "io-util",], optional = true}
-futures = { version = "*", optional = true}
+async-trait = { version = "0.1", optional = true }
+tokio = { version = "*", features = [
+    "rt",
+    "sync",
+    "macros",
+    "io-util",
+], optional = true }
+futures = { version = "*", optional = true }
 
-des-cqueue = {path = "../des-cqueue", optional = true}
-des-macros = {path = "../des-macros", optional = true}
-des-ndl = { path = "../des-ndl", optional = true}
-
+des-cqueue = { path = "../des-cqueue", optional = true }
+des-macros = { path = "../des-macros", optional = true }
+des-ndl = { path = "../des-ndl", optional = true }
 
 
 [dev-dependencies]

@@ -125,7 +125,30 @@ impl Builder {
         self
     }
 
-    /// Builds the runtime.
+    ///
+    /// Builds a new [`Runtime`] instance, using an application as core,
+    /// and accepting events of type [`Event<A>`](crate::runtime::Event).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use des::prelude::*;
+    ///
+    /// // Assumme Application is implemented for App.
+    /// #[derive(Debug)]
+    /// struct App(usize,  String);
+    /// # impl Application for App {
+    /// #   type EventSet = Events;
+    /// #   type Lifecycle = ();
+    /// # }
+    /// # enum Events {}
+    /// # impl EventSet<App> for Events {
+    /// #   fn handle(self, rt: &mut Runtime<App>) {}
+    /// # }
+    ///
+    /// let app = App(42, String::from("Hello there!"));
+    /// let rt = Builder::new().build(app);
+    /// ```
     pub fn build<A: Application>(self, app: A) -> Runtime<A> {
         let permit = {
             let lock = SIMULATION_LOCK.try_lock();

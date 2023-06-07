@@ -13,22 +13,12 @@ echo "[des]"
 cargo build -p des
 echo "[des] cqueue"
 cargo build -p des --features cqueue
-echo "[des] metrics"
-cargo build -p des --features metrics
-echo "[des] cqueue + metrics"
-cargo build -p des --features cqueue --features metrics
 echo "[des] net"
 cargo build -p des --features net
 echo "[des] net + ndl"
 cargo build -p des --features net --features ndl
-echo "[des] net + metrics"
-cargo build -p des --features net --features metrics
-echo "[des] net + ndl + metrics"
-cargo build -p des --features net --features ndl --features metrics
 echo "[des] net + async"
 cargo build -p des --features net --features async
-echo "[des] net + async + metrics"
-cargo build -p des --features net --features metrics --features async
 
 
 echo "[des] multi-threaded"

@@ -7,11 +7,6 @@ use std::{
 
 use sysinfo::{CpuExt, SystemExt};
 
-#[cfg(feature = "metrics")]
-use crate::stats::{ProfilerOutputTarget, RuntimeMetrics};
-#[cfg(feature = "metrics")]
-use std::cell::RefCell;
-
 use super::{FT_ASYNC, FT_CQUEUE, FT_INTERNAL_METRICS, FT_NET};
 
 /// A run profiler
@@ -37,10 +32,6 @@ pub struct Profiler {
     pub event_count: usize,
     /// The active features.
     pub features: Vec<String>,
-
-    /// Internal metrics
-    #[cfg(feature = "metrics")]
-    pub metrics: Arc<RefCell<RuntimeMetrics>>,
 }
 
 impl Profiler {
@@ -63,54 +54,6 @@ impl Profiler {
         self.event_count = event_count;
         let now = Instant::now();
         self.duration = now - self.time_start;
-    }
-
-    /// Writes into a benchmark folder.
-    ///
-    /// # Errors
-    ///
-    /// Returns an IO error when an underlying IO operation has failed.
-    ///
-    #[cfg(feature = "metrics")]
-    #[allow(clippy::explicit_auto_deref)]
-    pub fn write_to(&self, target: impl Into<ProfilerOutputTarget>) -> std::io::Result<()> {
-        let target = target.into();
-        target.run(&*self.metrics.borrow())
-        // writeln!(f, "[{}] {{", self.exec)?;
-        // writeln!(
-        //     f,
-        //     "\tT: {:?} @ {:?}",
-        //     self.simulation_start
-        //         .duration_since(SystemTime::UNIX_EPOCH)
-        //         .expect("HUH"),
-        //     self.target
-        // )?;
-        // self.env.write_to(&mut f)?;
-        // writeln!(f)?;
-
-        // #[cfg(feature = "metrics")]
-        // {
-        //     self.metrics.write_to(&mut f)?;
-        //     writeln!(f)?;
-        // }
-
-        // let throughput = self.event_count as f64 / self.duration.as_secs_f64();
-
-        // writeln!(
-        //     f,
-        //     "\t{} ({} events/s) events ",
-        //     self.event_count,
-        //     throughput.floor() as usize
-        // )?;
-        // writeln!(
-        //     f,
-        //     "\twith features <{}> in {:?}",
-        //     self.features.join(", "),
-        //     self.duration
-        // )?;
-        // writeln!(f, "}}")?;
-
-        // Ok(())
     }
 }
 
@@ -165,9 +108,6 @@ impl Default for Profiler {
 
             event_count: 0,
             features,
-
-            #[cfg(feature = "metrics")]
-            metrics: Arc::new(RefCell::new(RuntimeMetrics::new())),
         }
     }
 }

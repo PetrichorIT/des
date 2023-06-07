@@ -122,7 +122,6 @@ pub mod prelude;
 
 pub mod doc;
 pub mod runtime;
-pub mod stats;
 pub mod time;
 pub mod tracing;
 
