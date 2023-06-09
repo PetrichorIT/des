@@ -1,9 +1,6 @@
-use std::{
-    any::{Any, TypeId},
-    fmt,
-};
+use std::{any::TypeId, fmt};
 
-use super::{Plugin, PluginPanicPolicy, PluginStatus};
+use super::Plugin;
 
 #[derive(Debug)]
 pub(crate) struct PluginRegistry {
@@ -18,14 +15,11 @@ pub(crate) struct PluginRegistry {
 
 pub(crate) struct PluginEntry {
     pub(super) id: usize,       // a module-specific unqiue identifier
-    pub(super) gen: usize,      // the number of restarts the plugin has performed
     pub(super) priority: usize, // 2 bits reserved, public API at least 0b****10
 
     pub(super) typ: TypeId,
     pub(super) core: Option<Box<dyn Plugin>>,
     pub(super) state: PluginState,
-
-    pub(super) policy: PluginPanicPolicy,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -45,9 +39,33 @@ pub(crate) enum PluginState {
 
     /// To be deleted next turn
     PendingRemoval = 3,
+}
 
-    /// Plugin in not active, because its dead, thus self.plugin is empty.
-    Paniced = 4,
+/// The current state of the plugin from an external view.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PluginStatus {
+    /// The plugin was just created an is not active during the current
+    /// event cycle.
+    StartingUp,
+    /// The plugin is fully active during the current and all future
+    /// event cycles (except if removed).
+    Active,
+    /// The plugin was active during the current event cycle, but
+    /// was deactived / removed, thus will no longer act.
+    ShuttingDown,
+    /// The use handle is in some way invalid and does not point to an
+    /// existing plugin.
+    NotFound,
+}
+
+impl PluginStatus {
+    fn from_entry(entry: &PluginEntry) -> Self {
+        match entry.state {
+            PluginState::Idle | PluginState::Running => PluginStatus::Active,
+            PluginState::JustCreated => PluginStatus::StartingUp,
+            PluginState::PendingRemoval => PluginStatus::ShuttingDown,
+        }
+    }
 }
 
 impl PluginRegistry {
@@ -105,7 +123,7 @@ impl PluginRegistry {
                 self.inject
                     .iter()
                     .find(|p| p.id == id)
-                    .map_or(PluginStatus::Gone, |_| PluginStatus::StartingUp)
+                    .map_or(PluginStatus::NotFound, |_| PluginStatus::StartingUp)
             },
             PluginStatus::from_entry,
         )
@@ -163,13 +181,6 @@ impl PluginRegistry {
         self.inner[pos - 1].core = Some(plugin);
     }
 
-    pub(crate) fn paniced_upstream(&mut self, payload: Box<dyn Any + Send>) {
-        let pos = self.pos[0];
-        self.inner[pos - 1].state = PluginState::Paniced;
-        let policy = self.inner[pos - 1].policy.clone();
-        policy.activate(&mut self.inner[pos - 1], payload);
-    }
-
     pub(crate) fn begin_main_downstream(&mut self) {
         self.up = false;
         self.pos.truncate(1);
@@ -203,13 +214,6 @@ impl PluginRegistry {
         if deactivate && self.inner[pos].state != PluginState::PendingRemoval {
             self.inner[pos].state = PluginState::Idle;
         }
-    }
-
-    pub(crate) fn paniced_downstream(&mut self, payload: Box<dyn Any + Send>) {
-        let pos = self.pos();
-        self.inner[pos].state = PluginState::Paniced;
-        let policy = self.inner[pos].policy.clone();
-        policy.activate(&mut self.inner[pos], payload);
     }
 }
 
@@ -262,7 +266,6 @@ impl fmt::Debug for PluginEntry {
             .field("priority", &self.priority)
             .field("core", &self.core.is_some())
             .field("state", &self.state)
-            .field("policy", &self.policy)
             .finish()
     }
 }

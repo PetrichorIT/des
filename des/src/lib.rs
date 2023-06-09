@@ -60,7 +60,7 @@
 //!
 //! The [`Application`](crate::runtime::Application) object (in this case `MyApp`) is used as a global context handle that
 //! it stored inside the runtime. It can be accessed via 'rt.app' and can be used
-//! to record [`stats`](crate::stats) during the simulation. Note that the [`EventSet`](crate::runtime::EventSet)
+//! to record state during the simulation. Note that the [`EventSet`](crate::runtime::EventSet)
 //! and the [`Application`](crate::runtime::Application) are linked via a trait with generic parameters. This means
 //! that `MyEvents` could implement [`EventSet`](crate::runtime::EventSet) a second time for another application.
 //!

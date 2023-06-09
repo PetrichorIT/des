@@ -27,8 +27,7 @@ use crate::{
 /// fn setup(this: &ModuleContext) {
 ///     this.add_plugin(
 ///         MyDebugPlugin,
-///         10,
-///         PluginPanicPolicy::Abort,
+///         10
 ///     );
 /// }
 ///

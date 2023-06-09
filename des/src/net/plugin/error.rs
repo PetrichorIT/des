@@ -72,13 +72,6 @@ impl PluginError {
                         }
                     }
                     },
-                    PluginState::Paniced => PluginError {
-                        kind: PluginErrorKind::PluginPaniced,
-                        internal: format!(
-                            "expected plugin of type {} was found, but paniced",
-                            type_name::<T>()
-                        ),
-                    },
                     PluginState::PendingRemoval => PluginError {
                         kind: PluginErrorKind::PluginNotFound,
                         internal: format!(

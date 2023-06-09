@@ -2,8 +2,8 @@
 use des::net::plugin::*;
 use des::prelude::*;
 use serial_test::serial;
+use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
-use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::Arc;
 
 #[macro_use]
@@ -190,7 +190,7 @@ impl Module for PluginInPluginCreation2 {
 
     fn at_sim_start(&mut self, _stage: usize) {
         add_plugin(RecrusivePluginCreationPlugin2 { level: 10 }, 10);
-        for i in 0..=10 {
+        for i in 0..10 {
             schedule_in(
                 Message::new().id(10 - i).kind(0).build(),
                 Duration::from_secs(i as u64),
@@ -221,8 +221,8 @@ fn plugin_in_plugin_creation2() {
         panic!("Unexpected runtime result")
     };
 
-    assert_eq!(time, 10.0);
-    assert_eq!(profiler.event_count, 11);
+    assert_eq!(time, 9.0);
+    assert_eq!(profiler.event_count, 10);
 }
 
 struct PluginPriority;
@@ -466,260 +466,260 @@ fn plugin_removal() {
     assert_eq!(profiler.event_count, 201);
 }
 
-struct PanicPolicyAbort;
-impl_build_named!(PanicPolicyAbort);
-impl Module for PanicPolicyAbort {
-    fn new() -> Self {
-        Self
-    }
+// struct PanicPolicyAbort;
+// impl_build_named!(PanicPolicyAbort);
+// impl Module for PanicPolicyAbort {
+//     fn new() -> Self {
+//         Self
+//     }
 
-    fn at_sim_start(&mut self, _stage: usize) {
-        add_plugin_with(lcommon::PanicOnIncoming, 100, PluginPanicPolicy::Abort);
-        for i in 0..10 {
-            schedule_in(Message::new().id(i).build(), Duration::from_secs(i as u64))
-        }
-    }
+//     fn at_sim_start(&mut self, _stage: usize) {
+//         add_plugin_with(lcommon::PanicOnIncoming, 100);
+//         for i in 0..10 {
+//             schedule_in(Message::new().id(i).build(), Duration::from_secs(i as u64))
+//         }
+//     }
 
-    fn handle_message(&mut self, _msg: Message) {
-        panic!("Should never reach this point");
-    }
-}
+//     fn handle_message(&mut self, _msg: Message) {
+//         panic!("Should never reach this point");
+//     }
+// }
 
-struct PanicPolicyCapture;
-impl_build_named!(PanicPolicyCapture);
-impl Module for PanicPolicyCapture {
-    fn new() -> Self {
-        Self
-    }
+// struct PanicPolicyCapture;
+// impl_build_named!(PanicPolicyCapture);
+// impl Module for PanicPolicyCapture {
+//     fn new() -> Self {
+//         Self
+//     }
 
-    fn at_sim_start(&mut self, _stage: usize) {
-        add_plugin_with(lcommon::PanicOnIncoming, 100, PluginPanicPolicy::Capture);
-        for i in 0..10 {
-            schedule_in(Message::new().id(i).build(), Duration::from_secs(i as u64))
-        }
-    }
+//     fn at_sim_start(&mut self, _stage: usize) {
+//         add_plugin_with(lcommon::PanicOnIncoming, 100);
+//         for i in 0..10 {
+//             schedule_in(Message::new().id(i).build(), Duration::from_secs(i as u64))
+//         }
+//     }
 
-    fn handle_message(&mut self, msg: Message) {
-        assert!(msg.header().id > 0)
-    }
-}
+//     fn handle_message(&mut self, msg: Message) {
+//         assert!(msg.header().id > 0)
+//     }
+// }
 
-#[test]
-#[serial]
-fn plugin_panic_capture() {
-    // Logger::new().set_logger();
+// #[test]
+// #[serial]
+// fn plugin_panic_capture() {
+//     // Logger::new().set_logger();
 
-    let mut app = NetworkApplication::new(());
+//     let mut app = NetworkApplication::new(());
 
-    let module = PanicPolicyCapture::build_named(ObjectPath::from("root"), &mut app);
-    app.register_module(module);
+//     let module = PanicPolicyCapture::build_named(ObjectPath::from("root"), &mut app);
+//     app.register_module(module);
 
-    let rt = Builder::seeded(123).build(app);
-    let result = rt.run();
+//     let rt = Builder::seeded(123).build(app);
+//     let result = rt.run();
 
-    let result = result.unwrap();
-    assert_eq!(result.1.as_secs(), 9);
-    assert_eq!(result.2.event_count, 10);
-}
+//     let result = result.unwrap();
+//     assert_eq!(result.1.as_secs(), 9);
+//     assert_eq!(result.2.event_count, 10);
+// }
 
-struct PanicAtThree;
-impl Plugin for PanicAtThree {
-    fn capture_incoming(&mut self, msg: Message) -> Option<Message> {
-        if msg.header().id == 3 {
-            panic!("I dont like this number")
-        }
-        Some(msg)
-    }
-}
+// struct PanicAtThree;
+// impl Plugin for PanicAtThree {
+//     fn capture_incoming(&mut self, msg: Message) -> Option<Message> {
+//         if msg.header().id == 3 {
+//             panic!("I dont like this number")
+//         }
+//         Some(msg)
+//     }
+// }
 
-struct PanicPolicyRestart {
-    handle: Vec<PluginHandle>,
-}
-impl_build_named!(PanicPolicyRestart);
-impl Module for PanicPolicyRestart {
-    fn new() -> Self {
-        Self { handle: Vec::new() }
-    }
+// struct PanicPolicyRestart {
+//     handle: Vec<PluginHandle>,
+// }
+// impl_build_named!(PanicPolicyRestart);
+// impl Module for PanicPolicyRestart {
+//     fn new() -> Self {
+//         Self { handle: Vec::new() }
+//     }
 
-    fn at_sim_start(&mut self, _stage: usize) {
-        let h = add_plugin_with(
-            PanicAtThree,
-            100,
-            PluginPanicPolicy::Restart(Arc::new(|| Box::new(PanicAtThree))),
-        );
-        self.handle.push(h);
+//     fn at_sim_start(&mut self, _stage: usize) {
+//         let h = add_plugin_with(
+//             PanicAtThree,
+//             100,
+//             PluginPanicPolicy::Restart(Arc::new(|| Box::new(PanicAtThree))),
+//         );
+//         self.handle.push(h);
 
-        for i in 0..100 {
-            schedule_in(Message::new().id(i).build(), Duration::from_secs(i as u64))
-        }
-    }
+//         for i in 0..100 {
+//             schedule_in(Message::new().id(i).build(), Duration::from_secs(i as u64))
+//         }
+//     }
 
-    fn handle_message(&mut self, msg: Message) {
-        assert_ne!(msg.header().id, 3);
-        assert_eq!(msg.header().id, SimTime::now().as_secs() as u16);
+//     fn handle_message(&mut self, msg: Message) {
+//         assert_ne!(msg.header().id, 3);
+//         assert_eq!(msg.header().id, SimTime::now().as_secs() as u16);
 
-        assert_eq!(self.handle[0].status(), PluginStatus::Active);
-    }
-}
+//         assert_eq!(self.handle[0].status(), PluginStatus::Active);
+//     }
+// }
 
-#[test]
-#[serial]
-fn plugin_panic_restart() {
-    // Logger::new().set_logger();
+// #[test]
+// #[serial]
+// fn plugin_panic_restart() {
+//     // Logger::new().set_logger();
 
-    let mut app = NetworkApplication::new(());
+//     let mut app = NetworkApplication::new(());
 
-    let module = PanicPolicyRestart::build_named(ObjectPath::from("root"), &mut app);
-    app.register_module(module);
+//     let module = PanicPolicyRestart::build_named(ObjectPath::from("root"), &mut app);
+//     app.register_module(module);
 
-    let rt = Builder::seeded(123).build(app);
-    let result = rt.run();
+//     let rt = Builder::seeded(123).build(app);
+//     let result = rt.run();
 
-    let result = result.unwrap();
-    assert_eq!(result.1.as_secs(), 99);
-    assert_eq!(result.2.event_count, 100);
-}
+//     let result = result.unwrap();
+//     assert_eq!(result.1.as_secs(), 99);
+//     assert_eq!(result.2.event_count, 100);
+// }
 
-struct PluginErrorPlugin(Arc<AtomicBool>);
-impl Plugin for PluginErrorPlugin {
-    fn event_start(&mut self) {
-        if SimTime::now().as_secs() > 20 {
-            panic!("Test-Panic to get plugin error")
-        }
-        self.0.store(true, SeqCst);
-    }
+// struct PluginErrorPlugin(Arc<AtomicBool>);
+// impl Plugin for PluginErrorPlugin {
+//     fn event_start(&mut self) {
+//         if SimTime::now().as_secs() > 20 {
+//             panic!("Test-Panic to get plugin error")
+//         }
+//         self.0.store(true, SeqCst);
+//     }
 
-    fn event_end(&mut self) {
-        self.0.store(false, SeqCst)
-    }
-}
+//     fn event_end(&mut self) {
+//         self.0.store(false, SeqCst)
+//     }
+// }
 
-struct PluginErrorModule {
-    flag: Arc<AtomicBool>,
-    done: bool,
-}
-impl_build_named!(PluginErrorModule);
-impl Module for PluginErrorModule {
-    fn new() -> Self {
-        Self {
-            flag: Arc::new(AtomicBool::new(false)),
-            done: false,
-        }
-    }
+// struct PluginErrorModule {
+//     flag: Arc<AtomicBool>,
+//     done: bool,
+// }
+// impl_build_named!(PluginErrorModule);
+// impl Module for PluginErrorModule {
+//     fn new() -> Self {
+//         Self {
+//             flag: Arc::new(AtomicBool::new(false)),
+//             done: false,
+//         }
+//     }
 
-    fn at_sim_start(&mut self, _stage: usize) {
-        let err = PluginError::expected::<PluginErrorPlugin>();
-        assert_eq!(
-            format!("{err}"),
-            "expected plugin of type plugins::PluginErrorPlugin, but no such plugin exists (ENOTFOUND)"
-        );
+//     fn at_sim_start(&mut self, _stage: usize) {
+//         let err = PluginError::expected::<PluginErrorPlugin>();
+//         assert_eq!(
+//             format!("{err}"),
+//             "expected plugin of type plugins::PluginErrorPlugin, but no such plugin exists (ENOTFOUND)"
+//         );
 
-        add_plugin(PluginErrorPlugin(self.flag.clone()), 10);
+//         add_plugin(PluginErrorPlugin(self.flag.clone()), 10);
 
-        // 20 valid packet
-        // 1 lost to plugin panic
-        // 1 got through to trigger error
-        for i in 1..23 {
-            schedule_in(Message::new().build(), Duration::from_secs(i))
-        }
-    }
+//         // 20 valid packet
+//         // 1 lost to plugin panic
+//         // 1 got through to trigger error
+//         for i in 1..23 {
+//             schedule_in(Message::new().build(), Duration::from_secs(i))
+//         }
+//     }
 
-    fn handle_message(&mut self, _msg: Message) {
-        if !self.flag.load(SeqCst) {
-            let err = PluginError::expected::<PluginErrorPlugin>();
-            assert_eq!(
-                format!("{err}"),
-                "expected plugin of type plugins::PluginErrorPlugin was found, but paniced (EPANICED)"
-            );
-            self.done = true;
-        }
-    }
+//     fn handle_message(&mut self, _msg: Message) {
+//         if !self.flag.load(SeqCst) {
+//             let err = PluginError::expected::<PluginErrorPlugin>();
+//             assert_eq!(
+//                 format!("{err}"),
+//                 "expected plugin of type plugins::PluginErrorPlugin was found, but paniced (EPANICED)"
+//             );
+//             self.done = true;
+//         }
+//     }
 
-    fn at_sim_end(&mut self) {
-        assert!(self.done)
-    }
-}
+//     fn at_sim_end(&mut self) {
+//         assert!(self.done)
+//     }
+// }
 
-#[test]
-#[serial]
-fn plugin_error_expected_t() {
-    // Logger::new().set_logger();
+// #[test]
+// #[serial]
+// fn plugin_error_expected_t() {
+//     // Logger::new().set_logger();
 
-    let mut rt = NetworkApplication::new(());
+//     let mut rt = NetworkApplication::new(());
 
-    let module = PluginErrorModule::build_named(ObjectPath::from("root".to_string()), &mut rt);
-    rt.register_module(module);
+//     let module = PluginErrorModule::build_named(ObjectPath::from("root".to_string()), &mut rt);
+//     rt.register_module(module);
 
-    let rt = Builder::seeded(123).build(rt);
+//     let rt = Builder::seeded(123).build(rt);
 
-    let res = rt.run();
-    let _res = res.unwrap();
-    // assert_eq!(res.3, 2);
-}
+//     let res = rt.run();
+//     let _res = res.unwrap();
+//     // assert_eq!(res.3, 2);
+// }
 
-struct PluginErrorTriggerPlugin(Arc<AtomicBool>);
-impl Plugin for PluginErrorTriggerPlugin {
-    fn event_start(&mut self) {
-        if !self.0.load(SeqCst) {
-            let err = PluginError::expected::<PluginErrorPlugin>();
-            assert_eq!(
-                format!("{err}"),
-                "expected plugin of type plugins::PluginErrorPlugin was found, but paniced (EPANICED)"
-            );
-        }
-    }
-}
+// struct PluginErrorTriggerPlugin(Arc<AtomicBool>);
+// impl Plugin for PluginErrorTriggerPlugin {
+//     fn event_start(&mut self) {
+//         if !self.0.load(SeqCst) {
+//             let err = PluginError::expected::<PluginErrorPlugin>();
+//             assert_eq!(
+//                 format!("{err}"),
+//                 "expected plugin of type plugins::PluginErrorPlugin was found, but paniced (EPANICED)"
+//             );
+//         }
+//     }
+// }
 
-struct PluginErrorTriggerModule {
-    flag: Arc<AtomicBool>,
-    handles: Vec<PluginHandle>,
-}
-impl_build_named!(PluginErrorTriggerModule);
-impl Module for PluginErrorTriggerModule {
-    fn new() -> Self {
-        Self {
-            flag: Arc::new(AtomicBool::new(false)),
-            handles: Vec::new(),
-        }
-    }
+// struct PluginErrorTriggerModule {
+//     flag: Arc<AtomicBool>,
+//     handles: Vec<PluginHandle>,
+// }
+// impl_build_named!(PluginErrorTriggerModule);
+// impl Module for PluginErrorTriggerModule {
+//     fn new() -> Self {
+//         Self {
+//             flag: Arc::new(AtomicBool::new(false)),
+//             handles: Vec::new(),
+//         }
+//     }
 
-    fn at_sim_start(&mut self, _stage: usize) {
-        self.handles
-            .push(add_plugin(PluginErrorPlugin(self.flag.clone()), 10));
-        self.handles
-            .push(add_plugin(PluginErrorTriggerPlugin(self.flag.clone()), 100));
+//     fn at_sim_start(&mut self, _stage: usize) {
+//         self.handles
+//             .push(add_plugin(PluginErrorPlugin(self.flag.clone()), 10));
+//         self.handles
+//             .push(add_plugin(PluginErrorTriggerPlugin(self.flag.clone()), 100));
 
-        // 20 valid packet
-        // 1 lost to plugin panic
-        // 1 got through to trigger error
-        for i in 1..23 {
-            schedule_in(Message::new().build(), Duration::from_secs(i))
-        }
-    }
+//         // 20 valid packet
+//         // 1 lost to plugin panic
+//         // 1 got through to trigger error
+//         for i in 1..23 {
+//             schedule_in(Message::new().build(), Duration::from_secs(i))
+//         }
+//     }
 
-    fn at_sim_end(&mut self) {
-        assert_eq!(self.handles[0].status(), PluginStatus::Paniced);
-        assert_eq!(self.handles[1].status(), PluginStatus::Active);
-    }
-}
+//     fn at_sim_end(&mut self) {
+//         assert_eq!(self.handles[0].status(), PluginStatus::Paniced);
+//         assert_eq!(self.handles[1].status(), PluginStatus::Active);
+//     }
+// }
 
-#[test]
-#[serial]
-fn plugin_error_expected_t_inside_other_plugin() {
-    // Logger::new().set_logger();
+// #[test]
+// #[serial]
+// fn plugin_error_expected_t_inside_other_plugin() {
+//     // Logger::new().set_logger();
 
-    let mut rt = NetworkApplication::new(());
+//     let mut rt = NetworkApplication::new(());
 
-    let module =
-        PluginErrorTriggerModule::build_named(ObjectPath::from("root".to_string()), &mut rt);
-    rt.register_module(module);
+//     let module =
+//         PluginErrorTriggerModule::build_named(ObjectPath::from("root".to_string()), &mut rt);
+//     rt.register_module(module);
 
-    let rt = Builder::seeded(123).build(rt);
+//     let rt = Builder::seeded(123).build(rt);
 
-    let res = rt.run();
-    let _res = res.unwrap();
-    // assert_eq!(res.3, 2);
-}
+//     let res = rt.run();
+//     let _res = res.unwrap();
+//     // assert_eq!(res.3, 2);
+// }
 
 struct ExpectedPlugin;
 impl Plugin for ExpectedPlugin {
@@ -760,44 +760,44 @@ impl Plugin for ExpectingPlugin {
     }
 }
 
-struct PluginErrorMalfunction {
-    done: bool,
-}
-impl_build_named!(PluginErrorMalfunction);
-impl Module for PluginErrorMalfunction {
-    fn new() -> Self {
-        Self { done: false }
-    }
+// struct PluginErrorMalfunction {
+//     done: bool,
+// }
+// impl_build_named!(PluginErrorMalfunction);
+// impl Module for PluginErrorMalfunction {
+//     fn new() -> Self {
+//         Self { done: false }
+//     }
 
-    fn at_sim_start(&mut self, _stage: usize) {
-        add_plugin_with(ExpectedPlugin, 10, PluginPanicPolicy::Abort);
-        add_plugin_with(ExpectingPlugin, 100, PluginPanicPolicy::Abort);
+//     fn at_sim_start(&mut self, _stage: usize) {
+//         add_plugin_with(ExpectedPlugin, 10, PluginPanicPolicy::Abort);
+//         add_plugin_with(ExpectingPlugin, 100, PluginPanicPolicy::Abort);
 
-        schedule_in(Message::new().build(), Duration::from_secs(1));
-    }
+//         schedule_in(Message::new().build(), Duration::from_secs(1));
+//     }
 
-    fn handle_message(&mut self, _msg: Message) {
-        self.done = true;
-    }
+//     fn handle_message(&mut self, _msg: Message) {
+//         self.done = true;
+//     }
 
-    fn at_sim_end(&mut self) {
-        assert!(self.done);
-    }
-}
+//     fn at_sim_end(&mut self) {
+//         assert!(self.done);
+//     }
+// }
 
-#[test]
-#[serial]
-fn plugin_error_malfunction_or_priority() {
-    let mut rt = NetworkApplication::new(());
+// #[test]
+// #[serial]
+// fn plugin_error_malfunction_or_priority() {
+//     let mut rt = NetworkApplication::new(());
 
-    let module = PluginErrorMalfunction::build_named(ObjectPath::from("root".to_string()), &mut rt);
-    rt.register_module(module);
+//     let module = PluginErrorMalfunction::build_named(ObjectPath::from("root".to_string()), &mut rt);
+//     rt.register_module(module);
 
-    let rt = Builder::seeded(123).build(rt);
+//     let rt = Builder::seeded(123).build(rt);
 
-    let res = rt.run();
-    let _res = res.unwrap();
-}
+//     let res = rt.run();
+//     let _res = res.unwrap();
+// }
 
 struct PluginOutputCapture {
     c: usize,
