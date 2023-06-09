@@ -6,8 +6,8 @@
 //! independent of the modules defined state and behaviour.
 //!
 //! All plugins must implement the `Plugin` trait. To install
-//! them on a module, use the `add_plugin` or `add_plugin_with`
-//! functions and assign them a priority and panic policy. The
+//! them on a module, use the `add_plugin`
+//! function and assign them a priority. The
 //! lower the priority value, the closer the plugin is to the network
 //! layer. Plugins can then be controlled and observed using the
 //! `PluginHandle` return by the install functions.
@@ -47,14 +47,6 @@
 //! still create new output-streams through all plugins closer to the networklayer
 //! than the origin.
 //!
-//! # Panic behaviour
-//!
-//! Since plugins are kind of like small subprogramms, crashes of plugins
-//! should not affect the main application itself. Thus if a panic occurs
-//! inside of a plugin, it well be captured and then further processed by
-//! the `PluginPanicPolicy` associated with the plugin. Externally
-//! the resulting plugin status can be observed via `PluginHandle::status`
-//!
 //! # Plugin creation and removal
 //!  
 //! When plugins are created using e.g. `add_plugin` they are not active
@@ -67,7 +59,7 @@
 //! can ensure that they existed at all relevent points in the event-lifecycle.
 //!
 //! Accordingly plugins the are removed using `PluginHandle::remove`
-//! still exists for the rest duration of the event, and are only deleted,
+//! still exists for the rest of the event cycle, and are only deleted
 //! once the next event arrives.
 //!  
 
@@ -269,7 +261,7 @@ pub(crate) fn plugin_output_stream(msg: Message) -> Option<Message> {
 
         let rem_msg = plugin.capture_outgoing(msg);
 
-        // (3) Continue iteration if possible, readl with panics
+        // (3) Continue iteration if possible
         let mut plugins = ctx.plugins.write();
 
         plugins.put_back_downstream(plugin, false);

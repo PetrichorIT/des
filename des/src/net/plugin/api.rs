@@ -42,7 +42,7 @@ use super::{Plugin, registry::{PluginEntry, PluginState, PluginStatus}};
 /// #    fn new() -> Self { Self }
 /// // ...
 /// fn at_sim_start(&mut self, _: usize) {
-///     let handle = add_plugin_with(
+///     let handle = add_plugin(
 ///         OpinionatedPlugin { trigger: 12 },
 ///         1,
 ///     );
