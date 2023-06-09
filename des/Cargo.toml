@@ -28,6 +28,8 @@ net = ["dep:des-macros"]
 ndl = ["dep:des-ndl"]
 tracing = []
 
+unstable-tokio-enable-time = ["async", "tokio/time"]
+
 [dependencies]
 # Rand primives must be set since they are bound to the
 # runtime and sould be seedable by the user.

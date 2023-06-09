@@ -34,6 +34,9 @@ echo "[des] tracing + net"
 cargo build -p des --features tracing --features net
 echo "[des] tracing + net + async + ndl"
 cargo build -p des --features tracing --features net --features async --features ndl
+echo "[des] tracing + net + async + ndl + unstable-tokio-enable-time"
+cargo build -p des --features tracing --features net --features async --features ndl --features unstable-tokio-enable-time
+
 
 
 # 'tests' build
