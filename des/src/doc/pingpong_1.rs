@@ -168,7 +168,7 @@
 //!         pings_send: 0, pings_recv: 0,
 //!         pongs_send: 0, pongs_recv: 0,
 //!     };
-//!     let mut rt = Runtime::new(app);
+//!     let mut rt = Builder::new().build(app);
 //!     rt.add_event(IntervalEvent, SimTime::ZERO);
 //!     let result = rt.run();
 //!     println!("{:?}", result);

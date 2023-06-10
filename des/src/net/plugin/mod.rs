@@ -6,8 +6,8 @@
 //! independent of the modules defined state and behaviour.
 //!
 //! All plugins must implement the `Plugin` trait. To install
-//! them on a module, use the `add_plugin` or `add_plugin_with`
-//! functions and assign them a priority and panic policy. The
+//! them on a module, use the `add_plugin`
+//! function and assign them a priority. The
 //! lower the priority value, the closer the plugin is to the network
 //! layer. Plugins can then be controlled and observed using the
 //! `PluginHandle` return by the install functions.
@@ -47,14 +47,6 @@
 //! still create new output-streams through all plugins closer to the networklayer
 //! than the origin.
 //!
-//! # Panic behaviour
-//!
-//! Since plugins are kind of like small subprogramms, crashes of plugins
-//! should not affect the main application itself. Thus if a panic occurs
-//! inside of a plugin, it well be captured and then further processed by
-//! the `PluginPanicPolicy` associated with the plugin. Externally
-//! the resulting plugin status can be observed via `PluginHandle::status`
-//!
 //! # Plugin creation and removal
 //!  
 //! When plugins are created using e.g. `add_plugin` they are not active
@@ -67,28 +59,22 @@
 //! can ensure that they existed at all relevent points in the event-lifecycle.
 //!
 //! Accordingly plugins the are removed using `PluginHandle::remove`
-//! still exists for the rest duration of the event, and are only deleted,
+//! still exists for the rest of the event cycle, and are only deleted
 //! once the next event arrives.
 //!  
 
 use crate::prelude::Message;
 use std::any::Any;
-use std::panic::catch_unwind;
-
-mod panic;
-pub use self::panic::{PluginPanicPolicy, PluginStatus};
 
 mod api;
-pub use self::api::{add_plugin, add_plugin_with, get_plugin_state, PluginHandle};
+pub use self::api::{add_plugin, get_plugin_state, PluginHandle};
 
 mod error;
 pub use self::error::{PluginError, PluginErrorKind};
 
 mod registry;
 pub(crate) use self::registry::PluginRegistry;
-
-mod util;
-pub(crate) use self::util::UnwindSafeBox;
+pub use self::registry::PluginStatus;
 
 use super::module::with_mod_ctx_lock;
 
@@ -265,39 +251,25 @@ pub(crate) fn plugin_output_stream(msg: Message) -> Option<Message> {
     //      - self is not an issue, since without a core not in itr
     //      - BUT: begin_downstream poisoined the old downstream info.
     let mut msg = msg;
-    while let Some(plugin) = {
+    while let Some(mut plugin) = {
         let mut lock = ctx.plugins.write();
         let ret = lock.next_downstream();
         drop(lock);
         ret
     } {
-        let plugin = UnwindSafeBox(plugin);
         // (2) Capture the packet
-        let result = catch_unwind(move || {
-            let mut plugin = plugin;
-            let msg = msg;
 
-            let ret = plugin.0.capture_outgoing(msg);
-            (plugin, ret)
-        });
+        let rem_msg = plugin.capture_outgoing(msg);
 
-        // (3) Continue iteration if possible, readl with panics
+        // (3) Continue iteration if possible
         let mut plugins = ctx.plugins.write();
-        match result {
-            Ok((r_plugin, r_msg)) => {
-                plugins.put_back_downstream(r_plugin.0, false);
-                if let Some(r_msg) = r_msg {
-                    msg = r_msg;
-                } else {
-                    plugins.close_sub_downstream();
-                    return None;
-                }
-            }
-            Err(p) => {
-                plugins.paniced_downstream(p);
-                plugins.close_sub_downstream();
-                return None;
-            }
+
+        plugins.put_back_downstream(plugin, false);
+        if let Some(rem_msg) = rem_msg {
+            msg = rem_msg;
+        } else {
+            plugins.close_sub_downstream();
+            return None;
         }
     }
 

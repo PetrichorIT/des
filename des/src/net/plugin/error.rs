@@ -72,13 +72,6 @@ impl PluginError {
                         }
                     }
                     },
-                    PluginState::Paniced => PluginError {
-                        kind: PluginErrorKind::PluginPaniced,
-                        internal: format!(
-                            "expected plugin of type {} was found, but paniced",
-                            type_name::<T>()
-                        ),
-                    },
                     PluginState::PendingRemoval => PluginError {
                         kind: PluginErrorKind::PluginNotFound,
                         internal: format!(
@@ -120,9 +113,6 @@ pub enum PluginErrorKind {
     /// This error indicates, that the existence of a plugin was expected,
     /// but no such plugin exists.
     PluginNotFound,
-    /// This error indicates, that the existence of a plugin was expected,
-    /// but the plugin paniced.
-    PluginPaniced,
     /// This error indicates that a plugin should have been active, but was not
     /// since it has a lower priority than the origin point of the error.
     PluginWithLowerPriority,
@@ -138,7 +128,6 @@ impl Display for PluginErrorKind {
             "{}",
             match self {
                 Self::PluginNotFound => "ENOTFOUND",
-                Self::PluginPaniced => "EPANICED",
                 Self::PluginWithLowerPriority => "EINACTIVE",
                 Self::PluginMalfunction => "EMALFUNCTION",
             }

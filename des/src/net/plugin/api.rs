@@ -1,19 +1,13 @@
 use std::{any::TypeId, fmt};
 use crate::net::module::{with_mod_ctx, ModuleContext, module_id, ModuleId};
-use super::{Plugin, PluginStatus, PluginPanicPolicy, registry::{PluginEntry, PluginState}};
+use super::{Plugin, registry::{PluginEntry, PluginState, PluginStatus}};
 
-/// Adds a plugin with the default policy.
-/// 
-/// See [`add_plugin_with`] for more information.
-pub fn add_plugin<T: Plugin>(plugin: T, priority: usize) -> PluginHandle  {
-    add_plugin_with(plugin, priority, PluginPanicPolicy::default())
-}
 
-/// Attaches a plugin to the current plugin, 
-/// using the provided priority and panic policy.
+/// Attaches a plugin to the current module, 
+/// with the provided priority.
 /// 
 /// The plugin will be added into the plugin registry however it will only
-/// become active in the next event. Its position in the plugin queue
+/// become active in the next event cylce. Its position in the plugin queue
 /// is dependent on the provided priority. 
 /// 
 /// Note that this API should be used for user-defined plugins
@@ -25,9 +19,6 @@ pub fn add_plugin<T: Plugin>(plugin: T, priority: usize) -> PluginHandle  {
 /// 
 /// The order of plugins with the same priority is not 
 /// guranteed, but deterministic.
-/// 
-/// The provided panic policy is used to act upon an panic that occured within a plugins execution.
-/// All policies will discard the current plugin-state, but further consequences differ.
 /// 
 /// # Examples
 /// 
@@ -51,23 +42,21 @@ pub fn add_plugin<T: Plugin>(plugin: T, priority: usize) -> PluginHandle  {
 /// #    fn new() -> Self { Self }
 /// // ...
 /// fn at_sim_start(&mut self, _: usize) {
-///     let handle = add_plugin_with(
+///     let handle = add_plugin(
 ///         OpinionatedPlugin { trigger: 12 },
 ///         1,
-///         PluginPanicPolicy::Abort,
 ///     );
-///    assert_eq!(handle.status(), PluginStatus::StartingUp);
+///     assert_eq!(handle.status(), PluginStatus::StartingUp);
 /// 
-///    // That should be fine
-///    schedule_in(Message::new().id(18).build(), Duration::from_secs(10));
+///     // That should be fine
+///     schedule_in(Message::new().id(18).build(), Duration::from_secs(10));
 /// }
 /// // ...
 /// # }
 /// #
 /// ```
-pub fn add_plugin_with<T: Plugin>(plugin: T, priority: usize, policy: PluginPanicPolicy) -> PluginHandle {
-    let priority = (priority << 2) | 0b011;
-    with_mod_ctx(|ctx| ctx.add_plugin(plugin, priority, policy))
+pub fn add_plugin<T: Plugin>(plugin: T, priority: usize) -> PluginHandle  {
+    with_mod_ctx(|ctx| ctx.add_plugin(plugin, priority))
 }
 
 /// Runs the provided clousure on the module state retuned by 
@@ -90,13 +79,13 @@ pub struct PluginHandle {
 }
 
 impl PluginHandle {
-    /// Indicates that status of the plugin.
+
+    /// Returns the plugins status
     /// 
-    /// # Panics 
+   /// # Panics 
     /// 
     /// This function panics if the plugin describes by this handle does not 
     /// belong to the current module.
-    #[must_use]
     pub fn status(&self) -> PluginStatus {
         assert_eq!(
             self.mod_id,
@@ -105,7 +94,7 @@ impl PluginHandle {
              self.mod_id, 
              module_id()
         );
-        with_mod_ctx(|ctx| ctx.plugin_status(self))
+        with_mod_ctx(|ctx| ctx.status(self))
     }
 
     /// Removes this plugin from the module.
@@ -149,16 +138,13 @@ impl ModuleContext {
         &self,
         plugin: T,
         priority: usize,
-        policy: PluginPanicPolicy,
     ) -> PluginHandle {
         let entry = PluginEntry {
             id: 0,
-            gen: 0,
             core: Some(Box::new(plugin)),
             state: PluginState::JustCreated,
             typ: TypeId::of::<T>(),
             priority,
-            policy,
         };
 
         let id = self.plugins
@@ -187,16 +173,9 @@ impl ModuleContext {
             .remove(handle.id);
     }
 
-    /// Refer to [`PluginHandle::status`]
-    ///
-    /// # Panics
-    ///
-    /// This function panics, if the handle in invalid.
-    pub fn plugin_status(&self, handle: &PluginHandle) -> PluginStatus {
-        self.plugins
-            .try_write()
-            .expect("Failed to fetch write lock: remove_plugin")
-            .status(handle.id)
+    /// Returns the plugin status
+    pub fn status(&self, handle: &PluginHandle) -> PluginStatus {
+        self.plugins.try_read().expect("failed to aquire read lock: plugin_status").status(handle.id)
     }
 
     /// Returns the plugin state mutably.

@@ -19,7 +19,7 @@ fn main() {
     );
     app.include_par_file("examples/utils/init.par");
 
-    let rt = Runtime::new_with(app, RuntimeOptions::seeded(0x123).quiet());
+    let rt = Builder::seeded(0x123).quiet().build(app);
     let (app, time, p) = rt.run().unwrap();
 
     let topo = app.globals().topology.lock().unwrap().clone();

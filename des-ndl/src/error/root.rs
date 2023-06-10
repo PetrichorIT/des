@@ -10,7 +10,6 @@ use crate::resource::SourceMap;
 
 pub type RootResult<T> = Result<T, RootError>;
 
-#[derive(Debug)]
 pub struct RootError {
     pub errors: Errors,
     pub smap: SourceMap,
@@ -151,5 +150,10 @@ impl fmt::Display for RootError {
             error.fmt(&self.smap, &mut buffer)?;
         }
         write!(f, "{}", String::from_utf8_lossy(buffer.as_slice()))
+    }
+}
+impl fmt::Debug for RootError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        <Self as fmt::Display>::fmt(self, f)
     }
 }

@@ -77,7 +77,7 @@ fn stateless_module_shudown() {
     let gate = module.create_gate("in", GateServiceType::Input);
 
     rt.register_module(module);
-    let mut rt = Runtime::new(rt);
+    let mut rt = Builder::seeded(123).build(rt);
     rt.add_message_onto(
         gate,
         Message::new().build(),
@@ -132,7 +132,7 @@ fn stateless_module_restart() {
     let gate = module.create_gate("in", GateServiceType::Input);
 
     rt.register_module(module);
-    let mut rt = Runtime::new(rt);
+    let mut rt = Builder::seeded(123).build(rt);
     rt.add_message_onto(
         gate.clone(),
         Message::new().id(9).build(),
@@ -201,7 +201,7 @@ fn statefull_module_restart() {
     let gate = module.create_gate("in", GateServiceType::Input);
 
     rt.register_module(module);
-    let mut rt = Runtime::new(rt);
+    let mut rt = Builder::seeded(123).build(rt);
     rt.add_message_onto(
         gate.clone(),
         Message::new().id(9).build(),
@@ -249,7 +249,7 @@ fn shutdown_via_async_handle() {
 
     let module = ShutdownViaHandleModule::build_named(ObjectPath::from("RootModule"), &mut rt);
     rt.register_module(module);
-    let rt = Runtime::new(rt);
+    let rt = Builder::seeded(123).build(rt);
 
     let _ = rt.run().unwrap();
     assert_eq!(DROPPED_SHUTDOWN_VIA_HANDLE.load(Ordering::SeqCst), 1)
@@ -293,7 +293,7 @@ fn restart_via_async_handle() {
 
     let module = RestartViaHandleModule::build_named(ObjectPath::from("RootModule"), &mut rt);
     rt.register_module(module);
-    let rt = Runtime::new(rt);
+    let rt = Builder::seeded(123).build(rt);
 
     let _ = rt.run().unwrap();
     assert_eq!(DROPPED_RESTART_VIA_HANDLE.load(Ordering::SeqCst), 2)
@@ -368,7 +368,7 @@ fn shutdown_will_ignore_incoming() {
     let module =
         WillIgnoreInncomingInDowntime::build_named(ObjectPath::from("RootModule"), &mut rt);
     rt.register_module(module);
-    let rt = Runtime::new(rt);
+    let rt = Builder::seeded(123).build(rt);
 
     let _ = rt.run().unwrap();
 }
@@ -478,7 +478,7 @@ fn shutdown_will_drop_transiting() {
     app.register_module(pong);
     app.register_module(transit);
 
-    let rt = Runtime::new_with(app, RuntimeOptions::seeded(123).max_itr(500));
+    let rt = Builder::seeded(123).max_itr(500).build(app);
     let _ = rt.run().unwrap();
 }
 
@@ -533,6 +533,6 @@ fn shutdown_will_drop_transiting_delayed_channels() {
     app.register_module(pong);
     app.register_module(transit);
 
-    let rt = Runtime::new_with(app, RuntimeOptions::seeded(123).max_itr(500));
+    let rt = Builder::seeded(123).max_itr(500).build(app);
     let _ = rt.run().unwrap();
 }

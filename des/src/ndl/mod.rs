@@ -37,7 +37,7 @@
 //!             return;
 //!         },
 //!     };
-//!     let rt = Runtime::new(NetworkApplication::new(app));
+//!     let rt = Builder::new().build(NetworkApplication::new(app));
 //!     let _ = rt.run();
 //! }
 //! ```
@@ -77,6 +77,12 @@ pub struct NdlApplication {
 }
 
 impl NdlApplication {
+    /// Turns the NDL builder into a `NetworkApplication`, ready to be
+    /// used by a `Runtime`.
+    pub fn into_app(self) -> NetworkApplication<NdlApplication> {
+        NetworkApplication::new(self)
+    }
+
     /// Returns a handle to the simulated network.
     ///
     /// This function returns None, if the network was not yet created.

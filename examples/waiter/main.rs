@@ -157,10 +157,7 @@ fn main() {
         busy_time: SimTime::ZERO,
     };
 
-    let opts = RuntimeOptions::seeded(0x42069);
-
-    let mut rt = Runtime::new_with(app, opts);
-
+    let mut rt = Builder::seeded(0x42069).build(app);
     // Create first event
     let l = rt.app.l;
     let dur = Duration::from_secs_f64(expdist(&mut rt, l));

@@ -5,14 +5,6 @@ version = "0.1.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[[bin]]
-name = "t-metrics"
-path = "metrics/main.rs"
-
-[[bin]]
-name = "t-metrics2"
-path = "metrics2/main.rs"
-required-features = ["des/metrics"]
 
 [[bin]]
 name = "t-waiter"
@@ -56,7 +48,7 @@ path = "ndl2/main.rs"
 
 [dependencies]
 async-trait = "*"
-des = {path = "../des", features = ["full"]}
+des = { path = "../des", features = ["full"] }
 rand = "*"
 tracing = "*"
 tokio = "*"

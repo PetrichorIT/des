@@ -1,4 +1,3 @@
-use std::panic;
 use std::sync::atomic::Ordering::SeqCst;
 
 use crate::{
@@ -7,7 +6,6 @@ use crate::{
         gate::GateServiceType,
         message::{Message},
         module::with_mod_ctx_lock,
-        plugin::UnwindSafeBox,
         runtime::buf_process,
         NetworkApplication,
     },
@@ -167,7 +165,7 @@ impl HandleMessageEvent {
     where
         A: EventLifecycle<NetworkApplication<A>>,
     {
-       enter_scope(self.module.scope_token());
+        enter_scope(self.module.scope_token());
 
         let mut message = self.message;
         message.header.receiver_module_id = self.module.ctx.id;
@@ -268,23 +266,10 @@ impl ModuleRef {
         ctx.plugins.write().being_upstream(false);
         loop {
             let plugin = ctx.plugins.write().next_upstream();
-            let Some(plugin) = plugin else { break };
-            let plugin = UnwindSafeBox(plugin);
+            let Some(mut plugin) = plugin else { break };
 
-            let result = panic::catch_unwind(move || {
-                let mut plugin = plugin;
-                plugin.0.event_start();
-                plugin
-            });
-
-            match result {
-                Ok(plugin) => {
-                    ctx.plugins.write().put_back_upstream(plugin.0);
-                }
-                Err(p) => {
-                    ctx.plugins.write().paniced_upstream(p);
-                }
-            }
+            plugin.event_start();
+            ctx.plugins.write().put_back_upstream(plugin);   
         }
 
         // Reset the upstream for message parsing
@@ -294,29 +279,16 @@ impl ModuleRef {
         while let Some(moved_message) = msg.take() {
             // log::trace!("capture clause");
             let plugin = ctx.plugins.write().next_upstream();
-            let Some(plugin) = plugin else {
+            let Some(mut plugin) = plugin else {
                 // log::info!("noplugin");
                 msg = Some(moved_message);
                 break
             };
-            let plugin = UnwindSafeBox(plugin);
-
-            let result = panic::catch_unwind(move || {
-                let mut plugin = plugin;
-                let ret = plugin.0.capture_incoming(moved_message);
-                (ret, plugin)
-            });
-
-            match result {
-                Ok((remaining_msg, plugin)) => {
-                    // log::trace!("returned some = {}", remaining_msg.is_some());
-                    msg = remaining_msg;
-                    ctx.plugins.write().put_back_upstream(plugin.0);
-                }
-                Err(p) => {
-                    ctx.plugins.write().paniced_upstream(p);
-                }
-            }
+           
+            let rem_msg = plugin.capture_incoming(moved_message);
+            // log::trace!("returned some = {}", remaining_msg.is_some());
+            msg = rem_msg;
+            ctx.plugins.write().put_back_upstream(plugin); 
         }
         msg
     }
@@ -327,24 +299,11 @@ impl ModuleRef {
         ctx.plugins.write().begin_main_downstream();
         loop {
             let plugin = ctx.plugins.write().next_downstream();
-            let Some(plugin) = plugin else { break };
-            let plugin = UnwindSafeBox(plugin);
+            let Some(mut plugin) = plugin else { break };
 
-            let result = panic::catch_unwind(move || {
-                let mut plugin = plugin;
-                plugin.0.event_end();
-                plugin
-            });
-
-            match result {
-                Ok(plugin) => {
-                    ctx.plugins.write().put_back_downstream(plugin.0, true);
-                }
-                Err(p) => {
-                    ctx.plugins.write().paniced_downstream(p);
-                    continue;
-                }
-            }
+            plugin.event_end();
+            ctx.plugins.write().put_back_downstream(plugin, true);
+               
         }
     }
 

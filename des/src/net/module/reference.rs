@@ -330,13 +330,27 @@ impl ModuleRef {
         let mut ids = Vec::new();
 
         for (i, item) in next_hops.into_iter().enumerate() {
-            let gate = Gate::new(self, name, typ, size, i, channel.clone(), item);
-            ids.push(GateRef::clone(&gate));
-
-            self.ctx.gates.write().push(gate);
+            ids.push(self.create_raw_gate(name, typ, size, i, channel.clone(), item));
         }
 
         ids
+    }
+
+    /// Creates a gate on the current module, returning its ID.
+    ///
+    #[must_use]
+    pub fn create_raw_gate(
+        &self,
+        name: &str,
+        typ: GateServiceType,
+        size: usize,
+        pos: usize,
+        channel: Option<ChannelRef>,
+        next: Option<GateRef>,
+    ) -> GateRef {
+        let gate = Gate::new(self, name, typ, size, pos, channel, next);
+        self.ctx.gates.write().push(gate.clone());
+        gate
     }
 }
 

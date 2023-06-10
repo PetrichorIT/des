@@ -1,4 +1,0 @@
-	instant_queue_size: Mean:   0.001 with derivation   0.032 (min:   0.000 max:   1.000 len: 1001)
-	bucket_queue_size: Mean:   4.995 with derivation   0.158 (min:   0.000 max:   5.000 len: 1001)
-	event_timespan: Mean:   1.000 with derivation   0.000 (min:   0.000 max:   1.000 len: 1/1004)
-	instant_event_prec: 0.999000999000999

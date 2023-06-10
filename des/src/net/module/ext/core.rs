@@ -38,8 +38,15 @@ impl AsyncCoreExt {
         let (wtx, wrx) = unbounded_channel();
         let (stx, srx) = unbounded_channel();
 
+        #[allow(unused_mut)]
+        let mut builder = Builder::new_current_thread();
+
+        #[cfg(feature = "unstable-tokio-enable-time")]
+        builder.enable_time();
+
         Self {
-            rt: Rt::Builder(Builder::new_current_thread()),
+            rt: Rt::Builder(builder),
+
             driver: Some(Driver::new()),
 
             wait_queue_tx: wtx,

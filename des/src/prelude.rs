@@ -6,8 +6,8 @@
 // # Generic core exports
 //
 
+pub use crate::runtime::Builder;
 pub use crate::runtime::Runtime;
-pub use crate::runtime::RuntimeOptions;
 pub use crate::runtime::RuntimeResult;
 
 pub use crate::time::Duration;
@@ -20,18 +20,6 @@ pub use crate::runtime::EventSet;
 
 pub use crate::runtime::random;
 pub use crate::runtime::sample;
-
-#[allow(deprecated)]
-pub use crate::runtime::sim_time;
-
-//
-// # Metrics & Misc
-//
-
-pub use crate::stats::OutVec;
-#[doc(hidden)]
-pub use crate::stats::Statistic;
-pub use crate::stats::StdDev;
 
 //
 // # feature = "net"

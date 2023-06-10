@@ -247,7 +247,7 @@
 //! fn main() {
 //!     # return;
 //!     let app = NdlApplication::new("main.ndl", registry![Ping, Pong, MyTestCase]).unwrap();
-//!     let rt = Runtime::new(NetworkApplication::new(app));
+//!     let rt = Builder::new().build(NetworkApplication::new(app));
 //!     let result = rt.run();
 //!     println!("{:?}", result);
 //! }

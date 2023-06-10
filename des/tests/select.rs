@@ -41,7 +41,7 @@ fn deterministic_branching() {
 
         let module = Main::build_named(ObjectPath::from("root"), &mut rt);
         rt.register_module(module);
-        let rt = Runtime::new_with(rt, RuntimeOptions::seeded(123));
+        let rt = Builder::seeded(123).build(rt);
         let v = rt.run();
         assert!(matches!(v, RuntimeResult::EmptySimulation { .. }));
     }

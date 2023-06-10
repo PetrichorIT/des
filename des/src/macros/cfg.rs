@@ -70,26 +70,6 @@ macro_rules! cfg_not_multi_threaded {
     }
 }
 
-macro_rules! cfg_metrics {
-    ($($item:item)*) => {
-        $(
-            #[cfg(feature = "metrics")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "metrics")))]
-            $item
-        )*
-    }
-}
-
-macro_rules! cfg_metrics_rt_full {
-    ($($item:item)*) => {
-        $(
-            #[cfg(feature = "metrics-rt-full")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "metrics-rt-full")))]
-            $item
-        )*
-    }
-}
-
 macro_rules! cfg_cqueue {
     ($($item:item)*) => {
         $(

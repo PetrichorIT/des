@@ -44,6 +44,6 @@ fn main() {
         }
     };
     let app = NetworkApplication::new(ndl);
-    let rt = Runtime::new_with(app, RuntimeOptions::seeded(123).max_itr(10));
+    let rt = Builder::seeded(123).max_itr(10).build(app);
     let _ = rt.run();
 }

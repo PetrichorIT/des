@@ -48,15 +48,10 @@ fn main() {
         })
         .unwrap_or(400);
 
-    let rt = Runtime::new_with(
-        App {
-            event_delay,
-            num_events,
-        },
-        RuntimeOptions::seeded(123)
-            .include_env()
-            .max_time(SimTime::from_duration(Duration::from_secs(100_000))),
-    );
+    let rt = Builder::seeded(123).max_time(100_000.0.into()).build(App {
+        event_delay,
+        num_events,
+    });
 
     let _ = rt.run();
 }
