@@ -264,7 +264,7 @@ where
 
         let handle = super::async_sim_end_join_take().expect("Crime");
         let _g = rt.0.enter();
-        assert!(handle.is_finished());
+        assert!(handle.is_finished(), "at_sim_end() could not complete, since it is stuck at some await point");
         rt.0.block_on(handle).unwrap();
         drop(_g);
     }
