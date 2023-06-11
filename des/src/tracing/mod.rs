@@ -109,8 +109,12 @@ struct Scope {
     fmt: Box<dyn TracingFormatter>,
 }
 
-struct SpanInfo {
-    formatted: String,
+/// Input to a formatter to work with spans.
+#[derive(Debug)]
+pub struct SpanInfo {
+    /// The result produced by `TracingFormatter::fmt_span`
+    pub formatted: String,
+    name: &'static str,
     sc: usize,
 }
 
@@ -241,7 +245,7 @@ impl<P: ScopeConfigurationPolicy + 'static> tracing::Subscriber for Subscriber<P
             .stack
             .read()
             .iter()
-            .map(|id| spans.get(id).unwrap().formatted.as_str())
+            .map(|id| spans.get(id).unwrap())
             .collect::<Vec<_>>();
 
         let mut record = TracingRecord {
@@ -307,6 +311,7 @@ impl SpanInfo {
         fmt.fmt_new_span(&mut buffer, attr).unwrap();
 
         Self {
+            name: attr.metadata().name(),
             formatted: String::from_utf8_lossy(buffer.as_slice()).into_owned(),
             sc: 1,
         }

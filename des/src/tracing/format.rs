@@ -4,7 +4,7 @@ use tracing::{field::Visit, span::Attributes, Event, Level};
 
 use crate::prelude::SimTime;
 
-use super::output::TracingRecord;
+use super::{output::TracingRecord, SpanInfo};
 
 /// A formatter for a tracing subscriber scope.
 pub trait TracingFormatter {
@@ -94,11 +94,11 @@ impl ColorfulTracingFormatter {
         out.reset()
     }
 
-    fn fmt_spans(&mut self, out: &mut Buffer, spans: &[&str]) -> Result<()> {
+    fn fmt_spans(&mut self, out: &mut Buffer, spans: &[&SpanInfo]) -> Result<()> {
         out.set_color(ColorSpec::new().set_bold(true))?;
         let end = spans.len();
         for (i, span) in spans.into_iter().enumerate() {
-            write!(out, "{}", span)?;
+            write!(out, "{}", span.formatted)?;
             if i + 1 < end {
                 write!(out, ":")?;
             } else {
@@ -176,7 +176,7 @@ impl TracingFormatter for NoColorFormatter {
         write!(out, ": ")?;
 
         for span in record.spans {
-            write!(out, "{} ", span)?;
+            write!(out, "{} ", span.formatted)?;
         }
 
         struct Vis<'a> {

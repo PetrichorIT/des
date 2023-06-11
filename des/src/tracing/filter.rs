@@ -58,7 +58,7 @@ impl FilterDiretive {
         }
 
         if let Some(ref span) = self.span {
-            if !record.spans.contains(&&span[..]) {
+            if !record.spans.iter().any(|s| s.name == span){
                 return lvl;
             }
         }
