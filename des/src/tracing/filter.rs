@@ -52,7 +52,7 @@ pub(super) struct FilterDiretive {
 impl FilterDiretive {
     fn level_filter_for(&self, lvl: LevelFilter, record: &TracingRecord) -> LevelFilter {
         if let Some(ref target) = self.target {
-            if record.target != target {
+            if !record.target.starts_with(target) {
                 return lvl;
             }
         }

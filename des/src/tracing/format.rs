@@ -85,9 +85,12 @@ impl ColorfulTracingFormatter {
             write!(out, "{}", scope)?;
         }
 
-        out.set_color(ColorSpec::new().set_fg(Some(color)).set_bold(true))?;
-        write!(out, " ({target})")?;
-        write!(out, ":")?;
+        out.set_color(
+            ColorSpec::new()
+                .set_fg(Some(color))
+                .set_fg(Some(TARGET_COLOR)),
+        )?;
+        write!(out, " {target}")?;
         out.reset()
     }
 
@@ -136,6 +139,8 @@ impl ColorfulTracingFormatter {
 }
 
 const PARENS_COLOR: Color = Color::Rgb(0x7f, 0x8c, 0x8d);
+const TARGET_COLOR: Color = Color::Rgb(55, 55, 55);
+
 const fn get_level_color(level: Level) -> Color {
     match level {
         Level::DEBUG => Color::Magenta,

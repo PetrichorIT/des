@@ -252,10 +252,7 @@ impl<P: ScopeConfigurationPolicy + 'static> tracing::Subscriber for Subscriber<P
             event,
         };
 
-        dbg!(&record);
-
         let allowed_max_level = self.filters.level_filter_for(&record);
-        dbg!(&allowed_max_level);
         if allowed_max_level < *event.metadata().level() {
             return;
         }
@@ -266,6 +263,7 @@ impl<P: ScopeConfigurationPolicy + 'static> tracing::Subscriber for Subscriber<P
             output.write(&mut **fmt, record).unwrap();
         } else {
             // TODO: todo!()
+            unimplemented!("no scope found")
         }
     }
 
