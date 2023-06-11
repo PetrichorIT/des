@@ -1,11 +1,12 @@
 //! Structured event tracing with custom context
 
+// mod filter;
 mod filter;
 mod format;
 mod output;
 mod policy;
 
-use self::{filter::TargetFilters, policy::DefaultScopeConfigurationPolicy};
+use self::{filter::Filters, policy::DefaultScopeConfigurationPolicy};
 use crate::{
     prelude::SimTime,
     sync::{Mutex, RwLock},
@@ -20,7 +21,10 @@ use std::{
 };
 use termcolor::BufferWriter;
 use tracing::{
-    level_filters::STATIC_MAX_LEVEL, metadata::LevelFilter, span, subscriber::SetGlobalDefaultError,
+    level_filters::STATIC_MAX_LEVEL,
+    metadata::LevelFilter,
+    span,
+    subscriber::{with_default, SetGlobalDefaultError},
 };
 
 pub use self::format::ColorfulTracingFormatter;
@@ -51,6 +55,8 @@ pub fn new_scope(s: &str) -> ScopeToken {
     let lock = SCOPES.lock();
     if let Some(scopes) = &*lock {
         scopes.send((token, s.to_string())).expect("Failed to send");
+    } else {
+        // WARNING MAYBE
     }
     token
 }
@@ -85,7 +91,7 @@ pub fn leave_scope() {
 pub struct Subscriber<P: ScopeConfigurationPolicy> {
     policy: P,
     scopes: RwLock<FxHashMap<u64, Scope>>,
-    filters: TargetFilters,
+    filters: Filters,
     max_log_level: LevelFilter,
 
     scopes_tx: Sender<(ScopeToken, String)>,
@@ -103,8 +109,12 @@ struct Scope {
     fmt: Box<dyn TracingFormatter>,
 }
 
-struct SpanInfo {
-    formatted: String,
+/// Input to a formatter to work with spans.
+#[derive(Debug)]
+pub struct SpanInfo {
+    /// The result produced by `TracingFormatter::fmt_span`
+    pub formatted: String,
+    name: &'static str,
     sc: usize,
 }
 
@@ -116,7 +126,7 @@ impl<P: ScopeConfigurationPolicy> Subscriber<P> {
         Self {
             policy,
             scopes: RwLock::new(FxHashMap::with_hasher(FxBuildHasher::default())),
-            filters: TargetFilters::new(true),
+            filters: Filters::from_env().expect("Failed to parse from env"),
             max_log_level: STATIC_MAX_LEVEL,
 
             scopes_tx,
@@ -139,7 +149,7 @@ impl<P: ScopeConfigurationPolicy> Subscriber<P> {
 
     /// Adds a target filter in textual repr to the subscriber.
     pub fn with_filter(mut self, filter: impl AsRef<str>) -> Self {
-        self.filters.parse_str(filter.as_ref());
+        self.filters = filter.as_ref().parse().expect("Failed to parse");
         self
     }
 
@@ -152,6 +162,18 @@ impl<P: ScopeConfigurationPolicy> Subscriber<P> {
         tracing::subscriber::set_global_default(self)?;
         let _ = SCOPES.lock().replace(tx);
         Ok(())
+    }
+
+    /// Set the subscriber as the default in the closure
+    pub fn with<R>(self, f: impl FnOnce() -> R) -> R
+    where
+        P: 'static,
+    {
+        let tx = self.scopes_tx.clone();
+        let prev = SCOPES.lock().replace(tx);
+        let ret = with_default(self, f);
+        *SCOPES.lock() = prev;
+        ret
     }
 }
 
@@ -210,18 +232,6 @@ impl<P: ScopeConfigurationPolicy + 'static> tracing::Subscriber for Subscriber<P
 
     fn event(&self, event: &tracing::Event<'_>) {
         // (-1) Target
-        let target = if Some(event.metadata().target()) == event.metadata().module_path() {
-            None
-        } else {
-            Some(event.metadata().target())
-        };
-
-        if let Some(target) = target {
-            let allowed_max_level = self.filters.filter_for(target, LevelFilter::TRACE);
-            if allowed_max_level < *event.metadata().level() {
-                return;
-            }
-        }
 
         // (0) Identify current scope
         self.check_scopes();
@@ -235,16 +245,21 @@ impl<P: ScopeConfigurationPolicy + 'static> tracing::Subscriber for Subscriber<P
             .stack
             .read()
             .iter()
-            .map(|id| spans.get(id).unwrap().formatted.as_str())
+            .map(|id| spans.get(id).unwrap())
             .collect::<Vec<_>>();
 
         let mut record = TracingRecord {
             time: SimTime::now(),
             scope: None,
-            target,
+            target: event.metadata().target(),
             spans: &active,
             event,
         };
+
+        let allowed_max_level = self.filters.level_filter_for(&record);
+        if allowed_max_level < *event.metadata().level() {
+            return;
+        }
 
         if let Some(Scope { output, fmt, path }) = scope {
             // must be in this order because brwchk
@@ -252,6 +267,7 @@ impl<P: ScopeConfigurationPolicy + 'static> tracing::Subscriber for Subscriber<P
             output.write(&mut **fmt, record).unwrap();
         } else {
             // TODO: todo!()
+            unimplemented!("no scope found")
         }
     }
 
@@ -295,6 +311,7 @@ impl SpanInfo {
         fmt.fmt_new_span(&mut buffer, attr).unwrap();
 
         Self {
+            name: attr.metadata().name(),
             formatted: String::from_utf8_lossy(buffer.as_slice()).into_owned(),
             sc: 1,
         }

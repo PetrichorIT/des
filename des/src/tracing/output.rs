@@ -5,7 +5,7 @@ use tracing::Event;
 
 use crate::prelude::SimTime;
 
-use super::format::TracingFormatter;
+use super::{format::TracingFormatter, SpanInfo};
 
 /// A processes tracing event.
 #[derive(Debug)]
@@ -16,9 +16,9 @@ pub struct TracingRecord<'a> {
     pub scope: Option<&'a str>,
     /// The provided target parameters, if the target differs
     /// from the module path.
-    pub target: Option<&'a str>,
+    pub target: &'a str,
     /// A textual repr of all active spans.
-    pub spans: &'a [&'a str],
+    pub spans: &'a [&'a SpanInfo],
     /// The source event
     pub event: &'a Event<'a>,
 }

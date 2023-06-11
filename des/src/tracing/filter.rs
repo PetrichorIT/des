@@ -1,77 +1,259 @@
-use fxhash::{FxBuildHasher, FxHashMap};
-use std::fmt::Debug;
-use tracing::metadata::LevelFilter;
+use std::{str::FromStr, error::Error, fmt::{Display, Debug}, env};
+use tracing::{metadata::LevelFilter, level_filters::STATIC_MAX_LEVEL};
 
-const ENV_RUST_LOG: &str = "RUST_LOG";
+use super::TracingRecord;
 
-#[derive(Debug, Clone)]
-pub(super) struct TargetFilters {
-    matches: FxHashMap<String, LevelFilter>,
-    fallback: Vec<(String, LevelFilter)>,
+pub(super) struct Filters {
+    directives: Vec<FilterDiretive>,
 }
 
-impl TargetFilters {
-    /// Creates a new filter policy from env
-    pub(super) fn new(parse_env: bool) -> Self {
-        let mut this = TargetFilters {
-            matches: FxHashMap::with_hasher(FxBuildHasher::default()),
-            fallback: Vec::new(),
-        };
-        if parse_env {
-            let Ok(s) = std::env::var(ENV_RUST_LOG) else {
-                return this
-            };
-            this.parse_str(&s);
-        }
-        this
+impl Filters {
+    pub(super) fn from_env() -> Result<Self, FilterDirectiveParsingError> {
+        let env = env::var("RUST_LOG").unwrap_or(String::new());
+        env.parse()
     }
 
-    pub(super) fn parse_str(&mut self, s: &str) {
-        for part in s.split(',') {
-            let parts = part.split('=').collect::<Vec<_>>();
-            if parts.len() != 2 {
+    pub(super) fn level_filter_for(&self, record: &TracingRecord) -> LevelFilter {
+        let mut lvl = STATIC_MAX_LEVEL;
+        for directive in &self.directives {
+            lvl = directive.level_filter_for(lvl, record);
+        }
+        lvl
+    }
+}
+
+impl FromStr for Filters {
+    type Err = FilterDirectiveParsingError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let split = s.split(',');
+        let mut directives = Vec::new();
+        for directive in split {
+            if directive.is_empty() {
                 continue;
             }
 
-            let mut capture = parts[0].to_string();
+            directives.push(FilterDiretive::from_str(directive.trim())?);
+        }
 
-            let filter = match parts[1].to_lowercase().as_str() {
-                "trace" => LevelFilter::TRACE,
-                "debug" => LevelFilter::DEBUG,
-                "info" => LevelFilter::INFO,
-                "warn" => LevelFilter::WARN,
-                "error" => LevelFilter::ERROR,
-                "off" => LevelFilter::OFF,
-                _ => continue,
-            };
+        Ok(Self {
+            directives
+        })
+    }
+}
 
-            if capture.ends_with("*") {
-                capture.pop();
-                match self
-                    .fallback
-                    .binary_search_by(|e| capture.len().cmp(&e.0.len()))
-                {
-                    Ok(i) | Err(i) => self.fallback.insert(i, (capture, filter)),
-                };
-            } else {
-                self.matches.insert(capture, filter);
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct FilterDiretive {
+    target: Option<String>,
+    span: Option<String>,
+    fields: Option<SpanFields>,
+    level: LevelFilter,
+}
+
+impl FilterDiretive {
+    fn level_filter_for(&self, lvl: LevelFilter, record: &TracingRecord) -> LevelFilter {
+        if let Some(ref target) = self.target {
+            if !record.target.starts_with(target) {
+                return lvl;
             }
         }
+
+        if let Some(ref span) = self.span {
+            if !record.spans.iter().any(|s| s.name == span){
+                return lvl;
+            }
+        }
+
+        // TODO: fields
+
+        self.level
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SpanFields {
+    key: String,
+    value: String,
+}
+
+impl FromStr for FilterDiretive {
+    type Err = FilterDirectiveParsingError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let Some((mut s, lvl)) = s.split_once('=') else {
+            return Ok(FilterDiretive { 
+                target: None, 
+                span: None, 
+                fields: None, 
+                level: parse_level(s)?
+            });
+        };
+
+        let level = parse_level(lvl)?;
+
+        let Some(target) = read_until(&mut s, '[') else {            
+            return Ok(FilterDiretive {
+                target: Some(s.to_string()),
+                span: None,
+                fields: None,
+                level
+            });
+        };
+
+        assert!(s.ends_with(']'));
+        s = s.trim_end_matches("]");
+        let target = if target.is_empty() { None } else { Some(target.to_string()) };
+
+        let Some(span) = read_until(&mut s, '{') else {
+            return Ok(FilterDiretive { 
+                target,
+                span: Some(s.to_string()), 
+                fields: None, 
+                level 
+            });
+        };
+
+        assert!(s.ends_with('}'));
+        s = s.trim_end_matches("}");
+        let span = if span.is_empty() { None } else { Some(span.to_string()) };
+
+        Ok(FilterDiretive { 
+            target,
+            span, 
+            fields: Some(SpanFields::from_str(s)?), 
+            level
+        })
+    }
+}
+
+
+impl FromStr for SpanFields {
+    type Err = FilterDirectiveParsingError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let Some((l, mut r)) = s.split_once('=') else {
+            return Err(FilterDirectiveParsingError::MissingKeyValue)
+        };
+        assert!(r.starts_with('"'));
+        assert!(r.ends_with('"'));
+
+        r = r.trim_start_matches('"');
+        r = r.trim_end_matches('"');
+
+        Ok(Self { key: l.to_string(), value: r.to_string() })
+    }
+}
+
+fn parse_level(lvl: &str) -> Result<LevelFilter, FilterDirectiveParsingError> {
+    match lvl.to_lowercase().as_str() {
+        "error" => Ok(LevelFilter::ERROR),
+        "warn" => Ok(LevelFilter::WARN),
+        "info" => Ok(LevelFilter::INFO),
+        "debug" => Ok(LevelFilter::DEBUG),
+        "trace" => Ok(LevelFilter::TRACE),
+        "off" => Ok(LevelFilter::OFF),
+        _ => return Err(FilterDirectiveParsingError::InvalidFilterLevel)
+    }
+}
+
+fn read_until<'a>(s: &mut &'a str, p: char) -> Option<&'a str> {
+    let mut offset = 0;
+    for c in s.chars() {
+        if c == p {
+            let fwd = &s[..offset];
+            *s = &s[(offset + c.len_utf8())..];
+            return Some(fwd);
+        }
+        offset += c.len_utf8()
     }
 
-    /// Constructs a filter from the
-    pub(super) fn filter_for(&self, s: &str, base: LevelFilter) -> LevelFilter {
-        self.matches
-            .get(s)
-            .copied()
-            .or_else(|| {
-                for filter in &self.fallback {
-                    if s.starts_with(&filter.0) {
-                        return Some(filter.1);
-                    }
-                }
-                None
-            })
-            .unwrap_or(base)
+    None
+}
+
+#[derive(Debug, Clone)]
+pub(super) enum FilterDirectiveParsingError {
+    InvalidFilterLevel,
+    MissingKeyValue
+}
+
+impl Error for FilterDirectiveParsingError {}
+
+impl Display for FilterDirectiveParsingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        <Self as Debug>::fmt(&self, f)
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn levels() -> Result<(), FilterDirectiveParsingError> {
+        assert_eq!(parse_level("info")?, LevelFilter::INFO);
+        assert_eq!(parse_level("WARN")?, LevelFilter::WARN);
+        assert_eq!(parse_level("Trace")?, LevelFilter::TRACE);
+        assert_eq!(parse_level("debug")?, LevelFilter::DEBUG);
+        assert_eq!(parse_level("off")?, LevelFilter::OFF);
+        assert_eq!(parse_level("Error")?, LevelFilter::ERROR);
+        Ok(())
+    }
+
+    #[test]
+    fn pure_target_filters() -> Result<(), FilterDirectiveParsingError> {
+        let flt = "target=info".parse::<FilterDiretive>()?;
+        assert_eq!(flt, FilterDiretive {
+            target: Some("target".to_string()),
+            span: None,
+            fields: None,
+            level: LevelFilter::INFO
+        });
+
+        let flt = "with-dash=trace".parse::<FilterDiretive>()?;
+        assert_eq!(flt, FilterDiretive {
+            target: Some("with-dash".to_string()),
+            span: None,
+            fields: None,
+            level: LevelFilter::TRACE
+        });
+        Ok(())
+    }
+
+    #[test]
+    fn pure_span_filters() -> Result<(), FilterDirectiveParsingError> {
+        let flt = "[spanname]=info".parse::<FilterDiretive>()?;
+        assert_eq!(flt, FilterDiretive {
+            target: None,
+            span: Some("spanname".to_string()),
+            fields: None,
+            level: LevelFilter::INFO
+        });
+
+        let flt = "[with-dash]=trace".parse::<FilterDiretive>()?;
+        assert_eq!(flt, FilterDiretive {
+            target: None,
+            span: Some("with-dash".to_string()),
+            fields: None,
+            level: LevelFilter::TRACE
+        });
+        Ok(())
+    }
+
+    #[test]
+    fn mixed_target_span_filters() -> Result<(), FilterDirectiveParsingError> {
+        let flt = "target[spanname]=info".parse::<FilterDiretive>()?;
+        assert_eq!(flt, FilterDiretive {
+            target: Some("target".to_string()),
+            span: Some("spanname".to_string()),
+            fields: None,
+            level: LevelFilter::INFO
+        });
+
+        let flt = "with-[dash]=trace".parse::<FilterDiretive>()?;
+        assert_eq!(flt, FilterDiretive {
+            target: Some("with-".to_string()),
+            span: Some("dash".to_string()),
+            fields: None,
+            level: LevelFilter::TRACE
+        });
+        Ok(())
     }
 }

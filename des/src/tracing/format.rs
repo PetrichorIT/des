@@ -4,7 +4,7 @@ use tracing::{field::Visit, span::Attributes, Event, Level};
 
 use crate::prelude::SimTime;
 
-use super::output::TracingRecord;
+use super::{output::TracingRecord, SpanInfo};
 
 /// A formatter for a tracing subscriber scope.
 pub trait TracingFormatter {
@@ -76,7 +76,7 @@ impl ColorfulTracingFormatter {
         &mut self,
         out: &mut Buffer,
         scope: Option<&str>,
-        target: Option<&str>,
+        target: &str,
         level: Level,
     ) -> Result<()> {
         let color = get_level_color(level);
@@ -85,20 +85,20 @@ impl ColorfulTracingFormatter {
             write!(out, "{}", scope)?;
         }
 
-        out.set_color(ColorSpec::new().set_fg(Some(color)).set_bold(true))?;
-        if let Some(target) = target {
-            write!(out, " ({target})")?;
-        }
-
-        write!(out, ":")?;
+        out.set_color(
+            ColorSpec::new()
+                .set_fg(Some(color))
+                .set_fg(Some(TARGET_COLOR)),
+        )?;
+        write!(out, " {target}")?;
         out.reset()
     }
 
-    fn fmt_spans(&mut self, out: &mut Buffer, spans: &[&str]) -> Result<()> {
+    fn fmt_spans(&mut self, out: &mut Buffer, spans: &[&SpanInfo]) -> Result<()> {
         out.set_color(ColorSpec::new().set_bold(true))?;
         let end = spans.len();
         for (i, span) in spans.into_iter().enumerate() {
-            write!(out, "{}", span)?;
+            write!(out, "{}", span.formatted)?;
             if i + 1 < end {
                 write!(out, ":")?;
             } else {
@@ -139,6 +139,8 @@ impl ColorfulTracingFormatter {
 }
 
 const PARENS_COLOR: Color = Color::Rgb(0x7f, 0x8c, 0x8d);
+const TARGET_COLOR: Color = Color::Rgb(55, 55, 55);
+
 const fn get_level_color(level: Level) -> Color {
     match level {
         Level::DEBUG => Color::Magenta,
@@ -169,13 +171,12 @@ impl TracingFormatter for NoColorFormatter {
         if let Some(scope) = record.scope {
             write!(out, "{}", scope)?;
         }
-        if let Some(target) = record.target {
-            write!(out, " ({target})")?;
-        }
+
+        write!(out, " ({})", record.target)?;
         write!(out, ": ")?;
 
         for span in record.spans {
-            write!(out, "{} ", span)?;
+            write!(out, "{} ", span.formatted)?;
         }
 
         struct Vis<'a> {
