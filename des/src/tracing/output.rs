@@ -16,7 +16,7 @@ pub struct TracingRecord<'a> {
     pub scope: Option<&'a str>,
     /// The provided target parameters, if the target differs
     /// from the module path.
-    pub target: Option<&'a str>,
+    pub target: &'a str,
     /// A textual repr of all active spans.
     pub spans: &'a [&'a str],
     /// The source event

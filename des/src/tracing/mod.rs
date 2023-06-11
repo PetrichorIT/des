@@ -1,6 +1,7 @@
 //! Structured event tracing with custom context
 
 mod filter;
+mod filter2;
 mod format;
 mod output;
 mod policy;
@@ -210,17 +211,12 @@ impl<P: ScopeConfigurationPolicy + 'static> tracing::Subscriber for Subscriber<P
 
     fn event(&self, event: &tracing::Event<'_>) {
         // (-1) Target
-        let target = if Some(event.metadata().target()) == event.metadata().module_path() {
-            None
-        } else {
-            Some(event.metadata().target())
-        };
 
-        if let Some(target) = target {
-            let allowed_max_level = self.filters.filter_for(target, LevelFilter::TRACE);
-            if allowed_max_level < *event.metadata().level() {
-                return;
-            }
+        let allowed_max_level = self
+            .filters
+            .filter_for(event.metadata().target(), LevelFilter::TRACE);
+        if allowed_max_level < *event.metadata().level() {
+            return;
         }
 
         // (0) Identify current scope
@@ -241,7 +237,7 @@ impl<P: ScopeConfigurationPolicy + 'static> tracing::Subscriber for Subscriber<P
         let mut record = TracingRecord {
             time: SimTime::now(),
             scope: None,
-            target,
+            target: event.metadata().target(),
             spans: &active,
             event,
         };

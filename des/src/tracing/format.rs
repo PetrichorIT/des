@@ -76,7 +76,7 @@ impl ColorfulTracingFormatter {
         &mut self,
         out: &mut Buffer,
         scope: Option<&str>,
-        target: Option<&str>,
+        target: &str,
         level: Level,
     ) -> Result<()> {
         let color = get_level_color(level);
@@ -86,10 +86,7 @@ impl ColorfulTracingFormatter {
         }
 
         out.set_color(ColorSpec::new().set_fg(Some(color)).set_bold(true))?;
-        if let Some(target) = target {
-            write!(out, " ({target})")?;
-        }
-
+        write!(out, " ({target})")?;
         write!(out, ":")?;
         out.reset()
     }
@@ -169,9 +166,8 @@ impl TracingFormatter for NoColorFormatter {
         if let Some(scope) = record.scope {
             write!(out, "{}", scope)?;
         }
-        if let Some(target) = record.target {
-            write!(out, " ({target})")?;
-        }
+
+        write!(out, " ({})", record.target)?;
         write!(out, ": ")?;
 
         for span in record.spans {
