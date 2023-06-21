@@ -267,7 +267,8 @@ impl<P: ScopeConfigurationPolicy + 'static> tracing::Subscriber for Subscriber<P
             output.write(&mut **fmt, record).unwrap();
         } else {
             // TODO: todo!()
-            unimplemented!("no scope found")
+            // unimplemented!("no scope found")
+            eprintln!("no scope found")
         }
     }
 

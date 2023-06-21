@@ -3,7 +3,7 @@
 use super::{
     HandleMessageEvent, MessageAtGateEvent, NetworkApplication, NetworkApplicationGlobals,
 };
-use crate::net::module::{MOD_CTX, SETUP_FN};
+use crate::net::module::{with_mod_ctx, MOD_CTX, SETUP_FN};
 use crate::net::ModuleRestartEvent;
 use crate::net::{gate::GateRef, message::Message, NetEvents};
 use crate::prelude::{module_id, EventLifecycle, ModuleRef};
@@ -74,6 +74,8 @@ pub(crate) fn buf_send_at(mut msg: Message, gate: GateRef, send_time: SimTime) {
     // channels.
     let event = MessageAtGateEvent { gate, msg };
     event.handle_with_sink(&mut ctx.events);
+
+    crate::tracing::enter_scope(with_mod_ctx(|ctx| ctx.scope_token));
 }
 
 pub(crate) fn buf_schedule_at(msg: Message, arrival_time: SimTime) {

@@ -49,6 +49,7 @@ struct NodeInfo {
     connections: FxHashSet<String>,
 }
 
+#[derive(Debug, PartialEq, Eq)]
 enum NodeKind {
     BuilderAsync,
     ExternalT,

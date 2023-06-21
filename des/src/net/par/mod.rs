@@ -280,7 +280,7 @@ where
                 _phantom: PhantomData,
             }
         } else {
-            panic!()
+            panic!("{} does not exist", self.key);
         }
     }
 

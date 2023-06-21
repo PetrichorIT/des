@@ -166,10 +166,11 @@ where
                 // Use cloned handles to appease the brwchk
                 let module = rt.app.modules()[i].clone();
                 if stage < module.num_sim_start_stages() {
+                    module.activate();
+
                     #[cfg(feature = "tracing")]
                     tracing::info!("Calling at_sim_start({}).", stage);
 
-                    module.activate();
                     module.at_sim_start(stage);
                     module.deactivate(rt);
 
@@ -214,7 +215,7 @@ where
         {
             // Ensure all sim_start stages have finished
             for module in rt.app.module_list.iter().cloned().collect::<Vec<_>>() {
-                enter_scope(module.scope_token());
+                // enter_scope(module.scope_token());
 
                 module.activate();
                 module.finish_sim_end();
