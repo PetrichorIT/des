@@ -1,8 +1,9 @@
 use std::{str::FromStr, error::Error, fmt::{Display, Debug}, env};
-use tracing::{metadata::LevelFilter, level_filters::STATIC_MAX_LEVEL};
+use tracing::{metadata::LevelFilter, level_filters::STATIC_MAX_LEVEL, Metadata};
 
 use super::TracingRecord;
 
+#[derive(Debug)]
 pub(super) struct Filters {
     directives: Vec<FilterDiretive>,
 }
@@ -17,6 +18,14 @@ impl Filters {
         let mut lvl = STATIC_MAX_LEVEL;
         for directive in &self.directives {
             lvl = directive.level_filter_for(lvl, record);
+        }
+        lvl
+    }
+
+    pub(super) fn callsite_filter_for(&self, record: &Metadata) -> LevelFilter {
+        let mut lvl = STATIC_MAX_LEVEL;
+        for directive in &self.directives {
+            lvl = directive.callsite_filter_for(lvl, record);
         }
         lvl
     }
@@ -43,6 +52,7 @@ impl FromStr for Filters {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct FilterDiretive {
+    scope: Option<String>,
     target: Option<String>,
     span: Option<String>,
     fields: Option<SpanFields>,
@@ -51,6 +61,12 @@ pub(super) struct FilterDiretive {
 
 impl FilterDiretive {
     fn level_filter_for(&self, lvl: LevelFilter, record: &TracingRecord) -> LevelFilter {
+        if let Some(ref scope) = self.scope {
+            if !record.scope.map(|s| s.starts_with(scope)).unwrap_or(false) {
+                return lvl;
+            }
+        }
+       
         if let Some(ref target) = self.target {
             if !record.target.starts_with(target) {
                 return lvl;
@@ -63,7 +79,21 @@ impl FilterDiretive {
             }
         }
 
-        // TODO: fields
+        if let Some(ref fields) = self.fields { 
+            if !record.spans.iter().any(|s| s.fields.get(fields.key.as_str()) == Some(&fields.value)) {
+                return lvl;
+            }
+        }
+
+        self.level
+    }
+
+    fn callsite_filter_for(&self, lvl: LevelFilter, callsite: &Metadata) -> LevelFilter {
+        if let Some(ref target) = self.target {
+            if !callsite.module_path().map_or(false, |t| t.starts_with(target)) {
+                return lvl;
+            }
+        }
 
         self.level
     }
@@ -78,8 +108,9 @@ struct SpanFields {
 impl FromStr for FilterDiretive {
     type Err = FilterDirectiveParsingError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let Some((mut s, lvl)) = s.split_once('=') else {
+        let Some((mut s, lvl)) = s.rsplit_once('=') else {
             return Ok(FilterDiretive { 
+                scope: None,
                 target: None, 
                 span: None, 
                 fields: None, 
@@ -89,8 +120,9 @@ impl FromStr for FilterDiretive {
 
         let level = parse_level(lvl)?;
 
-        let Some(target) = read_until(&mut s, '[') else {            
+        let Some((scope_or_target, c)) = read_until_set(&mut s, &[':', '[']) else {
             return Ok(FilterDiretive {
+                scope: None,
                 target: Some(s.to_string()),
                 span: None,
                 fields: None,
@@ -98,12 +130,32 @@ impl FromStr for FilterDiretive {
             });
         };
 
-        assert!(s.ends_with(']'));
-        s = s.trim_end_matches("]");
-        let target = if target.is_empty() { None } else { Some(target.to_string()) };
+        let (target, scope) = if c == ':' {
+            let scope = nonempty_or_none(scope_or_target);
+
+            let Some(target) = read_until(&mut s, '[') else {            
+                return Ok(FilterDiretive {
+                    scope,
+                    target: nonempty_or_none(s),
+                    span: None,
+                    fields: None,
+                    level
+                });
+            };
+
+            assert!(s.ends_with(']'));
+            s = s.trim_end_matches("]");
+
+            (nonempty_or_none(target), scope)
+        } else {
+            assert!(s.ends_with(']'));
+            s = s.trim_end_matches("]");
+            (nonempty_or_none(scope_or_target), None)
+        };
 
         let Some(span) = read_until(&mut s, '{') else {
             return Ok(FilterDiretive { 
+                scope,
                 target,
                 span: Some(s.to_string()), 
                 fields: None, 
@@ -116,6 +168,7 @@ impl FromStr for FilterDiretive {
         let span = if span.is_empty() { None } else { Some(span.to_string()) };
 
         Ok(FilterDiretive { 
+            scope,
             target,
             span, 
             fields: Some(SpanFields::from_str(s)?), 
@@ -167,6 +220,28 @@ fn read_until<'a>(s: &mut &'a str, p: char) -> Option<&'a str> {
     None
 }
 
+fn read_until_set<'a>(s: &mut &'a str, p: &[char]) -> Option<(&'a str,char)> {
+    let mut offset = 0;
+    for c in s.chars() {
+        if p.contains(&c) {
+            let fwd = &s[..offset];
+            *s = &s[(offset + c.len_utf8())..];
+            return Some((fwd, c));
+        }
+        offset += c.len_utf8()
+    }
+
+    None
+}
+
+fn nonempty_or_none(s: &str) -> Option<String> {
+    if s.is_empty() {
+        None
+    } else {
+        Some(s.to_string())
+    }
+}
+
 #[derive(Debug, Clone)]
 pub(super) enum FilterDirectiveParsingError {
     InvalidFilterLevel,
@@ -200,7 +275,8 @@ mod tests {
     #[test]
     fn pure_target_filters() -> Result<(), FilterDirectiveParsingError> {
         let flt = "target=info".parse::<FilterDiretive>()?;
-        assert_eq!(flt, FilterDiretive {
+        assert_eq!(flt, FilterDiretive { 
+            scope: None,
             target: Some("target".to_string()),
             span: None,
             fields: None,
@@ -208,7 +284,7 @@ mod tests {
         });
 
         let flt = "with-dash=trace".parse::<FilterDiretive>()?;
-        assert_eq!(flt, FilterDiretive {
+        assert_eq!(flt, FilterDiretive { scope: None,
             target: Some("with-dash".to_string()),
             span: None,
             fields: None,
@@ -221,6 +297,7 @@ mod tests {
     fn pure_span_filters() -> Result<(), FilterDirectiveParsingError> {
         let flt = "[spanname]=info".parse::<FilterDiretive>()?;
         assert_eq!(flt, FilterDiretive {
+            scope: None,
             target: None,
             span: Some("spanname".to_string()),
             fields: None,
@@ -228,7 +305,7 @@ mod tests {
         });
 
         let flt = "[with-dash]=trace".parse::<FilterDiretive>()?;
-        assert_eq!(flt, FilterDiretive {
+        assert_eq!(flt, FilterDiretive { scope: None,
             target: None,
             span: Some("with-dash".to_string()),
             fields: None,
@@ -240,7 +317,7 @@ mod tests {
     #[test]
     fn mixed_target_span_filters() -> Result<(), FilterDirectiveParsingError> {
         let flt = "target[spanname]=info".parse::<FilterDiretive>()?;
-        assert_eq!(flt, FilterDiretive {
+        assert_eq!(flt, FilterDiretive { scope: None,
             target: Some("target".to_string()),
             span: Some("spanname".to_string()),
             fields: None,
@@ -248,8 +325,39 @@ mod tests {
         });
 
         let flt = "with-[dash]=trace".parse::<FilterDiretive>()?;
-        assert_eq!(flt, FilterDiretive {
+        assert_eq!(flt, FilterDiretive { scope: None,
             target: Some("with-".to_string()),
+            span: Some("dash".to_string()),
+            fields: None,
+            level: LevelFilter::TRACE
+        });
+        Ok(())
+    }
+
+    #[test]
+    fn scope_definition() -> Result<(), FilterDirectiveParsingError> {
+        let flt = "scope:target=info".parse::<FilterDiretive>()?;
+        assert_eq!(flt, FilterDiretive { 
+            scope: Some("scope".to_string()),
+            target: Some("target".to_string()),
+            span: None,
+            fields: None,
+            level: LevelFilter::INFO
+        });
+
+        let flt = "scope:[dash]=trace".parse::<FilterDiretive>()?;
+        assert_eq!(flt, FilterDiretive { 
+            scope: Some("scope".to_string()),
+            target: None,
+            span: Some("dash".to_string()),
+            fields: None,
+            level: LevelFilter::TRACE
+        });
+
+        let flt = ":t[dash]=trace".parse::<FilterDiretive>()?;
+        assert_eq!(flt, FilterDiretive { 
+            scope: None,
+            target: Some("t".to_string()),
             span: Some("dash".to_string()),
             fields: None,
             level: LevelFilter::TRACE

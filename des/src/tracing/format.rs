@@ -1,6 +1,6 @@
 use std::io::{Result, Write};
 use termcolor::{Buffer, Color, ColorSpec, WriteColor};
-use tracing::{field::Visit, span::Attributes, Event, Level};
+use tracing::{field::Visit, Event, Level};
 
 use crate::prelude::SimTime;
 
@@ -10,9 +10,6 @@ use super::{output::TracingRecord, SpanInfo};
 pub trait TracingFormatter {
     /// Formats an emitted tracing event onto a buffer.
     fn fmt(&mut self, out: &mut Buffer, record: TracingRecord<'_>) -> Result<()>;
-
-    /// Formats a new span for later use
-    fn fmt_new_span(&mut self, out: &mut Buffer, span: &Attributes<'_>) -> Result<()>;
 }
 
 /// A formatter intenden for a ANIS terminal.
@@ -32,33 +29,6 @@ impl TracingFormatter for ColorfulTracingFormatter {
         self.fmt_spans(out, &record.spans)?;
         self.fmt_event(out, record.event)?;
         writeln!(out)
-    }
-
-    fn fmt_new_span(&mut self, out: &mut Buffer, span: &Attributes<'_>) -> Result<()> {
-        struct Vis<'a> {
-            s: &'a mut String,
-        }
-        impl Visit for Vis<'_> {
-            fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
-                use std::fmt::Write;
-                write!(self.s, "{}={:?}, ", field.name(), value).unwrap();
-            }
-        }
-
-        if span.values().is_empty() {
-            out.set_color(ColorSpec::new().set_bold(true))?;
-            write!(out, "{}", span.metadata().name())?;
-            out.reset()
-        } else {
-            out.set_color(ColorSpec::new().set_bold(true))?;
-            write!(out, "{}", span.metadata().name())?;
-            out.set_color(ColorSpec::new().set_bold(false).set_fg(Some(PARENS_COLOR)))?;
-
-            let mut s = String::new();
-            span.values().record(&mut Vis { s: &mut s });
-            write!(out, "{{ {} }}", s.trim_end_matches(", "))?;
-            out.reset()
-        }
     }
 }
 
@@ -98,7 +68,7 @@ impl ColorfulTracingFormatter {
         out.set_color(ColorSpec::new().set_bold(true))?;
         let end = spans.len();
         for (i, span) in spans.into_iter().enumerate() {
-            write!(out, "{}", span.formatted)?;
+            self.fmt_span(out, span)?;
             if i + 1 < end {
                 write!(out, ":")?;
             } else {
@@ -106,6 +76,30 @@ impl ColorfulTracingFormatter {
             }
         }
         out.reset()
+    }
+
+    fn fmt_span(&mut self, out: &mut Buffer, span: &SpanInfo) -> Result<()> {
+        if span.fields.is_empty() {
+            out.set_color(ColorSpec::new().set_bold(true))?;
+            write!(out, "{}", span.name)?;
+            out.reset()
+        } else {
+            out.set_color(ColorSpec::new().set_bold(true))?;
+            write!(out, "{}", span.name)?;
+
+            let mut s = String::new();
+            for (k, v) in &span.fields {
+                s.push_str(&format!("{k}={v},"))
+            }
+
+            out.set_color(ColorSpec::new().set_bold(false).set_fg(Some(PARENS_COLOR)))?;
+            write!(out, "{{")?;
+            out.set_color(ColorSpec::new().set_bold(true).set_fg(None))?;
+            write!(out, " {} ", s.trim_end_matches(','))?;
+            out.set_color(ColorSpec::new().set_bold(false).set_fg(Some(PARENS_COLOR)))?;
+            write!(out, "}}")?;
+            out.reset()
+        }
     }
 
     fn fmt_event(&mut self, out: &mut Buffer, event: &Event<'_>) -> Result<()> {
@@ -176,7 +170,8 @@ impl TracingFormatter for NoColorFormatter {
         write!(out, ": ")?;
 
         for span in record.spans {
-            write!(out, "{} ", span.formatted)?;
+            self.fmt_span(out, span)?;
+            write!(out, " ")?;
         }
 
         struct Vis<'a> {
@@ -208,24 +203,18 @@ impl TracingFormatter for NoColorFormatter {
 
         writeln!(out)
     }
+}
 
-    fn fmt_new_span(&mut self, out: &mut Buffer, span: &Attributes<'_>) -> Result<()> {
-        struct Vis<'a> {
-            s: &'a mut String,
-        }
-        impl Visit for Vis<'_> {
-            fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
-                use std::fmt::Write;
-                write!(self.s, "{} = {:?},", field.name(), value).unwrap();
-            }
-        }
-
-        if span.values().is_empty() {
-            write!(out, "{}", span.metadata().name())
+impl NoColorFormatter {
+    fn fmt_span(&mut self, out: &mut Buffer, span: &SpanInfo) -> Result<()> {
+        if span.fields.is_empty() {
+            write!(out, "{}", span.name)
         } else {
-            write!(out, "{}", span.metadata().name())?;
+            write!(out, "{}", span.name)?;
             let mut s = String::new();
-            span.values().record(&mut Vis { s: &mut s });
+            for (k, v) in &span.fields {
+                s.push_str(&format!("{k}={v}"))
+            }
             write!(out, "{{{}}}", s.trim_end_matches(','))
         }
     }
