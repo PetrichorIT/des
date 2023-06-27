@@ -191,7 +191,7 @@ impl Builder {
         SimTime::set_now(self.start_time);
 
         // Set RNG
-        *unsafe { &mut *RNG.get() } = Some(self.rng);
+        RNG.with(|rng| *rng.borrow_mut() = Some(self.rng));
 
         Runtime {
             future_event_set,

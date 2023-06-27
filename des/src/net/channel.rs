@@ -2,15 +2,14 @@
 #![allow(clippy::cast_precision_loss)]
 
 use rand::distributions::Uniform;
-use rand::prelude::StdRng;
-use rand::{Rng, RngCore};
 use std::collections::VecDeque;
 use std::fmt::{Debug, Display};
 use std::sync::{Arc, RwLock};
 
 use crate::net::runtime::ChannelUnbusyNotif;
 use crate::net::{message::Message, MessageAtGateEvent, NetEvents, ObjectPath};
-use crate::runtime::{rng, EventSink};
+use crate::prelude::sample;
+use crate::runtime::EventSink;
 use crate::time::{Duration, SimTime};
 
 use super::gate::GateRef;
@@ -72,7 +71,7 @@ impl ChannelMetrics {
     /// Calcualtes the duration a message travels on a link.
     ///
     #[allow(clippy::if_same_then_else)]
-    pub fn calculate_duration(&self, msg: &Message, rng: &mut dyn RngCore) -> Duration {
+    pub fn calculate_duration(&self, msg: &Message) -> Duration {
         if self.bitrate == 0 {
             return Duration::ZERO;
         }
@@ -82,7 +81,7 @@ impl ChannelMetrics {
         if self.jitter == Duration::ZERO {
             self.latency + transmission_time
         } else {
-            let perc = rng.sample(Uniform::new(0.0f64, self.jitter.as_secs_f64()));
+            let perc = sample(Uniform::new(0.0f64, self.jitter.as_secs_f64()));
             self.latency + transmission_time + Duration::from_secs_f64(perc)
         }
     }
@@ -232,12 +231,8 @@ impl Channel {
     ///
     /// Panics if the simulation core was poisoned.
     ///
-    pub fn calculate_duration(&self, msg: &Message, rng: &mut StdRng) -> Duration {
-        self.inner
-            .read()
-            .unwrap()
-            .metrics
-            .calculate_duration(msg, rng)
+    pub fn calculate_duration(&self, msg: &Message) -> Duration {
+        self.inner.read().unwrap().metrics.calculate_duration(msg)
     }
 
     ///
@@ -259,7 +254,6 @@ impl Channel {
         next_gate: &GateRef,
         sink: &mut S,
     ) {
-        let rng_ref = rng();
         let mut chan = self.inner.write().unwrap();
 
         if chan.busy {
@@ -285,7 +279,7 @@ impl Channel {
                 chan.buffer.push_back((msg, Arc::clone(next_gate)));
             }
         } else {
-            let dur = chan.metrics.calculate_duration(&msg, rng_ref);
+            let dur = chan.metrics.calculate_duration(&msg);
             let busy = chan.metrics.calculate_busy(&msg);
 
             let transmissin_finish = SimTime::now() + busy;

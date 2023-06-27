@@ -5,9 +5,9 @@ use crate::{
         gate::GateRef,
         gate::GateServiceType,
         message::{Message},
-        module::with_mod_ctx_lock,
+
         runtime::buf_process,
-        NetworkApplication,
+        NetworkApplication, module::with_mod_ctx,
     },
     prelude::{ChannelRef, EventLifecycle, ModuleRef},
     runtime::{EventSet, EventSink, Runtime},
@@ -261,50 +261,51 @@ impl ModuleRef {
 
     #[allow(clippy::unused_self)]
     pub(crate) fn plugin_upstream(&self, msg: Option<Message>) -> Option<Message> {
-        let ctx = with_mod_ctx_lock();
+        with_mod_ctx(|ctx| {
+            ctx.plugins.write().being_upstream(false);
+            loop {
+                let plugin = ctx.plugins.write().next_upstream();
+                let Some(mut plugin) = plugin else { break };
 
-        ctx.plugins.write().being_upstream(false);
-        loop {
-            let plugin = ctx.plugins.write().next_upstream();
-            let Some(mut plugin) = plugin else { break };
+                plugin.event_start();
+                ctx.plugins.write().put_back_upstream(plugin);   
+            }
 
-            plugin.event_start();
-            ctx.plugins.write().put_back_upstream(plugin);   
-        }
+            // Reset the upstream for message parsing
+            ctx.plugins.write().being_upstream(true);
 
-        // Reset the upstream for message parsing
-        ctx.plugins.write().being_upstream(true);
-
-        let mut msg = msg;
-        while let Some(moved_message) = msg.take() {
-            // log::trace!("capture clause");
-            let plugin = ctx.plugins.write().next_upstream();
-            let Some(mut plugin) = plugin else {
-                // log::info!("noplugin");
-                msg = Some(moved_message);
-                break
-            };
-           
-            let rem_msg = plugin.capture_incoming(moved_message);
-            // log::trace!("returned some = {}", remaining_msg.is_some());
-            msg = rem_msg;
-            ctx.plugins.write().put_back_upstream(plugin); 
-        }
-        msg
-    }
+            let mut msg = msg;
+            while let Some(moved_message) = msg.take() {
+                // log::trace!("capture clause");
+                let plugin = ctx.plugins.write().next_upstream();
+                let Some(mut plugin) = plugin else {
+                    // log::info!("noplugin");
+                    msg = Some(moved_message);
+                    break
+                };
+            
+                let rem_msg = plugin.capture_incoming(moved_message);
+                // log::trace!("returned some = {}", remaining_msg.is_some());
+                msg = rem_msg;
+                ctx.plugins.write().put_back_upstream(plugin); 
+            }
+            msg
+        })
+}
 
     #[allow(clippy::unused_self)]
     pub(crate) fn plugin_downstream(&self) {
-        let ctx = with_mod_ctx_lock();
-        ctx.plugins.write().begin_main_downstream();
-        loop {
-            let plugin = ctx.plugins.write().next_downstream();
-            let Some(mut plugin) = plugin else { break };
+        with_mod_ctx(|ctx|{
+            ctx.plugins.write().begin_main_downstream();
+            loop {
+                let plugin = ctx.plugins.write().next_downstream();
+                let Some(mut plugin) = plugin else { break };
 
-            plugin.event_end();
-            ctx.plugins.write().put_back_downstream(plugin, true);
-               
-        }
+                plugin.event_end();
+                ctx.plugins.write().put_back_downstream(plugin, true);
+                
+            }
+        })
     }
 
     #[cfg(feature = "async")]

@@ -2,14 +2,11 @@
 //! Central primitives for running a discrete event simulation.
 //!
 
-use crate::{
-    macros::support::SyncWrap,
-    time::{Duration, SimTime},
-};
+use crate::time::{Duration, SimTime};
 use rand::{distributions::Standard, prelude::Distribution, Rng, RngCore};
 use std::{
     any::type_name,
-    cell::UnsafeCell,
+    cell::RefCell,
     fmt::{Debug, Display},
     sync::MutexGuard,
 };
@@ -37,8 +34,9 @@ pub(crate) const FT_ASYNC: bool = cfg!(feature = "async");
 pub(crate) const SYM_CHECKMARK: char = '\u{2713}';
 pub(crate) const SYM_CROSSMARK: char = '\u{02df}';
 
-pub(crate) static RNG: SyncWrap<UnsafeCell<Option<Box<dyn RngCore>>>> =
-    SyncWrap::new(UnsafeCell::new(None));
+thread_local! {
+    pub(crate) static RNG: RefCell<Option<Box<dyn RngCore>>> = const { RefCell::new(None) }
+}
 
 ///
 /// Returns a reference to a given rng.
@@ -49,10 +47,19 @@ pub(crate) static RNG: SyncWrap<UnsafeCell<Option<Box<dyn RngCore>>>> =
 /// This will be done once the `Runtime` was created.
 ///
 #[must_use]
+#[deprecated]
 pub fn rng() -> &'static mut dyn RngCore {
-    unsafe { &mut *RNG.get() }
-        .as_mut()
-        .expect("RNG not yet initalized")
+    todo!()
+}
+
+/// Executes something using the simulation RNG.
+pub fn with_rng<R>(f: impl FnOnce(&mut dyn RngCore) -> R) -> R {
+    RNG.with(|rng| {
+        rng.borrow_mut()
+            .as_mut()
+            .map(|rng| f(rng))
+            .expect("failed to fetch rng")
+    })
 }
 
 ///
@@ -63,7 +70,7 @@ pub fn random<T>() -> T
 where
     Standard: Distribution<T>,
 {
-    rng().gen::<T>()
+    with_rng(|rng| rng.gen::<T>())
 }
 
 ///
@@ -74,7 +81,7 @@ pub fn sample<T, D>(distr: D) -> T
 where
     D: Distribution<T>,
 {
-    rng().sample::<T, D>(distr)
+    with_rng(|rng| rng.sample::<T, D>(distr))
 }
 
 ///

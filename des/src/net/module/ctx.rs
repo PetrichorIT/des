@@ -4,19 +4,26 @@ use super::{DummyModule, ModuleId, ModuleRef, ModuleRefWeak, ModuleReferencingEr
 use crate::{
     net::plugin::PluginRegistry,
     prelude::{GateRef, ObjectPath},
-    sync::{RwLock, SwapLock, SwapLockReadGuard},
+    sync::RwLock,
     tracing::{new_scope, ScopeToken},
 };
 use std::{
+    cell::RefCell,
     fmt::Debug,
+    mem,
     sync::{atomic::AtomicBool, Arc},
 };
 
 #[cfg(feature = "async")]
 use crate::net::module::core::AsyncCoreExt;
 
-pub(crate) static MOD_CTX: SwapLock<Option<Arc<ModuleContext>>> = SwapLock::new(None);
-pub(crate) static SETUP_FN: RwLock<fn(&ModuleContext)> = RwLock::new(_default_setup);
+thread_local! {
+    pub(crate) static MOD_CTX: RefCell<Option<Arc<ModuleContext>>> = const { RefCell::new(None) };
+    pub(crate) static SETUP_FN: RefCell<fn(&ModuleContext)> = const { RefCell::new(_default_setup)}
+}
+
+// pub(crate) static MOD_CTX: SwapLock<Option<Arc<ModuleContext>>> = SwapLock::new(None);
+// pub(crate) static SETUP_FN: RwLock<fn(&ModuleContext)> = RwLock::new(_default_setup);
 
 pub(crate) fn _default_setup(_: &ModuleContext) {}
 
@@ -57,7 +64,7 @@ impl ModuleContext {
             children: RwLock::new(FxHashMap::with_hasher(FxBuildHasher::default())),
         }));
 
-        SETUP_FN.read()(&this);
+        SETUP_FN.with(|f| f.borrow()(&this));
 
         this
     }
@@ -83,7 +90,7 @@ impl ModuleContext {
             children: RwLock::new(FxHashMap::with_hasher(FxBuildHasher::default())),
         }));
 
-        SETUP_FN.read()(&this);
+        SETUP_FN.with(|f| f.borrow()(&this));
 
         parent
             .ctx
@@ -96,13 +103,13 @@ impl ModuleContext {
 
     pub(crate) fn place(self: Arc<Self>) -> Option<Arc<ModuleContext>> {
         let mut this = Some(self);
-        MOD_CTX.swap(&mut this);
+        MOD_CTX.with(|ctx| mem::swap(&mut this, &mut *ctx.borrow_mut()));
         this
     }
 
     pub(crate) fn take() -> Option<Arc<ModuleContext>> {
         let mut this = None;
-        MOD_CTX.swap(&mut this);
+        MOD_CTX.with(|ctx| mem::swap(&mut this, &mut *ctx.borrow_mut()));
         this
     }
 
@@ -198,15 +205,17 @@ unsafe impl Send for ModuleContext {}
 unsafe impl Sync for ModuleContext {}
 
 pub(crate) fn with_mod_ctx<R>(f: impl FnOnce(&Arc<ModuleContext>) -> R) -> R {
-    let lock = MOD_CTX.read();
-    let r = f(&lock);
-    drop(lock);
-    r
+    MOD_CTX.with(|ctx| ctx.borrow().as_ref().map(f).expect("no mod ctx set"))
+
+    // let lock = MOD_CTX.read();
+    // let r = f(&lock);
+    // drop(lock);
+    // r
 }
 
-pub(crate) fn with_mod_ctx_lock() -> SwapLockReadGuard<'static, Option<Arc<ModuleContext>>> {
-    MOD_CTX.read()
-}
+// pub(crate) fn with_mod_ctx_lock() -> SwapLockReadGuard<'static, Option<Arc<ModuleContext>>> {
+//     MOD_CTX.read()
+// }
 
 cfg_async! {
     use tokio::runtime::Runtime;

@@ -37,8 +37,8 @@ use crate::{
 ///     /* ... */
 /// }
 /// ```
-pub fn set_setup_fn(f: fn(&ModuleContext)) {
-    *SETUP_FN.write() = f;
+pub fn set_setup_fn(new_f: fn(&ModuleContext)) {
+    SETUP_FN.with(|f| *f.borrow_mut() = new_f);
 }
 
 /// Returns a runtime-unqiue identifier for the currently active module.

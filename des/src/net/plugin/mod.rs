@@ -76,7 +76,7 @@ mod registry;
 pub(crate) use self::registry::PluginRegistry;
 pub use self::registry::PluginStatus;
 
-use super::module::with_mod_ctx_lock;
+use super::module::with_mod_ctx;
 
 /// A subprogramm between the module application and the network layer.
 ///
@@ -236,45 +236,46 @@ pub trait Plugin: 'static {
 ///
 pub(crate) fn plugin_output_stream(msg: Message) -> Option<Message> {
     // (0) Create new downstream
-    let ctx = with_mod_ctx_lock();
-    {
-        ctx.plugins.write().begin_sub_downstream(None);
-    }
-
-    // (1) Move the message allong the downstream, only using active plugins.
-    //
-    // 3 cases:
-    // - call origin is in upstream-plugin (good since all plugins below are ::running with a core stored)
-    // - call origin is main (good since all plugins are ::running with a core stored)
-    // - call origin is in downstream branch
-    //      - good since all plugins below are still ::running with a core and all aboth will be ignored ::idle
-    //      - self is not an issue, since without a core not in itr
-    //      - BUT: begin_downstream poisoined the old downstream info.
-    let mut msg = msg;
-    while let Some(mut plugin) = {
-        let mut lock = ctx.plugins.write();
-        let ret = lock.next_downstream();
-        drop(lock);
-        ret
-    } {
-        // (2) Capture the packet
-
-        let rem_msg = plugin.capture_outgoing(msg);
-
-        // (3) Continue iteration if possible
-        let mut plugins = ctx.plugins.write();
-
-        plugins.put_back_downstream(plugin, false);
-        if let Some(rem_msg) = rem_msg {
-            msg = rem_msg;
-        } else {
-            plugins.close_sub_downstream();
-            return None;
+    with_mod_ctx(|ctx| {
+        {
+            ctx.plugins.write().begin_sub_downstream(None);
         }
-    }
 
-    ctx.plugins.write().close_sub_downstream();
+        // (1) Move the message allong the downstream, only using active plugins.
+        //
+        // 3 cases:
+        // - call origin is in upstream-plugin (good since all plugins below are ::running with a core stored)
+        // - call origin is main (good since all plugins are ::running with a core stored)
+        // - call origin is in downstream branch
+        //      - good since all plugins below are still ::running with a core and all aboth will be ignored ::idle
+        //      - self is not an issue, since without a core not in itr
+        //      - BUT: begin_downstream poisoined the old downstream info.
+        let mut msg = msg;
+        while let Some(mut plugin) = {
+            let mut lock = ctx.plugins.write();
+            let ret = lock.next_downstream();
+            drop(lock);
+            ret
+        } {
+            // (2) Capture the packet
 
-    // (4) If the message survives, good.
-    Some(msg)
+            let rem_msg = plugin.capture_outgoing(msg);
+
+            // (3) Continue iteration if possible
+            let mut plugins = ctx.plugins.write();
+
+            plugins.put_back_downstream(plugin, false);
+            if let Some(rem_msg) = rem_msg {
+                msg = rem_msg;
+            } else {
+                plugins.close_sub_downstream();
+                return None;
+            }
+        }
+
+        ctx.plugins.write().close_sub_downstream();
+
+        // (4) If the message survives, good.
+        Some(msg)
+    })
 }
