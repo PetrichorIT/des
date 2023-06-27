@@ -34,7 +34,7 @@
 //!
 //! The format for `RUST_LOG` is as follows:
 //!
-//! `scope:target[span{key=\"value\"}]=level`
+//! `scope/target[span{key=\"value\"}]=level`
 //! A filter consists of two parts:
 //! - An optional directive before the equals sign
 //! - An assigned level after the equals sign

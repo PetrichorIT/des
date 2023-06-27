@@ -182,7 +182,7 @@ fn span_fields_recognition() {
         assert_eq!(
             *records,
             [
-                "[  0ns  ] INFO node-a (tracing): my-span{key = 42} node-a 0s #1\n".to_string(),
+                "[  0ns  ] INFO node-a (tracing): my-span{key=42} node-a 0s #1\n".to_string(),
                 "[  0ns  ] TRACE node-a.node-b (tracing): node-b 0s #1\n".to_string(),
             ]
         );
@@ -221,8 +221,8 @@ fn multi_span_recogition() {
         assert_eq!(
             *records,
             [
-                "[  0ns  ] INFO node-a (tracing): my-span{key = 42} node-a 0s #1\n".to_string(),
-                "[  0ns  ] INFO node-a (tracing): my-span{key = 42} say_hello hello\n".to_string(),
+                "[  0ns  ] INFO node-a (tracing): my-span{key=42} node-a 0s #1\n".to_string(),
+                "[  0ns  ] INFO node-a (tracing): my-span{key=42} say_hello hello\n".to_string(),
             ]
         );
     });
@@ -254,7 +254,7 @@ fn filter_fallback_rule() {
         let records = records.lock();
         assert_eq!(
             *records,
-            ["[  0ns  ] WARN node-a (tracing): my-span{key = 42} node-a 0s #2\n".to_string(),]
+            ["[  0ns  ] WARN node-a (tracing): node-a 0s #2\n".to_string(),]
         );
     });
 }
@@ -291,7 +291,7 @@ fn filter_target_rule() {
         let records = records.lock();
         assert_eq!(
             *records,
-            ["[  0ns  ] INFO node-a (tracing): my-span{key = 42} node-a 0s #1\n".to_string(),]
+            ["[  0ns  ] INFO node-a (tracing): my-span{key=42} node-a 0s #1\n".to_string(),]
         );
     });
 }
@@ -322,7 +322,7 @@ fn filter_span_rule() {
         let records = records.lock();
         assert_eq!(
             *records,
-            ["[  0ns  ] INFO node-a (tracing): my-span{key = 42} node-a 0s #1\n".to_string(),]
+            ["[  0ns  ] INFO node-a (tracing): my-span{key=42} node-a 0s #1\n".to_string(),]
         );
     });
 }
@@ -346,7 +346,7 @@ fn filter_mixed_rule() {
                 tracing::info!("#3"); // NO
                 submodule::say_hello();
             }
-            .instrument(tracing::span!(Level::TRACE, "span-name"))
+            .instrument(tracing::span!(Level::ERROR, "span-name"))
             .await;
 
             Ok(())

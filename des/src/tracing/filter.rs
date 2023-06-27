@@ -120,7 +120,7 @@ impl FromStr for FilterDiretive {
 
         let level = parse_level(lvl)?;
 
-        let Some((scope_or_target, c)) = read_until_set(&mut s, &[':', '[']) else {
+        let Some((scope_or_target, c)) = read_until_set(&mut s, &['/', '[']) else {
             return Ok(FilterDiretive {
                 scope: None,
                 target: Some(s.to_string()),
@@ -130,7 +130,7 @@ impl FromStr for FilterDiretive {
             });
         };
 
-        let (target, scope) = if c == ':' {
+        let (target, scope) = if c == '/' {
             let scope = nonempty_or_none(scope_or_target);
 
             let Some(target) = read_until(&mut s, '[') else {            
@@ -336,7 +336,7 @@ mod tests {
 
     #[test]
     fn scope_definition() -> Result<(), FilterDirectiveParsingError> {
-        let flt = "scope:target=info".parse::<FilterDiretive>()?;
+        let flt = "scope/target=info".parse::<FilterDiretive>()?;
         assert_eq!(flt, FilterDiretive { 
             scope: Some("scope".to_string()),
             target: Some("target".to_string()),
@@ -345,7 +345,7 @@ mod tests {
             level: LevelFilter::INFO
         });
 
-        let flt = "scope:[dash]=trace".parse::<FilterDiretive>()?;
+        let flt = "scope/[dash]=trace".parse::<FilterDiretive>()?;
         assert_eq!(flt, FilterDiretive { 
             scope: Some("scope".to_string()),
             target: None,
@@ -354,7 +354,7 @@ mod tests {
             level: LevelFilter::TRACE
         });
 
-        let flt = ":t[dash]=trace".parse::<FilterDiretive>()?;
+        let flt = "/t[dash]=trace".parse::<FilterDiretive>()?;
         assert_eq!(flt, FilterDiretive { 
             scope: None,
             target: Some("t".to_string()),
