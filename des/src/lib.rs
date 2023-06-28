@@ -116,8 +116,6 @@
 #[doc(hidden)]
 pub mod macros;
 
-pub(crate) mod sync;
-
 pub mod prelude;
 
 pub mod doc;

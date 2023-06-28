@@ -140,11 +140,11 @@ where
 
             // drop the rt, to prevent all async activity from happening.
             #[cfg(feature = "async")]
-            module.ctx.async_ext.write().rt.shutdown();
+            module.ctx.async_ext.borrow_mut().rt.shutdown();
 
             // drop all hooks to ensure all messages reach the async impl
             // module.ctx.hooks.borrow_mut().clear(); TODO: Plugin clean
-            module.ctx.plugins.write().clear();
+            module.ctx.plugins.borrow_mut().clear();
             SETUP_FN.with(|f| f.borrow()(&module.ctx));
 
             // Reset the internal state

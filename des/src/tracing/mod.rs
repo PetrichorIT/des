@@ -65,11 +65,9 @@ mod policy;
 mod span;
 
 use self::{filter::Filters, policy::DefaultScopeConfigurationPolicy, span::SpanInfo};
-use crate::{
-    prelude::SimTime,
-    sync::{Mutex, RwLock},
-};
+use crate::prelude::SimTime;
 use fxhash::{FxBuildHasher, FxHashMap};
+use spin::{Mutex, RwLock};
 use std::{
     fmt::Debug,
     sync::{

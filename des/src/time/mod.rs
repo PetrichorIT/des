@@ -28,7 +28,7 @@
 mod duration;
 pub use duration::*;
 
-use crate::sync::RwLock;
+use std::cell::RefCell;
 use std::f64::EPSILON;
 use std::fmt::{Debug, Display};
 use std::ops::{Deref, Div, Sub, SubAssign};
@@ -49,7 +49,9 @@ cfg_async! {
     pub use interval::*;
 }
 
-static SIMTIME: RwLock<SimTime> = RwLock::new(SimTime::ZERO);
+thread_local! {
+    static SIMTIME: RefCell<SimTime> = const { RefCell::new(SimTime::ZERO) }
+}
 
 ///
 /// A specific point of time in the simulation.
@@ -69,14 +71,14 @@ impl SimTime {
     /// ```
     #[must_use]
     pub fn now() -> Self {
-        *SIMTIME.read()
+        SIMTIME.with(|t| *t.borrow())
     }
 
     ///
     /// Sets the sim time
     ///
     pub(crate) fn set_now(time: SimTime) {
-        *SIMTIME.write() = time;
+        SIMTIME.with(|t| *t.borrow_mut() = time)
     }
 
     ///

@@ -2,9 +2,10 @@
 #![allow(clippy::cast_precision_loss)]
 
 use rand::distributions::Uniform;
+use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::fmt::{Debug, Display};
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use crate::net::runtime::ChannelUnbusyNotif;
 use crate::net::{message::Message, MessageAtGateEvent, NetEvents, ObjectPath};
@@ -119,7 +120,7 @@ impl Eq for ChannelMetrics {}
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub struct Channel {
-    inner: RwLock<ChannelInner>,
+    inner: RefCell<ChannelInner>,
 }
 
 #[derive(Debug)]
@@ -150,7 +151,7 @@ impl Channel {
     ///
     #[must_use]
     pub fn path(&self) -> ObjectPath {
-        self.inner.read().unwrap().path.clone()
+        self.inner.borrow().path.clone()
     }
 
     ///
@@ -163,7 +164,7 @@ impl Channel {
     ///
     #[must_use]
     pub fn metrics(&self) -> ChannelMetrics {
-        self.inner.read().unwrap().metrics
+        self.inner.borrow().metrics
     }
 
     ///
@@ -179,7 +180,7 @@ impl Channel {
     ///
     #[must_use]
     pub fn is_busy(&self) -> bool {
-        self.inner.read().unwrap().busy
+        self.inner.borrow().busy
     }
 
     ///
@@ -187,7 +188,7 @@ impl Channel {
     /// in '`sim_time`' time units.
     ///
     pub(crate) fn set_busy_until(&self, sim_time: SimTime) {
-        let mut chan = self.inner.write().unwrap();
+        let mut chan = self.inner.borrow_mut();
         chan.busy = true;
         chan.transmission_finish_time = sim_time;
     }
@@ -202,7 +203,7 @@ impl Channel {
     ///
     #[must_use]
     pub fn transmission_finish_time(&self) -> SimTime {
-        self.inner.read().unwrap().transmission_finish_time
+        self.inner.borrow().transmission_finish_time
     }
 
     ///
@@ -212,7 +213,7 @@ impl Channel {
     #[must_use]
     pub fn new(path: ObjectPath, metrics: ChannelMetrics) -> ChannelRef {
         ChannelRef::new(Channel {
-            inner: RwLock::new(ChannelInner {
+            inner: RefCell::new(ChannelInner {
                 path,
                 metrics,
                 busy: false,
@@ -232,7 +233,7 @@ impl Channel {
     /// Panics if the simulation core was poisoned.
     ///
     pub fn calculate_duration(&self, msg: &Message) -> Duration {
-        self.inner.read().unwrap().metrics.calculate_duration(msg)
+        self.inner.borrow().metrics.calculate_duration(msg)
     }
 
     ///
@@ -245,7 +246,7 @@ impl Channel {
     ///
     #[must_use]
     pub fn calculate_busy(&self, msg: &Message) -> Duration {
-        self.inner.read().unwrap().metrics.calculate_busy(msg)
+        self.inner.borrow().metrics.calculate_busy(msg)
     }
 
     pub(super) fn send_message<S: EventSink<NetEvents>>(
@@ -254,7 +255,7 @@ impl Channel {
         next_gate: &GateRef,
         sink: &mut S,
     ) {
-        let mut chan = self.inner.write().unwrap();
+        let mut chan = self.inner.borrow_mut();
 
         if chan.busy {
             let msg_size = msg.length();
@@ -313,7 +314,7 @@ impl Channel {
     /// Resets the busy state of a channel.
     ///
     pub(crate) fn unbusy<S: EventSink<NetEvents>>(self: Arc<Self>, sink: &mut S) {
-        let mut chan = self.inner.write().unwrap();
+        let mut chan = self.inner.borrow_mut();
 
         chan.busy = false;
         chan.transmission_finish_time = SimTime::ZERO;
@@ -348,7 +349,7 @@ impl FmtChannelState {
 
 impl Debug for Channel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let this = self.inner.read().unwrap();
+        let this = self.inner.borrow();
 
         f.debug_struct("Channel")
             .field("path", &this.path)

@@ -24,7 +24,7 @@ fn topology_load() {
     .unwrap();
     let rt = Builder::new().build(NetworkApplication::new(app));
     let app = rt.run().into_app();
-    let mut topo = app.globals().topology.lock().unwrap().clone();
+    let mut topo = app.globals().topology.borrow().clone();
 
     topo.filter_nodes(|n| n.module.name() != "node[2]");
 

@@ -1,8 +1,9 @@
 //! Module-specific network ports.
 
 use crate::net::channel::ChannelRef;
+use std::cell::RefCell;
 use std::fmt::Debug;
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Weak};
 
 use super::module::{ModuleContext, ModuleRef, ModuleRefWeak};
 
@@ -41,10 +42,10 @@ pub struct Gate {
     size: usize,
     pos: usize,
 
-    channel: Mutex<Option<ChannelRef>>,
+    channel: RefCell<Option<ChannelRef>>,
 
-    next_gate: Mutex<Option<GateRef>>,
-    previous_gate: Mutex<Option<GateRefWeak>>,
+    next_gate: RefCell<Option<GateRef>>,
+    previous_gate: RefCell<Option<GateRefWeak>>,
 }
 
 impl Gate {
@@ -126,7 +127,7 @@ impl Gate {
     ///
     #[must_use]
     pub fn previous_gate(&self) -> Option<GateRef> {
-        self.previous_gate.lock().unwrap().clone()?.upgrade()
+        self.previous_gate.borrow().clone()?.upgrade()
     }
 
     ///
@@ -138,7 +139,7 @@ impl Gate {
     ///
     #[must_use]
     pub fn next_gate(&self) -> Option<GateRef> {
-        self.next_gate.lock().unwrap().clone()
+        self.next_gate.borrow().clone()
     }
 
     ///
@@ -150,8 +151,8 @@ impl Gate {
     /// Panics if the simulation core was poisoned.
     ///
     pub fn set_next_gate(self: &GateRef, next_gate: GateRef) {
-        *next_gate.previous_gate.lock().unwrap() = Some(Arc::downgrade(self));
-        *self.next_gate.lock().unwrap() = Some(next_gate);
+        *next_gate.previous_gate.borrow_mut() = Some(Arc::downgrade(self));
+        *self.next_gate.borrow_mut() = Some(next_gate);
     }
 
     ///
@@ -163,7 +164,7 @@ impl Gate {
     #[must_use]
     pub fn channel(&self) -> Option<ChannelRef> {
         // only provide a read_only interface publicly
-        Some(Arc::clone(self.channel.lock().unwrap().as_ref()?))
+        Some(Arc::clone(self.channel.borrow().as_ref()?))
     }
 
     ///
@@ -171,7 +172,7 @@ impl Gate {
     ///
     pub(crate) fn channel_mut(&self) -> Option<ChannelRef> {
         // only provide a read_only interface publicly
-        Some(Arc::clone(self.channel.lock().unwrap().as_ref()?))
+        Some(Arc::clone(self.channel.borrow().as_ref()?))
     }
 
     ///
@@ -181,7 +182,7 @@ impl Gate {
     ///
     /// Panics if the simulation core was poisoned.
     pub fn set_channel(&self, channel: ChannelRef) {
-        *self.channel.lock().unwrap() = Some(channel);
+        *self.channel.borrow_mut() = Some(channel);
     }
 
     ///
@@ -249,9 +250,9 @@ impl Gate {
             typ,
             size,
             pos,
-            channel: Mutex::new(channel),
-            next_gate: Mutex::new(None),
-            previous_gate: Mutex::new(None),
+            channel: RefCell::new(channel),
+            next_gate: RefCell::new(None),
+            previous_gate: RefCell::new(None),
         });
 
         if let Some(next_gate) = next_gate {
@@ -272,11 +273,6 @@ impl Debug for Gate {
             .finish()
     }
 }
-
-// SAFTY:
-// Gates are never exposed by value to the user so they will be marked
-// as `Send` to fulfill the trait bound for Ptr<Gate> to be `Send`.
-unsafe impl Send for Gate {}
 
 // SOLVED ISSUE: stack overflow when comaring circular ptr
 // next_gate & previous_gate --> Custim PartialEq impl
@@ -332,7 +328,7 @@ impl IntoModuleGate for (&str, usize) {
     fn as_gate(&self, module: &ModuleContext) -> Option<GateRef> {
         module
             .gates
-            .read()
+            .borrow()
             .iter()
             .find(|&g| g.name() == self.0 && g.pos() == self.1)
             .cloned()
@@ -344,7 +340,7 @@ impl IntoModuleGate for &str {
     fn as_gate(&self, module: &ModuleContext) -> Option<GateRef> {
         module
             .gates
-            .read()
+            .borrow()
             .iter()
             .find(|&g| g.name() == *self && g.size() == 1)
             .cloned()

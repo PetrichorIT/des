@@ -19,7 +19,9 @@ macro_rules! guid {
             #[repr(transparent)]
             $vis struct $ident(pub $ty);
 
-            static $sident: $crate::macros::support::SyncWrap<::std::cell::Cell<$ty>> = $crate::macros::support::SyncWrap::new(::std::cell::Cell::new(0xff));
+            thread_local! {
+                static $sident: ::std::cell::Cell<$ty> = const { ::std::cell::Cell::new(0xff) };
+            }
 
             impl $ident {
                 ///
@@ -32,9 +34,11 @@ macro_rules! guid {
                 /// Generates a new unique id.
                 ///
                 pub fn gen() -> Self {
-                    let a = $sident.get();
-                    $sident.set(a + 1);
-                    Self(a)
+                    $sident.with(|i| {
+                        let a = i.get();
+                        i.set(a + 1);
+                        Self(a)
+                    })
                 }
             }
 

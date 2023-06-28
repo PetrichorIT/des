@@ -262,22 +262,22 @@ impl ModuleRef {
     #[allow(clippy::unused_self)]
     pub(crate) fn plugin_upstream(&self, msg: Option<Message>) -> Option<Message> {
         with_mod_ctx(|ctx| {
-            ctx.plugins.write().being_upstream(false);
+            ctx.plugins.borrow_mut().being_upstream(false);
             loop {
-                let plugin = ctx.plugins.write().next_upstream();
+                let plugin = ctx.plugins.borrow_mut().next_upstream();
                 let Some(mut plugin) = plugin else { break };
 
                 plugin.event_start();
-                ctx.plugins.write().put_back_upstream(plugin);   
+                ctx.plugins.borrow_mut().put_back_upstream(plugin);   
             }
 
             // Reset the upstream for message parsing
-            ctx.plugins.write().being_upstream(true);
+            ctx.plugins.borrow_mut().being_upstream(true);
 
             let mut msg = msg;
             while let Some(moved_message) = msg.take() {
                 // log::trace!("capture clause");
-                let plugin = ctx.plugins.write().next_upstream();
+                let plugin = ctx.plugins.borrow_mut().next_upstream();
                 let Some(mut plugin) = plugin else {
                     // log::info!("noplugin");
                     msg = Some(moved_message);
@@ -287,7 +287,7 @@ impl ModuleRef {
                 let rem_msg = plugin.capture_incoming(moved_message);
                 // log::trace!("returned some = {}", remaining_msg.is_some());
                 msg = rem_msg;
-                ctx.plugins.write().put_back_upstream(plugin); 
+                ctx.plugins.borrow_mut().put_back_upstream(plugin); 
             }
             msg
         })
@@ -296,13 +296,13 @@ impl ModuleRef {
     #[allow(clippy::unused_self)]
     pub(crate) fn plugin_downstream(&self) {
         with_mod_ctx(|ctx|{
-            ctx.plugins.write().begin_main_downstream();
+            ctx.plugins.borrow_mut().begin_main_downstream();
             loop {
-                let plugin = ctx.plugins.write().next_downstream();
+                let plugin = ctx.plugins.borrow_mut().next_downstream();
                 let Some(mut plugin) = plugin else { break };
 
                 plugin.event_end();
-                ctx.plugins.write().put_back_downstream(plugin, true);
+                ctx.plugins.borrow_mut().put_back_downstream(plugin, true);
                 
             }
         })

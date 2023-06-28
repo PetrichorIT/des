@@ -21,7 +21,7 @@ default = []
 full = ["net", "ndl", "cqueue", "async", "macros"]
 
 macros = ["dep:des-macros", "dep:futures"]
-async = ["net", "dep:tokio", "dep:async-trait"]
+async = ["net", "dep:tokio", "dep:async-trait", "dep:futures"]
 cqueue = ["dep:des-cqueue"]
 multi-threaded = []
 net = ["dep:des-macros"]

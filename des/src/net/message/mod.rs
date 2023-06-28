@@ -3,7 +3,6 @@
 use crate::net::{gate::GateRef, module::ModuleId};
 use crate::time::SimTime;
 use std::fmt::Debug;
-use std::panic::UnwindSafe;
 
 mod api;
 pub use api::*;
@@ -261,8 +260,6 @@ impl Message {
 // A message only contains primitve data, ptrs that are threadsafe
 // and a untyped contained value.
 unsafe impl Send for Message {}
-
-impl UnwindSafe for Message {}
 
 ///
 /// A intermediary type for constructing messages.

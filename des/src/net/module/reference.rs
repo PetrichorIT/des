@@ -217,10 +217,10 @@ impl ModuleRef {
             use crate::time::{Driver, SimTime};
 
             if let Some(prev) = prev {
-                prev.async_ext.write().driver = Driver::unset();
+                prev.async_ext.borrow_mut().driver = Driver::unset();
             }
 
-            let driver = self.ctx.async_ext.write().driver.take();
+            let driver = self.ctx.async_ext.borrow_mut().driver.take();
             driver.map(|mut d| {
                 let bumpable = d.bump();
                 if d.next_wakeup <= SimTime::now() {
@@ -241,7 +241,7 @@ impl ModuleRef {
             use crate::net::AsyncWakeupEvent;
             use crate::time::Driver;
 
-            let mut ext = self.ctx.async_ext.write();
+            let mut ext = self.ctx.async_ext.borrow_mut();
             let mut driver = Driver::unset().unwrap();
             if let Some(next_wakeup) = driver.next() {
                 if next_wakeup < driver.next_wakeup {
@@ -349,7 +349,7 @@ impl ModuleRef {
         next: Option<GateRef>,
     ) -> GateRef {
         let gate = Gate::new(self, name, typ, size, pos, channel, next);
-        self.ctx.gates.write().push(gate.clone());
+        self.ctx.gates.borrow_mut().push(gate.clone());
         gate
     }
 }

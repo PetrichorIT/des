@@ -238,7 +238,7 @@ pub(crate) fn plugin_output_stream(msg: Message) -> Option<Message> {
     // (0) Create new downstream
     with_mod_ctx(|ctx| {
         {
-            ctx.plugins.write().begin_sub_downstream(None);
+            ctx.plugins.borrow_mut().begin_sub_downstream(None);
         }
 
         // (1) Move the message allong the downstream, only using active plugins.
@@ -252,7 +252,7 @@ pub(crate) fn plugin_output_stream(msg: Message) -> Option<Message> {
         //      - BUT: begin_downstream poisoined the old downstream info.
         let mut msg = msg;
         while let Some(mut plugin) = {
-            let mut lock = ctx.plugins.write();
+            let mut lock = ctx.plugins.borrow_mut();
             let ret = lock.next_downstream();
             drop(lock);
             ret
@@ -262,7 +262,7 @@ pub(crate) fn plugin_output_stream(msg: Message) -> Option<Message> {
             let rem_msg = plugin.capture_outgoing(msg);
 
             // (3) Continue iteration if possible
-            let mut plugins = ctx.plugins.write();
+            let mut plugins = ctx.plugins.borrow_mut();
 
             plugins.put_back_downstream(plugin, false);
             if let Some(rem_msg) = rem_msg {
@@ -273,7 +273,7 @@ pub(crate) fn plugin_output_stream(msg: Message) -> Option<Message> {
             }
         }
 
-        ctx.plugins.write().close_sub_downstream();
+        ctx.plugins.borrow_mut().close_sub_downstream();
 
         // (4) If the message survives, good.
         Some(msg)

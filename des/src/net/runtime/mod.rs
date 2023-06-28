@@ -4,9 +4,10 @@ use super::Topology;
 use crate::net::ObjectPath;
 use crate::runtime::{Application, EventLifecycle, Runtime};
 use crate::tracing::{enter_scope, leave_scope};
+use std::cell::RefCell;
 use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 mod events;
 pub(crate) use events::*;
@@ -14,8 +15,10 @@ pub(crate) use events::*;
 mod ctx;
 pub use self::ctx::*;
 
-mod builder;
-pub use self::builder::*;
+cfg_async! {
+    mod builder;
+    pub use self::builder::*;
+}
 
 ///
 /// A runtime application for a module/network oriantated simulation.
@@ -143,8 +146,7 @@ where
         rt.app
             .globals
             .topology
-            .lock()
-            .unwrap()
+            .borrow_mut()
             .build(&rt.app.module_list);
 
         // (2) Run network-node sim_starting stages
@@ -272,7 +274,7 @@ pub struct NetworkApplicationGlobals {
     ///
     /// The topology of the network from a module viewpoint.
     ///
-    pub topology: Mutex<Topology>,
+    pub topology: RefCell<Topology>,
 }
 
 impl NetworkApplicationGlobals {
@@ -283,7 +285,7 @@ impl NetworkApplicationGlobals {
     pub fn new() -> Self {
         Self {
             parameters: Arc::new(ParMap::new()),
-            topology: Mutex::new(Topology::new()),
+            topology: RefCell::new(Topology::new()),
         }
     }
 }

@@ -97,7 +97,7 @@ impl Topology {
 
         for (i, module) in modules.iter().enumerate() {
             let mut outgoing = Vec::new();
-            let gates = module.ctx.gates.read();
+            let gates = module.ctx.gates.borrow();
 
             'outer: for gate in &*gates {
                 // Ingore path if we are not at the path start.

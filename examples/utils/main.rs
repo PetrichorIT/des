@@ -22,7 +22,7 @@ fn main() {
     let rt = Builder::seeded(0x123).quiet().build(app);
     let (app, time, p) = rt.run().unwrap();
 
-    let topo = app.globals().topology.lock().unwrap().clone();
+    let topo = app.globals().topology.borrow().clone();
 
     assert_eq!(topo.nodes().len(), 4 + 1);
     assert_eq!(topo.edges().count(), 14);

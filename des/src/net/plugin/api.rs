@@ -148,7 +148,7 @@ impl ModuleContext {
         };
 
         let id = self.plugins
-            .try_write()
+            .try_borrow_mut()
             .expect("Failed to fetch write lock: add_plugin")
             .add(entry);
 
@@ -168,14 +168,14 @@ impl ModuleContext {
     #[allow(clippy::needless_pass_by_value)]
     pub fn remove_plugin(&self, handle: PluginHandle) {
         self.plugins
-            .try_write()
+            .try_borrow_mut()
             .expect("Failed to fetch write lock: remove_plugin")
             .remove(handle.id);
     }
 
     /// Returns the plugin status
     pub fn status(&self, handle: &PluginHandle) -> PluginStatus {
-        self.plugins.try_read().expect("failed to aquire read lock: plugin_status").status(handle.id)
+        self.plugins.try_borrow().expect("failed to aquire read lock: plugin_status").status(handle.id)
     }
 
     /// Returns the plugin state mutably.
@@ -187,7 +187,7 @@ impl ModuleContext {
     /// 
     pub fn get_plugin_state<P: Plugin, S: 'static>(&self) -> Option<S> {
         match self.plugins
-            .try_read()
+            .try_borrow()
             .expect("failed to fetch read lock: get_plugin_state<T>")
             .iter()
             .find(|p| p.typ == TypeId::of::<P>())?

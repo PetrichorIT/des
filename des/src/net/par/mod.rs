@@ -1,7 +1,8 @@
+use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::sync::atomic::{AtomicUsize, Ordering::SeqCst};
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 mod api;
 use fxhash::{FxBuildHasher, FxHashMap};
@@ -17,7 +18,7 @@ use super::globals;
 ///
 #[derive(Debug)]
 pub struct ParMap {
-    tree: RwLock<ParTree>,
+    tree: RefCell<ParTree>,
 }
 
 #[derive(Debug)]
@@ -45,7 +46,7 @@ impl ParMap {
     #[must_use]
     pub fn new() -> ParMap {
         ParMap {
-            tree: RwLock::new(ParTree::new()),
+            tree: RefCell::new(ParTree::new()),
         }
     }
 
@@ -65,16 +66,16 @@ impl ParMap {
     }
 
     fn get_rlock(&self, key: &str, inc: usize) -> Option<String> {
-        self.tree.read().unwrap().get_rlock(key, inc)
+        self.tree.borrow().get_rlock(key, inc)
     }
 
     fn release_rlock(&self, key: &str) {
-        let done = self.tree.read().unwrap().release_rlock(key);
+        let done = self.tree.borrow().release_rlock(key);
         assert!(done);
     }
 
     fn insert(&self, key: &str, value: String) -> bool {
-        self.tree.write().unwrap().insert(key, value)
+        self.tree.borrow_mut().insert(key, value)
     }
 }
 
