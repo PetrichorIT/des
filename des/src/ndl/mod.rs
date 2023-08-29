@@ -43,7 +43,7 @@
 //! ```
 
 use crate::{
-    net::module::ModuleContext,
+    net::{channel::ChannelDropBehaviour, module::ModuleContext},
     prelude::{
         Channel, ChannelMetrics, EventLifecycle, GateServiceType, ModuleRef, NetworkApplication,
         ObjectPath,
@@ -259,14 +259,12 @@ impl From<&ir::Link> for ChannelMetrics {
             bitrate: value.bitrate as usize,
             jitter: Duration::from_secs_f64(value.jitter),
             latency: Duration::from_secs_f64(value.latency),
-            cost: value
-                .fields
-                .get("cost")
-                .map_or(1.0, ir::Literal::as_float_casted),
-            queuesize: value
-                .fields
-                .get("queuesize")
-                .map_or(0, ir::Literal::as_integer_casted) as usize,
+            drop_behaviour: ChannelDropBehaviour::Queue(Some(
+                value
+                    .fields
+                    .get("queuesize")
+                    .map_or(0, ir::Literal::as_integer_casted) as usize,
+            )),
         }
     }
 }

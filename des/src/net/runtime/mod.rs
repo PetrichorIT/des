@@ -14,9 +14,10 @@ pub(crate) use events::*;
 mod ctx;
 pub use self::ctx::*;
 
-mod builder;
-pub use self::builder::*;
-
+cfg_async! {
+    mod builder;
+    pub use self::builder::*;
+}
 ///
 /// A runtime application for a module/network oriantated simulation.
 ///

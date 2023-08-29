@@ -1,8 +1,7 @@
 #![allow(missing_docs, missing_debug_implementations, unreachable_pub)]
 
-use std::{io, panic};
+use std::{future::Future, io, panic};
 
-use futures::Future;
 use fxhash::{FxBuildHasher, FxHashMap, FxHashSet};
 use tokio::{
     sync::mpsc::{channel, Receiver, Sender},

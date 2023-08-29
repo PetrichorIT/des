@@ -9,6 +9,11 @@ use super::{output::TracingRecord, SpanInfo};
 /// A formatter for a tracing subscriber scope.
 pub trait TracingFormatter {
     /// Formats an emitted tracing event onto a buffer.
+    ///
+    /// # Errors
+    ///
+    /// Fails when either buffer operations fail, or the formatter
+    /// refuses to display the record.
     fn fmt(&mut self, out: &mut Buffer, record: TracingRecord<'_>) -> Result<()>;
 }
 
@@ -26,22 +31,23 @@ impl TracingFormatter for ColorfulTracingFormatter {
             *record.event.metadata().level(),
         )?;
         write!(out, " ")?;
-        self.fmt_spans(out, &record.spans)?;
+        self.fmt_spans(out, record.spans)?;
         self.fmt_event(out, record.event)?;
         writeln!(out)
     }
 }
 
 impl ColorfulTracingFormatter {
+    #[allow(clippy::unused_self)]
     fn fmt_time(&mut self, out: &mut Buffer, time: SimTime) -> Result<()> {
         out.set_color(ColorSpec::new().set_fg(Some(PARENS_COLOR)))?;
         write!(out, "[ ")?;
-        let time_str = format!("{}", time);
-        write!(out, "{time_str:^5}")?;
+        write!(out, "{time:^5}")?;
         write!(out, " ]")?;
         out.reset()
     }
 
+    #[allow(clippy::unused_self)]
     fn fmt_scope(
         &mut self,
         out: &mut Buffer,
@@ -52,7 +58,7 @@ impl ColorfulTracingFormatter {
         let color = get_level_color(level);
         if let Some(scope) = scope {
             out.set_color(ColorSpec::new().set_fg(Some(color)))?;
-            write!(out, "{}", scope)?;
+            write!(out, "{scope}")?;
         }
 
         out.set_color(
@@ -67,7 +73,7 @@ impl ColorfulTracingFormatter {
     fn fmt_spans(&mut self, out: &mut Buffer, spans: &[&SpanInfo]) -> Result<()> {
         out.set_color(ColorSpec::new().set_bold(true))?;
         let end = spans.len();
-        for (i, span) in spans.into_iter().enumerate() {
+        for (i, span) in spans.iter().enumerate() {
             self.fmt_span(out, span)?;
             if i + 1 < end {
                 write!(out, ":")?;
@@ -78,6 +84,7 @@ impl ColorfulTracingFormatter {
         out.reset()
     }
 
+    #[allow(clippy::unused_self)]
     fn fmt_span(&mut self, out: &mut Buffer, span: &SpanInfo) -> Result<()> {
         if span.fields.is_empty() {
             out.set_color(ColorSpec::new().set_bold(true))?;
@@ -89,7 +96,7 @@ impl ColorfulTracingFormatter {
 
             let mut s = String::new();
             for (k, v) in &span.fields {
-                s.push_str(&format!("{k}={v},"))
+                s.push_str(&format!("{k}={v},"));
             }
 
             out.set_color(ColorSpec::new().set_bold(false).set_fg(Some(PARENS_COLOR)))?;
@@ -102,6 +109,7 @@ impl ColorfulTracingFormatter {
         }
     }
 
+    #[allow(clippy::unused_self)]
     fn fmt_event(&mut self, out: &mut Buffer, event: &Event<'_>) -> Result<()> {
         struct Vis<'a> {
             values: &'a mut String,
@@ -111,9 +119,9 @@ impl ColorfulTracingFormatter {
             fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
                 use std::fmt::Write;
                 if field.name() == "message" {
-                    write!(self.message, "{:?}", value).unwrap();
+                    write!(self.message, "{value:?}").unwrap();
                 } else {
-                    write!(self.values, "{} = {:?}", field.name(), value).unwrap();
+                    write!(self.values, "{} = {value:?}", field.name()).unwrap();
                 }
             }
         }
@@ -125,9 +133,9 @@ impl ColorfulTracingFormatter {
             message: &mut message,
         });
         if values.is_empty() {
-            write!(out, "{}", message)
+            write!(out, "{message}")
         } else {
-            write!(out, "{} {}", values, message)
+            write!(out, "{values} {message}")
         }
     }
 }
@@ -149,6 +157,7 @@ const fn get_level_color(level: Level) -> Color {
 #[derive(Debug)]
 pub struct NoColorFormatter;
 impl TracingFormatter for NoColorFormatter {
+    #[allow(clippy::items_after_statements)]
     fn fmt(&mut self, out: &mut Buffer, record: TracingRecord<'_>) -> Result<()> {
         write!(out, "[ ")?;
         let time_str = format!("{}", record.time);
@@ -163,7 +172,7 @@ impl TracingFormatter for NoColorFormatter {
         }?;
 
         if let Some(scope) = record.scope {
-            write!(out, "{}", scope)?;
+            write!(out, "{scope}")?;
         }
 
         write!(out, " ({})", record.target)?;
@@ -182,9 +191,9 @@ impl TracingFormatter for NoColorFormatter {
             fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
                 use std::fmt::Write;
                 if field.name() == "message" {
-                    write!(self.message, "{:?}", value).unwrap();
+                    write!(self.message, "{value:?}").unwrap();
                 } else {
-                    write!(self.values, "{} = {:?}", field.name(), value).unwrap();
+                    write!(self.values, "{} = {value:?}", field.name()).unwrap();
                 }
             }
         }
@@ -196,9 +205,9 @@ impl TracingFormatter for NoColorFormatter {
             message: &mut message,
         });
         if values.is_empty() {
-            write!(out, "{}", message)?;
+            write!(out, "{message}")?;
         } else {
-            write!(out, "{} {}", values, message)?;
+            write!(out, "{values} {message}")?;
         }
 
         writeln!(out)
@@ -206,6 +215,7 @@ impl TracingFormatter for NoColorFormatter {
 }
 
 impl NoColorFormatter {
+    #[allow(clippy::unused_self)]
     fn fmt_span(&mut self, out: &mut Buffer, span: &SpanInfo) -> Result<()> {
         if span.fields.is_empty() {
             write!(out, "{}", span.name)
@@ -213,7 +223,7 @@ impl NoColorFormatter {
             write!(out, "{}", span.name)?;
             let mut s = String::new();
             for (k, v) in &span.fields {
-                s.push_str(&format!("{k}={v}"))
+                s.push_str(&format!("{k}={v}"));
             }
             write!(out, "{{{}}}", s.trim_end_matches(','))
         }

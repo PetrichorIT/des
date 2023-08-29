@@ -110,8 +110,8 @@ impl Topology {
                 let mut itr = 0;
 
                 while let Some(next) = cur.next_gate() {
-                    if let Some(ch) = cur.channel() {
-                        cost += ch.metrics().cost;
+                    if cur.channel().is_some() {
+                        cost += 1.0;
                     }
                     cur = next;
 

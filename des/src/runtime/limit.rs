@@ -52,13 +52,12 @@ impl RuntimeLimit {
     }
 
     pub(crate) fn add(&mut self, limit: RuntimeLimit) {
-        match self {
-            Self::None => *self = limit,
-            _ => {
-                let mut other = Self::None;
-                mem::swap(&mut other, self);
-                *self = Self::CombinedAnd(Box::new(other), Box::new(limit));
-            }
+        if matches!(self, Self::None) {
+            *self = limit;
+        } else {
+            let mut other = Self::None;
+            mem::swap(&mut other, self);
+            *self = Self::CombinedAnd(Box::new(other), Box::new(limit));
         }
     }
 }

@@ -1,5 +1,13 @@
 #![cfg(feature = "net")]
-use des::prelude::*;
+use std::{
+    rc::Rc,
+    sync::atomic::{AtomicUsize, Ordering},
+};
+
+use des::{
+    net::channel::{ChannelDropBehaviour, ChannelProbe},
+    prelude::*,
+};
 use serial_test::serial;
 
 #[macro_use]
@@ -51,8 +59,7 @@ fn channel_dropping_message() {
             bitrate: 1000,
             latency: Duration::from_millis(100),
             jitter: Duration::ZERO,
-            queuesize: 0,
-            cost: 1.0,
+            drop_behaviour: ChannelDropBehaviour::default(),
         },
     );
 
@@ -118,8 +125,7 @@ fn channel_buffering_message() {
             bitrate: 1000,
             latency: Duration::from_millis(100),
             jitter: Duration::ZERO,
-            queuesize: 600,
-            cost: 1.0,
+            drop_behaviour: ChannelDropBehaviour::Queue(Some(600)),
         },
     );
 
@@ -173,8 +179,7 @@ fn channel_instant_busy() {
             bitrate: 1000,
             latency: Duration::from_millis(100),
             jitter: Duration::ZERO,
-            queuesize: 0,
-            cost: 1.0,
+            drop_behaviour: ChannelDropBehaviour::default(),
         },
     );
 
@@ -182,6 +187,172 @@ fn channel_instant_busy() {
     g_out.set_next_gate(g_in);
 
     rt.register_module(module);
+
+    let rt = Builder::seeded(123).build(rt);
+    let _ = rt.run();
+}
+
+struct ChannelProbing;
+impl_build_named!(ChannelProbing);
+impl Module for ChannelProbing {
+    fn new() -> Self {
+        Self
+    }
+    fn at_sim_start(&mut self, _stage: usize) {
+        gate("out", 0)
+            .unwrap()
+            .channel()
+            .unwrap()
+            .attach_probe(Probe(0));
+
+        send(Message::new().build(), "out")
+    }
+}
+
+struct Probe(usize);
+impl ChannelProbe for Probe {
+    fn on_message_transmit(&mut self, _: &ChannelMetrics, _: &Message) {
+        self.0 += 1;
+    }
+}
+
+impl Drop for Probe {
+    fn drop(&mut self) {
+        assert_eq!(self.0, 1)
+    }
+}
+
+#[test]
+#[serial]
+fn channel_probes() {
+    // Logger::new()
+    //     .interal_max_log_level(log::LevelFilter::Trace)
+    //     .set_logger();
+
+    let mut rt = NetworkApplication::new(());
+
+    let alice = ChannelProbing::build_named(ObjectPath::from("alice".to_string()), &mut rt);
+    let bob = ChannelProbing::build_named(ObjectPath::from("bob".to_string()), &mut rt);
+
+    let alice_in = alice.create_gate("in", GateServiceType::Input);
+    let alice_out = alice.create_gate("out", GateServiceType::Output);
+
+    let bob_in = bob.create_gate("in", GateServiceType::Input);
+    let bob_out = bob.create_gate("out", GateServiceType::Output);
+
+    let alice_to_bob = Channel::new(
+        ObjectPath::appended_channel(&alice.path(), "chan"),
+        ChannelMetrics {
+            bitrate: 1000,
+            latency: Duration::from_millis(100),
+            jitter: Duration::ZERO,
+            drop_behaviour: ChannelDropBehaviour::default(),
+        },
+    );
+
+    let bob_to_alice = Channel::new(
+        ObjectPath::appended_channel(&bob.path(), "chan"),
+        ChannelMetrics {
+            bitrate: 1000,
+            latency: Duration::from_millis(100),
+            jitter: Duration::ZERO,
+            drop_behaviour: ChannelDropBehaviour::default(),
+        },
+    );
+
+    alice_out.set_channel(alice_to_bob);
+    alice_out.set_next_gate(bob_in);
+
+    bob_out.set_channel(bob_to_alice);
+    bob_out.set_next_gate(alice_in);
+
+    rt.register_module(alice);
+    rt.register_module(bob);
+
+    let rt = Builder::seeded(123).build(rt);
+    let _ = rt.run();
+}
+
+struct ChannelProbingRc {
+    rc: Rc<AtomicUsize>,
+}
+impl_build_named!(ChannelProbingRc);
+impl Module for ChannelProbingRc {
+    fn new() -> Self {
+        Self {
+            rc: Rc::new(AtomicUsize::new(0)),
+        }
+    }
+    fn at_sim_start(&mut self, _stage: usize) {
+        gate("out", 0)
+            .unwrap()
+            .channel()
+            .unwrap()
+            .attach_probe(ProbeRc(self.rc.clone()));
+
+        for _ in 0..42 {
+            send(Message::new().build(), "out");
+        }
+    }
+
+    fn at_sim_end(&mut self) {
+        assert_eq!(self.rc.load(Ordering::SeqCst), 42);
+    }
+}
+
+struct ProbeRc(Rc<AtomicUsize>);
+impl ChannelProbe for ProbeRc {
+    fn on_message_transmit(&mut self, _: &ChannelMetrics, _: &Message) {
+        self.0.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+#[test]
+#[serial]
+fn channel_probe_rc() {
+    // Logger::new()
+    //     .interal_max_log_level(log::LevelFilter::Trace)
+    //     .set_logger();
+
+    let mut rt = NetworkApplication::new(());
+
+    let alice = ChannelProbing::build_named(ObjectPath::from("alice".to_string()), &mut rt);
+    let bob = ChannelProbing::build_named(ObjectPath::from("bob".to_string()), &mut rt);
+
+    let alice_in = alice.create_gate("in", GateServiceType::Input);
+    let alice_out = alice.create_gate("out", GateServiceType::Output);
+
+    let bob_in = bob.create_gate("in", GateServiceType::Input);
+    let bob_out = bob.create_gate("out", GateServiceType::Output);
+
+    let alice_to_bob = Channel::new(
+        ObjectPath::appended_channel(&alice.path(), "chan"),
+        ChannelMetrics {
+            bitrate: 1000,
+            latency: Duration::from_millis(100),
+            jitter: Duration::ZERO,
+            drop_behaviour: ChannelDropBehaviour::default(),
+        },
+    );
+
+    let bob_to_alice = Channel::new(
+        ObjectPath::appended_channel(&bob.path(), "chan"),
+        ChannelMetrics {
+            bitrate: 1000,
+            latency: Duration::from_millis(100),
+            jitter: Duration::ZERO,
+            drop_behaviour: ChannelDropBehaviour::default(),
+        },
+    );
+
+    alice_out.set_channel(alice_to_bob);
+    alice_out.set_next_gate(bob_in);
+
+    bob_out.set_channel(bob_to_alice);
+    bob_out.set_next_gate(alice_in);
+
+    rt.register_module(alice);
+    rt.register_module(bob);
 
     let rt = Builder::seeded(123).build(rt);
     let _ = rt.run();

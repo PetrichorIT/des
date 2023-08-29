@@ -506,8 +506,7 @@ fn shutdown_will_drop_transiting_delayed_channels() {
             bitrate: 100_000,
             latency: Duration::from_secs_f64(0.004),
             jitter: Duration::ZERO,
-            cost: 1.0,
-            queuesize: 0,
+            drop_behaviour: ChannelDropBehaviour::default(),
         },
     );
     let ch_to_i = Channel::new(
@@ -516,8 +515,7 @@ fn shutdown_will_drop_transiting_delayed_channels() {
             bitrate: 100_000,
             latency: Duration::from_secs_f64(0.004),
             jitter: Duration::ZERO,
-            cost: 1.0,
-            queuesize: 0,
+            drop_behaviour: ChannelDropBehaviour::default(),
         },
     );
 

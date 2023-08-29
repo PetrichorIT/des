@@ -19,6 +19,7 @@ use super::{Application, FutureEventSet, Profiler, Runtime, RuntimeLimit, RNG};
 static SIMULATION_LOCK: Mutex<()> = Mutex::new(());
 
 /// A builder for a runtime instance.
+#[must_use]
 pub struct Builder {
     pub(super) quiet: bool,
     pub(super) rng: Box<dyn RngCore>,
@@ -36,7 +37,7 @@ impl Builder {
     pub fn new() -> Builder {
         Builder {
             quiet: false,
-            rng: Box::new(StdRng::from_rng(OsRng::default()).expect("Failed to create RNG")),
+            rng: Box::new(StdRng::from_rng(OsRng).expect("Failed to create RNG")),
             limit: RuntimeLimit::None,
 
             start_time: SimTime::MIN,
@@ -70,7 +71,6 @@ impl Builder {
     /// Sets the cqueue options if this runtime uses a cqueue.
     /// NOP otherwise.
     ///
-    #[must_use]
     #[cfg(feature = "cqueue")]
     pub fn cqueue_options(mut self, n: usize, t: Duration) -> Self {
         self.cqueue_num_buckets = n;
@@ -82,7 +82,6 @@ impl Builder {
     ///
     /// Suppressed runtime messages from the simulation framework.
     ///
-    #[must_use]
     pub fn quiet(mut self) -> Self {
         self.quiet = true;
         self
@@ -91,7 +90,6 @@ impl Builder {
     ///
     /// Changes the maximum iteration number of a runtime.
     ///
-    #[must_use]
     pub fn start_time(mut self, time: SimTime) -> Self {
         self.start_time = time;
         self
@@ -100,7 +98,6 @@ impl Builder {
     ///
     /// Changes the maximum iteration number of a runtime.
     ///
-    #[must_use]
     pub fn max_itr(mut self, max_itr: usize) -> Self {
         self.limit.add(RuntimeLimit::EventCount(max_itr));
         self
@@ -109,7 +106,6 @@ impl Builder {
     ///
     /// Changes the maximum time of the runtime (default: inf).
     ///
-    #[must_use]
     pub fn max_time(mut self, max_time: SimTime) -> Self {
         self.limit.add(RuntimeLimit::SimTime(max_time));
         self
@@ -119,7 +115,6 @@ impl Builder {
     /// Sets a custom limit to the end of the runtime, overwriting
     /// all `max_itr` and `max_time` options.
     ///
-    #[must_use]
     pub fn limit(mut self, limit: RuntimeLimit) -> Self {
         self.limit.add(limit);
         self
@@ -207,6 +202,12 @@ impl Builder {
 
             app,
         }
+    }
+}
+
+impl Default for Builder {
+    fn default() -> Self {
+        Builder::new()
     }
 }
 

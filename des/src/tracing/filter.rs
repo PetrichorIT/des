@@ -62,7 +62,7 @@ pub(super) struct FilterDiretive {
 impl FilterDiretive {
     fn level_filter_for(&self, lvl: LevelFilter, record: &TracingRecord) -> LevelFilter {
         if let Some(ref scope) = self.scope {
-            if !record.scope.map(|s| s.starts_with(scope)).unwrap_or(false) {
+            if !record.scope.map_or(false, |s| s.starts_with(scope)) {
                 return lvl;
             }
         }
@@ -144,12 +144,12 @@ impl FromStr for FilterDiretive {
             };
 
             assert!(s.ends_with(']'));
-            s = s.trim_end_matches("]");
+            s = s.trim_end_matches(']');
 
             (nonempty_or_none(target), scope)
         } else {
             assert!(s.ends_with(']'));
-            s = s.trim_end_matches("]");
+            s = s.trim_end_matches(']');
             (nonempty_or_none(scope_or_target), None)
         };
 
@@ -164,7 +164,7 @@ impl FromStr for FilterDiretive {
         };
 
         assert!(s.ends_with('}'));
-        s = s.trim_end_matches("}");
+        s = s.trim_end_matches('}');
         let span = if span.is_empty() { None } else { Some(span.to_string()) };
 
         Ok(FilterDiretive { 
@@ -202,7 +202,7 @@ fn parse_level(lvl: &str) -> Result<LevelFilter, FilterDirectiveParsingError> {
         "debug" => Ok(LevelFilter::DEBUG),
         "trace" => Ok(LevelFilter::TRACE),
         "off" => Ok(LevelFilter::OFF),
-        _ => return Err(FilterDirectiveParsingError::InvalidFilterLevel)
+        _ => Err(FilterDirectiveParsingError::InvalidFilterLevel)
     }
 }
 
@@ -214,7 +214,7 @@ fn read_until<'a>(s: &mut &'a str, p: char) -> Option<&'a str> {
             *s = &s[(offset + c.len_utf8())..];
             return Some(fwd);
         }
-        offset += c.len_utf8()
+        offset += c.len_utf8();
     }
 
     None
@@ -228,7 +228,7 @@ fn read_until_set<'a>(s: &mut &'a str, p: &[char]) -> Option<(&'a str,char)> {
             *s = &s[(offset + c.len_utf8())..];
             return Some((fwd, c));
         }
-        offset += c.len_utf8()
+        offset += c.len_utf8();
     }
 
     None
@@ -252,7 +252,7 @@ impl Error for FilterDirectiveParsingError {}
 
 impl Display for FilterDirectiveParsingError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        <Self as Debug>::fmt(&self, f)
+        <Self as Debug>::fmt(self, f)
     }
 }
 

@@ -80,7 +80,7 @@ impl SimTime {
     }
 
     ///
-    /// Constructs an instance of SimTime from a give duration since SimTime::ZERO.
+    /// Constructs an instance of `SimTime` from a give duration since `SimTime::ZERO`.
     ///
     #[must_use]
     pub const fn from_duration(duration: Duration) -> Self {
@@ -109,9 +109,14 @@ impl SimTime {
 
     /// Returns the amount of time elapsed from another instant to this one,
     /// or zero duration if that instant is later than this one.
+    ///
+    /// # Panics
+    ///
+    /// This function  panics of the checked operation fails.
     #[must_use]
     pub fn duration_since(&self, earlier: SimTime) -> Duration {
-        self.checked_duration_since(earlier).unwrap()
+        self.checked_duration_since(earlier)
+            .expect("duration subtraction invalid")
     }
 
     /// Returns the amount of time elapsed from another instant to this one,

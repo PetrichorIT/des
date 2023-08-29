@@ -145,6 +145,7 @@ pub fn leave_scope() {
 ///
 /// This subscriber should only be used in combination with a
 /// des `Runtime` that executes a `NetworkApplication`.
+#[must_use]
 pub struct Subscriber<P: ScopeConfigurationPolicy> {
     policy: P,
     scopes: RwLock<FxHashMap<u64, Scope>>,
@@ -202,6 +203,10 @@ impl<P: ScopeConfigurationPolicy> Subscriber<P> {
     }
 
     /// Sets the tracer as the global default.
+    ///
+    /// # Errors
+    ///
+    /// May fail if a subscriber has been set before.
     pub fn init(self) -> Result<(), SetGlobalDefaultError>
     where
         P: 'static,
@@ -231,7 +236,7 @@ impl<P: ScopeConfigurationPolicy> Subscriber<P> {
         while let Ok((id, scope_name)) = rx.try_recv() {
             let mut scopes = self.scopes.write();
             let cfg = self.policy.configure(&scope_name);
-            let _a = scopes.insert(
+            let a = scopes.insert(
                 id.0,
                 Scope {
                     path: if scope_name.is_empty() {
@@ -243,7 +248,7 @@ impl<P: ScopeConfigurationPolicy> Subscriber<P> {
                     fmt: cfg.fmt,
                 },
             );
-            assert!(_a.is_none());
+            assert!(a.is_none());
         }
     }
 }
@@ -321,7 +326,7 @@ impl<P: ScopeConfigurationPolicy + 'static> tracing::Subscriber for Subscriber<P
         } else {
             // TODO: todo!()
             // unimplemented!("no scope found")
-            eprintln!("no scope found")
+            eprintln!("no scope found");
         }
     }
 
@@ -330,7 +335,7 @@ impl<P: ScopeConfigurationPolicy + 'static> tracing::Subscriber for Subscriber<P
     }
 
     fn exit(&self, span: &Id) {
-        assert_eq!(self.stack.write().pop(), Some(span.clone()))
+        assert_eq!(self.stack.write().pop(), Some(span.clone()));
     }
 
     fn try_close(&self, id: Id) -> bool {
@@ -347,7 +352,9 @@ impl<P: ScopeConfigurationPolicy + 'static> tracing::Subscriber for Subscriber<P
     }
 
     fn clone_span(&self, id: &Id) -> Id {
-        self.spans.write().get_mut(id).map(|info| info.sc += 1);
+        if let Some(info) = self.spans.write().get_mut(id) {
+            info.sc += 1;
+        }
         id.clone()
     }
 }

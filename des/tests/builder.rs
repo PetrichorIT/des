@@ -85,8 +85,7 @@ fn builder_delayed_links() {
             bitrate: 10000,
             latency: Duration::from_millis(10),
             jitter: Duration::ZERO,
-            cost: 1.0,
-            queuesize: 0,
+            drop_behaviour: ChannelDropBehaviour::default(),
         }),
     );
 
