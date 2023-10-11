@@ -24,6 +24,7 @@ use super::NetworkApplication;
 /// without having to define modules manualy. It provides a strong
 /// abstraction over the underyling realities of a `NetworkApplication`
 ///
+#[derive(Debug)]
 pub struct AsyncBuilder {
     app: NetworkApplication<()>,
     default_cfg: NodeCfg,
@@ -40,6 +41,7 @@ pub struct NodeCfg {
     pub join: bool,
 }
 
+#[derive(Debug)]
 struct NodeInfo {
     #[allow(unused)]
     kind: NodeKind,
@@ -65,6 +67,7 @@ impl AsyncBuilder {
     /// functions to create async nodes. [`connect`](Self::connect)
     ///  can then be used to connect nodes
     ///
+    #[must_use]
     pub fn new() -> AsyncBuilder {
         AsyncBuilder {
             app: NetworkApplication::new(()),
@@ -86,6 +89,7 @@ impl AsyncBuilder {
     /// network application, to be passed to a [`Runtime`](crate::runtime::Runtime).
     ///
     /// This operation never fails.
+    #[must_use]
     pub fn build(self) -> NetworkApplication<()> {
         self.app
     }
@@ -97,6 +101,10 @@ impl AsyncBuilder {
     /// since the builder creates modules incrementaly to connect
     /// nodes, while the input type T may have created its own gates.
     /// This may lead to collisions.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the provided parent does not exist.
     pub fn external<T: Module>(&mut self, name: &str, parent: Option<&str>) {
         let ctx = if let Some(parent) = parent {
             let parent = self
@@ -137,7 +145,7 @@ impl AsyncBuilder {
         F: Fn(Receiver<Message>) -> Fut + Send + 'static,
         Fut: Future<Output = io::Result<()>> + Send + 'static,
     {
-        self.node_with_cfg_and_parent(name.as_ref(), None, self.default_cfg.clone(), software)
+        self.node_with_cfg_and_parent(name.as_ref(), None, self.default_cfg.clone(), software);
     }
 
     /// Adds a normal network node with the given name and cfg.
@@ -151,7 +159,7 @@ impl AsyncBuilder {
         F: Fn(Receiver<Message>) -> Fut + Send + 'static,
         Fut: Future<Output = io::Result<()>> + Send + 'static,
     {
-        self.node_with_cfg_and_parent(name.as_ref(), None, cfg, software)
+        self.node_with_cfg_and_parent(name.as_ref(), None, cfg, software);
     }
 
     /// Adds a normal network node with the given name and parent.
@@ -174,7 +182,7 @@ impl AsyncBuilder {
             Some(parent.as_ref()),
             self.default_cfg.clone(),
             software,
-        )
+        );
     }
 
     /// Adds a normal network node to the simulation.
@@ -196,6 +204,10 @@ impl AsyncBuilder {
     /// is a creation fn to enable the simulation to
     /// recreate the main task, when the module was shut down
     /// and restarted.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the provided parent does not exist.
     pub fn node_with_cfg_and_parent<F, Fut>(
         &mut self,
         name: &str,
@@ -254,7 +266,7 @@ impl AsyncBuilder {
     /// This operation panic if the provided node names do
     /// not map to existing nodes.
     pub fn connect(&mut self, lhs: impl AsRef<str>, rhs: impl AsRef<str>) {
-        self.connect_with(lhs, rhs, None)
+        self.connect_with(lhs, rhs, None);
     }
 
     /// Connects two nodes with a duplex channel.
@@ -343,7 +355,11 @@ impl AsyncBuilder {
     }
 }
 
-//
+impl Default for AsyncBuilder {
+    fn default() -> Self {
+        AsyncBuilder::new()
+    }
+}
 
 struct FutModule<F, Fut>
 where

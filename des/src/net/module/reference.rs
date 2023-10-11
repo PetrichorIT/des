@@ -1,6 +1,7 @@
 use crate::net::NetEvents;
 use crate::prelude::{ChannelRef, Gate, GateRef, GateServiceType};
 use crate::runtime::EventSink;
+use crate::time::TimerSlot;
 use crate::tracing::{enter_scope, leave_scope};
 
 use super::{DummyModule, Module, ModuleContext};
@@ -221,14 +222,14 @@ impl ModuleRef {
             }
 
             let driver = self.ctx.async_ext.write().driver.take();
-            driver.map(|mut d| {
+            if let Some(mut d) = driver {
                 let bumpable = d.bump();
                 if d.next_wakeup <= SimTime::now() {
                     d.next_wakeup = SimTime::MAX;
                 }
-                bumpable.into_iter().for_each(|s| s.wake_all());
+                bumpable.into_iter().for_each(TimerSlot::wake_all);
                 d.set();
-            });
+            }
         }
     }
 
@@ -258,7 +259,7 @@ impl ModuleRef {
                             module: self.clone(),
                         }),
                         next_wakeup,
-                    )
+                    );
                 }
             }
             ext.driver = Some(driver);

@@ -261,6 +261,7 @@ impl Gate {
     }
 }
 
+#[allow(clippy::missing_fields_in_debug)]
 impl Debug for Gate {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Gate")

@@ -169,6 +169,10 @@ struct Scope {
 
 impl<P: ScopeConfigurationPolicy> Subscriber<P> {
     /// Creates a new tracing Subscriber with the given policy.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the filter provided from the env using `RUST_LOG` is not valid.
     pub fn new(policy: P) -> Self {
         let (scopes_tx, scopes_rx) = channel();
 
@@ -197,8 +201,12 @@ impl<P: ScopeConfigurationPolicy> Subscriber<P> {
     }
 
     /// Adds a target filter in textual repr to the subscriber.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the provided filter is not valid.
     pub fn with_filter(mut self, filter: impl AsRef<str>) -> Self {
-        self.filters = filter.as_ref().parse().expect("Failed to parse");
+        self.filters = filter.as_ref().parse().expect("failed to parse filter");
         self
     }
 
@@ -324,8 +332,7 @@ impl<P: ScopeConfigurationPolicy + 'static> tracing::Subscriber for Subscriber<P
             record.scope = Some(&*path);
             output.write(&mut **fmt, record).unwrap();
         } else {
-            // TODO: todo!()
-            // unimplemented!("no scope found")
+            // TODO: Is this really the best option?
             eprintln!("no scope found");
         }
     }

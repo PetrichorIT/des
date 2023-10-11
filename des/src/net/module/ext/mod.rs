@@ -103,8 +103,6 @@ pub trait AsyncModule: Send {
     /// ```
     async fn at_sim_start(&mut self, _stage: usize) {}
 
-   
-
     ///
     /// A function that is called once the simulation has terminated.
     /// Any event created by this function will be ignored.
@@ -150,7 +148,7 @@ where
     fn handle_message(&mut self, msg: Message) {
         // (1) Fetch the runtime and initial the time context.
         let Some(rt) = super::async_get_rt() else {
-            return
+            return;
         };
 
         // (2) Ignore notifty message only relevant for a
@@ -160,7 +158,6 @@ where
             time: SimTime::now(),
         })
         .expect("Failed to forward message to 'handle_message'");
-    
 
         rt.1.block_on(&rt.0, yield_now());
     }
@@ -168,7 +165,7 @@ where
     fn at_sim_start(&mut self, stage: usize) {
         // time is 0
         let Some(rt) = super::async_get_rt() else {
-            return
+            return;
         };
 
         // # Setup message receive handle.
@@ -227,24 +224,25 @@ where
 
     fn finish_sim_start(&mut self) {
         let Some(rt) = super::async_get_rt() else {
-            return 
+            return;
         };
 
         super::async_sim_start_tx_send(usize::MAX)
             .expect("Failed to send close signal to sim_start_task");
 
-            rt.1.block_on(&rt.0, yield_now());
+        rt.1.block_on(&rt.0, yield_now());
 
         // The join must succeed else saftey invariant cannot be archived.
         let handle = super::async_sim_start_join_take().expect("Crime");
         let _g = rt.0.enter();
         assert!(handle.is_finished());
         rt.0.block_on(handle).unwrap();
-        drop(_g);
     }
 
     fn at_sim_end(&mut self) {
-        let Some(rt) = super::async_get_rt() else { return };
+        let Some(rt) = super::async_get_rt() else {
+            return;
+        };
 
         // SAFTEY:
         // Sim end means only this function will be executed before drop
@@ -258,15 +256,19 @@ where
     }
 
     fn finish_sim_end(&mut self) {
-        let Some(rt) = super::async_get_rt() else { return };
+        let Some(rt) = super::async_get_rt() else {
+            return;
+        };
 
         rt.1.block_on(&rt.0, yield_now());
 
         let handle = super::async_sim_end_join_take().expect("Crime");
         let _g = rt.0.enter();
-        assert!(handle.is_finished(), "at_sim_end() could not complete, since it is stuck at some await point");
+        assert!(
+            handle.is_finished(),
+            "at_sim_end() could not complete, since it is stuck at some await point"
+        );
         rt.0.block_on(handle).unwrap();
-        drop(_g);
     }
 
     fn num_sim_start_stages(&self) -> usize {

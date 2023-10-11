@@ -112,8 +112,15 @@ impl Channel {
     }
 
     /// Attaches a probe
+    ///
+    /// # Panics
+    ///
+    /// Panics if the channel mutex was poisoned.
     pub fn attach_probe(&self, probe: impl ChannelProbe) {
-        let mut chan = self.inner.write().unwrap();
+        let mut chan = self
+            .inner
+            .write()
+            .expect("failed to get inner channel lock");
         let probe = Box::new(probe);
         chan.probe = probe;
     }
@@ -198,7 +205,7 @@ impl Channel {
             metrics.drop_behaviour.handle(path, buffer, msg, next_gate);
         } else {
             let ChannelInner { probe, metrics, .. } = &mut *chan;
-            probe.on_message_transmit(&metrics, &msg);
+            probe.on_message_transmit(metrics, &msg);
 
             let dur = metrics.calculate_duration(&msg, rng_ref);
             let busy = metrics.calculate_busy(&msg);
@@ -284,8 +291,6 @@ impl ChannelDropBehaviour {
 
 impl Debug for Channel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let this = self.inner.read().unwrap();
-
         #[derive(Debug)]
         #[allow(unused)]
         enum FmtChannelState {
@@ -310,6 +315,8 @@ impl Debug for Channel {
                 }
             }
         }
+
+        let this = self.inner.read().unwrap();
 
         f.debug_struct("Channel")
             .field("path", &this.path)

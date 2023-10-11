@@ -1,7 +1,7 @@
 use super::{Cursor, Delimiter, Token};
 use crate::{
     ast::{token::TokenKind, Lit},
-    error::Error,
+    error::{Error, ErrorKind},
     lexer::{self, LiteralKind},
     Span,
 };
@@ -311,11 +311,12 @@ impl TokenTree {
                     }
 
                     OpenBrace | OpenBracket | OpenParen => {
-                        todo!();
+                        unreachable!("")
                     }
-                    CloseBrace | CloseBracket | CloseParen => {
-                        todo!()
-                    }
+                    CloseBrace | CloseBracket | CloseParen => Err(Error::new(
+                        ErrorKind::MissingDelim,
+                        format!("missing opening delimiter for {:?}", token),
+                    )),
 
                     Ident => Ok(TokenTree::Token(
                         Token::new(TokenKind::ident_or_keyword(span, cursor), span),

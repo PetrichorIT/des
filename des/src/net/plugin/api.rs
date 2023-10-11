@@ -86,6 +86,7 @@ impl PluginHandle {
     /// 
     /// This function panics if the plugin describes by this handle does not 
     /// belong to the current module.
+    #[must_use]
     pub fn status(&self) -> PluginStatus {
         assert_eq!(
             self.mod_id,
@@ -121,12 +122,14 @@ impl fmt::Debug for PluginHandle {
         return f
             .debug_struct("PluginHandle")
             .field("id", &self.id)
+            .field("mod_id", &self.mod_id)
             .finish();
 
         #[cfg(debug_assertions)]
         return f
             .debug_struct("PluginHandle")
             .field("id", &self.id)
+            .field("mod_id", &self.mod_id)
             .field("info", &self.plugin_info)
             .finish();
     }
@@ -134,6 +137,10 @@ impl fmt::Debug for PluginHandle {
 
 impl ModuleContext {
     /// Refer to [`add_plugin`].
+    /// 
+    /// # Panics
+    /// 
+    /// This function panics if the plugin store is deadlocked.
     pub fn add_plugin<T: Plugin + 'static>(
         &self,
         plugin: T,
@@ -174,6 +181,10 @@ impl ModuleContext {
     }
 
     /// Returns the plugin status
+    /// 
+    /// # Panics
+    /// 
+    /// This function panics if the plugin store is deadlocked
     pub fn status(&self, handle: &PluginHandle) -> PluginStatus {
         self.plugins.try_read().expect("failed to aquire read lock: plugin_status").status(handle.id)
     }

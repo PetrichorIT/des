@@ -387,6 +387,7 @@ impl<E> Debug for EventNode<E> {
             .field("next", &self.next)
             .field("time", &self.time)
             .field("value", &self.value.is_some())
+            .field("id", &self.id)
             .finish()
     }
 }

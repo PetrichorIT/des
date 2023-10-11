@@ -79,6 +79,7 @@ pub struct NdlApplication {
 impl NdlApplication {
     /// Turns the NDL builder into a `NetworkApplication`, ready to be
     /// used by a `Runtime`.
+    #[must_use]
     pub fn into_app(self) -> NetworkApplication<NdlApplication> {
         NetworkApplication::new(self)
     }
@@ -230,12 +231,11 @@ impl NdlApplication {
         }
 
         ctx.activate();
-        // log_scope!(ctx.logger_token);
+
         let f = rt.app.inner.registry.get(ty).unwrap();
         let state = f();
         ctx.upgrade_dummy(state);
 
-        // TODO: is this still usefull or should we just save the entry point?
         rt.app.register_module(ctx.clone());
 
         ctx

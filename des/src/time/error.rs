@@ -1,6 +1,6 @@
 //! Time error types.
 
-use self::Kind::*;
+use self::Kind::{AtCapacity, Invalid, Shutdown};
 use std::error;
 use std::fmt;
 
@@ -51,31 +51,37 @@ pub struct Elapsed(());
 
 impl Error {
     /// Creates an error representing a shutdown timer.
+    #[must_use]
     pub fn shutdown() -> Error {
         Error(Shutdown)
     }
 
     /// Returns `true` if the error was caused by the timer being shutdown.
+    #[must_use]
     pub fn is_shutdown(&self) -> bool {
         matches!(self.0, Kind::Shutdown)
     }
 
     /// Creates an error representing a timer at capacity.
+    #[must_use]
     pub fn at_capacity() -> Error {
         Error(AtCapacity)
     }
 
     /// Returns `true` if the error was caused by the timer being at capacity.
+    #[must_use]
     pub fn is_at_capacity(&self) -> bool {
         matches!(self.0, Kind::AtCapacity)
     }
 
     /// Creates an error representing a misconfigured timer.
+    #[must_use]
     pub fn invalid() -> Error {
         Error(Invalid)
     }
 
     /// Returns `true` if the error was caused by the timer being misconfigured.
+    #[must_use]
     pub fn is_invalid(&self) -> bool {
         matches!(self.0, Kind::Invalid)
     }
@@ -85,13 +91,13 @@ impl error::Error for Error {}
 
 impl fmt::Display for Error {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use self::Kind::*;
+        use self::Kind::{AtCapacity, Invalid, Shutdown};
         let descr = match self.0 {
             Shutdown => "the timer is shutdown, must be called from the context of Tokio runtime",
             AtCapacity => "timer is at capacity and cannot create a new entry",
             Invalid => "timer duration exceeds maximum duration",
         };
-        write!(fmt, "{}", descr)
+        write!(fmt, "{descr}")
     }
 }
 

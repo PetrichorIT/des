@@ -156,7 +156,7 @@ pub fn derive_impl(ident: Ident, data: Data, generics: Generics) -> Result<Token
 }
 
 fn generate_impl_generics(mut generics: Generics) -> Generics {
-    for param in generics.params.iter_mut() {
+    for param in &mut generics.params {
         if let GenericParam::Type(param) = param {
             if !param.bounds.trailing_punct() && !param.bounds.is_empty() {
                 param.bounds.push_punct(Plus {

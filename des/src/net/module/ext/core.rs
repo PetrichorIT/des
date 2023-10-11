@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{rc::Rc, sync::Arc};
 
 use crate::{
     net::message::Message,
@@ -26,9 +26,10 @@ pub(crate) struct AsyncCoreExt {
     pub(crate) sim_end_join: Option<JoinHandle<()>>,
 }
 
+#[allow(clippy::large_enum_variant)]
 pub(crate) enum Rt {
     Builder(Builder),
-    Runtime((Arc<Runtime>, Arc<LocalSet>)),
+    Runtime((Arc<Runtime>, Rc<LocalSet>)),
     Shutdown,
 }
 
@@ -69,7 +70,7 @@ impl AsyncCoreExt {
                     .build()
                     .expect("Failed to build tokio runtime"),
             ),
-            Arc::new(LocalSet::new()),
+            Rc::new(LocalSet::new()),
         ));
 
         // let (tx, rx) = unbounded_channel();
@@ -92,7 +93,7 @@ impl AsyncCoreExt {
 }
 
 impl Rt {
-    pub(crate) fn current(&mut self) -> Option<(Arc<Runtime>, Arc<LocalSet>)> {
+    pub(crate) fn current(&mut self) -> Option<(Arc<Runtime>, Rc<LocalSet>)> {
         match self {
             Rt::Builder(builder) => {
                 let seed = RngSeed::from_bytes(&random::<u64>().to_le_bytes());
@@ -103,7 +104,7 @@ impl Rt {
                             .build()
                             .expect("Failed to build tokio runtime"),
                     ),
-                    Arc::new(LocalSet::new()),
+                    Rc::new(LocalSet::new()),
                 ));
                 self.current()
             }

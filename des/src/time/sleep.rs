@@ -86,7 +86,7 @@ pin_project! {
     /// use it with [`select!`] or by calling `poll`, you have to pin it first.
     /// If you use it with `.await`, this does not apply.
     ///
-    #[must_use]
+    #[must_use  = "futures do nothing unless you `.await` or poll them"]
     #[derive(Debug)]
     pub struct Sleep {
         deadline: SimTime,
@@ -112,6 +112,7 @@ impl Sleep {
     }
 
     /// Returns the instant at which the future will complete.
+    #[must_use]
     pub fn deadline(&self) -> SimTime {
         self.deadline
     }
@@ -119,6 +120,7 @@ impl Sleep {
     /// Returns `true` if `Sleep` has elapsed.
     ///
     /// A `Sleep` instance is elapsed when the requested duration has elapsed.
+    #[must_use]
     pub fn is_elapsed(&self) -> bool {
         self.deadline <= SimTime::now()
     }
@@ -153,7 +155,7 @@ impl Sleep {
     ///
     /// [`Pin::as_mut`]: fn@std::pin::Pin::as_mut
     pub fn reset(self: Pin<&mut Self>, deadline: SimTime) {
-        self.reset_inner(deadline)
+        self.reset_inner(deadline);
     }
 
     fn reset_inner(self: Pin<&mut Self>, deadline: SimTime) {

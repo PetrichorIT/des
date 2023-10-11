@@ -64,7 +64,7 @@ impl Driver {
     }
 
     pub(super) fn with_current<R>(f: impl FnOnce(&mut Driver) -> R) -> R {
-        TIME_CTX.with(|ctx| f(&mut ctx.borrow_mut().as_mut().unwrap()))
+        TIME_CTX.with(|ctx| f(ctx.borrow_mut().as_mut().unwrap()))
     }
 }
 
@@ -123,7 +123,7 @@ impl TimerQueue {
         if front <= SimTime::now() {
             let mut buffer = Vec::new();
             while let Some(Ok(v)) = self.pending.borrow_mut().pop_front().map(Arc::try_unwrap) {
-                buffer.push(v)
+                buffer.push(v);
             }
             buffer
         } else {
@@ -134,7 +134,7 @@ impl TimerQueue {
 
 impl TimerSlot {
     fn add(&self, entry: TimerSlotEntry) {
-        self.entrys.borrow_mut().push(entry)
+        self.entrys.borrow_mut().push(entry);
     }
 
     fn remove(&self, id: usize) -> Option<TimerSlotEntry> {
@@ -152,7 +152,7 @@ impl TimerSlot {
         self.entrys
             .into_inner()
             .into_iter()
-            .for_each(|entry| entry.waker.wake())
+            .for_each(|entry| entry.waker.wake());
     }
 }
 

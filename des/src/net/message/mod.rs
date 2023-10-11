@@ -90,6 +90,9 @@ impl Message {
     /// Trys to return the content by reference casted to the given type T.
     /// Panics if the no content exists or the content is not of type T.
     ///
+    /// # Panics
+    ///
+    /// Panics if he cast fails.
     #[must_use]
     pub fn content<T: 'static + MessageBody>(&self) -> &T {
         self.try_content().expect("Failed to unwrap")
@@ -107,6 +110,9 @@ impl Message {
     /// Trys to return the content by mutable ref casted to the given type T.
     /// Panics if the no content exists or the content is not of type T.
     ///
+    /// # Panics
+    ///
+    /// Panics if he cast fails.
     pub fn content_mut<T: 'static + MessageBody>(&mut self) -> &mut T {
         self.try_content_mut().expect("Failed to unwrap")
     }
@@ -126,6 +132,9 @@ impl Message {
     /// which does not gurantee that this is a internally valid instance
     /// of 'T'.
     ///
+    /// # Panics
+    ///
+    /// Panics if he cast fails.
     #[inline]
     #[must_use]
     pub fn can_cast<T: 'static + MessageBody>(&self) -> bool {
@@ -135,6 +144,9 @@ impl Message {
     ///
     /// Performs a [`try_cast`](Message::try_cast)unwraping the result.
     ///
+    /// # Panics
+    ///
+    /// Panics if he cast fails.
     #[must_use]
     pub fn cast<T: 'static + MessageBody + Send>(self) -> (T, MessageHeader) {
         self.try_cast().expect("Could not cast to type T")
@@ -167,6 +179,10 @@ impl Message {
     /// # Safety
     ///
     /// See [`try_cast_unsafe`](Message::try_cast_unsafe)
+    ///
+    /// # Panics
+    ///
+    /// Panics if he cast fails.
     #[must_use]
     pub unsafe fn cast_unsafe<T: 'static + MessageBody>(self) -> (T, MessageHeader) {
         self.try_cast_unsafe().expect("Could not cast to type T")

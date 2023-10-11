@@ -173,16 +173,6 @@ impl<T> DualLinkedList<T> {
     }
 }
 
-// impl<T: Clone> Clone for DLL<T> {
-//     fn clone(&self) -> Self {
-//         let mut r = Self::new(self.shared_len.clone(), todo!());
-//         for (event, time) in self.into_iter() {
-//             r.add(EventNode::new(event.clone(), *time, r.shared_len.clone()).0);
-//         }
-//         r
-//     }
-// }
-
 impl<T> Debug for DualLinkedList<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let head_ptr: *const EventNode<T> = &*self.head;
@@ -194,12 +184,6 @@ impl<T> Debug for DualLinkedList<T> {
             .finish()
     }
 }
-
-// impl<T> Default for DLL<T> {
-//     fn default() -> Self {
-//         Self::new(Arc::new(AtomicUsize::new(0)), todo!())
-//     }
-// // }
 
 impl<T> Drop for DualLinkedList<T> {
     fn drop(&mut self) {
@@ -247,22 +231,6 @@ impl<T: Hash> Hash for DualLinkedList<T> {
 }
 
 // FROM
-
-// impl<T> FromIterator<(T, Duration)> for DLL<T> {
-//     fn from_iter<I: IntoIterator<Item = (T, Duration)>>(iter: I) -> Self {
-//         let mut r = Self::new(todo!());
-//         for (item, time) in iter {
-//             r.add(EventNode::new(item, time, r.shared_len.clone()).0);
-//         }
-//         r
-//     }
-// }
-
-// impl<T, const N: usize> From<[(T, Duration); N]> for DLL<T> {
-//     fn from(value: [(T, Duration); N]) -> Self {
-//         Self::from_iter(value)
-//     }
-// }
 
 // IMPL: DLL Into Iter
 

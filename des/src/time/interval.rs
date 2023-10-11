@@ -64,7 +64,7 @@ fn internal_interval_at(start: SimTime, period: Duration) -> Interval {
     Interval {
         delay,
         period,
-        missed_tick_behavior: Default::default(),
+        missed_tick_behavior: MissedTickBehavior::default(),
     }
 }
 
@@ -154,7 +154,7 @@ pub enum MissedTickBehavior {
 
 impl MissedTickBehavior {
     /// If a tick is missed, this method is called to determine when the next tick should happen.
-    fn next_timeout(&self, timeout: SimTime, now: SimTime, period: Duration) -> SimTime {
+    fn next_timeout(self, timeout: SimTime, now: SimTime, period: Duration) -> SimTime {
         match self {
             Self::Burst => timeout + period,
             Self::Delay => now + period,
@@ -205,6 +205,7 @@ impl Default for MissedTickBehavior {
 /// [`IntervalStream`]: https://docs.rs/tokio-stream/latest/tokio_stream/wrappers/struct.IntervalStream.html
 /// [`sleep`]: crate::time::sleep()
 #[derive(Debug)]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct Interval {
     /// Future that completes the next time the `Interval` yields a value.
     delay: Pin<Box<Sleep>>,
@@ -277,6 +278,7 @@ impl Interval {
     }
 
     /// Returns the [`MissedTickBehavior`] strategy currently being used.
+    #[must_use]
     pub fn missed_tick_behavior(&self) -> MissedTickBehavior {
         self.missed_tick_behavior
     }
@@ -287,6 +289,7 @@ impl Interval {
     }
 
     /// Returns the period of the interval.
+    #[must_use]
     pub fn period(&self) -> Duration {
         self.period
     }

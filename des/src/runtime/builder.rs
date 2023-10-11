@@ -34,6 +34,10 @@ pub struct Builder {
 
 impl Builder {
     /// Creates a new unconfigured builder.
+    ///
+    /// # Panics
+    ///
+    /// Panics if no RNG can be build.
     pub fn new() -> Builder {
         Builder {
             quiet: false,

@@ -44,6 +44,12 @@ impl SpanFields {
     }
 }
 
+impl SpanFields {
+    pub fn iter(&self) -> slice::Iter<'_, (&'static str, String)> {
+        <&Self as IntoIterator>::into_iter(self)
+    }
+}
+
 impl<'a> IntoIterator for &'a SpanFields {
     type Item = &'a (&'static str, String);
     type IntoIter = slice::Iter<'a, (&'static str, String)>;

@@ -2,15 +2,14 @@ use std::sync::atomic::Ordering::SeqCst;
 
 use crate::{
     net::{
-        gate::GateRef,
-        gate::GateServiceType,
-        message::{Message},
-        module::with_mod_ctx_lock,
+        message::Message,
+        gate::{GateRef, GateServiceType},
+        module::{ModuleRef, with_mod_ctx_lock},
         runtime::buf_process,
+        channel::ChannelRef,
         NetworkApplication,
     },
-    prelude::{ChannelRef, EventLifecycle, ModuleRef},
-    runtime::{EventSet, EventSink, Runtime},
+    runtime::{EventSet, EventSink, Runtime, EventLifecycle},
     time::SimTime, tracing::enter_scope,
 };
 
@@ -71,7 +70,6 @@ impl MessageAtGateEvent {
             msg.header.last_gate = Some(next.clone());
 
             // Drop message is owner is not active, but notfiy since this is an irregularity.
-            // TODO: maybe move to log::trace if this becomes a common pattern
             if !cur.owner().is_active() {
                 #[cfg(feature = "tracing")]
                 tracing::warn!(
@@ -179,7 +177,7 @@ impl HandleMessageEvent {
         module.handle_message(message);
         module.deactivate(rt);
 
-        buf_process(&module, rt);
+        buf_process(module, rt);
     }
 }
 
@@ -203,7 +201,7 @@ impl ModuleRestartEvent {
         module.module_restart();
         module.deactivate(rt);
 
-        buf_process(&module, rt);
+        buf_process(module, rt);
     }
 }
 
@@ -229,7 +227,7 @@ impl AsyncWakeupEvent {
         module.async_wakeup();
         module.deactivate(rt);
 
-        buf_process(&module, rt);
+        buf_process(module, rt);
     }
 }
 
@@ -312,7 +310,7 @@ impl ModuleRef {
         if self.ctx.active.load(SeqCst) {
             let _ = self.plugin_upstream(None);
             if self.handler.borrow().__indicate_async() {
-                Self::run_without_event()
+                Self::run_without_event();
             }
             self.plugin_downstream();
         }else {
@@ -333,11 +331,9 @@ impl ModuleRef {
 
 
     pub(crate) fn module_restart(&self) {
-         // TODO: verify
          #[cfg(feature = "tracing")]
          tracing::debug!("Restarting module");
          // restart the module itself.
-         // self.reset();
          self.ctx.active.store(true, SeqCst);
 
          // Do sim start procedure
@@ -363,7 +359,7 @@ impl ModuleRef {
             } else {
                 #[cfg(feature = "async")]
                 if self.handler.borrow().__indicate_async() {
-                    Self::run_without_event()
+                    Self::run_without_event();
                 }
             }
 

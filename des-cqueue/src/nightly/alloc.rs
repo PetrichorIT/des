@@ -123,8 +123,6 @@ impl CQueueLLAllocatorInner {
             }
         }
 
-        // TODO: maybe add to tail ?
-
         // no suitable region found
         // create new region
         unsafe {

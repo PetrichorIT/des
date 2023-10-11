@@ -109,7 +109,10 @@ impl PluginRegistry {
         let i = self.inner.iter().enumerate().find(|(_, p)| p.id == id);
         let Some((i, _)) = i else {
             #[cfg(feature = "tracing")]
-            tracing::error!("Could not remove plugin for handle '{}: may be removed due to panic policy", id);
+            tracing::error!(
+                "Could not remove plugin for handle '{}: may be removed due to panic policy",
+                id
+            );
             return;
         };
 
@@ -266,6 +269,7 @@ impl fmt::Debug for PluginEntry {
             .field("priority", &self.priority)
             .field("core", &self.core.is_some())
             .field("state", &self.state)
+            .field("typ", &self.typ)
             .finish()
     }
 }

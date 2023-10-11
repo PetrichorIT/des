@@ -9,6 +9,7 @@ use crate::{
 };
 use std::{
     fmt::Debug,
+    rc::Rc,
     sync::{atomic::AtomicBool, Arc},
 };
 
@@ -137,6 +138,10 @@ impl ModuleContext {
     ///
     /// Returns an error if no parent exists, or is not yet initalized
     /// (see load order).
+    ///
+    /// # Panics
+    ///
+    /// May panic when the simulation is currently being dropped.
     pub fn parent(&self) -> Result<ModuleRef, ModuleReferencingError> {
         if let Some(ref parent) = self.parent {
             let strong = parent
@@ -215,7 +220,7 @@ cfg_async! {
     use tokio::sync::mpsc::{UnboundedReceiver, error::SendError};
     use super::ext::WaitingMessage;
 
-    pub(crate) fn async_get_rt() -> Option<(Arc<Runtime>, Arc<LocalSet>)> {
+    pub(crate) fn async_get_rt() -> Option<(Arc<Runtime>, Rc<LocalSet>)> {
         with_mod_ctx(|ctx| ctx.async_ext.write().rt.current())
     }
 

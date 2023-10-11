@@ -200,7 +200,7 @@ where
     }
 
     fn at_sim_end(rt: &mut Runtime<NetworkApplication<A>>) {
-        for module in rt.app.module_list.iter().cloned().collect::<Vec<_>>() {
+        for module in rt.app.module_list.clone() {
             enter_scope(module.scope_token());
 
             #[cfg(feature = "tracing")]
@@ -215,7 +215,7 @@ where
         #[cfg(feature = "async")]
         {
             // Ensure all sim_start stages have finished
-            for module in rt.app.module_list.iter().cloned().collect::<Vec<_>>() {
+            for module in rt.app.module_list.clone() {
                 // enter_scope(module.scope_token());
 
                 module.activate();

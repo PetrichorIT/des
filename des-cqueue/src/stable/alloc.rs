@@ -69,7 +69,7 @@ impl CQueueLLAllocatorInner {
 
     pub fn handle(&self) -> CQueueLLAllocator {
         CQueueLLAllocator {
-            inner: self as *const CQueueLLAllocatorInner as *mut CQueueLLAllocatorInner,
+            inner: (self as *const CQueueLLAllocatorInner).cast_mut(),
         }
     }
 
@@ -122,8 +122,6 @@ impl CQueueLLAllocatorInner {
             current = current.next.as_mut().unwrap();
         }
 
-        // TODO: maybe add to tail ?
-
         // no suitable region found
         // create new region
         unsafe {
@@ -166,6 +164,7 @@ impl CQueueLLAllocatorInner {
     }
 }
 
+#[allow(clippy::missing_fields_in_debug)]
 impl Debug for CQueueLLAllocatorInner {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CQueueLLAllocatorInner")

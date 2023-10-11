@@ -24,6 +24,10 @@ impl PluginError {
     /// a plugin of type T should have been active and should have provide some service
     /// but did not. This method will figure out what caused the plugin to
     /// not provide its service
+    /// 
+    /// # Panics
+    /// 
+    /// This function panics if the plugin store is deadlocked.
     #[must_use]
     pub fn expected<T: Any>() -> PluginError {
         // let current_plugin = ;

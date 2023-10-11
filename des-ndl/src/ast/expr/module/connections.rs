@@ -109,7 +109,6 @@ impl Spanned for ConnectionsStmt {
 
 impl Spanned for ConnectionDefinition {
     fn span(&self) -> Span {
-        // TODO: make fromto also reorder if nessecary
         Span::fromto(self.source.span(), self.target.span())
     }
 }
