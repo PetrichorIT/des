@@ -16,9 +16,9 @@ mod util;
 
 pub use self::ast_tables::*;
 pub use self::ir_tables::*;
-pub use self::link::*;
+// pub use self::link::*;
 pub use self::local_tables::*;
-pub use self::module::*;
+// pub use self::module::*;
 
 pub(crate) use self::util::*;
 

@@ -1,6 +1,5 @@
 use crate::net::{message::Message, module::Module};
 use crate::time::SimTime;
-use async_trait::async_trait;
 use tokio::task::yield_now;
 
 pub(crate) mod core;
@@ -11,10 +10,7 @@ pub(crate) use self::core::WaitingMessage;
 /// of an asynchronous module.
 ///
 /// This trait is just a async version of [`Module`](crate::net::module::Module).
-/// Note that this implementation used [`async_trait::async_trait`] to provide function
-/// signatures.
-///
-#[async_trait]
+#[allow(async_fn_in_trait)]
 pub trait AsyncModule: Send {
     /// Creates a new instance of Self.
     fn new() -> Self
@@ -38,14 +34,13 @@ pub trait AsyncModule: Send {
     ///
     /// ```rust
     /// use des::prelude::*;
-    /// use async_trait::async_trait;
     ///
     /// struct MyAsyncModule {
     ///     prop_1: f64,
     ///     prop_2: String,
     /// }
     ///
-    /// #[async_trait]
+    /// 
     /// impl AsyncModule for MyAsyncModule {
     /// # fn new() -> Self { todo!() }
     ///     /* ... */    
@@ -73,7 +68,6 @@ pub trait AsyncModule: Send {
     ///
     /// ```rust
     /// use des::prelude::*;
-    /// use async_trait::async_trait;
     ///
     /// # type Config = ();
     /// async fn fetch_config(id: ModuleId) -> Config {
@@ -85,7 +79,7 @@ pub trait AsyncModule: Send {
     ///     records: Vec<f64>,
     /// }
     ///
-    /// #[async_trait]
+    /// 
     /// impl AsyncModule for MyModule {
     /// # fn new() -> Self { todo!() }
     ///     /* ... */    

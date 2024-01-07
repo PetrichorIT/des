@@ -40,7 +40,7 @@ impl Drop for DropTest {
 struct StatelessModule {}
 impl_build_named!(StatelessModule);
 
-#[async_trait::async_trait]
+
 impl AsyncModule for StatelessModule {
     fn new() -> Self {
         Self {}
@@ -94,7 +94,7 @@ fn stateless_module_shudown() {
 struct StatelessModuleRestart {}
 impl_build_named!(StatelessModuleRestart);
 
-#[async_trait::async_trait]
+
 impl AsyncModule for StatelessModuleRestart {
     fn new() -> Self {
         Self {}
@@ -153,7 +153,7 @@ struct StatefullModule {
 }
 impl_build_named!(StatefullModule);
 
-#[async_trait::async_trait]
+
 impl AsyncModule for StatefullModule {
     fn new() -> Self {
         Self { state: 0 }
@@ -219,7 +219,7 @@ fn statefull_module_restart() {
 
 struct ShutdownViaHandleModule {}
 impl_build_named!(ShutdownViaHandleModule);
-#[async_trait::async_trait]
+
 impl AsyncModule for ShutdownViaHandleModule {
     fn new() -> Self {
         Self {}
@@ -257,7 +257,7 @@ fn shutdown_via_async_handle() {
 
 struct RestartViaHandleModule {}
 impl_build_named!(RestartViaHandleModule);
-#[async_trait::async_trait]
+
 impl AsyncModule for RestartViaHandleModule {
     fn new() -> Self {
         Self {}

@@ -987,11 +987,7 @@ fn plugin_shutdown_downtime() {
 struct PluginWithState {
     state: Vec<usize>,
 }
-impl Plugin for PluginWithState {
-    fn state(&self) -> Box<dyn std::any::Any> {
-        Box::new(self.state.clone())
-    }
-}
+impl Plugin for PluginWithState {}
 
 struct PluginWithStateModule;
 impl_build_named!(PluginWithStateModule);
@@ -1008,12 +1004,12 @@ impl Module for PluginWithStateModule {
             100,
         );
 
-        assert!(get_plugin_state::<PluginWithState, Vec<usize>>().is_none());
+        assert!(with_plugin::<PluginWithState, _>(|p| p.state.clone()).is_none());
         schedule_in(Message::new().build(), Duration::from_secs(2));
     }
 
     fn handle_message(&mut self, _msg: Message) {
-        let s = get_plugin_state::<PluginWithState, Vec<usize>>().unwrap();
+        let s = with_plugin::<PluginWithState, Vec<usize>>(|p| p.state.clone()).unwrap();
         assert_eq!(s, vec![1, 2, 3])
     }
 }

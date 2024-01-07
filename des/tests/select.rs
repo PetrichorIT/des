@@ -11,7 +11,7 @@ impl_build_named!(Main);
 static A: AtomicUsize = AtomicUsize::new(0);
 static B: AtomicUsize = AtomicUsize::new(0);
 
-#[async_trait::async_trait]
+
 impl AsyncModule for Main {
     fn new() -> Main {
         Main

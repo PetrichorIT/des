@@ -5,8 +5,6 @@ use std::sync::{
     atomic::{AtomicBool, AtomicUsize},
     Arc,
 };
-
-use async_trait::async_trait;
 use des::{prelude::*, time::sleep};
 use tokio::{
     sync::{
@@ -29,7 +27,7 @@ struct QuasaiSyncModule {
     counter: usize,
 }
 impl_build_named!(QuasaiSyncModule);
-#[async_trait]
+
 impl AsyncModule for QuasaiSyncModule {
     fn new() -> Self {
         Self { counter: 0 }
@@ -92,7 +90,7 @@ struct MutipleTasksModule {
     result: Arc<AtomicUsize>,
 }
 impl_build_named!(MutipleTasksModule);
-#[async_trait]
+
 impl AsyncModule for MutipleTasksModule {
     fn new() -> Self {
         Self {
@@ -220,7 +218,6 @@ struct TimeSleepModule {
 }
 impl_build_named!(TimeSleepModule);
 
-#[async_trait]
 impl AsyncModule for TimeSleepModule {
     fn new() -> Self {
         Self { counter: 0 }
@@ -427,7 +424,7 @@ struct SemaphoreModule {
     result: Arc<AtomicBool>,
 }
 impl_build_named!(SemaphoreModule);
-#[async_trait]
+
 impl AsyncModule for SemaphoreModule {
     fn new() -> Self {
         Self {
@@ -514,7 +511,7 @@ fn semaphore_in_waiting_task() {
 struct ShouldBlockSimStart {}
 impl_build_named!(ShouldBlockSimStart);
 
-#[async_trait]
+
 impl AsyncModule for ShouldBlockSimStart {
     fn new() -> Self {
         Self {}

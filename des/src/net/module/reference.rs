@@ -1,7 +1,6 @@
 use crate::net::NetEvents;
 use crate::prelude::{ChannelRef, Gate, GateRef, GateServiceType};
 use crate::runtime::EventSink;
-use crate::time::TimerSlot;
 use crate::tracing::{enter_scope, leave_scope};
 
 use super::{DummyModule, Module, ModuleContext};
@@ -215,7 +214,7 @@ impl ModuleRef {
 
         #[cfg(feature = "async")]
         {
-            use crate::time::{Driver, SimTime};
+            use crate::time::{Driver, SimTime, TimerSlot};
 
             if let Some(prev) = prev {
                 prev.async_ext.write().driver = Driver::unset();

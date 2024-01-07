@@ -64,10 +64,9 @@
 //!  
 
 use crate::prelude::Message;
-use std::any::Any;
 
 mod api;
-pub use self::api::{add_plugin, get_plugin_state, PluginHandle};
+pub use self::api::{add_plugin, with_plugin, PluginHandle};
 
 mod error;
 pub use self::error::{PluginError, PluginErrorKind};
@@ -217,11 +216,6 @@ pub trait Plugin: 'static {
     /// ```
     fn capture_outgoing(&mut self, msg: Message) -> Option<Message> {
         Some(msg)
-    }
-
-    /// Returns the state of the plugin.
-    fn state(&self) -> Box<dyn Any> {
-        Box::new(())
     }
 }
 

@@ -9,7 +9,6 @@ use crate::{
 };
 use std::{
     fmt::Debug,
-    rc::Rc,
     sync::{atomic::AtomicBool, Arc},
 };
 
@@ -219,6 +218,7 @@ cfg_async! {
     use tokio::task::LocalSet;
     use tokio::sync::mpsc::{UnboundedReceiver, error::SendError};
     use super::ext::WaitingMessage;
+    use std::rc::Rc;
 
     pub(crate) fn async_get_rt() -> Option<(Arc<Runtime>, Rc<LocalSet>)> {
         with_mod_ctx(|ctx| ctx.async_ext.write().rt.current())

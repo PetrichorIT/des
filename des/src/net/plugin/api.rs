@@ -64,8 +64,8 @@ pub fn add_plugin<T: Plugin>(plugin: T, priority: usize) -> PluginHandle  {
 /// 
 /// Returns 'None' otherwise.
 #[must_use]
-pub fn get_plugin_state<P: Plugin, S: 'static>() -> Option<S> {
-    with_mod_ctx(|ctx| ctx.get_plugin_state::<P, S>())
+pub fn with_plugin<P: Plugin, R>(f: impl FnOnce(&P) -> R) -> Option<R> {
+    with_mod_ctx(|ctx| ctx.with_plugin::<P, R>(f))
 }
 
 
@@ -196,20 +196,19 @@ impl ModuleContext {
     /// Panics if a lock could not be acquired, probably
     /// due to feature missconfiguration.
     /// 
-    pub fn get_plugin_state<P: Plugin, S: 'static>(&self) -> Option<S> {
-        match self.plugins
+    pub fn with_plugin<P: Plugin, R>(&self, f: impl FnOnce(&P) -> R) -> Option<R> {
+        self.plugins
             .try_read()
             .expect("failed to fetch read lock: get_plugin_state<T>")
             .iter()
-            .find(|p| p.typ == TypeId::of::<P>())?
+            .find(|p| p.typ == TypeId::of::<P>())
+            ?
             .core
             .as_ref()
-            .unwrap()
-            .state()
-            .downcast::<S>() 
-        {
-            Ok(v) => Some(*v),
-            Err(_) => None
-        }
+            .map(|boxed| {
+                let ptr: *const dyn Plugin = &**boxed;
+                let ptr: *const P = ptr.cast::<P>();
+                f(unsafe { &*ptr})
+            })
     }
 }

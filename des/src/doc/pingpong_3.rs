@@ -9,7 +9,7 @@
 //!
 //! struct Ping;
 //!
-//! #[async_trait::async_trait]
+//! 
 //! impl AsyncModule for Ping {
 //!     fn new() -> Ping {
 //!         Ping

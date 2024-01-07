@@ -373,7 +373,6 @@ where
     rx: Option<Receiver<Message>>,
 }
 
-#[async_trait::async_trait]
 impl<F, Fut> AsyncModule for FutModule<F, Fut>
 where
     F: Fn(Receiver<Message>) -> Fut + Send,
