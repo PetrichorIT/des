@@ -63,39 +63,38 @@
 //! once the next event arrives.
 //!  
 
+use super::module::Module;
 use crate::prelude::Message;
-
-mod api;
-pub use self::api::{add_plugin, with_plugin, PluginHandle};
-
-mod error;
-pub use self::error::{PluginError, PluginErrorKind};
-
-mod registry;
-pub(crate) use self::registry::PluginRegistry;
-pub use self::registry::PluginStatus;
-
-use super::module::with_mod_ctx_lock;
 
 /// A subprogramm between the module application and the network layer.
 ///
-/// Plugins can follow different patterns based on the provided
+/// Processing elements can follow different patterns based on the provided
 /// API. Common patterns are:
 ///
-/// - **Observer**: The plugin does not modifiy the message stream, it just observes it.
+/// - **Observer**: The element does not modifiy the message stream, it just observes it.
 ///    This plugin can be used to get statistics over message streams or to log
 ///    debug output.
-/// - **Scope-Provider**: This plugin provides some kind of scope to all items further
+/// - **Scope-Provider**: This element provides some kind of scope to all items further
 ///    from the network layer than itself. A scope can be defined using a static variable
 ///    or just consist of a time meassurement between
 ///    [`event_start`](Plugin::event_start) / [`event_end`](Plugin::event_end).
-/// - **Capture**: This kind of plugins captures parts of the input stream and redirects
+/// - **Capture**: This kind of processing element captures parts of the input stream and redirects
 ///     it in some abitraty way, using other APIs. This pattern can be used to implement buffering
 ///     or mergeing of frameneted IP packets.
-/// - **Meta-Provider**: This kind of plugin attaches / modifies part of the incoming or
+/// - **Meta-Provider**: This kind of processing element attaches / modifies part of the incoming or
 ///    outgoing message stream to provide some new level of abstraction e.g. a VPN
 ///    or simulated network Interfaces.
-pub trait Plugin: 'static {
+pub trait ProcessingElement {
+    /// Defines the requires stack for this processing element.
+    ///
+    ///
+    fn stack(&self) -> Option<impl IntoProcessingElements>
+    where
+        Self: Sized,
+    {
+        Some(SyncBase)
+    }
+
     /// A handler for when an the event processing of a message starts.
     ///
     /// This function is called only once per event. If this function is called
@@ -108,13 +107,12 @@ pub trait Plugin: 'static {
     /// # Examples
     ///
     /// ```rust
-    /// # use des::net::plugin::*;
     /// # use des::prelude::*;
     /// struct LoggerPlugin {
     ///     counter: usize,
     /// }
     ///
-    /// impl Plugin for LoggerPlugin {
+    /// impl ProcessingElement for LoggerPlugin {
     ///     fn event_start(&mut self) {
     ///         tracing::trace!("receiving {}th message", self.counter);
     ///         self.counter += 1;   
@@ -135,14 +133,13 @@ pub trait Plugin: 'static {
     /// # Examples
     ///
     /// ```rust
-    /// # use des::net::plugin::*;
     /// # use des::prelude::*;
     /// # use des::time::*;
     /// struct Timer {
     ///     started: SimTime,    
     /// }
     ///
-    /// impl Plugin for Timer {
+    /// impl ProcessingElement for Timer {
     ///     fn event_start(&mut self) {
     ///        self.started = SimTime::now();
     ///     }
@@ -168,13 +165,12 @@ pub trait Plugin: 'static {
     ///
     /// ```
     /// # use des::prelude::*;
-    /// # use des::net::plugin::*;
     /// struct Filter {
     ///    filter: Box<dyn Fn(&Message) -> bool>,    
     /// }
     ///
-    /// impl Plugin for Filter {
-    ///     fn capture_incoming(&mut self, msg: Message) -> Option<Message> {
+    /// impl ProcessingElement for Filter {
+    ///     fn incoming(&mut self, msg: Message) -> Option<Message> {
     ///        let f = &self.filter;
     ///        if f(&msg) {
     ///            Some(msg)    
@@ -184,91 +180,168 @@ pub trait Plugin: 'static {
     ///     }    
     /// }
     /// ```
-    fn capture_incoming(&mut self, msg: Message) -> Option<Message> {
-        Some(msg)
-    }
-
-    /// A capture clause that can modify an outgoing mesesage stream.
-    ///
-    /// This function is called once per message send, thus it can be
-    /// called in all parts of the event processing. However
-    /// this function is never called before the
-    /// [`event_end`](Plugin::event_end) function
-    /// of this plugin, but allways after the
-    /// [`event_start`](Plugin::event_start) function.
-    ///
-    /// This function receives outgoing messages which it can modify
-    /// delete or passthrough.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use des::prelude::*;
-    /// # use des::net::plugin::*;
-    /// struct RandomizeId;
-    ///
-    /// impl Plugin for RandomizeId {
-    ///     fn capture_outgoing(&mut self, mut msg: Message) -> Option<Message> {
-    ///         msg.header_mut().id = random();
-    ///         Some(msg)    
-    ///     }
-    /// }
-    /// ```
-    fn capture_outgoing(&mut self, msg: Message) -> Option<Message> {
+    fn incoming(&mut self, msg: Message) -> Option<Message> {
         Some(msg)
     }
 }
 
-// # Internals
+/// A type that can be interprested as a processing element chain.
+pub trait IntoProcessingElements: 'static {
+    /// Convertes into processing elements
+    fn as_processing_elements(self) -> Vec<Box<dyn ProcessingElement>>;
+}
 
-/// Call this function when a message is send (via send / schedule_*)
-/// to process the plugin output stream accordingly.
-///
-/// # Notes
-///
-/// Can be called from other plugins, also from plugin upstream or downstream
-///
-pub(crate) fn plugin_output_stream(msg: Message) -> Option<Message> {
-    // (0) Create new downstream
-    let ctx = with_mod_ctx_lock();
-    {
-        ctx.plugins.write().begin_sub_downstream(None);
+impl<P: ProcessingElement + 'static> IntoProcessingElements for P {
+    fn as_processing_elements(self) -> Vec<Box<dyn ProcessingElement>> {
+        let mut stack = self
+            .stack()
+            .map(|stack| stack.as_processing_elements())
+            .unwrap_or_else(Vec::new);
+        stack.push(Box::new(self));
+        stack
+    }
+}
+
+impl<T: Module> ProcessingElement for T {
+    fn stack(&self) -> Option<impl IntoProcessingElements> {
+        Some(<Self as Module>::stack(self))
     }
 
-    // (1) Move the message allong the downstream, only using active plugins.
-    //
-    // 3 cases:
-    // - call origin is in upstream-plugin (good since all plugins below are ::running with a core stored)
-    // - call origin is main (good since all plugins are ::running with a core stored)
-    // - call origin is in downstream branch
-    //      - good since all plugins below are still ::running with a core and all aboth will be ignored ::idle
-    //      - self is not an issue, since without a core not in itr
-    //      - BUT: begin_downstream poisoined the old downstream info.
-    let mut msg = msg;
-    while let Some(mut plugin) = {
-        let mut lock = ctx.plugins.write();
-        let ret = lock.next_downstream();
-        drop(lock);
-        ret
-    } {
-        // (2) Capture the packet
+    fn incoming(&mut self, msg: Message) -> Option<Message> {
+        self.handle_message(msg);
+        None
+    }
+}
 
-        let rem_msg = plugin.capture_outgoing(msg);
+/// Base Module for Sync Base
+#[derive(Debug)]
+pub struct SyncBase;
+impl ProcessingElement for SyncBase {
+    fn stack(&self) -> Option<impl IntoProcessingElements> {
+        Option::<SyncBase>::None
+    }
 
-        // (3) Continue iteration if possible
-        let mut plugins = ctx.plugins.write();
+    fn incoming(&mut self, msg: Message) -> Option<Message> {
+        Some(msg)
+    }
+}
 
-        plugins.put_back_downstream(plugin, false);
-        if let Some(rem_msg) = rem_msg {
-            msg = rem_msg;
-        } else {
-            plugins.close_sub_downstream();
-            return None;
+
+
+#[doc(hidden)]
+#[allow(missing_debug_implementations)]
+pub struct ProcessingElements {
+    // last element is module
+    state: ProcessingState,
+    stack: Vec<Box<dyn ProcessingElement>>,
+    pub(super) handler: Box<dyn Module>,
+}
+
+enum ProcessingState {
+    Upstream(usize), // next processing index
+    Peek,
+    Downstream(usize), // last processing index
+}
+
+impl ProcessingState {
+    fn bump_upstream(&mut self) {
+        match self {
+            ProcessingState::Upstream(ref mut idx) => *idx += 1,
+            _ => unreachable!()
         }
     }
 
-    ctx.plugins.write().close_sub_downstream();
-
-    // (4) If the message survives, good.
-    Some(msg)
+    fn bump_downstream(&mut self) {
+        match self {
+            ProcessingState::Downstream(ref mut idx) => *idx -= 1,
+            _ => unreachable!()
+        }
+    }
 }
+
+impl ProcessingElements {
+    pub(super) fn new(stack: Vec<Box<dyn ProcessingElement>>, handler: impl Module) -> Self {
+        ProcessingElements {
+            state: ProcessingState::Upstream(0),
+            stack,
+            handler: Box::new(handler),
+        }
+    }
+
+    pub(super) fn incoming_upstream(&mut self, msg: Option<Message>) -> Option<Message> {
+        self.state = ProcessingState::Upstream(0);
+
+        let mut msg = msg;
+        for i in 0..self.stack.len() {
+            self.stack[i].event_start();
+            if let Some(existing_msg) = msg {
+                msg = self.stack[i].incoming(existing_msg);
+            }
+            self.state.bump_upstream();
+        }
+        msg
+    }
+
+    pub(super) fn incoming_downstream(&mut self) {
+        self.state = ProcessingState::Downstream(self.stack.len());
+        for i in (0..self.stack.len()).rev() {
+            self.stack[i].event_end();
+            self.state.bump_downstream()
+        }
+    }
+
+    pub(super) fn incoming(&mut self, msg: Option<Message>) {
+        // Upstream
+        let msg = self.incoming_upstream(msg);
+
+        // Peek
+        self.state = ProcessingState::Peek;
+        if let Some(msg) = msg {
+            self.handler.handle_message(msg)
+        } else {
+            #[cfg(feature = "async")]
+            if self.handler.__indicate_async() {
+                self.run_without_event()
+            }
+        }
+
+        // Downstream
+        self.incoming_downstream();
+    }
+
+    #[cfg(feature = "async")]
+    pub(super) fn run_without_event(&self) {
+        use crate::net::module::async_get_rt;
+        use tokio::task::yield_now;
+        let Some(rt) = async_get_rt() else { return };
+        rt.1.block_on(&rt.0, yield_now());
+    }
+}
+
+macro_rules! for_tuples {
+    (
+        $($i:ident),*
+    ) => {
+        impl<$($i: ProcessingElement + 'static),*> IntoProcessingElements for ($($i),*) {
+            #[allow(non_snake_case)]
+            fn as_processing_elements(self) -> Vec<Box<dyn ProcessingElement>> {
+                let mut stack = self.0.stack().map(|v| v.as_processing_elements()).unwrap_or_else(Vec::new);
+                let ($($i),*) = self;
+                $(
+                    stack.push(Box::new($i));
+                )*
+                stack
+            }
+        } 
+    };
+}
+
+for_tuples!(A, B);
+for_tuples!(A, B, C);
+for_tuples!(A, B, C, D);
+for_tuples!(A, B, C, D, E);
+for_tuples!(A, B, C, D, E, F);
+for_tuples!(A, B, C, D, E, F, G);
+for_tuples!(A, B, C, D, E, F, G, H);
+for_tuples!(A, B, C, D, E, F, G, H, I);
+for_tuples!(A, B, C, D, E, F, G, H, I, J);

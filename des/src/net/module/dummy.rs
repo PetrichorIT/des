@@ -12,10 +12,6 @@ impl Module for DummyModule {
         panic!("A dummy module is only a placeholder in the load process. No `dyn Module` functions should be called.")
     }
 
-    fn handle_par_change(&mut self) {
-        panic!("A dummy module is only a placeholder in the load process. No `dyn Module` functions should be called.")
-    }
-
     fn at_sim_start(&mut self, _stage: usize) {
         panic!("A dummy module is only a placeholder in the load process. No `dyn Module` functions should be called.")
     }

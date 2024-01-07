@@ -3,7 +3,6 @@ use crate::{
         gate::IntoModuleGate,
         message::Message,
         module::with_mod_ctx,
-        plugin,
         runtime::{buf_schedule_at, buf_send_at},
     },
     time::{Duration, SimTime},
@@ -49,9 +48,9 @@ pub fn send_at(msg: impl Into<Message>, gate: impl IntoModuleGate, send_time: Si
 
     if let Some(gate) = gate {
         // plugin capture
-        let Some(msg) = plugin::plugin_output_stream(msg) else {
-            return
-        };
+        // let Some(msg) = plugin::plugin_output_stream(msg) else {
+        //     return
+        // };
 
         buf_send_at(msg, gate, send_time);
     } else {
@@ -83,9 +82,9 @@ pub fn schedule_at(msg: impl Into<Message>, arrival_time: SimTime) {
     let msg: Message = msg.into();
 
     // plugin capture
-    let Some(msg) = plugin::plugin_output_stream(msg) else {
-        return
-    };
+    // let Some(msg) = plugin::plugin_output_stream(msg) else {
+    //     return
+    // };
 
     buf_schedule_at(msg, arrival_time);
 }

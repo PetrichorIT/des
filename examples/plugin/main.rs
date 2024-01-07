@@ -1,7 +1,7 @@
 use des::{
     net::{
         module::{set_setup_fn, ModuleContext},
-        plugin::{add_plugin, Plugin, PluginHandle, PluginStatus},
+        processing::ProcessingElement,
     },
     prelude::*,
     registry,
@@ -27,45 +27,33 @@ impl Module for A {
     }
 }
 
-struct Dummy;
-impl Plugin for Dummy {}
-
-struct OutputLogger {
-    handle: Option<PluginHandle>,
+#[derive(Default)]
+struct PacketCounter {
+    count: usize
 }
-impl Plugin for OutputLogger {
-    fn capture_outgoing(&mut self, msg: Message) -> Option<Message> {
-        tracing::info!(target: "output-logger-plugin", "sending: {}", msg.str());
-        match self.handle.take() {
-            Some(h) => {
-                assert_eq!(h.status(), PluginStatus::Active);
-                h.remove();
-            }
-            None => {
-                self.handle = Some(add_plugin(Dummy, 1000));
-                assert_eq!(
-                    self.handle.as_ref().unwrap().status(),
-                    PluginStatus::StartingUp
-                );
-            }
-        }
-        send(msg.dup::<i32>(), "out");
+
+impl ProcessingElement for PacketCounter {
+    fn incoming(&mut self, msg: Message) -> Option<Message> {
+        self.count += 1;
         Some(msg)
+    }
+}
+
+impl Drop for PacketCounter {
+    fn drop(&mut self) {
+        assert_eq!(self.count, 2);
     }
 }
 
 struct B {}
 
 impl Module for B {
+    fn stack(&self) -> impl ProcessingElement + 'static where Self: Sized {
+        PacketCounter::default()
+    }
+    
     fn new() -> Self {
         Self {}
-    }
-
-    fn at_sim_start(&mut self, _stage: usize) {
-        add_plugin(Dummy, 1);
-        add_plugin(OutputLogger { handle: None }, 10);
-        add_plugin(Dummy, 100);
-        add_plugin(Dummy, 2);
     }
 
     fn handle_message(&mut self, msg: Message) {

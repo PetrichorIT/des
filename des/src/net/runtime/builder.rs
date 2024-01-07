@@ -119,7 +119,7 @@ impl AsyncBuilder {
 
         ctx.activate();
 
-        let state = Box::new(T::new());
+        let state = T::new().as_processing_chain();
         ctx.upgrade_dummy(state);
 
         self.mapping.insert(
@@ -232,13 +232,13 @@ impl AsyncBuilder {
         ctx.activate();
 
         let (tx, rx) = channel(8);
-        let state = Box::new(FutModule {
+        let state = FutModule {
             software,
             cfg,
             handle: None,
             tx,
             rx: Some(rx),
-        });
+        }.as_processing_chain();
         ctx.upgrade_dummy(state);
 
         self.mapping.insert(

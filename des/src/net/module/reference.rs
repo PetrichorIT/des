@@ -1,4 +1,5 @@
 use crate::net::NetEvents;
+use crate::net::processing::ProcessingElements;
 use crate::prelude::{ChannelRef, Gate, GateRef, GateServiceType};
 use crate::runtime::EventSink;
 use crate::tracing::{enter_scope, leave_scope};
@@ -13,7 +14,7 @@ use std::sync::{Arc, Weak};
 #[derive(Clone)]
 pub(crate) struct ModuleRefWeak {
     ctx: Weak<ModuleContext>,
-    handler: Weak<RefCell<Box<dyn Module>>>,
+    handler: Weak<RefCell<ProcessingElements>>,
     // handler_ptr: *mut u8,
 }
 
@@ -21,7 +22,7 @@ impl ModuleRefWeak {
     pub(crate) fn new(strong: &ModuleRef) -> Self {
         Self {
             ctx: Arc::downgrade(&strong.ctx),
-            handler: Arc::downgrade(&strong.handler),
+            handler: Arc::downgrade(&strong.processing),
             // handler_ptr: strong.handler_ptr,
         }
     }
@@ -29,7 +30,7 @@ impl ModuleRefWeak {
     pub(crate) fn upgrade(&self) -> Option<ModuleRef> {
         Some(ModuleRef {
             ctx: self.ctx.upgrade()?,
-            handler: self.handler.upgrade()?,
+            processing: self.handler.upgrade()?,
             // handler_ptr: self.handler_ptr,
         })
     }
@@ -45,7 +46,7 @@ impl Debug for ModuleRefWeak {
 #[derive(Clone)]
 pub struct ModuleRef {
     pub(crate) ctx: Arc<ModuleContext>,
-    pub(crate) handler: Arc<RefCell<Box<dyn Module>>>,
+    pub(crate) processing: Arc<RefCell<ProcessingElements>>,
 }
 
 impl Deref for ModuleRef {
@@ -58,12 +59,9 @@ impl Deref for ModuleRef {
 impl ModuleRef {
     #[allow(clippy::explicit_deref_methods)]
     pub(crate) fn new<T: Module>(ctx: Arc<ModuleContext>, module: T) -> Self {
-        let boxed = Box::new(module);
-        let dynboxed: Box<dyn Module> = boxed;
-
-        let handler = Arc::new(RefCell::new(dynboxed));
-
-        Self { ctx, handler }
+        let procesing = module.as_processing_chain();
+        let handler = Arc::new(RefCell::new(procesing));
+        Self { ctx, processing: handler }
     }
 
     #[allow(unused)]
@@ -76,10 +74,10 @@ impl ModuleRef {
     #[allow(unused)]
     // Caller must ensure that handler is indeed a dummy
     #[doc(hidden)]
-    pub fn upgrade_dummy(&self, module: Box<dyn Module>) {
+    pub fn upgrade_dummy(&self, module: ProcessingElements) {
         let celled = RefCell::new(module);
-        let celled: RefCell<Box<dyn Module>> = celled;
-        self.handler.swap(&celled);
+        let celled: RefCell<ProcessingElements> = celled;
+        self.processing.swap(&celled);
     }
 
     // NOTE / TODO
@@ -115,8 +113,8 @@ impl ModuleRef {
     ///
     #[must_use]
     pub fn try_as_ref<T: Any>(&self) -> Option<Ref<T>> {
-        let brw = self.handler.borrow();
-        let rf = &**brw;
+        let brw = self.processing.borrow();
+        let rf = &*brw.handler;
         let ty = rf.type_id();
         if ty == TypeId::of::<T>() {
             // SAFTEY:
@@ -130,7 +128,7 @@ impl ModuleRef {
             //
             // Should the type check fail, the Ref is dropped so the borrow is freed.
             Some(Ref::map(brw, |brw| unsafe {
-                let hpt: *const dyn Module = &**brw;
+                let hpt: *const dyn Module = &*brw.handler;
                 // hpt.cast::<T>()
                 // &*(hpt as *const T)
                 &*(hpt.cast::<T>())
@@ -168,8 +166,8 @@ impl ModuleRef {
     ///
     #[must_use]
     pub fn try_as_mut<T: Any>(&self) -> Option<RefMut<T>> {
-        let brw = self.handler.borrow_mut();
-        let rf = &**brw;
+        let brw = self.processing.borrow_mut();
+        let rf = &*brw.handler;
         let ty = rf.type_id();
         if ty == TypeId::of::<T>() {
             // SAFTEY:
@@ -183,7 +181,7 @@ impl ModuleRef {
             //
             // Should the type check fail, the Ref is dropped so the borrow is freed.
             Some(RefMut::map(brw, |brw| unsafe {
-                let hpt: *mut dyn Module = &mut **brw;
+                let hpt: *mut dyn Module = &mut *brw.handler;
                 &mut *(hpt.cast::<T>())
             }))
         } else {
@@ -365,7 +363,7 @@ impl Debug for ModuleRef {
         f.debug_struct(&format!(
             "ModuleRef {{ name: {}, handler: {}, ctx {} }}",
             self.ctx.path.name(),
-            Arc::strong_count(&self.handler),
+            Arc::strong_count(&self.processing),
             Arc::strong_count(&self.ctx),
         ))
         .finish()

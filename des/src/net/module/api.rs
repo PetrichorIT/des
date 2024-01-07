@@ -12,31 +12,6 @@ use crate::{
 /// but manually creating them on each module type is bothersome, and errorprone.
 /// To cirumvent that, a common setup function is provided that initalizes some plugins
 /// on all modules.
-///
-/// # Example
-///
-/// ```rust
-/// use des::net::module::{set_setup_fn, ModuleContext};
-/// use des::net::plugin::*;
-///
-/// struct MyDebugPlugin;
-/// impl Plugin for MyDebugPlugin {
-///     /* ... */
-/// }
-///
-/// fn setup(this: &ModuleContext) {
-///     this.add_plugin(
-///         MyDebugPlugin,
-///         10
-///     );
-/// }
-///
-/// fn main() {
-///     # return;
-///     set_setup_fn(setup);
-///     /* ... */
-/// }
-/// ```
 pub fn set_setup_fn(f: fn(&ModuleContext)) {
     *SETUP_FN.write() = f;
 }

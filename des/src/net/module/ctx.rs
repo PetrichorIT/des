@@ -2,9 +2,8 @@ use fxhash::{FxBuildHasher, FxHashMap};
 
 use super::{DummyModule, ModuleId, ModuleRef, ModuleRefWeak, ModuleReferencingError};
 use crate::{
-    net::plugin::PluginRegistry,
     prelude::{GateRef, ObjectPath},
-    sync::{RwLock, SwapLock, SwapLockReadGuard},
+    sync::{RwLock, SwapLock},
     tracing::{new_scope, ScopeToken},
 };
 use std::{
@@ -27,7 +26,6 @@ pub struct ModuleContext {
 
     pub(crate) path: ObjectPath,
     pub(crate) gates: RwLock<Vec<GateRef>>,
-    pub(crate) plugins: RwLock<PluginRegistry>,
 
     pub(crate) scope_token: ScopeToken,
 
@@ -51,7 +49,6 @@ impl ModuleContext {
             path,
 
             gates: RwLock::new(Vec::new()),
-            plugins: RwLock::new(PluginRegistry::new()),
 
             parent: None,
             children: RwLock::new(FxHashMap::with_hasher(FxBuildHasher::default())),
@@ -77,7 +74,6 @@ impl ModuleContext {
             path,
 
             gates: RwLock::new(Vec::new()),
-            plugins: RwLock::new(PluginRegistry::new()),
 
             parent: Some(ModuleRefWeak::new(&parent)),
             children: RwLock::new(FxHashMap::with_hasher(FxBuildHasher::default())),
@@ -208,9 +204,9 @@ pub(crate) fn with_mod_ctx<R>(f: impl FnOnce(&Arc<ModuleContext>) -> R) -> R {
     r
 }
 
-pub(crate) fn with_mod_ctx_lock() -> SwapLockReadGuard<'static, Option<Arc<ModuleContext>>> {
-    MOD_CTX.read()
-}
+// pub(crate) fn with_mod_ctx_lock() -> SwapLockReadGuard<'static, Option<Arc<ModuleContext>>> {
+//     MOD_CTX.read()
+// }
 
 cfg_async! {
     use tokio::runtime::Runtime;

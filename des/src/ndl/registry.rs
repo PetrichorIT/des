@@ -1,9 +1,9 @@
 use fxhash::{FxBuildHasher, FxHashMap};
 use std::fmt;
 
-use crate::net::module::Module;
+use crate::net::processing::ProcessingElements;
 
-type ModuleCreationFn = dyn Fn() -> Box<dyn Module>;
+type ModuleCreationFn = dyn Fn() -> ProcessingElements;
 
 /// A registry for all user-defined modules.
 ///

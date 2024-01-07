@@ -66,6 +66,8 @@ cfg_net! {
     pub use crate::net::TopoNode;
     pub use crate::net::Topology;
 
+    pub use crate::net::processing::ProcessingElement;
+
     cfg_ndl! {
         pub use crate::ndl::NdlApplication;
         pub use crate::ndl::Registry;

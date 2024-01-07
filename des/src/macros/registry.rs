@@ -32,7 +32,7 @@ macro_rules! registry {
     ($($t:ty),*) => {{
         let mut registry = $crate::ndl::Registry::new();
         $(
-            registry.add(stringify!($t), Box::new(|| Box::new(<$t as Module>::new())));
+            registry.add(stringify!($t), Box::new(|| <$t as Module>::new().as_processing_chain()));
         )*
         registry
     }};

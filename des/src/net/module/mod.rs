@@ -19,6 +19,8 @@ pub use api::*;
 mod dummy;
 pub(crate) use dummy::*;
 
+use super::processing::{SyncBase, ProcessingElements, IntoProcessingElements};
+
 cfg_async! {
     mod ext;
     pub use self::ext::*;
@@ -47,6 +49,20 @@ pub trait Module: Any {
     fn reset(&mut self) {
         #[cfg(feature = "tracing")]
         tracing::warn!("Module has been shutdown and restarted, but reset() was not defined. This may lead to invalid custom state.");
+    }
+
+    /// Defines the required stack.
+    fn stack(&self) -> impl IntoProcessingElements where Self: Sized {
+        SyncBase
+    }
+
+    /// BUILD
+    fn as_processing_chain(self) -> ProcessingElements
+    where
+        Self: Sized + 'static,
+    {
+        let stack = <Self as Module>::stack(&self).as_processing_elements();
+        ProcessingElements::new(stack, self)
     }
 
     ///
@@ -145,10 +161,5 @@ pub trait Module: Any {
     fn __indicate_async(&self) -> bool {
         false
     }
-
-    ///
-    /// A callback function that is called should a parameter belonging to
-    /// this module be changed.
-    ///
-    fn handle_par_change(&mut self) {}
 }
+

@@ -4,7 +4,7 @@ use crate::{
     net::{
         message::Message,
         gate::{GateRef, GateServiceType},
-        module::{ModuleRef, with_mod_ctx_lock},
+        module::ModuleRef,
         runtime::buf_process,
         channel::ChannelRef,
         NetworkApplication,
@@ -247,88 +247,27 @@ impl ChannelUnbusyNotif {
 
 impl ModuleRef {
     pub(crate) fn num_sim_start_stages(&self) -> usize {
-        self.handler.borrow().num_sim_start_stages()
+        self.processing.borrow().handler.num_sim_start_stages()
     }
 
     pub(crate) fn reset(&self) {
-        let mut brw = self.handler.borrow_mut();
-        brw.reset();
-    }
-
-    // MARKER: handle_message
-
-    #[allow(clippy::unused_self)]
-    pub(crate) fn plugin_upstream(&self, msg: Option<Message>) -> Option<Message> {
-        let ctx = with_mod_ctx_lock();
-
-        ctx.plugins.write().being_upstream(false);
-        loop {
-            let plugin = ctx.plugins.write().next_upstream();
-            let Some(mut plugin) = plugin else { break };
-
-            plugin.event_start();
-            ctx.plugins.write().put_back_upstream(plugin);   
-        }
-
-        // Reset the upstream for message parsing
-        ctx.plugins.write().being_upstream(true);
-
-        let mut msg = msg;
-        while let Some(moved_message) = msg.take() {
-            // log::trace!("capture clause");
-            let plugin = ctx.plugins.write().next_upstream();
-            let Some(mut plugin) = plugin else {
-                // log::info!("noplugin");
-                msg = Some(moved_message);
-                break
-            };
-           
-            let rem_msg = plugin.capture_incoming(moved_message);
-            // log::trace!("returned some = {}", remaining_msg.is_some());
-            msg = rem_msg;
-            ctx.plugins.write().put_back_upstream(plugin); 
-        }
-        msg
-    }
-
-    #[allow(clippy::unused_self)]
-    pub(crate) fn plugin_downstream(&self) {
-        let ctx = with_mod_ctx_lock();
-        ctx.plugins.write().begin_main_downstream();
-        loop {
-            let plugin = ctx.plugins.write().next_downstream();
-            let Some(mut plugin) = plugin else { break };
-
-            plugin.event_end();
-            ctx.plugins.write().put_back_downstream(plugin, true);
-               
-        }
+        let mut brw = self.processing.borrow_mut();
+        brw.handler.reset();
     }
 
     #[cfg(feature = "async")]
     pub(crate) fn async_wakeup(&self) {
         if self.ctx.active.load(SeqCst) {
-            let _ = self.plugin_upstream(None);
-            if self.handler.borrow().__indicate_async() {
-                Self::run_without_event();
+            self.processing.borrow_mut().incoming_upstream(None);
+            if self.processing.borrow().handler.__indicate_async() {
+                self.processing.borrow().run_without_event()
             }
-            self.plugin_downstream();
+            self.processing.borrow_mut().incoming_downstream();
         }else {
             #[cfg(feature = "tracing")]
             tracing::debug!("Ignoring message since module is inactive");
         }
     } 
-
-    #[cfg(feature = "async")]
-    fn run_without_event() {  
-        use tokio::task::yield_now;
-        use crate::net::module::async_get_rt;
-        let Some(rt) = async_get_rt() else {
-            return
-        };
-        rt.1.block_on(&rt.0, yield_now());
-    }
-
 
     pub(crate) fn module_restart(&self) {
          #[cfg(feature = "tracing")]
@@ -347,24 +286,11 @@ impl ModuleRef {
     }
 
     pub(crate) fn handle_message(&self, msg: Message) {
+
+
         if self.ctx.active.load(SeqCst) {
             // (0) Run upstream plugins.
-            let msg = self.plugin_upstream(Some(msg));
-
-            // (1) Call handle message, if the message was not consumed
-            // - If async and the message was consumed, send a NOTIFY packet to
-            //   still call poll until idle, and internal RT management.
-            if let Some(msg) = msg {
-                self.handler.borrow_mut().handle_message(msg);
-            } else {
-                #[cfg(feature = "async")]
-                if self.handler.borrow().__indicate_async() {
-                    Self::run_without_event();
-                }
-            }
-
-            // (2) Plugin downstram operations
-            self.plugin_downstream();
+            self.processing.borrow_mut().incoming(Some(msg));
         } else {
             #[cfg(feature = "tracing")]
             tracing::debug!("Ignoring message since module is inactive");
@@ -372,32 +298,33 @@ impl ModuleRef {
     }
 
     pub(crate) fn at_sim_start(&self, stage: usize) {
-        self.plugin_upstream(None);
-        self.handler.borrow_mut().at_sim_start(stage);
-        self.plugin_downstream();
+        self.processing.borrow_mut().incoming_upstream(None);
+        self.processing.borrow_mut().handler.at_sim_start(stage);
+        self.processing.borrow_mut().incoming_downstream();
+
     }
 
     #[cfg(feature = "async")]
     pub(crate) fn finish_sim_start(&self) {
-        if self.handler.borrow().__indicate_async() {
-            self.plugin_upstream(None);
-            self.handler.borrow_mut().finish_sim_start();
-            self.plugin_downstream();
+        if self.processing.borrow().handler.__indicate_async() {
+            self.processing.borrow_mut().incoming_upstream(None);
+            self.processing.borrow_mut().handler.finish_sim_start();
+            self.processing.borrow_mut().incoming_downstream();
         }
     }
 
     pub(crate) fn at_sim_end(&self) {
-        self.plugin_upstream(None);
-        self.handler.borrow_mut().at_sim_end();
-        self.plugin_downstream();
+        self.processing.borrow_mut().incoming_upstream(None);
+        self.processing.borrow_mut().handler.at_sim_end();
+        self.processing.borrow_mut().incoming_downstream();
     }
 
     #[cfg(feature = "async")]
     pub(crate) fn finish_sim_end(&self) {
-        if self.handler.borrow().__indicate_async() {
-            self.plugin_upstream(None);
-            self.handler.borrow_mut().finish_sim_end();
-            self.plugin_downstream();
+        if self.processing.borrow().handler.__indicate_async() {
+            self.processing.borrow_mut().incoming_upstream(None);
+            self.processing.borrow_mut().handler.finish_sim_end();
+            self.processing.borrow_mut().incoming_downstream();
         }
     }
 }
