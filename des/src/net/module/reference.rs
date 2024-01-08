@@ -1,5 +1,5 @@
-use crate::net::NetEvents;
 use crate::net::processing::ProcessingElements;
+use crate::net::NetEvents;
 use crate::prelude::{ChannelRef, Gate, GateRef, GateServiceType};
 use crate::runtime::EventSink;
 use crate::tracing::{enter_scope, leave_scope};
@@ -61,7 +61,10 @@ impl ModuleRef {
     pub(crate) fn new<T: Module>(ctx: Arc<ModuleContext>, module: T) -> Self {
         let procesing = module.as_processing_chain();
         let handler = Arc::new(RefCell::new(procesing));
-        Self { ctx, processing: handler }
+        Self {
+            ctx,
+            processing: handler,
+        }
     }
 
     #[allow(unused)]
@@ -78,6 +81,11 @@ impl ModuleRef {
         let celled = RefCell::new(module);
         let celled: RefCell<ProcessingElements> = celled;
         self.processing.swap(&celled);
+    }
+
+    /// DPC
+    pub fn with_pe<T: Any, R>(&self, f: impl FnOnce(&mut T) -> R) -> Option<R> {
+        self.processing.borrow_mut().with_pe::<T, R>(f)
     }
 
     // NOTE / TODO

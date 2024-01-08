@@ -1,3 +1,5 @@
+use std::any::Any;
+
 use super::{with_mod_ctx, ModuleContext, ModuleId, ModuleRef, ModuleReferencingError, SETUP_FN};
 use crate::{
     net::runtime::buf_schedule_shutdown,
@@ -145,6 +147,18 @@ pub fn gate(name: &str, pos: usize) -> Option<GateRef> {
 /// otherwise its effects should be consider UB.
 pub fn shutdown() {
     buf_schedule_shutdown(None);
+}
+
+
+/// GET
+pub fn get_meta<T: Any + Clone>() -> Option<T> {
+    with_mod_ctx(|ctx| ctx.meta::<T>())
+}
+
+
+/// SET
+pub fn set_meta<T: Any + Clone>(value: T) {
+    with_mod_ctx(|ctx| ctx.set_meta::<T>(value))
 }
 
 ///

@@ -1,6 +1,6 @@
 use fxhash::{FxBuildHasher, FxHashMap};
 
-use super::{DummyModule, ModuleId, ModuleRef, ModuleRefWeak, ModuleReferencingError};
+use super::{DummyModule, ModuleId, ModuleRef, ModuleRefWeak, ModuleReferencingError, meta::Metadata};
 use crate::{
     prelude::{GateRef, ObjectPath},
     sync::{RwLock, SwapLock},
@@ -8,7 +8,7 @@ use crate::{
 };
 use std::{
     fmt::Debug,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{atomic::AtomicBool, Arc}, any::Any,
 };
 
 #[cfg(feature = "async")]
@@ -27,6 +27,7 @@ pub struct ModuleContext {
     pub(crate) path: ObjectPath,
     pub(crate) gates: RwLock<Vec<GateRef>>,
 
+    pub(super) meta: RwLock<Metadata>,
     pub(crate) scope_token: ScopeToken,
 
     #[cfg(feature = "async")]
@@ -42,6 +43,7 @@ impl ModuleContext {
             #[cfg(feature = "async")]
             async_ext: RwLock::new(AsyncCoreExt::new()),
 
+            meta: RwLock::new(Metadata::new()),
             scope_token: new_scope(path.as_str()),
 
             active: AtomicBool::new(true),
@@ -66,6 +68,8 @@ impl ModuleContext {
         let this = ModuleRef::dummy(Arc::new(Self {
             #[cfg(feature = "async")]
             async_ext: RwLock::new(AsyncCoreExt::new()),
+
+            meta: RwLock::new(Metadata::new()),
             scope_token: new_scope(path.as_str()),
 
             active: AtomicBool::new(true),
@@ -127,6 +131,17 @@ impl ModuleContext {
             .find(|&g| g.name() == name && g.pos() == pos)
             .cloned()
     }
+
+    /// Retrieves metadata about a module, based on a type.
+    pub fn meta<T: Any + Clone>(&self) -> Option<T> {
+        Some(self.meta.try_read().expect("Failed lock").get::<T>()?.clone())
+    }
+
+    /// Sets a metadata object.
+    pub fn set_meta<T: Any + Clone>(&self, value: T) {
+        self.meta.try_write().expect("Failed lock").set(value);
+    }
+
     /// Returns a reference to a parent module
     ///
     /// # Errors

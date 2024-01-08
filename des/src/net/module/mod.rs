@@ -19,7 +19,10 @@ pub use api::*;
 mod dummy;
 pub(crate) use dummy::*;
 
-use super::processing::{SyncBase, ProcessingElements, IntoProcessingElements};
+mod meta;
+
+
+use super::processing::{BaseLoader, ProcessingElements, IntoProcessingElements};
 
 cfg_async! {
     mod ext;
@@ -53,7 +56,7 @@ pub trait Module: Any {
 
     /// Defines the required stack.
     fn stack(&self) -> impl IntoProcessingElements where Self: Sized {
-        SyncBase
+        BaseLoader
     }
 
     /// BUILD
