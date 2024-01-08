@@ -8,7 +8,7 @@ impl Module for Sub {
     }
 
     fn at_sim_start(&mut self, _stage: usize) {
-        if module_name() == "a" {
+        if current().name() == "a" {
             send(Message::new().build(), "out");
         }
     }

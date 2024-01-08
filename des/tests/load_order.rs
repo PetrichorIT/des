@@ -24,11 +24,11 @@ struct MidLevelModule {
 impl Module for MidLevelModule {
     fn new() -> Self {
         // gates loaded
-        assert!(gate("in", 0).is_some());
-        assert!(gate("out", 0).is_some());
+        assert!(current().gate("in", 0).is_some());
+        assert!(current().gate("out", 0).is_some());
 
         // child loaded
-        let child = child("child");
+        let child = current().child("child");
         assert!(child.is_ok());
         assert!(child
             .as_ref()
@@ -41,7 +41,7 @@ impl Module for MidLevelModule {
         );
 
         // parent not loaded yet
-        let parent = parent();
+        let parent = current().parent();
         assert!(parent.is_err());
         assert!(matches!(
             parent.unwrap_err(),
@@ -52,7 +52,7 @@ impl Module for MidLevelModule {
     }
 
     fn at_sim_start(&mut self, _stage: usize) {
-        let parent = parent();
+        let parent = current().parent();
         assert!(parent.is_ok());
         assert!(parent
             .as_ref()
@@ -68,8 +68,8 @@ struct LowLevelModule {
 
 impl Module for LowLevelModule {
     fn new() -> Self {
-        assert!(gate("in", 0).is_some());
-        assert!(gate("out", 0).is_some());
+        assert!(current().gate("in", 0).is_some());
+        assert!(current().gate("out", 0).is_some());
 
         Self { state: 0 }
     }

@@ -98,12 +98,12 @@ fn builder_recognize_parents() {
     let mut sim = AsyncBuilder::new();
     sim.set_default_cfg(NodeCfg { join: true });
     sim.node("parent", |_| async {
-        let ch = child("child").expect("parent sees no child");
+        let ch = current().child("child").expect("parent sees no child");
         assert_eq!(ch.name(), "child");
         Ok(())
     });
     sim.node_with_parent("child", "parent", |_| async {
-        let p = parent().expect("child sees no parent");
+        let p = current().parent().expect("child sees no parent");
         assert_eq!(p.name(), "parent");
         Ok(())
     });

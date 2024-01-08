@@ -106,24 +106,67 @@ impl ModuleContext {
         this
     }
 
-    /// INTERNAL
+
+
+    /// Returns a runtime-unqiue identifier for the currently active module.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use des::prelude::*;
+    ///
+    /// struct MyModule;
+    /// impl Module for MyModule {
+    ///     fn new() -> Self { Self }
+    ///     fn handle_message(&mut self, msg: Message) {
+    ///         let id = current().id();
+    ///         assert_eq!(id, msg.header().receiver_module_id);    
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// [`Module`]: crate::net::module::Module
     pub fn id(&self) -> ModuleId {
         self.id
     }
 
-    /// INTERNAL
+    /// Returns a runtime-unqiue identifier for the currently active module,
+    /// based on its place in the module graph.
+    ///
+    /// ```
+    /// use des::prelude::*;
+    ///
+    /// struct MyModule;
+    /// impl Module for MyModule {
+    ///     fn new() -> Self { Self }
+    ///     fn handle_message(&mut self, msg: Message) {
+    ///         let path = current().path();
+    ///         println!("[{path}] recv message: {}", msg.str())  
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// [`Module`]: crate::net::module::Module
     pub fn path(&self) -> ObjectPath {
         self.path.clone()
     }
-    /// INTERNAL
+
+    /// Returns the name for the currently active module.
+    ///
+    /// Note that the module name is just the last component of the module
+    /// path.
     pub fn name(&self) -> String {
         self.path.name().to_string()
     }
-    /// INTERNAL
+
+
+    /// Returns a unstructured list of all gates from the current module.
     pub fn gates(&self) -> Vec<GateRef> {
         self.gates.read().clone()
     }
-    /// INTERNAL
+
+    /// Returns a ref to a gate of the current module dependent on its name and cluster position
+    /// if possible.
     pub fn gate(&self, name: &str, pos: usize) -> Option<GateRef> {
         self.gates
             .read()
@@ -142,12 +185,18 @@ impl ModuleContext {
         self.meta.try_write().expect("Failed lock").set(value);
     }
 
+
+  
+
     /// Returns a reference to a parent module
     ///
+    /// Use this handle to either access the parent modules topological
+    /// state, or cast it to access the custom state of the parent.
+    /// 
     /// # Errors
     ///
-    /// Returns an error if no parent exists, or is not yet initalized
-    /// (see load order).
+    /// Returns an error if no parent exists, or 
+    /// the parent is currently shut down.
     ///
     /// # Panics
     ///
@@ -179,11 +228,17 @@ impl ModuleContext {
             )))
         }
     }
-    /// Returns a reference to a child module.
+
+
+    /// Returns a handle to the child element, with the provided module name.
+    ///
+    /// Use this handle to either access and modify the childs modules topological
+    /// state, or cast it to access its custom state .
     ///
     /// # Errors
     ///
-    /// Returns an error if no child with the provided name exists.
+    /// Returns an error if no child was found under the given name,
+    /// or the child is currently shut down.
     pub fn child(&self, name: &str) -> Result<ModuleRef, ModuleReferencingError> {
         if let Some(child) = self.children.read().get(name) {
             if !child.is_active() {

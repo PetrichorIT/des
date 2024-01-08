@@ -1,4 +1,4 @@
-use std::any::Any;
+use std::sync::Arc;
 
 use super::{with_mod_ctx, ModuleContext, ModuleId, ModuleRef, ModuleReferencingError, SETUP_FN};
 use crate::{
@@ -16,6 +16,34 @@ use crate::{
 /// on all modules.
 pub fn set_setup_fn(f: fn(&ModuleContext)) {
     *SETUP_FN.write() = f;
+}
+
+/// Retuns a handle to the context of the current module. This
+/// handle can be used on inspect and change the modules simulation 
+/// properties, independent of the modules processing elements.
+/// 
+/// **This handle is only fully valid, during the execution of the current event,
+/// thus is should never be stored.**
+/// 
+/// # Example
+/// 
+/// ```
+/// # use des::prelude::*;
+/// 
+/// struct MyModule;
+/// impl Module for MyModule {
+///     fn new() -> Self { Self }
+///     fn handle_message(&mut self, msg: Message) {
+///         let id = current().id();
+///         if id == msg.header().sender_module_id {
+///             println!("Self message received");
+///         }
+///     }
+/// }
+/// ```
+#[must_use]
+pub fn current() -> Arc<ModuleContext> {
+    with_mod_ctx(Arc::clone)
 }
 
 /// Returns a runtime-unqiue identifier for the currently active module.
@@ -41,6 +69,7 @@ pub fn set_setup_fn(f: fn(&ModuleContext)) {
 ///
 /// [`Module`]: crate::net::module::Module
 #[must_use]
+#[deprecated]
 pub fn module_id() -> ModuleId {
     with_mod_ctx(|ctx| ctx.id())
 }
@@ -67,6 +96,7 @@ pub fn module_id() -> ModuleId {
 ///
 /// [`Module`]: crate::net::module::Module
 #[must_use]
+#[deprecated]
 pub fn module_path() -> ObjectPath {
     with_mod_ctx(|ctx| ctx.path())
 }
@@ -81,6 +111,7 @@ pub fn module_path() -> ObjectPath {
 /// invalid module-names or module-names of modules that are no longer valid.
 ///
 #[must_use]
+#[deprecated]
 pub fn module_name() -> String {
     with_mod_ctx(|ctx| ctx.name())
 }
@@ -96,7 +127,7 @@ pub fn module_name() -> String {
 ///
 /// Returns an error if the module has no parent or
 /// the parent is currently shut down.
-///
+#[deprecated]
 pub fn parent() -> Result<ModuleRef, ModuleReferencingError> {
     with_mod_ctx(|ctx| ctx.parent())
 }
@@ -110,7 +141,7 @@ pub fn parent() -> Result<ModuleRef, ModuleReferencingError> {
 ///
 /// Returns an error if no child was found under the given name,
 /// or the child is currently shut down.
-///
+#[deprecated]
 pub fn child(name: &str) -> Result<ModuleRef, ModuleReferencingError> {
     with_mod_ctx(|ctx| ctx.child(name))
 }
@@ -121,6 +152,7 @@ pub fn child(name: &str) -> Result<ModuleRef, ModuleReferencingError> {
 /// Returns a unstructured list of all gates from the current module.
 ///
 #[must_use]
+#[deprecated]
 pub fn gates() -> Vec<GateRef> {
     with_mod_ctx(|ctx| ctx.gates())
 }
@@ -130,6 +162,7 @@ pub fn gates() -> Vec<GateRef> {
 /// if possible.
 ///
 #[must_use]
+#[deprecated]
 pub fn gate(name: &str, pos: usize) -> Option<GateRef> {
     with_mod_ctx(|ctx| ctx.gate(name, pos))
 }
@@ -149,17 +182,6 @@ pub fn shutdown() {
     buf_schedule_shutdown(None);
 }
 
-
-/// GET
-pub fn get_meta<T: Any + Clone>() -> Option<T> {
-    with_mod_ctx(|ctx| ctx.meta::<T>())
-}
-
-
-/// SET
-pub fn set_meta<T: Any + Clone>(value: T) {
-    with_mod_ctx(|ctx| ctx.set_meta::<T>(value))
-}
 
 ///
 /// Shuts down all activity for the module.

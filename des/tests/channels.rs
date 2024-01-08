@@ -152,7 +152,7 @@ impl Module for SendMessageModule {
     fn handle_message(&mut self, msg: Message) {
         if msg.header().kind == 10 {
             send(Message::new().content("Hello world").build(), "out");
-            let gate = gate("out", 0).unwrap();
+            let gate = current().gate("out", 0).unwrap();
             let ch = gate.channel().unwrap();
             assert!(ch.is_busy());
         }
@@ -199,7 +199,7 @@ impl Module for ChannelProbing {
         Self
     }
     fn at_sim_start(&mut self, _stage: usize) {
-        gate("out", 0)
+        current().gate("out", 0)
             .unwrap()
             .channel()
             .unwrap()
@@ -284,7 +284,7 @@ impl Module for ChannelProbingRc {
         }
     }
     fn at_sim_start(&mut self, _stage: usize) {
-        gate("out", 0)
+        current().gate("out", 0)
             .unwrap()
             .channel()
             .unwrap()

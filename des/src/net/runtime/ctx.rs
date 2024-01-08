@@ -3,10 +3,10 @@
 use super::{
     HandleMessageEvent, MessageAtGateEvent, NetworkApplication, NetworkApplicationGlobals,
 };
-use crate::net::module::{with_mod_ctx, MOD_CTX, SETUP_FN};
+use crate::net::module::{with_mod_ctx, MOD_CTX, SETUP_FN, current};
 use crate::net::ModuleRestartEvent;
 use crate::net::{gate::GateRef, message::Message, NetEvents};
-use crate::prelude::{module_id, EventLifecycle, ModuleRef};
+use crate::prelude::{EventLifecycle, ModuleRef};
 use crate::runtime::Runtime;
 use crate::sync::Mutex;
 use crate::time::SimTime;
@@ -57,7 +57,7 @@ pub fn globals() -> Arc<NetworkApplicationGlobals> {
 
 pub(crate) fn buf_send_at(mut msg: Message, gate: GateRef, send_time: SimTime) {
     let mut ctx = BUF_CTX.lock();
-    msg.header.sender_module_id = module_id();
+    msg.header.sender_module_id = current().id();
 
     crate::tracing::enter_scope(gate.owner().scope_token());
 

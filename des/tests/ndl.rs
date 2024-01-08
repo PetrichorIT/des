@@ -4,7 +4,7 @@ use des::{ndl::NdlApplication, prelude::*, registry};
 use des_ndl::error::RootResult;
 
 mod common {
-    use des::prelude::*;
+    use des::{prelude::*, net::module::current};
 
     pub struct Main;
     impl Module for Main {
@@ -67,12 +67,12 @@ mod common {
                     }
                 }
                 2 => {
-                    if module_name().starts_with("node") {
-                        assert_eq!(format!("node[{}]", msg.header().id), module_name());
+                    if current().name().starts_with("node") {
+                        assert_eq!(format!("node[{}]", msg.header().id), current().name());
                         self.rcv += 1;
                     }
-                    if module_name().starts_with("ring") {
-                        if format!("ring[{}]", msg.header().id) == module_name() {
+                    if current().name().starts_with("ring") {
+                        if format!("ring[{}]", msg.header().id) == current().name() {
                             self.rcv += 1;
                         } else {
                             send(msg, "out")
@@ -88,7 +88,7 @@ mod common {
                 .as_option()
                 .map(|v| v.parse::<usize>().unwrap())
             {
-                assert_eq!(v, self.rcv, "failed at module: {}", module_path());
+                assert_eq!(v, self.rcv, "failed at module: {}", current().path());
             }
         }
     }
@@ -107,7 +107,7 @@ mod common {
         }
 
         fn handle_message(&mut self, msg: Message) {
-            let g = gate("out", msg.header().id as usize).unwrap();
+            let g = current().gate("out", msg.header().id as usize).unwrap();
             send(msg, g);
         }
     }

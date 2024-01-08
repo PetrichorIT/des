@@ -1,12 +1,12 @@
 use super::Par;
-use crate::net::module::module_path;
+use crate::net::module::current;
 
 ///
 /// Returns a parameter by reference (not parsed).
 ///
 #[must_use]
 pub fn par(key: impl AsRef<str>) -> Par {
-    Par::new(key.as_ref(), module_path().as_str())
+    Par::new(key.as_ref(), current().path().as_str())
 }
 
 ///

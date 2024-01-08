@@ -1,4 +1,4 @@
-use des::{prelude::*, net::module::{set_meta, get_meta}};
+use des::prelude::*;
 use serial_test::serial;
 
 #[macro_use]
@@ -13,16 +13,16 @@ impl Module for Parent {
     }
 
     fn at_sim_start(&mut self, _stage: usize) {
-        set_meta(32u64);
+        current().set_meta(32u64);
         schedule_in(Message::new().build(), Duration::from_secs(1));
     }
 
     fn handle_message(&mut self, _msg: Message) {
-        assert_eq!(get_meta::<u64>(), Some(32));
-        assert_eq!(get_meta::<bool>(), None);
+        assert_eq!(current().meta::<u64>(), Some(32));
+        assert_eq!(current().meta::<bool>(), None);
 
-        assert_eq!(child("child-a").unwrap().meta::<String>(), Some("child-a".to_string()));
-        assert_eq!(child("child-b").unwrap().meta::<String>(), Some("child-b".to_string()));
+        assert_eq!(current().child("child-a").unwrap().meta::<String>(), Some("child-a".to_string()));
+        assert_eq!(current().child("child-b").unwrap().meta::<String>(), Some("child-b".to_string()));
     }
 }
 
@@ -35,12 +35,12 @@ impl Module for Child {
     }
 
     fn at_sim_start(&mut self, _stage: usize) {
-        set_meta(module_name());
+        current().set_meta(current().name());
         schedule_in(Message::new().build(), Duration::from_secs(1));
     }
 
     fn handle_message(&mut self, _msg: Message) {
-        assert_eq!(parent().unwrap().meta::<u64>(), Some(32));
+        assert_eq!(current().parent().unwrap().meta::<u64>(), Some(32));
     }
 }
 
@@ -78,13 +78,13 @@ impl Module for Overrider {
     }
 
     fn at_sim_start(&mut self, _stage: usize) {
-        set_meta(32u64);
+        current().set_meta(32u64);
         schedule_in(Message::new().build(), Duration::from_secs(1));
-        set_meta(64u64);
+        current().set_meta(64u64);
     }
 
     fn handle_message(&mut self, _msg: Message) {
-        assert_eq!(get_meta::<u64>(), Some(64));
+        assert_eq!(current().meta::<u64>(), Some(64));
     }
 }
 

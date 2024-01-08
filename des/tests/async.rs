@@ -34,7 +34,7 @@ impl AsyncModule for QuasaiSyncModule {
     }
 
     async fn handle_message(&mut self, msg: Message) {
-        println!("[{}] Received msg: {}", module_name(), msg.header().id);
+        println!("[{}] Received msg: {}", current().name(), msg.header().id);
         self.counter += msg.header().id as usize;
     }
 }
@@ -226,11 +226,11 @@ impl AsyncModule for TimeSleepModule {
     async fn handle_message(&mut self, msg: Message) {
         tracing::debug!("recv msg: {}", msg.str());
         let wait_time = msg.header().kind as u64;
-        tracing::info!("<{}> [{}] Waiting for timer", module_name(), SimTime::now());
+        tracing::info!("<{}> [{}] Waiting for timer", current().name(), SimTime::now());
         sleep(Duration::from_secs(wait_time)).await;
         tracing::info!(
             "<{}> [{}] Done waiting for id: {}",
-            module_name(),
+            current().name(),
             SimTime::now(),
             msg.header().id
         );

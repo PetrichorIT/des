@@ -54,8 +54,9 @@ cfg_net! {
     pub use crate::net::module::ModuleRef;
     pub use crate::net::module::ModuleReferencingError;
 
+    #[allow(deprecated)]
     pub use crate::net::module::{
-        child, gate, gates, module_id, module_name, module_path, parent, shutdow_and_restart_at, shutdow_and_restart_in, shutdown
+        current, child, gate, gates, module_id, module_name, module_path, parent, shutdow_and_restart_at, shutdow_and_restart_in, shutdown
     };
     pub use crate::net::{par, par_for};
 
