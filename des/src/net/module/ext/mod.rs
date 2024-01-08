@@ -89,7 +89,7 @@ pub trait AsyncModule: Send {
     ///     }
     ///
     ///     async fn at_sim_start(&mut self, _stage: usize) {
-    ///         self.config = fetch_config(module_id()).await;
+    ///         self.config = fetch_config(current().id()).await;
     ///         self.records.clear();
     ///     }
     /// }

@@ -118,7 +118,7 @@ pub trait Module: Any {
     ///     /* ... */
     ///     
     ///     fn at_sim_start(&mut self, _stage: usize) {
-    ///         self.config = fetch_config("https://mysimconfig.com/simrun1", module_id());
+    ///         self.config = fetch_config("https://mysimconfig.com/simrun1", current().id());
     ///         self.records.clear();
     ///     }
     ///

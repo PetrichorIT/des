@@ -56,7 +56,7 @@ cfg_net! {
 
     #[allow(deprecated)]
     pub use crate::net::module::{
-        current, child, gate, gates, module_id, module_name, module_path, parent, shutdow_and_restart_at, shutdow_and_restart_in, shutdown
+        current, shutdow_and_restart_at, shutdow_and_restart_in, shutdown
     };
     pub use crate::net::{par, par_for};
 

@@ -1,9 +1,8 @@
 use std::sync::Arc;
 
-use super::{with_mod_ctx, ModuleContext, ModuleId, ModuleRef, ModuleReferencingError, SETUP_FN};
+use super::{with_mod_ctx, ModuleContext, SETUP_FN};
 use crate::{
     net::runtime::buf_schedule_shutdown,
-    prelude::{GateRef, ObjectPath},
     time::{Duration, SimTime},
 };
 
@@ -46,126 +45,6 @@ pub fn current() -> Arc<ModuleContext> {
     with_mod_ctx(Arc::clone)
 }
 
-/// Returns a runtime-unqiue identifier for the currently active module.
-///
-/// This function should only be used within the context of a module.
-/// Note that outside of the context of a module, this function may provide
-/// invalid module-ids or module-ids of modules that are no longer valid.
-///
-/// # Example
-///
-/// ```
-/// use des::prelude::*;
-///
-/// struct MyModule;
-/// impl Module for MyModule {
-///     fn new() -> Self { Self }
-///     fn handle_message(&mut self, msg: Message) {
-///         let id = module_id();
-///         assert_eq!(id, msg.header().receiver_module_id);    
-///     }
-/// }
-/// ```
-///
-/// [`Module`]: crate::net::module::Module
-#[must_use]
-#[deprecated]
-pub fn module_id() -> ModuleId {
-    with_mod_ctx(|ctx| ctx.id())
-}
-
-/// Returns a runtime-unqiue identifier for the currently active module,
-/// based on its place in the module graph.
-///
-/// This function should only be used within the context of a module.
-/// Note that outside of the context of a module, this function may provide
-/// invalid module-paths or module-paths of modules that are no longer valid.
-///
-/// ```
-/// use des::prelude::*;
-///
-/// struct MyModule;
-/// impl Module for MyModule {
-///     fn new() -> Self { Self }
-///     fn handle_message(&mut self, msg: Message) {
-///         let path = module_path();
-///         println!("[{path}] recveived message: {}", msg.str())  
-///     }
-/// }
-/// ```
-///
-/// [`Module`]: crate::net::module::Module
-#[must_use]
-#[deprecated]
-pub fn module_path() -> ObjectPath {
-    with_mod_ctx(|ctx| ctx.path())
-}
-
-/// Returns the name for the currently active module.
-///
-/// Note that the module name is just the last component of the module
-/// path.
-///
-/// This function should only be used within the context of a module.
-/// Note that outside of the context of a module, this function may provide
-/// invalid module-names or module-names of modules that are no longer valid.
-///
-#[must_use]
-#[deprecated]
-pub fn module_name() -> String {
-    with_mod_ctx(|ctx| ctx.name())
-}
-
-// PARENT CHILD
-
-/// Returns a handle parent module in the module graph.
-///
-/// Use this handle to either access the parent modules topological
-/// state, or cast it to access the custom state of the parent.
-///
-/// # Errors
-///
-/// Returns an error if the module has no parent or
-/// the parent is currently shut down.
-#[deprecated]
-pub fn parent() -> Result<ModuleRef, ModuleReferencingError> {
-    with_mod_ctx(|ctx| ctx.parent())
-}
-
-/// Returns a handle to the child element, with the provided module name.
-///
-/// Use this handle to either access and modify the childs modules topological
-/// state, or cast it to access its custom state .
-///
-/// # Errors
-///
-/// Returns an error if no child was found under the given name,
-/// or the child is currently shut down.
-#[deprecated]
-pub fn child(name: &str) -> Result<ModuleRef, ModuleReferencingError> {
-    with_mod_ctx(|ctx| ctx.child(name))
-}
-
-// GATE RELATED
-
-///
-/// Returns a unstructured list of all gates from the current module.
-///
-#[must_use]
-#[deprecated]
-pub fn gates() -> Vec<GateRef> {
-    with_mod_ctx(|ctx| ctx.gates())
-}
-
-///
-/// Returns a ref to a gate of the current module dependent on its name and cluster position
-/// if possible.
-///
-#[must_use]
-#[deprecated]
-pub fn gate(name: &str, pos: usize) -> Option<GateRef> {
-    with_mod_ctx(|ctx| ctx.gate(name, pos))
-}
 
 // BUF CTX based
 
