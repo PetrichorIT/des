@@ -9,11 +9,11 @@ use std::fmt::{Debug, Display};
 use std::sync::{Arc, RwLock};
 
 use crate::net::runtime::ChannelUnbusyNotif;
-use crate::net::{message::Message, MessageAtGateEvent, NetEvents, ObjectPath};
+use crate::net::{message::Message, MessageExitingConnection, NetEvents, ObjectPath};
 use crate::runtime::{rng, EventSink};
 use crate::time::{Duration, SimTime};
 
-use super::gate::GateRef;
+use super::gate::Connection;
 
 /// A readonly reference to a channel.
 pub type ChannelRef = Arc<Channel>;
@@ -34,17 +34,17 @@ struct ChannelInner {
 
 #[derive(Default)]
 struct Buffer {
-    packets: VecDeque<(Message, GateRef)>,
+    packets: VecDeque<(Message, Connection)>,
     acc_bytes: usize,
 }
 
 impl Buffer {
-    fn enqueue(&mut self, msg: Message, gate: GateRef) {
+    fn enqueue(&mut self, msg: Message, con: Connection) {
         self.acc_bytes += msg.length();
-        self.packets.push_back((msg, gate));
+        self.packets.push_back((msg, con));
     }
 
-    fn dequeue(&mut self) -> Option<(Message, GateRef)> {
+    fn dequeue(&mut self) -> Option<(Message, Connection)> {
         let (msg, gate) = self.packets.pop_front()?;
         self.acc_bytes -= msg.length();
         Some((msg, gate))
@@ -75,7 +75,25 @@ pub enum ChannelDropBehaviour {
     Queue(Option<usize>),
 }
 
+impl ChannelInner {
+    fn dup(&self) -> Self {
+        Self {
+            path: self.path.clone(),
+            metrics: self.metrics.clone(),
+            busy: false,
+            transmission_finish_time: SimTime::ZERO,
+            buffer: Buffer::default(),
+            probe: Box::new(DummyChannelProbe)
+        }
+    }
+}
+
 impl Channel {
+
+    pub(super) fn dup(&self) -> Self {
+        Channel { inner: RwLock::new(self.inner.read().unwrap().dup()) }
+    }
+
     /// The object path of the channel.
     ///
     /// # Panics
@@ -188,7 +206,7 @@ impl Channel {
     pub(super) fn send_message<S: EventSink<NetEvents>>(
         self: Arc<Self>,
         msg: Message,
-        next_gate: &GateRef,
+        via: Connection,
         sink: &mut S,
     ) {
         let rng_ref = rng();
@@ -202,7 +220,7 @@ impl Channel {
                 ..
             } = &mut *chan;
 
-            metrics.drop_behaviour.handle(path, buffer, msg, next_gate);
+            metrics.drop_behaviour.handle(path, buffer, msg, via);
         } else {
             let ChannelInner { probe, metrics, .. } = &mut *chan;
             probe.on_message_transmit(metrics, &msg);
@@ -225,8 +243,8 @@ impl Channel {
             let next_event_time = SimTime::now() + dur;
 
             sink.add(
-                NetEvents::MessageAtGateEvent(MessageAtGateEvent {
-                    gate: Arc::clone(next_gate),
+                NetEvents::MessageAtGateEvent(MessageExitingConnection {
+                    con: via.clone(),
                     msg,
                 }),
                 next_event_time,
@@ -246,19 +264,19 @@ impl Channel {
 
         if let Some((msg, next_gate)) = chan.buffer.dequeue() {
             drop(chan);
-            self.send_message(msg, &next_gate, sink);
+            self.send_message(msg, next_gate, sink);
         }
     }
 }
 
 impl ChannelDropBehaviour {
-    fn handle(&self, _path: &ObjectPath, buffer: &mut Buffer, msg: Message, next_gate: &GateRef) {
+    fn handle(&self, _path: &ObjectPath, buffer: &mut Buffer, msg: Message, via: Connection) {
         match self {
             Self::Drop => {
                 #[cfg(feature = "tracing")]
                 tracing::warn!(
                     "Gate '{}' dropping message [{}] pushed onto busy channel {}",
-                    next_gate.previous_gate().unwrap().name(),
+                    via.prev_hop().unwrap().name(),
                     msg.str(),
                     _path
                 );
@@ -269,7 +287,7 @@ impl ChannelDropBehaviour {
                     #[cfg(feature = "tracing")]
                     tracing::warn!(
                         "Gate '{}' dropping message [{}] pushed onto busy channel {}",
-                        next_gate.previous_gate().unwrap().name(),
+                        via.prev_hop().unwrap().name(),
                         msg.str(),
                         _path
                     );
@@ -278,11 +296,11 @@ impl ChannelDropBehaviour {
                     #[cfg(feature = "tracing")]
                     tracing::trace!(
                         "Gate '{}' added message [{}] to queue of channel {}",
-                        next_gate.previous_gate().unwrap().name(),
+                        via.prev_hop().unwrap().name(),
                         msg.str(),
                         _path
                     );
-                    buffer.enqueue(msg, Arc::clone(next_gate));
+                    buffer.enqueue(msg, via);
                 }
             }
         }

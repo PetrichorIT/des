@@ -45,7 +45,7 @@
 use crate::{
     net::{channel::ChannelDropBehaviour, module::ModuleContext},
     prelude::{
-        Channel, ChannelMetrics, EventLifecycle, GateServiceType, ModuleRef, NetworkApplication,
+        Channel, ChannelMetrics, EventLifecycle, ModuleRef, NetworkApplication,
         ObjectPath,
     },
     time::Duration,
@@ -175,7 +175,7 @@ impl NdlApplication {
             let _ = ctx.create_gate_cluster(
                 &gate.ident.raw,
                 gate.cluster.as_size(),
-                gate.service_typ.into(),
+                // gate.service_typ.into(),
             );
         }
 
@@ -217,17 +217,19 @@ impl NdlApplication {
             }
             .unwrap();
 
-            from.set_next_gate(to.clone());
 
-            if let Some(delay) = &con.delay {
+
+            from.connect_dedup(to,  if let Some(delay) = &con.delay {
                 let link = delay.as_link_arc().unwrap();
-                let channel = Channel::new(
+                Some(Channel::new(
                     ctx.path().appended_channel("ch"),
                     ChannelMetrics::from(&*link),
-                );
+                ))
 
-                from.set_channel(channel);
-            }
+            } else {
+                None
+            });
+           
         }
 
         ctx.activate();
@@ -242,15 +244,15 @@ impl NdlApplication {
     }
 }
 
-impl From<ir::GateServiceType> for GateServiceType {
-    fn from(value: ir::GateServiceType) -> Self {
-        match value {
-            ir::GateServiceType::Input => GateServiceType::Input,
-            ir::GateServiceType::Output => GateServiceType::Output,
-            ir::GateServiceType::None => GateServiceType::Undefined,
-        }
-    }
-}
+// impl From<ir::GateServiceType> for GateServiceType {
+//     fn from(value: ir::GateServiceType) -> Self {
+//         match value {
+//             ir::GateServiceType::Input => GateServiceType::Input,
+//             ir::GateServiceType::Output => GateServiceType::Output,
+//             ir::GateServiceType::None => GateServiceType::Undefined,
+//         }
+//     }
+// }
 
 impl From<&ir::Link> for ChannelMetrics {
     #[allow(clippy::cast_sign_loss)]

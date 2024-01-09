@@ -46,8 +46,6 @@ cfg_net! {
 
     pub use crate::net::gate::Gate;
     pub use crate::net::gate::GateRef;
-    pub use crate::net::gate::GateServiceType;
-
 
     pub use crate::net::module::Module;
     pub use crate::net::module::ModuleId;

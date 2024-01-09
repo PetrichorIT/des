@@ -3,7 +3,7 @@ use std::sync::atomic::Ordering::SeqCst;
 use crate::{
     net::{
         message::Message,
-        gate::{GateRef, GateServiceType},
+        gate::Connection,
         module::ModuleRef,
         runtime::buf_process,
         channel::ChannelRef,
@@ -20,7 +20,7 @@ use crate::{
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 #[derive(Debug)]
 pub enum NetEvents {
-    MessageAtGateEvent(MessageAtGateEvent),
+    MessageAtGateEvent(MessageExitingConnection),
     HandleMessageEvent(HandleMessageEvent),
     ChannelUnbusyNotif(ChannelUnbusyNotif),
     ModuleRestartEvent(ModuleRestartEvent),
@@ -45,38 +45,38 @@ where
 }
 
 #[derive(Debug)]
-pub struct MessageAtGateEvent {
-    pub(crate) gate: GateRef,
-    pub(crate) msg: Message,
+pub struct MessageExitingConnection {
+    pub(crate) con: Connection, // exiting the following connecrtion
+    pub(crate) msg: Message, // with this message
 }
 
-impl MessageAtGateEvent {
+impl MessageExitingConnection {
     // This function executes an event with a sink not a runtime as an parameter.
     // That allows for the executing of events not handles by the runtime itself
     // aka. the calling with an abitrary event sink.
     pub(crate) fn handle_with_sink(self, sink: &mut impl EventSink<NetEvents>)
     {
         let mut msg = self.msg;
-        msg.header.last_gate = Some(self.gate.clone());
+        msg.header.last_gate = Some(self.con.endpoint.clone());
 
-        // Follow gates until either the gate chain is terminated,
-        // or a delayed action is required.
-        let mut cur = self.gate;
-        while let Some(next) = cur.next_gate() {
-            enter_scope(cur.owner().scope_token());
+        // The connection that was exited.
+        // Current packet position: `cur.endpoint`
+        let mut cur = self.con;
+        while let Some(next) = cur.next_hop() {
+            enter_scope(cur.endpoint.owner().scope_token());
 
             // Since a next gate exists log the current gate as
             // transit complete. (do this before drop check to allow for better debugging at drop)
-            msg.header.last_gate = Some(next.clone());
+            msg.header.last_gate = Some(next.endpoint.clone());
 
             // Drop message is owner is not active, but notfiy since this is an irregularity.
-            if !cur.owner().is_active() {
+            if !cur.endpoint.owner().is_active() {
                 #[cfg(feature = "tracing")]
                 tracing::warn!(
                     "Gate '{}' dropped message [{}] since owner module {} is inactive",
-                    cur.name(),
+                    cur.endpoint.name(),
                     msg.str(),
-                    cur.owner().path()
+                    cur.endpoint.owner().path()
                 );
 
                 drop(msg);
@@ -87,21 +87,13 @@ impl MessageAtGateEvent {
             #[cfg(feature = "tracing")]
             tracing::info!(
                 "Gate '{}' forwarding message [{}] to next gate delayed: {}",
-                cur.name(),
+                cur.endpoint.name(),
                 msg.str(),
                 cur.channel().is_some()
             );
 
-            if let Some(ch) = cur.channel_mut() {
-                // since a channel is nessecary for this hop, a delayed
-                // action is nessecary
-                assert_ne!(
-                    cur.service_type(),
-                    GateServiceType::Input,
-                    "Channels cannot start at a input gate"
-                );
-
-                ch.send_message(msg, &next, sink);
+            if let Some(ch) = next.channel() {
+                ch.send_message(msg, next, sink);
                 return;
             } 
             
@@ -112,25 +104,17 @@ impl MessageAtGateEvent {
 
         // The loop has ended. This means we are at the end of a gate chain
         // cur has not been checked for anything
-        enter_scope(cur.owner().scope_token());
-
-        assert_ne!(
-            cur.service_type(), 
-            GateServiceType::Output,
-            "Messages cannot be forwarded to modules on Output gates. (Gate '{}' owned by Module '{}')",
-            cur.str(),
-            cur.owner().as_str()
-        );
+        enter_scope(cur.endpoint.owner().scope_token());
        
         #[cfg(feature = "tracing")]
         tracing::info!(
             "Gate '{}' forwarding message [{}] to module #{}",
-            cur.name(),
+            cur.endpoint.name(),
             msg.str(),
-            cur.owner().ctx.id
+            cur.endpoint.owner().id()
         );
 
-        let module = cur.owner();
+        let module = cur.endpoint.owner();
         sink.add(
             NetEvents::HandleMessageEvent(HandleMessageEvent {
                 module,
@@ -138,12 +122,10 @@ impl MessageAtGateEvent {
             }),
             SimTime::now(),
         );
-
-
     }
 }
 
-impl MessageAtGateEvent {
+impl MessageExitingConnection {
     fn handle<A>(self, rt: &mut Runtime<NetworkApplication<A>>)
     where
         A: EventLifecycle<NetworkApplication<A>>,

@@ -41,7 +41,7 @@ impl Application {
         println!("(avg) waittime := {:?}", avg_wait);
 
         assert!((busy_perc - 0.4996535454771872).abs() < 0.01);
-        assert_eq!(avg_wait, Duration::from_secs_f64(1.00213517))
+        assert_eq!(avg_wait, Duration::from_secs_f64(1.002135171))
     }
 }
 

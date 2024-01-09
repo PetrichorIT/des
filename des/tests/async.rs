@@ -46,13 +46,13 @@ fn quasai_sync_non_blocking() {
 
     let module = QuasaiSyncModule::build_named(ObjectPath::from("RootModule".to_string()), &mut rt);
 
-    let gate_a = module.create_gate("in", GateServiceType::Input);
+    let gate_a = module.create_gate("in");
     rt.register_module(module);
 
     let module_b =
         QuasaiSyncModule::build_named(ObjectPath::from("OtherRootModule".to_string()), &mut rt);
 
-    let gate_b = module_b.create_gate("in", GateServiceType::Input);
+    let gate_b = module_b.create_gate("in");
     rt.register_module(module_b);
 
     let mut rt = Builder::seeded(123).build(rt);
@@ -177,7 +177,7 @@ fn mutiple_active_tasks() {
     let module_a =
         MutipleTasksModule::build_named(ObjectPath::from("RootModule".to_string()), &mut rt);
 
-    let gate_a = module_a.create_gate("in", GateServiceType::Input);
+    let gate_a = module_a.create_gate("in");
     rt.register_module(module_a);
 
     let mut rt = Builder::seeded(123).build(rt);
@@ -250,7 +250,7 @@ fn one_module_timers() {
     let module_a =
         TimeSleepModule::build_named(ObjectPath::from("RootModule".to_string()), &mut rt);
 
-    let gate_a = module_a.create_gate("in", GateServiceType::Input);
+    let gate_a = module_a.create_gate("in");
     rt.register_module(module_a);
 
     let mut rt = Builder::seeded(123).build(rt);
@@ -292,7 +292,7 @@ fn one_module_delayed_recv() {
     let module_a =
         TimeSleepModule::build_named(ObjectPath::from("RootModule".to_string()), &mut rt);
 
-    let gate_a = module_a.create_gate("in", GateServiceType::Input);
+    let gate_a = module_a.create_gate("in");
     rt.register_module(module_a);
 
     let mut rt = Builder::seeded(123).build(rt);
@@ -347,12 +347,12 @@ fn mutiple_module_delayed_recv() {
 
     let module_a =
         TimeSleepModule::build_named(ObjectPath::from("RootModule".to_string()), &mut rt);
-    let gate_a = module_a.create_gate("in", GateServiceType::Input);
+    let gate_a = module_a.create_gate("in");
     rt.register_module(module_a);
 
     let module_b =
         TimeSleepModule::build_named(ObjectPath::from("OtherRootModule".to_string()), &mut rt);
-    let gate_b = module_b.create_gate("in", GateServiceType::Input);
+    let gate_b = module_b.create_gate("in");
     rt.register_module(module_b);
 
     let mut rt = Builder::seeded(123).build(rt);
@@ -457,12 +457,12 @@ fn semaphore_in_waiting_task() {
 
     let module_a =
         SemaphoreModule::build_named(ObjectPath::from("RootModule".to_string()), &mut rt);
-    let gate_a = module_a.create_gate("in", GateServiceType::Input);
+    let gate_a = module_a.create_gate("in");
     rt.register_module(module_a);
 
     let module_b =
         SemaphoreModule::build_named(ObjectPath::from("OtherRootModule".to_string()), &mut rt);
-    let gate_b = module_b.create_gate("in", GateServiceType::Input);
+    let gate_b = module_b.create_gate("in");
     rt.register_module(module_b);
 
     let mut rt = Builder::seeded(123).build(rt);
@@ -507,38 +507,3 @@ fn semaphore_in_waiting_task() {
         _ => panic!("Expected runtime to finish"),
     }
 }
-
-struct ShouldBlockSimStart {}
-impl_build_named!(ShouldBlockSimStart);
-
-
-impl AsyncModule for ShouldBlockSimStart {
-    fn new() -> Self {
-        Self {}
-    }
-
-    async fn handle_message(&mut self, _: Message) {}
-
-    async fn at_sim_start(&mut self, _: usize) {
-        let sem = Semaphore::new(0);
-        let _ = sem.acquire().await.expect("CRASH");
-    }
-}
-
-// #[test]
-// #[should_panic = "Join Idle: RuntimeIdle(())"]
-// fn sim_start_deadlock() {
-//     let mut rt = NetworkApplication::new(());
-//     let mut cx = BuildContext::new(&mut rt);
-
-//     let module_a = ShouldBlockSimStart::build_named(
-//         ObjectPath::from("RootModule".to_string()),
-//         &mut cx,
-//     );
-
-//     cx.create_module(module_a);
-
-//     let rt = Runtime::new(rt);
-
-//     let _result = rt.run();
-// }

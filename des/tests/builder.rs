@@ -40,8 +40,9 @@ fn builder_connected_modules() {
     let mut sim = AsyncBuilder::new();
 
     sim.node("sender", move |_| async move {
+        println!("sender start");
         for _ in 0..10 {
-            send(Message::new().build(), ("out", 0));
+            send(Message::new().build(), ("port", 0));
             sleep(Duration::from_secs(1)).await;
         }
         Ok(())
@@ -58,6 +59,7 @@ fn builder_connected_modules() {
 
     sim.connect("sender", "receiver");
 
+    println!("init");
     let rt = Builder::seeded(123).build(sim.build());
     let _ = rt.run();
     assert_eq!(counter_c.load(SeqCst), 10);
@@ -70,7 +72,7 @@ fn builder_delayed_links() {
     sim.set_default_cfg(NodeCfg { join: true });
 
     sim.node("client", |_| async {
-        send(Message::new().build(), ("out", 0));
+        send(Message::new().build(), ("port", 0));
         Ok(())
     });
     sim.node("server", |mut rx| async move {
@@ -132,7 +134,7 @@ fn builder_with_extern() {
     let mut sim = AsyncBuilder::new();
     sim.set_default_cfg(NodeCfg { join: true });
     sim.node("client", |_| async {
-        send(Message::new().build(), ("out", 0));
+        send(Message::new().build(), ("port", 0));
         Ok(())
     });
     sim.external::<ExternalReceiver>("server", None);

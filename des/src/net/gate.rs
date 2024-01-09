@@ -15,18 +15,6 @@ pub type GateRef = Arc<Gate>;
 ///
 pub(crate) type GateRefWeak = Weak<Gate>;
 
-///
-/// The type of service a gate cluster can support.
-///
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum GateServiceType {
-    /// A gate that can be connected to in NDL notation
-    Input,
-    /// A gate that can be pointed to antoher gate in NDL notation.
-    Output,
-    /// A gate without restrictions.
-    Undefined,
-}
 
 ///
 /// A gate, a message insertion or extraction point used for handeling channels.
@@ -37,14 +25,93 @@ pub struct Gate {
     owner: ModuleRefWeak,
     name: String,
 
-    typ: GateServiceType,
     size: usize,
     pos: usize,
 
-    channel: Mutex<Option<ChannelRef>>,
+    connections: Mutex<Connections>,
+}
 
-    next_gate: Mutex<Option<GateRef>>,
-    previous_gate: Mutex<Option<GateRefWeak>>,
+struct Connections {
+    connections: [Option<Connection>; 2]
+}
+
+/// A connection to a peering gate
+#[derive(Debug, Clone)]
+pub struct Connection {
+    /// The endpoint from the view of the owning gate
+    pub endpoint: GateRef,
+    /// The index of the slot used at the endpoint
+    pub endpoint_id: usize,
+    /// A channel to slow down the connection.
+    pub channel: Option<ChannelRef>
+}
+
+impl Connection {
+    /// NEW
+    pub fn new(gate: GateRef) -> Self {
+        assert!(gate.connections.try_lock().unwrap().len() <= 1);
+        Self::new_unchecked(gate)
+    }
+
+    /// 
+    pub fn new_unchecked(gate: GateRef) -> Self {
+        Self {
+            endpoint: gate,
+            endpoint_id: 1, // TODO: smarter ??
+            channel: None
+        }
+    }
+
+    /// NEXT
+    pub fn next_hop(&self) -> Option<Connection> {
+        let idx = [1, 0][self.endpoint_id];
+        let lock = self.endpoint.connections.lock().expect("failed to get lock");
+        lock.connections[idx].clone()
+    }
+
+    /// PREV
+    pub fn prev_hop(&self) -> Option<GateRef> {
+        let lock = self.endpoint.connections.lock().expect("failed to get lock");
+        Some(lock.connections[self.endpoint_id].as_ref()?.endpoint.clone())
+    }
+
+    /// CHAN
+    pub fn channel(&self) -> Option<ChannelRef> {
+        self.channel.as_ref().map(Arc::clone)
+    }
+}
+
+impl Connections {
+    fn new() -> Self {
+        Self { connections: [None, None] }
+    }
+
+    fn len(&self) -> usize {
+        self.connections.iter().filter(|v| v.is_some()).count()
+    }
+
+    fn put(&mut self, connection: Connection) {
+        for i in 0..2 {
+            if self.connections[i].is_none() {
+                self.connections[i] = Some(connection);
+                return;
+            }
+        }
+        unreachable!()
+    }
+}
+
+struct PathIter {
+    con: Option<Connection>
+}
+
+impl Iterator for PathIter {
+    type Item = Connection;
+    fn next(&mut self) -> Option<Self::Item> {
+        let next = self.con.as_ref()?.next_hop()?;
+        self.con = Some(next.clone());
+        Some(next)
+    }
 }
 
 impl Gate {
@@ -89,24 +156,13 @@ impl Gate {
         }
     }
 
-    ///
-    /// Returns the serivce type of the gate cluster.
-    ///
-    #[must_use]
-    pub fn service_type(&self) -> GateServiceType {
-        self.typ
-    }
 
     ///
     /// Returns a short identifcator that holds all nessecary information.
     ///
     #[must_use]
     pub fn str(&self) -> String {
-        match self.typ {
-            GateServiceType::Input => format!("{} (input)", self.name_with_pos()),
-            GateServiceType::Output => format!("{} (output)", self.name_with_pos()),
-            GateServiceType::Undefined => self.name_with_pos(),
-        }
+       self.name_with_pos()
     }
 
     ///
@@ -117,100 +173,64 @@ impl Gate {
         format!("{}:{}", self.owner().ctx.path, self.name_with_pos())
     }
 
-    ///
-    /// The next gate in the gate chain by reference.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the simulation core was poisoned.
-    ///
-    #[must_use]
-    pub fn previous_gate(&self) -> Option<GateRef> {
-        self.previous_gate.lock().unwrap().clone()?.upgrade()
+   
+   /// CONNECT
+    pub fn connect(self: GateRef, other: GateRef, channel: Option<ChannelRef>) {
+        let mut conns = self.connections.try_lock().expect("Failed to get lock");
+        let mut other_conns = other.connections.try_lock().expect("failed to get lock");
+
+        let conns_pos = conns.len();
+        let other_conns_pos = other_conns.len();
+        assert!(conns_pos < 2 && other_conns_pos < 2, "Cannot add connection, gates allready connected to multiple points");
+
+
+        let ch1 = channel.as_ref().map(|c| Arc::new(c.dup()));
+        let ch2 = channel;
+
+        conns.put(Connection { endpoint: other.clone(), endpoint_id: other_conns_pos, channel: ch1 });
+        other_conns.put(Connection { endpoint: self.clone(), endpoint_id: conns_pos, channel: ch2 });
     }
 
-    ///
-    /// The next gate in the gate chain by reference.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the simulation core was poisoned.
-    ///
-    #[must_use]
-    pub fn next_gate(&self) -> Option<GateRef> {
-        self.next_gate.lock().unwrap().clone()
-    }
-
-    ///
-    /// A function to link the next gate in the gate chain, by referencing
-    /// its identifier.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the simulation core was poisoned.
-    ///
-    pub fn set_next_gate(self: &GateRef, next_gate: GateRef) {
-        *next_gate.previous_gate.lock().unwrap() = Some(Arc::downgrade(self));
-        *self.next_gate.lock().unwrap() = Some(next_gate);
-    }
-
-    ///
-    /// Returns the channel attached to this gate, if any exits.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the simulation core was poisoned.
-    #[must_use]
-    pub fn channel(&self) -> Option<ChannelRef> {
-        // only provide a read_only interface publicly
-        Some(Arc::clone(self.channel.lock().unwrap().as_ref()?))
-    }
-
-    ///
-    /// Returns the channel attached to this gate, if any exits.
-    ///
-    pub(crate) fn channel_mut(&self) -> Option<ChannelRef> {
-        // only provide a read_only interface publicly
-        Some(Arc::clone(self.channel.lock().unwrap().as_ref()?))
-    }
-
-    ///
-    /// Sets the channel attached to this gate.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the simulation core was poisoned.
-    pub fn set_channel(&self, channel: ChannelRef) {
-        *self.channel.lock().unwrap() = Some(channel);
-    }
-
-    ///
-    /// Follows the previous-gate references until a gate without a previous-gate
-    /// was found.
-    ///
-    #[must_use]
-    pub fn path_start(&self) -> Option<GateRef> {
-        let mut current = self.previous_gate()?;
-        while let Some(previous_gate) = current.previous_gate() {
-            current = previous_gate;
+    /// DEDUP
+    pub fn connect_dedup(self: GateRef, other: GateRef, channel: Option<ChannelRef>) {
+        // Check whether the target is allready connected
+        let conns = self.connections.try_lock().expect("failed lock");
+        for i in 0..2 {
+            if let Some(ref con) = conns.connections[i] {
+                if Arc::ptr_eq(&con.endpoint, &other) {
+                    return
+                }
+            }
         }
 
-        Some(current)
+        drop(conns);
+        self.connect(other, channel)
     }
 
-    ///
-    /// Follows the next-gate references until a gate without a next-gate
-    /// was found.
-    ///
-    #[must_use]
-    pub fn path_end(&self) -> Option<GateRef> {
-        let mut current = self.next_gate()?;
-        while let Some(next_gate) = current.next_gate() {
-            current = next_gate;
+    /// CHAN
+    pub fn channel(self: &GateRef) -> Option<ChannelRef> {
+        self.path_iter().nth(0).map(|con| con.channel).flatten()
+    }
+
+    /// ITER
+    pub fn path_iter(self: &GateRef) -> impl Iterator<Item = Connection> {
+        PathIter {
+            con: Some(Connection::new_unchecked(self.clone()))
         }
-
-        Some(current)
     }
+
+
+    /// NEXT GATE
+    pub fn next_gate(self: &GateRef) -> Option<GateRef> {
+        self.path_iter().nth(0).map(|c| c.endpoint)
+    }
+
+    /// END
+    pub fn path_end(self: &GateRef) -> Option<GateRef> {
+        self.path_iter().last().map(|c| c.endpoint)
+    }
+
+ 
 
     ///
     /// Returns the owner module by reference of this gate.
@@ -235,28 +255,19 @@ impl Gate {
     pub fn new(
         owner: &ModuleRef,
         name: impl AsRef<str>,
-        typ: GateServiceType,
         size: usize,
         pos: usize,
-        channel: Option<ChannelRef>,
-        next_gate: Option<GateRef>,
     ) -> GateRef {
         assert!(size >= 1, "Cannot create with a non-postive size");
 
         let this = GateRef::new(Self {
             owner: ModuleRefWeak::new(owner),
             name: name.as_ref().to_string(),
-            typ,
             size,
             pos,
-            channel: Mutex::new(channel),
-            next_gate: Mutex::new(None),
-            previous_gate: Mutex::new(None),
+            connections: Mutex::new(Connections::new()),
         });
 
-        if let Some(next_gate) = next_gate {
-            this.set_next_gate(next_gate);
-        }
         this
     }
 }
@@ -266,7 +277,7 @@ impl Debug for Gate {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Gate")
             .field("path", &self.path())
-            .field("typ", &self.typ)
+            // .field("typ", &self.typ)
             // .field("next", &self.next_gate.borrow().as_ref().map(|_| ()))
             // .field("prev", &self.previous_gate.borrow().as_ref().map(|_| ()))
             // .field("channel", &self.channel.borrow())

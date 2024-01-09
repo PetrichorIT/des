@@ -15,7 +15,7 @@ version = "0.5.1"
 
 [features]
 # Include nothing by default
-default = []
+default = ["full"]
 
 # Include everything used for default test runs.
 full = ["net", "ndl", "cqueue", "async", "macros"]

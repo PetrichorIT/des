@@ -741,7 +741,7 @@ impl<A> RuntimeResult<A> {
 }
 
 cfg_net! {
-    use crate::net::{gate::GateRef,  HandleMessageEvent, message::Message, MessageAtGateEvent, module::ModuleRef, NetEvents, NetworkApplication};
+    use crate::net::{gate::{GateRef, Connection},  HandleMessageEvent, message::Message, MessageExitingConnection, module::ModuleRef, NetEvents, NetworkApplication};
 
     impl<A> Runtime<NetworkApplication<A>> where
         A: EventLifecycle<NetworkApplication<A>>,{
@@ -754,8 +754,8 @@ cfg_net! {
             message: impl Into<Message>,
             time: SimTime,
         ) {
-            let event = MessageAtGateEvent {
-                gate,
+            let event = MessageExitingConnection {
+                con: Connection::new(gate),
                 msg: message.into(),
             };
 

@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::{net::module::ModuleRef, prelude::GateRef};
 
 ///
@@ -19,10 +17,8 @@ pub struct Topology {
 pub struct TopoNode {
     /// A reference to the module itself, including its custom state.
     pub module: ModuleRef,
-    /// The number of incoming connections. (NOT nessicarily the number of input gates)
-    pub incount: usize,
-    /// The number of outgoing connections. (nessicarily the number of input gates)
-    pub outcount: usize,
+    /// The number of connections. (not nessecarily the number of gates)
+    pub degree: usize,
     /// An indicate whether the module is at all connected to the rest of of the network.
     pub alive: bool,
 }
@@ -33,13 +29,11 @@ pub struct TopoNode {
 #[derive(Debug, Clone)]
 
 pub struct TopoEdge {
-    /// The start of the gate chain.
-    pub src: GateRef,
-    /// The end of the gate chain.
-    pub dst: GateRef,
-    /// The node-id of the destination node.
-    pub dst_id: usize,
-    /// The accumulated cost according to the channel metrics.
+    ///
+    pub src: (GateRef, usize), //
+    ///
+    pub dst: (GateRef, usize),
+    ///
     pub cost: f64,
 }
 
@@ -61,11 +55,12 @@ impl Topology {
 
     /// An iterator over all edges in the entries network, annotated with the
     /// node-id of the starting node.
-    pub fn edges(&self) -> impl Iterator<Item = (usize, &TopoEdge)> {
+    pub fn edges(&self) -> usize {
         self.edges
             .iter()
             .enumerate()
             .flat_map(|(i, edges)| edges.iter().map(move |e| (i, e)))
+            .count() / 2
     }
 
     /// All outgoing edges associated with a single
@@ -83,85 +78,59 @@ impl Topology {
     /// the topology from the ground up using the `ModuleRef` stored in the
     /// node information.
     pub fn build(&mut self, modules: &[ModuleRef]) {
-        let offset = self.nodes.len();
 
         for module in modules {
             self.nodes.push(TopoNode {
                 module: module.clone(),
-                incount: 0,
-                outcount: 0,
+                degree: 0,
                 alive: false,
             });
             self.edges.push(Vec::new());
         }
 
-        for (i, module) in modules.iter().enumerate() {
-            let mut outgoing = Vec::new();
-            let gates = module.ctx.gates.read();
-
-            'outer: for gate in &*gates {
-                // Ingore path if we are not at the path start.
-                if gate.previous_gate().is_some() {
-                    continue;
-                }
-
+        for (_, module) in modules.iter().enumerate() {
+            let gates = module.ctx.gates();
+            'outer: for gate in gates {
                 let mut cost = 0.0;
-                let mut cur = gate.clone();
-                let mut itr = 0;
+                let mut dst = gate.clone();
 
-                while let Some(next) = cur.next_gate() {
-                    if cur.channel().is_some() {
+                for con in gate.path_iter().take(16) {
+                    if con.channel().is_some() {
                         cost += 1.0;
                     }
-                    cur = next;
 
-                    // Set alive notes
-                    let transit_id = cur.owner().id;
-                    let Some(transit) = self.nodes.iter_mut().find(|n| n.module.ctx.id == transit_id) else {
-                        break 'outer;
+                    let transit_id = con.endpoint.owner().id();
+                    let Some(transit) = self.nodes.iter_mut().find(|k| k.module.ctx.id() == transit_id) else {
+                        break 'outer
                     };
                     transit.alive |= true;
 
-                    // CHANGE:
-                    // No longer break once another module was reached,
-                    // only break at the end of a gate chain.
-
-                    // CHANGE:
-                    // Add a breaking condition to ensure termination
-                    // even in misconfigured simulations.
-                    itr += 1;
-                    if itr > 16 {
-                        break;
-                    }
+                    dst = con.endpoint.clone();
                 }
 
-                if !Arc::ptr_eq(&cur, gate) {
-                    // Featch the topo info for faster algorithms later on
-                    let dst_id = cur.owner().ctx.id;
-                    let Some((id, dst)) = self
-                        .nodes
-                        .iter_mut()
-                        .enumerate()
-                        .find(|(_, n)| n.module.ctx.id == dst_id) else {
-                            continue;
-                        };
+                let src_id = gate.owner().id();
+                let dst_id = dst.owner().id();
+                let (src_idx, src_node) = self.nodes.iter_mut().enumerate().find(|(_, m)| m.module.ctx.id() == src_id).unwrap();
+                src_node.degree += 1;
+                src_node.alive |= true;
 
-                    dst.incount += 1;
-                    dst.alive |= true;
+                let (dst_idx, dst_node) = self.nodes.iter_mut().enumerate().find(|(_, m)| m.module.ctx.id() == dst_id).unwrap();
+                dst_node.degree += 1;
+                dst_node.alive |= true;
+                
 
-                    outgoing.push(TopoEdge {
-                        dst_id: id,
-                        src: gate.clone(),
-                        dst: cur,
-                        cost,
-                    });
-                }
+                let edge = TopoEdge {
+                    src: (gate, src_idx),
+                    dst: (dst, dst_idx),
+                    cost
+                };
+
+                self.edges[src_idx].push(edge);
             }
-
-            self.nodes[offset + i].alive |= !outgoing.is_empty();
-            self.nodes[offset + i].outcount = outgoing.len();
-            self.edges[offset + i] = outgoing;
         }
+
+        // Divide bc each connection was counted twice
+        self.nodes.iter_mut().for_each(|node| node.degree /= 2);
     }
 
     ///
@@ -182,30 +151,18 @@ impl Topology {
             if keep {
                 // Do nothing this node will be kept so no links must be pruned
             } else {
-                // Remove outgoing edges
+                // Fix degrees
+                dbg!(i, &self.edges[i]);
                 for edge in self.edges[i].drain(..) {
-                    self.nodes[edge.dst_id].incount -= 1;
-                    self.nodes[i].outcount -= 1;
+                    self.nodes[edge.src.1].degree -= 1;
+                    self.nodes[edge.dst.1].degree -= 1;
                 }
-                // Remove incoming edges
-                for j in 0..n {
-                    if j == i {
-                        continue;
-                    }
 
-                    let mut k = 0;
-                    while k < self.edges[j].len() {
-                        if self.edges[j][k].dst_id == i {
-                            self.nodes[i].incount -= 1;
-                            self.nodes[j].outcount -= 1;
-                            self.edges[j].remove(k);
-                        } else {
-                            k += 1;
-                        }
-                    }
+                for j in 0..n {
+                    if j == i { continue; }
+                    self.edges[j].retain(|edge| edge.dst.1 != i)
                 }
-                debug_assert_eq!(self.nodes[i].outcount, 0);
-                debug_assert_eq!(self.nodes[i].incount, 0);
+                debug_assert_eq!(self.nodes[i].degree, 0);
             }
         }
 
@@ -226,7 +183,7 @@ impl Topology {
         // Update edge ids
         for edges in &mut self.edges {
             for edge in edges {
-                edge.dst_id = mapping[edge.dst_id];
+                edge.dst.1 = mapping[edge.dst.1];
             }
         }
     }
@@ -249,14 +206,14 @@ impl Topology {
                     j += 1;
                 } else {
                     self.edges[i].remove(j);
-                    self.nodes[i].outcount -= 1;
-                    self.nodes[self.edges[i][j].dst_id].incount -= 1;
+                    self.nodes[i].degree -= 1;
+                    self.nodes[self.edges[i][j].dst.1].degree -= 1;
                 }
             }
         }
 
         for node in &mut self.nodes {
-            if node.incount == 0 && node.outcount == 0 {
+            if node.degree == 0 {
                 node.alive = false;
             }
         }
@@ -276,26 +233,6 @@ impl Topology {
         }
     }
 
-    /// Checks whether all links are bidirectional,
-    /// thus all links will be recognized as routing ports.
-    #[must_use]
-    #[allow(clippy::float_cmp)]
-    pub fn all_links_bidiretional(&self) -> bool {
-        for i in 0..self.nodes.len() {
-            for edge in self.edges_for(i) {
-                let dst_edges = self.edges_for(edge.dst_id);
-                let peer = dst_edges.iter().find(|e| e.dst_id == i);
-                if let Some(peer) = peer {
-                    if peer.cost != edge.cost {
-                        return false;
-                    }
-                } else {
-                    return false;
-                }
-            }
-        }
-        true
-    }
 
     /// Creates a .dot output for visualizing the module graph.
     #[must_use]
@@ -303,7 +240,7 @@ impl Topology {
         let mut output = String::from("digraph D {{\n");
 
         for def in &self.nodes {
-            if def.incount > 0 || def.outcount > 0 {
+            if def.degree > 0  {
                 output.push_str(&format!("    \"{}\" [shape=box]\n", def.module.as_str()));
             }
         }
@@ -313,13 +250,12 @@ impl Topology {
         for (src, edges) in self.edges.iter().enumerate() {
             let from_node = self.nodes[src].module.as_str();
             for TopoEdge {
-                dst_id: id,
                 src,
                 dst,
                 cost,
             } in edges
             {
-                let to_node = self.nodes[*id].module.as_str();
+                let to_node = self.nodes[src.1].module.as_str();
                 let label = if *cost == 0.0 {
                     String::new()
                 } else {
@@ -327,12 +263,12 @@ impl Topology {
                 };
 
                 output.push_str(&format!(
-                    "    \"{}\" -> \"{}\" [ headlabel=\"{}\" {} taillabel=\"{}\" ]\n",
+                    "    \"{}\" - \"{}\" [ headlabel=\"{}\" {} taillabel=\"{}\" ]\n",
                     from_node,
                     to_node,
-                    dst.name(),
+                    dst.0.name(),
                     label,
-                    src.name(),
+                    src.0.name(),
                 ));
             }
         }

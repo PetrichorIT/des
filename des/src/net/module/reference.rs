@@ -1,6 +1,6 @@
 use crate::net::processing::ProcessingElements;
 use crate::net::NetEvents;
-use crate::prelude::{ChannelRef, Gate, GateRef, GateServiceType};
+use crate::prelude::{Gate, GateRef};
 use crate::runtime::EventSink;
 use crate::tracing::{enter_scope, leave_scope};
 
@@ -278,25 +278,10 @@ impl ModuleRef {
     /// Creates a gate on the current module, returning its ID.
     ///
     #[must_use]
-    pub fn create_gate(&self, name: &str, typ: GateServiceType) -> GateRef {
-        self.create_gate_cluster(name, 1, typ).remove(0)
+    pub fn create_gate(&self, name: &str) -> GateRef {
+        self.create_gate_cluster(name, 1).remove(0)
     }
 
-    ///
-    /// Creates a gate on the current module that points to another gate as its
-    /// next hop, returning the ID of the created gate.
-    ///
-    #[must_use]
-    pub fn create_gate_into(
-        &self,
-        name: &str,
-        typ: GateServiceType,
-        channel: Option<ChannelRef>,
-        next_hop: Option<GateRef>,
-    ) -> GateRef {
-        self.create_gate_cluster_into(name, 1, typ, channel, vec![next_hop])
-            .remove(0)
-    }
 
     ///
     /// Createas a cluster of gates on the current module returning their IDs.
@@ -306,41 +291,10 @@ impl ModuleRef {
         &self,
         name: &str,
         size: usize,
-        typ: GateServiceType,
     ) -> Vec<GateRef> {
-        self.create_gate_cluster_into(name, size, typ, None, vec![None; size])
-    }
-
-    ///
-    /// Creates a cluster of gates on the current module, pointing to the given next hops,
-    /// returning the new IDs.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic should size != `next_hops.len`()
-    ///
-    #[allow(clippy::needless_pass_by_value)]
-    #[must_use]
-    pub fn create_gate_cluster_into(
-        &self,
-        name: &str,
-        size: usize,
-        typ: GateServiceType,
-        channel: Option<ChannelRef>,
-        next_hops: Vec<Option<GateRef>>,
-    ) -> Vec<GateRef> {
-        assert!(
-            size == next_hops.len(),
-            "The value 'next_hops' must be equal to the size of the gate cluster"
-        );
-
-        let mut ids = Vec::new();
-
-        for (i, item) in next_hops.into_iter().enumerate() {
-            ids.push(self.create_raw_gate(name, typ, size, i, channel.clone(), item));
-        }
-
-        ids
+        (0..size).map(|id| {
+            self.create_raw_gate(name, size, id)
+        }).collect()
     }
 
     /// Creates a gate on the current module, returning its ID.
@@ -349,13 +303,10 @@ impl ModuleRef {
     pub fn create_raw_gate(
         &self,
         name: &str,
-        typ: GateServiceType,
         size: usize,
         pos: usize,
-        channel: Option<ChannelRef>,
-        next: Option<GateRef>,
     ) -> GateRef {
-        let gate = Gate::new(self, name, typ, size, pos, channel, next);
+        let gate = Gate::new(self, name, size, pos);
         self.ctx.gates.write().push(gate.clone());
         gate
     }

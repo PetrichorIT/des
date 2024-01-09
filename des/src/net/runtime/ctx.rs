@@ -1,8 +1,9 @@
 #![allow(missing_docs)]
 
 use super::{
-    HandleMessageEvent, MessageAtGateEvent, NetworkApplication, NetworkApplicationGlobals,
+    HandleMessageEvent, MessageExitingConnection, NetworkApplication, NetworkApplicationGlobals,
 };
+use crate::net::gate::Connection;
 use crate::net::module::{with_mod_ctx, MOD_CTX, SETUP_FN, current};
 use crate::net::ModuleRestartEvent;
 use crate::net::{gate::GateRef, message::Message, NetEvents};
@@ -64,7 +65,7 @@ pub(crate) fn buf_send_at(mut msg: Message, gate: GateRef, send_time: SimTime) {
     // (0) If delayed send is active, dont skip gate_refs
     if send_time > SimTime::now() {
         ctx.events.push((
-            NetEvents::MessageAtGateEvent(MessageAtGateEvent { gate, msg }),
+            NetEvents::MessageAtGateEvent(MessageExitingConnection { con: Connection::new(gate), msg }),
             send_time,
         ));
         return;
@@ -72,7 +73,7 @@ pub(crate) fn buf_send_at(mut msg: Message, gate: GateRef, send_time: SimTime) {
 
     // (0) Else handle the event inlined, for instant effects on the associated
     // channels.
-    let event = MessageAtGateEvent { gate, msg };
+    let event = MessageExitingConnection { con: Connection::new(gate), msg };
     event.handle_with_sink(&mut ctx.events);
 
     crate::tracing::enter_scope(with_mod_ctx(|ctx| ctx.scope_token));

@@ -49,5 +49,5 @@ fn topology_load() {
     assert!(topo
         .edges_for(i)
         .iter()
-        .any(|edge| edge.dst_id == j && edge.src.name() == "debug"))
+        .any(|edge| edge.dst.1 == j && edge.src.0.name() == "debug"));
 }

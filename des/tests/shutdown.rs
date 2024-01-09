@@ -74,7 +74,7 @@ fn stateless_module_shudown() {
     let mut rt = NetworkApplication::new(());
 
     let module = StatelessModule::build_named(ObjectPath::from("RootModule"), &mut rt);
-    let gate = module.create_gate("in", GateServiceType::Input);
+    let gate = module.create_gate("in");
 
     rt.register_module(module);
     let mut rt = Builder::seeded(123).build(rt);
@@ -93,7 +93,6 @@ fn stateless_module_shudown() {
 
 struct StatelessModuleRestart {}
 impl_build_named!(StatelessModuleRestart);
-
 
 impl AsyncModule for StatelessModuleRestart {
     fn new() -> Self {
@@ -129,7 +128,7 @@ fn stateless_module_restart() {
     let mut rt = NetworkApplication::new(());
 
     let module = StatelessModuleRestart::build_named(ObjectPath::from("RootModule"), &mut rt);
-    let gate = module.create_gate("in", GateServiceType::Input);
+    let gate = module.create_gate("in");
 
     rt.register_module(module);
     let mut rt = Builder::seeded(123).build(rt);
@@ -198,7 +197,7 @@ fn statefull_module_restart() {
     let mut rt = NetworkApplication::new(());
 
     let module = StatefullModule::build_named(ObjectPath::from("RootModule"), &mut rt);
-    let gate = module.create_gate("in", GateServiceType::Input);
+    let gate = module.create_gate("in");
 
     rt.register_module(module);
     let mut rt = Builder::seeded(123).build(rt);
@@ -408,7 +407,7 @@ impl Module for EndNode {
                             counter: self.drops.clone(),
                         })
                         .build(),
-                    "out",
+                    "port",
                 );
                 schedule_in(Message::new().kind(1).build(), Duration::from_secs(1));
             }
@@ -460,19 +459,12 @@ fn shutdown_will_drop_transiting() {
     let pong = EndNode::build_named(ObjectPath::from("pong"), &mut app);
     let transit = Transit::build_named(ObjectPath::from("transit"), &mut app);
 
-    let ping_in = ping.create_gate("in", GateServiceType::Input);
-    let ping_out = ping.create_gate("out", GateServiceType::Output);
-    let pong_in = pong.create_gate("in", GateServiceType::Input);
-    let pong_out = pong.create_gate("out", GateServiceType::Output);
+    let ping_gate = ping.create_gate("port");
+    let transit_gate = transit.create_gate("connector");
+    let pong_gate = pong.create_gate("port");
 
-    let i_to_o = transit.create_gate("i_to_o", GateServiceType::Undefined);
-    let o_to_i = transit.create_gate("i_to_o", GateServiceType::Undefined);
-
-    ping_out.set_next_gate(i_to_o.clone());
-    i_to_o.set_next_gate(pong_in);
-
-    pong_out.set_next_gate(o_to_i.clone());
-    o_to_i.set_next_gate(ping_in);
+    ping_gate.connect(transit_gate.clone(), None);
+    transit_gate.connect(pong_gate, None);
 
     app.register_module(ping);
     app.register_module(pong);
@@ -492,40 +484,29 @@ fn shutdown_will_drop_transiting_delayed_channels() {
     let pong = EndNode::build_named(ObjectPath::from("pong"), &mut app);
     let transit = Transit::build_named(ObjectPath::from("transit"), &mut app);
 
-    let ping_in = ping.create_gate("in", GateServiceType::Input);
-    let ping_out = ping.create_gate("out", GateServiceType::Output);
-    let pong_in = pong.create_gate("in", GateServiceType::Input);
-    let pong_out = pong.create_gate("out", GateServiceType::Output);
+    let ping_gate = ping.create_gate("port");
+    let transit_gate = transit.create_gate("connector");
+    let pong_gate = pong.create_gate("port");
 
-    let i_to_o = transit.create_gate("i_to_o", GateServiceType::Undefined);
-    let o_to_i = transit.create_gate("i_to_o", GateServiceType::Undefined);
 
-    let ch_to_o = Channel::new(
-        ping.path().appended_channel("to_o"),
+    ping_gate.connect(transit_gate.clone(), Some(Channel::new(
+        ping.path().appended_channel("chan"),
         ChannelMetrics {
             bitrate: 100_000,
             latency: Duration::from_secs_f64(0.004),
             jitter: Duration::ZERO,
             drop_behaviour: ChannelDropBehaviour::default(),
         },
-    );
-    let ch_to_i = Channel::new(
-        ping.path().appended_channel("to_o"),
+    )));
+    transit_gate.connect(pong_gate, Some(Channel::new(
+        ping.path().appended_channel("chan"),
         ChannelMetrics {
             bitrate: 100_000,
             latency: Duration::from_secs_f64(0.004),
             jitter: Duration::ZERO,
             drop_behaviour: ChannelDropBehaviour::default(),
         },
-    );
-
-    ping_out.set_next_gate(i_to_o.clone());
-    ping_out.set_channel(ch_to_o);
-    i_to_o.set_next_gate(pong_in);
-
-    pong_out.set_next_gate(o_to_i.clone());
-    pong_out.set_channel(ch_to_i);
-    o_to_i.set_next_gate(ping_in);
+    )));
 
     app.register_module(ping);
     app.register_module(pong);

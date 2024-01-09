@@ -11,7 +11,7 @@ use tokio::{
 use crate::{
     net::module::ModuleContext,
     prelude::{
-        AsyncModule, Channel, ChannelMetrics, GateServiceType, Message, Module, ModuleRef,
+        AsyncModule, Channel, ChannelMetrics, Message, Module, ModuleRef,
         ObjectPath,
     },
 };
@@ -306,52 +306,21 @@ impl AsyncBuilder {
         assert!(lhs_info.connections.get(rhs).is_none());
         assert!(rhs_info.connections.get(lhs).is_none());
 
-        let lr = chan.map(|chan| {
+        let chan = chan.map(|chan| {
             Channel::new(
-                rhs_info.node.path.appended_channel(format!("{lhs}->{rhs}")),
-                chan,
-            )
-        });
-        let rl = chan.map(|chan| {
-            Channel::new(
-                rhs_info.node.path.appended_channel(format!("{lhs}->{rhs}")),
+                rhs_info.node.path.appended_channel(format!("{lhs}-{rhs}")),
                 chan,
             )
         });
 
-        let ri = rhs_info.node.create_raw_gate(
-            "in",
-            GateServiceType::Input,
-            rhs_info.c + 1,
-            rhs_info.c,
-            None,
-            None,
-        );
-        let _lo = lhs_info.node.create_raw_gate(
-            "out",
-            GateServiceType::Output,
-            lhs_info.c + 1,
-            lhs_info.c,
-            lr,
-            Some(ri.clone()),
-        );
+        let lhs_gate = lhs_info.node.create_raw_gate("port", lhs_info.c + 1, lhs_info.c);
+        let rhs_gate = rhs_info.node.create_raw_gate("port", rhs_info.c + 1, rhs_info.c);
 
-        let li = lhs_info.node.create_raw_gate(
-            "in",
-            GateServiceType::Input,
-            lhs_info.c + 1,
-            lhs_info.c,
-            None,
-            None,
-        );
-        let _ro = rhs_info.node.create_raw_gate(
-            "out",
-            GateServiceType::Output,
-            rhs_info.c + 1,
-            rhs_info.c,
-            rl,
-            Some(li.clone()),
-        );
+        self.mapping.get_mut(lhs).unwrap().c += 1;
+        self.mapping.get_mut(rhs).unwrap().c += 1;
+
+
+        lhs_gate.connect(rhs_gate, chan);
     }
 }
 
