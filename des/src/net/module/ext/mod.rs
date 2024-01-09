@@ -5,7 +5,6 @@ use tokio::task::yield_now;
 pub(crate) mod core;
 pub(crate) use self::core::WaitingMessage;
 
-///
 /// A set of user defined functions for customizing the behaviour
 /// of an asynchronous module.
 ///
@@ -165,7 +164,7 @@ where
         // # Setup message receive handle.
         if stage == 0 {
             // SAFTEY:
-            // We can guarntee the validity of the pointer:
+            // We can guarantee the validity of the pointer:
             // 1) The module is pinned while the simulation is running.
             // 2) The module is not dropped while the simulation is running.
             // 3) While we may create mutiple &mut T, handle_message is never run fully

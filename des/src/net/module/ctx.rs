@@ -185,9 +185,6 @@ impl ModuleContext {
         self.meta.try_write().expect("Failed lock").set(value);
     }
 
-
-  
-
     /// Returns a reference to a parent module
     ///
     /// Use this handle to either access the parent modules topological

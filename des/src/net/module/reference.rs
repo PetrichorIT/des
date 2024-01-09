@@ -84,6 +84,7 @@ impl ModuleRef {
     }
 
     /// DPC
+    #[deprecated]
     pub fn with_pe<T: Any, R>(&self, f: impl FnOnce(&mut T) -> R) -> Option<R> {
         self.processing.borrow_mut().with_pe::<T, R>(f)
     }
