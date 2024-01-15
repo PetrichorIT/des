@@ -1,11 +1,11 @@
 module M {
     gates {
-        in @input,
+        in,
         out,
     }
     gates {
         influx[5],
-        outflow[1] @out
+        outflow[1]
     }
 }
 

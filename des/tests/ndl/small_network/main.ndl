@@ -10,24 +10,24 @@ link Delay {
 // Node
 module Node {
     gates {
-        in @input,
-        out @output
+        in,
+        out
     }
 }
 
 // Router
 module Router {
     gates {
-        in[5] @input,
-        out[5] @output,
-        debug @output,
+        in[5],
+        out[5],
+        debug,
     }
 }
 
 // Debugger
 module Debugger {
     gates {
-        in @input,
+        in,
     }
 }
 
@@ -40,9 +40,9 @@ module Main {
     }
 
     connections {
-        node/out --> Delay --> router/in,
-        node/in <-- Delay <-- router/out,
-        debugger/in <-- router/debug,
+        node/out <-- Delay --> router/in,
+        node/in <-- Delay --> router/out,
+        debugger/in <--> router/debug,
     }
 }
 

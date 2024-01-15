@@ -1,5 +1,5 @@
 use des_ndl::error::*;
-use des_ndl::ir::{Cluster, GateServiceType};
+use des_ndl::ir::Cluster;
 use des_ndl::*;
 
 #[macro_use]
@@ -15,19 +15,15 @@ fn gates_ir_baseline() -> RootResult<()> {
 
     assert_eq!(entry.gates[0].ident.raw, "in");
     assert_eq!(entry.gates[0].cluster, Cluster::Standalone);
-    assert_eq!(entry.gates[0].service_typ, GateServiceType::Input);
 
     assert_eq!(entry.gates[1].ident.raw, "out");
     assert_eq!(entry.gates[1].cluster, Cluster::Standalone);
-    assert_eq!(entry.gates[1].service_typ, GateServiceType::None);
 
     assert_eq!(entry.gates[2].ident.raw, "influx");
     assert_eq!(entry.gates[2].cluster, Cluster::Clusted(5));
-    assert_eq!(entry.gates[2].service_typ, GateServiceType::None);
 
     assert_eq!(entry.gates[3].ident.raw, "outflow");
     assert_eq!(entry.gates[3].cluster, Cluster::Clusted(1));
-    assert_eq!(entry.gates[3].service_typ, GateServiceType::Output);
 
     Ok(())
 }

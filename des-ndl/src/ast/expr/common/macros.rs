@@ -1,9 +1,13 @@
 macro_rules! ast_expect_single_token {
     (
+        $(
         $vis:vis struct $type:ident {
             token: $token:expr,
         }
+        )*
+
     ) => {
+       $(
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         $vis struct $type {
             $vis span: crate::Span
@@ -59,5 +63,6 @@ macro_rules! ast_expect_single_token {
                 self.span
             }
         }
+    )*
     };
 }

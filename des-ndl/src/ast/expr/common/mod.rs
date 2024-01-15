@@ -30,136 +30,64 @@ pub use self::punct::*;
 ast_expect_single_token! {
     pub struct Slash {
         token: TokenKind::Slash,
-
     }
-}
-
-ast_expect_single_token! {
     pub struct Dot {
         token: TokenKind::Dot,
-
     }
-}
-
-ast_expect_single_token! {
     pub struct DotDot {
         token: TokenKind::DotDot,
-
     }
-}
-
-ast_expect_single_token! {
     pub struct DotDotDot {
         token: TokenKind::DotDotDot,
-
     }
-}
-
-ast_expect_single_token! {
     pub struct Eq {
         token: TokenKind::Eq,
-
     }
-}
-
-ast_expect_single_token! {
     pub struct Semi {
         token: TokenKind::Semi,
-
     }
-}
-
-ast_expect_single_token! {
     pub struct Comma {
         token: TokenKind::Comma,
-
     }
-}
-
-ast_expect_single_token! {
     pub struct Colon {
         token: TokenKind::Colon,
-
     }
-}
-
-ast_expect_single_token! {
     pub struct Plus {
         token: TokenKind::Plus,
-
     }
-}
-
-ast_expect_single_token! {
     pub struct Minus {
         token: TokenKind::Minus,
-
     }
-}
-
-ast_expect_single_token! {
     pub struct LeftSingleArrow {
         token: TokenKind::LSingleArrow,
-
     }
-}
-
-ast_expect_single_token! {
+    pub struct LeftRightSingleArrow {
+        token: TokenKind::LSingleArrowR,
+    }
     pub struct RightSingleArrow {
         token: TokenKind::RSingleArrow,
-
     }
-}
-
-ast_expect_single_token! {
     pub struct IncludeToken {
         token: TokenKind::Keyword(Keyword::Include),
-
     }
-}
-
-ast_expect_single_token! {
     pub struct ModuleToken {
         token: TokenKind::Keyword(Keyword::Module),
-
     }
-}
-
-ast_expect_single_token! {
     pub struct GatesToken {
         token: TokenKind::Keyword(Keyword::Gates),
-
     }
-}
-
-ast_expect_single_token! {
     pub struct SubmodulesToken {
         token: TokenKind::Keyword(Keyword::Submodules),
-
     }
-}
-
-ast_expect_single_token! {
     pub struct ConnectionsToken {
         token: TokenKind::Keyword(Keyword::Connections),
-
     }
-}
-
-ast_expect_single_token! {
     pub struct LinkToken {
         token: TokenKind::Keyword(Keyword::Link),
-
     }
-}
-
-ast_expect_single_token! {
     pub struct EntryToken {
         token: TokenKind::Keyword(Keyword::Entry),
     }
-}
-
-ast_expect_single_token! {
     pub struct DynToken {
         token: TokenKind::Keyword(Keyword::Dyn),
     }

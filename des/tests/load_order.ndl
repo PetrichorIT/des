@@ -5,13 +5,13 @@ module MidLevelModule {
     }
 
     gates {
-        in @input,
-        out @output,
+        in,
+        out,
     }
 
     connections {
-        out --> child/in,
-        in <-- child/out,
+        out <--> child/in,
+        in <--> child/out,
     }
 }
 
@@ -24,8 +24,8 @@ module TopLevelModule {
 
 module LowLevelModule {
     gates {
-        in @input,
-        out @output,
+        in,
+        out,
     }
 }
 

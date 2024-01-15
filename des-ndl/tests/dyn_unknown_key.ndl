@@ -1,7 +1,7 @@
 module Basic {
     gates {
-        in @input,
-        out @output
+        in,
+        out
     }
 }
 
@@ -14,7 +14,7 @@ module Dyn {
     }
 
     connections {
-        sub/out --> sub/in
+        sub/out <--> sub/in
     }
 }
 

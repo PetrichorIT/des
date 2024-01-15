@@ -101,7 +101,11 @@ impl TokenTree {
                     Dot => {
                         // Check for second dot
                         let Some(next) = cursor.peek(0) else {
-                            return Ok(TokenTree::Token(Token::new(TokenKind::Dot, span), Spacing::Alone).into())
+                            return Ok(TokenTree::Token(
+                                Token::new(TokenKind::Dot, span),
+                                Spacing::Alone,
+                            )
+                            .into());
                         };
 
                         if next.kind != Dot {
@@ -117,7 +121,11 @@ impl TokenTree {
 
                         // check for third dot.
                         let Some(next) = cursor.peek(0) else {
-                            return Ok(TokenTree::Token(Token::new(TokenKind::DotDot, span), Spacing::Alone).into())
+                            return Ok(TokenTree::Token(
+                                Token::new(TokenKind::DotDot, span),
+                                Spacing::Alone,
+                            )
+                            .into());
                         };
 
                         if next.kind == Eq {
@@ -203,6 +211,7 @@ impl TokenTree {
                         )
                         .into())
                     }
+
                     Minus => {
                         if cursor.peek(0).map(|t| t.kind) != Some(Minus) {
                             if let Some(lexer::Token {
@@ -281,11 +290,21 @@ impl TokenTree {
                             let (_, s) = cursor.next().unwrap();
                             span = Span::fromto(span, s);
 
-                            Ok(TokenTree::Token(
-                                Token::new(TokenKind::LSingleArrow, span),
-                                Spacing::Alone,
-                            )
-                            .into())
+                            if cursor.peek(0).map(|t| t.kind) == Some(Gt) {
+                                let (_, s) = cursor.next().unwrap();
+                                span = Span::fromto(span, s);
+                                Ok(TokenTree::Token(
+                                    Token::new(TokenKind::LSingleArrowR, span),
+                                    Spacing::Alone,
+                                )
+                                .into())
+                            } else {
+                                Ok(TokenTree::Token(
+                                    Token::new(TokenKind::LSingleArrow, span),
+                                    Spacing::Alone,
+                                )
+                                .into())
+                            }
                         }
                         _ => Ok(
                             TokenTree::Token(Token::new(TokenKind::Lt, span), Spacing::Alone)
@@ -355,5 +374,54 @@ impl TokenTree {
                 };
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{SourceMap, ast::token};
+    use super::*;
+
+    #[test]
+    fn recognize_arrows() {
+        let mut smap = SourceMap::new();
+        let asset = smap.load_raw(
+            "raw:token:0",
+            "module A {{
+            connections {{
+                a <--> b,
+                c <-- Link --> d
+            }}
+        }}",
+        );
+
+        let ts = TokenStream::new(asset).unwrap();
+        let TokenTree::Delimited(_, _, ref module_stmt) = ts.items[2] else {
+            unreachable!()
+        };
+        let TokenTree::Delimited(_, _, ref module_stmt) = module_stmt.items[0] else {
+            unreachable!()
+        };
+
+        dbg!(module_stmt);
+
+        let TokenTree::Delimited(_, _, ref conn_stmt) = module_stmt.items[1] else {
+            unreachable!()
+        };
+
+        let TokenTree::Delimited(_, _, ref list) = conn_stmt.items[0] else {
+            unreachable!()
+        };
+
+
+        let TokenTree::Token(ref arrow, _) = list.items[1] else {
+            unreachable!()
+        };
+        assert_eq!(arrow.kind, token::TokenKind::LSingleArrowR);
+
+        let TokenTree::Token(ref arrow, _) = list.items[5] else {
+            unreachable!()
+        };
+        assert_eq!(arrow.kind, token::TokenKind::LSingleArrow);
     }
 }

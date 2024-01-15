@@ -4,7 +4,7 @@ use crate::{
     ast::{ModuleStmt, Spanned},
     error::*,
     ir::{
-        Cluster, Connection, ConnectionEndpoint, Gate, GateServiceType, Module, RawSymbol,
+        Cluster, Connection, ConnectionEndpoint, Gate, Module, RawSymbol,
         Submodule, Symbol,
     },
     resolve::{LinkIrTable, LocalGatesTable, LocalSubmoduleTable, ModuleIrTable, SharedGatesTable},
@@ -81,11 +81,6 @@ impl Module {
                     .as_ref()
                     .map(Cluster::from)
                     .unwrap_or(Cluster::Standalone),
-                service_typ: gate
-                    .annotation
-                    .as_ref()
-                    .map(GateServiceType::from)
-                    .unwrap_or(GateServiceType::None),
             });
         }
 
@@ -275,8 +270,8 @@ impl Module {
                 None
             };
 
-            let lhs = shared_gtable.resolve(&con.source);
-            let rhs = shared_gtable.resolve(&con.target);
+            let lhs = shared_gtable.resolve(&con.lhs);
+            let rhs = shared_gtable.resolve(&con.rhs);
 
             let (lhs, rhs) = match (lhs, rhs) {
                 (Ok(lhs), Ok(rhs)) => (lhs, rhs),
@@ -303,23 +298,26 @@ impl Module {
                 let l = lhs.pop().unwrap();
                 let r = rhs.pop().unwrap();
 
-                if l.def.service_typ == GateServiceType::Input {
-                    errors.add(Error::new(
-                            ErrorKind::InvalidConGateServiceTyp,
-                            format!("Gate '{}' cannot serve as connection source, since it is of serivce type '{:?}'", l.def.ident.raw, l.def.service_typ)
-                        ));
-                }
+                // TODO: Topo check whether the gates can hold connections
 
-                if r.def.service_typ == GateServiceType::Output {
-                    errors.add(Error::new(
-                            ErrorKind::InvalidConGateServiceTyp,
-                            format!("Gate '{}' cannot serve as connection target, since it is of serivce type '{:?}'", r.def.ident.raw, r.def.service_typ)
-                        ));
-                }
+
+                // if l.def.service_typ == GateServiceType::Input {
+                //     errors.add(Error::new(
+                //             ErrorKind::InvalidConGateServiceTyp,
+                //             format!("Gate '{}' cannot serve as connection source, since it is of serivce type '{:?}'", l.def.ident.raw, l.def.service_typ)
+                //         ));
+                // }
+
+                // if r.def.service_typ == GateServiceType::Output {
+                //     errors.add(Error::new(
+                //             ErrorKind::InvalidConGateServiceTyp,
+                //             format!("Gate '{}' cannot serve as connection target, since it is of serivce type '{:?}'", r.def.ident.raw, r.def.service_typ)
+                //     ));
+                // }
 
                 ir_connections.push(Connection {
-                    from: ConnectionEndpoint::from(l),
-                    to: ConnectionEndpoint::from(r),
+                    lhs: ConnectionEndpoint::from(l),
+                    rhs: ConnectionEndpoint::from(r),
                     delay: delay.clone(),
                 });
             }

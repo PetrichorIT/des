@@ -199,7 +199,7 @@ impl NdlApplication {
         }
 
         for con in &ir.connections {
-            let from = match &con.from {
+            let from = match &con.lhs {
                 ConnectionEndpoint::Local(gate, pos) => ctx.gate(&gate.raw, pos.as_index()),
                 ConnectionEndpoint::Nonlocal(submod, pos, gate) => {
                     let c = ctx.child(&format!("{}{}", submod.raw, pos)).unwrap();
@@ -208,7 +208,7 @@ impl NdlApplication {
             }
             .unwrap();
 
-            let to = match &con.to {
+            let to = match &con.rhs {
                 ConnectionEndpoint::Local(gate, pos) => ctx.gate(&gate.raw, pos.as_index()),
                 ConnectionEndpoint::Nonlocal(submod, pos, gate) => {
                     let c = ctx.child(&format!("{}{}", submod.raw, pos)).unwrap();

@@ -1,7 +1,7 @@
 module 123 {
     gates {
-        in @input,
-        out @output,
+        in,
+        out,
     }
 }
 

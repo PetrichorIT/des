@@ -1,14 +1,14 @@
 module A {
     gates {
-        in @input,
-        out @output,
+        in,
+        out,
     }
 }
 
 module B {
     gates {
-        in @input,
-        out @output,
+        in,
+        out,
     }
 }
 
@@ -25,8 +25,8 @@ module Main {
         b: B,
     }
     connections {
-        a/out --> L --> b/in,
-        b/out --> L --> a/in,
+        a/out <-- L --> b/in,
+        b/out <-- L --> a/in,
     }
 }
 

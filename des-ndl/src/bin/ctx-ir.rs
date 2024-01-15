@@ -1,7 +1,7 @@
 use des_ndl::*;
 
 fn main() {
-    let mut ctx = match Context::load("des-ndl/src/bin/case-1/main.ndl") {
+    let mut ctx = match Context::load("des-ndl2/blueprint.ndl") {
         Ok(ctx) => ctx,
         Err(e) => {
             println!("[{e}]");

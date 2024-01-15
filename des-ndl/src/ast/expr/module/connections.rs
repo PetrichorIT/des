@@ -1,9 +1,9 @@
-use std::{fmt, mem};
+use std::fmt;
 
 use crate::{
     ast::{
         parse::*, ClusterDefinition, Comma, ConnectionsToken, Delimited, Delimiter, Ident,
-        LeftSingleArrow, Punctuated, RightSingleArrow, Slash,
+        LeftSingleArrow, Punctuated, RightSingleArrow, Slash, LeftRightSingleArrow, EitherOr,
     },
     error::Result,
     resource::Span,
@@ -18,10 +18,10 @@ pub struct ConnectionsStmt {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConnectionDefinition {
-    pub source: ModuleGateReference,
-    pub target: ModuleGateReference,
-    pub first_arrow: ConnectionArrow,
-    pub second_arrow: Option<ConnectionArrow>,
+    pub lhs: ModuleGateReference,
+    pub rhs: ModuleGateReference,
+    pub first_arrow: EitherOr<LeftSingleArrow, LeftRightSingleArrow>,
+    pub second_arrow: Option<RightSingleArrow>,
     pub link: Option<Ident>,
 }
 
@@ -47,6 +47,7 @@ pub struct NonlocalModuleGateReference {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ConnectionArrow {
+    Double(LeftRightSingleArrow),
     Left(LeftSingleArrow),
     Right(RightSingleArrow),
 }
@@ -54,6 +55,10 @@ pub enum ConnectionArrow {
 // # Impl
 
 impl ConnectionArrow {
+    pub fn is_double(&self) -> bool {
+        matches!(self, Self::Double(_))
+    }
+
     pub fn is_right(&self) -> bool {
         matches!(self, Self::Right(_))
     }
@@ -109,7 +114,7 @@ impl Spanned for ConnectionsStmt {
 
 impl Spanned for ConnectionDefinition {
     fn span(&self) -> Span {
-        Span::fromto(self.source.span(), self.target.span())
+        Span::fromto(self.lhs.span(), self.rhs.span())
     }
 }
 
@@ -143,6 +148,7 @@ impl Spanned for NonlocalModuleGateReference {
 impl Spanned for ConnectionArrow {
     fn span(&self) -> Span {
         match self {
+            Self::Double(d) => d.span(),
             Self::Left(left) => left.span(),
             Self::Right(right) => right.span(),
         }
@@ -169,62 +175,29 @@ impl Parse for ConnectionsStmt {
 
 impl Parse for ConnectionDefinition {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
-        let mut first = ModuleGateReference::parse(input)?;
-        let first_arrow = ConnectionArrow::parse(input)?;
-        let mut second = ModuleGateReference::parse(input)?;
-        if matches!(
-            second,
-            ModuleGateReference::Local(LocalModuleGateReference {
-                gate_cluster: None,
-                ..
-            })
-        ) {
+        let first = ModuleGateReference::parse(input)?;
+        let first_arrow = EitherOr::parse(input)?;
+
+        if matches!(first_arrow, EitherOr::Either(_)){
             // Could be a delayed connections
-            let second_arrow = match ConnectionArrow::parse(input) {
-                Ok(v) => v,
-                Err(_) => {
-                    if matches!(first_arrow, ConnectionArrow::Left(_)) {
-                        mem::swap(&mut first, &mut second)
-                    }
-                    return Ok(ConnectionDefinition {
-                        source: first,
-                        first_arrow,
-                        target: second,
-                        second_arrow: None,
-                        link: None,
-                    });
-                }
-            };
-
-            if first_arrow.is_right() != second_arrow.is_right() {
-                unimplemented!()
-            }
-
-            let mut third = ModuleGateReference::parse(input)?;
-            if matches!(first_arrow, ConnectionArrow::Left(_)) {
-                mem::swap(&mut first, &mut third)
-            }
-
-            let ModuleGateReference::Local(local) = second else {
-                unreachable!()
-            };
-            let link = local.gate;
+            let link = Ident::parse(input)?;
+            let second_arrow = RightSingleArrow::parse(input)?;
+            let third = ModuleGateReference::parse(input)?;
 
             Ok(ConnectionDefinition {
-                source: first,
-                target: third,
+                lhs: first,
+                rhs: third,
                 first_arrow,
                 second_arrow: Some(second_arrow),
                 link: Some(link),
             })
         } else {
-            if matches!(first_arrow, ConnectionArrow::Left(_)) {
-                mem::swap(&mut first, &mut second)
-            }
+            let second = ModuleGateReference::parse(input)?;
+
             Ok(ConnectionDefinition {
-                source: first,
+                lhs: first,
                 first_arrow,
-                target: second,
+                rhs: second,
                 second_arrow: None,
                 link: None,
             })
@@ -291,7 +264,7 @@ mod tests {
         // # Case 0
         let asset = smap.load_raw(
             "raw:case0",
-            "connections { from --> to, iden_t <-- from_dent }",
+            "connections { from <--> to, iden_t <--> from_dent }",
         );
         let ts = TokenStream::new(asset).unwrap();
         let buf = ParseBuffer::new(asset, ts);
@@ -300,37 +273,37 @@ mod tests {
         let items = stmt.items.iter().cloned().collect::<Vec<_>>();
         assert_eq!(items.len(), 2);
 
-        assert_eq!(items[0].source.to_string(), "from");
-        assert_eq!(items[0].target.to_string(), "to");
+        assert_eq!(items[0].lhs.to_string(), "from");
+        assert_eq!(items[0].rhs.to_string(), "to");
         assert_eq!(items[0].link, None);
 
-        assert_eq!(items[1].source.to_string(), "from_dent");
-        assert_eq!(items[1].target.to_string(), "iden_t");
+        assert_eq!(items[1].lhs.to_string(), "iden_t");
+        assert_eq!(items[1].rhs.to_string(), "from_dent");
         assert_eq!(items[1].link, None);
 
         // # Case 1
-        let asset = smap.load_raw("raw:case1", "connections { from --> 123 }");
+        let asset = smap.load_raw("raw:case1", "connections { from <--> 123 }");
         let ts = TokenStream::new(asset).unwrap();
         let buf = ParseBuffer::new(asset, ts);
 
         let _stmt = ConnectionsStmt::parse(&buf).unwrap_err();
 
         // # Case 2
-        let asset = smap.load_raw("raw:case2", "connections { from + --> ident }");
+        let asset = smap.load_raw("raw:case2", "connections { from + <--> ident }");
         let ts = TokenStream::new(asset).unwrap();
         let buf = ParseBuffer::new(asset, ts);
 
         let _stmt = ConnectionsStmt::parse(&buf).unwrap_err();
 
         // # Case 3
-        let asset = smap.load_raw("raw:case3", "connections {  --> ident }");
+        let asset = smap.load_raw("raw:case3", "connections {  <--> ident }");
         let ts = TokenStream::new(asset).unwrap();
         let buf = ParseBuffer::new(asset, ts);
 
         let _stmt = ConnectionsStmt::parse(&buf).unwrap_err();
 
         // # Case 3
-        let asset = smap.load_raw("raw:case3", "connections { from --> ident,, }");
+        let asset = smap.load_raw("raw:case3", "connections { from <--> ident,, }");
         let ts = TokenStream::new(asset).unwrap();
         let buf = ParseBuffer::new(asset, ts);
 
@@ -344,7 +317,7 @@ mod tests {
         // # Case 0
         let asset = smap.load_raw(
             "raw:case0",
-            "connections { from[1] --> to, iden_t[10] <-- from_dent[12] }",
+            "connections { from[1] <--> to, iden_t[10] <--> from_dent[12] }",
         );
         let ts = TokenStream::new(asset).unwrap();
         let buf = ParseBuffer::new(asset, ts);
@@ -352,12 +325,12 @@ mod tests {
         let stmt = ConnectionsStmt::parse(&buf).unwrap();
         let items = stmt.items.iter().cloned().collect::<Vec<_>>();
 
-        assert_eq!(items[0].source.to_string(), "from[1]");
-        assert_eq!(items[0].target.to_string(), "to");
+        assert_eq!(items[0].lhs.to_string(), "from[1]");
+        assert_eq!(items[0].rhs.to_string(), "to");
         assert_eq!(items[0].link, None);
 
-        assert_eq!(items[1].source.to_string(), "from_dent[12]");
-        assert_eq!(items[1].target.to_string(), "iden_t[10]");
+        assert_eq!(items[1].lhs.to_string(), "iden_t[10]");
+        assert_eq!(items[1].rhs.to_string(), "from_dent[12]");
         assert_eq!(items[1].link, None);
 
         // # Case 1
@@ -386,7 +359,7 @@ mod tests {
         // # Case 0
         let asset = smap.load_raw(
             "raw:case0",
-            "connections { child/from --> child/to, child/iden_t <-- child/from_dent }",
+            "connections { child/from <--> child/to, child/iden_t <--> child/from_dent }",
         );
         let ts = TokenStream::new(asset).unwrap();
         let buf = ParseBuffer::new(asset, ts);
@@ -395,12 +368,12 @@ mod tests {
         let items = stmt.items.iter().cloned().collect::<Vec<_>>();
         assert_eq!(items.len(), 2);
 
-        assert_eq!(items[0].source.to_string(), "child/from");
-        assert_eq!(items[0].target.to_string(), "child/to");
+        assert_eq!(items[0].lhs.to_string(), "child/from");
+        assert_eq!(items[0].rhs.to_string(), "child/to");
         assert_eq!(items[0].link, None);
 
-        assert_eq!(items[1].source.to_string(), "child/from_dent");
-        assert_eq!(items[1].target.to_string(), "child/iden_t");
+        assert_eq!(items[1].lhs.to_string(), "child/iden_t");
+        assert_eq!(items[1].rhs.to_string(), "child/from_dent");
         assert_eq!(items[1].link, None);
 
         // # Case 1
@@ -439,7 +412,7 @@ mod tests {
         // # Case 0
         let asset = smap.load_raw(
             "raw:case0",
-            "connections { child/from[1] --> child/to, child/iden_t[10] <-- child/from_dent[12] }",
+            "connections { child/from[1] <--> child/to, child/iden_t[10] <--> child/from_dent[12] }",
         );
         let ts = TokenStream::new(asset).unwrap();
         let buf = ParseBuffer::new(asset, ts);
@@ -447,18 +420,18 @@ mod tests {
         let stmt = ConnectionsStmt::parse(&buf).unwrap();
         let items = stmt.items.iter().cloned().collect::<Vec<_>>();
 
-        assert_eq!(items[0].source.to_string(), "child/from[1]");
-        assert_eq!(items[0].target.to_string(), "child/to");
+        assert_eq!(items[0].lhs.to_string(), "child/from[1]");
+        assert_eq!(items[0].rhs.to_string(), "child/to");
         assert_eq!(items[0].link, None);
 
-        assert_eq!(items[1].source.to_string(), "child/from_dent[12]");
-        assert_eq!(items[1].target.to_string(), "child/iden_t[10]");
+        assert_eq!(items[1].lhs.to_string(), "child/iden_t[10]");
+        assert_eq!(items[1].rhs.to_string(), "child/from_dent[12]");
         assert_eq!(items[1].link, None);
 
         // # Case 1
         let asset = smap.load_raw(
             "raw:case1",
-            "connections { child/from[ident] --> child/to }",
+            "connections { child/from[ident] <--> child/to }",
         );
         let ts = TokenStream::new(asset).unwrap();
         let buf = ParseBuffer::new(asset, ts);
@@ -466,20 +439,20 @@ mod tests {
         let _stmt = ConnectionsStmt::parse(&buf).unwrap_err();
 
         // # Case 2
-        let asset = smap.load_raw("raw:case2", "connections { child/from[] --> child/to }");
+        let asset = smap.load_raw("raw:case2", "connections { child/from[] <--> child/to }");
         let ts = TokenStream::new(asset).unwrap();
         let buf = ParseBuffer::new(asset, ts);
 
         let _stmt = ConnectionsStmt::parse(&buf).unwrap_err();
 
         // # Case 3
-        let asset = smap.load_raw("raw:case3", "connections { child/from[213 --> child/to }");
+        let asset = smap.load_raw("raw:case3", "connections { child/from[213 <--> child/to }");
         let _ts = TokenStream::new(asset).unwrap_err();
 
         // # Case 4
         let asset = smap.load_raw(
             "raw:case4",
-            "connections { child[1]/from --> child/to, child[10]/iden_t <-- child[12]/from_dent }",
+            "connections { child[1]/from <--> child/to, child[10]/iden_t <--> child[12]/from_dent }",
         );
         let ts = TokenStream::new(asset).unwrap();
         let buf = ParseBuffer::new(asset, ts);
@@ -487,18 +460,18 @@ mod tests {
         let stmt = ConnectionsStmt::parse(&buf).unwrap();
         let items = stmt.items.iter().cloned().collect::<Vec<_>>();
 
-        assert_eq!(items[0].source.to_string(), "child[1]/from");
-        assert_eq!(items[0].target.to_string(), "child/to");
+        assert_eq!(items[0].lhs.to_string(), "child[1]/from");
+        assert_eq!(items[0].rhs.to_string(), "child/to");
         assert_eq!(items[0].link, None);
 
-        assert_eq!(items[1].source.to_string(), "child[12]/from_dent");
-        assert_eq!(items[1].target.to_string(), "child[10]/iden_t");
+        assert_eq!(items[1].lhs.to_string(), "child[10]/iden_t");
+        assert_eq!(items[1].rhs.to_string(), "child[12]/from_dent");
         assert_eq!(items[1].link, None);
 
         // # Case 5
         let asset = smap.load_raw(
             "raw:case5",
-            "connections { child[ident]/from --> child/to }",
+            "connections { child[ident]/from <--> child/to }",
         );
         let ts = TokenStream::new(asset).unwrap();
         let buf = ParseBuffer::new(asset, ts);
@@ -506,7 +479,7 @@ mod tests {
         let _stmt = ConnectionsStmt::parse(&buf).unwrap_err();
 
         // # Case 6
-        let asset = smap.load_raw("raw:case6", "connections { child[]/from --> child[1]/to }");
+        let asset = smap.load_raw("raw:case6", "connections { child[]/from <--> child[1]/to }");
         let ts = TokenStream::new(asset).unwrap();
         let buf = ParseBuffer::new(asset, ts);
 
@@ -520,7 +493,7 @@ mod tests {
         // # Case 0
         let asset = smap.load_raw(
             "raw:case0",
-            "connections { from --> FastLink --> to, iden_t <-- L <-- from_dent }",
+            "connections { from <-- FastLink --> to, iden_t <-- L --> from_dent }",
         );
         let ts = TokenStream::new(asset).unwrap();
         let buf = ParseBuffer::new(asset, ts);
@@ -529,18 +502,18 @@ mod tests {
         let items = stmt.items.iter().cloned().collect::<Vec<_>>();
         assert_eq!(items.len(), 2);
 
-        assert_eq!(items[0].source.to_string(), "from");
-        assert_eq!(items[0].target.to_string(), "to");
+        assert_eq!(items[0].lhs.to_string(), "from");
+        assert_eq!(items[0].rhs.to_string(), "to");
         assert_eq!(items[0].link.as_ref().map(|v| &v.raw[..]), Some("FastLink"));
 
-        assert_eq!(items[1].source.to_string(), "from_dent");
-        assert_eq!(items[1].target.to_string(), "iden_t");
+        assert_eq!(items[1].lhs.to_string(), "iden_t");
+        assert_eq!(items[1].rhs.to_string(), "from_dent");
         assert_eq!(items[1].link.as_ref().map(|v| &v.raw[..]), Some("L"));
 
         // # Case 1
         let asset = smap.load_raw(
             "raw:case1",
-            "connections { from[1] --> FastLink --> to, iden_t[5] <-- from_dent }",
+            "connections { from[1] <-- FastLink --> to, iden_t[5] <--> from_dent }",
         );
         let ts = TokenStream::new(asset).unwrap();
         let buf = ParseBuffer::new(asset, ts);
@@ -549,12 +522,12 @@ mod tests {
         let items = stmt.items.iter().cloned().collect::<Vec<_>>();
         assert_eq!(items.len(), 2);
 
-        assert_eq!(items[0].source.to_string(), "from[1]");
-        assert_eq!(items[0].target.to_string(), "to");
+        assert_eq!(items[0].lhs.to_string(), "from[1]");
+        assert_eq!(items[0].rhs.to_string(), "to");
         assert_eq!(items[0].link.as_ref().map(|v| &v.raw[..]), Some("FastLink"));
 
-        assert_eq!(items[1].source.to_string(), "from_dent");
-        assert_eq!(items[1].target.to_string(), "iden_t[5]");
+        assert_eq!(items[1].lhs.to_string(), "iden_t[5]");
+        assert_eq!(items[1].rhs.to_string(), "from_dent");
         assert_eq!(items[1].link.as_ref().map(|v| &v.raw[..]), None);
     }
 }

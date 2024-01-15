@@ -5,7 +5,7 @@ use std::{
 
 use super::*;
 use crate::{
-    ast::{Annotation, ClusterDefinition, ModuleStmt},
+    ast::{ClusterDefinition, ModuleStmt},
     ir::GateRef,
     Span,
 };
@@ -27,14 +27,6 @@ pub struct Module {
 pub struct Gate {
     pub ident: RawSymbol,
     pub cluster: Cluster,
-    pub service_typ: GateServiceType,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum GateServiceType {
-    None,
-    Input,
-    Output,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -53,8 +45,8 @@ pub enum Cluster {
 }
 #[derive(Debug, Clone, PartialEq)]
 pub struct Connection {
-    pub from: ConnectionEndpoint,
-    pub to: ConnectionEndpoint,
+    pub lhs: ConnectionEndpoint,
+    pub rhs: ConnectionEndpoint,
     pub delay: Option<Symbol>,
 }
 
@@ -177,15 +169,6 @@ impl From<&Option<ClusterDefinition>> for Cluster {
     }
 }
 
-impl From<&Annotation> for GateServiceType {
-    fn from(value: &Annotation) -> Self {
-        match value.raw.as_str() {
-            "input" | "in" | "Input" | "In" => GateServiceType::Input,
-            "output" | "out" | "Output" | "Out" => GateServiceType::Output,
-            _ => unreachable!(),
-        }
-    }
-}
 
 impl Display for Cluster {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

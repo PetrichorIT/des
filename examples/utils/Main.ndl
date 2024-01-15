@@ -18,13 +18,13 @@ module Bob {
     gates {
         netIn[3],
         netOut[3],
-        uplink @output,
-        downlink @input,
+        uplink,
+        downlink,
     }
 
     connections {
-        netOut --> Link --> child/netIn,
-        netIn <-- Link <-- child/netOut,
+        netOut <-- Link --> child/netIn,
+        netIn <-- Link --> child/netOut,
     }
 }
 
@@ -41,8 +41,8 @@ module A {
     }
 
     connections {
-        bob[0]/uplink --> FastLink --> bob[1]/downlink,
-        bob[1]/uplink --> FastLink --> bob[0]/downlink,
+        bob[0]/uplink <-- FastLink --> bob[1]/downlink,
+        bob[1]/uplink <-- FastLink --> bob[0]/downlink,
     }
 }
 

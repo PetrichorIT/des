@@ -10,14 +10,14 @@ module Bob {
     }
 
     gates {
-        netIn[3] @input,
-        netOut[3] @output,
+        netIn[3],
+        netOut[3],
         uplink,
     }
 
     connections {
-        netOut --> Link --> child/netIn,
-        netIn <-- Link <-- child/netOut,
+        netOut <-- Link --> child/netIn,
+        netIn <-- Link --> child/netOut,
     }
 }
 

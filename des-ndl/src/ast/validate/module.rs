@@ -68,24 +68,6 @@ impl Validate for GatesStmt {
             } else {
                 symbols.push(&gate_def.ident.raw);
             }
-
-            // (1) Annotation correctness
-            match gate_def.annotation.as_ref().map(|a| a.raw.as_ref()) {
-                Some("input") | Some("in") | Some("Input") | Some("In") => { /* NOP */ }
-                Some("output") | Some("out") | Some("Output") | Some("Out") => { /* NOP */ }
-                Some(annot) => errors.add(
-                    Error::new(
-                        ErrorKind::InvalidAnnotation,
-                        format!(
-                            "invalid annotation '{}', gates can only be annoted with input/output",
-                            annot
-                        ),
-                    )
-                    .spanned(gate_def.span()),
-                ),
-                None => { /* NOP */ }
-            }
-
             // (2) Literal checking
             if let Some(cluster) = gate_def.cluster.as_ref() {
                 if let LitKind::Integer { ref lit } = cluster.lit.kind {
@@ -189,6 +171,7 @@ mod tests {
         ModuleStmt::parse(&buf).expect("Failed to create object, in validation pass")
     }
 
+
     #[test]
     fn invalid_gates() {
         let mut smap = SourceMap::new();
@@ -201,8 +184,8 @@ mod tests {
             gates {
                 in,
                 out[5],
-                inout @input,
-                outin[2] @output,
+                inout,
+                outin[2],
             }
          }",
         );
@@ -218,8 +201,8 @@ mod tests {
             gates {
                 in,
                 out[5],
-                inout @input,
-                outin[2] @output,
+                inout,
+                outin[2],
                 in,
                 out,
             }
@@ -246,17 +229,14 @@ mod tests {
             gates {
                 in,
                 out[5],
-                inout @inpuat,
-                outin[2] @oautput
+                inout,
+                outin[2]
             }
          }",
         );
         let mut errors = Errors::new().as_mut();
         stmt.validate(&mut errors);
-        assert_eq!(errors.len(), 2);
-
-        assert_eq!(errors.get(0).unwrap().kind, ErrorKind::InvalidAnnotation);
-        assert_eq!(errors.get(1).unwrap().kind, ErrorKind::InvalidAnnotation);
+        assert_eq!(errors.len(), 0);
 
         // # Case 3 (literals)
         let stmt = load_module(
@@ -266,8 +246,8 @@ mod tests {
             gates {
                 in,
                 out[1.0],
-                inout @input,
-                outin[\"\"] @output
+                inout,
+                outin[\"\"]
             }
          }",
         );
@@ -286,7 +266,7 @@ mod tests {
             gates {
                 in,
                 out[0],
-                inout @input,
+                inout,
             }
          }",
         );

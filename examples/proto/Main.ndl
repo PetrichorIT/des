@@ -1,7 +1,7 @@
 module Application {
     gates {
-        in @input,
-        out @output,
+        in,
+        out,
     }
 }
 
@@ -14,16 +14,16 @@ module Runner {
     }
 
     gates {
-        fromAppl @input,
-        toAppl @output,
+        fromAppl,
+        toAppl,
 
-        uplink @output,
-        downlink @input,
+        uplink,
+        downlink,
     }
 
     connections {
-        app/in <-- toAppl,
-        app/out --> fromAppl,
+        app/in <--> toAppl,
+        app/out <--> fromAppl,
     }
 }
 
@@ -35,17 +35,17 @@ module MultiRunner {
     }
     
     gates {
-        fromAppl[3] @input,
-        toAppl[3] @output,
+        fromAppl[3],
+        toAppl[3],
     }
 
     connections {
-        app1/in <-- toAppl[0],
-        app1/out --> fromAppl[0],
-        app2/in <-- toAppl[1],
-        app2/out --> fromAppl[1],
-        app3/in <-- toAppl[2],
-        app3/out --> fromAppl[2],
+        app1/in <--> toAppl[0],
+        app1/out <--> fromAppl[0],
+        app2/in <--> toAppl[1],
+        app2/out <--> fromAppl[1],
+        app3/in <--> toAppl[2],
+        app3/out <--> fromAppl[2],
     }
 }
 
@@ -58,8 +58,8 @@ module Main {
     }
 
     connections {
-        runnerA/uplink --> runnerB/downlink,
-        runnerA/downlink <-- runnerB/uplink,
+        runnerA/uplink <--> runnerB/downlink,
+        runnerA/downlink <--> runnerB/uplink,
     }
 }
 

@@ -1,9 +1,9 @@
 module Sub {
     gates {
-        in @input,
+        in,
     }
     gates {
-        out @output,
+        out,
     }
 }
 
@@ -16,8 +16,8 @@ module Main: Sub {
         downlink[2],
     }
     connections {
-        sub/out --> uplink,
-        sub/in <-- downlink,
+        sub/out <--> uplink,
+        sub/in <--> downlink,
     }
 }
 
