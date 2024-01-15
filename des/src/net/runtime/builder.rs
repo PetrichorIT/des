@@ -114,7 +114,7 @@ impl AsyncBuilder {
 
             ModuleContext::child_of(name, parent.node.clone())
         } else {
-            ModuleContext::standalone(ObjectPath::try_from(name).expect("infallible"))
+            ModuleContext::standalone(ObjectPath::from(name))
         };
 
         ctx.activate();
@@ -226,7 +226,7 @@ impl AsyncBuilder {
 
             ModuleContext::child_of(name, parent.node.clone())
         } else {
-            ModuleContext::standalone(ObjectPath::try_from(name).expect("infallible"))
+            ModuleContext::standalone(ObjectPath::from(name))
         };
 
         ctx.activate();

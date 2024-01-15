@@ -52,7 +52,6 @@ cfg_net! {
     pub use crate::net::module::ModuleRef;
     pub use crate::net::module::ModuleReferencingError;
 
-    #[allow(deprecated)]
     pub use crate::net::module::{
         current, shutdow_and_restart_at, shutdow_and_restart_in, shutdown
     };

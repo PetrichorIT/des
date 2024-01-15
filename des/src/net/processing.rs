@@ -78,14 +78,16 @@ use crate::{prelude::Message, sync::RwLock};
 ///    debug output.
 /// - **Scope-Provider**: This element provides some kind of scope to all items further
 ///    from the network layer than itself. A scope can be defined using a static variable
-///    or just consist of a time meassurement between
-///    [`event_start`](Plugin::event_start) / [`event_end`](Plugin::event_end).
+///    or just consist of a time meassurement between [`event_start`] / [`event_end`].
 /// - **Capture**: This kind of processing element captures parts of the input stream and redirects
 ///     it in some abitraty way, using other APIs. This pattern can be used to implement buffering
 ///     or mergeing of frameneted IP packets.
 /// - **Meta-Provider**: This kind of processing element attaches / modifies part of the incoming or
 ///    outgoing message stream to provide some new level of abstraction e.g. a VPN
 ///    or simulated network Interfaces.
+/// 
+/// [`event_start`]: ProcessingElement::event_start
+/// [`event_end`]: ProcessingElement::event_end
 pub trait ProcessingElement: Any {
     /// Defines the requires stack for this processing element.
     ///
@@ -126,8 +128,7 @@ pub trait ProcessingElement: Any {
     /// A handler for when an the event processing of a message ends.
     ///
     /// This function is called only once per event. The call order
-    /// is the reverse to the call order of
-    /// [`event_start`](Plugin::event_start).
+    /// is the reverse to the call order of [`event_start`].
     ///
     /// Use this function to set up actions, associated
     /// with the end of an event
@@ -151,13 +152,14 @@ pub trait ProcessingElement: Any {
     ///     }
     /// }
     /// ```
+    /// 
+    /// [`event_start`]: ProcessingElement::event_start
     fn event_end(&mut self) {}
 
     /// A capture clause that can modify an incoming message.
     ///
     /// This function is called at most once per event, after all
-    /// plugins have called
-    /// [`event_start`](Plugin::event_start),
+    /// plugins have called [`event_start`],
     /// but before all the main application has processed its message.
     ///
     /// This function receives an incoming message, and can
@@ -182,6 +184,8 @@ pub trait ProcessingElement: Any {
     ///     }    
     /// }
     /// ```
+    /// 
+    /// [`event_start`]: ProcessingElement::event_start
     fn incoming(&mut self, msg: Message) -> Option<Message> {
         Some(msg)
     }

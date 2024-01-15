@@ -79,7 +79,7 @@ impl ChannelInner {
     fn dup(&self) -> Self {
         Self {
             path: self.path.clone(),
-            metrics: self.metrics.clone(),
+            metrics: self.metrics,
             busy: false,
             transmission_finish_time: SimTime::ZERO,
             buffer: Buffer::default(),
@@ -243,7 +243,7 @@ impl Channel {
             let next_event_time = SimTime::now() + dur;
 
             sink.add(
-                NetEvents::MessageAtGateEvent(MessageExitingConnection {
+                NetEvents::MessageExitingConnection(MessageExitingConnection {
                     con: via.clone(),
                     msg,
                 }),

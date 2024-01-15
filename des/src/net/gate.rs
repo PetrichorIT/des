@@ -31,6 +31,24 @@ pub struct Gate {
     connections: Mutex<Connections>,
 }
 
+/// A kinds of operations supported on a gate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum GateKind {
+    /// Standalone gates are not connected to any gate chain
+    /// at all. They act as start and endpoint of a gatechain of
+    /// length 0. Messages send onto these gates will never leave 
+    /// the sending module.
+    Standalone,
+    /// Endpoint gates are at the start or end of gate chains.
+    /// These gates can be used to send messages onto a gate chain.
+    /// Each endpoint acts as the starting point for one direction.
+    Endpoint,
+    /// Transit gates are in the middle of a gate chain, connected
+    /// to two other gates. These gates cannot be used to start
+    /// a message sending process.
+    Transit,
+}
+
 struct Connections {
     connections: [Option<Connection>; 2]
 }
@@ -47,7 +65,12 @@ pub struct Connection {
 }
 
 impl Connection {
-    /// NEW
+    /// Crease a new pseudo connection, channeling into the 
+    /// provided gate
+    ///
+    /// # Panics
+    /// 
+    /// Panics if the provided gate is not an endpoint.
     pub fn new(gate: GateRef) -> Self {
         assert!(gate.connections.try_lock().unwrap().len() <= 1);
         Self::new_unchecked(gate)
@@ -63,6 +86,10 @@ impl Connection {
     }
 
     /// NEXT
+    /// 
+    /// # Panics
+    /// 
+    /// May panic on lock poisoning
     pub fn next_hop(&self) -> Option<Connection> {
         let idx = [1, 0][self.endpoint_id];
         let lock = self.endpoint.connections.lock().expect("failed to get lock");
@@ -70,6 +97,9 @@ impl Connection {
     }
 
     /// PREV
+    /// # Panics
+    /// 
+    /// May panic on lock poisoning
     pub fn prev_hop(&self) -> Option<GateRef> {
         let lock = self.endpoint.connections.lock().expect("failed to get lock");
         Some(lock.connections[self.endpoint_id].as_ref()?.endpoint.clone())
@@ -173,16 +203,53 @@ impl Gate {
         format!("{}:{}", self.owner().ctx.path, self.name_with_pos())
     }
 
-   
-   /// CONNECT
+    /// Returns the kind of operations allowed on this gate.
+    pub fn kind(&self) -> GateKind {
+        match self.connections.try_lock().expect("failed to get lock").len() {
+            0 => GateKind::Standalone,
+            1 => GateKind::Endpoint,
+            _ => GateKind::Transit
+        }
+    }
+
+    /// Connects two gates into a gate chain element.
+    ///
+    /// Gates can be organized into a bidirectional gate chain, that
+    /// forwards messages two the other end. Using this function two gates
+    /// are connected and both gates save their connection state. A gate
+    /// can have up to two other gates connected to it, forming a full gate
+    /// chain in response. 
+    /// 
+    /// If a channel was provided to enable message delaying on this chain element
+    /// both direction will have unique instances of the channel, with identical 
+    /// configuration.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use des::prelude::*;
+    /// # fn a() -> Option<()>{
+    /// # return None;
+    /// let a = current().gate("out", 0)?;
+    /// let b = current().parent().ok()?.gate("in", 0)?;
+    /// a.connect(b, None);
+    /// # Some(())
+    /// # }
+    /// ```
+    ///
+    /// # Panics
+    /// 
+    /// This function panic if either of the two gates is allready fully connected in a chain.
+    /// This function also panics if only one gate is provided
     pub fn connect(self: GateRef, other: GateRef, channel: Option<ChannelRef>) {
+        assert!(!Arc::ptr_eq(&self, &other), "Cannot connect gate to itself.");
+
         let mut conns = self.connections.try_lock().expect("Failed to get lock");
         let mut other_conns = other.connections.try_lock().expect("failed to get lock");
 
         let conns_pos = conns.len();
         let other_conns_pos = other_conns.len();
         assert!(conns_pos < 2 && other_conns_pos < 2, "Cannot add connection, gates allready connected to multiple points");
-
 
         let ch1 = channel.as_ref().map(|c| Arc::new(c.dup()));
         let ch2 = channel;

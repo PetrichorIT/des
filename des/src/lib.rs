@@ -55,8 +55,8 @@
 //! }
 //! ```
 //!
-//! This simulation will now provide a [`runtime`](crate::runtime) with
-//! [`time`](crate::time) managment and a future event set to execute events.
+//! This simulation will now provide a [`runtime`] with
+//! [`time`] managment and a future event set to execute events.
 //! If a event is executed [`MyEventSet::handle`](crate::runtime::EventSet::handle)
 //! will be called with the runtime as parameter. If new events are to be created
 //! as result of a event execution this mutable reference can be used
@@ -75,10 +75,9 @@
 //! (network links) that are attached to [Gates](crate::net::gate::Gate) (physical ports) on modules.
 //! Modules can send messages (packtes) through these gates / channels to communicated
 //! with other modules. Additionally modules can be created in a tree like structure,
-//! providing links like [`parent`](crate::net::module::parent) or
-//! [`child(...)`](crate::net::module::child).
+//! providing links like [`parent`] or [`child`].
 //!
-//! These tools are available in the [`net`](crate::net) module
+//! These tools are available in the [`net`] module
 //! when the feature `net` is active.
 //!
 //! ```toml
@@ -100,7 +99,7 @@
 //! ```
 //!
 //! While this feature activates smaller additions to the existing functionallity of
-//! [`net`](crate::net), it also contains a full reexport of [tokio](https://docs.rs/tokio) with modifications
+//! [`net`], it also contains a full reexport of [tokio](https://docs.rs/tokio) with modifications
 //! to fit the simulation context. This version of tokio is implicitly reexported with the
 //! newly added feature sim to integrate into a simulation context and thus does NOT
 //! provide access to the [`fs`](https://docs.rs/tokio/latest/tokio/fs/index.html),
@@ -110,11 +109,16 @@
 //! However it supports all synchronisation primitives (excluding Barrier)
 //! through the [`sync`](tokio::sync) module, asynchronous green tasks
 //! through [`task`](tokio::task), custom runtimes through [`runtime`](tokio::runtime)
-//! and simulation specific time primitives through [`time`](crate::time) replacing the
+//! and simulation specific time primitives through [`time`] replacing the
 //! standart [`time`](https://docs.rs/tokio/latest/tokio/time/index.html) module,
 //! aswell as simulation specifc network primitives replacing the standart
 //! [`net`](https://docs.rs/tokio/latest/tokio/net/index.html) module.
 //!
+//! [`time`]: crate::time
+//! [`net`]: crate::net
+//! [`runtime`]: crate::runtime
+//! [`parent`]: crate::net::module::ModuleContext::parent
+//! [`child`]: crate::net::module::ModuleContext::child
 
 #[macro_use]
 #[doc(hidden)]

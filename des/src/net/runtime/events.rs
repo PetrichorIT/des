@@ -20,7 +20,7 @@ use crate::{
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 #[derive(Debug)]
 pub enum NetEvents {
-    MessageAtGateEvent(MessageExitingConnection),
+    MessageExitingConnection(MessageExitingConnection),
     HandleMessageEvent(HandleMessageEvent),
     ChannelUnbusyNotif(ChannelUnbusyNotif),
     ModuleRestartEvent(ModuleRestartEvent),
@@ -34,7 +34,7 @@ where
 {
     fn handle(self, rt: &mut Runtime<NetworkApplication<A>>) {
         match self {
-            Self::MessageAtGateEvent(event) => event.handle(rt),
+            Self::MessageExitingConnection(event) => event.handle(rt),
             Self::HandleMessageEvent(event) => event.handle(rt),
             Self::ChannelUnbusyNotif(event) => event.handle(rt),
             Self::ModuleRestartEvent(event) => event.handle(rt),
@@ -242,7 +242,7 @@ impl ModuleRef {
         if self.ctx.active.load(SeqCst) {
             self.processing.borrow_mut().incoming_upstream(None);
             if self.processing.borrow().handler.__indicate_async() {
-                self.processing.borrow().run_without_event()
+                self.processing.borrow().run_without_event();
             }
             self.processing.borrow_mut().incoming_downstream();
         }else {

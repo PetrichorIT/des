@@ -55,6 +55,7 @@ impl Topology {
 
     /// An iterator over all edges in the entries network, annotated with the
     /// node-id of the starting node.
+    #[must_use]
     pub fn edges(&self) -> usize {
         self.edges
             .iter()
@@ -77,6 +78,7 @@ impl Topology {
     /// To add connections from the old set to the new one, recreate
     /// the topology from the ground up using the `ModuleRef` stored in the
     /// node information.
+    #[allow(clippy::missing_panics_doc)]
     pub fn build(&mut self, modules: &[ModuleRef]) {
 
         for module in modules {
@@ -88,7 +90,7 @@ impl Topology {
             self.edges.push(Vec::new());
         }
 
-        for (_, module) in modules.iter().enumerate() {
+        for module in modules {
             let gates = module.ctx.gates();
             'outer: for gate in gates {
                 let mut cost = 0.0;
@@ -160,7 +162,7 @@ impl Topology {
 
                 for j in 0..n {
                     if j == i { continue; }
-                    self.edges[j].retain(|edge| edge.dst.1 != i)
+                    self.edges[j].retain(|edge| edge.dst.1 != i);
                 }
                 debug_assert_eq!(self.nodes[i].degree, 0);
             }

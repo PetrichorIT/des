@@ -88,9 +88,9 @@ where
 ///
 /// - Create an 'App' struct that implements the trait [`Application`].
 /// This struct will hold the systems state and define the event set used in the simulation.
-/// - Create your events that handle the logic of you simulation. They must implement [`Event`](crate::runtime::Event) with the generic
+/// - Create your events that handle the logic of you simulation. They must implement [`Event`] with the generic
 /// parameter A, where A is your 'App' struct.
-/// - To bind those two together create a enum that implements [`EventSet`](crate::runtime::EventSet) that holds all your events.
+/// - To bind those two together create a enum that implements [`EventSet`] that holds all your events.
 /// This can be done via a macro. The use this event set as the associated event set in 'App'.
 ///
 /// # Usage with module system
@@ -101,6 +101,8 @@ where
 /// event nessecary for the simulation. All you have to do is to pass the app into [`Builder::build`]
 /// to create a runnable instance and the run it.
 ///
+/// [`Event`]: crate::runtime::Event
+/// [`EventSet`]: crate::runtime::EventSet
 pub struct Runtime<App>
 where
     App: Application,
@@ -759,7 +761,7 @@ cfg_net! {
                 msg: message.into(),
             };
 
-            self.add_event(NetEvents::MessageAtGateEvent(event), time);
+            self.add_event(NetEvents::MessageExitingConnection(event), time);
         }
 
         ///

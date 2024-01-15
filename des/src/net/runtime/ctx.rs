@@ -65,7 +65,7 @@ pub(crate) fn buf_send_at(mut msg: Message, gate: GateRef, send_time: SimTime) {
     // (0) If delayed send is active, dont skip gate_refs
     if send_time > SimTime::now() {
         ctx.events.push((
-            NetEvents::MessageAtGateEvent(MessageExitingConnection { con: Connection::new(gate), msg }),
+            NetEvents::MessageExitingConnection(MessageExitingConnection { con: Connection::new(gate), msg }),
             send_time,
         ));
         return;
