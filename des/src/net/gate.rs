@@ -15,7 +15,6 @@ pub type GateRef = Arc<Gate>;
 ///
 pub(crate) type GateRefWeak = Weak<Gate>;
 
-
 ///
 /// A gate, a message insertion or extraction point used for handeling channels.
 ///
@@ -36,7 +35,7 @@ pub struct Gate {
 pub enum GateKind {
     /// Standalone gates are not connected to any gate chain
     /// at all. They act as start and endpoint of a gatechain of
-    /// length 0. Messages send onto these gates will never leave 
+    /// length 0. Messages send onto these gates will never leave
     /// the sending module.
     Standalone,
     /// Endpoint gates are at the start or end of gate chains.
@@ -50,7 +49,7 @@ pub enum GateKind {
 }
 
 struct Connections {
-    connections: [Option<Connection>; 2]
+    connections: [Option<Connection>; 2],
 }
 
 /// A connection to a peering gate
@@ -61,48 +60,63 @@ pub struct Connection {
     /// The index of the slot used at the endpoint
     pub endpoint_id: usize,
     /// A channel to slow down the connection.
-    pub channel: Option<ChannelRef>
+    pub channel: Option<ChannelRef>,
 }
 
 impl Connection {
-    /// Crease a new pseudo connection, channeling into the 
+    /// Crease a new pseudo connection, channeling into the
     /// provided gate
     ///
     /// # Panics
-    /// 
+    ///
     /// Panics if the provided gate is not an endpoint.
     pub fn new(gate: GateRef) -> Self {
         assert!(gate.connections.try_lock().unwrap().len() <= 1);
         Self::new_unchecked(gate)
     }
 
-    /// 
+    ///
     pub fn new_unchecked(gate: GateRef) -> Self {
         Self {
             endpoint: gate,
             endpoint_id: 1, // TODO: smarter ??
-            channel: None
+            channel: None,
         }
     }
 
     /// NEXT
-    /// 
+    ///
     /// # Panics
-    /// 
+    ///
     /// May panic on lock poisoning
+    #[must_use]
     pub fn next_hop(&self) -> Option<Connection> {
         let idx = [1, 0][self.endpoint_id];
-        let lock = self.endpoint.connections.lock().expect("failed to get lock");
+        let lock = self
+            .endpoint
+            .connections
+            .lock()
+            .expect("failed to get lock");
         lock.connections[idx].clone()
     }
 
     /// PREV
     /// # Panics
-    /// 
+    ///
     /// May panic on lock poisoning
+    #[must_use]
     pub fn prev_hop(&self) -> Option<GateRef> {
-        let lock = self.endpoint.connections.lock().expect("failed to get lock");
-        Some(lock.connections[self.endpoint_id].as_ref()?.endpoint.clone())
+        let lock = self
+            .endpoint
+            .connections
+            .lock()
+            .expect("failed to get lock");
+        Some(
+            lock.connections[self.endpoint_id]
+                .as_ref()?
+                .endpoint
+                .clone(),
+        )
     }
 
     /// CHAN
@@ -113,7 +127,9 @@ impl Connection {
 
 impl Connections {
     fn new() -> Self {
-        Self { connections: [None, None] }
+        Self {
+            connections: [None, None],
+        }
     }
 
     fn len(&self) -> usize {
@@ -132,7 +148,7 @@ impl Connections {
 }
 
 struct PathIter {
-    con: Option<Connection>
+    con: Option<Connection>,
 }
 
 impl Iterator for PathIter {
@@ -186,13 +202,12 @@ impl Gate {
         }
     }
 
-
     ///
     /// Returns a short identifcator that holds all nessecary information.
     ///
     #[must_use]
     pub fn str(&self) -> String {
-       self.name_with_pos()
+        self.name_with_pos()
     }
 
     ///
@@ -204,11 +219,20 @@ impl Gate {
     }
 
     /// Returns the kind of operations allowed on this gate.
+    ///
+    /// # Panics
+    ///
+    /// Panics when accessed during teardown
     pub fn kind(&self) -> GateKind {
-        match self.connections.try_lock().expect("failed to get lock").len() {
+        match self
+            .connections
+            .try_lock()
+            .expect("failed to get lock")
+            .len()
+        {
             0 => GateKind::Standalone,
             1 => GateKind::Endpoint,
-            _ => GateKind::Transit
+            _ => GateKind::Transit,
         }
     }
 
@@ -218,10 +242,10 @@ impl Gate {
     /// forwards messages two the other end. Using this function two gates
     /// are connected and both gates save their connection state. A gate
     /// can have up to two other gates connected to it, forming a full gate
-    /// chain in response. 
-    /// 
+    /// chain in response.
+    ///
     /// If a channel was provided to enable message delaying on this chain element
-    /// both direction will have unique instances of the channel, with identical 
+    /// both direction will have unique instances of the channel, with identical
     /// configuration.
     ///
     /// # Examples
@@ -238,54 +262,71 @@ impl Gate {
     /// ```
     ///
     /// # Panics
-    /// 
+    ///
     /// This function panic if either of the two gates is allready fully connected in a chain.
     /// This function also panics if only one gate is provided
+    #[allow(clippy::needless_pass_by_value)]
     pub fn connect(self: GateRef, other: GateRef, channel: Option<ChannelRef>) {
-        assert!(!Arc::ptr_eq(&self, &other), "Cannot connect gate to itself.");
+        assert!(
+            !Arc::ptr_eq(&self, &other),
+            "Cannot connect gate to itself."
+        );
 
         let mut conns = self.connections.try_lock().expect("Failed to get lock");
         let mut other_conns = other.connections.try_lock().expect("failed to get lock");
 
         let conns_pos = conns.len();
         let other_conns_pos = other_conns.len();
-        assert!(conns_pos < 2 && other_conns_pos < 2, "Cannot add connection, gates allready connected to multiple points");
+        assert!(
+            conns_pos < 2 && other_conns_pos < 2,
+            "Cannot add connection, gates allready connected to multiple points"
+        );
 
         let ch1 = channel.as_ref().map(|c| Arc::new(c.dup()));
         let ch2 = channel;
 
-        conns.put(Connection { endpoint: other.clone(), endpoint_id: other_conns_pos, channel: ch1 });
-        other_conns.put(Connection { endpoint: self.clone(), endpoint_id: conns_pos, channel: ch2 });
+        conns.put(Connection {
+            endpoint: other.clone(),
+            endpoint_id: other_conns_pos,
+            channel: ch1,
+        });
+        other_conns.put(Connection {
+            endpoint: self.clone(),
+            endpoint_id: conns_pos,
+            channel: ch2,
+        });
     }
 
     /// DEDUP
+    /// # Panics
+    ///
+    /// May panic when accessed during teardown
     pub fn connect_dedup(self: GateRef, other: GateRef, channel: Option<ChannelRef>) {
         // Check whether the target is allready connected
         let conns = self.connections.try_lock().expect("failed lock");
         for i in 0..2 {
             if let Some(ref con) = conns.connections[i] {
                 if Arc::ptr_eq(&con.endpoint, &other) {
-                    return
+                    return;
                 }
             }
         }
 
         drop(conns);
-        self.connect(other, channel)
+        self.connect(other, channel);
     }
 
     /// CHAN
     pub fn channel(self: &GateRef) -> Option<ChannelRef> {
-        self.path_iter().nth(0).map(|con| con.channel).flatten()
+        self.path_iter().nth(0).and_then(|con| con.channel)
     }
 
     /// ITER
     pub fn path_iter(self: &GateRef) -> impl Iterator<Item = Connection> {
         PathIter {
-            con: Some(Connection::new_unchecked(self.clone()))
+            con: Some(Connection::new_unchecked(self.clone())),
         }
     }
-
 
     /// NEXT GATE
     pub fn next_gate(self: &GateRef) -> Option<GateRef> {
@@ -296,8 +337,6 @@ impl Gate {
     pub fn path_end(self: &GateRef) -> Option<GateRef> {
         self.path_iter().last().map(|c| c.endpoint)
     }
-
- 
 
     ///
     /// Returns the owner module by reference of this gate.
@@ -319,12 +358,7 @@ impl Gate {
     ///
     /// Panics if the provided size is not real positive.
     #[must_use]
-    pub fn new(
-        owner: &ModuleRef,
-        name: impl AsRef<str>,
-        size: usize,
-        pos: usize,
-    ) -> GateRef {
+    pub fn new(owner: &ModuleRef, name: impl AsRef<str>, size: usize, pos: usize) -> GateRef {
         assert!(size >= 1, "Cannot create with a non-postive size");
 
         let this = GateRef::new(Self {

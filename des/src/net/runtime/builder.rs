@@ -119,7 +119,7 @@ impl AsyncBuilder {
 
         ctx.activate();
 
-        let state = T::new().as_processing_chain();
+        let state = T::new().to_processing_chain();
         ctx.upgrade_dummy(state);
 
         self.mapping.insert(
@@ -238,7 +238,7 @@ impl AsyncBuilder {
             handle: None,
             tx,
             rx: Some(rx),
-        }.as_processing_chain();
+        }.to_processing_chain();
         ctx.upgrade_dummy(state);
 
         self.mapping.insert(

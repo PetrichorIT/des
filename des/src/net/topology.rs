@@ -1,4 +1,8 @@
+use fxhash::{FxBuildHasher, FxHashMap};
+
 use crate::{net::module::ModuleRef, prelude::GateRef};
+
+use super::{globals, ObjectPath};
 
 ///
 /// A mapping of all connections in a module connection graph.
@@ -47,6 +51,17 @@ impl Topology {
         }
     }
 
+    /// Gets the current topology.
+    ///
+    /// # Panics
+    /// 
+    /// Panics when called from outside a module context,
+    /// or when globals dont exist.
+    #[must_use]
+    pub fn current() -> Topology {
+        globals().topology.lock().unwrap().clone()
+    }
+
     /// All nodes if the current topology.
     #[must_use]
     pub fn nodes(&self) -> &[TopoNode] {
@@ -61,7 +76,8 @@ impl Topology {
             .iter()
             .enumerate()
             .flat_map(|(i, edges)| edges.iter().map(move |e| (i, e)))
-            .count() / 2
+            .count()
+            / 2
     }
 
     /// All outgoing edges associated with a single
@@ -80,7 +96,6 @@ impl Topology {
     /// node information.
     #[allow(clippy::missing_panics_doc)]
     pub fn build(&mut self, modules: &[ModuleRef]) {
-
         for module in modules {
             self.nodes.push(TopoNode {
                 module: module.clone(),
@@ -102,8 +117,12 @@ impl Topology {
                     }
 
                     let transit_id = con.endpoint.owner().id();
-                    let Some(transit) = self.nodes.iter_mut().find(|k| k.module.ctx.id() == transit_id) else {
-                        break 'outer
+                    let Some(transit) = self
+                        .nodes
+                        .iter_mut()
+                        .find(|k| k.module.ctx.id() == transit_id)
+                    else {
+                        break 'outer;
                     };
                     transit.alive |= true;
 
@@ -112,19 +131,28 @@ impl Topology {
 
                 let src_id = gate.owner().id();
                 let dst_id = dst.owner().id();
-                let (src_idx, src_node) = self.nodes.iter_mut().enumerate().find(|(_, m)| m.module.ctx.id() == src_id).unwrap();
+                let (src_idx, src_node) = self
+                    .nodes
+                    .iter_mut()
+                    .enumerate()
+                    .find(|(_, m)| m.module.ctx.id() == src_id)
+                    .unwrap();
                 src_node.degree += 1;
                 src_node.alive |= true;
 
-                let (dst_idx, dst_node) = self.nodes.iter_mut().enumerate().find(|(_, m)| m.module.ctx.id() == dst_id).unwrap();
+                let (dst_idx, dst_node) = self
+                    .nodes
+                    .iter_mut()
+                    .enumerate()
+                    .find(|(_, m)| m.module.ctx.id() == dst_id)
+                    .unwrap();
                 dst_node.degree += 1;
                 dst_node.alive |= true;
-                
 
                 let edge = TopoEdge {
                     src: (gate, src_idx),
                     dst: (dst, dst_idx),
-                    cost
+                    cost,
                 };
 
                 self.edges[src_idx].push(edge);
@@ -154,14 +182,16 @@ impl Topology {
                 // Do nothing this node will be kept so no links must be pruned
             } else {
                 // Fix degrees
-                dbg!(i, &self.edges[i]);
+
                 for edge in self.edges[i].drain(..) {
-                    self.nodes[edge.src.1].degree -= 1;
-                    self.nodes[edge.dst.1].degree -= 1;
+                    self.nodes[edge.src.1].degree = self.nodes[edge.src.1].degree.saturating_sub(1);
+                    self.nodes[edge.dst.1].degree = self.nodes[edge.dst.1].degree.saturating_sub(1);
                 }
 
                 for j in 0..n {
-                    if j == i { continue; }
+                    if j == i {
+                        continue;
+                    }
                     self.edges[j].retain(|edge| edge.dst.1 != i);
                 }
                 debug_assert_eq!(self.nodes[i].degree, 0);
@@ -235,6 +265,62 @@ impl Topology {
         }
     }
 
+    /// Generates a disjktra tree
+    /// 
+    /// # Panics 
+    /// 
+    /// Panics when the specified nodes does not exist.
+    #[allow(clippy::needless_pass_by_value)]
+    #[must_use]
+    pub fn dijkstra(&self, node: ObjectPath) -> FxHashMap<ObjectPath, GateRef> {
+        struct QE {
+            node: usize,
+            distance: usize,
+            next_hop: Option<GateRef>,
+        }
+
+        let mut visited = Vec::new();
+        let mut queue = Vec::new();
+        queue.push(QE {
+            node: self
+                .nodes
+                .iter()
+                .enumerate()
+                .find(|(_, n)| n.module.path() == node)
+                .unwrap()
+                .0,
+            distance: 0,
+            next_hop: None,
+        });
+
+        let mut mapping = FxHashMap::with_hasher(FxBuildHasher::default());
+        while let Some(cur) = queue.pop() {
+            if visited.contains(&cur.node) {
+                continue;
+            }
+
+            // travel along the edges
+            visited.push(cur.node);
+            if let Some(ref nh) = cur.next_hop {
+                mapping.insert(self.nodes[cur.node].module.path(), nh.clone());
+            }
+
+            for edge in self.edges_for(cur.node) {
+                if !visited.contains(&edge.dst.1) {
+                    queue.push(QE {
+                        node: edge.dst.1,
+                        distance: cur.distance + 1,
+                        next_hop: Some(cur.next_hop.clone().unwrap_or(edge.src.0.clone())),
+                    });
+                }
+            }
+
+            // rev
+            queue.sort_by(|l, r| r.distance.cmp(&l.distance));
+        }
+
+        mapping
+    }
 
     /// Creates a .dot output for visualizing the module graph.
     #[must_use]
@@ -242,7 +328,7 @@ impl Topology {
         let mut output = String::from("digraph D {{\n");
 
         for def in &self.nodes {
-            if def.degree > 0  {
+            if def.degree > 0 {
                 output.push_str(&format!("    \"{}\" [shape=box]\n", def.module.as_str()));
             }
         }
@@ -251,12 +337,7 @@ impl Topology {
 
         for (src, edges) in self.edges.iter().enumerate() {
             let from_node = self.nodes[src].module.as_str();
-            for TopoEdge {
-                src,
-                dst,
-                cost,
-            } in edges
-            {
+            for TopoEdge { src, dst, cost } in edges {
                 let to_node = self.nodes[src.1].module.as_str();
                 let label = if *cost == 0.0 {
                     String::new()

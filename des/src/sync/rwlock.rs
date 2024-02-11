@@ -26,6 +26,7 @@ cfg_not_multi_threaded! {
         x > UNUSED
     }
 
+    #[derive(Debug)]
     pub(crate) struct RwLock<T> {
         flag: Cell<BorrowFlag>,
         value: UnsafeCell<T>,

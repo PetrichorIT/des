@@ -30,9 +30,11 @@
 #[macro_export]
 macro_rules! registry {
     ($($t:ty),*) => {{
+        use $crate::net::module::Module;
+
         let mut registry = $crate::ndl::Registry::new();
         $(
-            registry.add(stringify!($t), Box::new(|| <$t as Module>::new().as_processing_chain()));
+            registry.add(stringify!($t), Box::new(|| <$t as Module>::new().to_processing_chain()));
         )*
         registry
     }};

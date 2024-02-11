@@ -73,29 +73,6 @@ fn test_result() {
 }
 
 #[test]
-fn test_cells() {
-    use std::cell::*;
-
-    let v = Cell::new(0u32);
-    assert_eq!(v.byte_len(), 4);
-
-    let v = Cell::new("Hello World".to_string());
-    assert_eq!(v.byte_len(), 11);
-
-    let v = RefCell::new(0u32);
-    assert_eq!(v.byte_len(), 4);
-
-    let v = RefCell::new("Hello World".to_string());
-    assert_eq!(v.byte_len(), 11);
-
-    let v = UnsafeCell::new(0u32);
-    assert_eq!(v.byte_len(), 4);
-
-    let v = UnsafeCell::new("Hello World".to_string());
-    assert_eq!(v.byte_len(), 11);
-}
-
-#[test]
 fn test_collections() {
     let v = vec![1u8, 2, 3];
     assert_eq!(v.byte_len(), 3);

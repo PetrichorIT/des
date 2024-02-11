@@ -57,7 +57,7 @@ impl RuntimeLimit {
         } else {
             let mut other = Self::None;
             mem::swap(&mut other, self);
-            *self = Self::CombinedAnd(Box::new(other), Box::new(limit));
+            *self = Self::CombinedOr(Box::new(other), Box::new(limit));
         }
     }
 }

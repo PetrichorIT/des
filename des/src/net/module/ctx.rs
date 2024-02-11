@@ -1,14 +1,17 @@
 use fxhash::{FxBuildHasher, FxHashMap};
 
-use super::{DummyModule, ModuleId, ModuleRef, ModuleRefWeak, ModuleReferencingError, meta::Metadata};
+use super::{
+    meta::Metadata, DummyModule, ModuleId, ModuleRef, ModuleRefWeak, ModuleReferencingError,
+};
 use crate::{
     prelude::{GateRef, ObjectPath},
     sync::{RwLock, SwapLock},
     tracing::{new_scope, ScopeToken},
 };
 use std::{
+    any::Any,
     fmt::Debug,
-    sync::{atomic::AtomicBool, Arc}, any::Any,
+    sync::{atomic::AtomicBool, Arc},
 };
 
 #[cfg(feature = "async")]
@@ -44,7 +47,7 @@ impl ModuleContext {
             async_ext: RwLock::new(AsyncCoreExt::new()),
 
             meta: RwLock::new(Metadata::new()),
-            scope_token: new_scope(path.as_str()),
+            scope_token: new_scope(path.clone()),
 
             active: AtomicBool::new(true),
             id: ModuleId::gen(),
@@ -70,7 +73,7 @@ impl ModuleContext {
             async_ext: RwLock::new(AsyncCoreExt::new()),
 
             meta: RwLock::new(Metadata::new()),
-            scope_token: new_scope(path.as_str()),
+            scope_token: new_scope(path.clone()),
 
             active: AtomicBool::new(true),
 
@@ -105,8 +108,6 @@ impl ModuleContext {
         MOD_CTX.swap(&mut this);
         this
     }
-
-
 
     /// Returns a runtime-unqiue identifier for the currently active module.
     ///
@@ -159,7 +160,6 @@ impl ModuleContext {
         self.path.name().to_string()
     }
 
-
     /// Returns a unstructured list of all gates from the current module.
     pub fn gates(&self) -> Vec<GateRef> {
         self.gates.read().clone()
@@ -176,11 +176,25 @@ impl ModuleContext {
     }
 
     /// Retrieves metadata about a module, based on a type.
+    ///
+    /// # Panics
+    ///
+    /// Panics when concurrently accessed from multiple threads.
     pub fn meta<T: Any + Clone>(&self) -> Option<T> {
-        Some(self.meta.try_read().expect("Failed lock").get::<T>()?.clone())
+        Some(
+            self.meta
+                .try_read()
+                .expect("Failed lock")
+                .get::<T>()?
+                .clone(),
+        )
     }
 
     /// Sets a metadata object.
+    ///
+    /// # Panics
+    ///
+    /// Panics when concurrently accessed from multiple threads.
     pub fn set_meta<T: Any + Clone>(&self, value: T) {
         self.meta.try_write().expect("Failed lock").set(value);
     }
@@ -189,10 +203,10 @@ impl ModuleContext {
     ///
     /// Use this handle to either access the parent modules topological
     /// state, or cast it to access the custom state of the parent.
-    /// 
+    ///
     /// # Errors
     ///
-    /// Returns an error if no parent exists, or 
+    /// Returns an error if no parent exists, or
     /// the parent is currently shut down.
     ///
     /// # Panics
@@ -225,7 +239,6 @@ impl ModuleContext {
             )))
         }
     }
-
 
     /// Returns a handle to the child element, with the provided module name.
     ///
@@ -266,9 +279,23 @@ unsafe impl Sync for ModuleContext {}
 
 pub(crate) fn with_mod_ctx<R>(f: impl FnOnce(&Arc<ModuleContext>) -> R) -> R {
     let lock = MOD_CTX.read();
-    let r = f(&lock);
+    let ctx = lock
+        .as_ref()
+        .expect("failed operation: no module currently in scope");
+    let r = f(ctx);
     drop(lock);
     r
+}
+
+pub(crate) fn try_with_mod_ctx<R>(f: impl FnOnce(&Arc<ModuleContext>) -> R) -> Option<R> {
+    let lock = MOD_CTX.read();
+    if let Some(ctx) = lock.as_real_inner() {
+        let r = f(ctx);
+        drop(lock);
+        Some(r)
+    } else {
+        None
+    }
 }
 
 // pub(crate) fn with_mod_ctx_lock() -> SwapLockReadGuard<'static, Option<Arc<ModuleContext>>> {

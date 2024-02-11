@@ -71,12 +71,18 @@ impl<'a, T> SwapLockReadGuard<'a, T> {
             _phantom: PhantomData,
         }
     }
+
+    pub(crate) fn as_real_inner(&self) -> &T {
+        unsafe { &(*self.lock.inner.get()) }
+    }
 }
 
-impl<'a, T> Deref for SwapLockReadGuard<'a, Option<T>> {
+impl<'a, T> Deref for SwapLockReadGuard<'a, T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
-        unsafe { (*self.lock.inner.get()).as_ref().unwrap_unchecked() }
+        unsafe {
+            &(*self.lock.inner.get())
+        }
     }
 }
 

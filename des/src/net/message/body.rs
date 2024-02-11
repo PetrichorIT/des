@@ -85,36 +85,6 @@ impl<T: MessageBody, E: MessageBody> MessageBody for Result<T, E> {
     }
 }
 
-// # Cells
-use std::cell::{Cell, RefCell, UnsafeCell};
-
-impl<T: MessageBody> MessageBody for Cell<T> {
-    fn byte_len(&self) -> usize {
-        // SAFTY: Since this is only used in this place, read only
-        // this can be considered safe
-        let val = unsafe { &*self.as_ptr() };
-        val.byte_len()
-    }
-}
-
-impl<T: MessageBody> MessageBody for RefCell<T> {
-    fn byte_len(&self) -> usize {
-        // SAFTY: Since this is only used in this place, read only
-        // this can be considered safe.
-        // This is nessecary to prevent a deadlock via an unknown borrow.
-        let val = unsafe { &*self.as_ptr() };
-        val.byte_len()
-    }
-}
-
-impl<T: MessageBody> MessageBody for UnsafeCell<T> {
-    fn byte_len(&self) -> usize {
-        // SAFTY: Only used locally, read-only
-        let val = unsafe { &*self.get() };
-        val.byte_len()
-    }
-}
-
 // # Collections
 use std::collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, LinkedList, VecDeque};
 

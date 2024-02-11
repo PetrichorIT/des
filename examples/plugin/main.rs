@@ -5,7 +5,6 @@ use des::{
     },
     prelude::*,
     registry,
-    tracing::Subscriber,
 };
 
 struct A {}
@@ -29,7 +28,7 @@ impl Module for A {
 
 #[derive(Default)]
 struct PacketCounter {
-    count: usize
+    count: usize,
 }
 
 impl ProcessingElement for PacketCounter {
@@ -48,10 +47,13 @@ impl Drop for PacketCounter {
 struct B {}
 
 impl Module for B {
-    fn stack(&self) -> impl ProcessingElement + 'static where Self: Sized {
+    fn stack(&self) -> impl ProcessingElement + 'static
+    where
+        Self: Sized,
+    {
         PacketCounter::default()
     }
-    
+
     fn new() -> Self {
         Self {}
     }
@@ -76,7 +78,9 @@ fn main() {
     //     .with_max_level(LevelFilter::TRACE)
     //     .init();
 
-    Subscriber::default().init().unwrap();
+    des::tracing::init();
+
+    // Subscriber::default().init().unwrap();
 
     set_setup_fn(empty);
 

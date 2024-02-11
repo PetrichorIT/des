@@ -1,3 +1,5 @@
+#![allow(clippy::unused_async)]
+
 use crate::net::{message::Message, module::Module};
 use crate::time::SimTime;
 use tokio::task::yield_now;
@@ -27,7 +29,7 @@ pub trait AsyncModule: Send {
     /// The function may block beyond the evaluation of the current event.
     /// If that happens, other messages that will be received will be queued
     /// until the evaluation of this event has concluded. For non-blocking
-    /// event execution use [tokio::spawn].
+    /// event execution use [`tokio::spawn`].
     ///
     /// # Example
     ///
@@ -49,7 +51,7 @@ pub trait AsyncModule: Send {
     ///     }
     /// }
     /// ```
-    async fn handle_message(&mut self, _msg: Message) {}
+    async fn handle_message(&mut self, _: Message) {}
 
     ///
     /// A function that is run at the start of each simulation, for each module.
@@ -60,7 +62,7 @@ pub trait AsyncModule: Send {
     /// # Note
     ///
     /// The user must ensure that all calls of `at_sim_start` will terminate at last
-    /// once all stages of at_sim_start of all modules have been called.
+    /// once all stages of `at_sim_start` of all modules have been called.
     /// The stages will be executed in order.
     ///
     /// # Example
@@ -94,7 +96,7 @@ pub trait AsyncModule: Send {
     /// }
     ///
     /// ```
-    async fn at_sim_start(&mut self, _stage: usize) {}
+    async fn at_sim_start(&mut self, _: usize) {}
 
     ///
     /// A function that is called once the simulation has terminated.

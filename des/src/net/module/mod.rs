@@ -21,6 +21,9 @@ pub(crate) use dummy::*;
 
 mod meta;
 
+#[cfg(test)]
+mod tests;
+
 
 use super::processing::{BaseLoader, ProcessingElements, IntoProcessingElements};
 
@@ -60,11 +63,11 @@ pub trait Module: Any {
     }
 
     /// BUILD
-    fn as_processing_chain(self) -> ProcessingElements
+    fn to_processing_chain(self) -> ProcessingElements
     where
         Self: Sized + 'static,
     {
-        let stack = <Self as Module>::stack(&self).as_processing_elements();
+        let stack = <Self as Module>::stack(&self).to_processing_elements();
         ProcessingElements::new(stack, self)
     }
 

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use super::{with_mod_ctx, ModuleContext, SETUP_FN};
+use super::{try_with_mod_ctx, ModuleContext, SETUP_FN};
 use crate::{
     net::runtime::buf_schedule_shutdown,
     time::{Duration, SimTime},
@@ -40,9 +40,13 @@ pub fn set_setup_fn(f: fn(&ModuleContext)) {
 ///     }
 /// }
 /// ```
+/// 
+/// # Panics
+/// 
+/// This function will panic if not called within a modules context.
 #[must_use]
 pub fn current() -> Arc<ModuleContext> {
-    with_mod_ctx(Arc::clone)
+    try_with_mod_ctx(Arc::clone).expect("cannot retrieve current module context, no module currently in scope")
 }
 
 

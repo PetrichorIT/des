@@ -5,6 +5,7 @@ cfg_not_multi_threaded! {
         ops::{Deref, DerefMut},
     };
 
+    #[derive(Debug)]
     pub(crate) struct Mutex<T> {
         value: UnsafeCell<T>,
         locked: AtomicBool,

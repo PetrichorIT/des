@@ -194,12 +194,12 @@ pub trait ProcessingElement: Any {
 /// A type that can be interprested as a processing element chain.
 pub trait IntoProcessingElements: 'static {
     /// Convertes into processing elements
-    fn as_processing_elements(self) -> Vec<ProcessorElement>;
+    fn to_processing_elements(self) -> Vec<ProcessorElement>;
 }
 
 impl<P: ProcessingElement + 'static> IntoProcessingElements for P {
-    fn as_processing_elements(self) -> Vec<ProcessorElement> {
-        let mut stack = self.stack().as_processing_elements();
+    fn to_processing_elements(self) -> Vec<ProcessorElement> {
+        let mut stack = self.stack().to_processing_elements();
         stack.push(ProcessorElement::new(self));
         stack
     }
@@ -228,14 +228,18 @@ fn _default_processing() -> Vec<ProcessorElement> {
 }
 
 impl IntoProcessingElements for BaseLoader {
-    fn as_processing_elements(self) -> Vec<ProcessorElement> {
+    fn to_processing_elements(self) -> Vec<ProcessorElement> {
         SETUP_PROCESSING.try_read().expect("Cannot access fn")()
     }
 }
 
 /// Sets a handler to create the default processing element of a module
+/// 
+/// # Panics 
+/// 
+/// May panic at interal misconfiguration
 pub fn set_default_processing_elements(f: fn() -> Vec<ProcessorElement>) {
-    *SETUP_PROCESSING.try_write().expect("no lock") = f
+    *SETUP_PROCESSING.try_write().expect("no lock") = f;
 }
 
 #[doc(hidden)]
@@ -327,7 +331,7 @@ impl ProcessingElements {
         self.state = ProcessingState::Downstream(self.stack.len());
         for i in (0..self.stack.len()).rev() {
             self.stack[i].inner.event_end();
-            self.state.bump_downstream()
+            self.state.bump_downstream();
         }
     }
 
@@ -338,11 +342,11 @@ impl ProcessingElements {
         // Peek
         self.state = ProcessingState::Peek;
         if let Some(msg) = msg {
-            self.handler.handle_message(msg)
+            self.handler.handle_message(msg);
         } else {
             #[cfg(feature = "async")]
             if self.handler.__indicate_async() {
-                self.run_without_event()
+                self.run_without_event();
             }
         }
 
@@ -351,6 +355,7 @@ impl ProcessingElements {
     }
 
     #[cfg(feature = "async")]
+    #[allow(clippy::unused_self)]
     pub(super) fn run_without_event(&self) {
         use crate::net::module::async_get_rt;
         use tokio::task::yield_now;
@@ -360,7 +365,7 @@ impl ProcessingElements {
 }
 
 impl IntoProcessingElements for () {
-    fn as_processing_elements(self) -> Vec<ProcessorElement> {
+    fn to_processing_elements(self) -> Vec<ProcessorElement> {
         Vec::new()
     }
 }
@@ -371,8 +376,8 @@ macro_rules! for_tuples {
     ) => {
         impl<$($i: ProcessingElement + 'static),*> IntoProcessingElements for ($($i),*) {
             #[allow(non_snake_case)]
-            fn as_processing_elements(self) -> Vec<ProcessorElement> {
-                let mut stack = self.0.stack().as_processing_elements();
+            fn to_processing_elements(self) -> Vec<ProcessorElement> {
+                let mut stack = self.0.stack().to_processing_elements();
                 let ($($i),*) = self;
                 $(
                     stack.push(ProcessorElement::new($i));

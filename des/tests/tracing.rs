@@ -1,363 +1,202 @@
-use std::{sync::Arc, time::Duration};
+use des::{net::AsyncBuilder, runtime::Builder, tracing::format};
+use tracing::{level_filters::LevelFilter, subscriber::with_default, Instrument, span, Level};
 
-use des::{
-    net::AsyncBuilder,
-    runtime::Builder,
-    time::sleep,
-    tracing::{
-        NoColorFormatter, ScopeConfiguration, ScopeConfigurationPolicy, Subscriber, TracingOutput,
-    },
-};
-use spin::Mutex;
-use termcolor::{BufferWriter, ColorChoice};
-use tracing::{Instrument, Level};
+mod mock {
+    use spin::Mutex;
+    use std::{io, sync::Arc};
+    use tracing_subscriber::fmt::MakeWriter;
 
-struct DebugOutput {
-    records: Arc<Mutex<Vec<String>>>,
-}
-impl TracingOutput for DebugOutput {
-    fn write(
-        &mut self,
-        fmt: &mut dyn des::tracing::TracingFormatter,
-        record: des::tracing::TracingRecord<'_>,
-    ) -> std::io::Result<()> {
-        let wrt = BufferWriter::stdout(ColorChoice::Never);
-        let mut buf = wrt.buffer();
-        fmt.fmt(&mut buf, record)?;
-        self.records
-            .lock()
-            .push(String::from_utf8_lossy(buf.as_slice()).to_string());
-        Ok(())
+    #[derive(Debug, Clone)]
+    pub struct MakeMockWriter {
+        lines: Arc<Mutex<String>>,
     }
-}
 
-struct DebugPolicy {
-    output: Arc<Mutex<Vec<String>>>,
-}
-impl ScopeConfigurationPolicy for DebugPolicy {
-    fn configure(&self, _scope: &str) -> ScopeConfiguration {
-        ScopeConfiguration {
-            output: Box::new(DebugOutput {
-                records: self.output.clone(),
-            }),
-            fmt: Box::new(NoColorFormatter),
+    #[derive(Debug, Clone)]
+    pub struct MockWriter {
+        lines: Arc<Mutex<String>>,
+    }
+
+    impl io::Write for MockWriter {
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            let mut lines = self.lines.lock();
+            lines.push_str(&String::from_utf8_lossy(buf));
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    impl MakeMockWriter {
+        pub fn new() -> Self {
+            MakeMockWriter {
+                lines: Arc::new(Mutex::new(String::new())),
+            }
+        }
+
+        pub fn content(&self) -> String {
+            self.lines.lock().clone()
+        }
+    }
+
+    impl<'a> MakeWriter<'a> for MakeMockWriter {
+        type Writer = MockWriter;
+        fn make_writer(&'a self) -> Self::Writer {
+            MockWriter {
+                lines: self.lines.clone(),
+            }
         }
     }
 }
 
 #[test]
 #[serial_test::serial]
-fn scope_recognition() {
-    let records = Arc::new(Mutex::new(Vec::new()));
-    Subscriber::new(DebugPolicy {
-        output: records.clone(),
-    })
-    .with(|| {
-        let mut sim = AsyncBuilder::new();
-        sim.node("node-a", |_| async {
-            tracing::info!("node-a 0s #1");
-            tracing::error!("node-a 0s #2");
-            Ok(())
-        });
+fn test_mock_output() {
+    let writer = mock::MakeMockWriter::new();
+    let subscriber = tracing_subscriber::fmt()
+        .with_ansi(false)
+        .with_max_level(LevelFilter::TRACE)
+        .event_format(format())
+        .with_writer(writer.clone())
+        .finish();
 
-        sim.node_with_parent("node-b", "node-a", |_| async {
-            tracing::trace!("node-b 0s #1");
-            Ok(())
-        });
-
-        let _ = Builder::new().build(sim.build()).run();
-
-        let records = records.lock();
+    with_default(subscriber, || {
+        tracing::info!(GENERAL = "Kenobi", "Hello there");
         assert_eq!(
-            *records,
-            [
-                "[  0ns  ] INFO node-a (tracing): node-a 0s #1\n".to_string(),
-                "[  0ns  ] ERROR node-a (tracing): node-a 0s #2\n".to_string(),
-                "[  0ns  ] TRACE node-a.node-b (tracing): node-b 0s #1\n".to_string(),
-            ]
+            writer.content(),
+            "[ 0ns ] INFO tracing: Hello there GENERAL=\"Kenobi\"\n"
+        );
+    })
+}
+
+#[test]
+#[serial_test::serial]
+fn scope_regognition() {
+    let writer = mock::MakeMockWriter::new();
+    let subscriber = tracing_subscriber::fmt()
+        .with_ansi(false)
+        .with_max_level(LevelFilter::TRACE)
+        .event_format(format())
+        .with_writer(writer.clone())
+        .finish();
+
+    with_default(subscriber, || {
+        let mut sim = AsyncBuilder::new();
+        sim.node("a", |_| async {
+            tracing::info!("node(a) says(1) at(0s)");
+            tracing::error!("node(a) says(2) at(0s)");
+            Ok(())
+        });
+        sim.node_with_parent("b", "a", |_| async {
+            tracing::trace!("node(b) says(1) at(0s)");
+            Ok(())
+        });
+
+        let _ = Builder::seeded(123).build(sim.build()).run();
+        assert_eq!(
+            writer.content(), 
+            "[ 0ns ] INFO a tracing: node(a) says(1) at(0s)\n[ 0ns ] ERROR a tracing: node(a) says(2) at(0s)\n[ 0ns ] TRACE a.b tracing: node(b) says(1) at(0s)\n"
         );
     });
 }
 
 #[test]
 #[serial_test::serial]
-fn time_recognition() {
-    let records = Arc::new(Mutex::new(Vec::new()));
-    Subscriber::new(DebugPolicy {
-        output: records.clone(),
-    })
-    .with(|| {
+fn time_regognition() {
+    let writer = mock::MakeMockWriter::new();
+    let subscriber = tracing_subscriber::fmt()
+        .with_ansi(false)
+        .with_max_level(LevelFilter::TRACE)
+        .event_format(format())
+        .with_writer(writer.clone())
+        .finish();
+
+    with_default(subscriber, || {
         let mut sim = AsyncBuilder::new();
-        sim.node("node-a", |_| async {
-            tracing::info!("node-a 0s #1");
-            sleep(Duration::from_secs(5)).await;
-            tracing::error!("node-a 5s #2");
+        sim.node("a", |_| async {
+            tracing::info!("node(a) says(1) at(0s)");
+            des::time::sleep(std::time::Duration::from_secs(5)).await;
+            tracing::error!("node(a) says(2) at(5s)");
             Ok(())
         });
-        sim.node_with_parent("node-b", "node-a", |_| async {
-            tracing::trace!("node-b 0s #1");
+        sim.node_with_parent("b", "a", |_| async {
+            tracing::trace!("node(b) says(1) at(0s)");
             Ok(())
         });
 
-        let _ = Builder::new().build(sim.build()).run();
-
-        let records = records.lock();
+        let _ = Builder::seeded(123).build(sim.build()).run();
         assert_eq!(
-            *records,
-            [
-                "[  0ns  ] INFO node-a (tracing): node-a 0s #1\n".to_string(),
-                "[  0ns  ] TRACE node-a.node-b (tracing): node-b 0s #1\n".to_string(),
-                "[  5s   ] ERROR node-a (tracing): node-a 5s #2\n".to_string(),
-            ]
+            writer.content(), 
+            "[ 0ns ] INFO a tracing: node(a) says(1) at(0s)\n[ 0ns ] TRACE a.b tracing: node(b) says(1) at(0s)\n[ 5s ] ERROR a tracing: node(a) says(2) at(5s)\n"
         );
     });
 }
 
 #[test]
 #[serial_test::serial]
-fn span_recognition() {
-    let records = Arc::new(Mutex::new(Vec::new()));
-    Subscriber::new(DebugPolicy {
-        output: records.clone(),
-    })
-    .with(|| {
-        let mut sim = AsyncBuilder::new();
+fn span_regognition() {
+    let writer = mock::MakeMockWriter::new();
+    let subscriber = tracing_subscriber::fmt()
+        .with_ansi(false)
+        .with_max_level(LevelFilter::TRACE)
+        .event_format(format())
+        .with_writer(writer.clone())
+        .finish();
 
-        sim.node("node-a", |_| {
-            let span = tracing::span!(Level::DEBUG, "my-span");
-            {
-                async {
-                    tracing::info!("node-a 0s #1");
-                    Ok(())
-                }
-                .instrument(span)
-            }
-        });
-        sim.node_with_parent("node-b", "node-a", |_| async {
-            tracing::trace!("node-b 0s #1");
+    with_default(subscriber, || {
+        let mut sim = AsyncBuilder::new();
+        sim.node("a", |_| async {
+            tracing::info!("node(a) says(1) at(0s)");
+            Ok(())
+        }.instrument(span!(Level::DEBUG, "my-span", key=123)));
+        sim.node_with_parent("b", "a", |_| async {
+            tracing::trace!("node(b) says(1) at(0s)");
             Ok(())
         });
 
-        let _ = Builder::new().build(sim.build()).run();
-
-        let records = records.lock();
+        let _ = Builder::seeded(123).build(sim.build()).run();
         assert_eq!(
-            *records,
-            [
-                "[  0ns  ] INFO node-a (tracing): my-span node-a 0s #1\n".to_string(),
-                "[  0ns  ] TRACE node-a.node-b (tracing): node-b 0s #1\n".to_string(),
-            ]
+            writer.content(), 
+            "[ 0ns ] INFO a my-span{key=123}: tracing: node(a) says(1) at(0s)\n[ 0ns ] TRACE a.b tracing: node(b) says(1) at(0s)\n"
         );
     });
 }
 
 #[test]
 #[serial_test::serial]
-fn span_fields_recognition() {
-    let records = Arc::new(Mutex::new(Vec::new()));
-    Subscriber::new(DebugPolicy {
-        output: records.clone(),
-    })
-    .with(|| {
-        let mut sim = AsyncBuilder::new();
-
-        sim.node("node-a", |_| {
-            let span = tracing::span!(Level::DEBUG, "my-span", key = 42);
-            {
-                async {
-                    tracing::info!("node-a 0s #1");
-                    Ok(())
-                }
-                .instrument(span)
-            }
-        });
-        sim.node_with_parent("node-b", "node-a", |_| async {
-            tracing::trace!("node-b 0s #1");
-            Ok(())
-        });
-
-        let _ = Builder::new().build(sim.build()).run();
-
-        let records = records.lock();
-        assert_eq!(
-            *records,
-            [
-                "[  0ns  ] INFO node-a (tracing): my-span{key=42} node-a 0s #1\n".to_string(),
-                "[  0ns  ] TRACE node-a.node-b (tracing): node-b 0s #1\n".to_string(),
-            ]
-        );
-    });
-}
-
-#[test]
-#[serial_test::serial]
-fn multi_span_recogition() {
+fn multi_span_regognition() {
     #[tracing::instrument]
     async fn say_hello() {
         tracing::info!("hello")
     }
+    
+    let writer = mock::MakeMockWriter::new();
+    let subscriber = tracing_subscriber::fmt()
+        .with_ansi(false)
+        .with_max_level(LevelFilter::TRACE)
+        .event_format(format())
+        .with_writer(writer.clone())
+        .finish();
 
-    let records = Arc::new(Mutex::new(Vec::new()));
-    Subscriber::new(DebugPolicy {
-        output: records.clone(),
-    })
-    .with(|| {
+    with_default(subscriber, || {
         let mut sim = AsyncBuilder::new();
-
-        sim.node("node-a", |_| {
-            let span = tracing::span!(Level::DEBUG, "my-span", key = 42);
-
-            async {
-                tracing::info!("node-a 0s #1");
-                say_hello().await;
-                Ok(())
-            }
-            .instrument(span)
-        });
-
-        let _ = Builder::new().build(sim.build()).run();
-
-        let records = records.lock();
-        assert_eq!(
-            *records,
-            [
-                "[  0ns  ] INFO node-a (tracing): my-span{key=42} node-a 0s #1\n".to_string(),
-                "[  0ns  ] INFO node-a (tracing): my-span{key=42} say_hello hello\n".to_string(),
-            ]
-        );
-    });
-}
-
-#[test]
-#[serial_test::serial]
-fn filter_fallback_rule() {
-    let records = Arc::new(Mutex::new(Vec::new()));
-    Subscriber::new(DebugPolicy {
-        output: records.clone(),
-    })
-    .with_filter("warn")
-    .with(|| {
-        let mut sim = AsyncBuilder::new();
-
-        sim.node("node-a", |_| {
-            let span = tracing::span!(Level::DEBUG, "my-span", key = 42);
-            async {
-                tracing::info!("node-a 0s #1");
-                tracing::warn!("node-a 0s #2");
-                Ok(())
-            }
-            .instrument(span)
-        });
-
-        let _ = Builder::new().build(sim.build()).run();
-
-        let records = records.lock();
-        assert_eq!(
-            *records,
-            ["[  0ns  ] WARN node-a (tracing): node-a 0s #2\n".to_string(),]
-        );
-    });
-}
-
-mod submodule {
-    pub fn say_hello() {
-        tracing::info!("hello")
-    }
-}
-
-#[test]
-#[serial_test::serial]
-fn filter_target_rule() {
-    let records = Arc::new(Mutex::new(Vec::new()));
-    Subscriber::new(DebugPolicy {
-        output: records.clone(),
-    })
-    .with_filter("tracing::submodule=warn")
-    .with(|| {
-        let mut sim = AsyncBuilder::new();
-
-        sim.node("node-a", |_| {
-            let span = tracing::span!(Level::DEBUG, "my-span", key = 42);
-            async {
-                tracing::info!("node-a 0s #1");
-                submodule::say_hello();
-                Ok(())
-            }
-            .instrument(span)
-        });
-
-        let _ = Builder::new().build(sim.build()).run();
-
-        let records = records.lock();
-        assert_eq!(
-            *records,
-            ["[  0ns  ] INFO node-a (tracing): my-span{key=42} node-a 0s #1\n".to_string(),]
-        );
-    });
-}
-
-#[test]
-#[serial_test::serial]
-fn filter_span_rule() {
-    let records = Arc::new(Mutex::new(Vec::new()));
-    Subscriber::new(DebugPolicy {
-        output: records.clone(),
-    })
-    .with_filter("tracing::submodule=warn")
-    .with(|| {
-        let mut sim = AsyncBuilder::new();
-
-        sim.node("node-a", |_| {
-            let span = tracing::span!(Level::DEBUG, "my-span", key = 42);
-            async {
-                tracing::info!("node-a 0s #1");
-                submodule::say_hello();
-                Ok(())
-            }
-            .instrument(span)
-        });
-
-        let _ = Builder::new().build(sim.build()).run();
-
-        let records = records.lock();
-        assert_eq!(
-            *records,
-            ["[  0ns  ] INFO node-a (tracing): my-span{key=42} node-a 0s #1\n".to_string(),]
-        );
-    });
-}
-
-#[test]
-#[serial_test::serial]
-fn filter_mixed_rule() {
-    let records = Arc::new(Mutex::new(Vec::new()));
-    Subscriber::new(DebugPolicy {
-        output: records.clone(),
-    })
-    .with_filter("warn,tracing::submodule[span-name]=trace")
-    .with(|| {
-        let mut sim = AsyncBuilder::new();
-
-        sim.node("node-a", |_| async {
-            tracing::info!("#1"); // NO
-            tracing::info!(target = "target", "#2"); // NO
-
-            async {
-                tracing::info!("#3"); // NO
-                submodule::say_hello();
-            }
-            .instrument(tracing::span!(Level::ERROR, "span-name"))
-            .await;
-
+        sim.node("a", |_| async {
+            say_hello().await;
+            Ok(())
+        }.instrument(span!(Level::DEBUG, "my-span", key=123)));
+        sim.node_with_parent("b", "a", |_| async {
+            tracing::trace!("node(b) says(1) at(0s)");
             Ok(())
         });
 
-        let _ = Builder::new().build(sim.build()).run();
-
-        let records = records.lock();
+        let _ = Builder::seeded(123).build(sim.build()).run();
         assert_eq!(
-            *records,
-            ["[  0ns  ] INFO node-a (tracing::submodule): span-name hello\n".to_string(),]
+            writer.content(), 
+            "[ 0ns ] INFO a my-span{key=123}:say_hello: tracing: hello\n[ 0ns ] TRACE a.b tracing: node(b) says(1) at(0s)\n"
         );
     });
 }
+
+
+

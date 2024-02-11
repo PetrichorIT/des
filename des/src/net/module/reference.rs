@@ -59,7 +59,7 @@ impl Deref for ModuleRef {
 impl ModuleRef {
     #[allow(clippy::explicit_deref_methods)]
     pub(crate) fn new<T: Module>(ctx: Arc<ModuleContext>, module: T) -> Self {
-        let procesing = module.as_processing_chain();
+        let procesing = module.to_processing_chain();
         let handler = Arc::new(RefCell::new(procesing));
         Self {
             ctx,
