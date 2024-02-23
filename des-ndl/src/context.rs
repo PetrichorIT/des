@@ -228,11 +228,11 @@ impl Context {
                     anchor = canon(anchor);
                     anchor.set_extension("ndl");
 
-                    let Some(asset) = self.assets.iter().enumerate().find(|asset| *asset.1.path().unwrap() == anchor) else {
+                    let Some(asset_pos) = self.assets.iter().position(|asset| *asset.path().unwrap() == anchor) else {
                         unreachable!()
                     };
 
-                    topo[i].push(asset.0);
+                    topo[i].push(asset_pos);
                     topo_span[i].push(include.span())
                 }
             }

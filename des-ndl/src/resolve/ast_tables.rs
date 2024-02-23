@@ -34,10 +34,9 @@ impl LinkAstTable {
             for dep in inh.symbols.iter() {
                 let ldep = local
                     .iter()
-                    .enumerate()
-                    .find(|(_, l)| l.ident.raw == dep.raw);
+                    .position(|l| l.ident.raw == dep.raw);
                 if let Some(ldep) = ldep {
-                    topo[i].push(ldep.0);
+                    topo[i].push(ldep);
                 } else {
                     // ignore nonloca dep
                 }
@@ -199,10 +198,9 @@ impl ModuleAstTable {
             for dep in submodules.iter().flat_map(|s| s.items.iter()) {
                 let ldep = local
                     .iter()
-                    .enumerate()
-                    .find(|(_, l)| l.ident.raw == dep.typ.raw());
+                    .position(|l| l.ident.raw == dep.typ.raw());
                 if let Some(ldep) = ldep {
-                    topo[i].push(ldep.0);
+                    topo[i].push(ldep);
                 }
             }
 
@@ -211,10 +209,9 @@ impl ModuleAstTable {
             for dep in inh.symbols.iter() {
                 let ldep = local
                     .iter()
-                    .enumerate()
-                    .find(|(_, l)| l.ident.raw == dep.raw);
+                    .position(|l| l.ident.raw == dep.raw);
                 if let Some(ldep) = ldep {
-                    topo[i].push(ldep.0)
+                    topo[i].push(ldep)
                 }
             }
         }

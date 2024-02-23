@@ -285,10 +285,8 @@ impl Topology {
             node: self
                 .nodes
                 .iter()
-                .enumerate()
-                .find(|(_, n)| n.module.path() == node)
-                .unwrap()
-                .0,
+                .position(|n| n.module.path() == node)
+                .unwrap(),
             distance: 0,
             next_hop: None,
         });

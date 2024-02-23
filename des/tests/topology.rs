@@ -32,18 +32,16 @@ fn topology_load() {
     assert_eq!(topo.nodes().len(), 7);
     assert_eq!(topo.nodes().into_iter().filter(|n| n.alive).count(), 6);
 
-    let (i, _) = topo
+    let i= topo
         .nodes()
         .into_iter()
-        .enumerate()
-        .find(|(_, n)| n.module.name() == "router")
+        .position(|n| n.module.name() == "router")
         .unwrap();
 
-    let (j, _) = topo
+    let j = topo
         .nodes()
         .into_iter()
-        .enumerate()
-        .find(|(_, n)| n.module.name() == "debugger")
+        .position(|n| n.module.name() == "debugger")
         .unwrap();
 
     assert!(topo

@@ -90,9 +90,9 @@ impl ParTree {
         match key.split_once('.') {
             Some((comp, remainder)) => {
                 for branch in self.branches.iter().filter(|b| b.matching.matches_r(comp)) {
-                    let Some(ret) =  branch.node.get_rlock(remainder, inc) else {
+                    let Some(ret) = branch.node.get_rlock(remainder, inc) else {
                         continue;
-                    } ;
+                    };
                     return Some(ret);
                 }
                 None
@@ -180,6 +180,7 @@ impl ParTreePathMatching {
     }
 
     fn matches_r(&self, key: &str) -> bool {
+        // dbg!(self, key);
         match self {
             Self::Any => true,
             Self::Path(ref path) => path == key,

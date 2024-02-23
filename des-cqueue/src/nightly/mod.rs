@@ -181,11 +181,10 @@ impl<E> CQueue<E> {
     pub fn cancel(&mut self, handle: EventHandle<E>) {
         if handle.time >= self.t_current {
             if handle.time == self.t_current {
-                if let Some((i, _)) = self
+                if let Some(i) = self
                     .zero_event_bucket
                     .iter()
-                    .enumerate()
-                    .find(|(_, v)| v.2 == handle.id)
+                    .position(|v| v.2 == handle.id)
                 {
                     self.zero_event_bucket.remove(i);
                     self.len -= 1;

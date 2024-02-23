@@ -56,7 +56,7 @@ pub fn dfs_cycles(topo: &[Vec<usize>]) -> std::result::Result<Vec<Vec<bool>>, Ve
             // Find the start point of the cycle
             // by using index 0 of the first occurence, we ensure that nodes lower i
             // tend to be the start point of cycles
-            let Some((p, _)) = cycles[k].iter().enumerate().find(|(_, &v)| s == v) else {
+            let Some(p) = cycles[k].iter().position(|&v| s == v) else {
                 k += 1;
                 continue 'outer;
             };

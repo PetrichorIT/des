@@ -106,7 +106,7 @@ fn source_map_padded_span() {
     smap.load_raw("raw:ex0", EX0);
 
     // Full padding.
-    let span = EX0.bytes().enumerate().find(|c| c.1 == b'5').unwrap().0;
+    let span = EX0.bytes().position(|c| c == b'5').unwrap();
     let span = Span::new(span, 1);
 
     let (padded_slice, offset) = smap.slice_padded_for(span);
@@ -117,7 +117,7 @@ fn source_map_padded_span() {
     );
 
     // Trunc end
-    let span = EX0.bytes().enumerate().find(|c| c.1 == b'y').unwrap().0;
+    let span = EX0.bytes().position(|c| c == b'y').unwrap();
     let span = Span::new(span, 1);
 
     let (padded_slice, offset) = smap.slice_padded_for(span);
@@ -125,7 +125,7 @@ fn source_map_padded_span() {
     assert_eq!(padded_slice, "}\n\nentry M;\n// Comment befor EOF");
 
     // Trunc start (offset 1)
-    let span = EX0.bytes().enumerate().find(|c| c.1 == b'x').unwrap().0;
+    let span = EX0.bytes().position(|c| c == b'x').unwrap();
     let span = Span::new(span, 1);
 
     let (padded_slice, offset) = smap.slice_padded_for(span);
