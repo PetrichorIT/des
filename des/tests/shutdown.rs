@@ -298,6 +298,7 @@ fn restart_via_async_handle() {
     assert_eq!(DROPPED_RESTART_VIA_HANDLE.load(Ordering::SeqCst), 2)
 }
 
+#[derive(Clone)]
 struct CountDropsMessage {
     counter: Arc<AtomicUsize>,
 }

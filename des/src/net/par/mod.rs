@@ -1,3 +1,5 @@
+use std::fmt::Display;
+use std::io;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::sync::atomic::{AtomicUsize, Ordering::SeqCst};
@@ -75,6 +77,14 @@ impl ParMap {
 
     fn insert(&self, key: &str, value: String) -> bool {
         self.tree.write().unwrap().insert(key, value)
+    }
+
+    fn remove(&self, key: &str) {
+        self.tree.write().unwrap().remove(key);
+    }
+
+    fn export(&self, writer: &mut impl io::Write) -> io::Result<()> {
+        self.tree.read().unwrap().export(writer, "")
     }
 }
 
@@ -169,6 +179,37 @@ impl ParTree {
             }
         }
     }
+
+    fn remove(&mut self, key: &str) -> bool {
+        match key.split_once('.') {
+            Some((comp, rem)) => self
+                .branches
+                .iter_mut()
+                .find(|b| b.matching.matches_w(comp))
+                .map(|b| b.node.remove(rem))
+                .unwrap_or(false),
+            None => self.pars.remove(&*key).is_some(),
+        }
+    }
+
+    fn export(&self, writer: &mut impl io::Write, path: &str) -> io::Result<()> {
+        // Write pars directly
+        for (key, (value, _)) in &self.pars {
+            writeln!(writer, "{path}.{key} = {value}")?;
+        }
+
+        // Recurse branches
+        for branch in &self.branches {
+            let new_path = if path.is_empty() {
+                branch.matching.to_string()
+            } else {
+                format!("{path}.{}", branch.matching)
+            };
+            branch.node.export(writer, &new_path)?;
+        }
+
+        Ok(())
+    }
 }
 
 impl ParTreePathMatching {
@@ -184,6 +225,15 @@ impl ParTreePathMatching {
         match self {
             Self::Any => true,
             Self::Path(ref path) => path == key,
+        }
+    }
+}
+
+impl Display for ParTreePathMatching {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Any => write!(f, "*"),
+            Self::Path(path) => write!(f, "{}", path),
         }
     }
 }
@@ -319,13 +369,11 @@ where
         map.get_rlock(&self.key, 0)
     }
 
-    ///
     /// Sets the parameter to the given value.
     ///
     /// # Errors
     ///
     /// Returns an error if other active locks exist for the datapoint.
-    ///
     #[allow(clippy::needless_pass_by_value)]
     pub fn set(self, value: impl ToString) -> Result<Par<Exists>, ParError> {
         let map = ParMap::shared();
@@ -338,6 +386,19 @@ where
             })
         } else {
             Err(ParError::CouldNotAquireWriteLock)
+        }
+    }
+
+    /// Remove the entry from the par storege.
+    /// 
+    /// Returns a `Par` object with optional (in this case None) content.
+    pub fn unset(self) -> Par<Optional> {
+        let map = ParMap::shared();
+        map.remove(&self.key);
+        Par {
+            value: None,
+            key: self.key.clone(),
+            _phantom: PhantomData,
         }
     }
 }

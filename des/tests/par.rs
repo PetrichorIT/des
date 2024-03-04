@@ -1,6 +1,8 @@
 #![cfg(feature = "net")]
 
-use des::net::Par;
+use std::io;
+
+use des::net::{Par, par_export};
 use des::prelude::*;
 use serial_test::serial;
 
@@ -126,4 +128,21 @@ fn parse_strings() {
 
     assert_eq!(&*handle, "\"My name\"");
     assert_eq!(handle.into_inner(), "My name".to_string());
+}
+
+#[test]
+#[serial]
+fn par_export_test() -> io::Result<()> {
+    let rt = NetworkApplication::new(());
+    rt.globals().parameters.build(EXAMPLE_NETWORK);
+
+
+    let mut str = Vec::new();
+    par_export(&mut str)?;
+
+    let str = String::from_utf8_lossy(&str);
+    assert_eq!(str, "netA.*.dnsServer = 1.1.1.1\nnetA.s0.ip = 0.0.0.1\nnetA.s1.ipv6 = fe80\nnetA.s1.ip = 0.0.0.1\n");
+
+
+    Ok(())
 }
