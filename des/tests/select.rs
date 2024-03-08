@@ -2,21 +2,12 @@
 use des::prelude::*;
 use std::sync::atomic::AtomicUsize;
 
-#[macro_use]
-mod common;
-
 struct Main;
-impl_build_named!(Main);
 
 static A: AtomicUsize = AtomicUsize::new(0);
 static B: AtomicUsize = AtomicUsize::new(0);
 
-
 impl AsyncModule for Main {
-    fn new() -> Main {
-        Main
-    }
-
     async fn at_sim_start(&mut self, _: usize) {
         tokio::select! {
             // Note that this test may change its result, if another call to the RNG
@@ -37,10 +28,9 @@ fn deterministic_branching() {
     // Since the invalid behaviour is indetermistic.,
     // check multiple iterations
     for _ in 0..100 {
-        let mut rt = NetworkApplication::new(());
+        let mut rt = Sim::new(());
+        rt.node("root", Main);
 
-        let module = Main::build_named(ObjectPath::from("root"), &mut rt);
-        rt.register_module(module);
         let rt = Builder::seeded(123).build(rt);
         let v = rt.run();
         assert!(matches!(v, RuntimeResult::EmptySimulation { .. }));

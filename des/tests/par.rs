@@ -2,7 +2,7 @@
 
 use std::io;
 
-use des::net::{Par, par_export};
+use des::net::{par_export, Par};
 use des::prelude::*;
 use serial_test::serial;
 
@@ -27,7 +27,7 @@ const EXAMPLE_NETWORK: &str = "
 #[test]
 #[serial]
 fn non_parse_read() {
-    let rt = NetworkApplication::new(());
+    let rt = Sim::new(());
     let par = &rt.globals().parameters;
 
     par.build(EXAMPLE_NETWORK);
@@ -69,7 +69,7 @@ fn non_parse_read() {
 #[test]
 #[serial]
 fn parse_integers() {
-    let rt = NetworkApplication::new(());
+    let rt = Sim::new(());
     let par = &rt.globals().parameters;
 
     par.build(EXAMPLE_TYPES);
@@ -120,7 +120,7 @@ fn parse_integers() {
 #[test]
 #[serial]
 fn parse_strings() {
-    let rt = NetworkApplication::new(());
+    let rt = Sim::new(());
     let par = &rt.globals().parameters;
     par.build(EXAMPLE_TYPES);
 
@@ -133,16 +133,14 @@ fn parse_strings() {
 #[test]
 #[serial]
 fn par_export_test() -> io::Result<()> {
-    let rt = NetworkApplication::new(());
+    let rt = Sim::new(());
     rt.globals().parameters.build(EXAMPLE_NETWORK);
-
 
     let mut str = Vec::new();
     par_export(&mut str)?;
 
     let str = String::from_utf8_lossy(&str);
     assert_eq!(str, "netA.*.dnsServer = 1.1.1.1\nnetA.s0.ip = 0.0.0.1\nnetA.s1.ipv6 = fe80\nnetA.s1.ip = 0.0.0.1\n");
-
 
     Ok(())
 }

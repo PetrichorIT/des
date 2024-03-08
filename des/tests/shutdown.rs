@@ -7,9 +7,6 @@ use std::sync::{
     Arc,
 };
 
-#[macro_use]
-mod common;
-
 struct DropTest {
     heap: Vec<usize>,
     dropper: &'static AtomicUsize,
@@ -37,15 +34,9 @@ impl Drop for DropTest {
     }
 }
 
-struct StatelessModule {}
-impl_build_named!(StatelessModule);
-
+struct StatelessModule;
 
 impl AsyncModule for StatelessModule {
-    fn new() -> Self {
-        Self {}
-    }
-
     async fn at_sim_start(&mut self, _: usize) {
         tokio::spawn(async {
             let mut drop_test = DropTest::new(&DROPPED_STATELESS_SHUTDOWN);
@@ -71,12 +62,10 @@ fn stateless_module_shudown() {
     DROPPED_STATELESS_SHUTDOWN.store(0, Ordering::SeqCst);
     println!("1");
 
-    let mut rt = NetworkApplication::new(());
+    let mut rt = Sim::new(());
+    rt.node("root", StatelessModule);
+    let gate = rt.gate("root", "in");
 
-    let module = StatelessModule::build_named(ObjectPath::from("RootModule"), &mut rt);
-    let gate = module.create_gate("in");
-
-    rt.register_module(module);
     let mut rt = Builder::seeded(123).build(rt);
     rt.add_message_onto(
         gate,
@@ -84,21 +73,13 @@ fn stateless_module_shudown() {
         SimTime::from_duration(Duration::from_secs(10)),
     );
 
-    println!("2");
     let _ = rt.run().unwrap();
-
-    println!("3");
     assert_eq!(DROPPED_STATELESS_SHUTDOWN.load(Ordering::SeqCst), 1)
 }
 
-struct StatelessModuleRestart {}
-impl_build_named!(StatelessModuleRestart);
+struct StatelessModuleRestart;
 
 impl AsyncModule for StatelessModuleRestart {
-    fn new() -> Self {
-        Self {}
-    }
-
     async fn at_sim_start(&mut self, _: usize) {
         tokio::spawn(async {
             let mut drop_test = DropTest::new(&DROPPED_STATLESS_RESTART);
@@ -125,12 +106,10 @@ static DROPPED_STATLESS_RESTART: AtomicUsize = AtomicUsize::new(0);
 fn stateless_module_restart() {
     DROPPED_STATLESS_RESTART.store(0, Ordering::SeqCst);
 
-    let mut rt = NetworkApplication::new(());
+    let mut rt = Sim::new(());
+    rt.node("root", StatelessModuleRestart);
+    let gate = rt.gate("root", "in");
 
-    let module = StatelessModuleRestart::build_named(ObjectPath::from("RootModule"), &mut rt);
-    let gate = module.create_gate("in");
-
-    rt.register_module(module);
     let mut rt = Builder::seeded(123).build(rt);
     rt.add_message_onto(
         gate.clone(),
@@ -147,17 +126,12 @@ fn stateless_module_restart() {
     assert_eq!(DROPPED_STATLESS_RESTART.load(Ordering::SeqCst), 2)
 }
 
+#[derive(Default)]
 struct StatefullModule {
     state: usize,
 }
-impl_build_named!(StatefullModule);
-
 
 impl AsyncModule for StatefullModule {
-    fn new() -> Self {
-        Self { state: 0 }
-    }
-
     fn reset(&mut self) {
         assert_eq!(self.state, 10);
         self.state = 5;
@@ -194,12 +168,10 @@ static DROPPED_STATFULL_RESTART: AtomicUsize = AtomicUsize::new(0);
 fn statefull_module_restart() {
     DROPPED_STATFULL_RESTART.store(0, Ordering::SeqCst);
 
-    let mut rt = NetworkApplication::new(());
+    let mut rt = Sim::new(());
+    rt.node("root", StatefullModule::default());
+    let gate = rt.gate("root", "in");
 
-    let module = StatefullModule::build_named(ObjectPath::from("RootModule"), &mut rt);
-    let gate = module.create_gate("in");
-
-    rt.register_module(module);
     let mut rt = Builder::seeded(123).build(rt);
     rt.add_message_onto(
         gate.clone(),
@@ -216,14 +188,9 @@ fn statefull_module_restart() {
     assert_eq!(DROPPED_STATFULL_RESTART.load(Ordering::SeqCst), 2);
 }
 
-struct ShutdownViaHandleModule {}
-impl_build_named!(ShutdownViaHandleModule);
+struct ShutdownViaHandleModule;
 
 impl AsyncModule for ShutdownViaHandleModule {
-    fn new() -> Self {
-        Self {}
-    }
-
     async fn at_sim_start(&mut self, _: usize) {
         tokio::spawn(async move {
             let mut drop_test = DropTest::new(&DROPPED_SHUTDOWN_VIA_HANDLE);
@@ -244,24 +211,18 @@ static DROPPED_SHUTDOWN_VIA_HANDLE: AtomicUsize = AtomicUsize::new(0);
 fn shutdown_via_async_handle() {
     DROPPED_SHUTDOWN_VIA_HANDLE.store(0, Ordering::SeqCst);
 
-    let mut rt = NetworkApplication::new(());
+    let mut rt = Sim::new(());
+    rt.node("root", ShutdownViaHandleModule);
 
-    let module = ShutdownViaHandleModule::build_named(ObjectPath::from("RootModule"), &mut rt);
-    rt.register_module(module);
     let rt = Builder::seeded(123).build(rt);
 
     let _ = rt.run().unwrap();
     assert_eq!(DROPPED_SHUTDOWN_VIA_HANDLE.load(Ordering::SeqCst), 1)
 }
 
-struct RestartViaHandleModule {}
-impl_build_named!(RestartViaHandleModule);
+struct RestartViaHandleModule;
 
 impl AsyncModule for RestartViaHandleModule {
-    fn new() -> Self {
-        Self {}
-    }
-
     async fn at_sim_start(&mut self, _: usize) {
         tokio::spawn(async move {
             let mut drop_test = DropTest::new(&DROPPED_RESTART_VIA_HANDLE);
@@ -288,10 +249,9 @@ static DROPPED_RESTART_VIA_HANDLE: AtomicUsize = AtomicUsize::new(0);
 fn restart_via_async_handle() {
     DROPPED_RESTART_VIA_HANDLE.store(0, Ordering::SeqCst);
 
-    let mut rt = NetworkApplication::new(());
+    let mut rt = Sim::new(());
+    rt.node("root", RestartViaHandleModule);
 
-    let module = RestartViaHandleModule::build_named(ObjectPath::from("RootModule"), &mut rt);
-    rt.register_module(module);
     let rt = Builder::seeded(123).build(rt);
 
     let _ = rt.run().unwrap();
@@ -313,20 +273,13 @@ impl Drop for CountDropsMessage {
     }
 }
 
+#[derive(Default)]
 struct WillIgnoreInncomingInDowntime {
     received: Arc<AtomicUsize>,
     drops: Arc<AtomicUsize>,
 }
-impl_build_named!(WillIgnoreInncomingInDowntime);
 
 impl Module for WillIgnoreInncomingInDowntime {
-    fn new() -> Self {
-        Self {
-            received: Arc::new(AtomicUsize::new(0)),
-            drops: Arc::new(AtomicUsize::new(0)),
-        }
-    }
-
     fn at_sim_start(&mut self, _stage: usize) {
         if SimTime::now().as_secs() == 0 {
             // schedule events for seconds 1..=10
@@ -363,32 +316,22 @@ impl Module for WillIgnoreInncomingInDowntime {
 #[test]
 #[serial]
 fn shutdown_will_ignore_incoming() {
-    let mut rt = NetworkApplication::new(());
+    let mut rt = Sim::new(());
+    rt.node("root", WillIgnoreInncomingInDowntime::default());
 
-    let module =
-        WillIgnoreInncomingInDowntime::build_named(ObjectPath::from("RootModule"), &mut rt);
-    rt.register_module(module);
     let rt = Builder::seeded(123).build(rt);
 
     let _ = rt.run().unwrap();
 }
 
+#[derive(Default)]
 struct EndNode {
     sent: usize,
     recv: usize,
     drops: Arc<AtomicUsize>,
 }
-impl_build_named!(EndNode);
 
 impl Module for EndNode {
-    fn new() -> Self {
-        Self {
-            sent: 0,
-            recv: 0,
-            drops: Arc::new(AtomicUsize::new(0)),
-        }
-    }
-
     fn at_sim_start(&mut self, _: usize) {
         schedule_in(Message::new().kind(1).build(), Duration::from_secs(1));
     }
@@ -431,13 +374,8 @@ impl Module for EndNode {
 }
 
 struct Transit;
-impl_build_named!(Transit);
 
 impl Module for Transit {
-    fn new() -> Self {
-        Self
-    }
-
     fn at_sim_start(&mut self, _stage: usize) {
         if SimTime::now() == SimTime::ZERO {
             schedule_in(Message::new().build(), Duration::from_secs_f64(5.5));
@@ -454,22 +392,17 @@ impl Module for Transit {
 #[serial]
 fn shutdown_will_drop_transiting() {
     // Logger::new().set_logger();
-    let mut app = NetworkApplication::new(());
+    let mut app = Sim::new(());
+    app.node("ping", EndNode::default());
+    app.node("pong", EndNode::default());
+    app.node("transit", Transit);
 
-    let ping = EndNode::build_named(ObjectPath::from("ping"), &mut app);
-    let pong = EndNode::build_named(ObjectPath::from("pong"), &mut app);
-    let transit = Transit::build_named(ObjectPath::from("transit"), &mut app);
+    let ping = app.gate("ping", "port");
+    let pong = app.gate("pong", "port");
+    let con = app.gate("transit", "connector");
 
-    let ping_gate = ping.create_gate("port");
-    let transit_gate = transit.create_gate("connector");
-    let pong_gate = pong.create_gate("port");
-
-    ping_gate.connect(transit_gate.clone(), None);
-    transit_gate.connect(pong_gate, None);
-
-    app.register_module(ping);
-    app.register_module(pong);
-    app.register_module(transit);
+    ping.connect(con.clone(), None);
+    con.connect(pong, None);
 
     let rt = Builder::seeded(123).max_itr(500).build(app);
     let _ = rt.run().unwrap();
@@ -479,39 +412,40 @@ fn shutdown_will_drop_transiting() {
 #[serial]
 fn shutdown_will_drop_transiting_delayed_channels() {
     // Logger::new().set_logger();
-    let mut app = NetworkApplication::new(());
+    let mut app = Sim::new(());
 
-    let ping = EndNode::build_named(ObjectPath::from("ping"), &mut app);
-    let pong = EndNode::build_named(ObjectPath::from("pong"), &mut app);
-    let transit = Transit::build_named(ObjectPath::from("transit"), &mut app);
+    app.node("ping", EndNode::default());
+    app.node("pong", EndNode::default());
+    app.node("transit", Transit);
 
-    let ping_gate = ping.create_gate("port");
-    let transit_gate = transit.create_gate("connector");
-    let pong_gate = pong.create_gate("port");
+    let ping = app.gate("ping", "port");
+    let pong = app.gate("pong", "port");
+    let con = app.gate("transit", "connector");
 
-
-    ping_gate.connect(transit_gate.clone(), Some(Channel::new(
-        ping.path().appended_channel("chan"),
-        ChannelMetrics {
-            bitrate: 100_000,
-            latency: Duration::from_secs_f64(0.004),
-            jitter: Duration::ZERO,
-            drop_behaviour: ChannelDropBehaviour::default(),
-        },
-    )));
-    transit_gate.connect(pong_gate, Some(Channel::new(
-        ping.path().appended_channel("chan"),
-        ChannelMetrics {
-            bitrate: 100_000,
-            latency: Duration::from_secs_f64(0.004),
-            jitter: Duration::ZERO,
-            drop_behaviour: ChannelDropBehaviour::default(),
-        },
-    )));
-
-    app.register_module(ping);
-    app.register_module(pong);
-    app.register_module(transit);
+    ping.connect(
+        con.clone(),
+        Some(Channel::new(
+            ObjectPath::new(),
+            ChannelMetrics {
+                bitrate: 100_000,
+                latency: Duration::from_secs_f64(0.004),
+                jitter: Duration::ZERO,
+                drop_behaviour: ChannelDropBehaviour::default(),
+            },
+        )),
+    );
+    con.connect(
+        pong,
+        Some(Channel::new(
+            ObjectPath::new(),
+            ChannelMetrics {
+                bitrate: 100_000,
+                latency: Duration::from_secs_f64(0.004),
+                jitter: Duration::ZERO,
+                drop_behaviour: ChannelDropBehaviour::default(),
+            },
+        )),
+    );
 
     let rt = Builder::seeded(123).max_itr(500).build(app);
     let _ = rt.run().unwrap();

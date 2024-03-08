@@ -38,7 +38,7 @@ fn create_runtime_and_wait(
     barrier.wait();
 
     // Create runtime
-    let app = NetworkApplication::new(());
+    let app = Sim::new(());
 
     let rt = Builder::new().build(app);
     let prev = active.fetch_add(1, SeqCst);

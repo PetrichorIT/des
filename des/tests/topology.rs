@@ -3,12 +3,12 @@ use des::{prelude::*, registry};
 
 macro_rules! module {
     ($($i:ident),*) => {
-        $(struct $i;
-        impl Module for $i {
-            fn new() -> Self {
-                Self
-            }
-        })*
+        $(
+            #[derive(Default)]
+            struct $i;
+
+            impl Module for $i {}
+        )*
     };
 }
 
@@ -16,13 +16,13 @@ module!(Node, Debugger, Router, Main);
 
 #[test]
 fn topology_load() {
-    let app = NdlApplication::new(
+    let app = Sim::ndl(
         "tests/ndl/small_network/main.ndl",
         registry![Node, Debugger, Router, Main],
     )
     .map_err(|e| println!("{e}"))
     .unwrap();
-    let rt = Builder::new().build(NetworkApplication::new(app));
+    let rt = Builder::new().build(app);
     let app = rt.run().into_app();
     let mut topo = app.globals().topology.lock().unwrap().clone();
 
@@ -32,7 +32,7 @@ fn topology_load() {
     assert_eq!(topo.nodes().len(), 7);
     assert_eq!(topo.nodes().into_iter().filter(|n| n.alive).count(), 6);
 
-    let i= topo
+    let i = topo
         .nodes()
         .into_iter()
         .position(|n| n.module.name() == "router")

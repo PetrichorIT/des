@@ -1,4 +1,4 @@
-use des::{net::AsyncBuilder, runtime::Builder, tracing::format};
+use des::{net::{Sim, AsyncFn}, runtime::Builder, tracing::format};
 use tracing::{level_filters::LevelFilter, subscriber::with_default, Instrument, span, Level};
 
 mod mock {
@@ -62,6 +62,9 @@ fn test_mock_output() {
         .finish();
 
     with_default(subscriber, || {
+        let sim = Sim::new(());
+        let _ = Builder::seeded(123).build(sim).run();
+
         tracing::info!(GENERAL = "Kenobi", "Hello there");
         assert_eq!(
             writer.content(),
@@ -82,18 +85,17 @@ fn scope_regognition() {
         .finish();
 
     with_default(subscriber, || {
-        let mut sim = AsyncBuilder::new();
-        sim.node("a", |_| async {
+        let mut sim = Sim::new(());
+        sim.node("a", AsyncFn::new(|_| async {
             tracing::info!("node(a) says(1) at(0s)");
             tracing::error!("node(a) says(2) at(0s)");
-            Ok(())
-        });
-        sim.node_with_parent("b", "a", |_| async {
-            tracing::trace!("node(b) says(1) at(0s)");
-            Ok(())
-        });
 
-        let _ = Builder::seeded(123).build(sim.build()).run();
+        }));
+        sim.node("a.b", AsyncFn::new(|_| async {
+            tracing::trace!("node(b) says(1) at(0s)");
+        }));
+
+        let _ = Builder::seeded(123).build(sim).run();
         assert_eq!(
             writer.content(), 
             "[ 0ns ] INFO a tracing: node(a) says(1) at(0s)\n[ 0ns ] ERROR a tracing: node(a) says(2) at(0s)\n[ 0ns ] TRACE a.b tracing: node(b) says(1) at(0s)\n"
@@ -113,19 +115,18 @@ fn time_regognition() {
         .finish();
 
     with_default(subscriber, || {
-        let mut sim = AsyncBuilder::new();
-        sim.node("a", |_| async {
+        let mut sim = Sim::new(());
+        sim.node("a", AsyncFn::new(|_| async {
             tracing::info!("node(a) says(1) at(0s)");
             des::time::sleep(std::time::Duration::from_secs(5)).await;
             tracing::error!("node(a) says(2) at(5s)");
-            Ok(())
-        });
-        sim.node_with_parent("b", "a", |_| async {
-            tracing::trace!("node(b) says(1) at(0s)");
-            Ok(())
-        });
 
-        let _ = Builder::seeded(123).build(sim.build()).run();
+        }));
+        sim.node("a.b", AsyncFn::new(|_| async {
+            tracing::trace!("node(b) says(1) at(0s)");
+        }));
+
+        let _ = Builder::seeded(123).build(sim).run();
         assert_eq!(
             writer.content(), 
             "[ 0ns ] INFO a tracing: node(a) says(1) at(0s)\n[ 0ns ] TRACE a.b tracing: node(b) says(1) at(0s)\n[ 5s ] ERROR a tracing: node(a) says(2) at(5s)\n"
@@ -145,17 +146,15 @@ fn span_regognition() {
         .finish();
 
     with_default(subscriber, || {
-        let mut sim = AsyncBuilder::new();
-        sim.node("a", |_| async {
+        let mut sim = Sim::new(());
+        sim.node("a", AsyncFn::new(|_| async {
             tracing::info!("node(a) says(1) at(0s)");
-            Ok(())
-        }.instrument(span!(Level::DEBUG, "my-span", key=123)));
-        sim.node_with_parent("b", "a", |_| async {
+        }.instrument(span!(Level::DEBUG, "my-span", key=123))));
+        sim.node("a.b", AsyncFn::new(|_| async {
             tracing::trace!("node(b) says(1) at(0s)");
-            Ok(())
-        });
+        }));
 
-        let _ = Builder::seeded(123).build(sim.build()).run();
+        let _ = Builder::seeded(123).build(sim).run();
         assert_eq!(
             writer.content(), 
             "[ 0ns ] INFO a my-span{key=123}: tracing: node(a) says(1) at(0s)\n[ 0ns ] TRACE a.b tracing: node(b) says(1) at(0s)\n"
@@ -180,17 +179,15 @@ fn multi_span_regognition() {
         .finish();
 
     with_default(subscriber, || {
-        let mut sim = AsyncBuilder::new();
-        sim.node("a", |_| async {
+        let mut sim = Sim::new(());
+        sim.node("a", AsyncFn::new(|_| async {
             say_hello().await;
-            Ok(())
-        }.instrument(span!(Level::DEBUG, "my-span", key=123)));
-        sim.node_with_parent("b", "a", |_| async {
+        }.instrument(span!(Level::DEBUG, "my-span", key=123))));
+        sim.node("a.b", AsyncFn::new(|_| async {
             tracing::trace!("node(b) says(1) at(0s)");
-            Ok(())
-        });
+        }));
 
-        let _ = Builder::seeded(123).build(sim.build()).run();
+        let _ = Builder::seeded(123).build(sim).run();
         assert_eq!(
             writer.content(), 
             "[ 0ns ] INFO a my-span{key=123}:say_hello: tracing: hello\n[ 0ns ] TRACE a.b tracing: node(b) says(1) at(0s)\n"

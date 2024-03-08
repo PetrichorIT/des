@@ -6,9 +6,6 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
 
-#[macro_use]
-mod common;
-
 mod lcommon {
     use des::net::processing::*;
     use des::prelude::*;
@@ -36,18 +33,12 @@ mod lcommon {
     }
 }
 
+#[derive(Default)]
 struct PluginCreation {
     sum: usize,
 }
-impl_build_named!(PluginCreation);
-
 impl Module for PluginCreation {
-    fn new() -> Self {
-        Self {
-            sum: 0,
-        }
-    }
-    fn stack(&self) -> impl ProcessingElement + 'static  {
+    fn stack(&self) -> impl ProcessingElement + 'static {
         lcommon::IncrementIncomingId
     }
 
@@ -61,7 +52,7 @@ impl Module for PluginCreation {
     }
 
     fn handle_message(&mut self, msg: Message) {
-        assert_eq!(SimTime::now().as_secs() + 1 , msg.header().id as u64);
+        assert_eq!(SimTime::now().as_secs() + 1, msg.header().id as u64);
         self.sum += msg.header().id as usize;
     }
 
@@ -75,10 +66,8 @@ impl Module for PluginCreation {
 fn plugin_raw_creation() {
     // Logger::new().set_logger();
 
-    let mut app = NetworkApplication::new(());
-
-    let root = PluginCreation::build_named(ObjectPath::from("root"), &mut app);
-    app.register_module(root);
+    let mut app = Sim::new(());
+    app.node("root", PluginCreation::default());
 
     let rt = Builder::seeded(123).build(app);
     let result = rt.run().unwrap();
@@ -86,8 +75,6 @@ fn plugin_raw_creation() {
     assert_eq!(result.1, SimTime::from_duration(Duration::from_secs(99)));
     assert_eq!(result.2.event_count, 100);
 }
-
-
 
 struct ActivitySensor {
     pub expected: usize,
@@ -105,17 +92,11 @@ impl ProcessingElement for ActivitySensor {
     }
 }
 
+#[derive(Default)]
 struct PluginPriorityDefer {
     arc: Arc<AtomicUsize>,
 }
-impl_build_named!(PluginPriorityDefer);
 impl Module for PluginPriorityDefer {
-    fn new() -> Self {
-        Self {
-            arc: Arc::new(AtomicUsize::new(0)),
-        }
-    }
-
     fn stack(&self) -> impl IntoProcessingElements {
         (
             ActivitySensor {
@@ -129,7 +110,7 @@ impl Module for PluginPriorityDefer {
             ActivitySensor {
                 shared: self.arc.clone(),
                 expected: 2,
-            }
+            },
         )
     }
 
@@ -147,10 +128,8 @@ impl Module for PluginPriorityDefer {
 fn plugin_priority_defer() {
     // Logger::new().set_logger();
 
-    let mut app = NetworkApplication::new(());
-
-    let module = PluginPriorityDefer::build_named(ObjectPath::from("root"), &mut app);
-    app.register_module(module);
+    let mut app = Sim::new(());
+    app.node("root", PluginPriorityDefer::default());
 
     let rt = Builder::seeded(123).build(app);
     let result = rt.run();
@@ -179,21 +158,16 @@ impl Drop for IncrementArcPlugin {
     }
 }
 
+#[derive(Default)]
 struct PluginAtShutdown {
     arc: Arc<AtomicUsize>,
 }
-impl_build_named!(PluginAtShutdown);
 impl Module for PluginAtShutdown {
-    fn new() -> Self {
-        Self {
-            arc: Arc::new(AtomicUsize::new(0)),
+    fn stack(&self) -> impl IntoProcessingElements {
+        IncrementArcPlugin {
+            arc: self.arc.clone(),
         }
     }
-
-    fn stack(&self) -> impl IntoProcessingElements {
-        IncrementArcPlugin { arc: self.arc.clone() }
-    }
-
 
     fn at_sim_start(&mut self, _stage: usize) {
         if SimTime::now().as_secs() == 0 {
@@ -226,12 +200,10 @@ fn plugin_shutdown_non_persistent_data() {
     //     .interal_max_log_level(log::LevelFilter::Trace)
     //     .set_logger();
 
-    let mut rt = NetworkApplication::new(());
+    let mut app = Sim::new(());
+    app.node("root", PluginAtShutdown::default());
 
-    let module = PluginAtShutdown::build_named(ObjectPath::from("root".to_string()), &mut rt);
-    rt.register_module(module);
-
-    let rt = Builder::seeded(123).build(rt);
+    let rt = Builder::seeded(123).build(app);
 
     let res = rt.run();
     let _res = res.unwrap();

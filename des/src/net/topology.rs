@@ -1,3 +1,5 @@
+use std::collections::hash_map::Values;
+
 use fxhash::{FxBuildHasher, FxHashMap};
 
 use crate::{net::module::ModuleRef, prelude::GateRef};
@@ -54,7 +56,7 @@ impl Topology {
     /// Gets the current topology.
     ///
     /// # Panics
-    /// 
+    ///
     /// Panics when called from outside a module context,
     /// or when globals dont exist.
     #[must_use]
@@ -95,8 +97,8 @@ impl Topology {
     /// the topology from the ground up using the `ModuleRef` stored in the
     /// node information.
     #[allow(clippy::missing_panics_doc)]
-    pub fn build(&mut self, modules: &[ModuleRef]) {
-        for module in modules {
+    pub fn build<'a>(&mut self, modules: Values<'_, ObjectPath, ModuleRef>) {
+        for module in modules.clone() {
             self.nodes.push(TopoNode {
                 module: module.clone(),
                 degree: 0,
@@ -266,9 +268,9 @@ impl Topology {
     }
 
     /// Generates a disjktra tree
-    /// 
-    /// # Panics 
-    /// 
+    ///
+    /// # Panics
+    ///
     /// Panics when the specified nodes does not exist.
     #[allow(clippy::needless_pass_by_value)]
     #[must_use]

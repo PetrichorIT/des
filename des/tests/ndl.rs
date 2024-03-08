@@ -1,18 +1,16 @@
 #![cfg(feature = "ndl")]
 
-use des::{ndl::NdlApplication, prelude::*, registry};
+use des::{prelude::*, registry};
 use des_ndl::error::RootResult;
 
 mod common {
-    use des::{prelude::*, net::module::current};
+    use des::{net::module::current, prelude::*};
 
+    #[derive(Default)]
     pub struct Main;
-    impl Module for Main {
-        fn new() -> Self {
-            Self
-        }
-    }
+    impl Module for Main {}
 
+    #[derive(Default)]
     pub struct Node {
         dst: usize,
         rem: usize,
@@ -20,15 +18,6 @@ mod common {
         rcv: usize,
     }
     impl Module for Node {
-        fn new() -> Self {
-            Self {
-                dst: 0,
-                rem: 0,
-                delay: Duration::new(0, 0),
-                rcv: 0,
-            }
-        }
-
         fn at_sim_start(&mut self, _stage: usize) {
             self.dst = par("dst")
                 .as_option()
@@ -93,19 +82,13 @@ mod common {
         }
     }
 
+    #[derive(Default)]
     pub struct Debugger;
-    impl Module for Debugger {
-        fn new() -> Self {
-            Self
-        }
-    }
+    impl Module for Debugger {}
 
+    #[derive(Default)]
     pub struct Router;
     impl Module for Router {
-        fn new() -> Self {
-            Self
-        }
-
         fn handle_message(&mut self, msg: Message) {
             let g = current().gate("out", msg.header().id as usize).unwrap();
             send(msg, g);
@@ -120,12 +103,12 @@ use serial_test::serial;
 fn small_network() -> RootResult<()> {
     // Logger::new().set_logger();
 
-    let ndl = NdlApplication::new(
+    let mut app = Sim::ndl(
         "tests/ndl/small_network/main.ndl",
         registry![Main, Node, Router, Debugger],
     )?;
-    let mut app = NetworkApplication::new(ndl);
-    app.include_par_file("tests/ndl/small_network/main.par");
+    app.include_par_file("tests/ndl/small_network/main.par")
+        .unwrap();
 
     let r = Builder::seeded(123)
         .max_time(1000.0.into())
@@ -142,12 +125,12 @@ fn small_network() -> RootResult<()> {
 fn ring_topology() -> RootResult<()> {
     // Logger::new().set_logger();
 
-    let ndl = NdlApplication::new(
+    let mut app = Sim::ndl(
         "tests/ndl/ring_topo/main.ndl",
         registry![Main, Node, Router, Debugger],
     )?;
-    let mut app = NetworkApplication::new(ndl);
-    app.include_par_file("tests/ndl/ring_topo/main.par");
+    app.include_par_file("tests/ndl/ring_topo/main.par")
+        .unwrap();
 
     let r = Builder::seeded(123)
         .max_time(1000.0.into())

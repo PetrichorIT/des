@@ -6,16 +6,10 @@ use members::*;
 #[derive(Debug, Default)]
 struct A;
 
-impl Module for A {
-    fn new() -> Self {
-        Self
-    }
-}
+impl Module for A {}
 
 fn main() {
-    let app = NetworkApplication::new(
-        NdlApplication::new("examples/ndl/main.ndl", registry![A, Alice, Bob]).unwrap(),
-    );
+    let app = Sim::ndl("examples/ndl/main.ndl", registry![A, Alice, Bob]).unwrap();
 
     let rt = Builder::seeded(0x123).build(app);
 

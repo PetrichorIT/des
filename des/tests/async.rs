@@ -1,11 +1,11 @@
 #![cfg(feature = "async")]
 #![allow(unused_variables)]
 
+use des::{prelude::*, time::sleep};
 use std::sync::{
     atomic::{AtomicBool, AtomicUsize},
     Arc,
 };
-use des::{prelude::*, time::sleep};
 use tokio::{
     sync::{
         mpsc::{channel, Sender},
@@ -16,23 +16,16 @@ use tokio::{
 
 use serial_test::serial;
 
-#[macro_use]
-mod common;
-
 // # Test case
 // The module behaves like a sync module, not creating any more
 // futures than the async call itself.
 
+#[derive(Default)]
 struct QuasaiSyncModule {
     counter: usize,
 }
-impl_build_named!(QuasaiSyncModule);
 
 impl AsyncModule for QuasaiSyncModule {
-    fn new() -> Self {
-        Self { counter: 0 }
-    }
-
     async fn handle_message(&mut self, msg: Message) {
         println!("[{}] Received msg: {}", current().name(), msg.header().id);
         self.counter += msg.header().id as usize;
@@ -42,18 +35,12 @@ impl AsyncModule for QuasaiSyncModule {
 #[test]
 #[serial]
 fn quasai_sync_non_blocking() {
-    let mut rt = NetworkApplication::new(());
+    let mut rt = Sim::new(());
+    rt.node("root", QuasaiSyncModule::default());
+    rt.node("other", QuasaiSyncModule::default());
 
-    let module = QuasaiSyncModule::build_named(ObjectPath::from("RootModule".to_string()), &mut rt);
-
-    let gate_a = module.create_gate("in");
-    rt.register_module(module);
-
-    let module_b =
-        QuasaiSyncModule::build_named(ObjectPath::from("OtherRootModule".to_string()), &mut rt);
-
-    let gate_b = module_b.create_gate("in");
-    rt.register_module(module_b);
+    let gate_a = rt.gate("root", "a");
+    let gate_b = rt.gate("other", "b");
 
     let mut rt = Builder::seeded(123).build(rt);
 
@@ -84,22 +71,14 @@ fn quasai_sync_non_blocking() {
 // tracker
 // The tasks shutdown with a shutdown message
 
+#[derive(Default)]
 struct MutipleTasksModule {
     handles: Vec<JoinHandle<()>>,
     sender: Option<Sender<Message>>,
     result: Arc<AtomicUsize>,
 }
-impl_build_named!(MutipleTasksModule);
 
 impl AsyncModule for MutipleTasksModule {
-    fn new() -> Self {
-        Self {
-            handles: Vec::new(),
-            sender: None,
-            result: Arc::new(AtomicUsize::new(0)),
-        }
-    }
-
     async fn at_sim_start(&mut self, _: usize) {
         let (txa, mut rxa) = channel::<Message>(8);
         let (txb, mut rxb) = channel(8);
@@ -172,13 +151,10 @@ impl AsyncModule for MutipleTasksModule {
 #[test]
 #[serial]
 fn mutiple_active_tasks() {
-    let mut rt = NetworkApplication::new(());
+    let mut rt = Sim::new(());
+    rt.node("root", MutipleTasksModule::default());
 
-    let module_a =
-        MutipleTasksModule::build_named(ObjectPath::from("RootModule".to_string()), &mut rt);
-
-    let gate_a = module_a.create_gate("in");
-    rt.register_module(module_a);
+    let gate_a = rt.gate("root", "in");
 
     let mut rt = Builder::seeded(123).build(rt);
 
@@ -213,20 +189,20 @@ fn mutiple_active_tasks() {
 // A module sleeps upon receiving a message,
 // This sleeps do NOT interfere with recv()
 
+#[derive(Default)]
 struct TimeSleepModule {
     counter: usize,
 }
-impl_build_named!(TimeSleepModule);
 
 impl AsyncModule for TimeSleepModule {
-    fn new() -> Self {
-        Self { counter: 0 }
-    }
-
     async fn handle_message(&mut self, msg: Message) {
         tracing::debug!("recv msg: {}", msg.str());
         let wait_time = msg.header().kind as u64;
-        tracing::info!("<{}> [{}] Waiting for timer", current().name(), SimTime::now());
+        tracing::info!(
+            "<{}> [{}] Waiting for timer",
+            current().name(),
+            SimTime::now()
+        );
         sleep(Duration::from_secs(wait_time)).await;
         tracing::info!(
             "<{}> [{}] Done waiting for id: {}",
@@ -245,13 +221,10 @@ fn one_module_timers() {
     //     .interal_max_log_level(log::LevelFilter::Trace)
     //     .set_logger();
 
-    let mut rt = NetworkApplication::new(());
+    let mut rt = Sim::new(());
+    rt.node("root", TimeSleepModule::default());
 
-    let module_a =
-        TimeSleepModule::build_named(ObjectPath::from("RootModule".to_string()), &mut rt);
-
-    let gate_a = module_a.create_gate("in");
-    rt.register_module(module_a);
+    let gate_a = rt.gate("root", "a");
 
     let mut rt = Builder::seeded(123).build(rt);
 
@@ -287,13 +260,10 @@ fn one_module_timers() {
 #[test]
 #[serial]
 fn one_module_delayed_recv() {
-    let mut rt = NetworkApplication::new(());
+    let mut rt = Sim::new(());
+    rt.node("root", TimeSleepModule::default());
 
-    let module_a =
-        TimeSleepModule::build_named(ObjectPath::from("RootModule".to_string()), &mut rt);
-
-    let gate_a = module_a.create_gate("in");
-    rt.register_module(module_a);
+    let gate_a = rt.gate("root", "in");
 
     let mut rt = Builder::seeded(123).build(rt);
 
@@ -343,17 +313,12 @@ fn one_module_delayed_recv() {
 #[test]
 #[serial]
 fn mutiple_module_delayed_recv() {
-    let mut rt = NetworkApplication::new(());
+    let mut rt = Sim::new(());
+    rt.node("a", TimeSleepModule::default());
+    rt.node("b", TimeSleepModule::default());
 
-    let module_a =
-        TimeSleepModule::build_named(ObjectPath::from("RootModule".to_string()), &mut rt);
-    let gate_a = module_a.create_gate("in");
-    rt.register_module(module_a);
-
-    let module_b =
-        TimeSleepModule::build_named(ObjectPath::from("OtherRootModule".to_string()), &mut rt);
-    let gate_b = module_b.create_gate("in");
-    rt.register_module(module_b);
+    let gate_a = rt.gate("a", "in");
+    let gate_b = rt.gate("b", "in");
 
     let mut rt = Builder::seeded(123).build(rt);
 
@@ -423,17 +388,18 @@ struct SemaphoreModule {
     handle: Option<JoinHandle<()>>,
     result: Arc<AtomicBool>,
 }
-impl_build_named!(SemaphoreModule);
 
-impl AsyncModule for SemaphoreModule {
-    fn new() -> Self {
+impl Default for SemaphoreModule {
+    fn default() -> Self {
         Self {
             semaphore: Arc::new(Semaphore::new(0)),
             handle: None,
             result: Arc::new(AtomicBool::new(false)),
         }
     }
+}
 
+impl AsyncModule for SemaphoreModule {
     async fn at_sim_start(&mut self, _: usize) {
         let sem = self.semaphore.clone();
         let res = self.result.clone();
@@ -453,17 +419,12 @@ impl AsyncModule for SemaphoreModule {
 #[test]
 #[serial]
 fn semaphore_in_waiting_task() {
-    let mut rt = NetworkApplication::new(());
+    let mut rt = Sim::new(());
+    rt.node("a", SemaphoreModule::default());
+    rt.node("b", SemaphoreModule::default());
 
-    let module_a =
-        SemaphoreModule::build_named(ObjectPath::from("RootModule".to_string()), &mut rt);
-    let gate_a = module_a.create_gate("in");
-    rt.register_module(module_a);
-
-    let module_b =
-        SemaphoreModule::build_named(ObjectPath::from("OtherRootModule".to_string()), &mut rt);
-    let gate_b = module_b.create_gate("in");
-    rt.register_module(module_b);
+    let gate_a = rt.gate("a", "in");
+    let gate_b = rt.gate("b", "in");
 
     let mut rt = Builder::seeded(123).build(rt);
 

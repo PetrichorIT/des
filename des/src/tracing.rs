@@ -66,9 +66,9 @@ pub fn leave_scope() {
 pub const FALLBACK_LOG_LEVEL: Level = Level::TRACE;
 
 /// Create a new tracing subscriber with a sim formatter.
-/// 
+///
 /// # Panics
-/// 
+///
 /// Panics when subscriber initilization fails.
 pub fn init() {
     let subscriber = tracing_subscriber::fmt();

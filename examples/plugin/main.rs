@@ -7,13 +7,10 @@ use des::{
     registry,
 };
 
+#[derive(Default)]
 struct A {}
 
 impl Module for A {
-    fn new() -> Self {
-        Self {}
-    }
-
     fn at_sim_start(&mut self, _stage: usize) {
         send(Message::new().content(42).build(), "out");
         send(Message::new().content(69).build(), "out");
@@ -44,6 +41,7 @@ impl Drop for PacketCounter {
     }
 }
 
+#[derive(Default)]
 struct B {}
 
 impl Module for B {
@@ -54,21 +52,14 @@ impl Module for B {
         PacketCounter::default()
     }
 
-    fn new() -> Self {
-        Self {}
-    }
-
     fn handle_message(&mut self, msg: Message) {
         send(msg, "out")
     }
 }
 
+#[derive(Default)]
 struct Main;
-impl Module for Main {
-    fn new() -> Self {
-        Self
-    }
-}
+impl Module for Main {}
 
 fn empty(_: &ModuleContext) {}
 
@@ -84,8 +75,7 @@ fn main() {
 
     set_setup_fn(empty);
 
-    let app = NdlApplication::new("examples/plugin/main.ndl", registry![A, B, Main]).unwrap();
-    let app = NetworkApplication::new(app);
+    let app = Sim::ndl("examples/plugin/main.ndl", registry![A, B, Main]).unwrap();
     let rt = Builder::new().build(app);
     let _res = rt.run();
 }

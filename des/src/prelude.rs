@@ -36,8 +36,9 @@ cfg_net! {
 
     pub use crate::net::message::{send, send_in, send_at, schedule_in, schedule_at};
 
-    pub use crate::net::NetworkApplication;
-    pub use crate::net::NetworkApplicationGlobals;
+    pub use crate::net::Sim;
+    pub use crate::net::ScopedSim;
+    pub use crate::net::Globals;
 
     pub use crate::net::channel::Channel;
     pub use crate::net::channel::ChannelMetrics;
@@ -67,8 +68,8 @@ cfg_net! {
     pub use crate::net::processing::ProcessingElement;
 
     cfg_ndl! {
-        pub use crate::ndl::NdlApplication;
         pub use crate::ndl::Registry;
+        pub use crate::ndl::RegistryCreatable;
     }
 
     cfg_async! {

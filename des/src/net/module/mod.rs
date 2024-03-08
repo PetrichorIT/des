@@ -24,8 +24,7 @@ mod meta;
 #[cfg(test)]
 mod tests;
 
-
-use super::processing::{BaseLoader, ProcessingElements, IntoProcessingElements};
+use super::processing::{BaseLoader, IntoProcessingElements, ProcessingElements};
 
 cfg_async! {
     mod ext;
@@ -46,11 +45,6 @@ guid!(
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub trait Module: Any {
-    /// Creates a new instance of Self.
-    fn new() -> Self
-    where
-        Self: Sized;
-
     /// Resets the custom state when a module is restarted.
     fn reset(&mut self) {
         #[cfg(feature = "tracing")]
@@ -58,7 +52,10 @@ pub trait Module: Any {
     }
 
     /// Defines the required stack.
-    fn stack(&self) -> impl IntoProcessingElements where Self: Sized {
+    fn stack(&self) -> impl IntoProcessingElements
+    where
+        Self: Sized,
+    {
         BaseLoader
     }
 
@@ -85,7 +82,6 @@ pub trait Module: Any {
     /// };
     ///
     /// impl Module for MyModule {
-    /// # fn new() -> Self { todo!() }
     ///     /* ... */    
     ///
     ///     fn handle_message(&mut self, msg: Message) {
@@ -117,7 +113,6 @@ pub trait Module: Any {
     /// };
     ///
     /// impl Module for SomeModule {
-    /// # fn new() -> Self { todo!() }
     ///     /* ... */
     ///     
     ///     fn at_sim_start(&mut self, _stage: usize) {
@@ -168,4 +163,3 @@ pub trait Module: Any {
         false
     }
 }
-

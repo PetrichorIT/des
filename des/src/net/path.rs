@@ -91,6 +91,16 @@ impl ObjectPath {
         Some(parent)
     }
 
+    /// Returns a parent that is not root.
+    pub fn nonzero_parent(&self) -> Option<ObjectPath> {
+        let parent = self.parent()?;
+        if parent.is_root() {
+            None
+        } else {
+            Some(parent)
+        }
+    }
+
     /// Creates a new object path pointing to the root.
     #[must_use]
     pub fn new() -> ObjectPath {
@@ -115,13 +125,15 @@ impl ObjectPath {
             "Cannot append to a path that points to a channel"
         );
         let module = module.as_ref();
-        if self.len != 0 {
-            self.last_element_offset = self.data.len() + 1;
-            self.data.push('.');
-        }
+        if module != "" {
+            if self.len != 0 {
+                self.last_element_offset = self.data.len() + 1;
+                self.data.push('.');
+            }
 
-        self.data.push_str(module);
-        self.len += 1;
+            self.data.push_str(module);
+            self.len += 1;
+        }
     }
 
     /// Append a channel leaf to the path.
@@ -210,6 +222,12 @@ impl FromStr for ObjectPath {
 impl From<&str> for ObjectPath {
     fn from(value: &str) -> Self {
         Self::from_str(value).unwrap()
+    }
+}
+
+impl From<&String> for ObjectPath {
+    fn from(value: &String) -> Self {
+        Self::from_str(value.as_str()).unwrap()
     }
 }
 

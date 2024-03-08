@@ -743,10 +743,10 @@ impl<A> RuntimeResult<A> {
 }
 
 cfg_net! {
-    use crate::net::{gate::{GateRef, Connection},  HandleMessageEvent, message::Message, MessageExitingConnection, module::ModuleRef, NetEvents, NetworkApplication};
+    use crate::net::{gate::{GateRef, Connection},  HandleMessageEvent, message::Message, MessageExitingConnection, module::ModuleRef, NetEvents, Sim};
 
-    impl<A> Runtime<NetworkApplication<A>> where
-        A: EventLifecycle<NetworkApplication<A>>,{
+    impl<A> Runtime<Sim<A>> where
+        A: EventLifecycle<Sim<A>>,{
         ///
         /// Adds a message event into a [`Runtime<NetworkApplication<A>>`] onto a gate.
         ///

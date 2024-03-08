@@ -1,12 +1,16 @@
-use super::module::ModuleRef;
 use super::par::ParMap;
 use super::Topology;
-use crate::net::ObjectPath;
-use crate::runtime::{Application, EventLifecycle, Runtime};
-use crate::tracing::{enter_scope, leave_scope};
-use std::fmt::{Debug, Display};
-use std::marker::PhantomData;
-use std::sync::{Arc, Mutex};
+use crate::{
+    net::module::ModuleContext,
+    prelude::{Application, EventLifecycle, GateRef, Module, ModuleRef, ObjectPath},
+    tracing::{enter_scope, leave_scope},
+};
+use fxhash::{FxBuildHasher, FxHashMap};
+use std::{
+    fs, io,
+    path::Path,
+    sync::{Arc, Mutex},
+};
 
 mod events;
 pub(crate) use events::*;
@@ -14,139 +18,375 @@ pub(crate) use events::*;
 mod ctx;
 pub use self::ctx::*;
 
-cfg_async! {
-    mod builder;
-    pub use self::builder::*;
-}
-///
-/// A runtime application for a module/network oriantated simulation.
-///
-/// * This type is only available of DES is build with the `"net"` feature.
-#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-pub struct NetworkApplication<A> {
-    ///
-    /// The set of module used in the network simulation.
-    /// All module must be boxed, since they must conform to the
-    /// [`Module`](crate::net::module::Module) trait.
-    ///
-    module_list: Vec<ModuleRef>,
+mod blocks;
+pub use self::blocks::*;
 
-    ///
-    /// The globals provided by the runtime
-    /// that cannot be mutated by the users.
-    ///
-    globals: Arc<NetworkApplicationGlobals>,
-
-    ///
-    /// A inner container for holding user defined global state.
-    ///
+/// A networking simulation.
+///
+/// This type acts as both a builder for simulations, as well as the application object
+/// used in the [`Runtime`].
+///
+/// A networking simulation can internally contain an application `A`,
+/// that implements [`EventLifecycle`]. This type can be used attach
+/// custom global behaviour at the simulation launch and shutdown. The
+/// lifetime events will be applied after the simulation has started itself
+/// and before the simulation itself will shut down.
+///
+/// However networking simulations allways use events of type `NetEvents`,
+/// internally. These events do not interact with the inner application `A`.
+///
+/// # Examples
+///
+/// ```
+/// # use des::prelude::*;
+/// # use des::net::HandlerFn;
+/// struct Inner;
+/// impl EventLifecycle<Sim<Inner>> for Inner {
+///     fn at_sim_start(rt: &mut Runtime<Sim<Inner>>) {
+///         println!("Hello simulation");
+///         /* Do something */
+///     }
+/// }
+///
+/// let mut sim = Sim::new(Inner);
+/// sim.node("alice", HandlerFn::new(|msg| {
+///     /* Message processing */
+/// }));
+///
+/// let _ = Builder::new().build(sim).run(); // prints 'Hello simulation'
+/// ```
+#[derive(Debug)]
+pub struct Sim<A> {
+    pub(crate) modules: FxHashMap<ObjectPath, ModuleRef>,
+    globals: Arc<Globals>,
+    /// A inner field of a network simulation that can be used to attach
+    /// custom lifetime handlers to a simulation
     pub inner: A,
 }
 
-impl<A> NetworkApplication<A> {
+/// A helper to manage a scoped part of a networking simulation,
+/// exclusivly used when building the simulation.
+///
+/// This type is helpful in combination with the trait [`ModuleBlock`]
+/// to create reproducable blocks of modules at different
+/// locations within the simulation.
+///
+/// This builder acts comparable to [`Sim`], but with an automatically
+/// applied path prefix, the `scope`.
+///
+/// # Examples
+///
+/// ```
+/// # use des::prelude::*;
+/// # use des::net::{ModuleBlock, ModuleFn, HandlerFn};
+/// struct LAN {}
+/// impl ModuleBlock for LAN {
+///     fn build<A>(self, mut sim: ScopedSim<'_, A>) {
+///         sim.root(HandlerFn::new(|_| {}));
+///         let gates = sim.gates("", "port", 5);
+///         for i in 0..5 {
+///             let host = format!("host-{i}");
+///             sim.node(&host, ModuleFn::new(
+///                 /* ... */
+///                 # || 123, |_, _| {}    
+///             ));
+///             let gate = sim.gate(&host, "port");
+///             gate.connect(gates[i].clone(), None);
+///         }
+///     }
+/// }
+///
+/// let mut sim = Sim::new(());
+/// sim.node("google", LAN {});
+/// sim.node("microsoft", LAN {});
+/// sim.node("aws", HandlerFn::new(|_| {}));
+/// sim.node("aws.us-east", LAN {});
+///
+/// let _ = Builder::new().build(sim).run();
+/// ```
+#[derive(Debug)]
+pub struct ScopedSim<'a, A> {
+    pub(crate) base: &'a mut Sim<A>,
+    pub(crate) scope: ObjectPath,
+}
+
+impl<A> Sim<A> {
+    /// Creates a new network simulation, with an inner application `A`.
     ///
-    /// Creates a new instance by wrapping 'inner' into a empty `NetworkApplication<A>`.
-    ///
-    #[must_use]
+    /// This allready binds the simulation globals to this instance.
     pub fn new(inner: A) -> Self {
         let this = Self {
-            module_list: Vec::new(),
-            globals: Arc::new(NetworkApplicationGlobals::new()),
-
+            modules: FxHashMap::with_hasher(FxBuildHasher::default()),
+            globals: Arc::new(Globals::new()),
             inner,
         };
-
-        // attack to current buffer
         buf_set_globals(Arc::downgrade(&this.globals));
         this
     }
 
+    /// Includes raw parameter defintions in the simulation.
     ///
-    /// Tries to include a parameter file.
+    /// If a parsing error is encountered, it will be silently
+    /// ignored. Only successful parses will be applied to the
+    /// module parameters.
     ///
-    pub fn include_par_file(&mut self, file: &str) {
-        match std::fs::read_to_string(file) {
-            Ok(string) => self.globals.parameters.build(&string),
-            Err(e) => eprintln!("Failed to load par file: {e}"),
+    /// # Examples
+    ///
+    /// ```
+    /// # use des::prelude::*;
+    /// # use des::net::ModuleFn;
+    /// use std::net::IpAddr;
+    ///
+    /// let mut sim = Sim::new(());
+    /// sim.include_par("alice.addr = 198.2.1.45\nalice.role = host");
+    /// sim.node("alice", ModuleFn::new(
+    ///     || {
+    ///         let addr = par("addr").unwrap().parse::<IpAddr>().unwrap();
+    ///         let role = par("role").unwrap().to_string();
+    ///     },
+    ///     |_, _| {}
+    /// ));
+    /// /*
+    ///     Note that the order of the previous operations does not matter,
+    ///     since the setup code will only be executed when the simulation
+    ///     is startin, so on `Runtime::run`.
+    /// */
+    ///
+    /// let _ = Builder::new().build(sim).run();
+    /// ```
+    pub fn include_par(&mut self, raw: &str) {
+        self.globals.parameters.build(raw);
+    }
+
+    /// Tries to read and include parameters from a file into the simulation.
+    ///
+    /// See [`include_par`] for more infomation.
+    ///
+    /// # Errors
+    ///
+    /// This function may fail if the reading from a file fails.
+    pub fn include_par_file(&mut self, path: impl AsRef<Path>) -> io::Result<()> {
+        self.include_par(&fs::read_to_string(path)?);
+        Ok(())
+    }
+
+    /// Returns a handle to the simulation globals.
+    pub fn globals(&self) -> Arc<Globals> {
+        self.globals.clone()
+    }
+
+    /// Creates a new module block within the simulation.
+    ///
+    /// A "node" is a block of modules at a given `path`. This may include:
+    /// - no modules at all
+    /// - just one module exactly at the given `path`
+    /// - multiple modules, one at `path`, the others as direct or indirect children of this root module.
+    ///
+    /// The provided parameter `module_block` must be some type that implements the trait `ModuleBlock`.
+    /// This trait can be used to create all components of the required block, within the local scope
+    /// defined by `path`. Modules themself also implement `ModuleBlock` so modules themselfs can be
+    /// build into a block of size 1.
+    ///
+    /// Custom implementations of `ModuleBlock` can not only create modules based
+    /// on config data, but also gates and connections between these modules. Note
+    /// that `ModuleBlock::build` is confined to the scope defined by `path`, since
+    /// it uses a [`ScopedSim`] builder.
+    ///
+    /// See [`ScopedSim`] for more information.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use des::prelude::*;
+    /// struct MyModule {
+    ///     state: i32,
+    /// }
+    /// impl Module for MyModule {
+    ///     fn handle_message(&mut self, msg: Message) {
+    ///         /* Do something */
+    ///     }
+    /// }
+    ///
+    /// let mut sim = Sim::new(());
+    /// sim.node("alice", MyModule { state: 42 });
+    ///
+    /// let _ = Builder::new().build(sim).run();
+    /// ```
+    pub fn node(&mut self, path: impl Into<ObjectPath>, module_block: impl ModuleBlock) {
+        let scoped = ScopedSim::new(self, path.into());
+        module_block.build(scoped)
+    }
+
+    /// Retrieves a module by reference from the simulation.
+    pub fn get(&self, path: &ObjectPath) -> Option<ModuleRef> {
+        self.modules.get(&path).cloned()
+    }
+
+    /// Creates a gate on a allready created module.
+    ///
+    /// The module will be defined `path` and the gate will be named `gate`.
+    /// Should such a gate allready exist, the allready existing gate will be
+    /// returned.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use des::prelude::*;
+    /// # struct SomeModule;
+    /// # impl Module for SomeModule {}
+    /// let mut sim = Sim::new(());
+    /// sim.node("alice", SomeModule);
+    /// sim.node("bob", SomeModule);
+    ///
+    /// let a = sim.gate("alice", "in");
+    /// let b = sim.gate("bob", "out");
+    ///
+    /// b.connect(a, None);
+    ///
+    /// let _ = Builder::new().build(sim).run();
+    /// ```
+    pub fn gate(&mut self, path: impl Into<ObjectPath>, gate: &str) -> GateRef {
+        let path = path.into();
+        let Some(module) = self.get(&path) else {
+            panic!("cannot create gate '{path}.{gate}', because node '{path}' does not exist")
+        };
+        if let Some(gate) = module.gate(gate, 0) {
+            gate
+        } else {
+            module.create_gate(gate)
         }
     }
 
+    /// Creates a clust of gate gate on a allready created module.
     ///
-    /// Registers a boxed module and adds it to the module set.
-    /// Returns a mutable refernce to the boxed module.
-    /// This reference should be short lived since it blocks any other reference to self.
-    ///
-    pub fn register_module(&mut self, module: ModuleRef) {
-        self.module_list.push(module);
+    /// The module will be defined `path` and the gate cluster will be named `gate`.
+    /// Should such a gate cluster allready exist, the allready existing gate will be
+    /// returned.
+    pub fn gates(&mut self, path: impl Into<ObjectPath>, gate: &str, size: usize) -> Vec<GateRef> {
+        let path = path.into();
+        let Some(module) = self.get(&path) else {
+            panic!("cannot create gate '{path}.{gate}', because node '{path}' does not exist")
+        };
+        let mut gates = Vec::new();
+        for k in 0..size {
+            if let Some(gate) = module.gate(gate, k) {
+                gates.push(gate);
+            } else {
+                break;
+            }
+        }
+        if gates.len() == size {
+            gates
+        } else {
+            assert!(gates.is_empty());
+            module.create_gate_cluster(gate, size)
+        }
     }
 
-    ///
-    /// Returns a reference to the list of all modules.
-    ///
-    #[must_use]
-    pub fn modules(&self) -> &[ModuleRef] {
-        &self.module_list
-    }
+    fn raw(&mut self, path: ObjectPath, module: impl Module) -> ModuleRef {
+        // Check dup
+        if self.modules.get(&path).is_some() {
+            panic!("cannot create node '{path}', node allready exists");
+        }
 
-    ///
-    /// Searches a module based on this predicate.
-    /// Shortcircuits if found and returns a read-only reference.
-    ///
-    pub fn module<F>(&self, predicate: F) -> Option<ModuleRef>
-    where
-        F: FnMut(&&ModuleRef) -> bool,
-    {
-        self.modules().iter().find(predicate).cloned()
-    }
+        // Check node path location
+        let ctx = if let Some(parent) = path.nonzero_parent() {
+            // (a) Check that the parent exists
+            let Some(parent) = self.get(&parent) else {
+                panic!("cannot create node '{path}', since parent node '{parent}' is required, but does not exist");
+            };
 
-    ///
-    /// Drops all modules and channels and only returns the inner value.
-    ///
-    #[must_use]
-    pub fn finish(self) -> A {
-        self.inner
-    }
+            ModuleContext::child_of(path.name(), parent)
+        } else {
+            ModuleContext::standalone(path.clone())
+        };
+        ctx.activate();
 
-    /// Returns the network runtime globals
-    pub fn globals(&self) -> Arc<NetworkApplicationGlobals> {
-        self.globals.clone()
+        let pe = module.to_processing_chain();
+        ctx.upgrade_dummy(pe);
+
+        // TODO: deactivate module
+        self.modules.insert(path, ctx.clone());
+        ctx
     }
 }
 
-impl<A> Application for NetworkApplication<A>
+impl<'a, A> ScopedSim<'a, A> {
+    pub(crate) fn new(base: &'a mut Sim<A>, scope: ObjectPath) -> Self {
+        Self { base, scope }
+    }
+
+    #[allow(unused)]
+    pub(crate) fn subscope<'b>(&'b mut self, path: impl AsRef<str>) -> ScopedSim<'b, A> {
+        ScopedSim {
+            base: &mut *self.base,
+            scope: self.scope.appended(path),
+        }
+    }
+
+    /// The current scope from an absoute prespective.
+    pub fn scope(&self) -> &ObjectPath {
+        &self.scope
+    }
+
+    /// The inner application of the simulation `Sim<A>`.
+    pub fn inner(&self) -> &A {
+        &self.base.inner
+    }
+
+    /// Sets the current scope module.
+    ///
+    /// This call is equivalent to `sim.node(scope, <module_block>)` on [`Sim`].
+    pub fn root(&mut self, module_block: impl Module) {
+        self.base.raw(self.scope.clone(), module_block);
+    }
+
+    /// Creates a module block within the current scope.
+    ///
+    /// See [`Sim::node`] for more information.
+    pub fn node(&mut self, path: impl Into<ObjectPath>, module_block: impl ModuleBlock) {
+        self.base
+            .node(self.scope.appended(path.into().as_str()), module_block);
+    }
+
+    /// Creates a gate on an existing node within the current scope.
+    ///
+    /// See [`Sim::gate`] for more information.
+    pub fn gate(&mut self, path: impl Into<ObjectPath>, gate: &str) -> GateRef {
+        self.base.gate(self.scope.appended(path.into()), gate)
+    }
+
+    /// Creates a cluster gate on an existing node within the current scope.
+    ///
+    /// See [`Sim::gates`] for more information.
+    pub fn gates(&mut self, path: impl Into<ObjectPath>, gate: &str, size: usize) -> Vec<GateRef> {
+        self.base
+            .gates(self.scope.appended(path.into()), gate, size)
+    }
+}
+
+impl<A> Application for Sim<A>
 where
-    A: EventLifecycle<NetworkApplication<A>>,
+    A: EventLifecycle<Sim<A>>,
 {
     type EventSet = NetEvents;
-    type Lifecycle = NetworkApplicationLifecycle<A>;
+    type Lifecycle = SimLifecycle;
 }
 
 #[doc(hidden)]
 #[derive(Debug)]
-pub struct NetworkApplicationLifecycle<A: EventLifecycle<NetworkApplication<A>>> {
-    _phantom: PhantomData<A>,
-}
-
-impl<A> EventLifecycle<NetworkApplication<A>> for NetworkApplicationLifecycle<A>
+pub struct SimLifecycle;
+impl<A> EventLifecycle<Sim<A>> for SimLifecycle
 where
-    A: EventLifecycle<NetworkApplication<A>>,
+    A: EventLifecycle<Sim<A>>,
 {
-    fn at_sim_start(rt: &mut Runtime<NetworkApplication<A>>) {
-        // Add inital event
-        // this is done via an event to get the usual module buffer clearing behavoir
-        // while the end ignores all send packets.
-
-        // (0) Start the contained application for lifetime behaviour
-        // - in case of NDL build topology with this call
-        A::at_sim_start(rt);
-
-        // (1) Initalize globals acoording to build network topology
+    fn at_sim_start(rt: &mut crate::prelude::Runtime<Sim<A>>) {
         rt.app
             .globals
             .topology
             .lock()
-            .unwrap()
-            .build(&rt.app.module_list);
+            .expect("could not get topology lock")
+            .build(rt.app.modules.values());
 
         // (2) Run network-node sim_starting stages
         // - inline this to ensure this is run before any possible events
@@ -156,16 +396,15 @@ where
         // 'module_handle_jobs'.
         let max_stage = rt
             .app
-            .modules()
-            .iter()
+            .modules
+            .values()
             .fold(1, |acc, module| acc.max(module.num_sim_start_stages()));
 
         // (2.1) Call the stages in order, parallel over all modules
         for stage in 0..max_stage {
             // Direct indexing since rt must be borrowed mutably in handle_buffers.
-            for i in 0..rt.app.modules().len() {
+            for module in rt.app.modules.values().cloned().collect::<Vec<_>>() {
                 // Use cloned handles to appease the brwchk
-                let module = rt.app.modules()[i].clone();
                 if stage < module.num_sim_start_stages() {
                     module.activate();
 
@@ -183,9 +422,7 @@ where
         // (2.2) Ensure all sim_start stages have finished, in an async context
         #[cfg(feature = "async")]
         {
-            for i in 0..rt.app.modules().len() {
-                let module = rt.app.modules()[i].clone();
-
+            for module in rt.app.modules.values().cloned().collect::<Vec<_>>() {
                 module.activate();
                 module.finish_sim_start();
                 module.deactivate(rt);
@@ -196,11 +433,13 @@ where
 
         leave_scope();
 
-        // (2.3) Reset the logging scope.
+        A::at_sim_start(rt);
     }
 
-    fn at_sim_end(rt: &mut Runtime<NetworkApplication<A>>) {
-        for module in rt.app.module_list.clone() {
+    fn at_sim_end(rt: &mut crate::prelude::Runtime<Sim<A>>) {
+        A::at_sim_end(rt);
+
+        for module in rt.app.modules.values().cloned().collect::<Vec<_>>() {
             enter_scope(module.scope_token());
 
             #[cfg(feature = "tracing")]
@@ -215,7 +454,7 @@ where
         #[cfg(feature = "async")]
         {
             // Ensure all sim_start stages have finished
-            for module in rt.app.module_list.clone() {
+            for module in rt.app.modules.values().cloned().collect::<Vec<_>>() {
                 // enter_scope(module.scope_token());
 
                 module.activate();
@@ -225,36 +464,6 @@ where
         }
 
         leave_scope();
-
-        A::at_sim_end(rt);
-    }
-}
-
-impl<A> Debug for NetworkApplication<A>
-where
-    A: Debug,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let modules = self
-            .module_list
-            .iter()
-            .map(|m| &m.ctx.path)
-            .collect::<Vec<&ObjectPath>>();
-
-        f.debug_struct("NetworkApplication")
-            .field("modules", &modules)
-            .field("globals", &self.globals)
-            .field("app", &self.inner)
-            .finish()
-    }
-}
-
-impl<A> Display for NetworkApplication<A>
-where
-    A: Display,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.inner.fmt(f)
     }
 }
 
@@ -263,7 +472,7 @@ where
 /// exposed.
 ///
 #[derive(Debug)]
-pub struct NetworkApplicationGlobals {
+pub struct Globals {
     ///
     /// The current state of the parameter tree, derived from *.par
     /// files and parameter changes at runtime.
@@ -276,7 +485,7 @@ pub struct NetworkApplicationGlobals {
     pub topology: Mutex<Topology>,
 }
 
-impl NetworkApplicationGlobals {
+impl Globals {
     ///
     /// Creates a new instance of Self.
     ///
@@ -289,7 +498,7 @@ impl NetworkApplicationGlobals {
     }
 }
 
-impl Default for NetworkApplicationGlobals {
+impl Default for Globals {
     fn default() -> Self {
         Self::new()
     }

@@ -15,7 +15,7 @@ version = "0.5.1"
 
 [features]
 # Include nothing by default
-default = ["full"]
+default = []
 
 # Include everything used for default test runs.
 full = ["net", "ndl", "cqueue", "async", "macros"]
@@ -26,7 +26,7 @@ cqueue = ["dep:des-cqueue"]
 multi-threaded = []
 net = ["dep:des-macros"]
 ndl = ["dep:des-ndl"]
-tracing = []
+tracing = ["net"]
 
 unstable-tokio-enable-time = ["async", "tokio/time"]
 
@@ -42,7 +42,7 @@ sysinfo = "*"
 # due to issues like #8
 spin = { version = "*" }
 tracing = { version = "*" }
-tracing-subscriber = { version = "*", features = ["env-filter"]}
+tracing-subscriber = { version = "*", features = ["env-filter"] }
 nu-ansi-term = "*"
 termcolor = "*"
 fxhash = "0.2"

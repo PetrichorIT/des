@@ -18,20 +18,19 @@ pub fn set_setup_fn(f: fn(&ModuleContext)) {
 }
 
 /// Retuns a handle to the context of the current module. This
-/// handle can be used on inspect and change the modules simulation 
+/// handle can be used on inspect and change the modules simulation
 /// properties, independent of the modules processing elements.
-/// 
+///
 /// **This handle is only fully valid, during the execution of the current event,
 /// thus is should never be stored.**
-/// 
+///
 /// # Example
-/// 
+///
 /// ```
 /// # use des::prelude::*;
-/// 
+///
 /// struct MyModule;
 /// impl Module for MyModule {
-///     fn new() -> Self { Self }
 ///     fn handle_message(&mut self, msg: Message) {
 ///         let id = current().id();
 ///         if id == msg.header().sender_module_id {
@@ -40,15 +39,15 @@ pub fn set_setup_fn(f: fn(&ModuleContext)) {
 ///     }
 /// }
 /// ```
-/// 
+///
 /// # Panics
-/// 
+///
 /// This function will panic if not called within a modules context.
 #[must_use]
 pub fn current() -> Arc<ModuleContext> {
-    try_with_mod_ctx(Arc::clone).expect("cannot retrieve current module context, no module currently in scope")
+    try_with_mod_ctx(Arc::clone)
+        .expect("cannot retrieve current module context, no module currently in scope")
 }
-
 
 // BUF CTX based
 
@@ -64,7 +63,6 @@ pub fn current() -> Arc<ModuleContext> {
 pub fn shutdown() {
     buf_schedule_shutdown(None);
 }
-
 
 ///
 /// Shuts down all activity for the module.
@@ -86,13 +84,6 @@ pub fn shutdown() {
 /// }
 ///
 /// impl Module for MyModule {
-///     fn new() -> Self {
-///         Self {
-///             volatile: 0,
-///             persistent: 0,
-///         }
-///     }
-///
 ///     fn reset(&mut self) {
 ///         self.volatile = 0;
 ///     }
@@ -116,7 +107,7 @@ pub fn shutdown() {
 ///
 /// fn main() {
 ///     let app = /* ... */
-/// #    NetworkApplication::new(());
+/// #    Sim::new(());
 ///     let rt = Builder::new().build(app).run();
 ///     // outputs 'Start at 0s with volatile := 0 and persistent := 0'
 ///     // outputs 'Start at 10s with volatile := 0 and persistent := 1024'

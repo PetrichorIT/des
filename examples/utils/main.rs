@@ -5,19 +5,13 @@ use members::*;
 
 #[derive(Debug, Default)]
 struct A;
-impl Module for A {
-    fn new() -> Self {
-        Self
-    }
-}
+impl Module for A {}
 
 fn main() {
-    let mut app = NetworkApplication::new(
-        NdlApplication::new("examples/utils/main.ndl", registry![A, Alice, Bob])
-            .map_err(|e| println!("{e}"))
-            .unwrap(),
-    );
-    app.include_par_file("examples/utils/init.par");
+    let mut app = Sim::ndl("examples/utils/main.ndl", registry![A, Alice, Bob])
+        .map_err(|e| println!("{e}"))
+        .unwrap();
+    app.include_par_file("examples/utils/init.par").unwrap();
 
     let rt = Builder::seeded(0x123).quiet().build(app);
     let (app, time, p) = rt.run().unwrap();

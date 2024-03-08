@@ -7,11 +7,11 @@ pub use modules::*;
 static MODULE_LEN: AtomicUsize = AtomicUsize::new(0);
 
 fn main() {
-    let app = NdlApplication::new("examples/droptest/main.ndl", registry![Network, Bob, Alice])
+    let app = Sim::ndl("examples/droptest/main.ndl", registry![Network, Bob, Alice])
         .map_err(|e| println!("{e}"))
         .unwrap();
 
-    let rt = Builder::seeded(0x123).build(NetworkApplication::new(app));
+    let rt = Builder::seeded(0x123).build(app);
 
     let (app, time, p) = rt.run().unwrap();
     let globals = app.globals();

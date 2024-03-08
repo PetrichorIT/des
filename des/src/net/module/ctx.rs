@@ -118,7 +118,6 @@ impl ModuleContext {
     ///
     /// struct MyModule;
     /// impl Module for MyModule {
-    ///     fn new() -> Self { Self }
     ///     fn handle_message(&mut self, msg: Message) {
     ///         let id = current().id();
     ///         assert_eq!(id, msg.header().receiver_module_id);    
@@ -139,7 +138,6 @@ impl ModuleContext {
     ///
     /// struct MyModule;
     /// impl Module for MyModule {
-    ///     fn new() -> Self { Self }
     ///     fn handle_message(&mut self, msg: Message) {
     ///         let path = current().path();
     ///         println!("[{path}] recv message: {}", msg.str())  

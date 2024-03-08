@@ -1,10 +1,8 @@
 #![allow(missing_docs)]
 
-use super::{
-    HandleMessageEvent, MessageExitingConnection, NetworkApplication, NetworkApplicationGlobals,
-};
+use super::{Globals, HandleMessageEvent, MessageExitingConnection, Sim};
 use crate::net::gate::Connection;
-use crate::net::module::{with_mod_ctx, MOD_CTX, SETUP_FN, current};
+use crate::net::module::{current, with_mod_ctx, MOD_CTX, SETUP_FN};
 use crate::net::ModuleRestartEvent;
 use crate::net::{gate::GateRef, message::Message, NetEvents};
 use crate::prelude::{EventLifecycle, ModuleRef};
@@ -32,7 +30,7 @@ struct BufferContext {
     #[allow(clippy::option_option)]
     shutdown: Option<Option<SimTime>>,
     // globals
-    globals: Option<Weak<NetworkApplicationGlobals>>,
+    globals: Option<Weak<Globals>>,
 }
 
 unsafe impl Send for BufferContext {}
@@ -47,7 +45,7 @@ unsafe impl Sync for BufferContext {}
 /// Note that a runtime is active if a instance of [`NetworkApplication`] exists.
 ///
 #[must_use]
-pub fn globals() -> Arc<NetworkApplicationGlobals> {
+pub fn globals() -> Arc<Globals> {
     let ctx = BUF_CTX.lock();
     ctx.globals
         .as_ref()
@@ -65,7 +63,10 @@ pub(crate) fn buf_send_at(mut msg: Message, gate: GateRef, send_time: SimTime) {
     // (0) If delayed send is active, dont skip gate_refs
     if send_time > SimTime::now() {
         ctx.events.push((
-            NetEvents::MessageExitingConnection(MessageExitingConnection { con: Connection::new(gate), msg }),
+            NetEvents::MessageExitingConnection(MessageExitingConnection {
+                con: Connection::new(gate),
+                msg,
+            }),
             send_time,
         ));
         return;
@@ -73,7 +74,10 @@ pub(crate) fn buf_send_at(mut msg: Message, gate: GateRef, send_time: SimTime) {
 
     // (0) Else handle the event inlined, for instant effects on the associated
     // channels.
-    let event = MessageExitingConnection { con: Connection::new(gate), msg };
+    let event = MessageExitingConnection {
+        con: Connection::new(gate),
+        msg,
+    };
     event.handle_with_sink(&mut ctx.events);
 
     crate::tracing::enter_scope(with_mod_ctx(|ctx| ctx.scope_token));
@@ -97,7 +101,7 @@ pub(crate) fn buf_schedule_shutdown(restart: Option<SimTime>) {
     ctx.shutdown = Some(restart);
 }
 
-pub(crate) fn buf_set_globals(globals: Weak<NetworkApplicationGlobals>) {
+pub(crate) fn buf_set_globals(globals: Weak<Globals>) {
     let mut ctx = BUF_CTX.lock();
     ctx.globals = Some(globals);
 
@@ -108,9 +112,9 @@ pub(crate) fn buf_set_globals(globals: Weak<NetworkApplicationGlobals>) {
     }
 }
 
-pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<NetworkApplication<A>>)
+pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<Sim<A>>)
 where
-    A: EventLifecycle<NetworkApplication<A>>,
+    A: EventLifecycle<Sim<A>>,
 {
     let mut ctx = BUF_CTX.lock();
 

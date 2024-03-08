@@ -1,52 +1,36 @@
 use des::{prelude::*, registry};
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct AppA {}
 
 impl Module for AppA {
-    fn new() -> Self {
-        Self {}
-    }
-
     fn handle_message(&mut self, _msg: Message) {
         println!("A: [{}] {:?}", SimTime::now(), _msg);
         assert_eq!(SimTime::now(), 1.0);
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct AppB {}
 
 impl Module for AppB {
-    fn new() -> Self {
-        Self {}
-    }
-
     fn handle_message(&mut self, _msg: Message) {
         println!("B: [{}] {:?}", SimTime::now(), _msg);
         assert_eq!(SimTime::now(), 2.0);
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct Runner {}
 
 impl Module for Runner {
-    fn new() -> Self {
-        Self {}
-    }
-
     fn handle_message(&mut self, _msg: Message) {}
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct MultiRunner {}
 
 impl Module for MultiRunner {
-    fn new() -> Self {
-        Self {}
-    }
-
     fn at_sim_start(&mut self, _stage: usize) {
         schedule_at(Message::new().kind(42).build(), 1.0.into());
     }
@@ -71,15 +55,11 @@ impl Module for MultiRunner {
 
 #[derive(Debug, Default)]
 struct Main;
-impl Module for Main {
-    fn new() -> Self {
-        Self
-    }
-}
+impl Module for Main {}
 
 fn main() {
     // Logger::new().try_set_logger().unwrap();
-    let app = NdlApplication::new(
+    let app = Sim::ndl(
         "examples/proto/main.ndl",
         registry![AppA, AppB, Runner, MultiRunner, Main],
     )
@@ -87,7 +67,7 @@ fn main() {
 
     // println!("{:?}", app.globals().parameters);
 
-    let rt = Builder::seeded(0x123).build(NetworkApplication::new(app));
+    let rt = Builder::seeded(0x123).build(app);
     let (app, _time, _event_count) = rt.run().unwrap();
 
     let _ = app
