@@ -42,15 +42,12 @@ fn channel_dropping_message() {
     let g_in = rt.gate("root", "in");
     let g_out = rt.gate("root", "out");
 
-    let channel = Channel::new(
-        ObjectPath::new(),
-        ChannelMetrics {
-            bitrate: 1000,
-            latency: Duration::from_millis(100),
-            jitter: Duration::ZERO,
-            drop_behaviour: ChannelDropBehaviour::default(),
-        },
-    );
+    let channel = Channel::new(ChannelMetrics {
+        bitrate: 1000,
+        latency: Duration::from_millis(100),
+        jitter: Duration::ZERO,
+        drop_behaviour: ChannelDropBehaviour::default(),
+    });
     g_in.connect(g_out, Some(channel));
 
     let rt = Builder::seeded(123).build(rt);
@@ -95,15 +92,12 @@ fn channel_buffering_message() {
     let g_in = rt.gate("root", "in");
     let g_out = rt.gate("root", "out");
 
-    let channel = Channel::new(
-        ObjectPath::new(),
-        ChannelMetrics {
-            bitrate: 1000,
-            latency: Duration::from_millis(100),
-            jitter: Duration::ZERO,
-            drop_behaviour: ChannelDropBehaviour::Queue(Some(600)),
-        },
-    );
+    let channel = Channel::new(ChannelMetrics {
+        bitrate: 1000,
+        latency: Duration::from_millis(100),
+        jitter: Duration::ZERO,
+        drop_behaviour: ChannelDropBehaviour::Queue(Some(600)),
+    });
     g_in.connect(g_out, Some(channel));
 
     let rt = Builder::seeded(123).build(rt);
@@ -139,15 +133,12 @@ fn channel_instant_busy() {
     let g_in = rt.gate("root", "in");
     let g_out = rt.gate("root", "out");
 
-    let channel = Channel::new(
-        ObjectPath::new(),
-        ChannelMetrics {
-            bitrate: 1000,
-            latency: Duration::from_millis(100),
-            jitter: Duration::ZERO,
-            drop_behaviour: ChannelDropBehaviour::default(),
-        },
-    );
+    let channel = Channel::new(ChannelMetrics {
+        bitrate: 1000,
+        latency: Duration::from_millis(100),
+        jitter: Duration::ZERO,
+        drop_behaviour: ChannelDropBehaviour::default(),
+    });
 
     g_in.connect(g_out, Some(channel));
 
@@ -195,15 +186,12 @@ fn channel_probes() {
     let alice_port = rt.gate("alice", "port");
     let bob_port = rt.gate("bob", "port");
 
-    let chan = Channel::new(
-        ObjectPath::new(),
-        ChannelMetrics {
-            bitrate: 1000,
-            latency: Duration::from_millis(100),
-            jitter: Duration::ZERO,
-            drop_behaviour: ChannelDropBehaviour::default(),
-        },
-    );
+    let chan = Channel::new(ChannelMetrics {
+        bitrate: 1000,
+        latency: Duration::from_millis(100),
+        jitter: Duration::ZERO,
+        drop_behaviour: ChannelDropBehaviour::default(),
+    });
 
     alice_port.connect(bob_port, Some(chan));
 

@@ -239,7 +239,7 @@ impl ModuleRef {
         }
     }
 
-    // INTERNAL
+    /// INTERNAL
     #[doc(hidden)]
     #[allow(unused)]
     pub(crate) fn deactivate(&self, rt: &mut impl EventSink<NetEvents>) {
@@ -282,30 +282,20 @@ impl ModuleRef {
         self.create_gate_cluster(name, 1).remove(0)
     }
 
-
     ///
     /// Createas a cluster of gates on the current module returning their IDs.
     ///
     #[must_use]
-    pub fn create_gate_cluster(
-        &self,
-        name: &str,
-        size: usize,
-    ) -> Vec<GateRef> {
-        (0..size).map(|id| {
-            self.create_raw_gate(name, size, id)
-        }).collect()
+    pub fn create_gate_cluster(&self, name: &str, size: usize) -> Vec<GateRef> {
+        (0..size)
+            .map(|id| self.create_raw_gate(name, size, id))
+            .collect()
     }
 
     /// Creates a gate on the current module, returning its ID.
     ///
     #[must_use]
-    pub fn create_raw_gate(
-        &self,
-        name: &str,
-        size: usize,
-        pos: usize,
-    ) -> GateRef {
+    pub fn create_raw_gate(&self, name: &str, size: usize, pos: usize) -> GateRef {
         let gate = Gate::new(self, name, size, pos);
         self.ctx.gates.write().push(gate.clone());
         gate

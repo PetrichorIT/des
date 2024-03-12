@@ -1,8 +1,6 @@
 use std::{error::Error, fmt::Display};
 
-///
 /// An error while resolving a reference to another module.
-///
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ModuleReferencingError {
     /// No reference exists.

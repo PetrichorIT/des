@@ -43,15 +43,12 @@ fn connectivity() {
 
     rx.connect(
         tx,
-        Some(Channel::new(
-            "chan".into(),
-            ChannelMetrics {
-                bitrate: 10000,
-                latency: Duration::from_millis(100),
-                jitter: Duration::ZERO,
-                drop_behaviour: ChannelDropBehaviour::Queue(None),
-            },
-        )),
+        Some(Channel::new(ChannelMetrics {
+            bitrate: 10000,
+            latency: Duration::from_millis(100),
+            jitter: Duration::ZERO,
+            drop_behaviour: ChannelDropBehaviour::Queue(None),
+        })),
     );
 
     let app = Builder::seeded(123).build(app);

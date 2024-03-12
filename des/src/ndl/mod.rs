@@ -63,24 +63,65 @@ mod registry;
 pub use self::registry::*;
 
 impl Sim<()> {
-    /// NDL
-    pub fn ndl(path: impl AsRef<Path>, registry: Registry) -> RootResult<Self> {
+    /// Creates a NDL application with the inner application `()`.
+    ///
+    /// See [`Sim::ndl_with`] for more information.
+    ///
+    /// # Errors
+    ///
+    /// This function may return an error, if the provided NDL topology is
+    /// erronous, or the software requirements cannot be fulfilled by the registry.
+    pub fn ndl(path: impl AsRef<Path>, registry: impl AsRef<Registry>) -> RootResult<Self> {
         Self::ndl_with(path, registry, ())
     }
 }
 
 impl<A> Sim<A> {
-    /// NDL
-    pub fn ndl_with(path: impl AsRef<Path>, registry: Registry, inner: A) -> RootResult<Self> {
+    /// Creates an NDL application from a topology description at `path`, with
+    /// software defined by `registry` and an inner application `inner`.
+    ///
+    /// The NDL topology desciption found at `path` describes a module tree
+    /// including a root module at the path `""`. Each node in this tree
+    /// is derived from a NDL Module. The name of this module prototype
+    /// is the symbol used in accessed to the registry. The NDL topology
+    /// additionally includes gate and gate-chain definitions.
+    ///
+    /// The tree is initalized depth first. This means for each module:
+    /// - First the gate of the current module are created
+    /// - Then all children are created, including gates **and** connections
+    /// - Then all connections are resolved, since connections statements may depend
+    ///   on the existence of gates in child nodes
+    ///
+    /// The provided parameter `registry` is resposible for attaching software
+    /// to the nodes defined by the topology description. Should the registry
+    /// fail to provide software for a node, this function will fail.
+    ///
+    /// The inner application `inner` is equivalent the inner application
+    /// object of a network simulation, which can be used to define custom
+    /// actions at sim start / end.
+    ///
+    /// # Errors
+    ///
+    /// Some Errors
+    pub fn ndl_with(
+        path: impl AsRef<Path>,
+        registry: impl AsRef<Registry>,
+        inner: A,
+    ) -> RootResult<Self> {
         let mut ctx = Context::load(path)?;
-        let tree = ctx.entry.take().unwrap();
+        let Some(tree) = ctx.entry.take() else {
+            return Err(RootError::single(
+                Error::new(ErrorKind::MissingEntryPoint, ""),
+                ctx.smap,
+            ));
+        };
 
         // Build network
         let mut this = Sim::new(inner);
         let mut errors = Errors::new().as_mut();
 
         let scoped = ScopedSim::new(&mut this, ObjectPath::new());
-        let _ = scoped.ndl(tree, &mut errors, &registry);
+        let _ = scoped.ndl(tree, &mut errors, registry.as_ref());
 
         if errors.is_empty() {
             Ok(this)
@@ -91,9 +132,10 @@ impl<A> Sim<A> {
 
     fn raw_ndl(&mut self, path: ObjectPath, pe: ProcessingElements) -> ModuleRef {
         // Check dup
-        if self.modules.get(&path).is_some() {
-            panic!("cannot crate module at {path}, allready exists");
-        }
+        assert!(
+            self.modules.get(&path).is_none(),
+            "cannot crate module at {path}, allready exists"
+        );
 
         // Check node path location
         let ctx = if let Some(parent) = path.parent() {
@@ -104,18 +146,19 @@ impl<A> Sim<A> {
 
             ModuleContext::child_of(path.name(), parent)
         } else {
-            ModuleContext::standalone(path.clone())
+            ModuleContext::standalone(path)
         };
         ctx.activate();
         ctx.upgrade_dummy(pe);
 
         // TODO: deactivate module
-        self.modules.insert(path, ctx.clone());
+        self.modules.add(ctx.clone());
         ctx
     }
 }
 
 impl<'a, A> ScopedSim<'a, A> {
+    #[allow(clippy::needless_pass_by_value)]
     fn ndl(
         mut self,
         ir: Arc<ir::Module>,
@@ -180,10 +223,7 @@ impl<'a, A> ScopedSim<'a, A> {
                 to,
                 if let Some(delay) = &con.delay {
                     let link = delay.as_link_arc().unwrap();
-                    Some(Channel::new(
-                        ctx.path().appended_channel("ch"),
-                        ChannelMetrics::from(&*link),
-                    ))
+                    Some(Channel::new(ChannelMetrics::from(&*link)))
                 } else {
                     None
                 },

@@ -14,9 +14,7 @@ use super::globals;
 
 // # Internal mappings
 
-///
-/// A mapping of all parameters in a simulation context
-///
+/// A storage for all parameters associated with a simulation.
 #[derive(Debug)]
 pub struct ParMap {
     tree: RwLock<ParTree>,
@@ -41,9 +39,7 @@ enum ParTreePathMatching {
 }
 
 impl ParMap {
-    ///
     /// Creates a new `ParMap`.
-    ///
     #[must_use]
     pub fn new() -> ParMap {
         ParMap {
@@ -55,9 +51,9 @@ impl ParMap {
         globals().parameters.clone()
     }
 
+    /// Creates new entries from a raw input text.
     ///
-    /// Creates new entries from a raw input text
-    ///
+    /// See [`Sim::include_par`](crate::net::Sim) for more infomation.
     pub fn build(&self, raw_text: &str) {
         for line in raw_text.lines() {
             if let Some((key, value)) = line.split_once('=') {
@@ -186,9 +182,8 @@ impl ParTree {
                 .branches
                 .iter_mut()
                 .find(|b| b.matching.matches_w(comp))
-                .map(|b| b.node.remove(rem))
-                .unwrap_or(false),
-            None => self.pars.remove(&*key).is_some(),
+                .is_some_and(|b| b.node.remove(rem)),
+            None => self.pars.remove(key).is_some(),
         }
     }
 
@@ -233,7 +228,7 @@ impl Display for ParTreePathMatching {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Any => write!(f, "*"),
-            Self::Path(path) => write!(f, "{}", path),
+            Self::Path(path) => write!(f, "{path}"),
         }
     }
 }
@@ -246,9 +241,16 @@ impl Default for ParMap {
 
 // # External API
 
+/// A handle to a parameter associated to a node within the simulation.
 ///
-/// A handle for a requested parameter.
+/// This type is parameterized by a type-state parameter `S`.
+/// This parameter indicates whether the parameter is guaranteed to
+/// exist `S = Exists` or this remains in question `S = Optional`.
 ///
+/// This type provides methods to read an write parameters, based on the
+/// type state. `Par<Exists>` implement `Deref<Target = str>` so parameters
+/// can be extracted and perhaps parsed, as soon as the existence of the parameter
+/// is confirmed.
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Par<S = Optional>
 where
@@ -260,26 +262,20 @@ where
     _phantom: PhantomData<S>,
 }
 
-///
 /// The state of a [`Par`] where its not decided
 /// whether data is contained or not. Useful for writing data
 /// to not yet initalized parameters.
-///
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Optional;
 impl private::ParState for Optional {}
 
-///
 /// The state of a [`Par`] where the contents are guaranteed
 /// to be there, thus allowing derefs on the handle.
-///
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Exists;
 impl private::ParState for Exists {}
 
-///
 /// Errors that can occur in combination with [`Par`] objects.
-///
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ParError {
     /// This error occures if a write operation failed, since a write lock could
@@ -313,16 +309,56 @@ impl<S> Par<S>
 where
     S: private::ParState,
 {
+    /// Returns a handle allowing [`Deref`] on the contained
+    /// value, consuming self.
     ///
-    /// Unwraps the handle allowing [Deref] on the contained
-    /// value consuming self.
+    /// # Examples
+    ///
+    /// This example would succeed:
+    /// ```
+    /// # use des::prelude::*;
+    /// # use des::net::*;
+    /// let mut sim = Sim::new(());
+    /// sim.node("alice", ModuleFn::new(
+    ///     || {
+    ///         let par = par("addr")
+    ///             .expect("parameter 'addr' does not exist")
+    ///             .parse::<IpAddr>()
+    ///             .expect("parameter 'addr' failed to be parsed");
+    ///     },
+    ///     |_, _| {}
+    /// ));
+    /// sim.include_par("alice.addr = 198.168.2.1\n");
+    /// /* ... */
+    ///
+    /// let _ = Builder::new().build(sim).run();
+    /// ```
+    ///
+    /// While this would panic:
+    ///
+    /// ```should_panic
+    /// # use des::prelude::*;
+    /// # use des::net::*;
+    /// let mut sim = Sim::new(());
+    /// sim.node("alice", ModuleFn::new(
+    ///     || {
+    ///         let par = par("addr")
+    ///             .expect("parameter 'addr' does not exist")
+    ///             .parse::<IpAddr>()
+    ///             .expect("parameter 'addr' failed to be parsed");
+    ///     },
+    ///     |_, _| {}
+    /// ));
+    ///
+    /// let _ = Builder::new().build(sim).run();
+    /// ```
     ///
     /// # Panics
     ///
     /// This function panics of the Par points to no data.
     ///
     #[must_use]
-    pub fn unwrap(self) -> Par<Exists> {
+    pub fn expect(self, msg: &str) -> Par<Exists> {
         let map = ParMap::shared();
         if let Some(value) = map.get_rlock(&self.key, 1) {
             Par {
@@ -331,13 +367,20 @@ where
                 _phantom: PhantomData,
             }
         } else {
-            panic!("{} does not exist", self.key);
+            panic!("{msg}");
         }
     }
 
+    /// Returns a handle allowing [`Deref`] on the contained
+    /// value, consuming self.
     ///
+    /// See [`Par::expect`] for more information.
+    #[must_use]
+    pub fn unwrap(self) -> Par<Exists> {
+        self.expect("called `Par::unwrap` on a parameter that does not exist")
+    }
+
     /// Indicates whether the handle contains a value.
-    ///
     #[must_use]
     pub fn is_some(&self) -> bool {
         // (0) Shortciruit
@@ -350,19 +393,15 @@ where
         map.get_rlock(&self.key, 0).is_some()
     }
 
-    ///
     /// Indicates whether the handle contains a value.
-    ///
     #[must_use]
     pub fn is_none(&self) -> bool {
         !self.is_some()
     }
 
-    ///
     /// Returns the contained value optionaly, thereby losing the
     /// ability to set the par. This does not create a permantent
     /// read lock.
-    ///
     #[must_use]
     pub fn as_option(self) -> Option<String> {
         let map = ParMap::shared();
@@ -374,6 +413,25 @@ where
     /// # Errors
     ///
     /// Returns an error if other active locks exist for the datapoint.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use des::prelude::*;
+    /// # use des::net::*;
+    /// let mut sim = Sim::new(());
+    /// sim.node("alice", ModuleFn::new(
+    ///     || {
+    ///         assert!(par("addr").is_none());
+    ///         par("addr").set(IpAddr::V4(Ipv4Addr::new(192, 168, 2, 110)));
+    ///         assert!(par("addr").is_some());
+    ///         assert_eq!(&*par("addr").unwrap(), "192.168.2.110");
+    ///     },
+    ///     |_, _| {}
+    /// ));
+    ///
+    /// let _ = Builder::new().build(sim).run();
+    /// ```
     #[allow(clippy::needless_pass_by_value)]
     pub fn set(self, value: impl ToString) -> Result<Par<Exists>, ParError> {
         let map = ParMap::shared();
@@ -389,9 +447,29 @@ where
         }
     }
 
-    /// Remove the entry from the par storege.
-    /// 
+    /// Remove the entry from the par storage.
+    ///
     /// Returns a `Par` object with optional (in this case None) content.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use des::prelude::*;
+    /// # use des::net::*;
+    /// let mut sim = Sim::new(());
+    /// sim.node("alice", ModuleFn::new(
+    ///     || {
+    ///         assert!(par("addr").is_some());
+    ///         par("addr").unset();
+    ///         assert!(par("addr").is_none());
+    ///     },
+    ///     |_, _| {}
+    /// ));
+    /// sim.include_par("alice.addr = 192.168.2.110");
+    ///
+    /// let _ = Builder::new().build(sim).run();
+    /// ```
+    #[must_use]
     pub fn unset(self) -> Par<Optional> {
         let map = ParMap::shared();
         map.remove(&self.key);
@@ -404,10 +482,8 @@ where
 }
 
 impl Par<Exists> {
-    ///
     /// Uses a custom string parser to parse a string, timming
     /// quotation marks in the process.
-    ///
     #[allow(clippy::missing_panics_doc)]
     #[must_use]
     pub fn into_inner(&self) -> String {

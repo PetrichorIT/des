@@ -44,7 +44,6 @@ spin = { version = "*" }
 tracing = { version = "*" }
 tracing-subscriber = { version = "*", features = ["env-filter"] }
 nu-ansi-term = "*"
-termcolor = "*"
 fxhash = "0.2"
 pin-project-lite = "0.2"
 

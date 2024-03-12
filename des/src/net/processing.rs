@@ -85,7 +85,7 @@ use crate::{prelude::Message, sync::RwLock};
 /// - **Meta-Provider**: This kind of processing element attaches / modifies part of the incoming or
 ///    outgoing message stream to provide some new level of abstraction e.g. a VPN
 ///    or simulated network Interfaces.
-/// 
+///
 /// [`event_start`]: ProcessingElement::event_start
 /// [`event_end`]: ProcessingElement::event_end
 pub trait ProcessingElement: Any {
@@ -152,7 +152,7 @@ pub trait ProcessingElement: Any {
     ///     }
     /// }
     /// ```
-    /// 
+    ///
     /// [`event_start`]: ProcessingElement::event_start
     fn event_end(&mut self) {}
 
@@ -184,7 +184,7 @@ pub trait ProcessingElement: Any {
     ///     }    
     /// }
     /// ```
-    /// 
+    ///
     /// [`event_start`]: ProcessingElement::event_start
     fn incoming(&mut self, msg: Message) -> Option<Message> {
         Some(msg)
@@ -216,7 +216,15 @@ impl<T: Module> ProcessingElement for T {
     }
 }
 
-/// Base Module for Sync Base
+/// A base module that is used to load the default processing elements
+/// onto a module.
+///
+/// It's common for simulations to share a set of basic processing elements
+/// accross all nodes. The baseLoader is a maker type, that attaches all default
+/// plugins to a node, that relies on `BaseLoader` in its processing stack.
+///
+/// Use [`set_default_processing_elements`] to set the default processing
+/// elements.
 #[derive(Debug)]
 pub struct BaseLoader;
 
@@ -234,14 +242,15 @@ impl IntoProcessingElements for BaseLoader {
 }
 
 /// Sets a handler to create the default processing element of a module
-/// 
-/// # Panics 
-/// 
+///
+/// # Panics
+///
 /// May panic at interal misconfiguration
 pub fn set_default_processing_elements(f: fn() -> Vec<ProcessorElement>) {
     *SETUP_PROCESSING.try_write().expect("no lock") = f;
 }
 
+/// A untyped set of processing elements, effectivly a processing stack.
 #[doc(hidden)]
 #[allow(missing_debug_implementations)]
 pub struct ProcessingElements {
@@ -251,7 +260,7 @@ pub struct ProcessingElements {
     pub(super) handler: Box<dyn Module>,
 }
 
-/// PE
+/// A untyped processing element, using dynamic dispatch.
 #[allow(missing_debug_implementations)]
 pub struct ProcessorElement {
     inner: Box<dyn ProcessingElement>,
@@ -259,7 +268,7 @@ pub struct ProcessorElement {
 }
 
 impl ProcessorElement {
-    /// C
+    /// Creates a new type-erased wrapper around a concrete processing element.
     pub fn new<T: ProcessingElement>(inner: T) -> Self {
         Self {
             inner: Box::new(inner),

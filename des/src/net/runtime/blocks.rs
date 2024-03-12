@@ -98,6 +98,7 @@ where
     ///
     /// The parameter `policy` defines how an error will be processed, should
     /// one occur during the execution of the handler.
+    #[allow(clippy::missing_panics_doc)]
     pub fn failable(
         mut handler: Handler,
         policy: FailabilityPolicy,
@@ -111,7 +112,7 @@ where
                         current().path
                     ),
                     FailabilityPolicy::Continue | FailabilityPolicy::Restart => {
-                        tracing::error!("failed to process message, handler fn failed with: {e}")
+                        tracing::error!("failed to process message, handler fn failed with: {e}");
                     }
                 },
             },
@@ -124,7 +125,7 @@ where
     Handler: FnMut(Message) + 'static,
 {
     fn handle_message(&mut self, msg: Message) {
-        (self.inner)(msg)
+        (self.inner)(msg);
     }
 }
 
@@ -190,6 +191,8 @@ where
     ///
     /// The parameter `policy` defines how an error will be processed, should
     /// one occur during the execution of the handler.
+    #[allow(clippy::missing_panics_doc)]
+    #[allow(clippy::complexity)]
     pub fn failable(
         gen: Gen,
         mut handler: Handler,
@@ -234,9 +237,9 @@ where
 
     fn handle_message(&mut self, msg: Message) {
         let Some(state) = &mut self.current else {
-            unreachable!()
+            unreachable!("handle_message cannot be called before at_sim_start")
         };
-        (self.handler)(state, msg)
+        (self.handler)(state, msg);
     }
 }
 
@@ -313,7 +316,7 @@ cfg_async! {
         Fut: Future<Output = ()> + 'static,
     {
         fn reset(&mut self) {
-            self.join.as_ref().map(|handle| handle.abort());
+            if let Some(ref join) = self.join { join.abort() }
         }
 
         async fn at_sim_start(&mut self, _: usize) {
@@ -328,7 +331,7 @@ cfg_async! {
         }
 
         async fn handle_message(&mut self, msg: Message) {
-            self.tx.try_send(msg).expect("async module blocked")
+            self.tx.try_send(msg).expect("async module blocked");
         }
     }
 }

@@ -115,15 +115,12 @@ fn builder_async_fn_channeled() {
 
     txg.connect(
         rxg,
-        Some(Channel::new(
-            ObjectPath::new(),
-            ChannelMetrics {
-                bitrate: 10000,
-                latency: Duration::from_millis(20),
-                jitter: Duration::ZERO,
-                drop_behaviour: ChannelDropBehaviour::Queue(None),
-            },
-        )),
+        Some(Channel::new(ChannelMetrics {
+            bitrate: 10000,
+            latency: Duration::from_millis(20),
+            jitter: Duration::ZERO,
+            drop_behaviour: ChannelDropBehaviour::Queue(None),
+        })),
     );
 
     let _ = Builder::seeded(123).build(sim).run();

@@ -1,10 +1,6 @@
-use std::collections::hash_map::Values;
-
-use fxhash::{FxBuildHasher, FxHashMap};
-
-use crate::{net::module::ModuleRef, prelude::GateRef};
-
 use super::{globals, ObjectPath};
+use crate::{net::module::ModuleRef, prelude::GateRef};
+use fxhash::{FxBuildHasher, FxHashMap};
 
 ///
 /// A mapping of all connections in a module connection graph.
@@ -97,8 +93,8 @@ impl Topology {
     /// the topology from the ground up using the `ModuleRef` stored in the
     /// node information.
     #[allow(clippy::missing_panics_doc)]
-    pub fn build<'a>(&mut self, modules: Values<'_, ObjectPath, ModuleRef>) {
-        for module in modules.clone() {
+    pub fn build(&mut self, modules: &[ModuleRef]) {
+        for module in modules {
             self.nodes.push(TopoNode {
                 module: module.clone(),
                 degree: 0,

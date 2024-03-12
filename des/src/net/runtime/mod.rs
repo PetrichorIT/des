@@ -2,21 +2,23 @@ use super::par::ParMap;
 use super::Topology;
 use crate::{
     net::module::ModuleContext,
-    prelude::{Application, EventLifecycle, GateRef, Module, ModuleRef, ObjectPath},
+    prelude::{Application, EventLifecycle, GateRef, Module, ModuleRef, ObjectPath, Runtime},
     tracing::{enter_scope, leave_scope},
 };
-use fxhash::{FxBuildHasher, FxHashMap};
 use std::{
-    fs, io,
+    fs, io, ops,
     path::Path,
     sync::{Arc, Mutex},
 };
 
+mod api;
+pub use self::api::*;
+
 mod events;
-pub(crate) use events::*;
+pub(crate) use self::events::*;
 
 mod ctx;
-pub use self::ctx::*;
+pub(crate) use self::ctx::*;
 
 mod blocks;
 pub use self::blocks::*;
@@ -57,7 +59,7 @@ pub use self::blocks::*;
 /// ```
 #[derive(Debug)]
 pub struct Sim<A> {
-    pub(crate) modules: FxHashMap<ObjectPath, ModuleRef>,
+    pub(crate) modules: ModuleTree,
     globals: Arc<Globals>,
     /// A inner field of a network simulation that can be used to attach
     /// custom lifetime handlers to a simulation
@@ -116,7 +118,7 @@ impl<A> Sim<A> {
     /// This allready binds the simulation globals to this instance.
     pub fn new(inner: A) -> Self {
         let this = Self {
-            modules: FxHashMap::with_hasher(FxBuildHasher::default()),
+            modules: ModuleTree::default(),
             globals: Arc::new(Globals::new()),
             inner,
         };
@@ -160,7 +162,7 @@ impl<A> Sim<A> {
 
     /// Tries to read and include parameters from a file into the simulation.
     ///
-    /// See [`include_par`] for more infomation.
+    /// See [`Sim::include_par`] for more infomation.
     ///
     /// # Errors
     ///
@@ -214,12 +216,12 @@ impl<A> Sim<A> {
     /// ```
     pub fn node(&mut self, path: impl Into<ObjectPath>, module_block: impl ModuleBlock) {
         let scoped = ScopedSim::new(self, path.into());
-        module_block.build(scoped)
+        module_block.build(scoped);
     }
 
     /// Retrieves a module by reference from the simulation.
     pub fn get(&self, path: &ObjectPath) -> Option<ModuleRef> {
-        self.modules.get(&path).cloned()
+        self.modules.get(path)
     }
 
     /// Creates a gate on a allready created module.
@@ -245,6 +247,10 @@ impl<A> Sim<A> {
     ///
     /// let _ = Builder::new().build(sim).run();
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// This function panic if node modules exists at `path`.
     pub fn gate(&mut self, path: impl Into<ObjectPath>, gate: &str) -> GateRef {
         let path = path.into();
         let Some(module) = self.get(&path) else {
@@ -262,6 +268,11 @@ impl<A> Sim<A> {
     /// The module will be defined `path` and the gate cluster will be named `gate`.
     /// Should such a gate cluster allready exist, the allready existing gate will be
     /// returned.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if either, not module exists at `path`, or
+    /// some parts of the gate cluster allready exist, but others do not.
     pub fn gates(&mut self, path: impl Into<ObjectPath>, gate: &str, size: usize) -> Vec<GateRef> {
         let path = path.into();
         let Some(module) = self.get(&path) else {
@@ -278,16 +289,20 @@ impl<A> Sim<A> {
         if gates.len() == size {
             gates
         } else {
-            assert!(gates.is_empty());
+            assert!(
+                gates.is_empty(),
+                "cannot create gate cluster from partial gate cluster"
+            );
             module.create_gate_cluster(gate, size)
         }
     }
 
     fn raw(&mut self, path: ObjectPath, module: impl Module) -> ModuleRef {
         // Check dup
-        if self.modules.get(&path).is_some() {
-            panic!("cannot create node '{path}', node allready exists");
-        }
+        assert!(
+            self.modules.get(&path).is_none(),
+            "cannot create node '{path}', node allready exists"
+        );
 
         // Check node path location
         let ctx = if let Some(parent) = path.nonzero_parent() {
@@ -298,7 +313,7 @@ impl<A> Sim<A> {
 
             ModuleContext::child_of(path.name(), parent)
         } else {
-            ModuleContext::standalone(path.clone())
+            ModuleContext::standalone(path)
         };
         ctx.activate();
 
@@ -306,7 +321,7 @@ impl<A> Sim<A> {
         ctx.upgrade_dummy(pe);
 
         // TODO: deactivate module
-        self.modules.insert(path, ctx.clone());
+        self.modules.add(ctx.clone());
         ctx
     }
 }
@@ -317,7 +332,7 @@ impl<'a, A> ScopedSim<'a, A> {
     }
 
     #[allow(unused)]
-    pub(crate) fn subscope<'b>(&'b mut self, path: impl AsRef<str>) -> ScopedSim<'b, A> {
+    pub(crate) fn subscope(&mut self, path: impl AsRef<str>) -> ScopedSim<'_, A> {
         ScopedSim {
             base: &mut *self.base,
             scope: self.scope.appended(path),
@@ -325,11 +340,13 @@ impl<'a, A> ScopedSim<'a, A> {
     }
 
     /// The current scope from an absoute prespective.
+    #[must_use]
     pub fn scope(&self) -> &ObjectPath {
         &self.scope
     }
 
     /// The inner application of the simulation `Sim<A>`.
+    #[must_use]
     pub fn inner(&self) -> &A {
         &self.base.inner
     }
@@ -380,13 +397,13 @@ impl<A> EventLifecycle<Sim<A>> for SimLifecycle
 where
     A: EventLifecycle<Sim<A>>,
 {
-    fn at_sim_start(rt: &mut crate::prelude::Runtime<Sim<A>>) {
+    fn at_sim_start(rt: &mut Runtime<Sim<A>>) {
         rt.app
             .globals
             .topology
             .lock()
             .expect("could not get topology lock")
-            .build(rt.app.modules.values());
+            .build(&rt.app.modules);
 
         // (2) Run network-node sim_starting stages
         // - inline this to ensure this is run before any possible events
@@ -397,13 +414,13 @@ where
         let max_stage = rt
             .app
             .modules
-            .values()
+            .iter()
             .fold(1, |acc, module| acc.max(module.num_sim_start_stages()));
 
         // (2.1) Call the stages in order, parallel over all modules
         for stage in 0..max_stage {
             // Direct indexing since rt must be borrowed mutably in handle_buffers.
-            for module in rt.app.modules.values().cloned().collect::<Vec<_>>() {
+            for module in rt.app.modules.iter().cloned().collect::<Vec<_>>() {
                 // Use cloned handles to appease the brwchk
                 if stage < module.num_sim_start_stages() {
                     module.activate();
@@ -422,7 +439,7 @@ where
         // (2.2) Ensure all sim_start stages have finished, in an async context
         #[cfg(feature = "async")]
         {
-            for module in rt.app.modules.values().cloned().collect::<Vec<_>>() {
+            for module in rt.app.modules.iter().cloned().collect::<Vec<_>>() {
                 module.activate();
                 module.finish_sim_start();
                 module.deactivate(rt);
@@ -436,10 +453,10 @@ where
         A::at_sim_start(rt);
     }
 
-    fn at_sim_end(rt: &mut crate::prelude::Runtime<Sim<A>>) {
+    fn at_sim_end(rt: &mut Runtime<Sim<A>>) {
         A::at_sim_end(rt);
 
-        for module in rt.app.modules.values().cloned().collect::<Vec<_>>() {
+        for module in rt.app.modules.iter().cloned().collect::<Vec<_>>() {
             enter_scope(module.scope_token());
 
             #[cfg(feature = "tracing")]
@@ -454,7 +471,7 @@ where
         #[cfg(feature = "async")]
         {
             // Ensure all sim_start stages have finished
-            for module in rt.app.modules.values().cloned().collect::<Vec<_>>() {
+            for module in rt.app.modules.iter().cloned().collect::<Vec<_>>() {
                 // enter_scope(module.scope_token());
 
                 module.activate();
@@ -468,7 +485,7 @@ where
 }
 
 ///
-/// The global parameters about a [`NetworkApplication`] that are publicly
+/// The global parameters about a [`Sim`] that are publicly
 /// exposed.
 ///
 #[derive(Debug)]
@@ -501,5 +518,90 @@ impl Globals {
 impl Default for Globals {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct ModuleTree {
+    modules: Vec<ModuleRef>,
+}
+
+impl ModuleTree {
+    pub(crate) fn get(&self, path: &ObjectPath) -> Option<ModuleRef> {
+        self.modules
+            .iter()
+            .find(|module| module.path == *path)
+            .cloned()
+    }
+
+    pub(crate) fn add(&mut self, module: ModuleRef) {
+        if let Some(parent) = module.path.parent() {
+            if parent.is_root() {
+                // root either non existen or at index 0
+                self.modules.push(module);
+            } else {
+                let parent_depth = parent.len();
+
+                // search for parent insert at last possible position
+                let Some(mut pos) = self.modules.iter().rposition(|m| m.path == parent) else {
+                    panic!("cannot create node '{}', since parent node '{parent}' is required, but does not exist", module.path)
+                };
+                pos += 1;
+
+                // (iter as long as we stay at path lengths > parent)
+                while pos < self.modules.len() && self.modules[pos].path.len() > parent_depth {
+                    pos += 1;
+                }
+                self.modules.insert(pos, module);
+            }
+        } else {
+            // No parent
+            self.modules.push(module);
+        }
+    }
+}
+
+impl ops::Deref for ModuleTree {
+    type Target = [ModuleRef];
+    fn deref(&self) -> &Self::Target {
+        &self.modules
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn module_tree() {
+        let mut tree = ModuleTree::default();
+        fn module(path: &str) -> ModuleRef {
+            ModuleContext::standalone(path.into())
+        }
+
+        tree.add(module("alice"));
+        tree.add(module("alice.alicent"));
+        tree.add(module("alice.john"));
+        tree.add(module("alice.john.previous"));
+        tree.add(module("bob"));
+        tree.add(module("eve"));
+        tree.add(module("eve.trevor"));
+        tree.add(module("eve.trevor.list"));
+        tree.add(module("eve.mark"));
+
+        assert_eq!(
+            tree.iter().map(|v| v.path.as_str()).collect::<Vec<_>>(),
+            [
+                "alice",
+                "alice.alicent",
+                "alice.john",
+                "alice.john.previous",
+                "bob",
+                "eve",
+                "eve.trevor",
+                "eve.trevor.list",
+                "eve.mark"
+            ]
+        );
     }
 }

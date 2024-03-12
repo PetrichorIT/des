@@ -42,7 +42,7 @@ where
     /// Since events sets are usually macro-generated this is just a match statement that calls
     /// the handle function on the given variant, as defined by the trait [Event].
     ///
-    fn handle(self, rt: &mut Runtime<A>);
+    fn handle(self, runtime: &mut Runtime<A>);
 }
 
 ///
@@ -67,7 +67,7 @@ where
     /// but could lead to unexpected behaviour if not done properly in custom
     /// event set implementations.
     ///
-    fn handle(self, rt: &mut Runtime<App>);
+    fn handle(self, runtime: &mut Runtime<App>);
 }
 
 ///
@@ -93,13 +93,14 @@ pub trait EventLifecycle<A = Self> {
     ///     type Lifecycle = Self;
     /// }
     /// impl EventLifecycle for MyApp {
-    ///     fn at_sim_start(rt: &mut Runtime<Self>) {
-    ///         rt.app.workers.iter_mut().for_each(|w| w.initalize());
+    ///     fn at_sim_start(runtime: &mut Runtime<Self>) {
+    ///         runtime.app.workers.iter_mut().for_each(|w| w.initalize());
     ///     }
     /// }
     /// ```
     ///
-    fn at_sim_start(_rt: &mut Runtime<A>)
+    #[allow(unused_variables)]
+    fn at_sim_start(runtime: &mut Runtime<A>)
     where
         A: Application,
     {
@@ -130,7 +131,8 @@ pub trait EventLifecycle<A = Self> {
     /// }
     /// ```
     ///
-    fn at_sim_end(_rt: &mut Runtime<A>)
+    #[allow(unused_variables)]
+    fn at_sim_end(runtime: &mut Runtime<A>)
     where
         A: Application,
     {

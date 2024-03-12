@@ -424,27 +424,21 @@ fn shutdown_will_drop_transiting_delayed_channels() {
 
     ping.connect(
         con.clone(),
-        Some(Channel::new(
-            ObjectPath::new(),
-            ChannelMetrics {
-                bitrate: 100_000,
-                latency: Duration::from_secs_f64(0.004),
-                jitter: Duration::ZERO,
-                drop_behaviour: ChannelDropBehaviour::default(),
-            },
-        )),
+        Some(Channel::new(ChannelMetrics {
+            bitrate: 100_000,
+            latency: Duration::from_secs_f64(0.004),
+            jitter: Duration::ZERO,
+            drop_behaviour: ChannelDropBehaviour::default(),
+        })),
     );
     con.connect(
         pong,
-        Some(Channel::new(
-            ObjectPath::new(),
-            ChannelMetrics {
-                bitrate: 100_000,
-                latency: Duration::from_secs_f64(0.004),
-                jitter: Duration::ZERO,
-                drop_behaviour: ChannelDropBehaviour::default(),
-            },
-        )),
+        Some(Channel::new(ChannelMetrics {
+            bitrate: 100_000,
+            latency: Duration::from_secs_f64(0.004),
+            jitter: Duration::ZERO,
+            drop_behaviour: ChannelDropBehaviour::default(),
+        })),
     );
 
     let rt = Builder::seeded(123).max_itr(500).build(app);

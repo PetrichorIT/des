@@ -36,22 +36,15 @@ struct BufferContext {
 unsafe impl Send for BufferContext {}
 unsafe impl Sync for BufferContext {}
 
-///
-/// Returns the globals of the runtime.
-///
-/// # Panics
-///
-/// This function panics if the no runtime is currently active.
-/// Note that a runtime is active if a instance of [`NetworkApplication`] exists.
-///
-#[must_use]
-pub fn globals() -> Arc<Globals> {
-    let ctx = BUF_CTX.lock();
-    ctx.globals
-        .as_ref()
-        .unwrap()
-        .upgrade()
-        .expect("No runtime globals attached")
+impl Globals {
+    pub(crate) fn current() -> Arc<Self> {
+        let ctx = BUF_CTX.lock();
+        ctx.globals
+            .as_ref()
+            .unwrap()
+            .upgrade()
+            .expect("No runtime globals attached")
+    }
 }
 
 pub(crate) fn buf_send_at(mut msg: Message, gate: GateRef, send_time: SimTime) {

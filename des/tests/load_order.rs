@@ -1,92 +1,38 @@
-// #![cfg(feature = "net")]
-// #![allow(unused)]
-// use des::{prelude::*, registry};
-// use serial_test::serial;
+#![cfg(feature = "net")]
 
-// #[macro_use]
-// mod common;
+use des::net::ModuleFn;
+use des::prelude::*;
+use std::sync::{atomic::AtomicU16, Arc};
 
-// struct TopLevelModule {
-//     state: u32,
-// }
+#[test]
+fn load_order() {
+    let state = Arc::new(AtomicU16::new(0));
+    let mut sim = Sim::new(());
 
-// impl Module for TopLevelModule {
-//     fn new() -> Self {
-//         println!("### TopLevelModule::new");
-//         Self { state: 42 }
-//     }
-// }
+    macro_rules! stage {
+        ($i:ident == $l:literal) => {{
+            let old = $i.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            assert_eq!(old, $l);
+        }};
+    }
 
-// struct MidLevelModule {
-//     state: i64,
-// }
+    let s2 = state.clone();
+    sim.node("alice", ModuleFn::new(move || stage!(s2 == 0), |_, _| {}));
+    let s2 = state.clone();
+    sim.node(
+        "alice.submodule",
+        ModuleFn::new(move || stage!(s2 == 1), |_, _| {}),
+    );
+    let s2 = state.clone();
+    sim.node(
+        "alice.bob",
+        ModuleFn::new(move || stage!(s2 == 3), |_, _| {}),
+    );
+    let s2 = state.clone();
+    sim.node(
+        "alice.submodule.sub",
+        ModuleFn::new(move || stage!(s2 == 2), |_, _| {}),
+    );
 
-// impl Module for MidLevelModule {
-//     fn new() -> Self {
-//         // gates loaded
-//         assert!(current().gate("in", 0).is_some());
-//         assert!(current().gate("out", 0).is_some());
-
-//         // child loaded
-//         let child = current().child("child");
-//         assert!(child.is_ok());
-//         assert!(child
-//             .as_ref()
-//             .unwrap()
-//             .try_as_ref::<LowLevelModule>()
-//             .is_some());
-//         assert_eq!(
-//             child.as_ref().unwrap().as_ref::<LowLevelModule>().state,
-//             0u8
-//         );
-
-//         // parent not loaded yet
-//         let parent = current().parent();
-//         assert!(parent.is_err());
-//         assert!(matches!(
-//             parent.unwrap_err(),
-//             ModuleReferencingError::NotYetInitalized(_)
-//         ));
-
-//         Self { state: -69 }
-//     }
-
-//     fn at_sim_start(&mut self, _stage: usize) {
-//         let parent = current().parent();
-//         assert!(parent.is_ok());
-//         assert!(parent
-//             .as_ref()
-//             .unwrap()
-//             .try_as_ref::<TopLevelModule>()
-//             .is_some());
-//     }
-// }
-
-// struct LowLevelModule {
-//     state: u8,
-// }
-
-// impl Module for LowLevelModule {
-//     fn new() -> Self {
-//         assert!(current().gate("in", 0).is_some());
-//         assert!(current().gate("out", 0).is_some());
-
-//         Self { state: 0 }
-//     }
-// }
-
-// #[test]
-// #[serial]
-// fn load_order() {
-//     let rt = NetworkApplication::new(
-//         NdlApplication::new(
-//             "tests/load_order.ndl",
-//             registry![TopLevelModule, MidLevelModule, LowLevelModule],
-//         )
-//         .map_err(|e| println!("{e}"))
-//         .unwrap(),
-//     );
-//     let rt = Builder::new().build(rt);
-
-//     let _ = rt.run();
-// }
+    let _ = Builder::seeded(123).build(sim).run();
+}

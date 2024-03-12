@@ -21,6 +21,8 @@ pub fn set_setup_fn(f: fn(&ModuleContext)) {
 /// handle can be used on inspect and change the modules simulation
 /// properties, independent of the modules processing elements.
 ///
+/// > *This function requires a node-context within the simulation*
+///
 /// **This handle is only fully valid, during the execution of the current event,
 /// thus is should never be stored.**
 ///
@@ -53,6 +55,8 @@ pub fn current() -> Arc<ModuleContext> {
 
 /// Shuts down all activity for the module.
 ///
+/// > *This function requires a node-context within the simulation*
+///
 /// A module that is shut down, will not longer be able to
 /// handle incoming messages, or run any user-defined code.
 /// All plugin activity will be suspendend. However the
@@ -64,9 +68,10 @@ pub fn shutdown() {
     buf_schedule_shutdown(None);
 }
 
-///
 /// Shuts down all activity for the module.
 /// Restarts after the given duration.
+///
+/// > *This function requires a node-context within the simulation*
 ///
 /// On restart the module will be reinitalized
 /// using `Module::reset`  and then `Module::at_sim_start`.
@@ -121,9 +126,10 @@ pub fn shutdow_and_restart_in(dur: Duration) {
     buf_schedule_shutdown(Some(SimTime::now() + dur));
 }
 
-///
 /// Shuts down all activity for the module.
 /// Restarts at the given time.
+///
+/// > *This function requires a node-context within the simulation*
 ///
 /// The user must ensure that the restart time
 /// point is greater or equal to the current simtime.
