@@ -1,5 +1,5 @@
-use super::par::ParMap;
 use super::Topology;
+use super::{module::MOD_CTX, par::ParMap};
 use crate::{
     net::module::ModuleContext,
     prelude::{Application, EventLifecycle, GateRef, Module, ModuleRef, ObjectPath, Runtime},
@@ -323,6 +323,16 @@ impl<A> Sim<A> {
         // TODO: deactivate module
         self.modules.add(ctx.clone());
         ctx
+    }
+}
+
+impl<A> Drop for Sim<A> {
+    fn drop(&mut self) {
+        // SAFETY: Remove ctxs, since the next use of a `Sim` may occur on
+        // a different thread
+        unsafe {
+            MOD_CTX.reset(None);
+        }
     }
 }
 

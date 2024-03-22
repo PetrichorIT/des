@@ -1,4 +1,4 @@
-use std::{error::Error, time::Duration};
+use std::{error::Error, fmt::Formatter, pin::Pin, time::Duration};
 
 use crate::{
     net::{message::Message, module::Module},
@@ -282,39 +282,81 @@ cfg_async! {
     ///
     /// let _ = Builder::new().build(sim).run();
     /// ```
-    #[derive(Debug)]
-    pub struct AsyncFn<Gen, Fut>
-    where
-        Gen: FnMut(Receiver<Message>) -> Fut,
-        Fut: Future<Output = ()>,
+    pub struct AsyncFn
     {
-        gen: Gen,
+        gen: BoxedGen,
 
         join: Option<JoinHandle<()>>,
         tx: Sender<Message>,
-        rx: Option<Receiver<Message>>
+        rx: Option<Receiver<Message>>,
 
+        require_join: bool,
     }
 
-    impl<Gen, Fut> AsyncFn<Gen, Fut>
-    where
-        Gen: FnMut(Receiver<Message>) -> Fut,
-        Gen: Send,
-        Fut: Future<Output = ()>,
-    {
+    type BoxedGen = Box<dyn FnMut(Receiver<Message>) -> BoxedFuture + Send>;
+    type BoxedFuture = Pin<Box<dyn Future<Output = ()> + Send>>;
+
+    impl AsyncFn {
+        /// Sets the handler to require a join
+        pub fn require_join(mut self) -> Self {
+            self.require_join = true;
+            self
+        }
+
         /// Creates a new instance using the generator function.
-        pub fn new(gen: Gen) -> Self {
+        pub fn new<Gen, Fut>(mut gen: Gen) -> Self
+        where
+            Gen: FnMut(Receiver<Message>) -> Fut,
+            Gen: Send + 'static,
+            Fut: Future<Output = ()>,
+            Fut: Send + 'static,
+        {
             let (tx, rx) = mpsc::channel(8);
-            Self { gen, join: None, tx, rx: Some(rx) }
+            Self { gen: Box::new(move |rx| Box::pin(gen(rx))), join: None, tx, rx: Some(rx), require_join: false }
+        }
+
+        /// Creates a new instance using the generator function.
+        pub fn failable<Failable, Fut, Err>(mut gen: Failable) -> Self
+        where
+            Failable: FnMut(Receiver<Message>) -> Fut,
+            Failable: Send + 'static,
+            Fut: Future<Output = Result<(), Err>>,
+            Fut: Send + 'static,
+            Err: Error
+        {
+            let (tx, rx) = mpsc::channel(8);
+            Self {
+                gen: Box::new(move |rx| {
+                    let fut = gen(rx);
+                    Box::pin(async move {
+                        match fut.await {
+                            Ok(()) => {},
+                            Err(e) => {
+                                panic!("node {} paniced at failable operation: {e}", current().path());
+                            },
+                        }
+                    })
+                }),
+                join: None,
+                tx,
+                rx: Some(rx),
+                require_join: false
+            }
+        }
+
+        /// Makes an io::error exepctor
+        pub fn io<Gen, Fut>(gen: Gen) -> Self
+        where
+            Gen: FnMut(Receiver<Message>) -> Fut,
+            Gen: Send + 'static,
+            Fut: Future<Output = std::io::Result<()>>,
+            Fut: Send + 'static,
+        {
+            Self::failable(gen)
         }
     }
 
-    impl<Gen, Fut> AsyncModule for AsyncFn<Gen, Fut>
-    where
-        Gen: FnMut(Receiver<Message>) -> Fut + 'static,
-        Gen: Send,
-        Fut: Future<Output = ()> + 'static,
-    {
+    impl AsyncModule for AsyncFn {
         fn reset(&mut self) {
             if let Some(ref join) = self.join { join.abort() }
         }
@@ -327,11 +369,25 @@ cfg_async! {
             });
 
             let fut = (self.gen)(rx);
-            self.join = Some(tokio::task::spawn_local(fut));
+            self.join = Some(tokio::task::spawn(fut));
         }
 
         async fn handle_message(&mut self, msg: Message) {
             self.tx.try_send(msg).expect("async module blocked");
+        }
+
+        async fn at_sim_end(&mut self) {
+            if let Some(join) = self.join.take() {
+                if join.is_finished() || self.require_join {
+                    join.await.expect("inner async task should have succeeded");
+                }
+            }
+        }
+    }
+
+    impl std::fmt::Debug for AsyncFn {
+        fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+            write!(f, "AsyncFn")
         }
     }
 }

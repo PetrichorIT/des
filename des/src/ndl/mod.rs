@@ -45,10 +45,7 @@
 //! ```
 
 use crate::{
-    net::{
-        channel::ChannelDropBehaviour, module::ModuleContext, processing::ProcessingElements,
-        ScopedSim, Sim,
-    },
+    net::{channel::ChannelDropBehaviour, module::ModuleContext, ScopedSim, Sim},
     prelude::{Channel, ChannelMetrics, ModuleRef, ObjectPath},
     time::Duration,
 };
@@ -100,6 +97,8 @@ impl<A> Sim<A> {
     /// object of a network simulation, which can be used to define custom
     /// actions at sim start / end.
     ///
+    /// **NOTE** that the nodes will be created with a call to this function.
+    ///
     /// # Errors
     ///
     /// Some Errors
@@ -108,6 +107,19 @@ impl<A> Sim<A> {
         registry: impl AsRef<Registry>,
         inner: A,
     ) -> RootResult<Self> {
+        let mut this = Sim::new(inner);
+        this.build_ndl(path, registry)?;
+        Ok(this)
+    }
+
+    /// Builds a NDL based application with onto an allready existing [`Sim`] object.
+    ///
+    /// See [`Sim::ndl_with`] for more infomation.
+    pub fn build_ndl(
+        &mut self,
+        path: impl AsRef<Path>,
+        registry: impl AsRef<Registry>,
+    ) -> RootResult<()> {
         let mut ctx = Context::load(path)?;
         let Some(tree) = ctx.entry.take() else {
             return Err(RootError::single(
@@ -116,21 +128,19 @@ impl<A> Sim<A> {
             ));
         };
 
-        // Build network
-        let mut this = Sim::new(inner);
         let mut errors = Errors::new().as_mut();
 
-        let scoped = ScopedSim::new(&mut this, ObjectPath::new());
+        let scoped = ScopedSim::new(self, ObjectPath::new());
         let _ = scoped.ndl(tree, &mut errors, registry.as_ref());
 
         if errors.is_empty() {
-            Ok(this)
+            Ok(())
         } else {
             Err(RootError::new(errors.into_inner(), ctx.smap))
         }
     }
 
-    fn raw_ndl(&mut self, path: ObjectPath, pe: ProcessingElements) -> ModuleRef {
+    fn raw_ndl(&mut self, path: &ObjectPath, ty: &str, registry: &Registry) -> Option<ModuleRef> {
         // Check dup
         assert!(
             self.modules.get(&path).is_none(),
@@ -146,14 +156,14 @@ impl<A> Sim<A> {
 
             ModuleContext::child_of(path.name(), parent)
         } else {
-            ModuleContext::standalone(path)
+            ModuleContext::standalone(path.clone())
         };
         ctx.activate();
-        ctx.upgrade_dummy(pe);
+        ctx.upgrade_dummy(registry.lookup(&path, ty)?);
 
         // TODO: deactivate module
         self.modules.add(ctx.clone());
-        ctx
+        Some(ctx)
     }
 }
 
@@ -167,15 +177,14 @@ impl<'a, A> ScopedSim<'a, A> {
     ) -> Option<ModuleRef> {
         let ty = ir.ident.raw.clone();
         let scope = &self.scope;
-        let Some(block) = registry.lookup(scope, &ty) else {
+
+        let Some(ctx) = self.base.raw_ndl(scope, &ty, registry) else {
             errors.add(Error::new(
                 ErrorKind::SymbolNotFound,
                 format!("symbol '{ty}' at '{scope}' could not be resolved by the registry"),
             ));
             return None;
         };
-
-        let ctx = self.base.raw_ndl(scope.clone(), block);
 
         for gate in &ir.gates {
             let _ = ctx.create_gate_cluster(&gate.ident.raw, gate.cluster.as_size());

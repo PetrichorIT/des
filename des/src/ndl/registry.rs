@@ -15,6 +15,9 @@ use crate::{
 pub trait RegistryCreatable {
     /// Creates a instance of `Self` from a path and symbol.
     ///
+    /// This function if called by [`Sim::ndl`](crate::net::Sim) will be called
+    /// within node-context.
+    ///
     /// # Examples
     ///
     /// ```

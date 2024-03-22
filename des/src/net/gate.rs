@@ -5,6 +5,7 @@ use std::fmt::Debug;
 use std::sync::{Arc, Mutex, Weak};
 
 use super::module::{ModuleContext, ModuleRef, ModuleRefWeak};
+use super::ObjectPath;
 
 ///
 /// A  reference to a gate.
@@ -214,8 +215,8 @@ impl Gate {
     /// The full tree path of the gate.
     ///
     #[must_use]
-    pub fn path(&self) -> String {
-        format!("{}:{}", self.owner().ctx.path, self.name_with_pos())
+    pub fn path(&self) -> ObjectPath {
+        self.owner().ctx.path.appended_gate(self.name_with_pos())
     }
 
     /// Returns the kind of operations allowed on this gate.

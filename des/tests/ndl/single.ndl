@@ -1,0 +1,9 @@
+module Single {}
+
+module Main {
+    submodules {
+        alice: Single
+    }
+}
+
+entry Main;

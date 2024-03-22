@@ -141,3 +141,26 @@ fn ring_topology() -> RootResult<()> {
     assert_eq!(r.1.as_secs(), 200);
     Ok(())
 }
+
+struct Single;
+
+impl RegistryCreatable for Single {
+    fn create(path: &ObjectPath, _: &str) -> Self {
+        println!("{path}");
+        assert!(par("addr").is_some());
+        Self
+    }
+}
+
+impl Module for Single {}
+
+#[test]
+#[serial]
+fn build_with_preexisting_sim() {
+    let mut sim = Sim::new(());
+    sim.include_par("alice.addr = 1.1.1.1\n");
+    sim.build_ndl("tests/ndl/single.ndl", registry![Single, else _])
+        .unwrap();
+
+    let _ = Builder::seeded(123).build(sim).run();
+}

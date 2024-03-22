@@ -145,6 +145,13 @@ impl ObjectPath {
             is_gate: false,
         }
     }
+
+    /// Retruns a new object path pointing to the gate on the current module.
+    pub fn appended_gate(&self, gate: impl AsRef<str>) -> Self {
+        let mut appended = self.appended(gate);
+        appended.is_gate = true;
+        appended
+    }
 }
 
 impl fmt::Display for ObjectPath {

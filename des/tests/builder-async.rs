@@ -1,8 +1,11 @@
 #![cfg(feature = "async")]
 
-use std::sync::{
-    atomic::{AtomicBool, AtomicU16, Ordering},
-    Arc,
+use std::{
+    io,
+    sync::{
+        atomic::{AtomicBool, AtomicU16, Ordering},
+        Arc,
+    },
 };
 
 use des::{net::AsyncFn, prelude::*, time::sleep};
@@ -125,4 +128,39 @@ fn builder_async_fn_channeled() {
 
     let _ = Builder::seeded(123).build(sim).run();
     assert_eq!(counter.load(Ordering::SeqCst), (0..16).sum());
+}
+
+#[test]
+#[serial]
+fn builder_async_failable() {
+    let mut sim = Sim::new(());
+    sim.node(
+        "alice",
+        AsyncFn::failable(|_| async move {
+            if false {
+                return Err(io::Error::new(io::ErrorKind::Other, "other"));
+            }
+
+            Ok(())
+        }),
+    );
+    let _ = Builder::new().build(sim).run();
+}
+
+#[test]
+#[serial]
+#[should_panic]
+fn builder_async_failable_with_fail() {
+    let mut sim = Sim::new(());
+    sim.node(
+        "alice",
+        AsyncFn::failable(|_| async move {
+            if true {
+                return Err(io::Error::new(io::ErrorKind::Other, "other"));
+            }
+
+            Ok(())
+        }),
+    );
+    let _ = Builder::new().build(sim).run();
 }
