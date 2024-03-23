@@ -2,7 +2,7 @@
 
 use std::io;
 
-use des::net::{par_export, Par};
+use des::net::{par_export, ModuleFn, Par};
 use des::prelude::*;
 use serial_test::serial;
 
@@ -31,6 +31,8 @@ fn non_parse_read() {
     let par = &rt.globals().parameters;
 
     par.build(EXAMPLE_NETWORK);
+
+    assert!(par_for_r("netB.s1", "dnsServer").is_none());
 
     // Case "netA.s0"
     assert_eq!(
@@ -128,6 +130,44 @@ fn parse_strings() {
 
     assert_eq!(&*handle, "\"My name\"");
     assert_eq!(handle.into_inner(), "My name".to_string());
+}
+
+#[test]
+#[serial]
+fn par_remove() {
+    let mut sim = Sim::new(());
+    sim.globals().parameters.build("counter = 123");
+    sim.node(
+        "",
+        ModuleFn::new(
+            || {
+                assert!(par("counter").is_some());
+                let _ = par("counter").unset();
+                assert!(par("counter").is_none());
+            },
+            |_, _| {},
+        ),
+    );
+
+    let _ = Builder::seeded(123).build(sim).run();
+}
+
+#[test]
+#[serial]
+#[should_panic = "failed to unwrap addr"]
+fn par_panic() {
+    let mut sim = Sim::new(());
+    sim.node(
+        "",
+        ModuleFn::new(
+            || {
+                let _ = par("addr").expect("failed to unwrap addr");
+            },
+            |_, _| {},
+        ),
+    );
+
+    let _ = Builder::seeded(123).build(sim).run();
 }
 
 #[test]

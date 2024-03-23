@@ -298,6 +298,7 @@ cfg_async! {
 
     impl AsyncFn {
         /// Sets the handler to require a join
+        #[must_use]
         pub fn require_join(mut self) -> Self {
             self.require_join = true;
             self
@@ -316,6 +317,7 @@ cfg_async! {
         }
 
         /// Creates a new instance using the generator function.
+        #[allow(clippy::missing_panics_doc)]
         pub fn failable<Failable, Fut, Err>(mut gen: Failable) -> Self
         where
             Failable: FnMut(Receiver<Message>) -> Fut,
@@ -379,7 +381,11 @@ cfg_async! {
         async fn at_sim_end(&mut self) {
             if let Some(join) = self.join.take() {
                 if join.is_finished() || self.require_join {
-                    join.await.expect("inner async task should have succeeded");
+                    match join.await {
+                        Ok(_) => {},
+                        Err(e) if e.is_cancelled() => {}
+                        Err(e) => panic!("{e}"),
+                    }
                 }
             }
         }

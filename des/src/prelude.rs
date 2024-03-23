@@ -32,7 +32,6 @@ cfg_net! {
     pub use crate::net::message::MessageId;
     pub use crate::net::message::MessageKind;
     pub use crate::net::message::MessageHeader;
-    pub use crate::net::message::MessageType;
 
     pub use crate::net::message::{send, send_in, send_at, schedule_in, schedule_at};
 

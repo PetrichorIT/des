@@ -3,7 +3,7 @@
 use std::{
     io,
     sync::{
-        atomic::{AtomicBool, AtomicU16, Ordering},
+        atomic::{AtomicBool, AtomicU16, AtomicUsize, Ordering},
         Arc,
     },
 };
@@ -163,4 +163,52 @@ fn builder_async_failable_with_fail() {
         }),
     );
     let _ = Builder::new().build(sim).run();
+}
+
+#[test]
+#[serial]
+fn builder_async_no_join() {
+    let mut sim = Sim::new(());
+    sim.node(
+        "alice",
+        AsyncFn::new(|_| async move { std::future::pending().await }),
+    );
+
+    let _ = Builder::seeded(123).build(sim).run();
+}
+
+#[test]
+#[serial]
+#[should_panic = "at_sim_end() could not complete, since it is stuck at some await point"]
+fn builder_async_require_join() {
+    let mut sim = Sim::new(());
+    sim.node(
+        "alice",
+        AsyncFn::io(|_| async move { std::future::pending().await }).require_join(),
+    );
+
+    let _ = Builder::seeded(123).build(sim).run();
+}
+
+#[test]
+#[serial]
+fn builder_async_restart() {
+    static COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+    let mut sim = Sim::new(());
+    let software = AsyncFn::io(|_| async move {
+        COUNTER.fetch_add(1, Ordering::SeqCst);
+
+        des::time::sleep(Duration::from_secs(10)).await;
+        shutdow_and_restart_in(Duration::from_secs(5));
+        std::future::pending().await
+    });
+    assert_eq!(format!("{software:?}"), "AsyncFn");
+
+    sim.node("alice", software);
+
+    let _ = Builder::seeded(123).max_time(25.0.into()).build(sim).run();
+
+    // once at 0, 15, next would be 30
+    assert_eq!(COUNTER.load(Ordering::SeqCst), 2);
 }

@@ -1,0 +1,19 @@
+module Main {
+    gates {
+        a,
+        b,
+        c
+    }
+
+    connections {
+        a <--  L --> b,
+    }
+}
+
+link L {
+    jitter: 0.0,
+    latency: 0.1,
+    bitrate: 10000
+}
+
+entry Main;

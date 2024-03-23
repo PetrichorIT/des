@@ -2,8 +2,8 @@
 use des::net::processing::*;
 use des::prelude::*;
 use serial_test::serial;
-use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 
 mod lcommon {
@@ -207,4 +207,76 @@ fn plugin_shutdown_non_persistent_data() {
 
     let res = rt.run();
     let _res = res.unwrap();
+}
+
+#[test]
+#[serial]
+fn module_as_processing_element() {
+    static DONE: AtomicBool = AtomicBool::new(false);
+
+    struct A;
+    struct B;
+    impl Module for A {
+        fn handle_message(&mut self, _: Message) {
+            DONE.store(true, Ordering::SeqCst);
+        }
+    }
+    impl Module for B {
+        fn stack(&self) -> impl IntoProcessingElements {
+            A
+        }
+
+        fn handle_message(&mut self, _: Message) {
+            panic!("should never be called");
+        }
+    }
+
+    let mut sim = Sim::new(());
+    sim.node("a", B);
+    let gate = sim.gate("a", "port");
+
+    let mut rt = Builder::seeded(123).build(sim);
+    rt.add_message_onto(gate, Message::new().build(), 1.0.into());
+
+    let _ = rt.run();
+    assert!(DONE.load(Ordering::SeqCst));
+}
+
+#[test]
+#[serial]
+fn custom_default_pe() {
+    static DONE: AtomicBool = AtomicBool::new(false);
+
+    struct EatAllAndSayDone;
+    impl ProcessingElement for EatAllAndSayDone {
+        fn incoming(&mut self, _: Message) -> Option<Message> {
+            DONE.store(true, Ordering::SeqCst);
+            None
+        }
+    }
+
+    fn custom() -> Vec<ProcessorElement> {
+        vec![ProcessorElement::new(EatAllAndSayDone)]
+    }
+
+    set_default_processing_elements(custom);
+
+    struct A;
+    impl Module for A {}
+
+    let mut sim = Sim::new(());
+    sim.node("a", A);
+    let gate = sim.gate("a", "port");
+
+    let mut rt = Builder::seeded(123).build(sim);
+    rt.add_message_onto(gate, Message::new().build(), 1.0.into());
+
+    let _ = rt.run();
+    assert!(DONE.load(Ordering::SeqCst));
+
+    fn reset() -> Vec<ProcessorElement> {
+        Vec::new()
+    }
+
+    set_default_processing_elements(reset)
 }

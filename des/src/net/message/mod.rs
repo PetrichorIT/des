@@ -267,7 +267,7 @@ impl Message {
             None
         };
 
-        let header = Box::new(self.header.dup());
+        let header = Box::new(self.header.dup(SimTime::now()));
 
         Some(Self { header, content })
     }
@@ -385,15 +385,13 @@ impl MessageBuilder {
         self
     }
 
-    /// Sets the field `content`.
-    #[must_use]
-    #[allow(clippy::cast_possible_truncation)]
-    pub fn content_boxed<T>(mut self, content: Box<T>) -> Self
+    /// Sets the field 'content' with a T that is not guarnteed to be Send.
+    pub unsafe fn content_unsafe<T>(mut self, content: T) -> Self
     where
-        T: 'static + MessageBody + Send,
+        T: 'static + MessageBody,
     {
         self.header.length = content.byte_len() as u32;
-        self.content = Some(AnyBox::new(*content));
+        self.content = Some(AnyBox::new(content));
         self
     }
 
@@ -421,3 +419,92 @@ impl Debug for MessageBuilder {
 // SAFTY:
 // Dervived from safty invariants of [Message].
 unsafe impl Send for MessageBuilder {}
+
+#[cfg(test)]
+mod tests {
+    use crate::{net::module::ModuleContext, prelude::Gate};
+
+    use super::*;
+    use std::{any::type_name, rc::Rc};
+
+    #[test]
+    fn message_fmt() {
+        let msg = Message::new()
+            .id(123)
+            .src([1; 6])
+            .dest([2; 6])
+            .content(String::from("Hello world!"))
+            .build();
+
+        #[cfg(debug_assertions)]
+        assert_eq!(
+            msg.str(),
+            format!("Message {{ 12 bytes {}  }}", type_name::<String>())
+        );
+
+        assert!(msg.can_cast::<String>());
+        assert_eq!(msg.content::<String>(), "Hello world!");
+    }
+
+    #[test]
+    fn message_builder_fmt() {
+        assert_eq!(format!("{:?}", MessageBuilder::default()), "MessageBuilder");
+    }
+
+    #[test]
+    fn message_cast() {
+        struct A(i32);
+        impl MessageBody for A {
+            fn byte_len(&self) -> usize {
+                0
+            }
+        }
+
+        let msg = Message::new()
+            .header(MessageHeader::default())
+            .id(123)
+            .receiver_module_id(ModuleId(1))
+            .sender_module_id(ModuleId(2))
+            .content(A(42))
+            .build();
+        let (value, header) = msg.cast::<A>();
+        assert_eq!(header.id, 123);
+        assert_eq!(value.0, 42);
+    }
+
+    #[test]
+    fn message_cast_unsafe() {
+        // RC is not send
+        #[derive(Default)]
+        struct A {
+            rc: Rc<i32>,
+        }
+        impl MessageBody for A {
+            fn byte_len(&self) -> usize {
+                0
+            }
+        }
+
+        let module = ModuleContext::standalone("root".into());
+        let gate = Gate::new(&module, "port", 1, 0);
+
+        unsafe {
+            let msg = Message::new()
+                .creation_time(10.0.into())
+                .send_time(11.0.into())
+                .last_gate(gate)
+                .content_unsafe(A { rc: Rc::new(42) })
+                .build();
+
+            let msg = msg.try_cast_unsafe::<String>().unwrap_err();
+
+            let (value, _) = msg.cast_unsafe::<A>();
+            assert_eq!(*value.rc, 42);
+
+            // See with None
+
+            let msg = Message::new().build();
+            assert!(msg.try_cast_unsafe::<String>().is_err());
+        }
+    }
+}

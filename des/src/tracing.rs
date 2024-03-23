@@ -26,7 +26,8 @@ pub struct ScopeToken(u64);
 
 static SCOPE_CURRENT_TOKEN: AtomicU64 = AtomicU64::new(u64::MAX);
 static SCOPE_TOKEN_NEXT: AtomicU64 = AtomicU64::new(0);
-static SCOPES: Mutex<Option<Sender<(ScopeToken, ObjectPath)>>> = Mutex::new(None);
+static SCOPES: std::sync::Mutex<Option<Sender<(ScopeToken, ObjectPath)>>> =
+    std::sync::Mutex::new(None);
 
 /// Creates a new scope attached to the tracing subscriber.
 ///
@@ -35,7 +36,7 @@ static SCOPES: Mutex<Option<Sender<(ScopeToken, ObjectPath)>>> = Mutex::new(None
 #[doc(hidden)]
 pub fn new_scope(obj_path: ObjectPath) -> ScopeToken {
     let token = ScopeToken(SCOPE_TOKEN_NEXT.fetch_add(1, Ordering::SeqCst));
-    let lock = SCOPES.lock();
+    let lock = SCOPES.lock().unwrap();
     if let Some(scopes) = &*lock {
         scopes.send((token, obj_path)).expect("Failed to send");
     } else {
@@ -104,7 +105,7 @@ struct Scope {
 impl SimFormat {
     fn init() -> SimFormat {
         let (tx, rx) = mpsc::channel();
-        SCOPES.lock().replace(tx);
+        SCOPES.lock().unwrap().replace(tx);
         SimFormat {
             scopes: RwLock::new(FxHashMap::with_hasher(FxBuildHasher::default())),
             rx: Mutex::new(rx),

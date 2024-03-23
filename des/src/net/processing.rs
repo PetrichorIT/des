@@ -63,10 +63,10 @@
 //! once the next event arrives.
 //!  
 
-use std::any::{Any, TypeId};
+use std::{any::Any, sync::RwLock};
 
 use super::module::Module;
-use crate::{prelude::Message, sync::RwLock};
+use crate::prelude::Message;
 
 /// A subprogramm between the module application and the network layer.
 ///
@@ -264,7 +264,6 @@ pub struct ProcessingElements {
 #[allow(missing_debug_implementations)]
 pub struct ProcessorElement {
     inner: Box<dyn ProcessingElement>,
-    typ: TypeId,
 }
 
 impl ProcessorElement {
@@ -272,7 +271,6 @@ impl ProcessorElement {
     pub fn new<T: ProcessingElement>(inner: T) -> Self {
         Self {
             inner: Box::new(inner),
-            typ: TypeId::of::<T>(),
         }
     }
 }
@@ -306,20 +304,6 @@ impl ProcessingElements {
             stack,
             handler: Box::new(handler),
         }
-    }
-
-    pub(super) fn with_pe<T: Any, R>(&mut self, f: impl FnOnce(&mut T) -> R) -> Option<R> {
-        let id = TypeId::of::<T>();
-        for i in 0..self.stack.len() {
-            let mid = self.stack[i].typ;
-            if mid == id {
-                let ptr: *mut dyn ProcessingElement = &mut *self.stack[i].inner;
-                let ptr: *mut T = ptr.cast();
-                let refm = unsafe { &mut *ptr };
-                return Some(f(refm));
-            }
-        }
-        None
     }
 
     pub(super) fn incoming_upstream(&mut self, msg: Option<Message>) -> Option<Message> {

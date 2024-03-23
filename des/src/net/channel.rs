@@ -214,17 +214,19 @@ impl Channel {
             let dur = metrics.calculate_duration(&msg, rng_ref);
             let busy = metrics.calculate_busy(&msg);
 
-            let transmissin_finish = SimTime::now() + busy;
+            if busy != Duration::ZERO {
+                let transmissin_finish = SimTime::now() + busy;
 
-            drop(chan);
-            self.set_busy_until(transmissin_finish);
+                drop(chan);
+                self.set_busy_until(transmissin_finish);
 
-            sink.add(
-                NetEvents::ChannelUnbusyNotif(ChannelUnbusyNotif {
-                    channel: self.clone(),
-                }),
-                transmissin_finish,
-            );
+                sink.add(
+                    NetEvents::ChannelUnbusyNotif(ChannelUnbusyNotif {
+                        channel: self.clone(),
+                    }),
+                    transmissin_finish,
+                );
+            }
 
             let next_event_time = SimTime::now() + dur;
 
@@ -346,12 +348,7 @@ impl ChannelMetrics {
     /// Calcualtes the duration a message travels on a link.
     #[allow(clippy::if_same_then_else)]
     pub fn calculate_duration(&self, msg: &Message, rng: &mut dyn RngCore) -> Duration {
-        if self.bitrate == 0 {
-            return Duration::ZERO;
-        }
-
-        let len = msg.length() * 8;
-        let transmission_time = Duration::from_secs_f64(len as f64 / self.bitrate as f64);
+        let transmission_time = self.calculate_busy(msg);
         if self.jitter == Duration::ZERO {
             self.latency + transmission_time
         } else {

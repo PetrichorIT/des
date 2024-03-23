@@ -83,12 +83,6 @@ impl ModuleRef {
         self.processing.swap(&celled);
     }
 
-    /// DPC
-    #[deprecated]
-    pub fn with_pe<T: Any, R>(&self, f: impl FnOnce(&mut T) -> R) -> Option<R> {
-        self.processing.borrow_mut().with_pe::<T, R>(f)
-    }
-
     // NOTE / TODO
     // Once feature(trait_upcasting) is stabalized, use traitupcasting for
     // safe interactions with the v-table.
@@ -318,8 +312,8 @@ impl PartialEq for ModuleRef {
 impl Debug for ModuleRef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct(&format!(
-            "ModuleRef {{ name: {}, handler: {}, ctx {} }}",
-            self.ctx.path.name(),
+            "ModuleRef {{ name: {}, handler: {}, ctx: {} }}",
+            self.ctx.path,
             Arc::strong_count(&self.processing),
             Arc::strong_count(&self.ctx),
         ))
@@ -332,3 +326,42 @@ unsafe impl Send for ModuleRefWeak {}
 
 unsafe impl Sync for ModuleRef {}
 unsafe impl Sync for ModuleRefWeak {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fmt() {
+        let module = ModuleContext::standalone("root.a.b".into());
+        let m2 = module.clone();
+        let weak = ModuleRefWeak::new(&module);
+
+        assert_eq!(module.as_str(), "root.a.b");
+        assert_eq!(
+            format!("{module:?}"),
+            "ModuleRef { name: root.a.b, handler: 2, ctx: 2 }"
+        );
+        assert_eq!(format!("{weak:?}"), "ModuleRefWeak");
+
+        assert_eq!(module, m2);
+    }
+
+    #[test]
+    fn as_typed_ref() {
+        #[derive(Debug, PartialEq)]
+        struct A {
+            inner: i32,
+        }
+        impl Module for A {}
+
+        let module = ModuleContext::standalone("root".into());
+        module.upgrade_dummy(ProcessingElements::new(Vec::new(), A { inner: 42 }));
+
+        assert!(module.try_as_ref::<i32>().is_none());
+        assert!(module.try_as_mut::<i32>().is_none());
+
+        module.as_mut::<A>().inner += 1;
+        assert_eq!(*module.as_ref::<A>(), A { inner: 43 });
+    }
+}

@@ -1,7 +1,12 @@
 #![cfg(feature = "ndl")]
 
+use std::sync::atomic::{AtomicUsize, Ordering};
+
 use des::{prelude::*, registry};
 use des_ndl::error::RootResult;
+
+#[path = "common/mock.rs"]
+mod mock;
 
 mod common {
     use des::{net::module::current, prelude::*};
@@ -156,11 +161,99 @@ impl Module for Single {}
 
 #[test]
 #[serial]
-fn build_with_preexisting_sim() {
+fn build_with_preexisting_sim() -> RootResult<()> {
     let mut sim = Sim::new(());
     sim.include_par("alice.addr = 1.1.1.1\n");
-    sim.build_ndl("tests/ndl/single.ndl", registry![Single, else _])
-        .unwrap();
+    sim.build_ndl("tests/ndl/single.ndl", registry![Single, else _])?;
 
     let _ = Builder::seeded(123).build(sim).run();
+    Ok(())
+}
+
+#[test]
+#[serial]
+fn non_std_gate_connections() -> RootResult<()> {
+    let sim = Sim::ndl(
+        "tests/ndl/local-con.ndl",
+        Registry::new().with_default_fallback(),
+    )?;
+    let _ = Builder::seeded(123).build(sim).run();
+    Ok(())
+}
+
+#[test]
+#[serial]
+fn registry_missing_symbol() {
+    let sim: Result<Sim<()>, des_ndl::error::RootError> = Sim::ndl(
+        "tests/ndl/ab-deep.ndl",
+        Registry::new().symbol("Main", |_| Debugger),
+    );
+    let errors = sim.unwrap_err().errors;
+    assert_eq!(errors.len(), 3);
+    assert_eq!(
+        errors.get(0).unwrap().internal.to_string(),
+        "symbol 'A' at 'a' could not be resolved by the registry",
+    );
+    assert_eq!(
+        errors.get(1).unwrap().internal.to_string(),
+        "symbol 'B' at 'a.b' could not be resolved by the registry",
+    );
+    assert_eq!(
+        errors.get(2).unwrap().internal.to_string(),
+        "symbol 'B' at 'b' could not be resolved by the registry",
+    );
+}
+
+#[test]
+#[serial]
+fn registry_fmt() {
+    assert_eq!(
+        format!("{:?}", Registry::new().symbol("A", |_| Debugger)),
+        "Registry"
+    );
+}
+
+#[test]
+#[serial]
+fn registry_custom_resolver() -> RootResult<()> {
+    static COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+    let registry = Registry::default()
+        .symbol("A", |_| Debugger)
+        .symbol("Main", |_| Debugger)
+        .custom(|_, symbol| {
+            if symbol == "B" {
+                COUNTER.fetch_add(1, Ordering::SeqCst);
+                Some(Debugger)
+            } else {
+                None
+            }
+        });
+
+    let sim = Sim::ndl("tests/ndl/ab.ndl", registry)?;
+    let _ = Builder::seeded(123).build(sim).run();
+
+    assert_eq!(COUNTER.load(Ordering::SeqCst), 1);
+
+    Ok(())
+}
+
+struct Sender;
+impl Module for Sender {
+    fn at_sim_start(&mut self, _stage: usize) {
+        send(Message::new().build(), "port")
+    }
+}
+
+#[test]
+#[serial]
+fn registry_default_fallback_does_not_pani() -> RootResult<()> {
+    let registry = Registry::default()
+        .symbol("A", |_| Sender)
+        .with_default_fallback();
+
+    let sim = Sim::ndl("tests/ndl/ab.ndl", registry)?;
+    let _ = Builder::seeded(123).build(sim).run();
+
+    Ok(())
 }

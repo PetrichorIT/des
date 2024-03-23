@@ -155,12 +155,12 @@ pub struct ScopedSim<'a, A> {
 }
 
 impl<A> Sim<A> {
-    #[inline(always)]
+    #[inline]
     pub(crate) fn modules(&self) -> &ModuleTree {
         &self.modules
     }
 
-    #[inline(always)]
+    #[inline]
     pub(crate) fn modules_mut(&mut self) -> &mut ModuleTree {
         &mut self.modules
     }
@@ -169,7 +169,7 @@ impl<A> Sim<A> {
     ///
     /// This allready binds the simulation globals to this instance.
     pub fn new(inner: A) -> Self {
-        let globals = Arc::new(Globals::new());
+        let globals = Arc::new(Globals::default());
         let guard = SimStaticsGuard::new(Arc::downgrade(&globals));
         Self {
             guard,
@@ -565,22 +565,12 @@ pub struct Globals {
     pub topology: Mutex<Topology>,
 }
 
-impl Globals {
-    ///
-    /// Creates a new instance of Self.
-    ///
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            parameters: Arc::new(ParMap::new()),
-            topology: Mutex::new(Topology::new()),
-        }
-    }
-}
-
 impl Default for Globals {
     fn default() -> Self {
-        Self::new()
+        Self {
+            parameters: Arc::new(ParMap::default()),
+            topology: Mutex::new(Topology::new()),
+        }
     }
 }
 

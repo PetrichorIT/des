@@ -126,9 +126,10 @@ impl Connection {
         )
     }
 
-    /// CHAN
+    /// Retrieves a handle to a channel attached to the connection
+    #[must_use]
     pub fn channel(&self) -> Option<ChannelRef> {
-        self.channel.as_ref().map(Arc::clone)
+        self.channel.clone()
     }
 }
 
@@ -325,24 +326,28 @@ impl Gate {
 
     /// CHAN
     pub fn channel(self: &GateRef) -> Option<ChannelRef> {
-        self.path_iter().nth(0).and_then(|con| con.channel)
+        self.path_iter()?.nth(0).and_then(|con| con.channel)
     }
 
     /// ITER
-    pub fn path_iter(self: &GateRef) -> impl Iterator<Item = Connection> {
-        PathIter {
-            con: Some(Connection::new_unchecked(self.clone())),
+    pub fn path_iter(self: &GateRef) -> Option<impl Iterator<Item = Connection>> {
+        if self.kind() == GateKind::Transit {
+            None
+        } else {
+            Some(PathIter {
+                con: Some(Connection::new_unchecked(self.clone())),
+            })
         }
     }
 
     /// NEXT GATE
     pub fn next_gate(self: &GateRef) -> Option<GateRef> {
-        self.path_iter().nth(0).map(|c| c.endpoint)
+        self.path_iter()?.nth(0).map(|c| c.endpoint)
     }
 
     /// END
     pub fn path_end(self: &GateRef) -> Option<GateRef> {
-        self.path_iter().last().map(|c| c.endpoint)
+        self.path_iter()?.last().map(|c| c.endpoint)
     }
 
     ///
@@ -386,11 +391,7 @@ impl Gate {
 impl Debug for Gate {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Gate")
-            .field("path", &self.path())
-            // .field("typ", &self.typ)
-            // .field("next", &self.next_gate.borrow().as_ref().map(|_| ()))
-            // .field("prev", &self.previous_gate.borrow().as_ref().map(|_| ()))
-            // .field("channel", &self.channel.borrow())
+            .field("path", &self.path().as_str())
             .finish()
     }
 }
@@ -424,31 +425,29 @@ pub trait IntoModuleGate: private::Sealed {
     /// Extracts a gate identifier from a module using the given
     /// value as implicit reference.
     ///
-    fn as_gate(&self, _module: &ModuleContext) -> Option<GateRef> {
-        None
-    }
+    fn as_gate(&self, module: &ModuleContext) -> Option<GateRef>;
 }
 
+impl<T: IntoModuleGate> IntoModuleGate for &T {
+    fn as_gate(&self, module: &ModuleContext) -> Option<GateRef> {
+        T::as_gate(self, module)
+    }
+}
+impl<T: IntoModuleGate> private::Sealed for &T {}
+
 impl IntoModuleGate for GateRef {
-    fn as_gate(&self, _module: &ModuleContext) -> Option<GateRef> {
+    fn as_gate(&self, _: &ModuleContext) -> Option<GateRef> {
         Some(self.clone())
     }
 }
 impl private::Sealed for GateRef {}
 
-impl IntoModuleGate for &GateRef {
-    fn as_gate(&self, _module: &ModuleContext) -> Option<GateRef> {
-        Some(GateRef::clone(self))
-    }
-}
-impl private::Sealed for &GateRef {}
-
-impl IntoModuleGate for &GateRefWeak {
-    fn as_gate(&self, _module: &ModuleContext) -> Option<GateRef> {
+impl IntoModuleGate for GateRefWeak {
+    fn as_gate(&self, _: &ModuleContext) -> Option<GateRef> {
         self.upgrade()
     }
 }
-impl private::Sealed for &GateRefWeak {}
+impl private::Sealed for GateRefWeak {}
 
 impl IntoModuleGate for (&str, usize) {
     fn as_gate(&self, module: &ModuleContext) -> Option<GateRef> {
@@ -473,3 +472,68 @@ impl IntoModuleGate for &str {
     }
 }
 impl private::Sealed for &str {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fmt() {
+        let owner = ModuleContext::standalone("root".into());
+        let gate = Gate::new(&owner, "port", 4, 1);
+        assert_eq!(format!("{gate:?}"), "Gate { path: \"root.port[1]\" }");
+        assert_eq!(gate.str(), "port[1]");
+        assert_eq!(gate.path().as_str(), "root.port[1]");
+    }
+
+    #[test]
+    fn kind_and_iter() {
+        let owner = ModuleContext::standalone("root".into());
+        let gate_a = Gate::new(&owner, "port-a", 1, 0);
+        assert_eq!(gate_a.kind(), GateKind::Standalone);
+
+        let gate_b = Gate::new(&owner, "port-b", 1, 0);
+        gate_a.clone().connect(gate_b.clone(), None);
+        assert_eq!(gate_a.kind(), GateKind::Endpoint);
+
+        let gate_c = Gate::new(&owner, "port-c", 1, 0);
+        gate_a.clone().connect(gate_c.clone(), None);
+        assert_eq!(gate_a.kind(), GateKind::Transit);
+
+        // Chain chould be c -- a -- b
+        assert_eq!(gate_c.next_gate(), Some(gate_a.clone()));
+        assert_eq!(gate_c.path_end(), Some(gate_b));
+
+        let mut iter = gate_c.path_iter().unwrap();
+        let ca = iter.next().unwrap();
+        assert_eq!(ca.prev_hop(), Some(gate_c));
+        let ab = iter.next().unwrap();
+        assert_eq!(ab.prev_hop(), Some(gate_a));
+    }
+
+    #[test]
+    fn dedup() {
+        let owner = ModuleContext::standalone("root".into());
+        let gate = Gate::new(&owner, "port", 1, 0);
+        assert_eq!(gate.kind(), GateKind::Standalone);
+
+        let gate_b = Gate::new(&owner, "port-b", 1, 0);
+        gate.clone().connect_dedup(gate_b.clone(), None);
+        assert_eq!(gate.kind(), GateKind::Endpoint);
+
+        gate.clone().connect_dedup(gate_b, None);
+        assert_eq!(gate.kind(), GateKind::Endpoint);
+    }
+
+    #[test]
+    fn into_gate() {
+        let ctx = ModuleContext::standalone("root".into());
+        let gate_a = ctx.create_gate("port-a");
+
+        assert_eq!((&gate_a).as_gate(&ctx.ctx), Some(gate_a.clone()));
+        assert_eq!(
+            Arc::downgrade(&gate_a).as_gate(&ctx.ctx),
+            Some(gate_a.clone())
+        );
+    }
+}

@@ -115,22 +115,26 @@ impl<A> Sim<A> {
     /// Builds a NDL based application with onto an allready existing [`Sim`] object.
     ///
     /// See [`Sim::ndl_with`] for more infomation.
+    ///
+    /// # Errors
+    ///
+    /// This function will fail if either:
+    /// a) some NDL error occures when parsing the NDL tree defined at `path`,
+    /// b) or the registry fails to provide software for some NDL-defined module.
     pub fn build_ndl(
         &mut self,
         path: impl AsRef<Path>,
         registry: impl AsRef<Registry>,
     ) -> RootResult<()> {
         let mut ctx = Context::load(path)?;
-        let Some(tree) = ctx.entry.take() else {
-            return Err(RootError::single(
-                Error::new(ErrorKind::MissingEntryPoint, ""),
-                ctx.smap,
-            ));
-        };
+        let tree = ctx
+            .entry
+            .take()
+            .expect("internal NDL error: entry point must be provided on Ok(Context)");
 
         let mut errors = Errors::new().as_mut();
 
-        let scoped = ScopedSim::new(self, ObjectPath::new());
+        let scoped = ScopedSim::new(self, ObjectPath::default());
         let _ = scoped.ndl(tree, &mut errors, registry.as_ref());
 
         if errors.is_empty() {
@@ -140,30 +144,44 @@ impl<A> Sim<A> {
         }
     }
 
-    fn raw_ndl(&mut self, path: &ObjectPath, ty: &str, registry: &Registry) -> Option<ModuleRef> {
+    fn raw_ndl(
+        &mut self,
+        path: &ObjectPath,
+        ty: &str,
+        registry: &Registry,
+        errors: &mut ErrorsMut,
+    ) -> ModuleRef {
         // Check dup
         assert!(
-            self.modules().get(&path).is_none(),
+            self.modules().get(path).is_none(),
             "cannot crate module at {path}, allready exists"
         );
 
         // Check node path location
         let ctx = if let Some(parent) = path.parent() {
             // (a) Check that the parent exists
-            let Some(parent) = self.get(&parent) else {
-                panic!("cannot create module at {path}, since parent module at {parent} is required, but not existent");
-            };
+            let parent = self
+                .get(&parent)
+                .expect("cannot create module, parent missing in NDL build");
 
             ModuleContext::child_of(path.name(), parent)
         } else {
             ModuleContext::standalone(path.clone())
         };
         ctx.activate();
-        ctx.upgrade_dummy(registry.lookup(&path, ty)?);
+
+        if let Some(software) = registry.lookup(path, ty) {
+            ctx.upgrade_dummy(software);
+        } else {
+            errors.add(Error::new(
+                ErrorKind::SymbolNotFound,
+                format!("symbol '{ty}' at '{path}' could not be resolved by the registry"),
+            ));
+        }
 
         // TODO: deactivate module
         self.modules_mut().add(ctx.clone());
-        Some(ctx)
+        ctx
     }
 }
 
@@ -178,13 +196,7 @@ impl<'a, A> ScopedSim<'a, A> {
         let ty = ir.ident.raw.clone();
         let scope = &self.scope;
 
-        let Some(ctx) = self.base.raw_ndl(scope, &ty, registry) else {
-            errors.add(Error::new(
-                ErrorKind::SymbolNotFound,
-                format!("symbol '{ty}' at '{scope}' could not be resolved by the registry"),
-            ));
-            return None;
-        };
+        let ctx = self.base.raw_ndl(scope, &ty, registry, errors);
 
         for gate in &ir.gates {
             let _ = ctx.create_gate_cluster(&gate.ident.raw, gate.cluster.as_size());

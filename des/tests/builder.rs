@@ -1,7 +1,7 @@
 #![cfg(feature = "net")]
 
 use des::{
-    net::{FailabilityPolicy, HandlerFn, ModuleFn},
+    net::{FailabilityPolicy, HandlerFn, ModuleBlock, ModuleFn},
     prelude::*,
 };
 use serial_test::serial;
@@ -86,6 +86,48 @@ fn builder_panic_gate_missing_node() {
 
 #[test]
 #[serial]
+fn builder_gate_cluster() {
+    struct Alice;
+    impl Module for Alice {
+        fn at_sim_start(&mut self, _: usize) {
+            for i in 0..4 {
+                assert!(current().gate("cluster", i).is_some());
+            }
+        }
+    }
+
+    let mut sim = Sim::new(());
+    sim.node("alice", Alice);
+    let _ = sim.gates("alice", "cluster", 4);
+
+    let _ = Builder::seeded(123).build(sim).run();
+}
+
+#[test]
+#[serial]
+fn builder_module_block() {
+    struct Def;
+    struct Block;
+    impl Module for Def {}
+    impl ModuleBlock for Block {
+        fn build<A>(self, mut sim: ScopedSim<'_, A>) {
+            sim.root(Def);
+            let _ = sim.gate("", &format!("port-{}", sim.scope()));
+
+            sim.node("sub", Def);
+            let _ = sim.gates("sub", "cluster", 123);
+
+            let _ = sim.inner();
+        }
+    }
+
+    let mut sim = Sim::new(());
+    sim.node("alice", Block);
+    assert!(sim.get(&"alice.sub".into()).is_some());
+}
+
+#[test]
+#[serial]
 fn builder_handler_fn() {
     let counter = Arc::new(AtomicU16::new(0));
     let c2 = counter.clone();
@@ -98,6 +140,8 @@ fn builder_handler_fn() {
         }),
     );
     let gate = sim.gate("alice", "port");
+    let other = sim.gate("alice", "port");
+    assert!(Arc::ptr_eq(&gate, &other));
 
     let mut rt = Builder::seeded(123).build(sim);
     rt.add_message_onto(gate.clone(), Message::new().id(1).build(), 1.0.into());

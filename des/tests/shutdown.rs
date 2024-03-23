@@ -1,6 +1,6 @@
 #![cfg(feature = "async")]
 
-use des::{prelude::*, time::sleep};
+use des::{net::ModuleFn, prelude::*, time::sleep};
 use serial_test::serial;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -443,4 +443,38 @@ fn shutdown_will_drop_transiting_delayed_channels() {
 
     let rt = Builder::seeded(123).max_itr(500).build(app);
     let _ = rt.run().unwrap();
+}
+
+#[test]
+#[serial]
+fn shutdown_prevents_accessing_parents() {
+    let mut sim = Sim::new(());
+    sim.node("a", ModuleFn::new(
+        || schedule_in(Message::new().build(), Duration::from_secs(10)),
+        |_, _| {
+            let err = current().child("b").unwrap_err();
+            assert_eq!(err, ModuleReferencingError::CurrentlyInactive("The child module 'b' of 'a' is currently shut down, thus cannot be accessed".to_string()));
+        }
+    ));
+    sim.node(
+        "a.b",
+        ModuleFn::new(
+            || schedule_in(Message::new().build(), Duration::from_secs(5)),
+            |_, _| {
+                shutdown();
+            },
+        ),
+    );
+    sim.node(
+        "a.b.c",
+        ModuleFn::new(
+            || schedule_in(Message::new().build(), Duration::from_secs(10)),
+            |_, _| {
+                let err = current().parent().unwrap_err();
+                assert_eq!(err, ModuleReferencingError::CurrentlyInactive("The parent module of 'a.b.c' is currently shut down, thus cannot be accessed".to_string()));
+            },
+        ),
+    );
+
+    let _ = Builder::seeded(123).build(sim).run();
 }

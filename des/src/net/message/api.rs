@@ -60,8 +60,9 @@ pub fn send(msg: impl Into<Message>, gate: impl IntoModuleGate) {
 ///         assert!(
 ///             !current()
 ///                 .gate("out", 0).unwrap()
-///                 .path_iter().next().unwrap()
-///                 .channel().unwrap()
+///                 .path_iter().unwrap() // an iter can NOT be created for transit gates, no direction info provided
+///                 .next().unwrap() // get next iter element
+///                 .channel().unwrap() // channels attached to connections are optional
 ///                 .is_busy()     
 ///        );
 ///     }

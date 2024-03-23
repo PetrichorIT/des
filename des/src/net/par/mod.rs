@@ -39,14 +39,6 @@ enum ParTreePathMatching {
 }
 
 impl ParMap {
-    /// Creates a new `ParMap`.
-    #[must_use]
-    pub fn new() -> ParMap {
-        ParMap {
-            tree: RwLock::new(ParTree::new()),
-        }
-    }
-
     fn shared() -> Arc<ParMap> {
         globals().parameters.clone()
     }
@@ -235,7 +227,9 @@ impl Display for ParTreePathMatching {
 
 impl Default for ParMap {
     fn default() -> Self {
-        Self::new()
+        ParMap {
+            tree: RwLock::new(ParTree::new()),
+        }
     }
 }
 

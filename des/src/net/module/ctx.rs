@@ -1,11 +1,12 @@
 use fxhash::{FxBuildHasher, FxHashMap};
+use spin::RwLock;
 
 use super::{
     meta::Metadata, DummyModule, ModuleId, ModuleRef, ModuleRefWeak, ModuleReferencingError,
 };
 use crate::{
     prelude::{GateRef, ObjectPath},
-    sync::{RwLock, SwapLock},
+    sync::SwapLock,
     tracing::{new_scope, ScopeToken},
 };
 use std::{

@@ -8,6 +8,7 @@ use des::{
     net::channel::{ChannelDropBehaviour, ChannelProbe},
     prelude::*,
 };
+use rand::{rngs::StdRng, SeedableRng};
 use serial_test::serial;
 
 #[derive(Default)]
@@ -133,12 +134,12 @@ fn channel_instant_busy() {
     let g_in = rt.gate("root", "in");
     let g_out = rt.gate("root", "out");
 
-    let channel = Channel::new(ChannelMetrics {
-        bitrate: 1000,
-        latency: Duration::from_millis(100),
-        jitter: Duration::ZERO,
-        drop_behaviour: ChannelDropBehaviour::default(),
-    });
+    let channel = Channel::new(ChannelMetrics::new(
+        1000,
+        Duration::from_millis(100),
+        Duration::ZERO,
+        ChannelDropBehaviour::default(),
+    ));
 
     g_in.connect(g_out, Some(channel));
 
@@ -150,14 +151,27 @@ fn channel_instant_busy() {
 struct ChannelProbing(Arc<AtomicUsize>);
 impl Module for ChannelProbing {
     fn at_sim_start(&mut self, _stage: usize) {
-        current()
-            .gate("port", 0)
-            .unwrap()
-            .channel()
-            .unwrap()
-            .attach_probe(Probe(self.0.clone()));
+        let chan = current().gate("port", 0).unwrap().channel().unwrap();
 
-        send(Message::new().build(), "port")
+        chan.attach_probe(Probe(self.0.clone()));
+        assert_eq!(chan.metrics().bitrate, 1234);
+
+        let msg = Message::new().build();
+        let busy_time = chan.calculate_busy(&msg);
+        let tft = SimTime::now() + busy_time;
+        dbg!(busy_time);
+        assert_eq!(
+            tft + Duration::from_millis(100),
+            SimTime::from_duration(chan.calculate_duration(&msg, &mut StdRng::seed_from_u64(123)))
+        );
+
+        assert_eq!(chan.transmission_finish_time(), SimTime::MIN);
+        assert_eq!(format!("{chan:?}"), format!("Channel {{ metrics: ChannelMetrics {{ bitrate: 1234, latency: 100ms, jitter: 0ns, drop_behaviour: Drop }}, state: Idle }}"));
+
+        send(msg, "port");
+
+        assert_eq!(chan.transmission_finish_time(), tft);
+        assert_eq!(format!("{chan:?}"), format!("Channel {{ metrics: ChannelMetrics {{ bitrate: 1234, latency: 100ms, jitter: 0ns, drop_behaviour: Drop }}, state: Busy {{ until: {tft}, bytes: 0, packets: 0 }} }}"));
     }
 
     fn at_sim_end(&mut self) {
@@ -187,7 +201,7 @@ fn channel_probes() {
     let bob_port = rt.gate("bob", "port");
 
     let chan = Channel::new(ChannelMetrics {
-        bitrate: 1000,
+        bitrate: 1234,
         latency: Duration::from_millis(100),
         jitter: Duration::ZERO,
         drop_behaviour: ChannelDropBehaviour::default(),
@@ -197,4 +211,42 @@ fn channel_probes() {
 
     let rt = Builder::seeded(123).build(rt);
     let _ = rt.run();
+}
+
+struct LatencyOnly(usize);
+
+impl Module for LatencyOnly {
+    fn at_sim_start(&mut self, _stage: usize) {
+        for _ in 0..10 {
+            send(Message::new().build(), "out");
+        }
+    }
+
+    fn handle_message(&mut self, _msg: Message) {
+        self.0 += 1;
+    }
+
+    fn at_sim_end(&mut self) {
+        assert_eq!(self.0, 10);
+    }
+}
+
+#[test]
+#[serial]
+fn latency_only_channel() {
+    let mut sim = Sim::new(());
+    sim.node("alice", LatencyOnly(0));
+    let gout = sim.gate("alice", "out");
+    let gin = sim.gate("alice", "in");
+    gout.connect(
+        gin,
+        Some(Channel::new(ChannelMetrics::new(
+            0,
+            Duration::from_secs(1),
+            Duration::ZERO,
+            ChannelDropBehaviour::Drop,
+        ))),
+    );
+
+    let _ = Builder::seeded(123).build(sim).run();
 }

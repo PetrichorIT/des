@@ -1,24 +1,11 @@
 #![cfg(feature = "ndl")]
-use des::{prelude::*, registry};
-
-macro_rules! module {
-    ($($i:ident),*) => {
-        $(
-            #[derive(Default)]
-            struct $i;
-
-            impl Module for $i {}
-        )*
-    };
-}
-
-module!(Node, Debugger, Router, Main);
+use des::prelude::*;
 
 #[test]
-fn topology_load() {
+fn main() {
     let app = Sim::ndl(
         "tests/ndl/small_network/main.ndl",
-        registry![Node, Debugger, Router, Main],
+        Registry::new().with_default_fallback(),
     )
     .map_err(|e| println!("{e}"))
     .unwrap();
@@ -26,7 +13,13 @@ fn topology_load() {
     let app = rt.run().into_app();
     let mut topo = app.globals().topology.lock().unwrap().clone();
 
+    let dj = topo.dijkstra("node[1]".into());
+    assert_eq!(dj.get(&"node[1]".into()), None);
+
     topo.filter_nodes(|n| n.module.name() != "node[2]");
+    topo.map_costs(|edge| edge.cost * 2.0);
+    topo.filter_edges(|_| true);
+    assert_eq!(topo.edges(), 9);
 
     // 4 nodes, router, debugger, main
     assert_eq!(topo.nodes().len(), 7);
@@ -48,4 +41,6 @@ fn topology_load() {
         .edges_for(i)
         .iter()
         .any(|edge| edge.dst.1 == j && edge.src.0.name() == "debug"));
+
+    let _ = topo.write_to_svg("tests/topology");
 }

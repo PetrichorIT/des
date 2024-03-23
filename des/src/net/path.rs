@@ -101,17 +101,6 @@ impl ObjectPath {
         }
     }
 
-    /// Creates a new object path pointing to the root.
-    #[must_use]
-    pub fn new() -> ObjectPath {
-        Self {
-            data: String::new().into(),
-            last_element_offset: 0,
-            len: 0,
-            is_gate: false,
-        }
-    }
-
     /// Returns a new instance with another module appended to the path.
     ///
     /// # Panics
@@ -147,6 +136,7 @@ impl ObjectPath {
     }
 
     /// Retruns a new object path pointing to the gate on the current module.
+    #[must_use]
     pub fn appended_gate(&self, gate: impl AsRef<str>) -> Self {
         let mut appended = self.appended(gate);
         appended.is_gate = true;
@@ -205,7 +195,12 @@ impl From<String> for ObjectPath {
 
 impl Default for ObjectPath {
     fn default() -> Self {
-        Self::new()
+        Self {
+            data: String::new().into(),
+            last_element_offset: 0,
+            len: 0,
+            is_gate: false,
+        }
     }
 }
 
@@ -215,7 +210,7 @@ mod tests {
 
     #[test]
     fn manual_appending() {
-        let path = ObjectPath::new().appended("top").appended("mid");
+        let path = ObjectPath::default().appended("top").appended("mid");
 
         assert_eq!(path.name(), "mid");
         assert_eq!(path.as_parent_str(), "top");
@@ -229,7 +224,7 @@ mod tests {
             }
         );
 
-        let path = ObjectPath::new()
+        let path = ObjectPath::default()
             .appended("top")
             .appended("mid")
             .appended("low");
@@ -246,7 +241,7 @@ mod tests {
             }
         );
 
-        let path = ObjectPath::new().appended("top");
+        let path = ObjectPath::default().appended("top");
         assert_eq!(path.name(), "top");
         assert_eq!(path.as_parent_str(), "");
         assert_eq!(
@@ -259,7 +254,7 @@ mod tests {
             }
         );
 
-        let path = ObjectPath::new();
+        let path = ObjectPath::default();
         assert_eq!(path.name(), "");
         assert_eq!(path.as_parent_str(), "");
         assert!(path.is_root());
@@ -276,7 +271,7 @@ mod tests {
 
     #[test]
     fn parent_creation() {
-        let path = ObjectPath::new().appended("top").appended("mid");
+        let path = ObjectPath::default().appended("top").appended("mid");
         let parent = path.parent();
         assert_eq!(
             parent,
@@ -288,7 +283,7 @@ mod tests {
             })
         );
 
-        let path = ObjectPath::new()
+        let path = ObjectPath::default()
             .appended("top")
             .appended("mid")
             .appended("low");
@@ -304,7 +299,7 @@ mod tests {
             })
         );
 
-        let path = ObjectPath::new().appended("top");
+        let path = ObjectPath::default().appended("top");
 
         let parent = path.parent();
         assert_eq!(
@@ -317,7 +312,7 @@ mod tests {
             })
         );
 
-        let path = ObjectPath::new();
+        let path = ObjectPath::default();
 
         let parent = path.parent();
         assert_eq!(parent, None);
@@ -375,5 +370,12 @@ mod tests {
                 is_gate: false,
             }
         );
+
+        assert!(ObjectPath::default().is_root());
+        assert!(ObjectPath::from(String::new()).is_module());
+        assert_eq!(ObjectPath::from(&String::new()).as_logger_scope(), "@root");
+        assert_eq!(ObjectPath::from("abc").as_logger_scope(), "abc");
+        assert!(!ObjectPath::from("a").appended_gate("gate").is_module());
+        assert!(ObjectPath::from("root.a.b.c").as_ref().starts_with("root"));
     }
 }

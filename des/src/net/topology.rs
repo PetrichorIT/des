@@ -113,7 +113,11 @@ impl Topology {
                 let mut cost = 0.0;
                 let mut dst = gate.clone();
 
-                for con in gate.path_iter().take(16) {
+                let Some(iter) = gate.path_iter() else {
+                    // its a transit gate
+                    continue;
+                };
+                for con in iter.take(16) {
                     if con.channel().is_some() {
                         cost += 1.0;
                     }
@@ -217,9 +221,12 @@ impl Topology {
         // Update edge ids
         for edges in &mut self.edges {
             for edge in edges {
+                edge.src.1 = mapping[edge.src.1];
                 edge.dst.1 = mapping[edge.dst.1];
             }
         }
+
+        assert_eq!(self.nodes.len(), self.edges.len())
     }
 
     ///

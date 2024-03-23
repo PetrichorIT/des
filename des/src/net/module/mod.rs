@@ -1,7 +1,10 @@
 //! Network nodes with custom state.
 
 use crate::net::message::Message;
-use std::any::Any;
+use std::{
+    any::Any,
+    sync::atomic::{AtomicU16, Ordering},
+};
 
 mod ctx;
 pub use self::ctx::ModuleContext;
@@ -31,12 +34,22 @@ cfg_async! {
     pub use self::ext::*;
 }
 
-guid!(
-    /// A runtime-unqiue identifier for a module / submodule inheritence tree.
-    /// * This type is only available of DES is build with the `"net"` feature.*
-    #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-    pub ModuleId(u16) = MODULE_ID;
-);
+/// A unique identifier for a module.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
+pub struct ModuleId(pub u16);
+
+static MODULE_ID: AtomicU16 = AtomicU16::new(0xff);
+
+impl ModuleId {
+    /// A general purpose ID indicating None.
+    pub const NULL: ModuleId = ModuleId(0);
+
+    /// Generates a unique module ID.
+    pub fn gen() -> Self {
+        Self(MODULE_ID.fetch_add(1, Ordering::SeqCst))
+    }
+}
 
 ///
 /// A set of user defined functions for customizing the

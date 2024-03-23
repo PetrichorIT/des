@@ -27,3 +27,16 @@ impl Display for ModuleReferencingError {
 }
 
 impl Error for ModuleReferencingError {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fmt() {
+        assert_eq!(
+            ModuleReferencingError::NoEntry("Hello world!".to_string()).to_string(),
+            "Hello world!"
+        );
+    }
+}
