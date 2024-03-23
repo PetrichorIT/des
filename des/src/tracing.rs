@@ -78,7 +78,7 @@ pub fn init() {
             .with_default_directive(Directive::from(FALLBACK_LOG_LEVEL))
             .from_env_lossy(),
     );
-    subscriber.finish().try_init().unwrap();
+    subscriber.finish().init();
 }
 
 /// An instance of a simulation formatter.

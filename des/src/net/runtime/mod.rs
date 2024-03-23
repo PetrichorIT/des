@@ -1,3 +1,4 @@
+use super::module::module_ctx_drop;
 use super::Topology;
 use super::{module::MOD_CTX, par::ParMap};
 use crate::{
@@ -5,6 +6,7 @@ use crate::{
     prelude::{Application, EventLifecycle, GateRef, Module, ModuleRef, ObjectPath, Runtime},
     tracing::{enter_scope, leave_scope},
 };
+use std::sync::{MutexGuard, TryLockError, Weak};
 use std::{
     fs, io, ops,
     path::Path,
@@ -22,6 +24,8 @@ pub(crate) use self::ctx::*;
 
 mod blocks;
 pub use self::blocks::*;
+
+static GUARD: Mutex<()> = Mutex::new(());
 
 /// A networking simulation.
 ///
@@ -59,11 +63,49 @@ pub use self::blocks::*;
 /// ```
 #[derive(Debug)]
 pub struct Sim<A> {
-    pub(crate) modules: ModuleTree,
+    modules: ModuleTree,
     globals: Arc<Globals>,
     /// A inner field of a network simulation that can be used to attach
     /// custom lifetime handlers to a simulation
     pub inner: A,
+
+    #[allow(unused)]
+    guard: SimStaticsGuard,
+}
+
+#[derive(Debug)]
+struct SimStaticsGuard {
+    #[allow(unused)]
+    guard: MutexGuard<'static, ()>,
+}
+
+impl SimStaticsGuard {
+    fn new(globals: Weak<Globals>) -> Self {
+        let guard = GUARD.try_lock();
+        let guard = match guard {
+            Ok(guard) => guard,
+            Err(e) => match e {
+                TryLockError::WouldBlock => GUARD.lock().unwrap_or_else(|e| {
+                    eprintln!("net-sim lock poisnoed: rebuilding lock");
+                    e.into_inner()
+                }),
+                TryLockError::Poisoned(poisoned) => {
+                    eprintln!("net-sim lock poisoned: rebuilding lock");
+                    poisoned.into_inner()
+                }
+            },
+        };
+
+        buf_init(globals);
+        Self { guard }
+    }
+}
+
+impl Drop for SimStaticsGuard {
+    fn drop(&mut self) {
+        buf_drop();
+        module_ctx_drop();
+    }
 }
 
 /// A helper to manage a scoped part of a networking simulation,
@@ -113,17 +155,28 @@ pub struct ScopedSim<'a, A> {
 }
 
 impl<A> Sim<A> {
+    #[inline(always)]
+    pub(crate) fn modules(&self) -> &ModuleTree {
+        &self.modules
+    }
+
+    #[inline(always)]
+    pub(crate) fn modules_mut(&mut self) -> &mut ModuleTree {
+        &mut self.modules
+    }
+
     /// Creates a new network simulation, with an inner application `A`.
     ///
     /// This allready binds the simulation globals to this instance.
     pub fn new(inner: A) -> Self {
-        let this = Self {
+        let globals = Arc::new(Globals::new());
+        let guard = SimStaticsGuard::new(Arc::downgrade(&globals));
+        Self {
+            guard,
             modules: ModuleTree::default(),
-            globals: Arc::new(Globals::new()),
+            globals,
             inner,
-        };
-        buf_set_globals(Arc::downgrade(&this.globals));
-        this
+        }
     }
 
     /// Includes raw parameter defintions in the simulation.

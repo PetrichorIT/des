@@ -22,6 +22,10 @@ pub(crate) static SETUP_FN: RwLock<fn(&ModuleContext)> = RwLock::new(_default_se
 
 pub(crate) fn _default_setup(_: &ModuleContext) {}
 
+pub(crate) fn module_ctx_drop() {
+    MOD_CTX.swap(&mut None);
+}
+
 /// The topological components of a module, not including the attached
 /// software.
 ///

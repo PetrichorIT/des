@@ -72,7 +72,13 @@ impl Connection {
     ///
     /// Panics if the provided gate is not an endpoint.
     pub fn new(gate: GateRef) -> Self {
-        assert!(gate.connections.try_lock().unwrap().len() <= 1);
+        assert!(
+            gate.connections
+                .lock()
+                .expect("locking failure: GateRef seems to be active on another thread")
+                .len()
+                <= 1
+        );
         Self::new_unchecked(gate)
     }
 
@@ -349,7 +355,9 @@ impl Gate {
     ///
     #[must_use]
     pub fn owner(&self) -> ModuleRef {
-        self.owner.upgrade().unwrap()
+        self.owner
+            .upgrade()
+            .expect("cannot refer to gate owner during drop")
     }
 
     ///
@@ -397,7 +405,7 @@ unsafe impl Send for Gate {}
 impl PartialEq for Gate {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name
-            && self.owner.upgrade().unwrap().ctx.id == other.owner.upgrade().unwrap().ctx.id
+            && self.owner().ctx.id == other.owner().ctx.id
             && self.size == other.size
             && self.pos == other.pos
     }

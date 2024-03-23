@@ -143,7 +143,7 @@ impl<A> Sim<A> {
     fn raw_ndl(&mut self, path: &ObjectPath, ty: &str, registry: &Registry) -> Option<ModuleRef> {
         // Check dup
         assert!(
-            self.modules.get(&path).is_none(),
+            self.modules().get(&path).is_none(),
             "cannot crate module at {path}, allready exists"
         );
 
@@ -162,7 +162,7 @@ impl<A> Sim<A> {
         ctx.upgrade_dummy(registry.lookup(&path, ty)?);
 
         // TODO: deactivate module
-        self.modules.add(ctx.clone());
+        self.modules_mut().add(ctx.clone());
         Some(ctx)
     }
 }
@@ -191,7 +191,9 @@ impl<'a, A> ScopedSim<'a, A> {
         }
 
         for submod in &ir.submodules {
-            let sir = submod.typ.as_module_arc().unwrap();
+            let sir = submod.typ.as_module_arc().expect(
+                "invalid NDL tree: submodule typ referes does not refer to a module object",
+            );
 
             match submod.cluster {
                 ir::Cluster::Standalone => {
@@ -213,25 +215,31 @@ impl<'a, A> ScopedSim<'a, A> {
             let from = match &con.lhs {
                 ConnectionEndpoint::Local(gate, pos) => ctx.gate(&gate.raw, pos.as_index()),
                 ConnectionEndpoint::Nonlocal(submod, pos, gate) => {
-                    let c = ctx.child(&format!("{}{}", submod.raw, pos)).unwrap();
+                    let c = ctx
+                        .child(&format!("{}{}", submod.raw, pos))
+                        .expect("invalid NDL tree: connection refer to child that does not exist");
                     c.gate(&gate.0.raw, gate.1.as_index())
                 }
             }
-            .unwrap();
+            .expect("invalid NDL tree: connections refer to gate(-cluster) not defined by NDL");
 
             let to = match &con.rhs {
                 ConnectionEndpoint::Local(gate, pos) => ctx.gate(&gate.raw, pos.as_index()),
                 ConnectionEndpoint::Nonlocal(submod, pos, gate) => {
-                    let c = ctx.child(&format!("{}{}", submod.raw, pos)).unwrap();
+                    let c = ctx
+                        .child(&format!("{}{}", submod.raw, pos))
+                        .expect("invalid NDL tree: connection refer to child that does not exist");
                     c.gate(&gate.0.raw, gate.1.as_index())
                 }
             }
-            .unwrap();
+            .expect("invalid NDL tree: connections refer to gate(-cluster) not defined by NDL");
 
             from.connect_dedup(
                 to,
                 if let Some(delay) = &con.delay {
-                    let link = delay.as_link_arc().unwrap();
+                    let link = delay
+                        .as_link_arc()
+                        .expect("invalid NDL tree: link typ does not refer to a link object");
                     Some(Channel::new(ChannelMetrics::from(&*link)))
                 } else {
                     None

@@ -249,7 +249,14 @@ impl ModuleRef {
             use crate::time::Driver;
 
             let mut ext = self.ctx.async_ext.write();
-            let mut driver = Driver::unset().unwrap();
+            let Some(mut driver) = Driver::unset() else {
+                // Somebody stole our driver
+                #[cfg(feature = "tracing")]
+                tracing::error!("IO time driver missing after event execution");
+
+                ext.driver = Some(Driver::new());
+                return;
+            };
             if let Some(next_wakeup) = driver.next() {
                 if next_wakeup < driver.next_wakeup {
                     #[cfg(feature = "tracing")]

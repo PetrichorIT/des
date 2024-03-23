@@ -1,5 +1,5 @@
 use core::fmt;
-use std::{str::FromStr, sync::Arc};
+use std::sync::Arc;
 
 ///
 /// A unqiue identifier for a object, indicating its parental inheritance.
@@ -166,10 +166,8 @@ impl AsRef<str> for ObjectPath {
     }
 }
 
-impl FromStr for ObjectPath {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+impl From<&str> for ObjectPath {
+    fn from(s: &str) -> Self {
         let mut o = 0;
         let mut last_element_offset = 0;
         let mut len = 0;
@@ -184,30 +182,24 @@ impl FromStr for ObjectPath {
             len += 1;
         }
 
-        Ok(Self {
+        Self {
             data: s.to_string().into(),
             last_element_offset,
             len,
             is_gate: false,
-        })
-    }
-}
-
-impl From<&str> for ObjectPath {
-    fn from(value: &str) -> Self {
-        Self::from_str(value).unwrap()
+        }
     }
 }
 
 impl From<&String> for ObjectPath {
     fn from(value: &String) -> Self {
-        Self::from_str(value.as_str()).unwrap()
+        Self::from(value.as_str())
     }
 }
 
 impl From<String> for ObjectPath {
     fn from(value: String) -> Self {
-        Self::from_str(value.as_str()).unwrap()
+        Self::from(value.as_str())
     }
 }
 

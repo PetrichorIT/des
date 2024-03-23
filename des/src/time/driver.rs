@@ -64,7 +64,12 @@ impl Driver {
     }
 
     pub(super) fn with_current<R>(f: impl FnOnce(&mut Driver) -> R) -> R {
-        TIME_CTX.with(|ctx| f(ctx.borrow_mut().as_mut().unwrap()))
+        TIME_CTX.with(|ctx| {
+            f(ctx
+                .borrow_mut()
+                .as_mut()
+                .expect("no IO time driver provided"))
+        })
     }
 }
 

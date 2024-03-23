@@ -211,7 +211,8 @@ where
         let handle = super::async_sim_start_join_take().expect("Crime");
         let _g = rt.0.enter();
         assert!(handle.is_finished());
-        rt.0.block_on(handle).unwrap();
+        rt.0.block_on(handle)
+            .expect("could not finish all sim start stages without time progression");
     }
 
     fn at_sim_end(&mut self) {
@@ -243,7 +244,8 @@ where
             handle.is_finished(),
             "at_sim_end() could not complete, since it is stuck at some await point"
         );
-        rt.0.block_on(handle).unwrap();
+        rt.0.block_on(handle)
+            .expect("could not finish all sim end stages without time progession");
     }
 
     fn num_sim_start_stages(&self) -> usize {

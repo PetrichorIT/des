@@ -11,12 +11,7 @@ use crate::sync::Mutex;
 use crate::time::SimTime;
 use std::sync::{Arc, Weak};
 
-static BUF_CTX: Mutex<BufferContext> = Mutex::new(BufferContext {
-    events: Vec::new(),
-    loopback: Vec::new(),
-    shutdown: None,
-    globals: None,
-});
+static BUF_CTX: Mutex<BufferContext> = Mutex::new(BufferContext::new());
 
 type LoopbackBuffer = Vec<(Message, SimTime)>;
 
@@ -33,6 +28,17 @@ struct BufferContext {
     globals: Option<Weak<Globals>>,
 }
 
+impl BufferContext {
+    const fn new() -> Self {
+        Self {
+            events: Vec::new(),
+            loopback: Vec::new(),
+            shutdown: None,
+            globals: None,
+        }
+    }
+}
+
 unsafe impl Send for BufferContext {}
 unsafe impl Sync for BufferContext {}
 
@@ -41,10 +47,27 @@ impl Globals {
         let ctx = BUF_CTX.lock();
         ctx.globals
             .as_ref()
-            .unwrap()
+            .expect("no globals attached to this event")
             .upgrade()
-            .expect("No runtime globals attached")
+            .expect("globals allready dropped: simulation shutting down")
     }
+}
+
+pub(crate) fn buf_init(globals: Weak<Globals>) {
+    let mut ctx = BUF_CTX.lock();
+    ctx.globals = Some(globals);
+
+    // TODO: remove ?
+    // SAFTEY:
+    // reseting the MOD_CTX is safe, since simulation lock is aquired.
+    unsafe {
+        MOD_CTX.reset(None);
+    }
+}
+
+pub(crate) fn buf_drop() {
+    let mut ctx = BUF_CTX.lock();
+    *ctx = BufferContext::new();
 }
 
 pub(crate) fn buf_send_at(mut msg: Message, gate: GateRef, send_time: SimTime) {
@@ -92,17 +115,6 @@ pub(crate) fn buf_schedule_shutdown(restart: Option<SimTime>) {
 
     let mut ctx = BUF_CTX.lock();
     ctx.shutdown = Some(restart);
-}
-
-pub(crate) fn buf_set_globals(globals: Weak<Globals>) {
-    let mut ctx = BUF_CTX.lock();
-    ctx.globals = Some(globals);
-
-    // SAFTEY:
-    // reseting the MOD_CTX is safe, since simulation lock is aquired.
-    unsafe {
-        MOD_CTX.reset(None);
-    }
 }
 
 pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<Sim<A>>)

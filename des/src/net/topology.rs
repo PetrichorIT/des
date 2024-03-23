@@ -57,7 +57,11 @@ impl Topology {
     /// or when globals dont exist.
     #[must_use]
     pub fn current() -> Topology {
-        globals().topology.lock().unwrap().clone()
+        globals()
+            .topology
+            .lock()
+            .expect("could not retrive current topology: simulation paniced and poisoned locks")
+            .clone()
     }
 
     /// All nodes if the current topology.
@@ -134,7 +138,7 @@ impl Topology {
                     .iter_mut()
                     .enumerate()
                     .find(|(_, m)| m.module.ctx.id() == src_id)
-                    .unwrap();
+                    .expect("failed to generate topology: corrupted module tree");
                 src_node.degree += 1;
                 src_node.alive |= true;
 
@@ -143,7 +147,7 @@ impl Topology {
                     .iter_mut()
                     .enumerate()
                     .find(|(_, m)| m.module.ctx.id() == dst_id)
-                    .unwrap();
+                    .expect("failed to generate topology: corrupted module tree");
                 dst_node.degree += 1;
                 dst_node.alive |= true;
 
@@ -284,7 +288,7 @@ impl Topology {
                 .nodes
                 .iter()
                 .position(|n| n.module.path() == node)
-                .unwrap(),
+                .expect("no such node exists"),
             distance: 0,
             next_hop: None,
         });

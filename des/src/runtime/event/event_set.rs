@@ -65,7 +65,7 @@ cfg_not_cqueue! {
                     self.last_event_simtime = event.time;
                     event
                 } else {
-                    let event = self.heap.pop().unwrap();
+                    let event = self.heap.pop().expect("unreachable: fetch_next shall only be called with the guarantee that an event exists");
                     self.last_event_simtime = event.time;
                     event
                 };
