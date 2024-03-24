@@ -46,6 +46,10 @@ path = "plugin/main.rs"
 name = "t-ndl2"
 path = "ndl2/main.rs"
 
+[[bin]]
+name = "test-bin"
+path = "test-bin/main.rs"
+
 [dependencies]
 des = { path = "../des", features = ["full"] }
 rand = "*"

@@ -260,6 +260,8 @@ impl ModuleRef {
                         driver.next_wakeup
                     );
 
+                    println!("> scheduling wakeup at {}", next_wakeup);
+
                     driver.next_wakeup = next_wakeup;
                     rt.add(
                         NetEvents::AsyncWakeupEvent(AsyncWakeupEvent {

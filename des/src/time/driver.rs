@@ -36,7 +36,19 @@ pub(super) struct TimerSlotEntry {
 #[derive(Debug)]
 pub(super) struct TimerSlotEntryHandle {
     id: usize,
+    resolved: bool,
     handle: Weak<TimerSlot>,
+}
+
+impl Drop for TimerSlotEntryHandle {
+    fn drop(&mut self) {
+        if !self.resolved {
+            let Some(handle) = self.handle.upgrade() else {
+                return;
+            };
+            let _ = handle.remove(self.id);
+        }
+    }
 }
 
 impl Driver {
@@ -95,40 +107,51 @@ impl TimerQueue {
                 TimerSlotEntryHandle {
                     id,
                     handle: Arc::downgrade(&pending[found]),
+                    resolved: false,
                 }
             }
             Err(insert_at) => {
-                pending.insert(
-                    insert_at,
-                    Arc::new(TimerSlot {
-                        time,
-                        entrys: RefCell::new(vec![entry]),
+                let slot = TimerSlot::new(time, self.clone());
+                slot.add(entry);
 
-                        queue: self.clone(),
-                    }),
-                );
+                pending.insert(insert_at, Arc::new(slot));
                 TimerSlotEntryHandle {
                     id,
                     handle: Arc::downgrade(&pending[insert_at]),
+                    resolved: false,
                 }
             }
         }
     }
 
     pub(super) fn next(&self) -> Option<SimTime> {
-        self.pending.borrow().front().map(|s| s.time)
+        self.pending
+            .borrow()
+            .front()
+            .filter(|slot| !slot.entrys.borrow().is_empty())
+            .map(|s| s.time)
     }
 
     pub(crate) fn bump(&self) -> Vec<TimerSlot> {
-        *self.cur.borrow_mut() = SimTime::now();
-        let front = match self.pending.borrow().front() {
-            Some(v) => v.time,
-            None => return Vec::new(),
-        };
-        if front <= SimTime::now() {
+        let cur = SimTime::now();
+        *self.cur.borrow_mut() = cur;
+        if self
+            .pending
+            .borrow()
+            .front()
+            .map_or(false, |slot| slot.time <= cur)
+        {
             let mut buffer = Vec::new();
-            while let Some(Ok(v)) = self.pending.borrow_mut().pop_front().map(Arc::try_unwrap) {
-                buffer.push(v);
+            let mut pending = self.pending.borrow_mut();
+            while pending
+                .front()
+                .map(|slot| slot.time <= cur)
+                .unwrap_or(false)
+            {
+                let Ok(slot) = Arc::try_unwrap(pending.pop_front().expect("unreachable")) else {
+                    continue;
+                };
+                buffer.push(slot)
             }
             buffer
         } else {
@@ -138,6 +161,14 @@ impl TimerQueue {
 }
 
 impl TimerSlot {
+    fn new(time: SimTime, queue: Arc<TimerQueue>) -> Self {
+        Self {
+            time,
+            queue,
+            entrys: RefCell::new(Vec::with_capacity(2)),
+        }
+    }
+
     fn add(&self, entry: TimerSlotEntry) {
         self.entrys.borrow_mut().push(entry);
     }
@@ -162,6 +193,10 @@ impl TimerSlot {
 }
 
 impl TimerSlotEntryHandle {
+    pub(super) fn resolve(&mut self) {
+        self.resolved = true;
+    }
+
     pub(super) fn reset(self, new_deadline: SimTime) -> Option<TimerSlotEntryHandle> {
         let handle = self.handle.upgrade()?;
         let entry = handle.remove(self.id)?;

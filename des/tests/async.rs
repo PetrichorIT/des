@@ -1,14 +1,18 @@
 #![cfg(feature = "async")]
 #![allow(unused_variables)]
 
-use des::{prelude::*, time::sleep};
+use des::{
+    net::AsyncFn,
+    prelude::*,
+    time::{self, sleep, timeout, timeout_at, MissedTickBehavior},
+};
 use std::sync::{
-    atomic::{AtomicBool, AtomicUsize},
+    atomic::{AtomicBool, AtomicUsize, Ordering},
     Arc,
 };
 use tokio::{
     sync::{
-        mpsc::{channel, Sender},
+        mpsc::{self, channel, Sender},
         Semaphore,
     },
     task::JoinHandle,
@@ -467,4 +471,231 @@ fn semaphore_in_waiting_task() {
         }
         _ => panic!("Expected runtime to finish"),
     }
+}
+
+#[test]
+#[serial]
+fn async_time_sleep_far_future() {
+    let mut sim = Sim::new(());
+    sim.node(
+        "alice",
+        AsyncFn::new(|rx| async move {
+            assert_eq!(SimTime::now(), 0.0);
+            time::sleep_until(10.0.into()).await;
+            assert_eq!(SimTime::now(), 10.0);
+            let sleep = time::sleep(Duration::MAX);
+            assert_eq!(sleep.deadline(), SimTime::MAX);
+            assert!(!sleep.is_elapsed());
+
+            sleep.await;
+            panic!("should never be reached");
+        }),
+    );
+
+    let result = Builder::seeded(123).build(sim).run();
+    assert_eq!(result.unwrap().1, 10.0);
+}
+
+#[test]
+#[serial]
+fn async_time_sleep_select() {
+    let mut sim = Sim::new(());
+    sim.node(
+        "alice",
+        AsyncFn::new(|rx| async move {
+            tokio::select! {
+                _ = time::sleep(Duration::from_secs(10)) => unreachable!(),
+                _ = time::sleep(Duration::from_secs(5)) => println!("resolved"),
+            }
+        })
+        .require_join(),
+    );
+
+    let result = Builder::seeded(123).build(sim).run().unwrap();
+    assert_eq!(result.1, 5.0);
+    assert_eq!(result.2.event_count, 1); // Just async wakeup for 5s, 10s will never be scheduled
+}
+
+#[test]
+#[serial]
+fn async_time_sleep_reset() {
+    let mut sim = Sim::new(());
+    sim.node(
+        "alice",
+        AsyncFn::new(|rx| async move {
+            let sleep = time::sleep(Duration::from_secs(5));
+            tokio::pin!(sleep);
+
+            sleep.as_mut().reset(10.0.into());
+            sleep.await
+        })
+        .require_join(),
+    );
+
+    let result = Builder::seeded(123).build(sim).run().unwrap();
+    assert_eq!(result.1, 10.0);
+    assert_eq!(result.2.event_count, 1); // Just async wakeup for 10s, 5s was not yet scheduled
+}
+
+#[test]
+#[serial]
+fn async_time_timeout() {
+    let mut sim = Sim::new(());
+    sim.node(
+        "alice",
+        AsyncFn::new(|rx| async move {
+            let result: Result<i32, time::error::Elapsed> =
+                timeout(Duration::from_secs(10), std::future::pending()).await;
+            assert!(result.is_err());
+
+            let (tx, mut rx) = mpsc::channel(1);
+
+            let handle = tokio::spawn(async move {
+                time::sleep(Duration::from_secs(5)).await;
+                tx.send(42).await.unwrap();
+            });
+
+            let result: Result<Option<i32>, time::error::Elapsed> =
+                timeout_at(20.0.into(), rx.recv()).await;
+            assert_eq!(result, Ok(Some(42)));
+
+            handle.await.unwrap();
+        })
+        .require_join(),
+    );
+
+    let result = Builder::seeded(123).build(sim).run().unwrap();
+    assert_eq!(result.1, 15.0);
+    // why 15s?
+    // wakeup 20s will never be scheduled, since
+    // -> wakeup 15s from tokio::task is allready scheduled
+    // -> upon completion of 15s timeout 20s is allready removed
+}
+
+#[test]
+#[serial]
+fn async_time_timeout_far_future() {
+    let mut sim = Sim::new(());
+    sim.node(
+        "alice",
+        AsyncFn::new(|rx| async move {
+            // add a sleep to get a nonempty sim
+            time::sleep(Duration::from_secs(42)).await;
+
+            let mut timeout = timeout(Duration::MAX, std::future::pending());
+            let _: &std::future::Pending<i32> = timeout.get_ref();
+            let _: &mut std::future::Pending<i32> = timeout.get_mut();
+
+            let result: Result<i32, time::error::Elapsed> = timeout.await;
+            panic!("will never be reached")
+        }),
+    );
+
+    let result = Builder::seeded(123).build(sim).run().unwrap();
+    assert_eq!(result.1, 42.0);
+}
+
+#[test]
+#[serial]
+fn async_time_interval() {
+    let mut sim = Sim::new(());
+    sim.node(
+        "alice",
+        AsyncFn::new(|rx| async move {
+            // (0) No missed ticks
+            let counter = Arc::new(AtomicUsize::new(0));
+
+            let c = counter.clone();
+            tokio::spawn(async move {
+                let mut interval = time::interval(Duration::from_secs(1));
+                assert_eq!(interval.period(), Duration::from_secs(1));
+                assert_eq!(
+                    interval.missed_tick_behavior(),
+                    MissedTickBehavior::default()
+                );
+
+                loop {
+                    interval.tick().await;
+                    c.fetch_add(1, Ordering::SeqCst);
+                }
+            });
+
+            time::sleep(Duration::from_secs_f64(7.5)).await;
+            assert_eq!(counter.load(Ordering::SeqCst), 1 + 7);
+        }),
+    );
+
+    let _ = Builder::seeded(123).max_time(100.0.into()).build(sim).run();
+}
+
+#[test]
+#[serial]
+fn async_time_interval_missed_tick_behaviour() {
+    let mut sim = Sim::new(());
+    sim.node(
+        "burst",
+        AsyncFn::new(|rx| async move {
+            // (0) No missed ticks
+            let mut interval = time::interval(Duration::from_secs(1));
+            interval.set_missed_tick_behavior(MissedTickBehavior::Burst);
+
+            time::sleep(Duration::from_secs_f64(4.5)).await;
+
+            for _ in 0..6 {
+                // expected ticks at 0, 1, 2, 3, 4, 5
+                // got at 4.5, ..., 4.5, 5
+                interval.tick().await;
+            }
+            assert_eq!(SimTime::now(), 5.0);
+        }),
+    );
+
+    sim.node(
+        "delay",
+        AsyncFn::new(|rx| async move {
+            // (0) No missed ticks
+            let mut interval = time::interval(Duration::from_secs(1));
+            interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
+            let mut last = SimTime::now();
+
+            time::sleep(Duration::from_secs_f64(4.5)).await;
+
+            for i in 0..6 {
+                // expected ticks at 0, 1, 2, 3, 4, 5
+                // got at 4.5, ..., 4.5, 5
+                interval.tick().await;
+                if i != 0 {
+                    assert_eq!(SimTime::now(), last + 1.0);
+                }
+                last = SimTime::now();
+            }
+
+            assert_eq!(SimTime::now(), 4.5 + 5.0);
+        }),
+    );
+
+    sim.node(
+        "skip",
+        AsyncFn::new(|rx| async move {
+            // (0) No missed ticks
+            let mut interval = time::interval_at(0.0.into(), Duration::from_secs(1));
+            interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+
+            time::sleep(Duration::from_secs_f64(4.5)).await;
+
+            for i in 0..6 {
+                // expected ticks at 0, 1, 2, 3, 4, 5
+                // got at 4.5, ..., 4.5, 5
+                interval.tick().await;
+                if i != 0 {
+                    assert_eq!(SimTime::now().subsec_millis(), 0);
+                }
+            }
+
+            assert_eq!(SimTime::from(5.0).elapsed(), Duration::from_secs(4));
+            assert_eq!(SimTime::now(), 9.0);
+        }),
+    );
+
+    let _ = Builder::seeded(123).max_time(100.0.into()).build(sim).run();
 }

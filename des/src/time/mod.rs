@@ -252,3 +252,28 @@ impl From<f64> for SimTime {
         SimTime(Duration::from_secs_f64(value))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ops() {
+        assert_eq!(
+            f64::from(SimTime::from_duration(Duration::from_millis(300))),
+            0.3
+        );
+
+        assert_eq!(SimTime::from(60.0) / 3.0, SimTime::from(20.0));
+        assert_eq!(SimTime::from(60.0) / SimTime::from(3.0), 20.0);
+
+        assert_eq!(
+            SimTime::from(30.0) - SimTime::from(10.0),
+            Duration::from_secs(20)
+        );
+        assert_eq!(SimTime::from(30.0) - Duration::from_secs(10), 20.0);
+        let mut time = SimTime::from(30.0);
+        time -= Duration::from_secs(10);
+        assert_eq!(time, 20.0);
+    }
+}
