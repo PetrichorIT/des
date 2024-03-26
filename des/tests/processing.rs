@@ -38,7 +38,7 @@ struct PluginCreation {
     sum: usize,
 }
 impl Module for PluginCreation {
-    fn stack(&self) -> impl ProcessingElement + 'static {
+    fn stack(&self) -> impl ProcessingElement {
         lcommon::IncrementIncomingId
     }
 

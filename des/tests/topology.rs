@@ -40,8 +40,10 @@ fn main() {
         .edges_for("router")
         .any(|edge| edge.to.gate().owner().path().as_str() == "debugger"));
 
-    fs::File::create("tests/topology.svg")
-        .unwrap()
-        .write_all(topo.as_svg().unwrap().as_bytes())
-        .unwrap();
+    if let Ok(output) = topo.as_svg() {
+        fs::File::create("tests/topology.svg")
+            .unwrap()
+            .write_all(output.as_bytes())
+            .unwrap();
+    }
 }

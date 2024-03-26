@@ -9,7 +9,7 @@ use des_ndl::error::RootResult;
 mod mock;
 
 mod common {
-    use des::{net::module::current, prelude::*};
+    use des::prelude::*;
 
     #[derive(Default)]
     pub struct Main;

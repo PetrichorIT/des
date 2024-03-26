@@ -4,10 +4,7 @@ use std::sync::{
     Arc,
 };
 
-use des::{
-    net::channel::{ChannelDropBehaviour, ChannelProbe},
-    prelude::*,
-};
+use des::{net::channel::ChannelProbe, prelude::*};
 use rand::{rngs::StdRng, SeedableRng};
 use serial_test::serial;
 

@@ -1,8 +1,5 @@
 use des::{
-    net::{
-        module::{set_setup_fn, ModuleContext},
-        processing::ProcessingElement,
-    },
+    net::module::{set_setup_fn, ModuleContext},
     prelude::*,
     registry,
 };
@@ -45,10 +42,7 @@ impl Drop for PacketCounter {
 struct B {}
 
 impl Module for B {
-    fn stack(&self) -> impl ProcessingElement + 'static
-    where
-        Self: Sized,
-    {
+    fn stack(&self) -> impl ProcessingElement {
         PacketCounter::default()
     }
 
