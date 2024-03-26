@@ -12,3 +12,5 @@ graph*.svg
 *.parse
 *.fdesugar
 *.sdesugar
+
+tarpaulin-report.html

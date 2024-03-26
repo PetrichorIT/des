@@ -25,7 +25,6 @@ use linked_list::DualLinkedList;
 /// the insertion of entries with a timestamp smaller that entries
 /// that was last fetched (or `Duration::ZERO` initally).
 ///
-#[derive(Debug)]
 pub struct CQueue<E> {
     #[allow(unused)]
     pub(crate) alloc: Box<CQueueLLAllocatorInner>,
@@ -90,14 +89,6 @@ impl<E> CQueue<E> {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
-    }
-
-    #[must_use]
-    pub fn metrics(&self) -> (usize, usize) {
-        let (alloc, total) = self.alloc.metrics();
-        let additional = std::mem::size_of::<Self>();
-        let additional = additional + std::mem::size_of::<(E, Duration, usize)>() * self.len_zero();
-        (alloc + additional, total + additional)
     }
 
     /// Returns the timestamp of the last emitted event.
@@ -191,11 +182,7 @@ impl<E> CQueue<E> {
     pub fn cancel(&mut self, handle: EventHandle<E>) {
         if handle.time >= self.t_current {
             if handle.time == self.t_current {
-                if let Some(i) = self
-                    .zero_event_bucket
-                    .iter()
-                    .position(| v| v.2 == handle.id)
-                {
+                if let Some(i) = self.zero_event_bucket.iter().position(|v| v.2 == handle.id) {
                     self.zero_event_bucket.remove(i);
                     self.len -= 1;
                 }
