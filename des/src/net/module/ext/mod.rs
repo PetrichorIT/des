@@ -13,11 +13,6 @@ pub(crate) use self::core::WaitingMessage;
 /// This trait is just a async version of [`Module`](crate::net::module::Module).
 #[allow(async_fn_in_trait)]
 pub trait AsyncModule: Send {
-    /// Creates a new instance of Self.
-    fn new() -> Self
-    where
-        Self: Sized;
-
     /// Resets the custom state after shutdown.
     fn reset(&mut self) {}
 
@@ -41,9 +36,8 @@ pub trait AsyncModule: Send {
     ///     prop_2: String,
     /// }
     ///
-    /// 
+    ///
     /// impl AsyncModule for MyAsyncModule {
-    /// # fn new() -> Self { todo!() }
     ///     /* ... */    
     ///
     ///     async fn handle_message(&mut self, msg: Message) {
@@ -80,9 +74,8 @@ pub trait AsyncModule: Send {
     ///     records: Vec<f64>,
     /// }
     ///
-    /// 
+    ///
     /// impl AsyncModule for MyModule {
-    /// # fn new() -> Self { todo!() }
     ///     /* ... */    
     ///
     ///     async fn handle_message(&mut self, _: Message) {
@@ -105,12 +98,6 @@ pub trait AsyncModule: Send {
     async fn at_sim_end(&mut self) {}
 
     ///
-    /// A function that is called if the parameterst of the simulation
-    /// enviroment was changed
-    ///
-    async fn handle_par_change(&mut self) {}
-
-    ///
     /// A function that returns the number of required startup stages
     /// of a module.
     ///
@@ -125,13 +112,6 @@ where
 {
     fn __indicate_async(&self) -> bool {
         true
-    }
-
-    fn new() -> Self
-    where
-        Self: Sized,
-    {
-        <T as AsyncModule>::new()
     }
 
     fn reset(&mut self) {
@@ -231,7 +211,8 @@ where
         let handle = super::async_sim_start_join_take().expect("Crime");
         let _g = rt.0.enter();
         assert!(handle.is_finished());
-        rt.0.block_on(handle).unwrap();
+        rt.0.block_on(handle)
+            .expect("could not finish all sim start stages without time progression");
     }
 
     fn at_sim_end(&mut self) {
@@ -263,7 +244,8 @@ where
             handle.is_finished(),
             "at_sim_end() could not complete, since it is stuck at some await point"
         );
-        rt.0.block_on(handle).unwrap();
+        rt.0.block_on(handle)
+            .expect("could not finish all sim end stages without time progession");
     }
 
     fn num_sim_start_stages(&self) -> usize {

@@ -1,15 +1,15 @@
 use core::fmt;
-use std::str::FromStr;
+use std::sync::Arc;
 
 ///
 /// A unqiue identifier for a object, indicating its parental inheritance.
 ///
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ObjectPath {
-    data: String,
+    data: Arc<str>,
     last_element_offset: usize,
     len: usize,
-    is_channel: bool,
+    is_gate: bool,
 }
 
 impl ObjectPath {
@@ -19,16 +19,10 @@ impl ObjectPath {
         self.len == 0
     }
 
-    /// Indicates whether the path points to a channel.
-    #[must_use]
-    pub fn is_channel(&self) -> bool {
-        self.is_channel
-    }
-
     /// Indicates whether the path points to a module.
     #[must_use]
     pub fn is_module(&self) -> bool {
-        !self.is_channel
+        !self.is_gate
     }
 
     /// Returns the depth of the referenced object.
@@ -49,7 +43,7 @@ impl ObjectPath {
     /// Returns the entrie path as a &str.
     #[must_use]
     pub fn as_str(&self) -> &str {
-        self.data.as_str()
+        &self.data
     }
 
     /// Returns the entrie path as a &str for declaring a logger scope
@@ -75,93 +69,78 @@ impl ObjectPath {
             return None;
         }
 
-        let mut parent = self.clone();
-        parent
-            .data
-            .truncate(self.last_element_offset.saturating_sub(1));
+        let mut data = self.data.to_string();
+        let mut last_element_offset = self.last_element_offset;
+        let mut len = self.len;
 
-        if let Some(i) = parent.data.rfind('.') {
-            parent.last_element_offset = i + 1;
+        data.truncate(last_element_offset.saturating_sub(1));
+
+        if let Some(i) = data.rfind('.') {
+            last_element_offset = i + 1;
         } else {
-            parent.last_element_offset = 0;
+            last_element_offset = 0;
         }
-        parent.len -= 1;
-        parent.is_channel = false;
+        len -= 1;
 
-        Some(parent)
+        Some(Self {
+            data: data.into(),
+            last_element_offset,
+            len,
+            is_gate: false,
+        })
     }
 
-    /// Creates a new object path pointing to the root.
+    /// Returns a parent that is not root.
     #[must_use]
-    pub fn new() -> ObjectPath {
-        Self {
-            data: String::new(),
-            last_element_offset: 0,
-            len: 0,
-            is_channel: false,
+    pub fn nonzero_parent(&self) -> Option<ObjectPath> {
+        let parent = self.parent()?;
+        if parent.is_root() {
+            None
+        } else {
+            Some(parent)
         }
-    }
-
-    /// Appends another module to the path.
-    ///
-    /// # Panics
-    ///
-    /// This function panics if self allready points to a channel,
-    /// since channels are leaf elements in the object tree.
-    ///
-    pub fn append(&mut self, module: impl AsRef<str>) {
-        assert!(
-            !self.is_channel,
-            "Cannot append to a path that points to a channel"
-        );
-        let module = module.as_ref();
-        if self.len != 0 {
-            self.last_element_offset = self.data.len() + 1;
-            self.data.push('.');
-        }
-
-        self.data.push_str(module);
-        self.len += 1;
-    }
-
-    /// Append a channel leaf to the path.
-    ///
-    /// # Panics
-    ///
-    /// This function panics if self is pointing to a channel,
-    /// since channels are leaf elements in the object tree.
-    ///
-    pub fn append_channel(&mut self, channel: impl AsRef<str>) {
-        assert!(
-            !self.is_channel,
-            "Cannot append to a path that points to a channel"
-        );
-        let channel = channel.as_ref();
-        if self.len != 0 {
-            self.last_element_offset = self.data.len() + 1;
-            self.data.push('.');
-        }
-        self.data.push('<');
-        self.data.push_str(channel);
-        self.data.push('>');
-        self.is_channel = true;
-        self.len += 1;
     }
 
     /// Returns a new instance with another module appended to the path.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the current path points to a gate.
     #[must_use]
     pub fn appended(&self, module: impl AsRef<str>) -> Self {
-        let mut clone = self.clone();
-        clone.append(module);
-        clone
+        let mut data = self.data.to_string();
+        let mut last_element_offset = self.last_element_offset;
+        let mut len = self.len;
+
+        assert!(
+            !self.is_gate,
+            "cannot append to a path that points to a gate"
+        );
+
+        let suffix = module.as_ref();
+        if !suffix.is_empty() {
+            if self.len != 0 {
+                last_element_offset = data.len() + 1;
+                data.push('.');
+            }
+            data.push_str(suffix);
+            len += 1;
+        }
+
+        Self {
+            data: data.into(),
+            last_element_offset,
+            len,
+            is_gate: false,
+        }
     }
 
-    /// Returns a new instance with a channel appended to the path.
+    /// Retruns a new object path pointing to the gate on the current module.
     #[must_use]
-    pub fn appended_channel(&self, channel: impl AsRef<str>) -> Self {
-        let mut clone = self.clone();
-        clone.append_channel(channel);
-        clone
+    pub fn appended_gate(&self, gate: impl AsRef<str>) -> Self {
+        let mut appended = self.appended(gate);
+        appended.is_gate = true;
+        appended
     }
 }
 
@@ -177,10 +156,8 @@ impl AsRef<str> for ObjectPath {
     }
 }
 
-impl FromStr for ObjectPath {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+impl From<&str> for ObjectPath {
+    fn from(s: &str) -> Self {
         let mut o = 0;
         let mut last_element_offset = 0;
         let mut len = 0;
@@ -195,33 +172,35 @@ impl FromStr for ObjectPath {
             len += 1;
         }
 
-        let name = &s[last_element_offset..];
-        let is_channel = name.starts_with('<') && name.ends_with('>');
-
-        Ok(Self {
-            data: s.to_string(),
+        Self {
+            data: s.to_string().into(),
             last_element_offset,
             len,
-            is_channel,
-        })
+            is_gate: false,
+        }
     }
 }
 
-impl From<&str> for ObjectPath {
-    fn from(value: &str) -> Self {
-        Self::from_str(value).unwrap()
+impl From<&String> for ObjectPath {
+    fn from(value: &String) -> Self {
+        Self::from(value.as_str())
     }
 }
 
 impl From<String> for ObjectPath {
     fn from(value: String) -> Self {
-        Self::from_str(value.as_str()).unwrap()
+        Self::from(value.as_str())
     }
 }
 
 impl Default for ObjectPath {
     fn default() -> Self {
-        Self::new()
+        Self {
+            data: String::new().into(),
+            last_element_offset: 0,
+            len: 0,
+            is_gate: false,
+        }
     }
 }
 
@@ -231,114 +210,109 @@ mod tests {
 
     #[test]
     fn manual_appending() {
-        let mut path = ObjectPath::new();
-        path.append("top");
-        path.append("mid");
+        let path = ObjectPath::default().appended("top").appended("mid");
+
         assert_eq!(path.name(), "mid");
         assert_eq!(path.as_parent_str(), "top");
         assert_eq!(
             path,
             ObjectPath {
-                data: "top.mid".to_string(),
+                data: "top.mid".to_string().into(),
                 len: 2,
                 last_element_offset: 4,
-                is_channel: false,
+                is_gate: false,
             }
         );
 
-        let mut path = ObjectPath::new();
-        path.append("top");
-        path.append("mid");
-        path.append("low");
+        let path = ObjectPath::default()
+            .appended("top")
+            .appended("mid")
+            .appended("low");
+
         assert_eq!(path.name(), "low");
         assert_eq!(path.as_parent_str(), "top.mid");
         assert_eq!(
             path,
             ObjectPath {
-                data: "top.mid.low".to_string(),
+                data: "top.mid.low".to_string().into(),
                 len: 3,
                 last_element_offset: 8,
-                is_channel: false,
+                is_gate: false,
             }
         );
 
-        let mut path = ObjectPath::new();
-        path.append("top");
+        let path = ObjectPath::default().appended("top");
         assert_eq!(path.name(), "top");
         assert_eq!(path.as_parent_str(), "");
         assert_eq!(
             path,
             ObjectPath {
-                data: "top".to_string(),
+                data: "top".to_string().into(),
                 len: 1,
                 last_element_offset: 0,
-                is_channel: false,
+                is_gate: false,
             }
         );
 
-        let path = ObjectPath::new();
+        let path = ObjectPath::default();
         assert_eq!(path.name(), "");
         assert_eq!(path.as_parent_str(), "");
         assert!(path.is_root());
         assert_eq!(
             path,
             ObjectPath {
-                data: "".to_string(),
+                data: "".to_string().into(),
                 len: 0,
                 last_element_offset: 0,
-                is_channel: false,
+                is_gate: false,
             }
         );
     }
 
     #[test]
     fn parent_creation() {
-        let mut path = ObjectPath::new();
-        path.append("top");
-        path.append("mid");
-
+        let path = ObjectPath::default().appended("top").appended("mid");
         let parent = path.parent();
         assert_eq!(
             parent,
             Some(ObjectPath {
-                data: "top".to_string(),
+                data: "top".to_string().into(),
                 len: 1,
                 last_element_offset: 0,
-                is_channel: false,
+                is_gate: false,
             })
         );
 
-        let mut path = ObjectPath::new();
-        path.append("top");
-        path.append("mid");
-        path.append("low");
+        let path = ObjectPath::default()
+            .appended("top")
+            .appended("mid")
+            .appended("low");
 
         let parent = path.parent();
         assert_eq!(
             parent,
             Some(ObjectPath {
-                data: "top.mid".to_string(),
+                data: "top.mid".to_string().into(),
                 len: 2,
                 last_element_offset: 4,
-                is_channel: false,
+                is_gate: false,
             })
         );
 
-        let mut path = ObjectPath::new();
-        path.append("top");
+        let path = ObjectPath::default().appended("top");
 
         let parent = path.parent();
         assert_eq!(
             parent,
             Some(ObjectPath {
-                data: "".to_string(),
+                data: "".to_string().into(),
                 len: 0,
                 last_element_offset: 0,
-                is_channel: false,
+                is_gate: false,
             })
         );
 
-        let path = ObjectPath::new();
+        let path = ObjectPath::default();
 
         let parent = path.parent();
         assert_eq!(parent, None);
@@ -349,40 +323,40 @@ mod tests {
         assert_eq!(
             ObjectPath::from("top.mid"),
             ObjectPath {
-                data: "top.mid".to_string(),
+                data: "top.mid".to_string().into(),
                 len: 2,
                 last_element_offset: 4,
-                is_channel: false,
+                is_gate: false,
             }
         );
 
         assert_eq!(
             ObjectPath::from("top.mid.low"),
             ObjectPath {
-                data: "top.mid.low".to_string(),
+                data: "top.mid.low".to_string().into(),
                 len: 3,
                 last_element_offset: 8,
-                is_channel: false,
+                is_gate: false,
             }
         );
 
         assert_eq!(
             ObjectPath::from("top"),
             ObjectPath {
-                data: "top".to_string(),
+                data: "top".to_string().into(),
                 len: 1,
                 last_element_offset: 0,
-                is_channel: false,
+                is_gate: false,
             }
         );
 
         assert_eq!(
             ObjectPath::from(""),
             ObjectPath {
-                data: "".to_string(),
+                data: "".to_string().into(),
                 len: 0,
                 last_element_offset: 0,
-                is_channel: false,
+                is_gate: false,
             }
         );
 
@@ -390,43 +364,18 @@ mod tests {
         assert_eq!(
             ObjectPath::from("top.a😀b.low"),
             ObjectPath {
-                data: "top.a😀b.low".to_string(),
+                data: "top.a😀b.low".to_string().into(),
                 len: 3,
                 last_element_offset: 11,
-                is_channel: false,
-            }
-        );
-    }
-
-    #[test]
-    fn channel() {
-        assert_eq!(
-            ObjectPath::from("top.<low>"),
-            ObjectPath {
-                data: "top.<low>".to_string(),
-                len: 2,
-                last_element_offset: 4,
-                is_channel: true,
+                is_gate: false,
             }
         );
 
-        let path = ObjectPath::from("top.<low>");
-        assert!(path.is_channel());
-        assert_eq!(
-            path.parent(),
-            Some(ObjectPath {
-                data: "top".to_string(),
-                last_element_offset: 0,
-                len: 1,
-                is_channel: false
-            })
-        );
-    }
-
-    #[test]
-    #[should_panic]
-    fn channel_append_something() {
-        let mut path = ObjectPath::from("top.<low>");
-        path.append("mod");
+        assert!(ObjectPath::default().is_root());
+        assert!(ObjectPath::from(String::new()).is_module());
+        assert_eq!(ObjectPath::from(&String::new()).as_logger_scope(), "@root");
+        assert_eq!(ObjectPath::from("abc").as_logger_scope(), "abc");
+        assert!(!ObjectPath::from("a").appended_gate("gate").is_module());
+        assert!(ObjectPath::from("root.a.b.c").as_ref().starts_with("root"));
     }
 }

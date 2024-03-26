@@ -1,4 +1,4 @@
-use des::prelude::*;
+use des::{prelude::*, runtime::RuntimeLimit};
 use rand::{distributions::Standard, prelude::SliceRandom, Rng};
 use serial_test::serial;
 
@@ -372,4 +372,32 @@ fn deferred_sim_start() {
 
     assert_eq!(app.started, true);
     assert_eq!(app.ended, true);
+}
+
+struct CustomStartApp;
+impl Application for CustomStartApp {
+    type EventSet = CustomStartEvent;
+    type Lifecycle = Self;
+}
+
+struct CustomStartEvent;
+impl EventSet<CustomStartApp> for CustomStartEvent {
+    fn handle(self, _: &mut Runtime<CustomStartApp>) {}
+}
+
+impl EventLifecycle for CustomStartApp {
+    fn at_sim_start(_: &mut Runtime<Self>) {
+        assert_eq!(SimTime::now(), 42.0);
+    }
+}
+
+#[test]
+#[serial]
+fn custom_start_time() {
+    let _ = Builder::new()
+        .quiet()
+        .start_time(42.0.into())
+        .limit(RuntimeLimit::EventCount(10))
+        .build(CustomStartApp)
+        .run();
 }

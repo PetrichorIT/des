@@ -1,0 +1,27 @@
+module A {
+    submodules {
+        b: B
+    }
+
+    gates {
+        port,
+    }
+}
+module B {
+    gates {
+        port,
+    }
+}
+
+module Main {
+    submodules {
+        a: A,
+        b: B,
+    }
+
+    connections {
+        a/port <--> b/port,
+    }
+}
+
+entry Main;

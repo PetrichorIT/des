@@ -3,10 +3,9 @@ use std::{
     sync::Arc,
 };
 
-use super::*;
+use super::{GateRef, RawSymbol, Symbol};
 use crate::{
     ast::{ClusterDefinition, ModuleStmt},
-    ir::GateRef,
     Span,
 };
 
@@ -168,7 +167,6 @@ impl From<&Option<ClusterDefinition>> for Cluster {
             .unwrap_or(Cluster::Standalone)
     }
 }
-
 
 impl Display for Cluster {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

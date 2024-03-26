@@ -2,12 +2,9 @@
 use des::net::processing::*;
 use des::prelude::*;
 use serial_test::serial;
-use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
-
-#[macro_use]
-mod common;
 
 mod lcommon {
     use des::net::processing::*;
@@ -36,18 +33,12 @@ mod lcommon {
     }
 }
 
+#[derive(Default)]
 struct PluginCreation {
     sum: usize,
 }
-impl_build_named!(PluginCreation);
-
 impl Module for PluginCreation {
-    fn new() -> Self {
-        Self {
-            sum: 0,
-        }
-    }
-    fn stack(&self) -> impl ProcessingElement + 'static  {
+    fn stack(&self) -> impl ProcessingElement {
         lcommon::IncrementIncomingId
     }
 
@@ -61,7 +52,7 @@ impl Module for PluginCreation {
     }
 
     fn handle_message(&mut self, msg: Message) {
-        assert_eq!(SimTime::now().as_secs() + 1 , msg.header().id as u64);
+        assert_eq!(SimTime::now().as_secs() + 1, msg.header().id as u64);
         self.sum += msg.header().id as usize;
     }
 
@@ -75,10 +66,8 @@ impl Module for PluginCreation {
 fn plugin_raw_creation() {
     // Logger::new().set_logger();
 
-    let mut app = NetworkApplication::new(());
-
-    let root = PluginCreation::build_named(ObjectPath::from("root"), &mut app);
-    app.register_module(root);
+    let mut app = Sim::new(());
+    app.node("root", PluginCreation::default());
 
     let rt = Builder::seeded(123).build(app);
     let result = rt.run().unwrap();
@@ -86,8 +75,6 @@ fn plugin_raw_creation() {
     assert_eq!(result.1, SimTime::from_duration(Duration::from_secs(99)));
     assert_eq!(result.2.event_count, 100);
 }
-
-
 
 struct ActivitySensor {
     pub expected: usize,
@@ -105,17 +92,11 @@ impl ProcessingElement for ActivitySensor {
     }
 }
 
+#[derive(Default)]
 struct PluginPriorityDefer {
     arc: Arc<AtomicUsize>,
 }
-impl_build_named!(PluginPriorityDefer);
 impl Module for PluginPriorityDefer {
-    fn new() -> Self {
-        Self {
-            arc: Arc::new(AtomicUsize::new(0)),
-        }
-    }
-
     fn stack(&self) -> impl IntoProcessingElements {
         (
             ActivitySensor {
@@ -129,7 +110,7 @@ impl Module for PluginPriorityDefer {
             ActivitySensor {
                 shared: self.arc.clone(),
                 expected: 2,
-            }
+            },
         )
     }
 
@@ -147,10 +128,8 @@ impl Module for PluginPriorityDefer {
 fn plugin_priority_defer() {
     // Logger::new().set_logger();
 
-    let mut app = NetworkApplication::new(());
-
-    let module = PluginPriorityDefer::build_named(ObjectPath::from("root"), &mut app);
-    app.register_module(module);
+    let mut app = Sim::new(());
+    app.node("root", PluginPriorityDefer::default());
 
     let rt = Builder::seeded(123).build(app);
     let result = rt.run();
@@ -179,21 +158,16 @@ impl Drop for IncrementArcPlugin {
     }
 }
 
+#[derive(Default)]
 struct PluginAtShutdown {
     arc: Arc<AtomicUsize>,
 }
-impl_build_named!(PluginAtShutdown);
 impl Module for PluginAtShutdown {
-    fn new() -> Self {
-        Self {
-            arc: Arc::new(AtomicUsize::new(0)),
+    fn stack(&self) -> impl IntoProcessingElements {
+        IncrementArcPlugin {
+            arc: self.arc.clone(),
         }
     }
-
-    fn stack(&self) -> impl IntoProcessingElements {
-        IncrementArcPlugin { arc: self.arc.clone() }
-    }
-
 
     fn at_sim_start(&mut self, _stage: usize) {
         if SimTime::now().as_secs() == 0 {
@@ -226,13 +200,83 @@ fn plugin_shutdown_non_persistent_data() {
     //     .interal_max_log_level(log::LevelFilter::Trace)
     //     .set_logger();
 
-    let mut rt = NetworkApplication::new(());
+    let mut app = Sim::new(());
+    app.node("root", PluginAtShutdown::default());
 
-    let module = PluginAtShutdown::build_named(ObjectPath::from("root".to_string()), &mut rt);
-    rt.register_module(module);
-
-    let rt = Builder::seeded(123).build(rt);
+    let rt = Builder::seeded(123).build(app);
 
     let res = rt.run();
     let _res = res.unwrap();
+}
+
+#[test]
+#[serial]
+fn module_as_processing_element() {
+    static DONE: AtomicBool = AtomicBool::new(false);
+
+    struct A;
+    struct B;
+    impl Module for A {
+        fn handle_message(&mut self, _: Message) {
+            DONE.store(true, Ordering::SeqCst);
+        }
+    }
+    impl Module for B {
+        fn stack(&self) -> impl IntoProcessingElements {
+            A
+        }
+
+        fn handle_message(&mut self, _: Message) {
+            panic!("should never be called");
+        }
+    }
+
+    let mut sim = Sim::new(());
+    sim.node("a", B);
+    let gate = sim.gate("a", "port");
+
+    let mut rt = Builder::seeded(123).build(sim);
+    rt.add_message_onto(gate, Message::new().build(), 1.0.into());
+
+    let _ = rt.run();
+    assert!(DONE.load(Ordering::SeqCst));
+}
+
+#[test]
+#[serial]
+fn custom_default_pe() {
+    static DONE: AtomicBool = AtomicBool::new(false);
+
+    struct EatAllAndSayDone;
+    impl ProcessingElement for EatAllAndSayDone {
+        fn incoming(&mut self, _: Message) -> Option<Message> {
+            DONE.store(true, Ordering::SeqCst);
+            None
+        }
+    }
+
+    fn custom() -> Vec<ProcessorElement> {
+        vec![ProcessorElement::new(EatAllAndSayDone)]
+    }
+
+    set_default_processing_elements(custom);
+
+    struct A;
+    impl Module for A {}
+
+    let mut sim = Sim::new(());
+    sim.node("a", A);
+    let gate = sim.gate("a", "port");
+
+    let mut rt = Builder::seeded(123).build(sim);
+    rt.add_message_onto(gate, Message::new().build(), 1.0.into());
+
+    let _ = rt.run();
+    assert!(DONE.load(Ordering::SeqCst));
+
+    fn reset() -> Vec<ProcessorElement> {
+        Vec::new()
+    }
+
+    set_default_processing_elements(reset)
 }

@@ -1,11 +1,12 @@
 use fxhash::{FxBuildHasher, FxHashMap};
+use spin::RwLock;
 
 use super::{
     meta::Metadata, DummyModule, ModuleId, ModuleRef, ModuleRefWeak, ModuleReferencingError,
 };
 use crate::{
     prelude::{GateRef, ObjectPath},
-    sync::{RwLock, SwapLock},
+    sync::SwapLock,
     tracing::{new_scope, ScopeToken},
 };
 use std::{
@@ -22,7 +23,20 @@ pub(crate) static SETUP_FN: RwLock<fn(&ModuleContext)> = RwLock::new(_default_se
 
 pub(crate) fn _default_setup(_: &ModuleContext) {}
 
+pub(crate) fn module_ctx_drop() {
+    MOD_CTX.swap(&mut None);
+}
+
+/// The topological components of a module, not including the attached
+/// software.
 ///
+/// The term `within node-context` refers to the presence of a `ModuleContext`
+/// in the global scope, that indicates that a module is currently active.
+///
+/// This type is internally used to create the simulations layout, but
+/// creating module contexts on your own is highly discouraged, since
+/// managing these structures is rather complicated. However the nessecary
+/// constructors are still available, so use them with care.
 pub struct ModuleContext {
     pub(crate) active: AtomicBool,
     pub(crate) id: ModuleId,
@@ -40,7 +54,13 @@ pub struct ModuleContext {
 }
 
 impl ModuleContext {
-    /// Creates a new standalone instance
+    /// Creates a new standalone instance of a new node.
+    ///
+    /// Note that this function returns a `ModuleRef`.
+    /// A `ModuleRef` contains both the topological properties of a node
+    /// if form of a `ModuleContext` as well as some attached software.
+    /// The sofware attched to the returned reference is a dummy module
+    /// that should be replaced before the simulation is started.
     pub fn standalone(path: ObjectPath) -> ModuleRef {
         let this = ModuleRef::dummy(Arc::new(Self {
             #[cfg(feature = "async")]
@@ -64,7 +84,13 @@ impl ModuleContext {
         this
     }
 
-    /// Creates a child
+    /// Creates a instance within a module tree.
+    ///  
+    /// Note that this function returns a `ModuleRef`.
+    /// A `ModuleRef` contains both the topological properties of a node
+    /// if form of a `ModuleContext` as well as some attached software.
+    /// The sofware attched to the returned reference is a dummy module
+    /// that should be replaced before the simulation is started.
     #[allow(clippy::needless_pass_by_value)]
     pub fn child_of(name: &str, parent: ModuleRef) -> ModuleRef {
         let path = ObjectPath::appended(&parent.ctx.path, name);
@@ -118,7 +144,6 @@ impl ModuleContext {
     ///
     /// struct MyModule;
     /// impl Module for MyModule {
-    ///     fn new() -> Self { Self }
     ///     fn handle_message(&mut self, msg: Message) {
     ///         let id = current().id();
     ///         assert_eq!(id, msg.header().receiver_module_id);    
@@ -139,7 +164,6 @@ impl ModuleContext {
     ///
     /// struct MyModule;
     /// impl Module for MyModule {
-    ///     fn new() -> Self { Self }
     ///     fn handle_message(&mut self, msg: Message) {
     ///         let path = current().path();
     ///         println!("[{path}] recv message: {}", msg.str())  
@@ -176,6 +200,8 @@ impl ModuleContext {
     }
 
     /// Retrieves metadata about a module, based on a type.
+    ///
+    /// # Examples
     ///
     /// # Panics
     ///

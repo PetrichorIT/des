@@ -1,18 +1,21 @@
 #![cfg(feature = "ndl")]
 
-use des::{ndl::NdlApplication, prelude::*, registry};
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+use des::{prelude::*, registry};
 use des_ndl::error::RootResult;
 
+#[path = "common/mock.rs"]
+mod mock;
+
 mod common {
-    use des::{prelude::*, net::module::current};
+    use des::prelude::*;
 
+    #[derive(Default)]
     pub struct Main;
-    impl Module for Main {
-        fn new() -> Self {
-            Self
-        }
-    }
+    impl Module for Main {}
 
+    #[derive(Default)]
     pub struct Node {
         dst: usize,
         rem: usize,
@@ -20,15 +23,6 @@ mod common {
         rcv: usize,
     }
     impl Module for Node {
-        fn new() -> Self {
-            Self {
-                dst: 0,
-                rem: 0,
-                delay: Duration::new(0, 0),
-                rcv: 0,
-            }
-        }
-
         fn at_sim_start(&mut self, _stage: usize) {
             self.dst = par("dst")
                 .as_option()
@@ -93,19 +87,13 @@ mod common {
         }
     }
 
+    #[derive(Default)]
     pub struct Debugger;
-    impl Module for Debugger {
-        fn new() -> Self {
-            Self
-        }
-    }
+    impl Module for Debugger {}
 
+    #[derive(Default)]
     pub struct Router;
     impl Module for Router {
-        fn new() -> Self {
-            Self
-        }
-
         fn handle_message(&mut self, msg: Message) {
             let g = current().gate("out", msg.header().id as usize).unwrap();
             send(msg, g);
@@ -120,12 +108,12 @@ use serial_test::serial;
 fn small_network() -> RootResult<()> {
     // Logger::new().set_logger();
 
-    let ndl = NdlApplication::new(
+    let mut app = Sim::ndl(
         "tests/ndl/small_network/main.ndl",
         registry![Main, Node, Router, Debugger],
     )?;
-    let mut app = NetworkApplication::new(ndl);
-    app.include_par_file("tests/ndl/small_network/main.par");
+    app.include_par_file("tests/ndl/small_network/main.par")
+        .unwrap();
 
     let r = Builder::seeded(123)
         .max_time(1000.0.into())
@@ -142,12 +130,12 @@ fn small_network() -> RootResult<()> {
 fn ring_topology() -> RootResult<()> {
     // Logger::new().set_logger();
 
-    let ndl = NdlApplication::new(
+    let mut app = Sim::ndl(
         "tests/ndl/ring_topo/main.ndl",
         registry![Main, Node, Router, Debugger],
     )?;
-    let mut app = NetworkApplication::new(ndl);
-    app.include_par_file("tests/ndl/ring_topo/main.par");
+    app.include_par_file("tests/ndl/ring_topo/main.par")
+        .unwrap();
 
     let r = Builder::seeded(123)
         .max_time(1000.0.into())
@@ -156,5 +144,116 @@ fn ring_topology() -> RootResult<()> {
         .unwrap();
 
     assert_eq!(r.1.as_secs(), 200);
+    Ok(())
+}
+
+struct Single;
+
+impl RegistryCreatable for Single {
+    fn create(path: &ObjectPath, _: &str) -> Self {
+        println!("{path}");
+        assert!(par("addr").is_some());
+        Self
+    }
+}
+
+impl Module for Single {}
+
+#[test]
+#[serial]
+fn build_with_preexisting_sim() -> RootResult<()> {
+    let mut sim = Sim::new(());
+    sim.include_par("alice.addr = 1.1.1.1\n");
+    sim.build_ndl("tests/ndl/single.ndl", registry![Single, else _])?;
+
+    let _ = Builder::seeded(123).build(sim).run();
+    Ok(())
+}
+
+#[test]
+#[serial]
+fn non_std_gate_connections() -> RootResult<()> {
+    let sim = Sim::ndl(
+        "tests/ndl/local-con.ndl",
+        Registry::new().with_default_fallback(),
+    )?;
+    let _ = Builder::seeded(123).build(sim).run();
+    Ok(())
+}
+
+#[test]
+#[serial]
+fn registry_missing_symbol() {
+    let sim: Result<Sim<()>, des_ndl::error::RootError> = Sim::ndl(
+        "tests/ndl/ab-deep.ndl",
+        Registry::new().symbol("Main", |_| Debugger),
+    );
+    let errors = sim.unwrap_err().errors;
+    assert_eq!(errors.len(), 3);
+    assert_eq!(
+        errors.get(0).unwrap().internal.to_string(),
+        "symbol 'A' at 'a' could not be resolved by the registry",
+    );
+    assert_eq!(
+        errors.get(1).unwrap().internal.to_string(),
+        "symbol 'B' at 'a.b' could not be resolved by the registry",
+    );
+    assert_eq!(
+        errors.get(2).unwrap().internal.to_string(),
+        "symbol 'B' at 'b' could not be resolved by the registry",
+    );
+}
+
+#[test]
+#[serial]
+fn registry_fmt() {
+    assert_eq!(
+        format!("{:?}", Registry::new().symbol("A", |_| Debugger)),
+        "Registry"
+    );
+}
+
+#[test]
+#[serial]
+fn registry_custom_resolver() -> RootResult<()> {
+    static COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+    let registry = Registry::default()
+        .symbol("A", |_| Debugger)
+        .symbol("Main", |_| Debugger)
+        .custom(|_, symbol| {
+            if symbol == "B" {
+                COUNTER.fetch_add(1, Ordering::SeqCst);
+                Some(Debugger)
+            } else {
+                None
+            }
+        });
+
+    let sim = Sim::ndl("tests/ndl/ab.ndl", registry)?;
+    let _ = Builder::seeded(123).build(sim).run();
+
+    assert_eq!(COUNTER.load(Ordering::SeqCst), 1);
+
+    Ok(())
+}
+
+struct Sender;
+impl Module for Sender {
+    fn at_sim_start(&mut self, _stage: usize) {
+        send(Message::new().build(), "port")
+    }
+}
+
+#[test]
+#[serial]
+fn registry_default_fallback_does_not_pani() -> RootResult<()> {
+    let registry = Registry::default()
+        .symbol("A", |_| Sender)
+        .with_default_fallback();
+
+    let sim = Sim::ndl("tests/ndl/ab.ndl", registry)?;
+    let _ = Builder::seeded(123).build(sim).run();
+
     Ok(())
 }

@@ -1,0 +1,47 @@
+// ndl.v2
+
+// Link
+link Delay {
+    jitter: 0.0,
+    latency: 0.1,
+    bitrate: 10000000
+}
+
+// Node
+module Node {
+    gates {
+        port,
+    }
+}
+
+// Router
+module Router {
+    gates {
+        port[5],
+        debug,
+    }
+}
+
+// Debugger
+module Debugger {
+    gates {
+        in,
+    }
+}
+
+// Main
+module Main {
+    submodules {
+        node[5]: Node,
+        router: Router,
+        debugger: Debugger,
+        distant: Debugger,
+    }
+
+    connections {
+        node/port <-- Delay --> router/port,
+        debugger/in <--> router/debug,
+    }
+}
+
+entry Main;

@@ -1,51 +1,49 @@
 #![cfg(feature = "ndl")]
-use des::{prelude::*, registry};
+use std::{fs, io::Write};
 
-macro_rules! module {
-    ($($i:ident),*) => {
-        $(struct $i;
-        impl Module for $i {
-            fn new() -> Self {
-                Self
-            }
-        })*
-    };
-}
-
-module!(Node, Debugger, Router, Main);
+use des::prelude::*;
 
 #[test]
-fn topology_load() {
-    let app = NdlApplication::new(
-        "tests/ndl/small_network/main.ndl",
-        registry![Node, Debugger, Router, Main],
-    )
-    .map_err(|e| println!("{e}"))
-    .unwrap();
-    let rt = Builder::new().build(NetworkApplication::new(app));
+fn main() {
+    let app = Sim::ndl("tests/ndl/top.ndl", Registry::new().with_default_fallback())
+        .map_err(|e| println!("{e}"))
+        .unwrap();
+    let rt = Builder::new().build(app);
     let app = rt.run().into_app();
-    let mut topo = app.globals().topology.lock().unwrap().clone();
+    let mut topo = app
+        .globals()
+        .topology
+        .lock()
+        .unwrap()
+        .clone()
+        .with_edge_cost_attachment()
+        .with_node_connectivity_attachment();
 
-    topo.filter_nodes(|n| n.module.name() != "node[2]");
+    assert!(topo.bidirectional());
+    assert!(!topo.connected());
 
-    // 4 nodes, router, debugger, main
-    assert_eq!(topo.nodes().len(), 7);
-    assert_eq!(topo.nodes().into_iter().filter(|n| n.alive).count(), 6);
+    let dj = topo.dijkstra("node[1]");
+    assert_eq!(dj.get(&"node[1]".into()), None);
 
-    let i= topo
-        .nodes()
-        .into_iter()
-        .position(|n| n.module.name() == "router")
-        .unwrap();
+    topo.filter_nodes(|n| n.module().name() != "node[2]");
 
-    let j = topo
-        .nodes()
-        .into_iter()
-        .position(|n| n.module.name() == "debugger")
-        .unwrap();
+    assert_eq!(topo.edges().count(), 10);
+
+    // 4 nodes, router, debugger, main + distant
+    assert_eq!(topo.nodes().len(), 8);
+
+    topo.filter_nodes(|node| node.degree > 0);
+    assert_eq!(topo.nodes().len(), 6);
+    assert_eq!(topo.edges().count(), 10);
 
     assert!(topo
-        .edges_for(i)
-        .iter()
-        .any(|edge| edge.dst.1 == j && edge.src.0.name() == "debug"));
+        .edges_for("router")
+        .any(|edge| edge.to.gate().owner().path().as_str() == "debugger"));
+
+    if let Ok(output) = topo.as_svg() {
+        fs::File::create("tests/topology.svg")
+            .unwrap()
+            .write_all(output.as_bytes())
+            .unwrap();
+    }
 }

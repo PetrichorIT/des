@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use super::*;
+use super::{Cluster, Link, Module};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct RawSymbol {

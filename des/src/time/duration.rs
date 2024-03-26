@@ -35,3 +35,25 @@ impl AddAssign<f64> for SimTime {
         self.0.add_assign(Duration::from_secs_f64(rhs));
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn addition() {
+        let mut time = SimTime::from(14.2);
+        let duration = 3.4;
+
+        assert_eq!(time + duration, SimTime::from(17.6));
+        time += duration;
+        assert_eq!(time, SimTime::from(17.6));
+
+        let mut time = SimTime::from(14.2);
+        let duration = Duration::from_secs_f64(3.4);
+
+        assert_eq!(time + duration, SimTime::from(17.6));
+        time += duration;
+        assert_eq!(time, SimTime::from(17.6));
+    }
+}

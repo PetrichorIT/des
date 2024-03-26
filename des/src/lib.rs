@@ -131,10 +131,10 @@ pub mod prelude;
 pub mod doc;
 pub mod runtime;
 pub mod time;
-pub mod tracing;
 
 cfg_net! {
     pub mod net;
+    pub mod tracing;
 }
 
 cfg_ndl! {

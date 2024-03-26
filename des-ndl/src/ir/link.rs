@@ -1,7 +1,7 @@
 use crate::ast::{self, LinkStmt, Spanned};
 use std::{collections::HashMap, fmt, sync::Arc};
 
-use super::*;
+use super::RawSymbol;
 
 #[derive(Clone, PartialEq)]
 pub struct Link {

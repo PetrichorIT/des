@@ -1,7 +1,11 @@
 //! Network nodes with custom state.
 
 use crate::net::message::Message;
-use std::any::Any;
+use std::{
+    any::Any,
+    fmt,
+    sync::atomic::{AtomicU16, Ordering},
+};
 
 mod ctx;
 pub use self::ctx::ModuleContext;
@@ -24,20 +28,35 @@ mod meta;
 #[cfg(test)]
 mod tests;
 
-
-use super::processing::{BaseLoader, ProcessingElements, IntoProcessingElements};
+use super::processing::{BaseLoader, IntoProcessingElements, ProcessingElements};
 
 cfg_async! {
     mod ext;
     pub use self::ext::*;
 }
 
-guid!(
-    /// A runtime-unqiue identifier for a module / submodule inheritence tree.
-    /// * This type is only available of DES is build with the `"net"` feature.*
-    #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-    pub ModuleId(u16) = MODULE_ID;
-);
+/// A unique identifier for a module.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
+pub struct ModuleId(pub u16);
+
+static MODULE_ID: AtomicU16 = AtomicU16::new(0xff);
+
+impl ModuleId {
+    /// A general purpose ID indicating None.
+    pub const NULL: ModuleId = ModuleId(0);
+
+    /// Generates a unique module ID.
+    pub fn gen() -> Self {
+        Self(MODULE_ID.fetch_add(1, Ordering::SeqCst))
+    }
+}
+
+impl fmt::Display for ModuleId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 ///
 /// A set of user defined functions for customizing the
@@ -46,11 +65,6 @@ guid!(
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub trait Module: Any {
-    /// Creates a new instance of Self.
-    fn new() -> Self
-    where
-        Self: Sized;
-
     /// Resets the custom state when a module is restarted.
     fn reset(&mut self) {
         #[cfg(feature = "tracing")]
@@ -58,7 +72,10 @@ pub trait Module: Any {
     }
 
     /// Defines the required stack.
-    fn stack(&self) -> impl IntoProcessingElements where Self: Sized {
+    fn stack(&self) -> impl IntoProcessingElements
+    where
+        Self: Sized,
+    {
         BaseLoader
     }
 
@@ -85,7 +102,6 @@ pub trait Module: Any {
     /// };
     ///
     /// impl Module for MyModule {
-    /// # fn new() -> Self { todo!() }
     ///     /* ... */    
     ///
     ///     fn handle_message(&mut self, msg: Message) {
@@ -117,7 +133,6 @@ pub trait Module: Any {
     /// };
     ///
     /// impl Module for SomeModule {
-    /// # fn new() -> Self { todo!() }
     ///     /* ... */
     ///     
     ///     fn at_sim_start(&mut self, _stage: usize) {
@@ -168,4 +183,3 @@ pub trait Module: Any {
         false
     }
 }
-

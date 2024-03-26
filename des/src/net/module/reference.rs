@@ -83,12 +83,6 @@ impl ModuleRef {
         self.processing.swap(&celled);
     }
 
-    /// DPC
-    #[deprecated]
-    pub fn with_pe<T: Any, R>(&self, f: impl FnOnce(&mut T) -> R) -> Option<R> {
-        self.processing.borrow_mut().with_pe::<T, R>(f)
-    }
-
     // NOTE / TODO
     // Once feature(trait_upcasting) is stabalized, use traitupcasting for
     // safe interactions with the v-table.
@@ -200,12 +194,10 @@ impl ModuleRef {
 }
 
 impl ModuleRef {
-    pub(crate) fn is_active(&self) -> bool {
+    /// Whether the module is currently active or shut down.
+    #[must_use]
+    pub fn is_active(&self) -> bool {
         self.ctx.active.load(std::sync::atomic::Ordering::SeqCst)
-    }
-
-    pub(crate) fn as_str(&self) -> &str {
-        self.ctx.path.as_str()
     }
 
     pub(crate) fn scope_token(&self) -> crate::tracing::ScopeToken {
@@ -239,7 +231,7 @@ impl ModuleRef {
         }
     }
 
-    // INTERNAL
+    /// INTERNAL
     #[doc(hidden)]
     #[allow(unused)]
     pub(crate) fn deactivate(&self, rt: &mut impl EventSink<NetEvents>) {
@@ -249,7 +241,14 @@ impl ModuleRef {
             use crate::time::Driver;
 
             let mut ext = self.ctx.async_ext.write();
-            let mut driver = Driver::unset().unwrap();
+            let Some(mut driver) = Driver::unset() else {
+                // Somebody stole our driver
+                #[cfg(feature = "tracing")]
+                tracing::error!("IO time driver missing after event execution");
+
+                ext.driver = Some(Driver::new());
+                return;
+            };
             if let Some(next_wakeup) = driver.next() {
                 if next_wakeup < driver.next_wakeup {
                     #[cfg(feature = "tracing")]
@@ -282,30 +281,20 @@ impl ModuleRef {
         self.create_gate_cluster(name, 1).remove(0)
     }
 
-
     ///
     /// Createas a cluster of gates on the current module returning their IDs.
     ///
     #[must_use]
-    pub fn create_gate_cluster(
-        &self,
-        name: &str,
-        size: usize,
-    ) -> Vec<GateRef> {
-        (0..size).map(|id| {
-            self.create_raw_gate(name, size, id)
-        }).collect()
+    pub fn create_gate_cluster(&self, name: &str, size: usize) -> Vec<GateRef> {
+        (0..size)
+            .map(|id| self.create_raw_gate(name, size, id))
+            .collect()
     }
 
     /// Creates a gate on the current module, returning its ID.
     ///
     #[must_use]
-    pub fn create_raw_gate(
-        &self,
-        name: &str,
-        size: usize,
-        pos: usize,
-    ) -> GateRef {
+    pub fn create_raw_gate(&self, name: &str, size: usize, pos: usize) -> GateRef {
         let gate = Gate::new(self, name, size, pos);
         self.ctx.gates.write().push(gate.clone());
         gate
@@ -321,8 +310,8 @@ impl PartialEq for ModuleRef {
 impl Debug for ModuleRef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct(&format!(
-            "ModuleRef {{ name: {}, handler: {}, ctx {} }}",
-            self.ctx.path.name(),
+            "ModuleRef {{ name: {}, handler: {}, ctx: {} }}",
+            self.ctx.path,
             Arc::strong_count(&self.processing),
             Arc::strong_count(&self.ctx),
         ))
@@ -335,3 +324,42 @@ unsafe impl Send for ModuleRefWeak {}
 
 unsafe impl Sync for ModuleRef {}
 unsafe impl Sync for ModuleRefWeak {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fmt() {
+        let module = ModuleContext::standalone("root.a.b".into());
+        let m2 = module.clone();
+        let weak = ModuleRefWeak::new(&module);
+
+        assert_eq!(module.path.as_str(), "root.a.b");
+        assert_eq!(
+            format!("{module:?}"),
+            "ModuleRef { name: root.a.b, handler: 2, ctx: 2 }"
+        );
+        assert_eq!(format!("{weak:?}"), "ModuleRefWeak");
+
+        assert_eq!(module, m2);
+    }
+
+    #[test]
+    fn as_typed_ref() {
+        #[derive(Debug, PartialEq)]
+        struct A {
+            inner: i32,
+        }
+        impl Module for A {}
+
+        let module = ModuleContext::standalone("root".into());
+        module.upgrade_dummy(ProcessingElements::new(Vec::new(), A { inner: 42 }));
+
+        assert!(module.try_as_ref::<i32>().is_none());
+        assert!(module.try_as_mut::<i32>().is_none());
+
+        module.as_mut::<A>().inner += 1;
+        assert_eq!(*module.as_ref::<A>(), A { inner: 43 });
+    }
+}

@@ -1,13 +1,9 @@
 use des::prelude::*;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Alice();
 
 impl Module for Alice {
-    fn new() -> Self {
-        Self {}
-    }
-
     fn at_sim_start(&mut self, _: usize) {
         let msg = Message::new().kind(1).content(42usize).build();
         send(msg, ("netOut", 0));
@@ -21,14 +17,10 @@ impl Module for Alice {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Bob();
 
 impl Module for Bob {
-    fn new() -> Self {
-        Self {}
-    }
-
     fn handle_message(&mut self, msg: Message) {
         let (msg, head) = msg.cast::<usize>();
 
@@ -39,14 +31,10 @@ impl Module for Bob {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Network();
 
 impl Module for Network {
-    fn new() -> Self {
-        Self {}
-    }
-
     fn handle_message(&mut self, _: Message) {
         unimplemented!()
     }

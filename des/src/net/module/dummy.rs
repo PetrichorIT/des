@@ -4,10 +4,6 @@ use super::Module;
 pub(crate) struct DummyModule {}
 
 impl Module for DummyModule {
-    fn new() -> Self {
-        panic!("A dummy module is only a placeholder in the load process. No `dyn Module` functions should be called.")
-    }
-
     fn handle_message(&mut self, _msg: crate::prelude::Message) {
         panic!("A dummy module is only a placeholder in the load process. No `dyn Module` functions should be called.")
     }

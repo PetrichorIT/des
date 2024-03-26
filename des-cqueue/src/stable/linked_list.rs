@@ -1,5 +1,5 @@
 use super::{alloc::CQueueLLAllocator, boxed::LocalBox, EventHandle};
-use std::{fmt::Debug, hash::Hash, marker::PhantomData, time::Duration};
+use std::{fmt::Debug, time::Duration};
 
 pub(crate) struct DualLinkedList<E> {
     alloc: CQueueLLAllocator,
@@ -8,7 +8,7 @@ pub(crate) struct DualLinkedList<E> {
     len: usize,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct EventNode<E> {
     pub(super) value: Option<E>,
     pub(super) time: Duration,
@@ -162,27 +162,6 @@ impl<T> DualLinkedList<T> {
             Some(EventNode::into_inner(node))
         }
     }
-
-    pub(super) fn iter(&self) -> Iter<'_, T> {
-        self.into_iter()
-    }
-
-    #[allow(unused)]
-    pub(super) fn iter_mut(&mut self) -> IterMut<'_, T> {
-        self.into_iter()
-    }
-}
-
-impl<T> Debug for DualLinkedList<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let head_ptr: *const EventNode<T> = &*self.head;
-        let tail_ptr: *const EventNode<T> = &*self.tail;
-
-        f.debug_struct("DLL")
-            .field("head", &head_ptr)
-            .field("tail", &tail_ptr)
-            .finish()
-    }
 }
 
 impl<T> Drop for DualLinkedList<T> {
@@ -193,149 +172,9 @@ impl<T> Drop for DualLinkedList<T> {
 
 // EQ
 
-impl<T: PartialEq> PartialEq for DualLinkedList<T> {
-    fn eq(&self, other: &Self) -> bool {
-        let mut lhs = self.iter();
-        let mut rhs = other.iter();
-
-        loop {
-            let l = lhs.next();
-            let r = rhs.next();
-            if let Some(l) = l {
-                if let Some(r) = r {
-                    if l.0 != r.0 {
-                        return false;
-                    }
-                } else {
-                    return false;
-                }
-            } else if r.is_some() {
-                return false;
-            } else {
-                break;
-            }
-        }
-
-        true
-    }
-}
-
-impl<T: Eq> Eq for DualLinkedList<T> {}
-
 // HASH
 
-impl<T: Hash> Hash for DualLinkedList<T> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.iter().for_each(|v| v.hash(state));
-    }
-}
-
 // IMPL: DLL Into Iter
-
-pub struct Iter<'a, T> {
-    marker: PhantomData<&'a DualLinkedList<T>>,
-    cur: *mut EventNode<T>,
-    alloc: CQueueLLAllocator,
-}
-
-impl<'a, T> Iterator for Iter<'a, T> {
-    type Item = (&'a T, &'a Duration);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        // SAFTEY:
-        // Will point to a valid node since:
-        // IA) head->next is a valid node
-        // IS) each time the next node is check to be non-null (thus valid)
-        let cur = unsafe { LocalBox::from_raw_in(self.cur, self.alloc) };
-        let result: Option<(*const T, *const Duration)> = {
-            if cur.next.is_null() {
-                // is tail
-                None
-            } else {
-                self.cur = cur.next;
-                // SAFTEY:
-                // cur is allways valid + now non-tail
-                Some((unsafe { cur.value.as_ref().unwrap_unchecked() }, &cur.time))
-            }
-        };
-        std::mem::forget(cur);
-        result.map(|(v, t)| unsafe { (&*v, &*t) })
-    }
-}
-
-impl<'a, T> IntoIterator for &'a DualLinkedList<T> {
-    type Item = (&'a T, &'a Duration);
-    type IntoIter = Iter<'a, T>;
-    fn into_iter(self) -> Self::IntoIter {
-        Iter {
-            marker: PhantomData,
-            cur: self.head.next,
-            alloc: self.alloc,
-        }
-    }
-}
-
-pub struct IterMut<'a, T> {
-    marker: PhantomData<&'a mut DualLinkedList<T>>,
-    cur: *mut EventNode<T>,
-    alloc: CQueueLLAllocator,
-}
-
-impl<'a, T> Iterator for IterMut<'a, T> {
-    type Item = (&'a mut T, &'a Duration);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        // SAFTEY:
-        // Will point to a valid node since:
-        // IA) head->next is a valid node
-        // IS) each time the next node is check to be non-null (thus valid)
-        let mut cur = unsafe { LocalBox::from_raw_in(self.cur, self.alloc) };
-        let result: Option<(*mut T, *const Duration)> = {
-            if cur.next.is_null() {
-                // is tail
-                None
-            } else {
-                self.cur = cur.next;
-                // SAFTEY:
-                // cur is allways valid + now non-tail
-                Some((unsafe { cur.value.as_mut().unwrap_unchecked() }, &cur.time))
-            }
-        };
-        std::mem::forget(cur);
-        result.map(|(v, t)| unsafe { (&mut *v, &*t) })
-    }
-}
-
-impl<'a, T> IntoIterator for &'a mut DualLinkedList<T> {
-    type Item = (&'a mut T, &'a Duration);
-    type IntoIter = IterMut<'a, T>;
-    fn into_iter(self) -> Self::IntoIter {
-        IterMut {
-            marker: PhantomData,
-            cur: self.head.next,
-            alloc: self.alloc,
-        }
-    }
-}
-
-pub struct IntoIter<T> {
-    dll: DualLinkedList<T>,
-}
-
-impl<T> Iterator for IntoIter<T> {
-    type Item = (T, Duration);
-    fn next(&mut self) -> Option<Self::Item> {
-        self.dll.pop_min()
-    }
-}
-
-impl<T> IntoIterator for DualLinkedList<T> {
-    type Item = (T, Duration);
-    type IntoIter = IntoIter<T>;
-    fn into_iter(self) -> Self::IntoIter {
-        IntoIter { dll: self }
-    }
-}
 
 // IMPL: Node
 
@@ -377,17 +216,5 @@ impl<T> EventNode<T> {
         // This function may only be applied to nodes that are
         // neither head nor tail. Such notes allways contain a value
         (unsafe { this.value.take().unwrap_unchecked() }, this.time)
-    }
-}
-
-impl<E> Debug for EventNode<E> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("EventNode")
-            .field("prev", &self.prev)
-            .field("next", &self.next)
-            .field("time", &self.time)
-            .field("value", &self.value.is_some())
-            .field("id", &self.id)
-            .finish()
     }
 }

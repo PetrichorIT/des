@@ -107,9 +107,7 @@
 //! }
 //! ```
 //!
-//! To be a module, this type must implement the trait [`Module`](crate::net::module::Module).
-//! This trait provides a number of available functions,
-//! but only [`Module::new`](crate::net::module::Module::new)m is required on all modules.
+//! This trait provides a number of available functions.
 //! This function should be used to create a new instance of the custom state for a
 //! network node. Note that this function is not nessecryly executed within the context
 //! of an event, so dont put complex custom logic here.
@@ -121,22 +119,10 @@
 //! /* ... */
 //!
 //! impl Module for Ping {
-//!     fn new() -> Self {
-//!         Self {
-//!             pongs_recv: 0,
-//!             pings_send: 0,
-//!         }
-//!     }
 //!     /* ... */
 //! }
 //!
 //! impl Module for Pong {
-//!     fn new() -> Self {
-//!         Self {
-//!             pings_recv: 0,
-//!             pongs_send: 0,
-//!         }
-//!     }
 //!     /* ... */
 //! }
 //! ```
@@ -160,7 +146,6 @@
 //! const WAKEUP: MessageKind = 69;
 //!
 //! impl Module for Ping {
-//! # fn new() -> Self { todo!() }
 //!     /* ... */
 //!
 //!     fn at_sim_start(&mut self, _stage: usize) {
@@ -190,7 +175,6 @@
 //! }
 //!
 //! impl Module for Pong {
-//! # fn new() -> Self { todo!() }
 //!     /* ... */
 //!
 //!     fn handle_message(&mut self, msg: Message) {
@@ -219,16 +203,13 @@
 //!
 //! struct MyTestCase;
 //! impl Module for MyTestCase {
-//!     fn new() -> MyTestCase {
-//!         Self
-//!     }
 //! }
 //! ```
 //!
 //! Now we have defined everything to create the simulation. To do that create an
-//! [`NdlApplication`](crate::ndl::NdlApplication) to load our network topology. This application requies
+//! NDL simulation to load our network topology. This application requies
 //! a [`Registry`](crate::ndl::Registry) of all known modules types, to link the Ndl-Modules to their rust struct.
-//! This application can be used to instantiate a [`NetworkApplication`](crate::net::NetworkApplication)
+//! This application can be used to instantiate a [`Sim`](crate::net::Sim)
 //! (provided by feature `net`),
 //! which in turn can be passed to the core [`Runtime`](crate::runtime::Runtime) of [`des`](crate).
 //! This runtime can than be executed, to run the simulation to its end.
@@ -236,18 +217,21 @@
 //! ```
 //! # use des::prelude::*;
 //! # use des::registry;
+//! # #[derive(Default)]
 //! # struct Ping;
-//! # impl Module for Ping { fn new() -> Self { Self }}
+//! # impl Module for Ping {}
+//! # #[derive(Default)]
 //! # struct Pong;
-//! # impl Module for Pong { fn new() -> Self { Self }}
+//! # impl Module for Pong {}
+//! # #[derive(Default)]
 //! # struct MyTestCase;
-//! # impl Module for MyTestCase { fn new() -> Self { Self }}
+//! # impl Module for MyTestCase {}
 //! /* ... */
 //!
 //! fn main() {
 //!     # return;
-//!     let app = NdlApplication::new("main.ndl", registry![Ping, Pong, MyTestCase]).unwrap();
-//!     let rt = Builder::new().build(NetworkApplication::new(app));
+//!     let app = Sim::ndl("main.ndl", registry![Ping, Pong, MyTestCase]).unwrap();
+//!     let rt = Builder::new().build(app);
 //!     let result = rt.run();
 //!     println!("{:?}", result);
 //! }

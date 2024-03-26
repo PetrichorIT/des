@@ -1,10 +1,8 @@
 #![allow(missing_docs)]
 
-use super::{
-    HandleMessageEvent, MessageExitingConnection, NetworkApplication, NetworkApplicationGlobals,
-};
+use super::{Globals, HandleMessageEvent, MessageExitingConnection, Sim};
 use crate::net::gate::Connection;
-use crate::net::module::{with_mod_ctx, MOD_CTX, SETUP_FN, current};
+use crate::net::module::{current, with_mod_ctx, MOD_CTX, SETUP_FN};
 use crate::net::ModuleRestartEvent;
 use crate::net::{gate::GateRef, message::Message, NetEvents};
 use crate::prelude::{EventLifecycle, ModuleRef};
@@ -13,12 +11,7 @@ use crate::sync::Mutex;
 use crate::time::SimTime;
 use std::sync::{Arc, Weak};
 
-static BUF_CTX: Mutex<BufferContext> = Mutex::new(BufferContext {
-    events: Vec::new(),
-    loopback: Vec::new(),
-    shutdown: None,
-    globals: None,
-});
+static BUF_CTX: Mutex<BufferContext> = Mutex::new(BufferContext::new());
 
 type LoopbackBuffer = Vec<(Message, SimTime)>;
 
@@ -32,28 +25,49 @@ struct BufferContext {
     #[allow(clippy::option_option)]
     shutdown: Option<Option<SimTime>>,
     // globals
-    globals: Option<Weak<NetworkApplicationGlobals>>,
+    globals: Option<Weak<Globals>>,
+}
+
+impl BufferContext {
+    const fn new() -> Self {
+        Self {
+            events: Vec::new(),
+            loopback: Vec::new(),
+            shutdown: None,
+            globals: None,
+        }
+    }
 }
 
 unsafe impl Send for BufferContext {}
 unsafe impl Sync for BufferContext {}
 
-///
-/// Returns the globals of the runtime.
-///
-/// # Panics
-///
-/// This function panics if the no runtime is currently active.
-/// Note that a runtime is active if a instance of [`NetworkApplication`] exists.
-///
-#[must_use]
-pub fn globals() -> Arc<NetworkApplicationGlobals> {
-    let ctx = BUF_CTX.lock();
-    ctx.globals
-        .as_ref()
-        .unwrap()
-        .upgrade()
-        .expect("No runtime globals attached")
+impl Globals {
+    pub(crate) fn current() -> Arc<Self> {
+        let ctx = BUF_CTX.lock();
+        ctx.globals
+            .as_ref()
+            .expect("no globals attached to this event")
+            .upgrade()
+            .expect("globals allready dropped: simulation shutting down")
+    }
+}
+
+pub(crate) fn buf_init(globals: Weak<Globals>) {
+    let mut ctx = BUF_CTX.lock();
+    ctx.globals = Some(globals);
+
+    // TODO: remove ?
+    // SAFTEY:
+    // reseting the MOD_CTX is safe, since simulation lock is aquired.
+    unsafe {
+        MOD_CTX.reset(None);
+    }
+}
+
+pub(crate) fn buf_drop() {
+    let mut ctx = BUF_CTX.lock();
+    *ctx = BufferContext::new();
 }
 
 pub(crate) fn buf_send_at(mut msg: Message, gate: GateRef, send_time: SimTime) {
@@ -65,7 +79,10 @@ pub(crate) fn buf_send_at(mut msg: Message, gate: GateRef, send_time: SimTime) {
     // (0) If delayed send is active, dont skip gate_refs
     if send_time > SimTime::now() {
         ctx.events.push((
-            NetEvents::MessageExitingConnection(MessageExitingConnection { con: Connection::new(gate), msg }),
+            NetEvents::MessageExitingConnection(MessageExitingConnection {
+                con: Connection::new(gate),
+                msg,
+            }),
             send_time,
         ));
         return;
@@ -73,7 +90,10 @@ pub(crate) fn buf_send_at(mut msg: Message, gate: GateRef, send_time: SimTime) {
 
     // (0) Else handle the event inlined, for instant effects on the associated
     // channels.
-    let event = MessageExitingConnection { con: Connection::new(gate), msg };
+    let event = MessageExitingConnection {
+        con: Connection::new(gate),
+        msg,
+    };
     event.handle_with_sink(&mut ctx.events);
 
     crate::tracing::enter_scope(with_mod_ctx(|ctx| ctx.scope_token));
@@ -97,20 +117,9 @@ pub(crate) fn buf_schedule_shutdown(restart: Option<SimTime>) {
     ctx.shutdown = Some(restart);
 }
 
-pub(crate) fn buf_set_globals(globals: Weak<NetworkApplicationGlobals>) {
-    let mut ctx = BUF_CTX.lock();
-    ctx.globals = Some(globals);
-
-    // SAFTEY:
-    // reseting the MOD_CTX is safe, since simulation lock is aquired.
-    unsafe {
-        MOD_CTX.reset(None);
-    }
-}
-
-pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<NetworkApplication<A>>)
+pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<Sim<A>>)
 where
-    A: EventLifecycle<NetworkApplication<A>>,
+    A: EventLifecycle<Sim<A>>,
 {
     let mut ctx = BUF_CTX.lock();
 

@@ -156,10 +156,7 @@ impl Validate for ConnectionsStmt {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        ast::{Parse, ParseBuffer},
-        SourceMap,
-    };
+    use crate::SourceMap;
 
     use super::*;
 
@@ -170,7 +167,6 @@ mod tests {
 
         ModuleStmt::parse(&buf).expect("Failed to create object, in validation pass")
     }
-
 
     #[test]
     fn invalid_gates() {

@@ -3,13 +3,10 @@ use std::sync::atomic::Ordering;
 use crate::MODULE_LEN;
 use des::prelude::*;
 
+#[derive(Default)]
 pub struct Alice();
 
 impl Module for Alice {
-    fn new() -> Self {
-        Self()
-    }
-
     fn at_sim_start(&mut self, _: usize) {
         let msg = Message::new().kind(1).content(42usize).build();
         send(msg, ("netOut", 0));
@@ -32,13 +29,10 @@ impl Drop for Alice {
     }
 }
 
+#[derive(Default)]
 pub struct Bob();
 
 impl Module for Bob {
-    fn new() -> Self {
-        Self()
-    }
-
     fn at_sim_start(&mut self, _stage: usize) {
         let prev = MODULE_LEN.fetch_add(1, Ordering::SeqCst);
         println!("Bob simstared: MODULE_LEN := {}", prev + 1)
@@ -61,13 +55,10 @@ impl Drop for Bob {
     }
 }
 
+#[derive(Default)]
 pub struct Network();
 
 impl Module for Network {
-    fn new() -> Self {
-        Self()
-    }
-
     fn at_sim_start(&mut self, _: usize) {
         let prev = MODULE_LEN.fetch_add(1, Ordering::SeqCst);
         println!("Network simstared: MODULE_LEN := {}", prev + 1);
