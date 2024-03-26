@@ -3,6 +3,7 @@
 use crate::net::message::Message;
 use std::{
     any::Any,
+    fmt,
     sync::atomic::{AtomicU16, Ordering},
 };
 
@@ -48,6 +49,12 @@ impl ModuleId {
     /// Generates a unique module ID.
     pub fn gen() -> Self {
         Self(MODULE_ID.fetch_add(1, Ordering::SeqCst))
+    }
+}
+
+impl fmt::Display for ModuleId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 

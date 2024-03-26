@@ -194,12 +194,10 @@ impl ModuleRef {
 }
 
 impl ModuleRef {
-    pub(crate) fn is_active(&self) -> bool {
+    /// Whether the module is currently active or shut down.
+    #[must_use]
+    pub fn is_active(&self) -> bool {
         self.ctx.active.load(std::sync::atomic::Ordering::SeqCst)
-    }
-
-    pub(crate) fn as_str(&self) -> &str {
-        self.ctx.path.as_str()
     }
 
     pub(crate) fn scope_token(&self) -> crate::tracing::ScopeToken {
@@ -259,8 +257,6 @@ impl ModuleRef {
                         next_wakeup,
                         driver.next_wakeup
                     );
-
-                    println!("> scheduling wakeup at {}", next_wakeup);
 
                     driver.next_wakeup = next_wakeup;
                     rt.add(
@@ -339,7 +335,7 @@ mod tests {
         let m2 = module.clone();
         let weak = ModuleRefWeak::new(&module);
 
-        assert_eq!(module.as_str(), "root.a.b");
+        assert_eq!(module.path.as_str(), "root.a.b");
         assert_eq!(
             format!("{module:?}"),
             "ModuleRef { name: root.a.b, handler: 2, ctx: 2 }"

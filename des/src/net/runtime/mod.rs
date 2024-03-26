@@ -1,5 +1,5 @@
 use super::module::module_ctx_drop;
-use super::Topology;
+use super::topology::Topology;
 use super::{module::MOD_CTX, par::ParMap};
 use crate::{
     net::module::ModuleContext,
@@ -156,11 +156,13 @@ pub struct ScopedSim<'a, A> {
 
 impl<A> Sim<A> {
     #[inline]
+    #[cfg(feature = "ndl")]
     pub(crate) fn modules(&self) -> &ModuleTree {
         &self.modules
     }
 
     #[inline]
+    #[cfg(feature = "ndl")]
     pub(crate) fn modules_mut(&mut self) -> &mut ModuleTree {
         &mut self.modules
     }
@@ -461,12 +463,14 @@ where
     A: EventLifecycle<Sim<A>>,
 {
     fn at_sim_start(rt: &mut Runtime<Sim<A>>) {
-        rt.app
+        let mut top = rt
+            .app
             .globals
             .topology
             .lock()
-            .expect("could not get topology lock")
-            .build(&rt.app.modules);
+            .expect("could not get topology lock");
+        *top = Topology::from_modules(&rt.app.modules);
+        drop(top);
 
         // (2) Run network-node sim_starting stages
         // - inline this to ensure this is run before any possible events
@@ -562,14 +566,14 @@ pub struct Globals {
     ///
     /// The topology of the network from a module viewpoint.
     ///
-    pub topology: Mutex<Topology>,
+    pub topology: Mutex<Topology<(), ()>>,
 }
 
 impl Default for Globals {
     fn default() -> Self {
         Self {
             parameters: Arc::new(ParMap::default()),
-            topology: Mutex::new(Topology::new()),
+            topology: Mutex::new(Topology::default()),
         }
     }
 }

@@ -3,9 +3,7 @@ use super::{
     SimTime,
 };
 use pin_project_lite::pin_project;
-use std::{
-    cmp::Ordering, future::Future, pin::Pin, sync::atomic::AtomicUsize, task::Poll, time::Duration,
-};
+use std::{future::Future, pin::Pin, sync::atomic::AtomicUsize, task::Poll, time::Duration};
 
 /// Waits until `duration` has elapsed.
 ///
@@ -187,28 +185,25 @@ impl Future for Sleep {
         // Project initaly
 
         let mut me = self.project();
-        match (*me.deadline).cmp(&SimTime::now()) {
-            Ordering::Greater => {
-                if !scheduled {
-                    let handle = Driver::with_current(|ctx| {
-                        ctx.queue.add(
-                            TimerSlotEntry {
-                                id: *me.id,
-                                waker: cx.waker().clone(),
-                            },
-                            *me.deadline,
-                        )
-                    });
-                    *me.handle = Some(handle);
-                }
-                Poll::Pending
+        if *me.deadline > SimTime::now() {
+            if !scheduled {
+                let handle = Driver::with_current(|ctx| {
+                    ctx.queue.add(
+                        TimerSlotEntry {
+                            id: *me.id,
+                            waker: cx.waker().clone(),
+                        },
+                        *me.deadline,
+                    )
+                });
+                *me.handle = Some(handle);
             }
-            _ => {
-                if let Some(mut handle) = me.handle.take() {
-                    handle.resolve();
-                }
-                Poll::Ready(())
+            Poll::Pending
+        } else {
+            if let Some(mut handle) = me.handle.take() {
+                handle.resolve();
             }
+            Poll::Ready(())
         }
     }
 }

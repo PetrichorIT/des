@@ -121,6 +121,7 @@ impl<A> Sim<A> {
     /// This function will fail if either:
     /// a) some NDL error occures when parsing the NDL tree defined at `path`,
     /// b) or the registry fails to provide software for some NDL-defined module.
+    #[allow(clippy::missing_panics_doc)]
     pub fn build_ndl(
         &mut self,
         path: impl AsRef<Path>,
@@ -192,7 +193,7 @@ impl<'a, A> ScopedSim<'a, A> {
         ir: Arc<ir::Module>,
         errors: &mut ErrorsMut,
         registry: &Registry,
-    ) -> Option<ModuleRef> {
+    ) -> ModuleRef {
         let ty = ir.ident.raw.clone();
         let scope = &self.scope;
 
@@ -259,7 +260,7 @@ impl<'a, A> ScopedSim<'a, A> {
             );
         }
 
-        Some(ctx)
+        ctx
     }
 }
 

@@ -386,6 +386,13 @@ impl MessageBuilder {
     }
 
     /// Sets the field 'content' with a T that is not guarnteed to be Send.
+    ///
+    /// # Safety
+    ///
+    /// `T` does not have the bound Send, but Message does, so a message
+    /// continaing non Send `T` may never be used on other threads.
+    #[must_use]
+    #[allow(clippy::cast_possible_truncation)]
     pub unsafe fn content_unsafe<T>(mut self, content: T) -> Self
     where
         T: 'static + MessageBody,

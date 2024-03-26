@@ -143,15 +143,11 @@ impl TimerQueue {
         {
             let mut buffer = Vec::new();
             let mut pending = self.pending.borrow_mut();
-            while pending
-                .front()
-                .map(|slot| slot.time <= cur)
-                .unwrap_or(false)
-            {
+            while pending.front().is_some_and(|slot| slot.time <= cur) {
                 let Ok(slot) = Arc::try_unwrap(pending.pop_front().expect("unreachable")) else {
                     continue;
                 };
-                buffer.push(slot)
+                buffer.push(slot);
             }
             buffer
         } else {

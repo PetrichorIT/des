@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use des::{prelude::*, registry};
 
 #[derive(Debug, Default)]
@@ -57,7 +59,7 @@ impl Module for MultiRunner {
 struct Main;
 impl Module for Main {}
 
-fn main() {
+fn main() -> std::io::Result<()> {
     // Logger::new().try_set_logger().unwrap();
     let app = Sim::ndl(
         "examples/proto/main.ndl",
@@ -70,10 +72,6 @@ fn main() {
     let rt = Builder::seeded(0x123).build(app);
     let (app, _time, _event_count) = rt.run().unwrap();
 
-    let _ = app
-        .globals()
-        .topology
-        .lock()
-        .unwrap()
-        .write_to_svg("examples/proto/graph");
+    std::fs::File::create("examples/proto/graph.svg")?
+        .write_all(app.globals().topology.lock().unwrap().as_svg()?.as_bytes())
 }

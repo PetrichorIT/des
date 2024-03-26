@@ -47,6 +47,8 @@ cfg_net! {
     pub use crate::net::gate::Gate;
     pub use crate::net::gate::GateRef;
 
+    pub use crate::net::topology::Topology;
+
     pub use crate::net::module::Module;
     pub use crate::net::module::ModuleId;
     pub use crate::net::module::ModuleRef;
@@ -55,14 +57,11 @@ cfg_net! {
     pub use crate::net::module::{
         current, shutdow_and_restart_at, shutdow_and_restart_in, shutdown
     };
-    pub use crate::net::{par, par_for};
+
 
     pub use crate::net::ObjectPath;
     pub use crate::net::ParMap;
-
-    pub use crate::net::TopoEdge;
-    pub use crate::net::TopoNode;
-    pub use crate::net::Topology;
+    pub use crate::net::{par, par_for};
 
     pub use crate::net::processing::ProcessingElement;
 

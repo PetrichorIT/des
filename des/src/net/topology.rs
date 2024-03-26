@@ -1,403 +1,683 @@
-use super::{globals, ObjectPath};
-use crate::{net::module::ModuleRef, prelude::GateRef};
+//! Graph-based tooling for exploring simulation topology.
 use fxhash::{FxBuildHasher, FxHashMap};
 
-///
-/// A mapping of all connections in a module connection graph.
-///
-#[derive(Debug, Clone)]
-pub struct Topology {
-    nodes: Vec<TopoNode>,
-    edges: Vec<Vec<TopoEdge>>,
+use super::{
+    gate::{GateKind, GateRef},
+    module::ModuleRef,
+    ObjectPath,
+};
+use std::{
+    io::{Result, Write},
+    process::Command,
+};
+use std::{ops::Deref, process::Stdio};
+
+/// A graph-based representation of the simulations topology.
+#[derive(Debug, Default, Clone)]
+pub struct Topology<N, C> {
+    nodes: Vec<Node<N>>,
+    edges: Vec<Vec<EdgeRaw<C>>>,
 }
 
-///
-/// A node in the module connection graph, representing a module and its
-/// connection state.
-///
-#[derive(Debug, Clone)]
-pub struct TopoNode {
-    /// A reference to the module itself, including its custom state.
-    pub module: ModuleRef,
-    /// The number of connections. (not nessecarily the number of gates)
-    pub degree: usize,
-    /// An indicate whether the module is at all connected to the rest of of the network.
-    pub alive: bool,
+type NodeID = usize;
+
+/// A node in the topologcial graph.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Node<N> {
+    data: N,
+    module: ModuleRef,
 }
 
-///
-/// A connection in the module connection graph.
-///
-#[derive(Debug, Clone)]
-
-pub struct TopoEdge {
-    ///
-    pub src: (GateRef, usize), //
-    ///
-    pub dst: (GateRef, usize),
-    ///
-    pub cost: f64,
+/// An edge in the topological graph.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Edge<'a, N, C> {
+    /// The endpoint where the current edge starts.
+    pub from: EdgeEndpoint<'a, N>,
+    /// The endpoint where the current edge ends.
+    pub to: EdgeEndpoint<'a, N>,
+    /// Some data attachment to the current edge.
+    pub attachment: &'a C,
 }
 
-impl Topology {
-    /// Creates a new empty instance.
-    #[must_use]
-    pub const fn new() -> Topology {
-        Self {
-            nodes: Vec::new(),
-            edges: Vec::new(),
-        }
-    }
+/// A endpoint of an edge, definining how and where a edge is
+/// attached to a node.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct EdgeEndpoint<'a, N> {
+    node: &'a Node<N>,
+    gate: &'a GateRef,
+    id: NodeID,
+}
 
-    /// Gets the current topology.
-    ///
-    /// # Panics
-    ///
-    /// Panics when called from outside a module context,
-    /// or when globals dont exist.
-    #[must_use]
-    pub fn current() -> Topology {
-        globals()
-            .topology
-            .lock()
-            .expect("could not retrive current topology: simulation paniced and poisoned locks")
-            .clone()
-    }
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct EdgeRaw<C> {
+    dst: NodeID,
+    data: C,
 
-    /// All nodes if the current topology.
+    start: GateRef,
+    end: GateRef,
+}
+
+// ==== impl Topology ====
+
+impl<N, C> Topology<N, C> {
+    /// Returns a slice of nodes, described by this topology object.
     #[must_use]
-    pub fn nodes(&self) -> &[TopoNode] {
+    pub fn nodes(&self) -> &[Node<N>] {
         &self.nodes
     }
 
-    /// An iterator over all edges in the entries network, annotated with the
-    /// node-id of the starting node.
-    #[must_use]
-    pub fn edges(&self) -> usize {
-        self.edges
-            .iter()
-            .enumerate()
-            .flat_map(|(i, edges)| edges.iter().map(move |e| (i, e)))
-            .count()
-            / 2
-    }
-
-    /// All outgoing edges associated with a single
-    /// module.
-    #[must_use]
-    pub fn edges_for(&self, i: usize) -> &[TopoEdge] {
-        &self.edges[i]
-    }
-
-    /// Adds the given modules and their connections to the connection graph.
+    /// Indicates whether the current graph is bidirectional.
     ///
-    /// Note that this only adds connections withing the new conenction set,
-    /// or from the new set to the old set.
-    /// To add connections from the old set to the new one, recreate
-    /// the topology from the ground up using the `ModuleRef` stored in the
-    /// node information.
-    #[allow(clippy::missing_panics_doc)]
-    pub fn build(&mut self, modules: &[ModuleRef]) {
-        for module in modules {
-            self.nodes.push(TopoNode {
-                module: module.clone(),
-                degree: 0,
-                alive: false,
+    /// Bidirectional in this case means:
+    ///
+    /// For each edge from `gate-a` to `gate-b` there exists an equivalent edge
+    /// from `gate-b` to `gate-a`. The attachments on each edge may differ.
+    #[must_use]
+    pub fn bidirectional(&self) -> bool {
+        for (src, bundle) in self.edges.iter().enumerate() {
+            for edge in bundle {
+                if !self.edges[edge.dst].iter().any(|edge| edge.dst == src) {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
+    /// Indicates whether the current graph is fully connected.
+    ///
+    /// A fully connected graph has a path from each abitrary start
+    /// node to each abitrary end node.
+    #[must_use]
+    pub fn connected(&self) -> bool {
+        fn visit<N, C>(topo: &Topology<N, C>, i: usize, visited: &mut Vec<NodeID>) {
+            if !visited.contains(&i) {
+                visited.push(i);
+                for edge in &topo.edges[i] {
+                    visit(topo, edge.dst, visited);
+                }
+            }
+        }
+
+        for start in 0..self.nodes.len() {
+            let mut visited = Vec::new();
+            visit(self, start, &mut visited);
+            if visited.len() != self.nodes.len() {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Filters out edges based on a given predicate `f`.
+    ///
+    /// This operation will only remove edges, nodes will be unchanged.
+    pub fn filter_edges<F>(&mut self, mut f: F)
+    where
+        F: FnMut(Edge<'_, N, C>) -> bool,
+    {
+        for (src, src_bundle) in self.edges.iter_mut().enumerate() {
+            src_bundle.retain(|raw| {
+                let edge = Edge {
+                    from: EdgeEndpoint {
+                        node: &self.nodes[src],
+                        gate: &raw.start,
+                        id: src,
+                    },
+                    to: EdgeEndpoint {
+                        node: &self.nodes[raw.dst],
+                        gate: &raw.end,
+                        id: raw.dst,
+                    },
+                    attachment: &raw.data,
+                };
+
+                f(edge)
             });
-            self.edges.push(Vec::new());
         }
-
-        for module in modules {
-            let gates = module.ctx.gates();
-            'outer: for gate in gates {
-                let mut cost = 0.0;
-                let mut dst = gate.clone();
-
-                let Some(iter) = gate.path_iter() else {
-                    // its a transit gate
-                    continue;
-                };
-                for con in iter.take(16) {
-                    if con.channel().is_some() {
-                        cost += 1.0;
-                    }
-
-                    let transit_id = con.endpoint.owner().id();
-                    let Some(transit) = self
-                        .nodes
-                        .iter_mut()
-                        .find(|k| k.module.ctx.id() == transit_id)
-                    else {
-                        break 'outer;
-                    };
-                    transit.alive |= true;
-
-                    dst = con.endpoint.clone();
-                }
-
-                let src_id = gate.owner().id();
-                let dst_id = dst.owner().id();
-                let (src_idx, src_node) = self
-                    .nodes
-                    .iter_mut()
-                    .enumerate()
-                    .find(|(_, m)| m.module.ctx.id() == src_id)
-                    .expect("failed to generate topology: corrupted module tree");
-                src_node.degree += 1;
-                src_node.alive |= true;
-
-                let (dst_idx, dst_node) = self
-                    .nodes
-                    .iter_mut()
-                    .enumerate()
-                    .find(|(_, m)| m.module.ctx.id() == dst_id)
-                    .expect("failed to generate topology: corrupted module tree");
-                dst_node.degree += 1;
-                dst_node.alive |= true;
-
-                let edge = TopoEdge {
-                    src: (gate, src_idx),
-                    dst: (dst, dst_idx),
-                    cost,
-                };
-
-                self.edges[src_idx].push(edge);
-            }
-        }
-
-        // Divide bc each connection was counted twice
-        self.nodes.iter_mut().for_each(|node| node.degree /= 2);
     }
 
+    /// Filters out nodes based on a given predicate `f`.
     ///
-    /// Filters out nodes that do not comply with the given predicate.
-    ///
-    /// Note that this may change node-ids so all previouisly
-    /// compiled information that relies on node-ids is to be considered
-    /// invalid.
-    ///
-    pub fn filter_nodes<P>(&mut self, predicate: P)
+    /// This operation not only removes nodes, but also edges connected
+    /// to the removed nodes.
+    pub fn filter_nodes<F>(&mut self, f: F)
     where
-        P: FnMut(&TopoNode) -> bool,
+        F: FnMut(&Node<N>) -> bool,
+        N: std::fmt::Debug,
     {
-        let keeps = self.nodes.iter().map(predicate).collect::<Vec<_>>();
-        let n = keeps.len();
+        let n = self.nodes.len();
 
-        for (i, &keep) in keeps.iter().enumerate() {
-            if keep {
-                // Do nothing this node will be kept so no links must be pruned
+        let keep = self.nodes.iter().map(f).collect::<Vec<_>>();
+
+        let mut node_id_mapping = (0..n).collect::<Vec<_>>();
+        let mut running_index = 0;
+        for index in &mut node_id_mapping {
+            if keep[*index] {
+                *index = running_index;
+                running_index += 1;
             } else {
-                // Fix degrees
-
-                for edge in self.edges[i].drain(..) {
-                    self.nodes[edge.src.1].degree = self.nodes[edge.src.1].degree.saturating_sub(1);
-                    self.nodes[edge.dst.1].degree = self.nodes[edge.dst.1].degree.saturating_sub(1);
-                }
-
-                for j in 0..n {
-                    if j == i {
-                        continue;
-                    }
-                    self.edges[j].retain(|edge| edge.dst.1 != i);
-                }
-                debug_assert_eq!(self.nodes[i].degree, 0);
+                *index = usize::MAX;
+                self.nodes.remove(running_index);
+                self.edges.remove(running_index);
             }
         }
 
-        // Remove elements
-        let mut ptr = 0;
-        let mut mapping = (0..n).collect::<Vec<_>>();
-        for (i, keep) in keeps.into_iter().enumerate() {
-            if keep {
-                mapping[i] = ptr;
-                ptr += 1;
-            } else {
-                self.nodes.remove(ptr);
-                self.edges.remove(ptr);
-                mapping[i] = usize::MAX;
-            }
-        }
-
-        // Update edge ids
-        for edges in &mut self.edges {
-            for edge in edges {
-                edge.src.1 = mapping[edge.src.1];
-                edge.dst.1 = mapping[edge.dst.1];
-            }
-        }
-
-        assert_eq!(self.nodes.len(), self.edges.len())
-    }
-
-    ///
-    /// Filters out edges that do not comply with the given predicate.
-    ///
-    /// Note that this does NOT change node-ids, but may change the
-    /// alive-flag on nodes, as well as in-/outcounts.
-    ///
-    pub fn filter_edges<P>(&mut self, mut predicate: P)
-    where
-        P: FnMut(&TopoEdge) -> bool,
-    {
-        for i in 0..self.edges.len() {
-            let mut j = 0;
-            while j < self.edges[i].len() {
-                let keep = predicate(&self.edges[i][j]);
-                if keep {
-                    j += 1;
-                } else {
-                    self.edges[i].remove(j);
-                    self.nodes[i].degree -= 1;
-                    self.nodes[self.edges[i][j].dst.1].degree -= 1;
-                }
-            }
-        }
-
-        for node in &mut self.nodes {
-            if node.degree == 0 {
-                node.alive = false;
-            }
+        for bundle in &mut self.edges {
+            bundle.retain_mut(|edge| {
+                edge.dst = node_id_mapping[edge.dst];
+                edge.dst != usize::MAX
+            });
         }
     }
 
-    ///
-    /// Changes the costs of edges according to a given mapping.
-    ///
-    pub fn map_costs<M>(&mut self, mut mapping: M)
-    where
-        M: FnMut(&TopoEdge) -> f64,
-    {
-        for edges in &mut self.edges {
-            for edge in edges {
-                edge.cost = mapping(edge);
-            }
-        }
-    }
-
-    /// Generates a disjktra tree
+    /// Preforms a dijstrak from a starting position.
     ///
     /// # Panics
     ///
-    /// Panics when the specified nodes does not exist.
-    #[allow(clippy::needless_pass_by_value)]
-    #[must_use]
-    pub fn dijkstra(&self, node: ObjectPath) -> FxHashMap<ObjectPath, GateRef> {
-        struct QE {
-            node: usize,
+    /// This function will panic if no node with the given object path exists
+    /// in the topology object.
+    pub fn dijkstra(&self, src: impl Into<ObjectPath>) -> FxHashMap<ObjectPath, Edge<'_, N, C>>
+    where
+        N: Clone,
+        C: Clone,
+    {
+        struct QueueElement<'a, N, C> {
+            idx: NodeID,
             distance: usize,
-            next_hop: Option<GateRef>,
+            next: Option<Edge<'a, N, C>>,
         }
+
+        let src = src.into();
 
         let mut visited = Vec::new();
         let mut queue = Vec::new();
-        queue.push(QE {
-            node: self
+        queue.push(QueueElement {
+            idx: self
                 .nodes
                 .iter()
-                .position(|n| n.module.path() == node)
-                .expect("no such node exists"),
+                .position(|node| node.module.path == src)
+                .expect("unknown node"),
             distance: 0,
-            next_hop: None,
+            next: None,
         });
 
         let mut mapping = FxHashMap::with_hasher(FxBuildHasher::default());
         while let Some(cur) = queue.pop() {
-            if visited.contains(&cur.node) {
+            if visited.contains(&cur.idx) {
                 continue;
             }
 
-            // travel along the edges
-            visited.push(cur.node);
-            if let Some(ref nh) = cur.next_hop {
-                mapping.insert(self.nodes[cur.node].module.path(), nh.clone());
+            visited.push(cur.idx);
+            if let Some(ref hop) = cur.next {
+                mapping.insert(self.nodes[cur.idx].module.path(), hop.clone());
             }
 
-            for edge in self.edges_for(cur.node) {
-                if !visited.contains(&edge.dst.1) {
-                    queue.push(QE {
-                        node: edge.dst.1,
+            for edge in self.edges_by_id(cur.idx) {
+                if !visited.contains(&edge.to.id) {
+                    queue.push(QueueElement {
+                        idx: edge.to.id,
                         distance: cur.distance + 1,
-                        next_hop: Some(cur.next_hop.clone().unwrap_or(edge.src.0.clone())),
+                        next: Some(cur.next.clone().unwrap_or(edge)),
                     });
                 }
             }
-
-            // rev
-            queue.sort_by(|l, r| r.distance.cmp(&l.distance));
         }
 
         mapping
     }
 
-    /// Creates a .dot output for visualizing the module graph.
-    #[must_use]
-    pub fn as_dot(&self) -> String {
-        let mut output = String::from("digraph D {{\n");
-
-        for def in &self.nodes {
-            if def.degree > 0 {
-                output.push_str(&format!("    \"{}\" [shape=box]\n", def.module.as_str()));
-            }
+    /// Adds some attached data to the nodes of the topology object.
+    pub fn with_node_attachments<F, A>(&self, mut f: F) -> Topology<A, C>
+    where
+        F: FnMut(&Node<N>) -> A,
+        C: Clone,
+    {
+        Topology {
+            nodes: self
+                .nodes
+                .iter()
+                .map(|node| Node {
+                    data: f(node),
+                    module: node.module.clone(),
+                })
+                .collect(),
+            edges: self.edges.clone(),
         }
-
-        output.push('\n');
-
-        for (src, edges) in self.edges.iter().enumerate() {
-            let from_node = self.nodes[src].module.as_str();
-            for TopoEdge { src, dst, cost } in edges {
-                let to_node = self.nodes[src.1].module.as_str();
-                let label = if *cost == 0.0 {
-                    String::new()
-                } else {
-                    format!("label=\"{cost}\"")
-                };
-
-                output.push_str(&format!(
-                    "    \"{}\" - \"{}\" [ headlabel=\"{}\" {} taillabel=\"{}\" ]\n",
-                    from_node,
-                    to_node,
-                    dst.0.name(),
-                    label,
-                    src.0.name(),
-                ));
-            }
-        }
-
-        output.push_str("\n}}");
-        output
     }
 
+    /// Adds some attached data to the edges of the topology object.
+    #[must_use]
+    pub fn with_edge_attachments<F, A>(&self, mut f: F) -> Topology<N, A>
+    where
+        F: FnMut(Edge<'_, N, C>) -> A,
+        N: Clone,
+    {
+        Topology {
+            nodes: self.nodes.clone(),
+            edges: self
+                .edges
+                .iter()
+                .enumerate()
+                .map(|(src_id, bundle)| {
+                    bundle
+                        .iter()
+                        .map(|raw| {
+                            let edge = Edge {
+                                from: EdgeEndpoint {
+                                    node: &self.nodes[src_id],
+                                    gate: &raw.start,
+                                    id: src_id,
+                                },
+                                to: EdgeEndpoint {
+                                    node: &self.nodes[raw.dst],
+                                    gate: &raw.end,
+                                    id: raw.dst,
+                                },
+                                attachment: &raw.data,
+                            };
+                            EdgeRaw {
+                                dst: raw.dst,
+                                data: f(edge),
+                                start: raw.start.clone(),
+                                end: raw.end.clone(),
+                            }
+                        })
+                        .collect()
+                })
+                .collect(),
+        }
+    }
+}
+
+impl Topology<(), ()> {
+    /// Generates a topology object over a given set of modules.
     ///
-    /// Writes the dot output to a *.dot file
-    /// and converts this file into a svg.
-    ///
-    /// # Note
-    ///
-    /// Be aware that this command relies on the 'dot' command line
-    /// programm to generate the svg.
+    /// This function will only created edges between the modules in the list.
+    /// Should this function find an edge to a module, not referenced  in this list
+    /// the edge will not be recorded.
+    #[must_use]
+    #[allow(clippy::missing_panics_doc)]
+    pub fn from_modules(modules: &[ModuleRef]) -> Self {
+        let mut this = Self::default();
+
+        for module in modules.iter().cloned() {
+            this.nodes.push(Node { data: (), module });
+            this.edges.push(Vec::new());
+        }
+
+        for (src_id, module) in modules.iter().enumerate() {
+            let gates = module.gates();
+            for gate in gates {
+                if gate.kind() == GateKind::Endpoint {
+                    let iter = gate
+                        .path_iter()
+                        .expect("path_iter should exist on gates of kind: endpoint");
+
+                    let mut end = gate.clone();
+                    for con in iter.take(16) {
+                        end = con.endpoint;
+                    }
+
+                    let end_id = end.owner().id();
+                    let Some(dst) = this
+                        .nodes
+                        .iter()
+                        .position(|node| node.module.id() == end_id)
+                    else {
+                        // no spanning tree, ignore external links
+                        continue;
+                    };
+
+                    let raw = EdgeRaw {
+                        dst,
+                        data: (),
+                        start: gate,
+                        end,
+                    };
+
+                    this.edges[src_id].push(raw);
+                }
+            }
+        }
+
+        this
+    }
+}
+
+#[cfg(test)]
+impl Topology<NodeID, ()> {
+    fn raw(edges: &[&[usize]]) -> Self {
+        let n = edges.len();
+        let module = super::module::ModuleContext::standalone("raw-topology-holder".into());
+        let start = module.create_gate("start");
+        let end = module.create_gate("end");
+
+        Self {
+            nodes: (0..n)
+                .map(|data| Node {
+                    data,
+                    module: module.clone(),
+                })
+                .collect(),
+            edges: edges
+                .into_iter()
+                .map(|bundle| {
+                    bundle
+                        .into_iter()
+                        .map(|&dst| EdgeRaw {
+                            dst,
+                            data: (),
+                            start: start.clone(),
+                            end: end.clone(),
+                        })
+                        .collect()
+                })
+                .collect(),
+        }
+    }
+}
+
+impl<N, C> Topology<N, C> {
+    /// Exports the current toplogy object as an DOT string.
+    #[must_use]
+    pub fn as_dot(&self) -> String {
+        let nodes = self
+            .nodes
+            .iter()
+            .map(|node| format!("\t\"{}\" [shape=box]\n", node.identifier()))
+            .fold(String::new(), |acc, s| acc + &s);
+
+        let edges = self
+            .edges()
+            .map(|edge| {
+                format!(
+                    "\t\"{}\" -> \"{}\" [ headlabel = \"{}\" taillable = \"{}\" ]\n",
+                    edge.from.identifier(),
+                    edge.to.identifier(),
+                    edge.from.gate.str(),
+                    edge.to.gate.str()
+                )
+            })
+            .fold(String::new(), |acc, s| acc + &s);
+
+        format!("digraph D {{ \n{nodes} {edges}}}")
+    }
+
+    /// Exports the current toplogy object as a SVG.
     ///
     /// # Errors
     ///
-    /// This operation will return an IO Error if
-    /// either the file cannot be created or the operations
-    /// using the dot engine wont work.
+    /// This function will fail, if the execution of the `dot` subcommand
+    /// fails.
     ///
-    pub fn write_to_svg(&self, path: &str) -> std::io::Result<()> {
-        use std::fs::File;
-        use std::io::Write;
-        use std::process::Command;
-        let dot_output = self.as_dot();
-        let mut file = File::create(format!("{path}.dot"))?;
-        write!(file, "{dot_output}")?;
-
-        let svg_output = Command::new("dot")
+    /// # Panics
+    ///
+    /// This function will panic if the subprocess stdin could not
+    /// be opened.
+    pub fn as_svg(&self) -> Result<String> {
+        let mut child = Command::new("dot")
             .arg("-Tsvg")
-            .arg(format!("{path}.dot"))
-            .output()?;
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()?;
 
-        let mut file = File::create(format!("{path}.svg"))?;
-        write!(file, "{}", String::from_utf8_lossy(&svg_output.stdout))?;
+        let mut stdin = child.stdin.take().expect("failed to open stdin");
+        stdin.write_all(self.as_dot().as_bytes())?;
+        drop(stdin);
 
-        Ok(())
+        let output = child.wait_with_output()?;
+
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    }
+}
+
+// ==== impl Attachments ====
+
+/// An attachment that represents a node local view on available
+/// connections.
+///
+/// > Note that attachments do NOT automatically updated when the topology object is later changed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct NodeConnectivityAttachment {
+    /// The number of outoing edges.
+    pub degree: usize,
+}
+
+impl<N, C> Topology<N, C> {
+    /// Adds [`NodeConnectivityAttachment`] to all nodes.
+    #[must_use]
+    pub fn with_node_connectivity_attachment(&self) -> Topology<NodeConnectivityAttachment, C>
+    where
+        C: Clone,
+    {
+        self.with_node_attachments(|node| {
+            let degree = self
+                .edges_for_node(node)
+                .filter(|edge| edge.from.gate().owner().id() != edge.to.gate().owner().id())
+                .count();
+
+            NodeConnectivityAttachment { degree }
+        })
+    }
+}
+
+/// An attachment that analyses the cost of edges, as well as their ability
+/// to transmit messages.
+///
+/// > Note that attachments do NOT automatically updated when the topology object is later changed.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct EdgeCostAttachment {
+    /// A cost definining how expensive a certain link would be.
+    pub cost: f64,
+    /// A flag whether a link is currently able to transmit messages.
+    ///
+    /// This may be false if, e.g. a transit node on the link is shut down.
+    pub alive: bool,
+}
+
+impl<N, C> Topology<N, C> {
+    /// Adds [`EdgeCostAttachment`]'s to all edges.
+    #[allow(clippy::missing_panics_doc)]
+    #[must_use]
+    pub fn with_edge_cost_attachment(&self) -> Topology<N, EdgeCostAttachment>
+    where
+        N: Clone,
+    {
+        self.with_edge_attachments(|edge| {
+            let mut cost = 0.0;
+            let mut alive = edge.from.gate.owner().is_active();
+
+            let iter = edge
+                .from
+                .gate()
+                .path_iter()
+                .expect("all repesented edges SHOULD exist only on endpoint gates");
+
+            for con in iter.take(16) {
+                if con.channel().is_some() {
+                    cost += 1.0;
+                }
+                alive |= con.endpoint.owner().is_active();
+            }
+
+            EdgeCostAttachment { cost, alive }
+        })
+    }
+}
+
+// ==== impl Node ====
+
+impl<N> Node<N> {
+    /// A module handle to the current nodes module.
+    pub fn module(&self) -> ModuleRef {
+        self.module.clone()
+    }
+
+    fn identifier(&self) -> &str {
+        self.module.path.as_logger_scope()
+    }
+}
+
+impl<N> Deref for Node<N> {
+    type Target = N;
+    fn deref(&self) -> &Self::Target {
+        &self.data
+    }
+}
+
+// ==== impl Edges ===
+
+/// An iterator over a set of edges in a [`Topology`] object.
+#[derive(Debug)]
+#[must_use]
+pub struct EdgesIter<'a, N, C> {
+    nodes: &'a [Node<N>],
+    inner_src: usize, // allways index + 1 (since iter starts as 0)
+    inner: &'a [EdgeRaw<C>],
+    buffer: &'a [Vec<EdgeRaw<C>>],
+}
+
+impl<'a, N, C> EdgesIter<'a, N, C> {
+    fn empty() -> Self {
+        Self {
+            nodes: &[],
+            inner_src: 0,
+            inner: &[],
+            buffer: &[],
+        }
+    }
+}
+
+impl<'a, N, C> Iterator for EdgesIter<'a, N, C> {
+    type Item = Edge<'a, N, C>;
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some((raw, remaining)) = self.inner.split_first() {
+            self.inner = remaining;
+            Some(Edge {
+                from: EdgeEndpoint {
+                    node: &self.nodes[self.inner_src - 1],
+                    gate: &raw.start,
+                    id: self.inner_src - 1,
+                },
+                to: EdgeEndpoint {
+                    node: &self.nodes[raw.dst],
+                    gate: &raw.end,
+                    id: raw.dst,
+                },
+                attachment: &raw.data,
+            })
+        } else {
+            let (next_slice, remaining) = self.buffer.split_first()?;
+            self.buffer = remaining;
+
+            self.inner_src += 1;
+            self.inner = next_slice;
+            self.next()
+        }
+    }
+}
+
+impl<N, C> Topology<N, C> {
+    /// Returns an edge iterator over all edges in the topology.
+    pub fn edges(&self) -> EdgesIter<'_, N, C> {
+        EdgesIter {
+            nodes: &self.nodes,
+            inner_src: 0,
+            inner: &[],
+            buffer: &self.edges,
+        }
+    }
+
+    /// Retuns an edge iterator for a specific node.
+    pub fn edges_for_node(&self, node: &Node<N>) -> EdgesIter<'_, N, C> {
+        self.edges_for(node.module.path.clone())
+    }
+
+    /// Returns an edge iterator of all edges starting at the specified node.
+    pub fn edges_for(&self, src: impl Into<ObjectPath>) -> EdgesIter<'_, N, C> {
+        let src = src.into();
+        let Some(src) = self.nodes.iter().position(|node| node.module.path == src) else {
+            return EdgesIter::empty();
+        };
+        self.edges_by_id(src)
+    }
+
+    fn edges_by_id(&self, src: NodeID) -> EdgesIter<'_, N, C> {
+        EdgesIter {
+            nodes: &self.nodes,
+            inner_src: src + 1,
+            inner: &self.edges[src],
+            buffer: &[],
+        }
+    }
+}
+
+// ==== impl Edge<'_> ====
+
+impl<'a, N> EdgeEndpoint<'a, N> {
+    /// Returns the gate the endpoint is attached to.
+    #[must_use]
+    pub fn gate(&self) -> GateRef {
+        self.gate.clone()
+    }
+}
+
+impl<'a, N> Deref for EdgeEndpoint<'a, N> {
+    type Target = Node<N>;
+    fn deref(&self) -> &Self::Target {
+        self.node
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn node_filtering() {
+        let mut topo = Topology::raw(&[&[1, 2], &[0], &[0, 3], &[2, 4], &[3]]);
+        assert!(topo.connected());
+        assert_eq!(topo.edges().count(), 8);
+
+        topo.filter_nodes(|node| ![2].contains(&node.data));
+
+        assert!(!topo.connected());
+        assert_eq!(topo.edges().count(), 4)
+    }
+
+    #[test]
+    fn edge_filtering() {
+        let mut topo = Topology::raw(&[&[1, 2], &[0], &[0, 3], &[2, 4], &[3]]);
+        assert!(topo.bidirectional());
+        assert_eq!(topo.edges().count(), 8);
+
+        topo.filter_edges(|e| e.from.data < e.to.data);
+        assert!(!topo.bidirectional());
+        assert_eq!(topo.edges().count(), 4);
+    }
+
+    #[test]
+    fn edge_iter() {
+        let topo = Topology::raw(&[&[1, 2], &[0], &[0, 3], &[2, 4], &[3]]);
+        let mapper = |edge: Edge<'_, usize, ()>| (edge.from.data, edge.to.data);
+        assert_eq!(
+            topo.edges().map(mapper).collect::<Vec<_>>(),
+            [
+                (0, 1),
+                (0, 2),
+                (1, 0),
+                (2, 0),
+                (2, 3),
+                (3, 2),
+                (3, 4),
+                (4, 3)
+            ]
+        );
+
+        assert_eq!(
+            topo.edges_by_id(2).map(mapper).collect::<Vec<_>>(),
+            [(2, 0), (2, 3),]
+        );
     }
 }

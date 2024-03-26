@@ -1,4 +1,4 @@
-use std::{error::Error, fmt::Formatter, pin::Pin, time::Duration};
+use std::{error::Error, time::Duration};
 
 use crate::{
     net::{message::Message, module::Module},
@@ -248,7 +248,7 @@ cfg_async! {
         sync::mpsc::{self, Receiver, Sender},
         task::JoinHandle,
     };
-    use std::future::Future;
+    use std::{future::Future, fmt::Formatter, pin::Pin,};
     use crate::net::module::AsyncModule;
 
 
@@ -382,7 +382,7 @@ cfg_async! {
             if let Some(join) = self.join.take() {
                 if join.is_finished() || self.require_join {
                     match join.await {
-                        Ok(_) => {},
+                        Ok(()) => {},
                         Err(e) if e.is_cancelled() => {}
                         Err(e) => panic!("{e}"),
                     }
