@@ -2,8 +2,10 @@
 use std::{fs, io::Write};
 
 use des::prelude::*;
+use serial_test::serial;
 
 #[test]
+#[serial]
 fn main() {
     let app = Sim::ndl("tests/ndl/top.ndl", Registry::new().with_default_fallback())
         .map_err(|e| println!("{e}"))
@@ -46,4 +48,35 @@ fn main() {
             .write_all(output.as_bytes())
             .unwrap();
     }
+}
+
+struct Fallback;
+impl Module for Fallback {}
+
+#[test]
+#[serial]
+fn spanned_topology() {
+    let mut sim = Sim::new(());
+
+    sim.node("alice", Fallback);
+    sim.node("alice.eve", Fallback);
+    sim.node("alice.eve.travis", Fallback);
+    sim.node("alice.sophie", Fallback);
+    sim.node("bob", Fallback);
+
+    sim.gate("alice", "to-eve")
+        .connect(sim.gate("alice.eve", "to-alice"), None);
+    sim.gate("alice", "to-sophie")
+        .connect(sim.gate("alice.sophie", "to-alice"), None);
+    sim.gate("alice.eve", "to-travis")
+        .connect(sim.gate("alice.eve.travis", "to-eve"), None);
+    sim.gate("alice.eve", "to-sophie")
+        .connect(sim.gate("alice.sophie", "to-eve"), None);
+
+    let root = sim.get(&"alice".into()).unwrap();
+
+    let topology = Topology::spanned(root);
+    assert_eq!(topology.nodes().len(), 4);
+    assert_eq!(topology.edges().count(), 2 * 4);
+    assert!(!topology.nodes().iter().any(|n| n.module().name() == "bob"));
 }

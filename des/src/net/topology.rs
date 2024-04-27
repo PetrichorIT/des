@@ -3,6 +3,7 @@ use fxhash::{FxBuildHasher, FxHashMap};
 
 use super::{
     gate::{GateKind, GateRef},
+    globals,
     module::ModuleRef,
     ObjectPath,
 };
@@ -291,6 +292,78 @@ impl<N, C> Topology<N, C> {
 }
 
 impl Topology<(), ()> {
+    /// Retrieves the current globsal topology
+    ///
+    /// # Panics
+    ///
+    /// This function panics if not called from a simulation context.
+    #[must_use]
+    pub fn current() -> Self {
+        globals()
+            .topology
+            .lock()
+            .expect("failed to fetch lock, from simulation context")
+            .clone()
+    }
+
+    /// Generates a topology based on all reachable destinations from a root node.
+    #[must_use]
+    #[allow(clippy::missing_panics_doc)]
+    pub fn spanned(root: ModuleRef) -> Self {
+        let mut modules = vec![root];
+        let mut this = Self::default();
+
+        while let Some(module) = modules.pop() {
+            let gates = module.gates();
+
+            this.nodes.push(Node { data: (), module });
+            this.edges.push(Vec::new());
+
+            let src_idx = this.nodes.len() - 1;
+            for gate in gates {
+                if gate.kind() == GateKind::Endpoint {
+                    let iter = gate
+                        .path_iter()
+                        .expect("path_iter should exist on gates of kind: endpoint");
+
+                    // The iterator is finite, since at least one gate (the start point) has degree 1
+                    let mut end = gate.clone();
+                    for con in iter {
+                        end = con.endpoint;
+                    }
+
+                    let end_id = end.owner().id();
+                    let end_idx = this
+                        .nodes
+                        .iter()
+                        .position(|node| node.module.id() == end_id)
+                        .unwrap_or_else(|| {
+                            // Node is not yet in the spanned set
+                            // but maybe allready in queue
+                            if let Some(offset) =
+                                modules.iter().position(|module| module.id() == end_id)
+                            {
+                                src_idx + 1 + offset
+                            } else {
+                                modules.push(end.owner());
+                                src_idx + modules.len()
+                            }
+                        });
+
+                    let raw = EdgeRaw {
+                        dst: end_idx,
+                        data: (),
+                        start: gate,
+                        end,
+                    };
+
+                    this.edges[src_idx].push(raw);
+                }
+            }
+        }
+        this
+    }
+
     /// Generates a topology object over a given set of modules.
     ///
     /// This function will only created edges between the modules in the list.
