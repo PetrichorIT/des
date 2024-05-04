@@ -385,6 +385,17 @@ impl Gate {
 
         this
     }
+
+    pub(crate) fn dissolve_paths(&self) {
+        let Ok(mut conns) = self.connections.try_lock() else {
+            return;
+        };
+        for con in &mut conns.connections {
+            if let Some(con) = con.take() {
+                con.endpoint.dissolve_paths();
+            }
+        }
+    }
 }
 
 #[allow(clippy::missing_fields_in_debug)]
@@ -412,6 +423,12 @@ impl PartialEq for Gate {
     }
 }
 impl Eq for Gate {}
+
+impl Drop for Gate {
+    fn drop(&mut self) {
+        println!("drop::Gate::{}", self.name());
+    }
+}
 
 mod private {
     pub trait Sealed {}

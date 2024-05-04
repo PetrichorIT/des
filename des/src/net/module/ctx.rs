@@ -303,6 +303,15 @@ impl Debug for ModuleContext {
 unsafe impl Send for ModuleContext {}
 unsafe impl Sync for ModuleContext {}
 
+impl Drop for ModuleContext {
+    fn drop(&mut self) {
+        println!("drop::ModuleContext::{}", self.path());
+        for gate in self.gates() {
+            gate.dissolve_paths();
+        }
+    }
+}
+
 pub(crate) fn with_mod_ctx<R>(f: impl FnOnce(&Arc<ModuleContext>) -> R) -> R {
     let lock = MOD_CTX.read();
     let ctx = lock
