@@ -1,6 +1,10 @@
 #![cfg(feature = "async")]
 
-use des::{net::ModuleFn, prelude::*, time::sleep};
+use des::{
+    net::{module::Module, ModuleFn},
+    prelude::*,
+    time::sleep,
+};
 use serial_test::serial;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -36,8 +40,8 @@ impl Drop for DropTest {
 
 struct StatelessModule;
 
-impl AsyncModule for StatelessModule {
-    async fn at_sim_start(&mut self, _: usize) {
+impl Module for StatelessModule {
+    fn at_sim_start(&mut self, _: usize) {
         tokio::spawn(async {
             let mut drop_test = DropTest::new(&DROPPED_STATELESS_SHUTDOWN);
             loop {
@@ -47,7 +51,7 @@ impl AsyncModule for StatelessModule {
         });
     }
 
-    async fn handle_message(&mut self, _msg: Message) {
+    fn handle_message(&mut self, _msg: Message) {
         shutdown();
     }
 }
@@ -79,8 +83,8 @@ fn stateless_module_shudown() {
 
 struct StatelessModuleRestart;
 
-impl AsyncModule for StatelessModuleRestart {
-    async fn at_sim_start(&mut self, _: usize) {
+impl Module for StatelessModuleRestart {
+    fn at_sim_start(&mut self, _: usize) {
         tokio::spawn(async {
             let mut drop_test = DropTest::new(&DROPPED_STATLESS_RESTART);
             loop {
@@ -90,7 +94,7 @@ impl AsyncModule for StatelessModuleRestart {
         });
     }
 
-    async fn handle_message(&mut self, msg: Message) {
+    fn handle_message(&mut self, msg: Message) {
         match msg.header().id {
             9 => shutdow_and_restart_at(SimTime::now() + Duration::from_secs(10)),
             10 => shutdown(),
@@ -131,13 +135,13 @@ struct StatefullModule {
     state: usize,
 }
 
-impl AsyncModule for StatefullModule {
+impl Module for StatefullModule {
     fn reset(&mut self) {
         assert_eq!(self.state, 10);
         self.state = 5;
     }
 
-    async fn at_sim_start(&mut self, _: usize) {
+    fn at_sim_start(&mut self, _: usize) {
         self.state = 10;
         tokio::spawn(async {
             let mut drop_test = DropTest::new(&DROPPED_STATFULL_RESTART);
@@ -148,7 +152,7 @@ impl AsyncModule for StatefullModule {
         });
     }
 
-    async fn handle_message(&mut self, msg: Message) {
+    fn handle_message(&mut self, msg: Message) {
         match msg.header().id {
             9 => shutdow_and_restart_at(SimTime::now() + Duration::from_secs(10)),
             10 => shutdown(),
@@ -156,7 +160,7 @@ impl AsyncModule for StatefullModule {
         }
     }
 
-    async fn at_sim_end(&mut self) {
+    fn at_sim_end(&mut self) {
         assert_eq!(self.state, 5)
     }
 }
@@ -190,8 +194,8 @@ fn statefull_module_restart() {
 
 struct ShutdownViaHandleModule;
 
-impl AsyncModule for ShutdownViaHandleModule {
-    async fn at_sim_start(&mut self, _: usize) {
+impl Module for ShutdownViaHandleModule {
+    fn at_sim_start(&mut self, _: usize) {
         tokio::spawn(async move {
             let mut drop_test = DropTest::new(&DROPPED_SHUTDOWN_VIA_HANDLE);
             loop {
@@ -222,8 +226,8 @@ fn shutdown_via_async_handle() {
 
 struct RestartViaHandleModule;
 
-impl AsyncModule for RestartViaHandleModule {
-    async fn at_sim_start(&mut self, _: usize) {
+impl Module for RestartViaHandleModule {
+    fn at_sim_start(&mut self, _: usize) {
         tokio::spawn(async move {
             let mut drop_test = DropTest::new(&DROPPED_RESTART_VIA_HANDLE);
             loop {

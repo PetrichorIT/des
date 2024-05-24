@@ -14,7 +14,7 @@
 //! The feature flag `async` enables writing modules in an asyncchronous matter
 //! using async/await based on a tokio runtime.
 //!
-//! The primary addition of this feature flag is the trait [`AsyncModule`] that
+//! The primary addition of this feature flag is the trait [`Module`] that
 //! acts as an async alternative to [`Module`]. The feature flag additionally adds
 //! a new wrapper [`AsyncFn`] that enables less boilderplate when creating async modules.
 //!

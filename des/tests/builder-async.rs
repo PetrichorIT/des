@@ -179,7 +179,7 @@ fn builder_async_no_join() {
 
 #[test]
 #[serial]
-#[should_panic = "at_sim_end() could not complete, since it is stuck at some await point"]
+#[should_panic = "Main task could not be joined"]
 fn builder_async_require_join() {
     let mut sim = Sim::new(());
     sim.node(

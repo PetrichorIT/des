@@ -255,7 +255,7 @@ pub fn set_default_processing_elements(f: fn() -> Vec<ProcessorElement>) {
 #[allow(missing_debug_implementations)]
 pub struct ProcessingElements {
     // last element is module
-    state: ProcessingState,
+    pub(super) state: ProcessingState,
     stack: Vec<ProcessorElement>,
     pub(super) handler: Box<dyn Module>,
 }
@@ -275,7 +275,7 @@ impl ProcessorElement {
     }
 }
 
-enum ProcessingState {
+pub(super) enum ProcessingState {
     Upstream(usize), // next processing index
     Peek,
     Downstream(usize), // last processing index
@@ -326,34 +326,6 @@ impl ProcessingElements {
             self.stack[i].inner.event_end();
             self.state.bump_downstream();
         }
-    }
-
-    pub(super) fn incoming(&mut self, msg: Option<Message>) {
-        // Upstream
-        let msg = self.incoming_upstream(msg);
-
-        // Peek
-        self.state = ProcessingState::Peek;
-        if let Some(msg) = msg {
-            self.handler.handle_message(msg);
-        } else {
-            #[cfg(feature = "async")]
-            if self.handler.__indicate_async() {
-                self.run_without_event();
-            }
-        }
-
-        // Downstream
-        self.incoming_downstream();
-    }
-
-    #[cfg(feature = "async")]
-    #[allow(clippy::unused_self)]
-    pub(super) fn run_without_event(&self) {
-        use crate::net::module::async_get_rt;
-        use tokio::task::yield_now;
-        let Some(rt) = async_get_rt() else { return };
-        rt.1.block_on(&rt.0, yield_now());
     }
 }
 

@@ -246,10 +246,9 @@ where
 cfg_async! {
     use tokio::{
         sync::mpsc::{self, Receiver, Sender},
-        task::JoinHandle,
     };
-    use std::{future::Future, fmt::Formatter, pin::Pin,};
-    use crate::net::module::AsyncModule;
+    use std::{future::Future, fmt::Formatter, pin::Pin, sync::{Arc,atomic::{AtomicBool, Ordering}}};
+    use tokio::task::JoinSet;
 
 
     /// A helper that enables user to treat a module as a async stream of messages,
@@ -286,7 +285,9 @@ cfg_async! {
     {
         gen: BoxedGen,
 
-        join: Option<JoinHandle<()>>,
+        join: JoinSet<()>,
+        joined: Arc<AtomicBool>,
+
         tx: Sender<Message>,
         rx: Option<Receiver<Message>>,
 
@@ -313,7 +314,7 @@ cfg_async! {
             Fut: Send + 'static,
         {
             let (tx, rx) = mpsc::channel(8);
-            Self { gen: Box::new(move |rx| Box::pin(gen(rx))), join: None, tx, rx: Some(rx), require_join: false }
+            Self { gen: Box::new(move |rx| Box::pin(gen(rx))), join: JoinSet::new(), joined: Arc::default(), tx, rx: Some(rx), require_join: false }
         }
 
         /// Creates a new instance using the generator function.
@@ -339,7 +340,8 @@ cfg_async! {
                         }
                     })
                 }),
-                join: None,
+                join: JoinSet::new(),
+                joined: Arc::default(),
                 tx,
                 rx: Some(rx),
                 require_join: false
@@ -358,37 +360,47 @@ cfg_async! {
         }
     }
 
-    impl AsyncModule for AsyncFn {
+    impl Module for AsyncFn {
         fn reset(&mut self) {
-            if let Some(ref join) = self.join { join.abort() }
+            self.join.abort_all();
+            self.joined.store(false, Ordering::SeqCst);
         }
 
-        async fn at_sim_start(&mut self, _: usize) {
+         fn at_sim_start(&mut self, _: usize) {
             let rx = self.rx.take().unwrap_or_else(|| {
                 let (tx, rx) = mpsc::channel(8);
                 self.tx = tx;
                 rx
             });
 
+            let joined = self.joined.clone();
             let fut = (self.gen)(rx);
-            self.join = Some(tokio::task::spawn(fut));
+            let fut = async move {
+                fut.await;
+                joined.store(true, Ordering::SeqCst);
+            };
+
+            self.join.spawn(fut);
         }
 
-        async fn handle_message(&mut self, msg: Message) {
+         fn handle_message(&mut self, msg: Message) {
             self.tx.try_send(msg).expect("async module blocked");
         }
 
-        async fn at_sim_end(&mut self) {
-            if let Some(join) = self.join.take() {
-                if join.is_finished() || self.require_join {
-                    match join.await {
-                        Ok(()) => {},
-                        Err(e) if e.is_cancelled() => {}
-                        Err(e) => panic!("{e}"),
-                    }
+         fn at_sim_end(&mut self) {
+            if let Some(result) = self.join.try_join_next() {
+                match result {
+                    Ok(_) => {},
+                    Err(e) if e.is_panic() => panic!("{e}"),
+                    Err(e) => println!("{e}")
+                }
+            } else if self.require_join {
+                if !self.joined.load(Ordering::SeqCst) {
+                    panic!("Main task could not be joined")
                 }
             }
-        }
+         }
+
     }
 
     impl std::fmt::Debug for AsyncFn {

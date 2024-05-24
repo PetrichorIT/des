@@ -31,8 +31,7 @@ mod tests;
 use super::processing::{BaseLoader, IntoProcessingElements, ProcessingElements};
 
 cfg_async! {
-    mod ext;
-    pub use self::ext::*;
+    pub(super) mod rt;
 }
 
 /// A unique identifier for a module.
@@ -149,14 +148,6 @@ pub trait Module: Any {
     fn at_sim_start(&mut self, _stage: usize) {}
 
     ///
-    /// A function that is called when all `sim_start` stages of all modules
-    /// are done. Used to resolve all async `sim_start_stages`.
-    ///
-    #[cfg(feature = "async")]
-    #[doc(hidden)]
-    fn finish_sim_start(&mut self) {}
-
-    ///
     /// The number of stages used for the module initalization.
     ///
     fn num_sim_start_stages(&self) -> usize {
@@ -168,18 +159,4 @@ pub trait Module: Any {
     /// All events emitted by this function will NOT be processed.
     ///
     fn at_sim_end(&mut self) {}
-
-    ///
-    /// A function that is called when all `sim_end` stages of all modules
-    /// are done. Used to resolve all async `sim_end_stages`.
-    ///
-    #[cfg(feature = "async")]
-    #[doc(hidden)]
-    fn finish_sim_end(&mut self) {}
-
-    #[cfg(feature = "async")]
-    #[doc(hidden)]
-    fn __indicate_async(&self) -> bool {
-        false
-    }
 }

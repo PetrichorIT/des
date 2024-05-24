@@ -1,14 +1,16 @@
-use std::sync::atomic::Ordering::SeqCst;
-
 use crate::{
     net::{
         channel::ChannelRef, gate::Connection, message::Message, module::ModuleRef,
-        runtime::buf_process, Sim,
+        processing::ProcessingState, runtime::buf_process, Sim,
     },
     runtime::{EventLifecycle, EventSet, EventSink, Runtime},
     time::SimTime,
     tracing::enter_scope,
 };
+use std::sync::atomic::Ordering::SeqCst;
+
+#[cfg(feature = "async")]
+use crate::net::module::with_mod_ctx;
 
 ///
 /// The event set for a [`NetworkApplication`].
@@ -223,23 +225,39 @@ impl ChannelUnbusyNotif {
     }
 }
 
-impl ModuleRef {
-    pub(crate) fn num_sim_start_stages(&self) -> usize {
-        self.processing.borrow().handler.num_sim_start_stages()
-    }
+#[cfg(not(feature = "async"))]
+fn with_harness<R>(f: impl FnOnce() -> R) -> R {
+    f()
+}
 
+#[cfg(feature = "async")]
+fn with_harness<R>(f: impl FnOnce() -> R) -> R {
+    let Some((rt, task_set)) = with_mod_ctx(|ctx| ctx.async_ext.write().rt.current()) else {
+        panic!("WHERE MY RT");
+    };
+
+    task_set.block_on(&rt, async move {
+        let ret = f();
+        tokio::task::yield_now().await;
+        ret
+    })
+}
+
+impl ModuleRef {
     pub(crate) fn reset(&self) {
         let mut brw = self.processing.borrow_mut();
-        brw.handler.reset();
+
+        #[cfg(feature = "async")]
+        with_mod_ctx(|ctx| ctx.async_ext.write().reset());
+
+        with_harness(move || brw.handler.reset());
     }
 
     #[cfg(feature = "async")]
     pub(crate) fn async_wakeup(&self) {
         if self.ctx.active.load(SeqCst) {
             self.processing.borrow_mut().incoming_upstream(None);
-            if self.processing.borrow().handler.__indicate_async() {
-                self.processing.borrow().run_without_event();
-            }
+            with_harness(|| {});
             self.processing.borrow_mut().incoming_downstream();
         } else {
             #[cfg(feature = "tracing")]
@@ -258,15 +276,28 @@ impl ModuleRef {
         for stage in 0..stages {
             self.at_sim_start(stage);
         }
-
-        #[cfg(feature = "async")]
-        self.finish_sim_start();
     }
 
     pub(crate) fn handle_message(&self, msg: Message) {
         if self.ctx.active.load(SeqCst) {
-            // (0) Run upstream plugins.
-            self.processing.borrow_mut().incoming(Some(msg));
+            let mut processing = self.processing.borrow_mut();
+
+            // Upstream
+            let msg = processing.incoming_upstream(Some(msg));
+
+            // Peek
+            processing.state = ProcessingState::Peek;
+            if let Some(msg) = msg {
+                with_harness(|| {
+                    let msg = msg;
+                    processing.handler.handle_message(msg)
+                });
+            } else {
+                with_harness(|| {})
+            }
+
+            // Downstream
+            processing.incoming_downstream();
         } else {
             #[cfg(feature = "tracing")]
             tracing::debug!("Ignoring message since module is inactive");
@@ -274,32 +305,23 @@ impl ModuleRef {
     }
 
     pub(crate) fn at_sim_start(&self, stage: usize) {
-        self.processing.borrow_mut().incoming_upstream(None);
-        self.processing.borrow_mut().handler.at_sim_start(stage);
-        self.processing.borrow_mut().incoming_downstream();
+        let mut processing = self.processing.borrow_mut();
+
+        processing.incoming_upstream(None);
+        with_harness(|| processing.handler.at_sim_start(stage));
+        processing.incoming_downstream();
     }
 
-    #[cfg(feature = "async")]
-    pub(crate) fn finish_sim_start(&self) {
-        if self.processing.borrow().handler.__indicate_async() {
-            self.processing.borrow_mut().incoming_upstream(None);
-            self.processing.borrow_mut().handler.finish_sim_start();
-            self.processing.borrow_mut().incoming_downstream();
-        }
+    pub(crate) fn num_sim_start_stages(&self) -> usize {
+        // No harness since this method bust be called before startin initalization to check the number of loops
+        self.processing.borrow().handler.num_sim_start_stages()
     }
 
     pub(crate) fn at_sim_end(&self) {
-        self.processing.borrow_mut().incoming_upstream(None);
-        self.processing.borrow_mut().handler.at_sim_end();
-        self.processing.borrow_mut().incoming_downstream();
-    }
+        let mut processing = self.processing.borrow_mut();
 
-    #[cfg(feature = "async")]
-    pub(crate) fn finish_sim_end(&self) {
-        if self.processing.borrow().handler.__indicate_async() {
-            self.processing.borrow_mut().incoming_upstream(None);
-            self.processing.borrow_mut().handler.finish_sim_end();
-            self.processing.borrow_mut().incoming_downstream();
-        }
+        processing.incoming_upstream(None);
+        with_harness(|| processing.handler.at_sim_end());
+        processing.incoming_downstream();
     }
 }

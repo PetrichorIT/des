@@ -1,29 +1,14 @@
 use std::{rc::Rc, sync::Arc};
 
-use crate::{
-    net::message::Message,
-    prelude::random,
-    time::{Driver, SimTime},
-};
+use crate::{prelude::random, time::Driver};
 use tokio::{
     runtime::{Builder, RngSeed, Runtime},
-    sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
-    task::{JoinHandle, LocalSet},
+    task::LocalSet,
 };
 
 pub(crate) struct AsyncCoreExt {
     pub(crate) rt: Rt,
     pub(crate) driver: Option<Driver>,
-
-    pub(crate) wait_queue_tx: UnboundedSender<WaitingMessage>,
-    pub(crate) wait_queue_rx: Option<UnboundedReceiver<WaitingMessage>>,
-    pub(crate) wait_queue_join: Option<JoinHandle<()>>,
-
-    pub(crate) sim_start_tx: UnboundedSender<usize>,
-    pub(crate) sim_start_rx: Option<UnboundedReceiver<usize>>,
-    pub(crate) sim_start_join: Option<JoinHandle<()>>,
-
-    pub(crate) sim_end_join: Option<JoinHandle<()>>,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -35,10 +20,6 @@ pub(crate) enum Rt {
 
 impl AsyncCoreExt {
     pub(crate) fn new() -> AsyncCoreExt {
-        // let (tx, rx) = unbounded_channel();
-        let (wtx, wrx) = unbounded_channel();
-        let (stx, srx) = unbounded_channel();
-
         #[allow(unused_mut)]
         let mut builder = Builder::new_current_thread();
 
@@ -47,18 +28,7 @@ impl AsyncCoreExt {
 
         Self {
             rt: Rt::Builder(builder),
-
             driver: Some(Driver::new()),
-
-            wait_queue_tx: wtx,
-            wait_queue_rx: Some(wrx),
-            wait_queue_join: None,
-
-            sim_start_tx: stx,
-            sim_start_rx: Some(srx),
-            sim_start_join: None,
-
-            sim_end_join: None,
         }
     }
 
@@ -72,23 +42,6 @@ impl AsyncCoreExt {
             ),
             Rc::new(LocalSet::new()),
         ));
-
-        // let (tx, rx) = unbounded_channel();
-        let (wtx, wrx) = unbounded_channel();
-        let (stx, srx) = unbounded_channel();
-
-        // self.buffers = rx;
-        // self.handle = tx;
-
-        self.wait_queue_tx = wtx;
-        self.wait_queue_rx = Some(wrx);
-        self.wait_queue_join = None;
-
-        self.sim_start_tx = stx;
-        self.sim_start_rx = Some(srx);
-        self.sim_start_join = None;
-
-        self.sim_end_join = None;
     }
 }
 
@@ -116,11 +69,4 @@ impl Rt {
     pub(crate) fn shutdown(&mut self) {
         *self = Self::Shutdown;
     }
-}
-
-#[derive(Debug)]
-pub(crate) struct WaitingMessage {
-    pub(crate) msg: Message,
-    #[allow(dead_code)]
-    pub(crate) time: SimTime,
 }

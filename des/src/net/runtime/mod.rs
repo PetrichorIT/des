@@ -503,18 +503,6 @@ where
             }
         }
 
-        // (2.2) Ensure all sim_start stages have finished, in an async context
-        #[cfg(feature = "async")]
-        {
-            for module in rt.app.modules.iter().cloned().collect::<Vec<_>>() {
-                module.activate();
-                module.finish_sim_start();
-                module.deactivate(rt);
-
-                super::buf_process(&module, rt);
-            }
-        }
-
         leave_scope();
 
         A::at_sim_start(rt);
@@ -533,18 +521,6 @@ where
             module.deactivate(rt);
 
             // NOTE: no buf_process since no furthe events will be processed.
-        }
-
-        #[cfg(feature = "async")]
-        {
-            // Ensure all sim_start stages have finished
-            for module in rt.app.modules.iter().cloned().collect::<Vec<_>>() {
-                // enter_scope(module.scope_token());
-
-                module.activate();
-                module.finish_sim_end();
-                module.deactivate(rt);
-            }
         }
 
         leave_scope();

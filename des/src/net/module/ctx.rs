@@ -16,7 +16,7 @@ use std::{
 };
 
 #[cfg(feature = "async")]
-use crate::net::module::core::AsyncCoreExt;
+use crate::net::module::rt::AsyncCoreExt;
 
 pub(crate) static MOD_CTX: SwapLock<Option<Arc<ModuleContext>>> = SwapLock::new(None);
 pub(crate) static SETUP_FN: RwLock<fn(&ModuleContext)> = RwLock::new(_default_setup);
@@ -329,68 +329,5 @@ pub(crate) fn try_with_mod_ctx<R>(f: impl FnOnce(&Arc<ModuleContext>) -> R) -> O
         Some(r)
     } else {
         None
-    }
-}
-
-// pub(crate) fn with_mod_ctx_lock() -> SwapLockReadGuard<'static, Option<Arc<ModuleContext>>> {
-//     MOD_CTX.read()
-// }
-
-cfg_async! {
-    use tokio::runtime::Runtime;
-    use tokio::task::JoinHandle;
-    use tokio::task::LocalSet;
-    use tokio::sync::mpsc::{UnboundedReceiver, error::SendError};
-    use super::ext::WaitingMessage;
-    use std::rc::Rc;
-
-    pub(crate) fn async_get_rt() -> Option<(Arc<Runtime>, Rc<LocalSet>)> {
-        with_mod_ctx(|ctx| ctx.async_ext.write().rt.current())
-    }
-
-    pub(super) fn async_ctx_reset() {
-        with_mod_ctx(|ctx| ctx.async_ext.write().reset());
-    }
-
-    // Wait queue
-
-    pub(super) fn async_wait_queue_tx_send(msg: WaitingMessage) -> Result<(), SendError<WaitingMessage>> {
-        with_mod_ctx(|ctx| ctx.async_ext.write().wait_queue_tx.send(msg))
-    }
-
-    pub(super) fn async_wait_queue_rx_take() -> Option<UnboundedReceiver<WaitingMessage>> {
-        with_mod_ctx(|ctx| ctx.async_ext.write().wait_queue_rx.take())
-    }
-
-    pub(super) fn async_set_wait_queue_join(join: JoinHandle<()>) {
-        with_mod_ctx(|ctx| ctx.async_ext.write().wait_queue_join = Some(join));
-    }
-
-    // Sim Staart
-
-    pub(super) fn async_sim_start_rx_take() -> Option<UnboundedReceiver<usize>> {
-        with_mod_ctx(|ctx| ctx.async_ext.write().sim_start_rx.take())
-    }
-
-    pub(super) fn async_set_sim_start_join(join: JoinHandle<()>) {
-        with_mod_ctx(|ctx| ctx.async_ext.write().sim_start_join = Some(join));
-    }
-
-    pub(super) fn async_sim_start_tx_send(stage: usize) -> Result<(), SendError<usize>>  {
-        with_mod_ctx(|ctx| ctx.async_ext.write().sim_start_tx.send(stage))
-    }
-
-    pub(super) fn async_sim_start_join_take() -> Option<JoinHandle<()>> {
-        with_mod_ctx(|ctx| ctx.async_ext.write().sim_start_join.take())
-    }
-
-    // SIM END
-
-    pub(super) fn async_sim_end_join_set(join: JoinHandle<()>)  {
-        with_mod_ctx(|ctx| ctx.async_ext.write().sim_end_join = Some(join));
-    }
-
-    pub(super) fn async_sim_end_join_take() -> Option<JoinHandle<()>> {
-        with_mod_ctx(|ctx| ctx.async_ext.write().sim_end_join.take())
     }
 }

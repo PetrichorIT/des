@@ -70,10 +70,6 @@ cfg_net! {
         pub use crate::ndl::RegistryCreatable;
     }
 
-    cfg_async! {
-        pub use crate::net::module::AsyncModule;
-    }
-
     pub use std::net::IpAddr;
     pub use std::net::Ipv4Addr;
     pub use std::net::Ipv6Addr;

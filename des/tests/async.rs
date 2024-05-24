@@ -2,7 +2,7 @@
 #![allow(unused_variables)]
 
 use des::{
-    net::AsyncFn,
+    net::{module::Module, AsyncFn},
     prelude::*,
     time::{self, sleep, timeout, timeout_at, MissedTickBehavior},
 };
@@ -15,7 +15,7 @@ use tokio::{
         mpsc::{self, channel, Sender},
         Semaphore,
     },
-    task::JoinHandle,
+    task::{JoinHandle, JoinSet},
 };
 
 use serial_test::serial;
@@ -29,8 +29,8 @@ struct QuasaiSyncModule {
     counter: usize,
 }
 
-impl AsyncModule for QuasaiSyncModule {
-    async fn handle_message(&mut self, msg: Message) {
+impl Module for QuasaiSyncModule {
+    fn handle_message(&mut self, msg: Message) {
         println!("[{}] Received msg: {}", current().name(), msg.header().id);
         self.counter += msg.header().id as usize;
     }
@@ -77,20 +77,20 @@ fn quasai_sync_non_blocking() {
 
 #[derive(Default)]
 struct MutipleTasksModule {
-    handles: Vec<JoinHandle<()>>,
+    handles: JoinSet<()>,
     sender: Option<Sender<Message>>,
     result: Arc<AtomicUsize>,
 }
 
-impl AsyncModule for MutipleTasksModule {
-    async fn at_sim_start(&mut self, _: usize) {
+impl Module for MutipleTasksModule {
+    fn at_sim_start(&mut self, _: usize) {
         let (txa, mut rxa) = channel::<Message>(8);
         let (txb, mut rxb) = channel(8);
         let (txc, mut rxc) = channel(8);
 
         let result = self.result.clone();
 
-        let ta = tokio::spawn(async move {
+        self.handles.spawn(async move {
             while let Some(v) = rxa.recv().await {
                 let k = v.header().kind;
                 txb.send(v).await.unwrap();
@@ -102,7 +102,7 @@ impl AsyncModule for MutipleTasksModule {
             }
         });
 
-        let tb = tokio::spawn(async move {
+        self.handles.spawn(async move {
             while let Some(v) = rxb.recv().await {
                 let k = v.header().kind;
                 txc.send(v).await.unwrap();
@@ -114,7 +114,7 @@ impl AsyncModule for MutipleTasksModule {
             }
         });
 
-        let tc = tokio::spawn(async move {
+        self.handles.spawn(async move {
             while let Some(v) = rxc.recv().await {
                 let k = v.header().kind;
                 result.fetch_add(v.header().id as usize, std::sync::atomic::Ordering::SeqCst);
@@ -126,29 +126,21 @@ impl AsyncModule for MutipleTasksModule {
         });
 
         self.sender = Some(txa);
-        self.handles.push(ta);
-        self.handles.push(tb);
-        self.handles.push(tc);
     }
 
-    async fn at_sim_end(&mut self) {
-        self.sender
-            .take()
-            .unwrap()
-            .send(Message::new().kind(42).build())
-            .await
-            .unwrap();
-
-        for join in self.handles.drain(..) {
-            join.await.unwrap()
+    fn at_sim_end(&mut self) {
+        for i in 0..self.handles.len() {
+            assert!(
+                self.handles.try_join_next().is_some(),
+                "Failed to join {i}-th handle"
+            );
         }
 
-        self.result
-            .fetch_add(100, std::sync::atomic::Ordering::SeqCst);
+        // first yield
     }
 
-    async fn handle_message(&mut self, msg: Message) {
-        self.sender.as_ref().unwrap().send(msg).await.unwrap()
+    fn handle_message(&mut self, msg: Message) {
+        self.sender.as_ref().unwrap().try_send(msg).unwrap()
     }
 }
 
@@ -163,7 +155,8 @@ fn mutiple_active_tasks() {
     let mut rt = Builder::seeded(123).build(rt);
 
     rt.add_message_onto(gate_a.clone(), Message::new().id(1).build(), SimTime::ZERO);
-    rt.add_message_onto(gate_a, Message::new().id(2).build(), SimTime::ZERO);
+    rt.add_message_onto(gate_a.clone(), Message::new().id(2).build(), SimTime::ZERO);
+    rt.add_message_onto(gate_a, Message::new().kind(42).build(), SimTime::ZERO);
 
     let result = rt.run();
     match result {
@@ -174,8 +167,8 @@ fn mutiple_active_tasks() {
         } => {
             assert_eq!(time, SimTime::ZERO);
 
-            //  2 * (Gate + HandleMessage)
-            assert_eq!(profiler.event_count, 4);
+            //  3 * (Gate + HandleMessage)
+            assert_eq!(profiler.event_count, 6);
 
             // let m1 = app
             //     .module(|m| m.module_core().name() == "RootModule")
@@ -194,27 +187,26 @@ fn mutiple_active_tasks() {
 // This sleeps do NOT interfere with recv()
 
 #[derive(Default)]
-struct TimeSleepModule {
-    counter: usize,
-}
+struct TimeSleepModule {}
 
-impl AsyncModule for TimeSleepModule {
-    async fn handle_message(&mut self, msg: Message) {
-        tracing::debug!("recv msg: {}", msg.str());
-        let wait_time = msg.header().kind as u64;
-        tracing::info!(
-            "<{}> [{}] Waiting for timer",
-            current().name(),
-            SimTime::now()
-        );
-        sleep(Duration::from_secs(wait_time)).await;
-        tracing::info!(
-            "<{}> [{}] Done waiting for id: {}",
-            current().name(),
-            SimTime::now(),
-            msg.header().id
-        );
-        self.counter += msg.header().id as usize
+impl Module for TimeSleepModule {
+    fn handle_message(&mut self, msg: Message) {
+        tokio::spawn(async move {
+            tracing::debug!("recv msg: {}", msg.str());
+            let wait_time = msg.header().kind as u64;
+            tracing::info!(
+                "<{}> [{}] Waiting for timer",
+                current().name(),
+                SimTime::now()
+            );
+            sleep(Duration::from_secs(wait_time)).await;
+            tracing::info!(
+                "<{}> [{}] Done waiting for id: {}",
+                current().name(),
+                SimTime::now(),
+                msg.header().id
+            );
+        });
     }
 }
 
@@ -298,14 +290,6 @@ fn one_module_delayed_recv() {
             // 5) Wakeup aka NOP (2s)
             // 6) Wakeup - sleep reloved - send in '5 (4s)
             assert_eq!(profiler.event_count, 6);
-
-            // let m1 = app
-            //     .module(|m| m.module_core().name() == "RootModule")
-            //     .unwrap()
-            //     .self_as::<TimeSleepModule>()
-            //     .unwrap();
-
-            // assert_eq!(m1.counter, 3);
         }
         _ => panic!("Expected runtime to finish"),
     }
@@ -363,25 +347,8 @@ fn mutiple_module_delayed_recv() {
             time,
             profiler,
         } => {
-            assert_eq!(time, 5.0);
-
+            assert_eq!(time, 4.0); // parallel exec is possible
             assert_eq!(profiler.event_count, 12);
-
-            // let m1 = app
-            //     .module(|m| m.module_core().name() == "RootModule")
-            //     .unwrap()
-            //     .self_as::<TimeSleepModule>()
-            //     .unwrap();
-
-            // assert_eq!(m1.counter, 3);
-
-            // let m2 = app
-            //     .module(|m| m.module_core().name() == "OtherRootModule")
-            //     .unwrap()
-            //     .self_as::<TimeSleepModule>()
-            //     .unwrap();
-
-            // assert_eq!(m2.counter, 30);
         }
         _ => panic!("Expected runtime to finish"),
     }
@@ -403,8 +370,8 @@ impl Default for SemaphoreModule {
     }
 }
 
-impl AsyncModule for SemaphoreModule {
-    async fn at_sim_start(&mut self, _: usize) {
+impl Module for SemaphoreModule {
+    fn at_sim_start(&mut self, _: usize) {
         let sem = self.semaphore.clone();
         let res = self.result.clone();
         self.handle = Some(tokio::spawn(async move {
@@ -415,7 +382,7 @@ impl AsyncModule for SemaphoreModule {
         }));
     }
 
-    async fn handle_message(&mut self, msg: Message) {
+    fn handle_message(&mut self, msg: Message) {
         self.semaphore.add_permits(msg.header().kind as usize);
     }
 }
@@ -550,16 +517,20 @@ fn async_time_timeout() {
 
             let (tx, mut rx) = mpsc::channel(1);
 
-            let handle = tokio::spawn(async move {
+            let handle = tokio::task::spawn(async move {
                 time::sleep(Duration::from_secs(5)).await;
                 tx.send(42).await.unwrap();
+                println!("1:{}", SimTime::now());
             });
 
+            println!("0:{}", SimTime::now());
             let result: Result<Option<i32>, time::error::Elapsed> =
-                timeout_at(20.0.into(), rx.recv()).await;
+                timeout_at(42.0.into(), rx.recv()).await;
             assert_eq!(result, Ok(Some(42)));
 
+            println!("2: {}", SimTime::now());
             handle.await.unwrap();
+            println!("3: {}", SimTime::now());
         })
         .require_join(),
     );
