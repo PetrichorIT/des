@@ -424,12 +424,6 @@ impl PartialEq for Gate {
 }
 impl Eq for Gate {}
 
-impl Drop for Gate {
-    fn drop(&mut self) {
-        println!("drop::Gate::{}", self.name());
-    }
-}
-
 mod private {
     pub trait Sealed {}
 }

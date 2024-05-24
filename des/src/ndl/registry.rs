@@ -1,5 +1,4 @@
-use fxhash::{FxBuildHasher, FxHashMap};
-use std::fmt;
+use std::{fmt, marker::PhantomData};
 
 use crate::{
     net::processing::{IntoProcessingElements, ProcessingElements},
@@ -53,6 +52,12 @@ impl<T: Default> RegistryCreatable for T {
     }
 }
 
+#[doc(hidden)]
+pub trait RegistryCreatableInner {
+    type Target;
+    fn create_inner(&mut self, path: &ObjectPath, symbol: &str) -> Self::Target;
+}
+
 /// A registry to attache user-defined software to nodes in
 /// a simulation.
 ///
@@ -65,18 +70,35 @@ impl<T: Default> RegistryCreatable for T {
 /// to assign software to each node that will be created. Since these
 /// nodes are related to a NDL-Module the modules name is also provided
 /// as a parameter.
-#[must_use]
-pub struct Registry {
-    symbols: FxHashMap<String, Box<GenByObjectPath>>,
-    custom: Vec<Box<GenByObjectPathAndSymbol>>,
-    fallback: Option<Box<Fallback>>,
+pub struct Registry<L: Layer> {
+    layer: L,
 }
 
-type GenByObjectPath = dyn Fn(&ObjectPath) -> ProcessingElements;
-type GenByObjectPathAndSymbol = dyn Fn(&ObjectPath, &str) -> Option<ProcessingElements>;
-type Fallback = dyn Fn() -> ProcessingElements;
+#[doc(hidden)]
+#[derive(Debug)]
+pub struct EmptyLayer;
 
-impl Registry {
+#[doc(hidden)]
+#[derive(Debug)]
+pub struct SymbolLayer<L, M>
+where
+    L: Layer,
+    M: RegistryCreatableInner,
+    M::Target: Module,
+{
+    ty: String,
+    inner: L,
+    factory: M,
+}
+
+#[doc(hidden)]
+#[derive(Debug)]
+pub struct FallbackLayer<L: Layer, F: Fn() -> M, M: Module> {
+    f: F,
+    inner: L,
+}
+
+impl Registry<EmptyLayer> {
     /// Creates a new empty registry.
     ///
     /// Registrys can be populated using the builder pattern or using
@@ -88,13 +110,14 @@ impl Registry {
     /// ```
     /// # use des::prelude::*;
     /// # use des::ndl::*;
+    /// # #[derive(Default)]
     /// # struct HostModule;
     /// # impl Module for HostModule {}
     /// let registry = Registry::new()
-    ///     .symbol("Host", |_| HostModule)
-    ///     .custom(|path, symbol| {
+    ///     .symbol::<HostModule>("Host")
+    ///     .symbol_fn("OtherHost", |pat| {
     ///         /* ... */
-    ///         # Option::<HostModule>::None
+    ///         # HostModule
     ///     })
     ///     .with_default_fallback();
     /// ```
@@ -113,26 +136,125 @@ impl Registry {
     /// type Host = HostModule; // symbol names and type names must match
     /// let registry = registry![Host].with_default_fallback();
     /// ```
-    pub fn new() -> Registry {
-        Self {
-            symbols: FxHashMap::with_hasher(FxBuildHasher::default()),
-            custom: Vec::new(),
-            fallback: None,
+    pub fn new() -> Registry<EmptyLayer> {
+        Registry { layer: EmptyLayer }
+    }
+}
+
+impl<L: Layer> Registry<L> {
+    pub(super) fn resolve(
+        &mut self,
+        path: &ObjectPath,
+        symbol: &str,
+    ) -> Option<ProcessingElements> {
+        self.layer.resolve(path, symbol)
+    }
+
+    /// Adds a symbol mapping to the registry.
+    ///
+    /// All nodes with the symbol `ty` will now use the provided genertator
+    /// type `M: RegistryCreatable` to generate software. This function is thus only
+    /// parameterized by the objects path.
+    ///
+    /// Newer assigments will override older assigments to the same symbol.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use des::ndl::*;
+    /// # use des::prelude::*;
+    /// # #[derive(Default)]
+    /// struct Host { /* ... */ }
+    ///
+    ///
+    /// impl Module for Host {
+    ///     /* ... */
+    /// }
+    ///
+    ///
+    /// /* ... */
+    /// # #[derive(Default)]
+    /// # struct Router;
+    /// # impl Router { fn new(path: &ObjectPath) -> Self { Self } }
+    /// # impl Module for Router {}
+    ///
+    /// let registry = Registry::new()
+    ///     .symbol::<Host>("Host")
+    ///     .symbol::<Router>("Router");
+    ///
+    /// # return;
+    /// let mut sim = Sim::ndl("path/to/ndl", registry);
+    /// /* ... */
+    /// ```
+    pub fn symbol<M>(self, ty: impl AsRef<str>) -> Registry<SymbolLayer<L, Create<M>>>
+    where
+        M: RegistryCreatable + Module,
+    {
+        assert!(
+            !L::FINAL,
+            "cannot add another layer, the registry was finalized by the previous one"
+        );
+        Registry {
+            layer: SymbolLayer {
+                ty: ty.as_ref().to_string(),
+                inner: self.layer,
+                factory: Create {
+                    _phantom: PhantomData,
+                },
+            },
         }
     }
 
-    /// Sets the `DefaultFallbackModule` as a fallback.
+    /// Adds a custom symbol mapping to the registry.
     ///
-    /// The default fallback module will behave as follows:
-    /// - `at_sim_start` and `àt_sim_end` are NOP with 1 sim start stage
-    /// - `reset` is a NOP
-    /// - `handle_message` will log any incoming messages to stderr
-    /// - `DefaultFallbackModule` is **not** async
-    /// - `DefaulfFallbackModule` will **not** load common plugins
+    /// This mapping uses the provided clousure to generate types, instead of `RegistryCreatable`.
+    /// This allows for the assignment of multiple types to one symbol, using Box<dyn Module> as
+    /// a return type.
     ///
-    /// See [`Registry::with_fallback`] for more infomation.
-    pub fn with_default_fallback(self) -> Self {
-        self.with_fallback(|| DefaultFallbackModule)
+    /// Note that a custom directive that allways returns `Some(...)` is equivalent
+    /// to a fallback module.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use des::prelude::*;
+    /// # use des::ndl::*;
+    /// # struct GoogleGeneralHost;
+    /// # impl GoogleGeneralHost { fn new(_: &ObjectPath) -> Self { Self }}
+    /// # impl Module for GoogleGeneralHost {}
+    /// # type AwsGeneralHost = GoogleGeneralHost;
+    /// let mut google_nodes = 0;
+    ///
+    /// let registry = Registry::new()
+    ///     .symbol_fn("Host", |path| {
+    ///         if path.as_str().starts_with("google") {
+    ///             google_nodes += 1;
+    ///         }
+    ///         GoogleGeneralHost::new(path)
+    ///     });
+    ///
+    /// # return;
+    /// let mut sim = Sim::ndl("path/to/ndl", registry);
+    /// /* ... */
+    /// ```
+    pub fn symbol_fn<F, M>(
+        self,
+        ty: impl AsRef<str>,
+        mut f: F,
+    ) -> Registry<SymbolLayer<L, FnWrapper<impl FnMut(&ObjectPath, &str) -> M, M>>>
+    where
+        F: FnMut(&ObjectPath) -> M,
+        M: Module,
+    {
+        Registry {
+            layer: SymbolLayer {
+                ty: ty.as_ref().to_string(),
+                inner: self.layer,
+                factory: FnWrapper {
+                    f: move |path, _| f(path),
+                },
+            },
+        }
     }
 
     /// Sets a fallback module, that will be used if no other
@@ -162,173 +284,165 @@ impl Registry {
     /// ```
     /// # use des::ndl::*;
     /// # use des::prelude::*;
+    /// # #[derive(Default)]
     /// # struct HostModule;
     /// # impl Module for HostModule {}
+    /// # #[derive(Default)]
     /// # struct SwitchModule;
     /// # impl Module for SwitchModule {}
+    /// # #[derive(Default)]
     /// # struct RouterModule;
     /// # impl Module for RouterModule {}
+    /// # #[derive(Default)]
     /// # struct NOP;
     /// # impl Module for NOP {}
     /// let registry = Registry::new()
-    ///     .symbol("Host", |_| HostModule)
-    ///     .symbol("Switch", |_| SwitchModule)
-    ///     .symbol("Router", |_| RouterModule)
+    ///     .symbol::<HostModule>("Host")
+    ///     .symbol::<SwitchModule>("Switch")
+    ///     .symbol::<RouterModule>("Router")
     ///     .with_fallback(|| NOP);
     ///
     /// # return;
     /// let mut sim = Sim::ndl("path/to/ndl", registry);
     /// /* ... */
     /// ```
-    pub fn with_fallback<M: Module>(mut self, fallback: impl Fn() -> M + 'static) -> Self {
-        self.fallback = Some(Box::new(move || fallback().to_processing_chain()));
-        self
-    }
-
-    /// Adds a symbol mapping to the registry.
-    ///
-    /// All nodes with the symbol `ty` will now use the provided genertator
-    /// function `f` to generate software. This function is thus only parameterized
-    /// by the objects path.
-    ///
-    /// Newer assigments will override older assigments to the same symbol.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use des::ndl::*;
-    /// # use des::prelude::*;
-    /// struct Host { /* ... */ }
-    ///
-    /// impl Host {
-    ///     fn new(path: &ObjectPath) -> Self {
-    ///         /* .. */
-    /// #       Host {}
-    ///     }
-    /// }
-    ///
-    /// impl Module for Host {
-    ///     /* ... */
-    /// }
-    ///
-    /// /* ... */
-    /// # struct Router;
-    /// # impl Router { fn new(path: &ObjectPath) -> Self { Self } }
-    /// # impl Module for Router {}
-    ///
-    /// let registry = Registry::new()
-    ///     .symbol("Host", |path| Host::new(path))
-    ///     .symbol("Router", |path| Router::new(path));
-    ///
-    /// # return;
-    /// let mut sim = Sim::ndl("path/to/ndl", registry);
-    /// /* ... */
-    /// ```
-    pub fn symbol<M: Module>(
-        mut self,
-        ty: impl AsRef<str>,
-        f: impl for<'a> Fn(&'a ObjectPath) -> M + 'static,
-    ) -> Self {
-        self.symbols.insert(
-            ty.as_ref().to_string(),
-            Box::new(move |path| f(path).to_processing_chain()),
+    pub fn with_fallback<F, M>(self, f: F) -> Registry<FallbackLayer<L, F, M>>
+    where
+        F: Fn() -> M,
+        M: Module,
+    {
+        assert!(
+            !L::FINAL,
+            "cannot add another layer, the registry was finalized by the previous one"
         );
-        self
+        Registry {
+            layer: FallbackLayer {
+                f,
+                inner: self.layer,
+            },
+        }
     }
 
-    /// Adds a custom directive to the registry.
+    /// Sets the `DefaultFallbackModule` as a fallback.
     ///
-    /// A custom directive is a function that optionally returns a module.
-    /// If `None` is returned that indicates that the directive is not responsible for
-    /// generating software for this node. Custom directive are executed in order
-    /// of definition.
+    /// The default fallback module will behave as follows:
+    /// - `at_sim_start` and `àt_sim_end` are NOP with 1 sim start stage
+    /// - `reset` is a NOP
+    /// - `handle_message` will log any incoming messages to stderr
+    /// - `DefaultFallbackModule` is **not** async
+    /// - `DefaulfFallbackModule` will **not** load common plugins
     ///
-    /// Note that a custom directive that allways returns `Some(...)` is equivalent
-    /// to a fallback module.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use des::prelude::*;
-    /// # use des::ndl::*;
-    /// # struct GoogleGeneralHost;
-    /// # impl GoogleGeneralHost { fn new(_: &ObjectPath) -> Self { Self }}
-    /// # impl Module for GoogleGeneralHost {}
-    /// let symbols = ["Host", "Client", "Server"];
-    ///
-    /// let registry = Registry::new()
-    ///     .custom(move |path, symbol| {
-    ///         if symbols.contains(&symbol) {
-    ///             if path.as_str().starts_with("google") {
-    ///                 Some(GoogleGeneralHost::new(path))
-    ///             } else {
-    ///                 None
-    ///             }
-    ///         } else {
-    ///             None
-    ///         }
-    ///     });
-    ///
-    /// # return;
-    /// let mut sim = Sim::ndl("path/to/ndl", registry);
-    /// /* ... */
-    /// ```
-    pub fn custom<M: Module>(
-        mut self,
-        f: impl Fn(&ObjectPath, &str) -> Option<M> + 'static,
-    ) -> Self {
-        self.custom.push(Box::new(move |path, symbol| {
-            Some(f(path, symbol)?.to_processing_chain())
-        }));
-        self
-    }
-
-    /// Lookup
-    pub(super) fn lookup(&self, path: &ObjectPath, ty: &str) -> Option<ProcessingElements> {
-        // (0) Symbol resolve
-        if let Some(resolver) = self.symbols.get(ty) {
-            return Some(resolver(path));
-        }
-
-        // (1) Check custom handlers
-        for handler in &self.custom {
-            if let Some(resolved) = handler(path, ty) {
-                return Some(resolved);
-            }
-        }
-
-        // (2) Fallback
-        self.fallback.as_ref().map(|fallback| fallback())
+    /// See [`Registry::with_fallback`] for more infomation.
+    pub fn with_default_fallback(
+        self,
+    ) -> Registry<FallbackLayer<L, impl Fn() -> DefaultFallbackModule, DefaultFallbackModule>> {
+        self.with_fallback(|| DefaultFallbackModule)
     }
 }
 
-impl fmt::Debug for Registry {
+impl<L: Layer> AsRef<Registry<L>> for Registry<L> {
+    fn as_ref(&self) -> &Registry<L> {
+        self
+    }
+}
+
+impl<L: Layer> AsMut<Registry<L>> for Registry<L> {
+    fn as_mut(&mut self) -> &mut Registry<L> {
+        self
+    }
+}
+
+impl<L: Layer> fmt::Debug for Registry<L> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Registry").finish()
     }
 }
 
-impl AsRef<Registry> for Registry {
-    fn as_ref(&self) -> &Registry {
-        self
+#[doc(hidden)]
+pub trait Layer {
+    const FINAL: bool = false;
+    #[doc(hidden)]
+    fn resolve(&mut self, path: &ObjectPath, symbol: &str) -> Option<ProcessingElements>;
+}
+
+impl Layer for EmptyLayer {
+    fn resolve(&mut self, _: &ObjectPath, _: &str) -> Option<ProcessingElements> {
+        None
     }
 }
 
-impl Default for Registry {
-    fn default() -> Self {
-        Self::new()
+impl<L, M> Layer for SymbolLayer<L, M>
+where
+    M: RegistryCreatableInner,
+    M::Target: Module,
+    L: Layer,
+{
+    fn resolve(&mut self, path: &ObjectPath, symbol: &str) -> Option<ProcessingElements> {
+        self.inner.resolve(path, symbol).or_else(|| {
+            if symbol == self.ty {
+                Some(
+                    self.factory
+                        .create_inner(path, symbol)
+                        .to_processing_chain(),
+                )
+            } else {
+                None
+            }
+        })
     }
 }
 
-#[derive(Default)]
-struct DefaultFallbackModule;
+impl<L, F, M> Layer for FallbackLayer<L, F, M>
+where
+    F: Fn() -> M,
+    M: Module,
+    L: Layer,
+{
+    const FINAL: bool = true;
+    fn resolve(&mut self, path: &ObjectPath, symbol: &str) -> Option<ProcessingElements> {
+        Some(
+            self.inner
+                .resolve(path, symbol)
+                .unwrap_or_else(|| (self.f)().to_processing_chain()),
+        )
+    }
+}
+
+#[doc(hidden)]
+#[derive(Debug, Default)]
+pub struct DefaultFallbackModule;
 impl Module for DefaultFallbackModule {
     fn stack(&self) -> impl IntoProcessingElements {}
-
     fn handle_message(&mut self, msg: crate::prelude::Message) {
         tracing::error!(
             ?msg,
             "received message: fallback dummy should never receive any messages"
         );
+    }
+}
+
+#[doc(hidden)]
+#[derive(Debug)]
+pub struct Create<M: RegistryCreatable + Module> {
+    _phantom: PhantomData<M>,
+}
+
+impl<M: RegistryCreatable + Module> RegistryCreatableInner for Create<M> {
+    type Target = M;
+    fn create_inner(&mut self, path: &ObjectPath, symbol: &str) -> Self::Target {
+        M::create(path, symbol)
+    }
+}
+
+#[doc(hidden)]
+#[derive(Debug)]
+pub struct FnWrapper<F: FnMut(&ObjectPath, &str) -> M, M: Module> {
+    f: F,
+}
+
+impl<F: FnMut(&ObjectPath, &str) -> M, M: Module> RegistryCreatableInner for FnWrapper<F, M> {
+    type Target = M;
+    fn create_inner(&mut self, path: &ObjectPath, symbol: &str) -> Self::Target {
+        (self.f)(path, symbol)
     }
 }

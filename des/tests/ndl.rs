@@ -186,7 +186,7 @@ fn non_std_gate_connections() -> RootResult<()> {
 fn registry_missing_symbol() {
     let sim: Result<Sim<()>, des_ndl::error::RootError> = Sim::ndl(
         "tests/ndl/ab-deep.ndl",
-        Registry::new().symbol("Main", |_| Debugger),
+        Registry::new().symbol::<Debugger>("Main"),
     );
     let errors = sim.unwrap_err().errors;
     assert_eq!(errors.len(), 3);
@@ -208,7 +208,7 @@ fn registry_missing_symbol() {
 #[serial]
 fn registry_fmt() {
     assert_eq!(
-        format!("{:?}", Registry::new().symbol("A", |_| Debugger)),
+        format!("{:?}", Registry::new().symbol::<Debugger>("A")),
         "Registry"
     );
 }
@@ -218,16 +218,12 @@ fn registry_fmt() {
 fn registry_custom_resolver() -> RootResult<()> {
     static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
-    let registry = Registry::default()
-        .symbol("A", |_| Debugger)
-        .symbol("Main", |_| Debugger)
-        .custom(|_, symbol| {
-            if symbol == "B" {
-                COUNTER.fetch_add(1, Ordering::SeqCst);
-                Some(Debugger)
-            } else {
-                None
-            }
+    let registry = Registry::new()
+        .symbol::<Debugger>("A")
+        .symbol::<Debugger>("Main")
+        .symbol_fn("B", |_| {
+            COUNTER.fetch_add(1, Ordering::SeqCst);
+            Debugger
         });
 
     let sim = Sim::ndl("tests/ndl/ab.ndl", registry)?;
@@ -238,6 +234,7 @@ fn registry_custom_resolver() -> RootResult<()> {
     Ok(())
 }
 
+#[derive(Debug, Default)]
 struct Sender;
 impl Module for Sender {
     fn at_sim_start(&mut self, _stage: usize) {
@@ -247,13 +244,22 @@ impl Module for Sender {
 
 #[test]
 #[serial]
-fn registry_default_fallback_does_not_pani() -> RootResult<()> {
-    let registry = Registry::default()
-        .symbol("A", |_| Sender)
+fn registry_default_fallback_does_not_panic() -> RootResult<()> {
+    let registry = Registry::new()
+        .symbol::<Sender>("A")
         .with_default_fallback();
 
     let sim = Sim::ndl("tests/ndl/ab.ndl", registry)?;
     let _ = Builder::seeded(123).build(sim).run();
 
     Ok(())
+}
+
+#[test]
+#[serial]
+#[should_panic = "cannot add another layer, the registry was finalized by the previous one"]
+fn registry_add_layer_after_fallback() {
+    let _ = Registry::new()
+        .with_default_fallback()
+        .symbol::<Sender>("A");
 }

@@ -59,6 +59,9 @@ use std::{path::Path, sync::Arc};
 mod registry;
 pub use self::registry::*;
 
+// mod registry;
+// pub use self::registry::*;
+
 impl Sim<()> {
     /// Creates a NDL application with the inner application `()`.
     ///
@@ -68,7 +71,10 @@ impl Sim<()> {
     ///
     /// This function may return an error, if the provided NDL topology is
     /// erronous, or the software requirements cannot be fulfilled by the registry.
-    pub fn ndl(path: impl AsRef<Path>, registry: impl AsRef<Registry>) -> RootResult<Self> {
+    pub fn ndl<L: Layer>(
+        path: impl AsRef<Path>,
+        registry: impl AsMut<Registry<L>>,
+    ) -> RootResult<Self> {
         Self::ndl_with(path, registry, ())
     }
 }
@@ -102,9 +108,9 @@ impl<A> Sim<A> {
     /// # Errors
     ///
     /// Some Errors
-    pub fn ndl_with(
+    pub fn ndl_with<L: Layer>(
         path: impl AsRef<Path>,
-        registry: impl AsRef<Registry>,
+        registry: impl AsMut<Registry<L>>,
         inner: A,
     ) -> RootResult<Self> {
         let mut this = Sim::new(inner);
@@ -122,10 +128,10 @@ impl<A> Sim<A> {
     /// a) some NDL error occures when parsing the NDL tree defined at `path`,
     /// b) or the registry fails to provide software for some NDL-defined module.
     #[allow(clippy::missing_panics_doc)]
-    pub fn build_ndl(
+    pub fn build_ndl<L: Layer>(
         &mut self,
         path: impl AsRef<Path>,
-        registry: impl AsRef<Registry>,
+        mut registry: impl AsMut<Registry<L>>,
     ) -> RootResult<()> {
         let mut ctx = Context::load(path)?;
         let tree = ctx
@@ -136,7 +142,7 @@ impl<A> Sim<A> {
         let mut errors = Errors::new().as_mut();
 
         let scoped = ScopedSim::new(self, ObjectPath::default());
-        let _ = scoped.ndl(tree, &mut errors, registry.as_ref());
+        let _ = scoped.ndl(tree, &mut errors, registry.as_mut());
 
         if errors.is_empty() {
             Ok(())
@@ -145,11 +151,11 @@ impl<A> Sim<A> {
         }
     }
 
-    fn raw_ndl(
+    fn raw_ndl<L: Layer>(
         &mut self,
         path: &ObjectPath,
         ty: &str,
-        registry: &Registry,
+        registry: &mut Registry<L>,
         errors: &mut ErrorsMut,
     ) -> ModuleRef {
         // Check dup
@@ -171,7 +177,7 @@ impl<A> Sim<A> {
         };
         ctx.activate();
 
-        if let Some(software) = registry.lookup(path, ty) {
+        if let Some(software) = registry.resolve(path, ty) {
             ctx.upgrade_dummy(software);
         } else {
             errors.add(Error::new(
@@ -188,11 +194,11 @@ impl<A> Sim<A> {
 
 impl<'a, A> ScopedSim<'a, A> {
     #[allow(clippy::needless_pass_by_value)]
-    fn ndl(
+    fn ndl<L: Layer>(
         mut self,
         ir: Arc<ir::Module>,
         errors: &mut ErrorsMut,
-        registry: &Registry,
+        registry: &mut Registry<L>,
     ) -> ModuleRef {
         let ty = ir.ident.raw.clone();
         let scope = &self.scope;

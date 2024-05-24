@@ -305,7 +305,6 @@ unsafe impl Sync for ModuleContext {}
 
 impl Drop for ModuleContext {
     fn drop(&mut self) {
-        println!("drop::ModuleContext::{}", self.path());
         for gate in self.gates() {
             gate.dissolve_paths();
         }

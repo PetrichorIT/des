@@ -36,36 +36,27 @@
 #[macro_export]
 macro_rules! registry {
     ($($t:ty),*) => {{
-        use $crate::ndl::RegistryCreatable;
-        use $crate::net::module::Module;
-
-        let mut registry = $crate::ndl::Registry::new();
+        let registry = $crate::ndl::Registry::new();
         $(
-            registry = registry.symbol(stringify!($t), |path| <$t as RegistryCreatable>::create(path, stringify!($t)));
+            let registry = registry.symbol::<$t>(stringify!($t));
         )*
 
         registry
     }};
 
     ($($t:ty),*, else _) => {{
-        use $crate::ndl::RegistryCreatable;
-        use $crate::net::module::Module;
-
-        let mut registry = $crate::ndl::Registry::new();
+        let registry = $crate::ndl::Registry::new();
         $(
-            registry = registry.symbol(stringify!($t), |path| <$t as RegistryCreatable>::create(path, stringify!($t)));
+            let registry = registry.symbol::<$t>(stringify!($t));
         )*
 
         registry.with_default_fallback()
     }};
 
     ($($t:ty),*, else $f:ty) => {{
-        use $crate::ndl::RegistryCreatable;
-        use $crate::net::module::Module;
-
-        let mut registry = $crate::ndl::Registry::new();
+        let registry = $crate::ndl::Registry::new();
         $(
-            registry = registry.symbol(stringify!($t), |path| <$t as RegistryCreatable>::create(path, stringify!($t)));
+            let registry = registry.symbol::<$t>(stringify!($t));
         )*
 
         registry.with_fallback(|| <$f as std::default::Default>::default())

@@ -21,7 +21,7 @@ fn main() -> std::io::Result<()> {
     let topo = app.globals().topology.lock().unwrap().clone();
 
     assert_eq!(topo.nodes().len(), 4 + 1);
-    assert_eq!(topo.edges().count(), 14);
+    assert_eq!(topo.edges().count(), 2 * 14);
 
     std::fs::File::create("examples/utils/graph.svg")?.write_all(topo.as_svg()?.as_bytes())?;
 
