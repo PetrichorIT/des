@@ -38,10 +38,6 @@ struct PluginCreation {
     sum: usize,
 }
 impl Module for PluginCreation {
-    fn stack(&self) -> impl ProcessingElement {
-        lcommon::IncrementIncomingId
-    }
-
     fn at_sim_start(&mut self, _stage: usize) {
         for i in 0..100 {
             schedule_at(
@@ -67,6 +63,7 @@ fn plugin_raw_creation() {
     // Logger::new().set_logger();
 
     let mut app = Sim::new(());
+    app.set_stack(|| lcommon::IncrementIncomingId);
     app.node("root", PluginCreation::default());
 
     let rt = Builder::seeded(123).build(app);
@@ -97,7 +94,7 @@ struct PluginPriorityDefer {
     arc: Arc<AtomicUsize>,
 }
 impl Module for PluginPriorityDefer {
-    fn stack(&self) -> impl IntoProcessingElements {
+    fn stack(&self, _: ProcessingStack) -> ProcessingStack {
         (
             ActivitySensor {
                 shared: self.arc.clone(),
@@ -112,6 +109,7 @@ impl Module for PluginPriorityDefer {
                 expected: 2,
             },
         )
+            .into()
     }
 
     fn at_sim_start(&mut self, _stage: usize) {
@@ -163,10 +161,11 @@ struct PluginAtShutdown {
     arc: Arc<AtomicUsize>,
 }
 impl Module for PluginAtShutdown {
-    fn stack(&self) -> impl IntoProcessingElements {
+    fn stack(&self, _: ProcessingStack) -> ProcessingStack {
         IncrementArcPlugin {
             arc: self.arc.clone(),
         }
+        .into()
     }
 
     fn at_sim_start(&mut self, _stage: usize) {
@@ -222,8 +221,8 @@ fn module_as_processing_element() {
         }
     }
     impl Module for B {
-        fn stack(&self) -> impl IntoProcessingElements {
-            A
+        fn stack(&self, _: ProcessingStack) -> ProcessingStack {
+            A.into()
         }
 
         fn handle_message(&mut self, _: Message) {
@@ -255,16 +254,15 @@ fn custom_default_pe() {
         }
     }
 
-    fn custom() -> Vec<ProcessorElement> {
-        vec![ProcessorElement::new(EatAllAndSayDone)]
+    fn custom() -> ProcessingStack {
+        EatAllAndSayDone.into()
     }
-
-    set_default_processing_elements(custom);
 
     struct A;
     impl Module for A {}
 
     let mut sim = Sim::new(());
+    sim.set_stack(|| custom());
     sim.node("a", A);
     let gate = sim.gate("a", "port");
 
@@ -273,10 +271,4 @@ fn custom_default_pe() {
 
     let _ = rt.run();
     assert!(DONE.load(Ordering::SeqCst));
-
-    fn reset() -> Vec<ProcessorElement> {
-        Vec::new()
-    }
-
-    set_default_processing_elements(reset)
 }

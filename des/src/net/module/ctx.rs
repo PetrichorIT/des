@@ -19,7 +19,6 @@ use std::{
 use crate::net::module::rt::AsyncCoreExt;
 
 pub(crate) static MOD_CTX: SwapLock<Option<Arc<ModuleContext>>> = SwapLock::new(None);
-pub(crate) static SETUP_FN: RwLock<fn(&ModuleContext)> = RwLock::new(_default_setup);
 
 pub(crate) fn _default_setup(_: &ModuleContext) {}
 
@@ -79,8 +78,6 @@ impl ModuleContext {
             children: RwLock::new(FxHashMap::with_hasher(FxBuildHasher::default())),
         }));
 
-        SETUP_FN.read()(&this);
-
         this
     }
 
@@ -111,8 +108,6 @@ impl ModuleContext {
             parent: Some(ModuleRefWeak::new(&parent)),
             children: RwLock::new(FxHashMap::with_hasher(FxBuildHasher::default())),
         }));
-
-        SETUP_FN.read()(&this);
 
         parent
             .ctx

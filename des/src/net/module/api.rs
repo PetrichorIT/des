@@ -1,21 +1,10 @@
 use std::sync::Arc;
 
-use super::{try_with_mod_ctx, ModuleContext, SETUP_FN};
+use super::{try_with_mod_ctx, ModuleContext};
 use crate::{
     net::runtime::buf_schedule_shutdown,
     time::{Duration, SimTime},
 };
-
-/// Overwrite the setup fn all modules run.
-///
-/// All modules require common functionality based on the baseline setup of the
-/// simulation. Such common functionality is usually provided by plugins,
-/// but manually creating them on each module type is bothersome, and errorprone.
-/// To cirumvent that, a common setup function is provided that initalizes some plugins
-/// on all modules.
-pub fn set_setup_fn(f: fn(&ModuleContext)) {
-    *SETUP_FN.write() = f;
-}
 
 /// Retuns a handle to the context of the current module. This
 /// handle can be used on inspect and change the modules simulation

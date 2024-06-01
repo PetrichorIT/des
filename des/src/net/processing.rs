@@ -63,9 +63,9 @@
 //! once the next event arrives.
 //!  
 
-use std::{any::Any, sync::RwLock};
+use std::{any::Any, ops::Deref};
 
-use super::module::Module;
+use super::{module::Module, util::NoDebug};
 use crate::prelude::Message;
 
 /// A subprogramm between the module application and the network layer.
@@ -89,16 +89,6 @@ use crate::prelude::Message;
 /// [`event_start`]: ProcessingElement::event_start
 /// [`event_end`]: ProcessingElement::event_end
 pub trait ProcessingElement: Any {
-    /// Defines the requires stack for this processing element.
-    ///
-    ///
-    fn stack(&self) -> impl IntoProcessingElements
-    where
-        Self: Sized,
-    {
-        BaseLoader
-    }
-
     /// A handler for when an the event processing of a message starts.
     ///
     /// This function is called only once per event. If this function is called
@@ -191,86 +181,51 @@ pub trait ProcessingElement: Any {
     }
 }
 
-/// A type that can be interprested as a processing element chain.
-pub trait IntoProcessingElements: 'static {
-    /// Convertes into processing elements
-    fn to_processing_elements(self) -> Vec<ProcessorElement>;
-}
-
-impl<P: ProcessingElement + 'static> IntoProcessingElements for P {
-    fn to_processing_elements(self) -> Vec<ProcessorElement> {
-        let mut stack = self.stack().to_processing_elements();
-        stack.push(ProcessorElement::new(self));
-        stack
-    }
-}
-
 impl<T: Module> ProcessingElement for T {
-    fn stack(&self) -> impl IntoProcessingElements {
-        <Self as Module>::stack(self)
-    }
-
     fn incoming(&mut self, msg: Message) -> Option<Message> {
         self.handle_message(msg);
         None
     }
 }
 
-/// A base module that is used to load the default processing elements
-/// onto a module.
-///
-/// It's common for simulations to share a set of basic processing elements
-/// accross all nodes. The baseLoader is a maker type, that attaches all default
-/// plugins to a node, that relies on `BaseLoader` in its processing stack.
-///
-/// Use [`set_default_processing_elements`] to set the default processing
-/// elements.
-#[derive(Debug)]
-pub struct BaseLoader;
-
-pub(crate) static SETUP_PROCESSING: RwLock<fn() -> Vec<ProcessorElement>> =
-    RwLock::new(_default_processing);
-
-fn _default_processing() -> Vec<ProcessorElement> {
-    Vec::new()
-}
-
-impl IntoProcessingElements for BaseLoader {
-    fn to_processing_elements(self) -> Vec<ProcessorElement> {
-        SETUP_PROCESSING.try_read().expect("Cannot access fn")()
-    }
-}
-
-/// Sets a handler to create the default processing element of a module
-///
-/// # Panics
-///
-/// May panic at interal misconfiguration
-pub fn set_default_processing_elements(f: fn() -> Vec<ProcessorElement>) {
-    *SETUP_PROCESSING.try_write().expect("no lock") = f;
-}
-
 /// A untyped set of processing elements, effectivly a processing stack.
 #[doc(hidden)]
 #[allow(missing_debug_implementations)]
-pub struct ProcessingElements {
+pub struct Processor {
     // last element is module
     pub(super) state: ProcessingState,
-    stack: Vec<ProcessorElement>,
+    stack: ProcessingStack,
     pub(super) handler: Box<dyn Module>,
 }
 
-/// A untyped processing element, using dynamic dispatch.
-#[allow(missing_debug_implementations)]
-pub struct ProcessorElement {
-    inner: Box<dyn ProcessingElement>,
-}
+impl Processor {
+    pub(super) fn new(stack: ProcessingStack, handler: impl Module) -> Self {
+        Processor {
+            state: ProcessingState::Upstream(0),
+            stack,
+            handler: Box::new(handler),
+        }
+    }
 
-impl ProcessorElement {
-    /// Creates a new type-erased wrapper around a concrete processing element.
-    pub fn new<T: ProcessingElement>(inner: T) -> Self {
-        Self {
-            inner: Box::new(inner),
+    pub(super) fn incoming_upstream(&mut self, msg: Option<Message>) -> Option<Message> {
+        self.state = ProcessingState::Upstream(0);
+
+        let mut msg = msg;
+        for i in 0..self.stack.items.len() {
+            self.stack.items[i].event_start();
+            if let Some(existing_msg) = msg {
+                msg = self.stack.items[i].incoming(existing_msg);
+            }
+            self.state.bump_upstream();
+        }
+        msg
+    }
+
+    pub(super) fn incoming_downstream(&mut self) {
+        self.state = ProcessingState::Downstream(self.stack.items.len());
+        for i in (0..self.stack.items.len()).rev() {
+            self.stack.items[i].event_end();
+            self.state.bump_downstream();
         }
     }
 }
@@ -297,41 +252,38 @@ impl ProcessingState {
     }
 }
 
-impl ProcessingElements {
-    pub(super) fn new(stack: Vec<ProcessorElement>, handler: impl Module) -> Self {
-        ProcessingElements {
-            state: ProcessingState::Upstream(0),
-            stack,
-            handler: Box::new(handler),
-        }
-    }
+/// A stack of processing elements
+#[derive(Debug, Default)]
+pub struct ProcessingStack {
+    items: NoDebug<Vec<Box<dyn ProcessingElement>>>,
+}
 
-    pub(super) fn incoming_upstream(&mut self, msg: Option<Message>) -> Option<Message> {
-        self.state = ProcessingState::Upstream(0);
-
-        let mut msg = msg;
-        for i in 0..self.stack.len() {
-            self.stack[i].inner.event_start();
-            if let Some(existing_msg) = msg {
-                msg = self.stack[i].inner.incoming(existing_msg);
-            }
-            self.state.bump_upstream();
-        }
-        msg
-    }
-
-    pub(super) fn incoming_downstream(&mut self) {
-        self.state = ProcessingState::Downstream(self.stack.len());
-        for i in (0..self.stack.len()).rev() {
-            self.stack[i].inner.event_end();
-            self.state.bump_downstream();
-        }
+impl ProcessingStack {
+    /// Merge a new stack onto the the current one.
+    pub fn append(&mut self, expansion: impl Into<ProcessingStack>) {
+        self.items.extend(expansion.into().items.into_inner());
     }
 }
 
-impl IntoProcessingElements for () {
-    fn to_processing_elements(self) -> Vec<ProcessorElement> {
-        Vec::new()
+impl Deref for ProcessingStack {
+    type Target = [Box<dyn ProcessingElement>];
+    fn deref(&self) -> &Self::Target {
+        &*self.items
+    }
+}
+
+impl From<()> for ProcessingStack {
+    fn from(_: ()) -> Self {
+        ProcessingStack::default()
+    }
+}
+
+impl<P: ProcessingElement> From<P> for ProcessingStack {
+    fn from(value: P) -> Self {
+        let boxed: Box<dyn ProcessingElement> = Box::new(value);
+        ProcessingStack {
+            items: vec![boxed].into(),
+        }
     }
 }
 
@@ -339,13 +291,13 @@ macro_rules! for_tuples {
     (
         $($i:ident),*
     ) => {
-        impl<$($i: ProcessingElement + 'static),*> IntoProcessingElements for ($($i),*) {
+        impl<$($i: ProcessingElement + 'static),*> From<($($i),*)> for ProcessingStack {
             #[allow(non_snake_case)]
-            fn to_processing_elements(self) -> Vec<ProcessorElement> {
-                let mut stack = self.0.stack().to_processing_elements();
-                let ($($i),*) = self;
+            fn from(value: ($($i),*)) -> Self {
+                let mut stack = ProcessingStack::default();
+                let ($($i),*) = value;
                 $(
-                    stack.push(ProcessorElement::new($i));
+                    stack.append(ProcessingStack::from($i));
                 )*
                 stack
             }

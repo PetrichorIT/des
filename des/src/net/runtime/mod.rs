@@ -1,8 +1,10 @@
 use super::module::module_ctx_drop;
+use super::processing::ProcessingStack;
 use super::topology::Topology;
+use super::util::NoDebug;
 use super::{module::MOD_CTX, par::ParMap};
 use crate::{
-    net::module::ModuleContext,
+    net::module::{ModuleContext, ModuleExt},
     prelude::{Application, EventLifecycle, GateRef, Module, ModuleRef, ObjectPath, Runtime},
     tracing::{enter_scope, leave_scope},
 };
@@ -63,6 +65,7 @@ static GUARD: Mutex<()> = Mutex::new(());
 /// ```
 #[derive(Debug)]
 pub struct Sim<A> {
+    pub(crate) stack: NoDebug<Box<dyn FnMut() -> ProcessingStack>>,
     modules: ModuleTree,
     globals: Arc<Globals>,
     /// A inner field of a network simulation that can be used to attach
@@ -173,12 +176,35 @@ impl<A> Sim<A> {
     pub fn new(inner: A) -> Self {
         let globals = Arc::new(Globals::default());
         let guard = SimStaticsGuard::new(Arc::downgrade(&globals));
+        let stack: Box<dyn FnMut() -> ProcessingStack> = Box::new(|| ProcessingStack::default());
         Self {
+            stack: stack.into(),
             guard,
             modules: ModuleTree::default(),
             globals,
             inner,
         }
+    }
+
+    /// Sets the default processing stack for the simulation.
+    ///
+    /// Note that this will only affect calls of `node` after
+    /// this function was called.
+    pub fn set_stack<T: Into<ProcessingStack>>(&mut self, mut stack: impl FnMut() -> T + 'static) {
+        let boxed: Box<dyn FnMut() -> ProcessingStack> = Box::new(move || stack().into());
+        self.stack = boxed.into();
+    }
+
+    /// Sets the default processing stack for the simulation.
+    ///
+    /// Note that this will only affect calls of `node` after
+    /// this function was called.
+    pub fn with_stack<T: Into<ProcessingStack>>(
+        mut self,
+        stack: impl FnMut() -> T + 'static,
+    ) -> Self {
+        self.set_stack(stack);
+        self
     }
 
     /// Includes raw parameter defintions in the simulation.
@@ -372,7 +398,7 @@ impl<A> Sim<A> {
         };
         ctx.activate();
 
-        let pe = module.to_processing_chain();
+        let pe = module.to_processing_chain((self.stack)());
         ctx.upgrade_dummy(pe);
 
         // TODO: deactivate module

@@ -1,10 +1,10 @@
-use crate::net::processing::ProcessingElements;
+use crate::net::processing::{ProcessingStack, Processor};
 use crate::net::NetEvents;
 use crate::prelude::{Gate, GateRef};
 use crate::runtime::EventSink;
 use crate::tracing::{enter_scope, leave_scope};
 
-use super::{DummyModule, Module, ModuleContext};
+use super::{DummyModule, Module, ModuleContext, ModuleExt};
 use std::any::{Any, TypeId};
 use std::cell::{Ref, RefCell, RefMut};
 use std::fmt::Debug;
@@ -14,7 +14,7 @@ use std::sync::{Arc, Weak};
 #[derive(Clone)]
 pub(crate) struct ModuleRefWeak {
     ctx: Weak<ModuleContext>,
-    handler: Weak<RefCell<ProcessingElements>>,
+    handler: Weak<RefCell<Processor>>,
     // handler_ptr: *mut u8,
 }
 
@@ -46,7 +46,7 @@ impl Debug for ModuleRefWeak {
 #[derive(Clone)]
 pub struct ModuleRef {
     pub(crate) ctx: Arc<ModuleContext>,
-    pub(crate) processing: Arc<RefCell<ProcessingElements>>,
+    pub(crate) processing: Arc<RefCell<Processor>>,
 }
 
 impl Deref for ModuleRef {
@@ -58,8 +58,12 @@ impl Deref for ModuleRef {
 
 impl ModuleRef {
     #[allow(clippy::explicit_deref_methods)]
-    pub(crate) fn new<T: Module>(ctx: Arc<ModuleContext>, module: T) -> Self {
-        let procesing = module.to_processing_chain();
+    pub(crate) fn new<T: Module>(
+        ctx: Arc<ModuleContext>,
+        module: T,
+        stack: ProcessingStack,
+    ) -> Self {
+        let procesing = module.to_processing_chain(stack);
         let handler = Arc::new(RefCell::new(procesing));
         Self {
             ctx,
@@ -71,15 +75,15 @@ impl ModuleRef {
     pub(crate) fn dummy(ctx: Arc<ModuleContext>) -> Self {
         // Create the dummy module explicitly not with ::new since
         // all dyn Module calls would panic
-        Self::new(ctx, DummyModule {})
+        Self::new(ctx, DummyModule {}, ProcessingStack::default())
     }
 
     #[allow(unused)]
     // Caller must ensure that handler is indeed a dummy
     #[doc(hidden)]
-    pub fn upgrade_dummy(&self, module: ProcessingElements) {
+    pub fn upgrade_dummy(&self, module: Processor) {
         let celled = RefCell::new(module);
-        let celled: RefCell<ProcessingElements> = celled;
+        let celled: RefCell<Processor> = celled;
         self.processing.swap(&celled);
     }
 
@@ -354,7 +358,7 @@ mod tests {
         impl Module for A {}
 
         let module = ModuleContext::standalone("root".into());
-        module.upgrade_dummy(ProcessingElements::new(Vec::new(), A { inner: 42 }));
+        module.upgrade_dummy(Processor::new(ProcessingStack::default(), A { inner: 42 }));
 
         assert!(module.try_as_ref::<i32>().is_none());
         assert!(module.try_as_mut::<i32>().is_none());

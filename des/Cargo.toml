@@ -34,9 +34,6 @@ unstable-tokio-enable-time = ["async", "tokio/time"]
 # Rand primives must be set since they are bound to the
 # runtime and sould be seedable by the user.
 rand = { version = "*", features = ["std_rng"] }
-# Sysinfo is used for collection information on 
-# system stats for metrics.
-sysinfo = "*"
 
 # Spin must be used in the logger event in single-threaded runnin
 # due to issues like #8
@@ -64,7 +61,7 @@ des-ndl = { path = "../des-ndl", optional = true }
 
 [dev-dependencies]
 futures = "0.3"
-serial_test = "2.0.0"
+serial_test = "3.1.1"
 
 [package.metadata.docs.rs]
 all-features = true

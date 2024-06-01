@@ -28,7 +28,7 @@ mod meta;
 #[cfg(test)]
 mod tests;
 
-use super::processing::{BaseLoader, IntoProcessingElements, ProcessingElements};
+use super::processing::{ProcessingStack, Processor};
 
 cfg_async! {
     pub(super) mod rt;
@@ -70,21 +70,14 @@ pub trait Module: Any {
         tracing::warn!("Module has been shutdown and restarted, but reset() was not defined. This may lead to invalid custom state.");
     }
 
-    /// Defines the required stack.
-    fn stack(&self) -> impl IntoProcessingElements
-    where
-        Self: Sized,
-    {
-        BaseLoader
-    }
-
-    /// BUILD
-    fn to_processing_chain(self) -> ProcessingElements
-    where
-        Self: Sized + 'static,
-    {
-        let stack = <Self as Module>::stack(&self).to_processing_elements();
-        ProcessingElements::new(stack, self)
+    ///
+    /// A function that assigns the processing stack that support this module.
+    ///
+    /// As input this function get the default processing stack. The default implemention
+    /// just returns this stack unchanged. Users may choose to override or append
+    /// the provided base stack.
+    fn stack(&self, stack: ProcessingStack) -> ProcessingStack {
+        stack
     }
 
     ///
@@ -160,3 +153,15 @@ pub trait Module: Any {
     ///
     fn at_sim_end(&mut self) {}
 }
+
+pub(crate) trait ModuleExt: Module {
+    /// BUILD TODO: Remove
+    fn to_processing_chain(self, stack: ProcessingStack) -> Processor
+    where
+        Self: Sized + 'static,
+    {
+        Processor::new(self.stack(stack), self)
+    }
+}
+
+impl<T: Module> ModuleExt for T {}

@@ -2,7 +2,7 @@
 
 use super::{Globals, HandleMessageEvent, MessageExitingConnection, Sim};
 use crate::net::gate::Connection;
-use crate::net::module::{current, with_mod_ctx, MOD_CTX, SETUP_FN};
+use crate::net::module::{current, with_mod_ctx, MOD_CTX};
 use crate::net::ModuleRestartEvent;
 use crate::net::{gate::GateRef, message::Message, NetEvents};
 use crate::prelude::{EventLifecycle, ModuleRef};
@@ -152,10 +152,6 @@ where
         // drop the rt, to prevent all async activity from happening.
         #[cfg(feature = "async")]
         module.ctx.async_ext.write().rt.shutdown();
-
-        // drop all hooks to ensure all messages reach the async impl
-        // module.ctx.hooks.borrow_mut().clear(); TODO: Plugin clean
-        SETUP_FN.read()(&module.ctx);
 
         // Reset the internal state
         // Note that the module is not active, so it must be manually reactivated

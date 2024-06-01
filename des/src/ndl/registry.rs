@@ -1,8 +1,9 @@
 use std::{fmt, marker::PhantomData};
 
-use crate::{
-    net::processing::{IntoProcessingElements, ProcessingElements},
-    prelude::{Module, ObjectPath},
+use crate::net::{
+    module::{Module, ModuleExt},
+    processing::{ProcessingStack, Processor},
+    ObjectPath,
 };
 
 /// A type that can be created based on the nodes path and a
@@ -146,8 +147,9 @@ impl<L: Layer> Registry<L> {
         &mut self,
         path: &ObjectPath,
         symbol: &str,
-    ) -> Option<ProcessingElements> {
-        self.layer.resolve(path, symbol)
+        stack: &mut dyn FnMut() -> ProcessingStack,
+    ) -> Option<Processor> {
+        self.layer.resolve(path, symbol, stack)
     }
 
     /// Adds a symbol mapping to the registry.
@@ -362,14 +364,17 @@ impl<L: Layer> fmt::Debug for Registry<L> {
 pub trait Layer {
     const FINAL: bool = false;
     #[doc(hidden)]
-    fn resolve(&mut self, path: &ObjectPath, symbol: &str) -> Option<ProcessingElements>;
-}
-
-impl Layer for EmptyLayer {
-    fn resolve(&mut self, _: &ObjectPath, _: &str) -> Option<ProcessingElements> {
+    fn resolve(
+        &mut self,
+        _path: &ObjectPath,
+        _symbol: &str,
+        _stack: &mut dyn FnMut() -> ProcessingStack,
+    ) -> Option<Processor> {
         None
     }
 }
+
+impl Layer for EmptyLayer {}
 
 impl<L, M> Layer for SymbolLayer<L, M>
 where
@@ -377,13 +382,18 @@ where
     M::Target: Module,
     L: Layer,
 {
-    fn resolve(&mut self, path: &ObjectPath, symbol: &str) -> Option<ProcessingElements> {
-        self.inner.resolve(path, symbol).or_else(|| {
+    fn resolve(
+        &mut self,
+        path: &ObjectPath,
+        symbol: &str,
+        stack: &mut dyn FnMut() -> ProcessingStack,
+    ) -> Option<Processor> {
+        self.inner.resolve(path, symbol, stack).or_else(|| {
             if symbol == self.ty {
                 Some(
                     self.factory
                         .create_inner(path, symbol)
-                        .to_processing_chain(),
+                        .to_processing_chain(stack()),
                 )
             } else {
                 None
@@ -399,11 +409,16 @@ where
     L: Layer,
 {
     const FINAL: bool = true;
-    fn resolve(&mut self, path: &ObjectPath, symbol: &str) -> Option<ProcessingElements> {
+    fn resolve(
+        &mut self,
+        path: &ObjectPath,
+        symbol: &str,
+        stack: &mut dyn FnMut() -> ProcessingStack,
+    ) -> Option<Processor> {
         Some(
             self.inner
-                .resolve(path, symbol)
-                .unwrap_or_else(|| (self.f)().to_processing_chain()),
+                .resolve(path, symbol, stack)
+                .unwrap_or_else(|| (self.f)().to_processing_chain(stack())),
         )
     }
 }
@@ -412,7 +427,6 @@ where
 #[derive(Debug, Default)]
 pub struct DefaultFallbackModule;
 impl Module for DefaultFallbackModule {
-    fn stack(&self) -> impl IntoProcessingElements {}
     fn handle_message(&mut self, msg: crate::prelude::Message) {
         tracing::error!(
             ?msg,

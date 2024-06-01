@@ -1,8 +1,4 @@
-use des::{
-    net::module::{set_setup_fn, ModuleContext},
-    prelude::*,
-    registry,
-};
+use des::{prelude::*, registry};
 
 #[derive(Default)]
 struct A {}
@@ -42,10 +38,6 @@ impl Drop for PacketCounter {
 struct B {}
 
 impl Module for B {
-    fn stack(&self) -> impl ProcessingElement {
-        PacketCounter::default()
-    }
-
     fn handle_message(&mut self, msg: Message) {
         send(msg, "out")
     }
@@ -54,8 +46,6 @@ impl Module for B {
 #[derive(Default)]
 struct Main;
 impl Module for Main {}
-
-fn empty(_: &ModuleContext) {}
 
 fn main() {
     // Logger::new().set_logger();
@@ -66,8 +56,6 @@ fn main() {
     des::tracing::init();
 
     // Subscriber::default().init().unwrap();
-
-    set_setup_fn(empty);
 
     let app = Sim::ndl("examples/plugin/main.ndl", registry![A, B, Main]).unwrap();
     let rt = Builder::new().build(app);

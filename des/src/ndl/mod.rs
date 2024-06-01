@@ -75,7 +75,7 @@ impl Sim<()> {
         path: impl AsRef<Path>,
         registry: impl AsMut<Registry<L>>,
     ) -> RootResult<Self> {
-        Self::ndl_with(path, registry, ())
+        Sim::new(()).with_ndl(path, registry)
     }
 }
 
@@ -108,14 +108,13 @@ impl<A> Sim<A> {
     /// # Errors
     ///
     /// Some Errors
-    pub fn ndl_with<L: Layer>(
+    pub fn with_ndl<L: Layer>(
+        mut self,
         path: impl AsRef<Path>,
         registry: impl AsMut<Registry<L>>,
-        inner: A,
     ) -> RootResult<Self> {
-        let mut this = Sim::new(inner);
-        this.build_ndl(path, registry)?;
-        Ok(this)
+        self.nodes_from_ndl(path, registry)?;
+        Ok(self)
     }
 
     /// Builds a NDL based application with onto an allready existing [`Sim`] object.
@@ -128,7 +127,7 @@ impl<A> Sim<A> {
     /// a) some NDL error occures when parsing the NDL tree defined at `path`,
     /// b) or the registry fails to provide software for some NDL-defined module.
     #[allow(clippy::missing_panics_doc)]
-    pub fn build_ndl<L: Layer>(
+    pub fn nodes_from_ndl<L: Layer>(
         &mut self,
         path: impl AsRef<Path>,
         mut registry: impl AsMut<Registry<L>>,
@@ -177,7 +176,7 @@ impl<A> Sim<A> {
         };
         ctx.activate();
 
-        if let Some(software) = registry.resolve(path, ty) {
+        if let Some(software) = registry.resolve(path, ty, &mut *self.stack) {
             ctx.upgrade_dummy(software);
         } else {
             errors.add(Error::new(
