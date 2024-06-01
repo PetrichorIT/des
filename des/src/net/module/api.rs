@@ -127,3 +127,15 @@ pub fn shutdow_and_restart_in(dur: Duration) {
 pub fn shutdow_and_restart_at(restart_at: SimTime) {
     buf_schedule_shutdown(Some(restart_at));
 }
+
+cfg_async! {
+    use tokio::task::JoinHandle;
+
+    /// Schedules a task to be joined when the simulatio ends
+    ///
+    /// This function will **not** block, but rather defer the joining
+    /// to the simulation shutdown phase.
+    pub fn join(handle: JoinHandle<()>) {
+        current().async_ext.write().require_joins.push(handle);
+    }
+}

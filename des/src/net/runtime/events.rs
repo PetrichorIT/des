@@ -1,3 +1,5 @@
+use tokio::task::yield_now;
+
 use crate::{
     net::{
         channel::ChannelRef, gate::Connection, message::Message, module::ModuleRef,
@@ -322,6 +324,31 @@ impl ModuleRef {
 
         processing.incoming_upstream(None);
         with_harness(|| processing.handler.at_sim_end());
+        #[cfg(feature = "async")]
+        {
+            let Some((rt, task_set)) = with_mod_ctx(|ctx| ctx.async_ext.write().rt.current())
+            else {
+                panic!("WHERE MY RT");
+            };
+            let mut joins = Vec::new();
+            with_mod_ctx(|ctx| {
+                std::mem::swap(&mut ctx.async_ext.write().require_joins, &mut joins)
+            });
+
+            let _guard = rt.enter();
+            task_set.block_on(&rt, yield_now());
+
+            for join in joins {
+                if !join.is_finished() {
+                    panic!("could not join task: not yet finished")
+                }
+
+                let join_result = rt.block_on(join);
+                if let Err(e) = join_result {
+                    panic!("could not join task: {e}")
+                }
+            }
+        }
         processing.incoming_downstream();
     }
 }

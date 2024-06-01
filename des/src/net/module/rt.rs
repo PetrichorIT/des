@@ -3,12 +3,13 @@ use std::{rc::Rc, sync::Arc};
 use crate::{prelude::random, time::Driver};
 use tokio::{
     runtime::{Builder, RngSeed, Runtime},
-    task::LocalSet,
+    task::{JoinHandle, LocalSet},
 };
 
 pub(crate) struct AsyncCoreExt {
     pub(crate) rt: Rt,
     pub(crate) driver: Option<Driver>,
+    pub(crate) require_joins: Vec<JoinHandle<()>>,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -29,6 +30,7 @@ impl AsyncCoreExt {
         Self {
             rt: Rt::Builder(builder),
             driver: Some(Driver::new()),
+            require_joins: Vec::new(),
         }
     }
 

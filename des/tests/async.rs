@@ -2,7 +2,10 @@
 #![allow(unused_variables)]
 
 use des::{
-    net::{module::Module, AsyncFn},
+    net::{
+        module::{join, Module},
+        AsyncFn,
+    },
     prelude::*,
     time::{self, sleep, timeout, timeout_at, MissedTickBehavior},
 };
@@ -669,4 +672,40 @@ fn async_time_interval_missed_tick_behaviour() {
     );
 
     let _ = Builder::seeded(123).max_time(100.0.into()).build(sim).run();
+}
+
+struct JoinOnModule;
+impl Module for JoinOnModule {
+    fn at_sim_start(&mut self, _stage: usize) {
+        join(tokio::spawn(async move {
+            std::future::pending::<()>().await;
+        }));
+    }
+}
+
+#[test]
+#[serial]
+#[should_panic = "could not join task: not yet finished"]
+fn async_join_on_module_fail() {
+    let mut sim = Sim::new(());
+    sim.node("main", JoinOnModule);
+
+    let _ = Builder::seeded(123).build(sim).run();
+}
+
+struct PanicIsJoinable;
+impl Module for PanicIsJoinable {
+    fn at_sim_start(&mut self, _stage: usize) {
+        join(tokio::spawn(async move { panic!("Panic-Source") }));
+    }
+}
+
+#[test]
+#[serial]
+#[should_panic = "could not join task: task"]
+fn async_join_paniced_will_join_but_fail() {
+    let mut sim = Sim::new(());
+    sim.node("main", PanicIsJoinable);
+
+    let _ = Builder::seeded(123).build(sim).run();
 }

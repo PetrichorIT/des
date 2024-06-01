@@ -168,50 +168,8 @@ impl Message {
     /// Returns an error if either there is no content, or
     /// the content is not of type T.
     pub fn try_cast<T: 'static + MessageBody + Send>(self) -> Result<(T, MessageHeader), Self> {
-        // SAFTY:
-        // Since T is 'Send' this is safe within the bounds of Messages safty contract
-        unsafe { self.try_cast_unsafe::<T>() }
-    }
-
-    ///
-    /// Performs a [`try_cast_unsafe`](Message::try_cast_unsafe) unwraping the result.
-    ///
-    /// # Safety
-    ///
-    /// See [`try_cast_unsafe`](Message::try_cast_unsafe)
-    ///
-    /// # Panics
-    ///
-    /// Panics if he cast fails.
-    #[must_use]
-    pub unsafe fn cast_unsafe<T: 'static + MessageBody>(self) -> (T, MessageHeader) {
-        self.try_cast_unsafe().expect("Could not cast to type T")
-    }
-
-    ///
-    /// Consumes the message casting the stored ptr
-    /// into a Box of type T.
-    ///
-    /// ## Safety
-    ///
-    /// The caller must ensure that the stored data is a valid instance
-    /// of type T. If this cannot be guarnteed this is UB.
-    /// Note that DES guarntees that the data refernced by ptr will not
-    /// be freed until this function is called, and ownership is thereby moved..
-    /// Note that this function allows T to be !Send. Be aware of safty problems arriving
-    /// from this.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if either there is no content,
-    /// or the content is not of type T.
-    ///
-
-    pub unsafe fn try_cast_unsafe<T: 'static + MessageBody>(
-        self,
-    ) -> Result<(T, MessageHeader), Self> {
         let Message { header, content } = self;
-        let content = match content.map(|c| c.try_cast_unsafe::<T>()) {
+        let content = match content.map(|c| c.try_cast::<T>()) {
             Some(Ok(c)) => c,
             Some(Err(content)) => {
                 return Err(Self {
@@ -385,23 +343,6 @@ impl MessageBuilder {
         self
     }
 
-    /// Sets the field 'content' with a T that is not guarnteed to be Send.
-    ///
-    /// # Safety
-    ///
-    /// `T` does not have the bound Send, but Message does, so a message
-    /// continaing non Send `T` may never be used on other threads.
-    #[must_use]
-    #[allow(clippy::cast_possible_truncation)]
-    pub unsafe fn content_unsafe<T>(mut self, content: T) -> Self
-    where
-        T: 'static + MessageBody,
-    {
-        self.header.length = content.byte_len() as u32;
-        self.content = Some(AnyBox::new(content));
-        self
-    }
-
     /// Builds a message from the builder.
     #[must_use]
     pub fn build(self) -> Message {
@@ -429,10 +370,8 @@ unsafe impl Send for MessageBuilder {}
 
 #[cfg(test)]
 mod tests {
-    use crate::{net::module::ModuleContext, prelude::Gate};
-
     use super::*;
-    use std::{any::type_name, rc::Rc};
+    use std::any::type_name;
 
     #[test]
     fn message_fmt() {
@@ -477,41 +416,5 @@ mod tests {
         let (value, header) = msg.cast::<A>();
         assert_eq!(header.id, 123);
         assert_eq!(value.0, 42);
-    }
-
-    #[test]
-    fn message_cast_unsafe() {
-        // RC is not send
-        #[derive(Default)]
-        struct A {
-            rc: Rc<i32>,
-        }
-        impl MessageBody for A {
-            fn byte_len(&self) -> usize {
-                0
-            }
-        }
-
-        let module = ModuleContext::standalone("root".into());
-        let gate = Gate::new(&module, "port", 1, 0);
-
-        unsafe {
-            let msg = Message::new()
-                .creation_time(10.0.into())
-                .send_time(11.0.into())
-                .last_gate(gate)
-                .content_unsafe(A { rc: Rc::new(42) })
-                .build();
-
-            let msg = msg.try_cast_unsafe::<String>().unwrap_err();
-
-            let (value, _) = msg.cast_unsafe::<A>();
-            assert_eq!(*value.rc, 42);
-
-            // See with None
-
-            let msg = Message::new().build();
-            assert!(msg.try_cast_unsafe::<String>().is_err());
-        }
     }
 }
