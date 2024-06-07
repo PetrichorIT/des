@@ -11,8 +11,8 @@ mod ctx;
 pub use self::ctx::ModuleContext;
 pub(crate) use self::ctx::*;
 
-mod reference;
-pub use reference::*;
+mod refs;
+pub use refs::*;
 
 mod error;
 pub use error::*;

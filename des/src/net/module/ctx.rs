@@ -20,8 +20,6 @@ use crate::net::module::rt::AsyncCoreExt;
 
 pub(crate) static MOD_CTX: SwapLock<Option<Arc<ModuleContext>>> = SwapLock::new(None);
 
-pub(crate) fn _default_setup(_: &ModuleContext) {}
-
 pub(crate) fn module_ctx_drop() {
     MOD_CTX.swap(&mut None);
 }
