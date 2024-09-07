@@ -1,3 +1,4 @@
+use fxhash::{FxBuildHasher, FxHashMap};
 use std::fmt::Display;
 use std::io;
 use std::marker::PhantomData;
@@ -6,11 +7,11 @@ use std::sync::atomic::{AtomicUsize, Ordering::SeqCst};
 use std::sync::{Arc, RwLock};
 
 mod api;
-use fxhash::{FxBuildHasher, FxHashMap};
+mod yaml;
 
 pub use self::api::*;
-
 use super::globals;
+use crate::net::par::yaml::yaml_to_par_map;
 
 // # Internal mappings
 
@@ -47,10 +48,9 @@ impl ParMap {
     ///
     /// See [`Sim::include_par`](crate::net::Sim) for more infomation.
     pub fn build(&self, raw_text: &str) {
-        for line in raw_text.lines() {
-            if let Some((key, value)) = line.split_once('=') {
-                self.insert(key.trim(), value.trim().to_string());
-            }
+        let map = yaml_to_par_map(raw_text).expect("failed to parse par");
+        for (key, value) in map {
+            self.insert(key.trim(), value.trim().to_string());
         }
     }
 
@@ -182,7 +182,7 @@ impl ParTree {
     fn export(&self, writer: &mut impl io::Write, path: &str) -> io::Result<()> {
         // Write pars directly
         for (key, (value, _)) in &self.pars {
-            writeln!(writer, "{path}.{key} = {value}")?;
+            writeln!(writer, "{path}.{key}: {value}")?;
         }
 
         // Recurse branches
@@ -322,7 +322,7 @@ where
     ///     },
     ///     |_, _| {}
     /// ));
-    /// sim.include_par("alice.addr = 198.168.2.1\n");
+    /// sim.include_par("alice.addr: 198.168.2.1\n");
     /// /* ... */
     ///
     /// let _ = Builder::new().build(sim).run();
@@ -459,7 +459,7 @@ where
     ///     },
     ///     |_, _| {}
     /// ));
-    /// sim.include_par("alice.addr = 192.168.2.110");
+    /// sim.include_par("alice.addr: 192.168.2.110");
     ///
     /// let _ = Builder::new().build(sim).run();
     /// ```

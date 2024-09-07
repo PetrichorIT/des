@@ -221,7 +221,7 @@ impl<A> Sim<A> {
     /// use std::net::IpAddr;
     ///
     /// let mut sim = Sim::new(());
-    /// sim.include_par("alice.addr = 198.2.1.45\nalice.role = host");
+    /// sim.include_par("alice.addr: 198.2.1.45\nalice.role: host");
     /// sim.node("alice", ModuleFn::new(
     ///     || {
     ///         let addr = par("addr").unwrap().parse::<IpAddr>().unwrap();

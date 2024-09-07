@@ -1,15 +1,14 @@
 [package]
+name = "des-networks"
+version = "0.1.0"
 edition = "2021"
-name = "des-ndl"
-version = "0.2.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-unic-emoji-char = "0.9"
-unicode-xid = "0.2"
-termcolor = "*"
+serde = { version = "*", features = ["derive"] }
+fxhash = "0.2"
 
-des-networks = { path = "../des-networks" }
+[dev-dependencies]
 serde_json = "*"
-serde_yml = "*"
+serde_test = "*"

@@ -55,6 +55,14 @@ impl Literal {
             Self::String(s) => s.parse().expect("Force casted as integer"),
         }
     }
+
+    pub fn to_string(&self) -> String {
+        match self {
+            Self::Integer(i) => i.to_string(),
+            Self::Float(f) => f.to_string(),
+            Self::String(s) => s.clone(),
+        }
+    }
 }
 
 impl From<ast::Lit> for Literal {

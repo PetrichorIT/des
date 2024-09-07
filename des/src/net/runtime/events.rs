@@ -1,5 +1,3 @@
-use tokio::task::yield_now;
-
 use crate::{
     net::{
         channel::ChannelRef, gate::Connection, message::Message, module::ModuleRef,
@@ -13,6 +11,8 @@ use std::sync::atomic::Ordering::SeqCst;
 
 #[cfg(feature = "async")]
 use crate::net::module::with_mod_ctx;
+#[cfg(feature = "async")]
+use tokio::task::yield_now;
 
 ///
 /// The event set for a [`NetworkApplication`].

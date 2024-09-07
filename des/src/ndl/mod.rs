@@ -54,7 +54,12 @@ use des_ndl::{
     ir::{self, ConnectionEndpoint},
     Context,
 };
-use std::{path::Path, sync::Arc};
+use des_networks::{
+    def::{self, Kardinality},
+    error::{self, Result},
+    network, transform,
+};
+use std::{fs::File, path::Path, sync::Arc};
 
 mod registry;
 pub use self::registry::*;
@@ -76,6 +81,14 @@ impl Sim<()> {
         registry: impl AsMut<Registry<L>>,
     ) -> RootResult<Self> {
         Sim::new(()).with_ndl(path, registry)
+    }
+
+    /// NEW
+    pub fn ndl2<L: Layer>(
+        path: impl AsRef<Path>,
+        registry: impl AsMut<Registry<L>>,
+    ) -> Result<Self> {
+        Sim::new(()).with_ndl2(path, registry)
     }
 }
 
@@ -117,6 +130,18 @@ impl<A> Sim<A> {
         Ok(self)
     }
 
+    /// NEW
+    pub fn with_ndl2<L: Layer>(
+        mut self,
+        path: impl AsRef<Path>,
+        registry: impl AsMut<Registry<L>>,
+    ) -> Result<Self> {
+        let f = File::open(path).map_err(|e| error::Error::Io(e.to_string()))?;
+        let def = serde_yml::from_reader(f).map_err(|e| error::Error::Io(e.to_string()))?;
+        self.nodes_from_ndl2(&def, registry)?;
+        Ok(self)
+    }
+
     /// Builds a NDL based application with onto an allready existing [`Sim`] object.
     ///
     /// See [`Sim::ndl_with`] for more infomation.
@@ -147,6 +172,26 @@ impl<A> Sim<A> {
             Ok(())
         } else {
             Err(RootError::new(errors.into_inner(), ctx.smap))
+        }
+    }
+
+    /// NEW
+    pub fn nodes_from_ndl2<L: Layer>(
+        &mut self,
+        def: &def::Def,
+        mut registry: impl AsMut<Registry<L>>,
+    ) -> Result<()> {
+        let mut errors = Errors::new().as_mut();
+
+        let parsed = transform(def)?;
+
+        let scoped = ScopedSim::new(self, ObjectPath::default());
+        let _ = scoped.ndl2(&parsed, &mut errors, registry.as_mut());
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(error::Error::Other)
         }
     }
 
@@ -192,6 +237,72 @@ impl<A> Sim<A> {
 }
 
 impl<'a, A> ScopedSim<'a, A> {
+    fn ndl2<L: Layer>(
+        mut self,
+        node: &network::Node,
+        errors: &mut ErrorsMut,
+        registry: &mut Registry<L>,
+    ) -> ModuleRef {
+        let symbol = node.typ.to_string();
+        let scope = &self.scope;
+
+        let ctx = self.base.raw_ndl(scope, &symbol, registry, errors);
+
+        for gate in &node.gates {
+            let _ = ctx.create_gate_cluster(&gate.ident, gate.kardinality.as_size());
+        }
+
+        for submodule in &node.submodules {
+            match submodule.name.kardinality {
+                Kardinality::Atom => {
+                    let subscope = self.subscope(&submodule.name.ident);
+                    subscope.ndl2(&submodule.typ, errors, registry);
+                }
+                Kardinality::Cluster(n) => {
+                    for k in 0..n {
+                        let ident = &submodule.name.ident;
+                        let subscope = self.subscope(format!("{ident}[{k}]"));
+                        subscope.ndl2(&submodule.typ, errors, registry);
+                    }
+                }
+            }
+        }
+
+        for connection in &node.connections {
+            let from = match &connection.peers[0] {
+                network::ConnectionEndpoint::Local(local) => {
+                    ctx.gate(&local.name, local.index.unwrap_or(0))
+                }
+                network::ConnectionEndpoint::Remote(local, remote) => {
+                    let child = ctx.child(&local.as_name()).expect("child");
+                    child.gate(&remote.name, remote.index.unwrap_or(0))
+                }
+            }
+            .expect("gate");
+
+            let to = match &connection.peers[1] {
+                network::ConnectionEndpoint::Local(local) => {
+                    ctx.gate(&local.name, local.index.unwrap_or(0))
+                }
+                network::ConnectionEndpoint::Remote(local, remote) => {
+                    let child = ctx.child(&local.as_name()).expect("child");
+                    child.gate(&remote.name, remote.index.unwrap_or(0))
+                }
+            }
+            .expect("gate");
+
+            from.connect_dedup(
+                to,
+                connection
+                    .link
+                    .as_ref()
+                    .map(|link| Channel::new(ChannelMetrics::from(link))),
+            )
+        }
+
+        ctx
+    }
+
     #[allow(clippy::needless_pass_by_value)]
     fn ndl<L: Layer>(
         mut self,
@@ -266,6 +377,23 @@ impl<'a, A> ScopedSim<'a, A> {
         }
 
         ctx
+    }
+}
+
+impl From<&network::Link> for ChannelMetrics {
+    #[allow(clippy::cast_sign_loss)]
+    fn from(value: &network::Link) -> Self {
+        ChannelMetrics {
+            bitrate: value.bitrate as usize,
+            jitter: Duration::from_secs_f64(value.jitter),
+            latency: Duration::from_secs_f64(value.latency),
+            drop_behaviour: ChannelDropBehaviour::Queue(Some(
+                value
+                    .other
+                    .get("queuesize")
+                    .map_or(0, |v| v.parse().expect("number")) as usize,
+            )),
+        }
     }
 }
 

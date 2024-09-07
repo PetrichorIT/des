@@ -11,17 +11,17 @@ fn par_for_r(module: &str, key: &str) -> Par {
 }
 
 const EXAMPLE_TYPES: &str = "
-    netA.*.text = \"My name\"
-    netA.s0.usize = 123
-    netA.s1.usize = 420
-    netA.s1.isize = -120
+    netA.*.text: \"My name\"
+    netA.s0.usize: 123
+    netA.s1.usize: 420
+    netA.s1.isize: -120
 ";
 
 const EXAMPLE_NETWORK: &str = "
-    netA.*.dnsServer = 1.1.1.1
-    netA.s0.ip = 0.0.0.1
-    netA.s1.ip = 0.0.0.1
-    netA.s1.ipv6 = fe80
+    netA.*.dnsServer: 1.1.1.1
+    netA.s0.ip: 0.0.0.1
+    netA.s1.ip: 0.0.0.1
+    netA.s1.ipv6: fe80
 ";
 
 #[test]
@@ -79,7 +79,7 @@ fn parse_integers() {
     // Case "netA.s0"
     assert_eq!(
         *par_for_r("netA.s0", "text").unwrap(),
-        "\"My name\"".to_string()
+        "My name".to_string()
     );
     assert_eq!(
         par_for_r("netA.s0", "usize")
@@ -93,7 +93,7 @@ fn parse_integers() {
     // Case "netA.s1"
     assert_eq!(
         *par_for_r("netA.s1", "text").unwrap(),
-        "\"My name\"".to_string()
+        "My name".to_string()
     );
     assert_eq!(
         par_for_r("netA.s1", "usize")
@@ -113,7 +113,7 @@ fn parse_integers() {
     // Case "netA.other"
     assert_eq!(
         par_for_r("netA.other", "text").as_option(),
-        Some("\"My name\"".to_string())
+        Some("My name".to_string())
     );
     assert_eq!(par_for_r("netA.other", "usize").as_option(), None);
     assert_eq!(par_for_r("netA.other", "isize").as_option(), None);
@@ -128,7 +128,7 @@ fn parse_strings() {
 
     let handle = par_for_r("netA.other", "text").unwrap();
 
-    assert_eq!(&*handle, "\"My name\"");
+    assert_eq!(&*handle, "My name");
     assert_eq!(handle.into_inner(), "My name".to_string());
 }
 
@@ -136,7 +136,7 @@ fn parse_strings() {
 #[serial]
 fn par_remove() {
     let mut sim = Sim::new(());
-    sim.globals().parameters.build("counter = 123");
+    sim.globals().parameters.build("counter: 123");
     sim.node(
         "",
         ModuleFn::new(
@@ -180,7 +180,10 @@ fn par_export_test() -> io::Result<()> {
     par_export(&mut str)?;
 
     let str = String::from_utf8_lossy(&str);
-    assert_eq!(str, "netA.*.dnsServer = 1.1.1.1\nnetA.s0.ip = 0.0.0.1\nnetA.s1.ipv6 = fe80\nnetA.s1.ip = 0.0.0.1\n");
+    assert_eq!(
+        str,
+        "netA.*.dnsServer: 1.1.1.1\nnetA.s1.ipv6: fe80\nnetA.s1.ip: 0.0.0.1\nnetA.s0.ip: 0.0.0.1\n"
+    );
 
     Ok(())
 }

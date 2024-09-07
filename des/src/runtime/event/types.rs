@@ -134,9 +134,27 @@ pub trait EventLifecycle<A = Self> {
     }
 }
 
+impl<A: Application> EventSet<A> for () {
+    fn handle(self, _: &mut Runtime<A>) {}
+}
+
 impl<A> EventLifecycle<A> for () {}
 
 ///
 /// A runtime unqiue identifier for a event.
 ///
 pub(crate) type EventId = usize;
+
+impl<F: FnMut() -> R, R> Application for F {
+    type EventSet = ();
+    type Lifecycle = Self;
+}
+
+impl<F: FnMut() -> R, R> EventLifecycle<F> for F {
+    fn at_sim_start(runtime: &mut Runtime<F>)
+    where
+        F: Application,
+    {
+        (runtime.app)();
+    }
+}

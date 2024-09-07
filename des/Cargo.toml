@@ -24,8 +24,8 @@ macros = ["dep:des-macros", "dep:futures"]
 async = ["net", "dep:tokio"]
 cqueue = ["dep:des-cqueue"]
 multi-threaded = []
-net = ["dep:des-macros"]
-ndl = ["dep:des-ndl"]
+net = ["dep:des-macros", "dep:serde", "dep:serde_yml"]
+ndl = ["dep:des-ndl", "dep:des-networks"]
 tracing = ["net"]
 
 unstable-tokio-enable-time = ["async", "tokio/time"]
@@ -45,7 +45,8 @@ fxhash = "0.2"
 pin-project-lite = "0.2"
 
 # All other dependencies are optional
-
+serde = { version = "*", optional = true, features = ["derive"] }
+serde_yml = { version = "*", optional = true }
 tokio = { version = "*", features = [
     "rt",
     "sync",
@@ -57,7 +58,7 @@ futures = { version = "*", optional = true }
 des-cqueue = { path = "../des-cqueue", optional = true }
 des-macros = { path = "../des-macros", optional = true }
 des-ndl = { path = "../des-ndl", optional = true }
-
+des-networks = { path = "../des-networks", optional = true }
 
 [dev-dependencies]
 futures = "0.3"

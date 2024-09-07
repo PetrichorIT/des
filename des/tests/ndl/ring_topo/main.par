@@ -1,19 +1,19 @@
-ring[0].dst = 1
-ring[0].c = 100
-ring[0].expected = 0
+ring[0].dst: 1
+ring[0].c: 100
+ring[0].expected: 0
 
-ring[1].dst = 4
-ring[1].c = 200
-ring[1].expected = 150
+ring[1].dst: 4
+ring[1].c: 200
+ring[1].expected: 150
 
-ring[2].dst = 3
-ring[2].c = 100
-ring[2].expected = 50
+ring[2].dst: 3
+ring[2].c: 100
+ring[2].expected: 50
 
-ring[3].dst = 2
-ring[3].c = 50
-ring[3].expected = 100
+ring[3].dst: 2
+ring[3].c: 50
+ring[3].expected: 100
 
-ring[4].dst = 1
-ring[4].c = 50
-ring[4].expected = 200
+ring[4].dst: 1
+ring[4].c: 50
+ring[4].expected: 200

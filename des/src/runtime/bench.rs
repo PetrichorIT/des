@@ -10,7 +10,8 @@ use super::{FT_ASYNC, FT_CQUEUE, FT_INTERNAL_METRICS, FT_NET};
 pub struct Profiler {
     /// The target executable.
     pub target: PathBuf,
-    exec: String,
+    /// The exec
+    pub exec: String,
 
     /// Whether the target is in release mode or not.
     pub target_is_release: bool,
@@ -18,7 +19,8 @@ pub struct Profiler {
     /// The time point where the simulation started.
     pub simulation_start: SystemTime,
 
-    time_start: Instant,
+    /// Timespec
+    pub time_start: Instant,
     /// The duration of the simulation.
     pub duration: Duration,
 

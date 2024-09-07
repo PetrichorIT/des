@@ -1,0 +1,13 @@
+{
+  "entry": "A",
+  "modules": {
+    "B": {
+      "submodules": { "d[3]": "D", "c": "C" },
+      "gates": ["port[3]"],
+      "connections": [{ "peers": ["port", "d/plug"] }]
+    },
+    "A": { "submodules": { "b": "B" }, "gates": [], "connections": [] },
+    "C": { "parent": "D", "submodules": {}, "gates": [], "connections": [] },
+    "D": { "submodules": {}, "gates": ["plug"], "connections": [] }
+  }
+}

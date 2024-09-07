@@ -163,7 +163,7 @@ impl Module for Single {}
 #[serial]
 fn build_with_preexisting_sim() -> RootResult<()> {
     let mut sim = Sim::new(());
-    sim.include_par("alice.addr = 1.1.1.1\n");
+    sim.include_par("alice.addr: 1.1.1.1\n");
     sim.nodes_from_ndl("tests/ndl/single.ndl", registry![Single, else _])?;
 
     let _ = Builder::seeded(123).build(sim).run();
