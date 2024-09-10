@@ -5,7 +5,7 @@ use des_ndl::{
     ir::Item,
     Context,
 };
-use des_networks::def::{self, FieldDef, Kardinality};
+use des_networks::ndl::def::{self, FieldDef, Kardinality};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args = std::env::args().skip(1).collect::<Vec<_>>();
@@ -108,20 +108,24 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 fn e2e(ep: &ModuleGateReference) -> def::ConnectionEndpointDef {
     match ep {
-        ModuleGateReference::Local(local) => def::ConnectionEndpointDef::Local(FieldDef {
-            ident: local.gate.raw.clone(),
-            kardinality: c2ko(&local.gate_cluster),
-        }),
-        ModuleGateReference::Nonlocal(nonlocal) => def::ConnectionEndpointDef::Remote(
-            FieldDef {
-                ident: nonlocal.submodule.raw.clone(),
-                kardinality: c2ko(&nonlocal.submodule_cluster),
-            },
-            FieldDef {
-                ident: nonlocal.gate.gate.raw.clone(),
-                kardinality: c2ko(&nonlocal.gate.gate_cluster),
-            },
-        ),
+        ModuleGateReference::Local(local) => def::ConnectionEndpointDef {
+            accessors: vec![FieldDef {
+                ident: local.gate.raw.clone(),
+                kardinality: c2ko(&local.gate_cluster),
+            }],
+        },
+        ModuleGateReference::Nonlocal(nonlocal) => def::ConnectionEndpointDef {
+            accessors: vec![
+                FieldDef {
+                    ident: nonlocal.submodule.raw.clone(),
+                    kardinality: c2ko(&nonlocal.submodule_cluster),
+                },
+                FieldDef {
+                    ident: nonlocal.gate.gate.raw.clone(),
+                    kardinality: c2ko(&nonlocal.gate.gate_cluster),
+                },
+            ],
+        },
     }
 }
 

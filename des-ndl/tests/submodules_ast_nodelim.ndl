@@ -1,8 +1,7 @@
 module A {}
 
 module M {
-    submodules;
-    
+
     submodules {
         a: A,
         b: A,

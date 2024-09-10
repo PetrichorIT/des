@@ -9,7 +9,6 @@ members = [
     "des-macros",
     "des-macros-core",
     "des-ndl",
-    "des-integration",
     "des-networks",
     "examples",
 ]

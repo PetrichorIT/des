@@ -1,7 +1,8 @@
+use super::globals;
+use crate::net::module::current;
 use std::io;
 
-use super::{Par, ParMap};
-use crate::net::module::current;
+pub use des_networks::par::Par;
 
 /// Retrieves a simulation parameter attached to the current node.
 ///
@@ -29,7 +30,11 @@ use crate::net::module::current;
 /// ```
 #[must_use]
 pub fn par(key: impl AsRef<str>) -> Par {
-    Par::new(key.as_ref(), current().path().as_str())
+    Par::new(
+        globals().parameters.clone(),
+        key.as_ref(),
+        current().path().as_str(),
+    )
 }
 
 /// Retrieves a simulation parameter from some node in the simulation.
@@ -40,7 +45,7 @@ pub fn par(key: impl AsRef<str>) -> Par {
 /// node. See [`par`] for more information.
 #[must_use]
 pub fn par_for(key: impl AsRef<str>, module: impl AsRef<str>) -> Par {
-    Par::new(key.as_ref(), module.as_ref())
+    Par::new(globals().parameters.clone(), key.as_ref(), module.as_ref())
 }
 
 /// Exports the current simulation parameter tree to some output device.
@@ -53,5 +58,5 @@ pub fn par_for(key: impl AsRef<str>, module: impl AsRef<str>) -> Par {
 /// This function may fail if write operations to the output
 /// fails.
 pub fn par_export(mut into: impl io::Write) -> io::Result<()> {
-    ParMap::shared().export(&mut into)
+    globals().parameters.export(&mut into)
 }

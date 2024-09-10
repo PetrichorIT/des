@@ -45,7 +45,7 @@
 //! ```
 
 use crate::{
-    net::{channel::ChannelDropBehaviour, module::ModuleContext, ScopedSim, Sim},
+    net::{self, channel::ChannelDropBehaviour, module::ModuleContext, ScopedSim, Sim},
     prelude::{Channel, ChannelMetrics, ModuleRef, ObjectPath},
     time::Duration,
 };
@@ -54,10 +54,10 @@ use des_ndl::{
     ir::{self, ConnectionEndpoint},
     Context,
 };
-use des_networks::{
+use des_networks::ndl::{
     def::{self, Kardinality},
     error::{self, Result},
-    network, transform,
+    transform, tree,
 };
 use std::{fs::File, path::Path, sync::Arc};
 
@@ -191,6 +191,7 @@ impl<A> Sim<A> {
         if errors.is_empty() {
             Ok(())
         } else {
+            println!("{:#?}", errors.into_inner());
             Err(error::Error::Other)
         }
     }
@@ -239,7 +240,7 @@ impl<A> Sim<A> {
 impl<'a, A> ScopedSim<'a, A> {
     fn ndl2<L: Layer>(
         mut self,
-        node: &network::Node,
+        node: &tree::Node,
         errors: &mut ErrorsMut,
         registry: &mut Registry<L>,
     ) -> ModuleRef {
@@ -268,28 +269,25 @@ impl<'a, A> ScopedSim<'a, A> {
             }
         }
 
-        for connection in &node.connections {
-            let from = match &connection.peers[0] {
-                network::ConnectionEndpoint::Local(local) => {
-                    ctx.gate(&local.name, local.index.unwrap_or(0))
-                }
-                network::ConnectionEndpoint::Remote(local, remote) => {
-                    let child = ctx.child(&local.as_name()).expect("child");
-                    child.gate(&remote.name, remote.index.unwrap_or(0))
-                }
+        fn access_gate(
+            ctx: &ModuleContext,
+            accessors: &[tree::ConnectionEndpointAccessor],
+        ) -> Option<net::gate::GateRef> {
+            assert!(accessors.len() > 0);
+            let accessor = &accessors[0];
+            if accessors.len() == 1 {
+                // Gate access
+                ctx.gate(&accessor.name, accessor.index.unwrap_or(0))
+            } else {
+                // Submodule access
+                let child = ctx.child(&accessor.as_name()).expect("child");
+                access_gate(&child.ctx, &accessors[1..])
             }
-            .expect("gate");
+        }
 
-            let to = match &connection.peers[1] {
-                network::ConnectionEndpoint::Local(local) => {
-                    ctx.gate(&local.name, local.index.unwrap_or(0))
-                }
-                network::ConnectionEndpoint::Remote(local, remote) => {
-                    let child = ctx.child(&local.as_name()).expect("child");
-                    child.gate(&remote.name, remote.index.unwrap_or(0))
-                }
-            }
-            .expect("gate");
+        for connection in &node.connections {
+            let from = access_gate(&ctx.ctx, &connection.peers[0].accessors).expect("gate");
+            let to = access_gate(&ctx.ctx, &connection.peers[1].accessors).expect("gate");
 
             from.connect_dedup(
                 to,
@@ -380,9 +378,9 @@ impl<'a, A> ScopedSim<'a, A> {
     }
 }
 
-impl From<&network::Link> for ChannelMetrics {
+impl From<&tree::Link> for ChannelMetrics {
     #[allow(clippy::cast_sign_loss)]
-    fn from(value: &network::Link) -> Self {
+    fn from(value: &tree::Link) -> Self {
         ChannelMetrics {
             bitrate: value.bitrate as usize,
             jitter: Duration::from_secs_f64(value.jitter),

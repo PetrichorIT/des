@@ -1,0 +1,29 @@
+entry: Main
+modules:
+  A:
+    gates:
+    - in
+    - out
+  Main:
+    submodules:
+      b: B
+      a: A
+    connections:
+    - peers:
+      - a/out
+      - b/in
+      link: L
+    - peers:
+      - b/out
+      - a/in
+      link: L
+  B:
+    gates:
+    - in
+    - out
+links:
+  L:
+    latency: 0.05
+    jitter: 0.0
+    bitrate: 100000000
+    queuesize: '2000'

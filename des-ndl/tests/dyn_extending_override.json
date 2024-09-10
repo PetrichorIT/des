@@ -1,0 +1,38 @@
+{
+  "entry": "M",
+  "modules": {
+    "Dyn": {
+      "submodules": {
+        "sub": "Basic"
+      },
+      "connections": [
+        {
+          "peers": [
+            "sub/out",
+            "sub/in"
+          ]
+        }
+      ]
+    },
+    "B": {
+      "parent": "Basic"
+    },
+    "Basic": {
+      "gates": [
+        "in",
+        "out"
+      ]
+    },
+    "A": {
+      "parent": "Basic",
+      "gates": [
+        "extender[5]"
+      ]
+    },
+    "M": {
+      "submodules": {
+        "d": "Dyn"
+      }
+    }
+  }
+}

@@ -1,0 +1,17 @@
+entry: Main
+modules:
+  Main:
+    gates:
+    - a
+    - b
+    - c
+    connections:
+    - peers:
+      - a
+      - b
+      link: L
+links:
+  L:
+    latency: 0.1
+    jitter: 0.0
+    bitrate: 10000

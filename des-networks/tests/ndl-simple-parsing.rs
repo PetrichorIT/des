@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use des_networks::{def::*, transform};
+use des_networks::ndl::{def::*, transform};
 use fxhash::FxHashMap;
 
 #[test]
@@ -50,20 +50,24 @@ fn module_order() {
                     }],
                     connections: vec![ConnectionDef {
                         peers: [
-                            ConnectionEndpointDef::Local(FieldDef {
-                                ident: "port".to_string(),
-                                kardinality: Kardinality::Atom,
-                            }),
-                            ConnectionEndpointDef::Remote(
-                                FieldDef {
-                                    ident: "d".to_string(),
+                            ConnectionEndpointDef {
+                                accessors: vec![FieldDef {
+                                    ident: "port".to_string(),
                                     kardinality: Kardinality::Atom,
-                                },
-                                FieldDef {
-                                    ident: "plug".to_string(),
-                                    kardinality: Kardinality::Atom,
-                                },
-                            ),
+                                }],
+                            },
+                            ConnectionEndpointDef {
+                                accessors: vec![
+                                    FieldDef {
+                                        ident: "d".to_string(),
+                                        kardinality: Kardinality::Atom,
+                                    },
+                                    FieldDef {
+                                        ident: "plug".to_string(),
+                                        kardinality: Kardinality::Atom,
+                                    },
+                                ],
+                            },
                         ],
                         link: None,
                     }],

@@ -1,6 +1,6 @@
-use std::{fmt::Display, io};
+use std::fmt::Display;
 
-use crate::def::FieldDef;
+use super::def::FieldDef;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -24,3 +24,5 @@ impl Display for Error {
         write!(f, "Error")
     }
 }
+
+impl std::error::Error for Error {}

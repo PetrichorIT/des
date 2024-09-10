@@ -10,10 +10,10 @@ struct A;
 impl Module for A {}
 
 fn main() -> std::io::Result<()> {
-    let mut app = Sim::ndl("examples/utils/main.ndl", registry![A, Alice, Bob])
+    let mut app = Sim::ndl2("examples/utils/main.yml", registry![A, Alice, Bob])
         .map_err(|e| println!("{e}"))
         .unwrap();
-    app.include_par_file("examples/utils/init.par").unwrap();
+    app.include_par_file("examples/utils/init.par.yml").unwrap();
 
     let rt = Builder::seeded(0x123).quiet().build(app);
     let (app, time, p) = rt.run().unwrap();
@@ -25,8 +25,8 @@ fn main() -> std::io::Result<()> {
 
     std::fs::File::create("examples/utils/graph.svg")?.write_all(topo.as_svg()?.as_bytes())?;
 
-    assert_eq!(p.event_count, 48);
-    assert_eq!(time.as_secs(), 83);
+    assert_eq!(p.event_count, 30);
+    assert_eq!(time.as_secs(), 50);
 
     Ok(())
 }

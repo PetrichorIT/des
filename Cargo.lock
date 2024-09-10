@@ -117,10 +117,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "des-integration"
-version = "0.1.0"
-
-[[package]]
 name = "des-macros"
 version = "0.5.0"
 dependencies = [
@@ -161,6 +157,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_test",
+ "serde_yml",
 ]
 
 [[package]]

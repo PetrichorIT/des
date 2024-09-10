@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-use des_networks::def::{ConnectionDef, ConnectionEndpointDef, FieldDef, Kardinality, LinkDef};
+use des_networks::ndl::def::{
+    ConnectionDef, ConnectionEndpointDef, FieldDef, Kardinality, LinkDef,
+};
 use fxhash::FxHashMap;
 use serde_test::{assert_de_tokens, assert_de_tokens_error, assert_tokens, Token};
 
@@ -105,70 +107,83 @@ fn test_field_def_as_map_key() {
 #[test]
 fn test_connection_endpoint_def() {
     assert_tokens(
-        &ConnectionEndpointDef::Local(FieldDef {
-            ident: "alice".to_string(),
-            kardinality: Kardinality::Atom,
-        }),
+        &ConnectionEndpointDef {
+            accessors: vec![FieldDef {
+                ident: "alice".to_string(),
+                kardinality: Kardinality::Atom,
+            }],
+        },
         &[Token::Str("alice")],
     );
     assert_tokens(
-        &ConnectionEndpointDef::Local(FieldDef {
-            ident: "bob".to_string(),
-            kardinality: Kardinality::Cluster(3),
-        }),
+        &ConnectionEndpointDef {
+            accessors: vec![FieldDef {
+                ident: "bob".to_string(),
+                kardinality: Kardinality::Cluster(3),
+            }],
+        },
         &[Token::Str("bob[3]")],
     );
 
     assert_tokens(
-        &ConnectionEndpointDef::Remote(
-            FieldDef {
-                ident: "alice".to_string(),
-                kardinality: Kardinality::Atom,
-            },
-            FieldDef {
-                ident: "eve".to_string(),
-                kardinality: Kardinality::Atom,
-            },
-        ),
+        &ConnectionEndpointDef {
+            accessors: vec![
+                FieldDef {
+                    ident: "alice".to_string(),
+                    kardinality: Kardinality::Atom,
+                },
+                FieldDef {
+                    ident: "eve".to_string(),
+                    kardinality: Kardinality::Atom,
+                },
+            ],
+        },
         &[Token::Str("alice/eve")],
     );
+
     assert_tokens(
-        &ConnectionEndpointDef::Remote(
-            FieldDef {
-                ident: "bob".to_string(),
-                kardinality: Kardinality::Cluster(3),
-            },
-            FieldDef {
-                ident: "eve".to_string(),
-                kardinality: Kardinality::Atom,
-            },
-        ),
+        &ConnectionEndpointDef {
+            accessors: vec![
+                FieldDef {
+                    ident: "bob".to_string(),
+                    kardinality: Kardinality::Cluster(3),
+                },
+                FieldDef {
+                    ident: "eve".to_string(),
+                    kardinality: Kardinality::Atom,
+                },
+            ],
+        },
         &[Token::Str("bob[3]/eve")],
     );
     assert_tokens(
-        &ConnectionEndpointDef::Remote(
-            FieldDef {
-                ident: "alice".to_string(),
-                kardinality: Kardinality::Atom,
-            },
-            FieldDef {
-                ident: "bob".to_string(),
-                kardinality: Kardinality::Cluster(3),
-            },
-        ),
+        &ConnectionEndpointDef {
+            accessors: vec![
+                FieldDef {
+                    ident: "alice".to_string(),
+                    kardinality: Kardinality::Atom,
+                },
+                FieldDef {
+                    ident: "bob".to_string(),
+                    kardinality: Kardinality::Cluster(3),
+                },
+            ],
+        },
         &[Token::Str("alice/bob[3]")],
     );
     assert_tokens(
-        &ConnectionEndpointDef::Remote(
-            FieldDef {
-                ident: "bob".to_string(),
-                kardinality: Kardinality::Cluster(4),
-            },
-            FieldDef {
-                ident: "bob".to_string(),
-                kardinality: Kardinality::Cluster(2),
-            },
-        ),
+        &ConnectionEndpointDef {
+            accessors: vec![
+                FieldDef {
+                    ident: "bob".to_string(),
+                    kardinality: Kardinality::Cluster(4),
+                },
+                FieldDef {
+                    ident: "bob".to_string(),
+                    kardinality: Kardinality::Cluster(2),
+                },
+            ],
+        },
         &[Token::Str("bob[4]/bob[2]")],
     );
 }
@@ -178,14 +193,18 @@ fn test_connection_without_link_field() {
     assert_tokens(
         &ConnectionDef {
             peers: [
-                ConnectionEndpointDef::Local(FieldDef {
-                    ident: "alice".to_string(),
-                    kardinality: Kardinality::Atom,
-                }),
-                ConnectionEndpointDef::Local(FieldDef {
-                    ident: "bob".to_string(),
-                    kardinality: Kardinality::Cluster(3),
-                }),
+                ConnectionEndpointDef {
+                    accessors: vec![FieldDef {
+                        ident: "alice".to_string(),
+                        kardinality: Kardinality::Atom,
+                    }],
+                },
+                ConnectionEndpointDef {
+                    accessors: vec![FieldDef {
+                        ident: "bob".to_string(),
+                        kardinality: Kardinality::Cluster(3),
+                    }],
+                },
             ],
             link: None,
         },
@@ -209,14 +228,18 @@ fn test_connection_with_link_field_null() {
     assert_de_tokens(
         &ConnectionDef {
             peers: [
-                ConnectionEndpointDef::Local(FieldDef {
-                    ident: "alice".to_string(),
-                    kardinality: Kardinality::Atom,
-                }),
-                ConnectionEndpointDef::Local(FieldDef {
-                    ident: "bob".to_string(),
-                    kardinality: Kardinality::Cluster(3),
-                }),
+                ConnectionEndpointDef {
+                    accessors: vec![FieldDef {
+                        ident: "alice".to_string(),
+                        kardinality: Kardinality::Atom,
+                    }],
+                },
+                ConnectionEndpointDef {
+                    accessors: vec![FieldDef {
+                        ident: "bob".to_string(),
+                        kardinality: Kardinality::Cluster(3),
+                    }],
+                },
             ],
             link: None,
         },
@@ -242,14 +265,18 @@ fn test_connection_with_link_field_some() {
     assert_de_tokens(
         &ConnectionDef {
             peers: [
-                ConnectionEndpointDef::Local(FieldDef {
-                    ident: "alice".to_string(),
-                    kardinality: Kardinality::Atom,
-                }),
-                ConnectionEndpointDef::Local(FieldDef {
-                    ident: "bob".to_string(),
-                    kardinality: Kardinality::Cluster(3),
-                }),
+                ConnectionEndpointDef {
+                    accessors: vec![FieldDef {
+                        ident: "alice".to_string(),
+                        kardinality: Kardinality::Atom,
+                    }],
+                },
+                ConnectionEndpointDef {
+                    accessors: vec![FieldDef {
+                        ident: "bob".to_string(),
+                        kardinality: Kardinality::Cluster(3),
+                    }],
+                },
             ],
             link: Some("LAN".to_string()),
         },

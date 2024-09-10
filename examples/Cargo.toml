@@ -30,10 +30,6 @@ name = "ptrhell"
 path = "ptrhell/main.rs"
 
 [[example]]
-name = "proto"
-path = "proto/main.rs"
-
-[[example]]
 name = "cqueue"
 path = "cqueue.rs"
 

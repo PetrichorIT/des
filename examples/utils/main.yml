@@ -1,0 +1,44 @@
+entry: A
+modules:
+  A:
+    submodules:
+      bob[2]: Bob
+    connections:
+    - peers:
+      - bob[0]/uplink
+      - bob[1]/downlink
+      link: FastLink
+    - peers:
+      - bob[1]/uplink
+      - bob[0]/downlink
+      link: FastLink
+  Bob:
+    gates:
+    - netIn[3]
+    - netOut[3]
+    - uplink
+    - downlink
+    submodules:
+      child: Alice
+    connections:
+    - peers:
+      - netOut
+      - child/netIn
+      link: Link
+    - peers:
+      - netIn
+      - child/netOut
+      link: Link
+  Alice:
+    gates:
+    - netIn[3]
+    - netOut[3]
+links:
+  FastLink:
+    latency: 0.05
+    jitter: 0.01
+    bitrate: 10000
+  Link:
+    latency: 0.1
+    jitter: 0.1
+    bitrate: 100

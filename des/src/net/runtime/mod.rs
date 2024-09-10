@@ -1,8 +1,10 @@
+use des_networks::par::ParMap;
+
 use super::module::module_ctx_drop;
+use super::module::MOD_CTX;
 use super::processing::ProcessingStack;
 use super::topology::Topology;
 use super::util::NoDebug;
-use super::{module::MOD_CTX, par::ParMap};
 use crate::{
     net::module::{ModuleContext, ModuleExt},
     prelude::{Application, EventLifecycle, GateRef, Module, ModuleRef, ObjectPath, Runtime},
@@ -135,7 +137,7 @@ impl Drop for SimStaticsGuard {
 ///             let host = format!("host-{i}");
 ///             sim.node(&host, ModuleFn::new(
 ///                 /* ... */
-///                 # || 123, |_, _| {}    
+///                 # || 123, |_, _| {}
 ///             ));
 ///             let gate = sim.gate(&host, "port");
 ///             gate.connect(gates[i].clone(), None);

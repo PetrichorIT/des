@@ -94,9 +94,8 @@ pub struct ConnectionDef {
 
 /// A connection endpoint.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum ConnectionEndpointDef {
-    Local(FieldDef),
-    Remote(FieldDef, FieldDef),
+pub struct ConnectionEndpointDef {
+    pub accessors: Vec<FieldDef>,
 }
 
 /// A generic field definition, with an optional cluster/index definition.
@@ -138,10 +137,15 @@ impl Serialize for ConnectionEndpointDef {
 
 impl Display for ConnectionEndpointDef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Local(local) => write!(f, "{local}"),
-            Self::Remote(local, remote) => write!(f, "{local}/{remote}"),
-        }
+        write!(
+            f,
+            "{}",
+            self.accessors
+                .iter()
+                .map(|v| v.to_string())
+                .reduce(|a, b| a + "/" + &b)
+                .unwrap_or(String::new()),
+        )
     }
 }
 
@@ -157,13 +161,11 @@ impl<'de> Deserialize<'de> for ConnectionEndpointDef {
 impl FromStr for ConnectionEndpointDef {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.split_once('/') {
-            None => Ok(ConnectionEndpointDef::Local(FieldDef::from_str(s)?)),
-            Some((local, remote)) => Ok(ConnectionEndpointDef::Remote(
-                FieldDef::from_str(local)?,
-                FieldDef::from_str(remote)?,
-            )),
-        }
+        let accessors = s
+            .split('/')
+            .map(|s| FieldDef::from_str(s))
+            .collect::<std::result::Result<Vec<_>, Self::Err>>()?;
+        Ok(ConnectionEndpointDef { accessors })
     }
 }
 

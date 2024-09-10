@@ -9,7 +9,7 @@ struct A;
 impl Module for A {}
 
 fn main() {
-    let app = Sim::ndl("examples/ndl/main.ndl", registry![A, Alice, Bob]).unwrap();
+    let app = Sim::ndl2("examples/ndl/main.yml", registry![A, Alice, Bob]).unwrap();
 
     let rt = Builder::seeded(0x123).build(app);
 

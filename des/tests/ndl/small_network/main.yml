@@ -1,0 +1,36 @@
+entry: Main
+modules:
+  Router:
+    gates:
+    - in[5]
+    - out[5]
+    - debug
+  Main:
+    submodules:
+      node[5]: Node
+      router: Router
+      debugger: Debugger
+    connections:
+    - peers:
+      - node/out
+      - router/in
+      link: Delay
+    - peers:
+      - node/in
+      - router/out
+      link: Delay
+    - peers:
+      - debugger/in
+      - router/debug
+  Node:
+    gates:
+    - in
+    - out
+  Debugger:
+    gates:
+    - in
+links:
+  Delay:
+    latency: 0.1
+    jitter: 0.0
+    bitrate: 10000000

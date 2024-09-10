@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use crate::def::{FieldDef, GateDef, LinkDef};
+use super::def::{FieldDef, GateDef, LinkDef};
 use serde::{Deserialize, Serialize};
 
 pub type Network = Node;
@@ -28,9 +28,8 @@ pub struct Connection {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ConnectionEndpoint {
-    Local(ConnectionEndpointAccessor),
-    Remote(ConnectionEndpointAccessor, ConnectionEndpointAccessor),
+pub struct ConnectionEndpoint {
+    pub accessors: Vec<ConnectionEndpointAccessor>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
