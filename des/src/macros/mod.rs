@@ -8,7 +8,7 @@ cfg_macros! {
     #[macro_use]
     mod event_set;
 
-    cfg_ndl! {
+    cfg_net! {
         mod registry;
     }
 }

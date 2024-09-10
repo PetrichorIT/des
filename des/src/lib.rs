@@ -137,10 +137,6 @@ cfg_net! {
     pub mod tracing;
 }
 
-cfg_ndl! {
-    pub mod ndl;
-}
-
 cfg_macros! {
     pub use des_macros::*;
 }

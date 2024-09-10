@@ -57,7 +57,7 @@ fn main() {
 
     // Subscriber::default().init().unwrap();
 
-    let app = Sim::ndl2("examples/plugin/main.yml", registry![A, B, Main]).unwrap();
+    let app = Sim::ndl("examples/plugin/main.yml", registry![A, B, Main]).unwrap();
     let rt = Builder::new().build(app);
     let _res = rt.run();
 }

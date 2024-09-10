@@ -8,7 +8,6 @@ members = [
     "des-cqueue",
     "des-macros",
     "des-macros-core",
-    "des-ndl",
-    "des-networks",
+    "des-net-utils",
     "examples",
 ]

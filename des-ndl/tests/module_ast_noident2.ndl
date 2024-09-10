@@ -1,9 +1,0 @@
-module 123 {
-    gates {
-        in,
-        out,
-    }
-}
-
-module M {}
-entry M;

@@ -2,7 +2,8 @@ use super::globals;
 use crate::net::module::current;
 use std::io;
 
-pub use des_networks::par::Par;
+pub use des_net_utils::par::Par;
+pub use des_net_utils::par::ParError;
 
 /// Retrieves a simulation parameter attached to the current node.
 ///

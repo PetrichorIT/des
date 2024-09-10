@@ -10,7 +10,7 @@ struct A;
 impl Module for A {}
 
 fn main() -> std::io::Result<()> {
-    let mut app = Sim::ndl2("examples/utils/main.yml", registry![A, Alice, Bob])
+    let mut app = Sim::ndl("examples/utils/main.yml", registry![A, Alice, Bob])
         .map_err(|e| println!("{e}"))
         .unwrap();
     app.include_par_file("examples/utils/init.par.yml").unwrap();

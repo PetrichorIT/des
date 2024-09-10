@@ -28,7 +28,7 @@ fn main() {
     //     .interal_max_log_level(log::LevelFilter::Debug)
     //     .set_logger();
 
-    let app = match Sim::ndl2("examples/ndl2/main.yml", registry![Main, Sub]) {
+    let app = match Sim::ndl("examples/ndl2/main.yml", registry![Main, Sub]) {
         Ok(v) => v,
         Err(e) => {
             println!("{e}");

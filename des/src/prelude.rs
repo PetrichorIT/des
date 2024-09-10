@@ -64,10 +64,8 @@ cfg_net! {
 
     pub use crate::net::processing::ProcessingElement;
 
-    cfg_ndl! {
-        pub use crate::ndl::Registry;
-        pub use crate::ndl::RegistryCreatable;
-    }
+    pub use crate::net::ndl::Registry;
+    pub use crate::net::ndl::RegistryCreatable;
 
     pub use std::net::IpAddr;
     pub use std::net::Ipv4Addr;

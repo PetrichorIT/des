@@ -7,7 +7,7 @@ use std::{
 };
 
 use des::{
-    ndl::Registry,
+    net::ndl::Registry,
     net::{module::Module, ModuleBlock, Sim},
     runtime::Builder,
 };
@@ -58,7 +58,7 @@ fn drop_check_modules_net_from_ndl() -> Result<(), Box<dyn Error>> {
         })
         .with_default_fallback();
 
-    let sim = Sim::ndl2("tests/ndl/drop-test.yml", registry)?;
+    let sim = Sim::ndl("tests/ndl/drop-test.yml", registry)?;
     let rtr = Builder::seeded(123).build(sim).run();
     drop(rtr);
 

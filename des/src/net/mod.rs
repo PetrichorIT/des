@@ -11,6 +11,7 @@ pub mod channel;
 pub mod gate;
 pub mod message;
 pub mod module;
+pub mod ndl;
 pub mod processing;
 pub mod topology;
 

@@ -182,7 +182,7 @@ fn par_export_test() -> io::Result<()> {
     let str = String::from_utf8_lossy(&str);
     assert_eq!(
         str,
-        "netA.*.dnsServer: 1.1.1.1\nnetA.s1.ipv6: fe80\nnetA.s1.ip: 0.0.0.1\nnetA.s0.ip: 0.0.0.1\n"
+        "netA._.dnsServer: 1.1.1.1\nnetA.s1.ipv6: fe80\nnetA.s1.ip: 0.0.0.1\nnetA.s0.ip: 0.0.0.1\n"
     );
 
     Ok(())

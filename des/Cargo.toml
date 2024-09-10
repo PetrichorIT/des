@@ -18,14 +18,13 @@ version = "0.6.0"
 default = []
 
 # Include everything used for default test runs.
-full = ["net", "ndl", "cqueue", "async", "macros"]
+full = ["net", "cqueue", "async", "macros"]
 
 macros = ["dep:des-macros", "dep:futures"]
 async = ["net", "dep:tokio"]
 cqueue = ["dep:des-cqueue"]
 multi-threaded = []
-net = ["dep:des-macros", "dep:serde", "dep:serde_yml"]
-ndl = ["dep:des-ndl", "dep:des-networks"]
+net = ["dep:des-macros", "dep:des-net-utils", "dep:serde", "dep:serde_yml"]
 tracing = ["net"]
 
 unstable-tokio-enable-time = ["async", "tokio/time"]
@@ -57,8 +56,7 @@ futures = { version = "*", optional = true }
 
 des-cqueue = { path = "../des-cqueue", optional = true }
 des-macros = { path = "../des-macros", optional = true }
-des-ndl = { path = "../des-ndl", optional = true }
-des-networks = { path = "../des-networks", optional = true }
+des-net-utils = { path = "../des-net-utils", optional = true }
 
 [dev-dependencies]
 futures = "0.3"

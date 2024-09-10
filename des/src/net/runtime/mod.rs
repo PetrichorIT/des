@@ -1,4 +1,4 @@
-use des_networks::par::ParMap;
+use des_net_utils::par::ParMap;
 
 use super::module::module_ctx_drop;
 use super::module::MOD_CTX;
@@ -161,13 +161,11 @@ pub struct ScopedSim<'a, A> {
 
 impl<A> Sim<A> {
     #[inline]
-    #[cfg(feature = "ndl")]
     pub(crate) fn modules(&self) -> &ModuleTree {
         &self.modules
     }
 
     #[inline]
-    #[cfg(feature = "ndl")]
     pub(crate) fn modules_mut(&mut self) -> &mut ModuleTree {
         &mut self.modules
     }
