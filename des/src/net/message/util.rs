@@ -48,7 +48,7 @@ impl AnyBox {
 
 impl Debug for AnyBox {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        return write!(f, "AnyBox {{ {} }}", self.ty_info);
+        write!(f, "AnyBox {{ {} }}", self.ty_info)
     }
 }
 

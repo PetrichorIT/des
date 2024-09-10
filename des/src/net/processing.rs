@@ -48,7 +48,7 @@
 //! than the origin.
 //!
 //! # Plugin creation and removal
-//!  
+//!
 //! When plugins are created using e.g. `add_plugin` they are not active
 //! right away. Plugins only become active when the next event arrives.
 //! This is the case, because some plugins may depend on some action
@@ -61,7 +61,7 @@
 //! Accordingly plugins the are removed using `PluginHandle::remove`
 //! still exists for the rest of the event cycle, and are only deleted
 //! once the next event arrives.
-//!  
+//!
 
 use std::{any::Any, ops::Deref};
 
@@ -109,7 +109,7 @@ pub trait ProcessingElement: Any {
     /// impl ProcessingElement for LoggerPlugin {
     ///     fn event_start(&mut self) {
     ///         tracing::trace!("receiving {}th message", self.counter);
-    ///         self.counter += 1;   
+    ///         self.counter += 1;
     ///     }
     /// }
     /// ```
@@ -129,7 +129,7 @@ pub trait ProcessingElement: Any {
     /// # use des::prelude::*;
     /// # use des::time::*;
     /// struct Timer {
-    ///     started: SimTime,    
+    ///     started: SimTime,
     /// }
     ///
     /// impl ProcessingElement for Timer {
@@ -138,7 +138,7 @@ pub trait ProcessingElement: Any {
     ///     }
     ///     fn event_end(&mut self) {
     ///        let t = SimTime::now().duration_since(self.started);
-    ///        tracing::trace!("took {:?}", t);   
+    ///        tracing::trace!("took {:?}", t);
     ///     }
     /// }
     /// ```
@@ -160,18 +160,18 @@ pub trait ProcessingElement: Any {
     /// ```
     /// # use des::prelude::*;
     /// struct Filter {
-    ///    filter: Box<dyn Fn(&Message) -> bool>,    
+    ///    filter: Box<dyn Fn(&Message) -> bool>,
     /// }
     ///
     /// impl ProcessingElement for Filter {
     ///     fn incoming(&mut self, msg: Message) -> Option<Message> {
     ///        let f = &self.filter;
     ///        if f(&msg) {
-    ///            Some(msg)    
+    ///            Some(msg)
     ///        } else {
     ///            None
     ///        }
-    ///     }    
+    ///     }
     /// }
     /// ```
     ///
@@ -268,12 +268,12 @@ impl ProcessingStack {
 impl Deref for ProcessingStack {
     type Target = [Box<dyn ProcessingElement>];
     fn deref(&self) -> &Self::Target {
-        &*self.items
+        &self.items
     }
 }
 
 impl From<()> for ProcessingStack {
-    fn from(_: ()) -> Self {
+    fn from((): ()) -> Self {
         ProcessingStack::default()
     }
 }

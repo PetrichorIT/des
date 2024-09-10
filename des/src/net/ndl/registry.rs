@@ -137,6 +137,7 @@ impl Registry<EmptyLayer> {
     /// type Host = HostModule; // symbol names and type names must match
     /// let registry = registry![Host].with_default_fallback();
     /// ```
+    #[must_use]
     pub fn new() -> Registry<EmptyLayer> {
         Registry { layer: EmptyLayer }
     }
@@ -188,6 +189,9 @@ impl<L: Layer> Registry<L> {
     /// let mut sim = Sim::ndl("path/to/ndl", registry);
     /// /* ... */
     /// ```
+    /// # Panics
+    ///
+    /// This function panics if the registry was already finalized.
     pub fn symbol<M>(self, ty: impl AsRef<str>) -> Registry<SymbolLayer<L, Create<M>>>
     where
         M: RegistryCreatable + Module,
@@ -308,6 +312,10 @@ impl<L: Layer> Registry<L> {
     /// let mut sim = Sim::ndl("path/to/ndl", registry);
     /// /* ... */
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the registry was already finalized.
     pub fn with_fallback<F, M>(self, f: F) -> Registry<FallbackLayer<L, F, M>>
     where
         F: Fn() -> M,
@@ -339,6 +347,12 @@ impl<L: Layer> Registry<L> {
         self,
     ) -> Registry<FallbackLayer<L, impl Fn() -> DefaultFallbackModule, DefaultFallbackModule>> {
         self.with_fallback(|| DefaultFallbackModule)
+    }
+}
+
+impl Default for Registry<EmptyLayer> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

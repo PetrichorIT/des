@@ -163,7 +163,7 @@ impl FromStr for ConnectionEndpointDef {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let accessors = s
             .split('/')
-            .map(|s| FieldDef::from_str(s))
+            .map(FieldDef::from_str)
             .collect::<std::result::Result<Vec<_>, Self::Err>>()?;
         Ok(ConnectionEndpointDef { accessors })
     }
@@ -230,7 +230,7 @@ impl Kardinality {
     pub fn index_iter(&self) -> Box<dyn Iterator<Item = Option<usize>>> {
         match self {
             Kardinality::Atom => Box::new(std::iter::once(None)),
-            Kardinality::Cluster(n) => Box::new((0..*n).into_iter().map(Some)),
+            Kardinality::Cluster(n) => Box::new((0..*n).map(Some)),
         }
     }
 }

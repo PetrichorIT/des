@@ -7,7 +7,7 @@ use crate::{
     time::SimTime,
     tracing::enter_scope,
 };
-use std::sync::atomic::Ordering::SeqCst;
+use std::{mem, sync::atomic::Ordering::SeqCst};
 
 #[cfg(feature = "async")]
 use crate::net::module::with_mod_ctx;
@@ -292,10 +292,10 @@ impl ModuleRef {
             if let Some(msg) = msg {
                 with_harness(|| {
                     let msg = msg;
-                    processing.handler.handle_message(msg)
+                    processing.handler.handle_message(msg);
                 });
             } else {
-                with_harness(|| {})
+                with_harness(|| {});
             }
 
             // Downstream
@@ -332,16 +332,14 @@ impl ModuleRef {
             };
             let mut joins = Vec::new();
             with_mod_ctx(|ctx| {
-                std::mem::swap(&mut ctx.async_ext.write().require_joins, &mut joins)
+                mem::swap(&mut ctx.async_ext.write().require_joins, &mut joins);
             });
 
             let _guard = rt.enter();
             task_set.block_on(&rt, yield_now());
 
             for join in joins {
-                if !join.is_finished() {
-                    panic!("could not join task: not yet finished")
-                }
+                assert!(join.is_finished(), "could not join task: not yet finished");
 
                 let join_result = rt.block_on(join);
                 if let Err(e) = join_result {

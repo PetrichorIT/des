@@ -85,28 +85,26 @@ fn transform_module(
     })
 }
 
-fn transform_gates(ident: &String, defs: &[GateDef]) -> Result<Vec<Gate>> {
-    defs.iter()
-        .map(|v| {
-            if v.kardinality == Kardinality::Cluster(0) {
-                Err(Error::InvalidGate(ident.clone(), v.ident.clone()))
-            } else {
-                Ok(())
-            }
-        })
-        .collect::<Result<()>>()?;
+fn transform_gates(ident: &str, defs: &[GateDef]) -> Result<Vec<Gate>> {
+    defs.iter().try_for_each(|v| {
+        if v.kardinality == Kardinality::Cluster(0) {
+            Err(Error::InvalidGate(ident.to_string(), v.ident.clone()))
+        } else {
+            Ok(())
+        }
+    })?;
     Ok(defs.to_vec())
 }
 
 fn transform_submodules(
-    ident: &String,
+    ident: &str,
     defs: &FxHashMap<FieldDef, String>,
     nodes: &FxHashMap<String, Node>,
 ) -> Result<Vec<Submodule>> {
-    defs.into_iter()
+    defs.iter()
         .map(|(field, typ)| {
             if field.kardinality == Kardinality::Cluster(0) {
-                return Err(Error::InvalidSubmodule(ident.clone(), field.ident.clone()))
+                return Err(Error::InvalidSubmodule(ident.to_string(), field.ident.clone()))
             }
             Ok(Submodule {
                 name: field.clone(),
@@ -126,7 +124,7 @@ fn transform_connections(
     links: &FxHashMap<String, Link>,
 ) -> Result<Vec<Connection>> {
     let mut results = initial;
-    for (idx, def) in defs.into_iter().enumerate() {
+    for (idx, def) in defs.iter().enumerate() {
         let lhs_resolved = transform_connection_endpoint(idx, &def.peers[0], nodes, gates)?;
         let rhs_resolved = transform_connection_endpoint(idx, &def.peers[1], nodes, gates)?;
 
@@ -177,12 +175,12 @@ fn transform_connection_endpoint_inner(
     submodules: &[Submodule],
     gates: &[Gate],
 ) -> Result<Vec<ConnectionEndpoint>> {
-    assert!(accessors.len() > 0);
+    assert!(!accessors.is_empty(), "accessors must be non-empty");
     let accessor = &accessors[0];
     if accessors.len() == 1 {
         // (A) Select gates from current module
         let gate_def = gates
-            .into_iter()
+            .iter()
             .find(|g| g.ident == accessor.ident)
             .ok_or_else(|| Error::UnknownGateInConnection(idx, accessor.clone()))?;
 
@@ -196,7 +194,7 @@ fn transform_connection_endpoint_inner(
     } else {
         // (B) Index into deeper submodules
         let submodule_def = submodules
-            .into_iter()
+            .iter()
             .find(|n| n.name.ident == accessor.ident)
             .ok_or_else(|| Error::UnknownSubmoduleInConnection(idx, accessor.clone()))?;
 
@@ -225,19 +223,19 @@ fn iter_for_kardinality_access<'a>(
     idx: usize,
     def: &FieldDef,
     access: &FieldDef,
-    ident: &'a String,
+    ident: &'a str,
 ) -> Result<Box<dyn Iterator<Item = ConnectionEndpointAccessor> + 'a>> {
     use Kardinality::*;
     match (def.kardinality, access.kardinality) {
         // 1:1 into atom
         (Atom, Atom) => Ok(Box::new(once(ConnectionEndpointAccessor {
-            name: ident.clone(),
+            name: ident.to_string(),
             index: None,
         }))),
 
         // 1:1 into cluster
         (Cluster(n), Cluster(i)) if i < n => Ok(Box::new(once(ConnectionEndpointAccessor {
-            name: ident.clone(),
+            name: ident.to_string(),
             index: Some(i),
         }))),
         (Cluster(_), Cluster(_)) => Err(Error::ConnectionIndexOutOfBounds(idx, access.clone())),
@@ -246,11 +244,9 @@ fn iter_for_kardinality_access<'a>(
         (Atom, Cluster(_)) => Err(Error::ConnectionIndexOutOfBounds(idx, access.clone())),
 
         // access cluster as multi-atom
-        (Cluster(n), Atom) => Ok(Box::new((0..n).into_iter().map(|i| {
-            ConnectionEndpointAccessor {
-                name: ident.clone(),
-                index: Some(i),
-            }
+        (Cluster(n), Atom) => Ok(Box::new((0..n).map(|i| ConnectionEndpointAccessor {
+            name: ident.to_string(),
+            index: Some(i),
         }))),
     }
 }

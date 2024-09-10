@@ -169,7 +169,7 @@ impl Message {
     /// the content is not of type T.
     pub fn try_cast<T: 'static + MessageBody + Send>(self) -> Result<(T, MessageHeader), Self> {
         let Message { header, content } = self;
-        let content = match content.map(|c| c.try_cast::<T>()) {
+        let content = match content.map(AnyBox::try_cast) {
             Some(Ok(c)) => c,
             Some(Err(content)) => {
                 return Err(Self {

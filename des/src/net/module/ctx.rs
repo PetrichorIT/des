@@ -58,8 +58,9 @@ impl ModuleContext {
     /// if form of a `ModuleContext` as well as some attached software.
     /// The sofware attched to the returned reference is a dummy module
     /// that should be replaced before the simulation is started.
+    #[must_use]
     pub fn standalone(path: ObjectPath) -> ModuleRef {
-        let this = ModuleRef::dummy(Arc::new(Self {
+        ModuleRef::dummy(Arc::new(Self {
             #[cfg(feature = "async")]
             async_ext: RwLock::new(AsyncCoreExt::new()),
 
@@ -74,19 +75,18 @@ impl ModuleContext {
 
             parent: None,
             children: RwLock::new(FxHashMap::with_hasher(FxBuildHasher::default())),
-        }));
-
-        this
+        }))
     }
 
     /// Creates a instance within a module tree.
-    ///  
+    ///
     /// Note that this function returns a `ModuleRef`.
     /// A `ModuleRef` contains both the topological properties of a node
     /// if form of a `ModuleContext` as well as some attached software.
     /// The sofware attched to the returned reference is a dummy module
     /// that should be replaced before the simulation is started.
     #[allow(clippy::needless_pass_by_value)]
+    #[must_use]
     pub fn child_of(name: &str, parent: ModuleRef) -> ModuleRef {
         let path = ObjectPath::appended(&parent.ctx.path, name);
         let this = ModuleRef::dummy(Arc::new(Self {
@@ -139,7 +139,7 @@ impl ModuleContext {
     /// impl Module for MyModule {
     ///     fn handle_message(&mut self, msg: Message) {
     ///         let id = current().id();
-    ///         assert_eq!(id, msg.header().receiver_module_id);    
+    ///         assert_eq!(id, msg.header().receiver_module_id);
     ///     }
     /// }
     /// ```
@@ -159,7 +159,7 @@ impl ModuleContext {
     /// impl Module for MyModule {
     ///     fn handle_message(&mut self, msg: Message) {
     ///         let path = current().path();
-    ///         println!("[{path}] recv message: {}", msg.str())  
+    ///         println!("[{path}] recv message: {}", msg.str())
     ///     }
     /// }
     /// ```

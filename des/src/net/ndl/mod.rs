@@ -204,22 +204,6 @@ impl<'a, A> ScopedSim<'a, A> {
             }
         }
 
-        fn access_gate(
-            ctx: &ModuleContext,
-            accessors: &[tree::ConnectionEndpointAccessor],
-        ) -> Option<net::gate::GateRef> {
-            assert!(accessors.len() > 0);
-            let accessor = &accessors[0];
-            if accessors.len() == 1 {
-                // Gate access
-                ctx.gate(&accessor.name, accessor.index.unwrap_or(0))
-            } else {
-                // Submodule access
-                let child = ctx.child(&accessor.as_name()).expect("child");
-                access_gate(&child.ctx, &accessors[1..])
-            }
-        }
-
         for connection in &node.connections {
             let from = access_gate(&ctx.ctx, &connection.peers[0].accessors).expect("gate");
             let to = access_gate(&ctx.ctx, &connection.peers[1].accessors).expect("gate");
@@ -230,10 +214,26 @@ impl<'a, A> ScopedSim<'a, A> {
                     .link
                     .as_ref()
                     .map(|link| Channel::new(ChannelMetrics::from(link))),
-            )
+            );
         }
 
         Ok(ctx)
+    }
+}
+
+fn access_gate(
+    ctx: &ModuleContext,
+    accessors: &[tree::ConnectionEndpointAccessor],
+) -> Option<net::gate::GateRef> {
+    assert!(!accessors.is_empty(), "accessors must be non-empty");
+    let accessor = &accessors[0];
+    if accessors.len() == 1 {
+        // Gate access
+        ctx.gate(&accessor.name, accessor.index.unwrap_or(0))
+    } else {
+        // Submodule access
+        let child = ctx.child(&accessor.as_name()).expect("child");
+        access_gate(&child.ctx, &accessors[1..])
     }
 }
 

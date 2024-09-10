@@ -390,14 +390,12 @@ cfg_async! {
          fn at_sim_end(&mut self) {
             if let Some(result) = self.join.try_join_next() {
                 match result {
-                    Ok(_) => {},
+                    Ok(()) => {},
                     Err(e) if e.is_panic() => panic!("{e}"),
                     Err(e) => println!("{e}")
                 }
             } else if self.require_join {
-                if !self.joined.load(Ordering::SeqCst) {
-                    panic!("Main task could not be joined")
-                }
+                assert!(self.joined.load(Ordering::SeqCst), "Main task could not be joined");
             }
          }
 

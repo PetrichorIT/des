@@ -176,7 +176,7 @@ impl<A> Sim<A> {
     pub fn new(inner: A) -> Self {
         let globals = Arc::new(Globals::default());
         let guard = SimStaticsGuard::new(Arc::downgrade(&globals));
-        let stack: Box<dyn FnMut() -> ProcessingStack> = Box::new(|| ProcessingStack::default());
+        let stack: Box<dyn FnMut() -> ProcessingStack> = Box::new(ProcessingStack::default);
         Self {
             stack: stack.into(),
             guard,
@@ -199,6 +199,7 @@ impl<A> Sim<A> {
     ///
     /// Note that this will only affect calls of `node` after
     /// this function was called.
+    #[must_use]
     pub fn with_stack<T: Into<ProcessingStack>>(
         mut self,
         stack: impl FnMut() -> T + 'static,
