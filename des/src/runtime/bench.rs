@@ -3,7 +3,7 @@ use std::{
     time::{Duration, Instant, SystemTime},
 };
 
-use super::{FT_ASYNC, FT_CQUEUE, FT_INTERNAL_METRICS, FT_NET};
+use super::{FT_ASYNC, FT_CQUEUE, FT_NET};
 
 /// A run profiler
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -77,9 +77,6 @@ impl Default for Profiler {
         }
         if FT_ASYNC {
             features.push("async".into());
-        }
-        if FT_INTERNAL_METRICS {
-            features.push("metrics".into());
         }
 
         Self {

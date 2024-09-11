@@ -1,10 +1,65 @@
 use std::collections::HashMap;
 
 use des_net_utils::ndl::def::{
-    ConnectionDef, ConnectionEndpointDef, FieldDef, Kardinality, LinkDef,
+    ConnectionDef, ConnectionEndpointDef, FieldDef, Kardinality, LinkDef, ModuleGenericsDef,
+    TypClause,
 };
 use fxhash::FxHashMap;
 use serde_test::{assert_de_tokens, assert_de_tokens_error, assert_tokens, Token};
+
+#[test]
+fn test_module_typ_def() {
+    assert_tokens(
+        &TypClause::<ModuleGenericsDef> {
+            ident: "A".to_string(),
+            args: Vec::new(),
+        },
+        &[Token::Str("A")],
+    );
+
+    assert_tokens(
+        &TypClause {
+            ident: "A".to_string(),
+            args: vec![ModuleGenericsDef {
+                binding: "B".to_string(),
+                bound: "BLike".to_string(),
+            }],
+        },
+        &[Token::Str("A(B <- BLike)")],
+    );
+
+    assert_tokens(
+        &TypClause {
+            ident: "A".to_string(),
+            args: vec![
+                ModuleGenericsDef {
+                    binding: "B".to_string(),
+                    bound: "BLike".to_string(),
+                },
+                ModuleGenericsDef {
+                    binding: "C".to_string(),
+                    bound: "CLike".to_string(),
+                },
+                ModuleGenericsDef {
+                    binding: "D".to_string(),
+                    bound: "DLike".to_string(),
+                },
+            ],
+        },
+        &[Token::Str("A(B <- BLike, C <- CLike, D <- DLike)")],
+    );
+}
+
+#[test]
+fn test_typ_clause_string() {
+    assert_tokens(
+        &TypClause {
+            ident: "A".to_string(),
+            args: vec!["B".to_string(), "C".to_string()],
+        },
+        &[Token::Str("A(B, C)")],
+    )
+}
 
 #[test]
 fn test_field_def() {

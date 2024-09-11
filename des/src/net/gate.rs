@@ -82,7 +82,7 @@ impl Connection {
         Self::new_unchecked(gate)
     }
 
-    ///
+    /// Unchecked
     pub fn new_unchecked(gate: GateRef) -> Self {
         Self {
             endpoint: gate,

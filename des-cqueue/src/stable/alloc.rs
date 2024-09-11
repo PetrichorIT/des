@@ -1,7 +1,7 @@
 use std::{
     alloc::{self, Layout},
     mem::{align_of, size_of},
-    ptr::NonNull,
+    ptr::{self, NonNull},
 };
 
 struct ListNode {
@@ -15,7 +15,7 @@ impl ListNode {
     }
 
     fn start_addr(&self) -> usize {
-        self as *const Self as usize
+        ptr::from_ref(self) as usize
     }
 
     fn end_addr(&self) -> usize {
@@ -64,7 +64,7 @@ impl CQueueLLAllocatorInner {
 
     pub fn handle(&self) -> CQueueLLAllocator {
         CQueueLLAllocator {
-            inner: (self as *const CQueueLLAllocatorInner).cast_mut(),
+            inner: ptr::from_ref(self).cast_mut(),
         }
     }
 

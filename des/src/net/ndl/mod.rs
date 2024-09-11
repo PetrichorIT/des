@@ -113,8 +113,8 @@ impl<A> Sim<A> {
         path: impl AsRef<Path>,
         registry: impl AsMut<Registry<L>>,
     ) -> Result<Self> {
-        let f = File::open(path).map_err(|e| error::Error::Io(e.to_string()))?;
-        let def = serde_yml::from_reader(f).map_err(|e| error::Error::Io(e.to_string()))?;
+        let f = File::open(path).map_err(|e| error::ErrorKind::Io(e.to_string()))?;
+        let def = serde_yml::from_reader(f).map_err(|e| error::ErrorKind::Io(e.to_string()))?;
         self.nodes_from_ndl(&def, registry)?;
         Ok(self)
     }
@@ -167,7 +167,7 @@ impl<A> Sim<A> {
         ctx.activate();
 
         let software = registry.resolve(path, ty, &mut *self.stack).ok_or(
-            error::Error::MissingRegistrySymbol(path.to_string(), ty.to_string()),
+            error::ErrorKind::MissingRegistrySymbol(path.to_string(), ty.to_string()),
         )?;
         ctx.upgrade_dummy(software);
 

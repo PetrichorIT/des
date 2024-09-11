@@ -1,4 +1,8 @@
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::{
+    fmt::Error,
+    io::ErrorKind,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 use des::{prelude::*, registry};
 
@@ -98,7 +102,7 @@ mod common {
     }
 }
 use common::*;
-use des_net_utils::ndl;
+use des_net_utils::ndl::{self, error};
 use serial_test::serial;
 
 #[test]
@@ -182,15 +186,15 @@ fn non_std_gate_connections() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 #[serial]
 fn registry_missing_symbol() {
-    let sim: Result<Sim<()>, ndl::error::Error> = Sim::ndl(
+    let sim: Result<Sim<()>, error::Error> = Sim::ndl(
         "tests/ndl/ab-deep.yml",
         Registry::new().symbol::<Debugger>("Main"),
     );
     let error = sim.unwrap_err();
     assert_eq!(
         error,
-        ndl::error::Error::MissingRegistrySymbol("b".to_string(), "B".to_string())
-    )
+        error::ErrorKind::MissingRegistrySymbol("b".to_string(), "B".to_string())
+    );
 }
 
 #[test]

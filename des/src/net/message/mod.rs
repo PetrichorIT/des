@@ -209,10 +209,10 @@ impl Message {
     /// Tries to create a duplicate of the message, assuming its content is of type T.
     ///
     /// - If the messages body is of type T, the body will be cloned as specified by T
-    /// and the dup will succeed.
+    ///   and the dup will succeed.
     /// - If the message body is not of type T, this function will return `None`.
     /// - If the message has no body it will succeed independent of T and clone only the
-    /// attached metadata.
+    ///   attached metadata.
     ///
     #[must_use]
     pub fn try_dup<T>(&self) -> Option<Self>

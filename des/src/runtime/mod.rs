@@ -30,7 +30,6 @@ mod metrics;
 
 pub(crate) const FT_NET: bool = cfg!(feature = "net");
 pub(crate) const FT_CQUEUE: bool = cfg!(feature = "cqueue");
-pub(crate) const FT_INTERNAL_METRICS: bool = cfg!(feature = "metrics");
 pub(crate) const FT_ASYNC: bool = cfg!(feature = "async");
 
 pub(crate) const SYM_CHECKMARK: char = '\u{2713}';
@@ -86,10 +85,11 @@ where
 /// parameter with an associated event set yourself. To do this follow this steps:
 ///
 /// - Create an 'App' struct that implements the trait [`Application`].
-/// This struct will hold the systems state and define the event set used in the simulation.
+///   This struct will hold the systems state and define the event set used in the simulation.
 /// - Create your events that handle the logic of you simulation. They must implement [`Event`] with the generic
-/// parameter A, where A is your 'App' struct.
+///   parameter A, where A is your 'App' struct.
 /// - To bind those two together create a enum that implements [`EventSet`] that holds all your events.
+///
 /// This can be done via a macro. The use this event set as the associated event set in 'App'.
 ///
 /// # Usage with module system
@@ -343,9 +343,8 @@ where
         println!("\u{23A1}");
         println!("\u{23A2} Simulation starting");
         println!(
-            "\u{23A2}  net [{}] metrics [{}] cqueue [{}] async[{}]",
+            "\u{23A2}  net [{}] cqueue [{}] async[{}]",
             symbol!(FT_NET),
-            symbol!(FT_INTERNAL_METRICS),
             symbol!(FT_CQUEUE),
             symbol!(FT_ASYNC),
         );
@@ -553,7 +552,7 @@ pub enum RuntimeResult<A> {
     /// The simulation has finished with an event count of `1`.
     /// This ususally inidcates that some parameter was invalid,
     /// or the user forgot to insert a startup event. However a
-    /// at_sim_start event has been called.
+    /// `at_sim_start` event has been called.
     EmptySimulation {
         /// The application provided upon runtime creation, only changed through
         /// the `at_sim_start` method of modules.

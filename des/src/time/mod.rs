@@ -29,7 +29,6 @@ mod duration;
 pub use duration::*;
 
 use crate::sync::RwLock;
-use std::f64::EPSILON;
 use std::fmt::{Debug, Display};
 use std::ops::{Deref, Div, Sub, SubAssign};
 
@@ -171,7 +170,7 @@ impl SimTime {
 impl PartialEq<f64> for SimTime {
     fn eq(&self, other: &f64) -> bool {
         let diff = (self.0.as_secs_f64() - *other).abs();
-        diff < EPSILON
+        diff < f64::EPSILON
     }
 }
 

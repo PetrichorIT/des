@@ -94,7 +94,7 @@ pub trait Module: Any {
     /// };
     ///
     /// impl Module for MyModule {
-    ///     /* ... */    
+    ///     /* ... */
     ///
     ///     fn handle_message(&mut self, msg: Message) {
     ///         println!("Received {:?}", msg);
@@ -126,7 +126,7 @@ pub trait Module: Any {
     ///
     /// impl Module for SomeModule {
     ///     /* ... */
-    ///     
+    ///
     ///     fn at_sim_start(&mut self, _stage: usize) {
     ///         self.config = fetch_config("https://mysimconfig.com/simrun1", current().id());
     ///         self.records.clear();

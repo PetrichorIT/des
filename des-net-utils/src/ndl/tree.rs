@@ -1,6 +1,7 @@
 use std::ops::Deref;
 
 use super::def::{FieldDef, GateDef, LinkDef};
+use fxhash::FxHashSet;
 use serde::{Deserialize, Serialize};
 
 pub type Network = Node;
@@ -9,7 +10,7 @@ pub type Network = Node;
 pub struct Node {
     pub typ: Symbol,
     pub submodules: Vec<Submodule>,
-    pub gates: Vec<Gate>,
+    pub gates: FxHashSet<Gate>,
     pub connections: Vec<Connection>,
 }
 
@@ -42,6 +43,32 @@ pub type Link = LinkDef;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Symbol(String);
+
+impl Node {
+    pub fn conform_to(&self, interface: &Node) -> bool {
+        if !interface.gates.is_subset(&self.gates) {
+            return false;
+        }
+
+        if !interface
+            .submodules
+            .iter()
+            .all(|submod| self.submodules.iter().any(|other| other == submod))
+        {
+            return false;
+        }
+
+        if !interface
+            .connections
+            .iter()
+            .all(|con| self.connections.iter().any(|other| other == con))
+        {
+            return false;
+        }
+
+        true
+    }
+}
 
 impl Deref for Symbol {
     type Target = str;
