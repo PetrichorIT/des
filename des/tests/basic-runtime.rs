@@ -401,3 +401,49 @@ fn custom_start_time() {
         .build(CustomStartApp)
         .run();
 }
+
+struct PausableApp;
+impl Application for PausableApp {
+    type EventSet = PausableAppEvent;
+    type Lifecycle = PausableApp;
+}
+
+impl EventLifecycle for PausableApp {
+    fn at_sim_start(runtime: &mut Runtime<Self>)
+    where
+        Self: Application,
+    {
+        runtime.add_event(PausableAppEvent(0), SimTime::ZERO);
+    }
+}
+
+struct PausableAppEvent(usize);
+impl EventSet<PausableApp> for PausableAppEvent {
+    fn handle(mut self, runtime: &mut Runtime<PausableApp>) {
+        self.0 += 1;
+        runtime.add_event_in(self, Duration::from_secs(1))
+    }
+}
+
+#[test]
+#[serial]
+fn pausable_app() {
+    let mut sim = Builder::new()
+        .quiet()
+        .limit(RuntimeLimit::EventCount(1000))
+        .build(PausableApp);
+
+    sim.start();
+
+    assert_eq!(sim.num_events_dispatched(), 0);
+
+    sim.dispatch_n_events(10);
+    assert_eq!(sim.num_events_dispatched(), 10);
+
+    sim.dispatch_events_until(42.0.into());
+    assert_eq!(sim.num_events_dispatched(), 43); // 0...42 ??
+
+    sim.dispatch_all();
+    assert_eq!(sim.num_events_dispatched() + 1, sim.num_events_scheduled());
+    assert_eq!(sim.num_events_dispatched(), 1000);
+}

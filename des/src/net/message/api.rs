@@ -63,7 +63,7 @@ pub fn send(msg: impl Into<Message>, gate: impl IntoModuleGate) {
 ///                 .path_iter().unwrap() // an iter can NOT be created for transit gates, no direction info provided
 ///                 .next().unwrap() // get next iter element
 ///                 .channel().unwrap() // channels attached to connections are optional
-///                 .is_busy()     
+///                 .is_busy()
 ///        );
 ///     }
 /// }

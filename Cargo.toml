@@ -4,10 +4,12 @@ debug = true
 [workspace]
 resolver = "2"
 members = [
+    "benches",
     "des",
     "des-cqueue",
     "des-macros",
     "des-macros-core",
     "des-net-utils",
+    "benches",
     "examples",
 ]

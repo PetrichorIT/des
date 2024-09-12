@@ -26,6 +26,9 @@ pub(crate) use self::events::*;
 mod ctx;
 pub(crate) use self::ctx::*;
 
+mod watcher;
+pub use self::watcher::*;
+
 mod blocks;
 pub use self::blocks::*;
 
@@ -70,6 +73,7 @@ pub struct Sim<A> {
     pub(crate) stack: NoDebug<Box<dyn FnMut() -> ProcessingStack>>,
     modules: ModuleTree,
     globals: Arc<Globals>,
+    watcher: Arc<WatcherValueMap>,
     /// A inner field of a network simulation that can be used to attach
     /// custom lifetime handlers to a simulation
     pub inner: A,
@@ -85,7 +89,7 @@ struct SimStaticsGuard {
 }
 
 impl SimStaticsGuard {
-    fn new(globals: Weak<Globals>) -> Self {
+    fn new(globals: Weak<Globals>, watcher: Weak<WatcherValueMap>) -> Self {
         let guard = GUARD.try_lock();
         let guard = match guard {
             Ok(guard) => guard,
@@ -101,7 +105,7 @@ impl SimStaticsGuard {
             },
         };
 
-        buf_init(globals);
+        buf_init(globals, watcher);
         Self { guard }
     }
 }
@@ -175,13 +179,15 @@ impl<A> Sim<A> {
     /// This allready binds the simulation globals to this instance.
     pub fn new(inner: A) -> Self {
         let globals = Arc::new(Globals::default());
-        let guard = SimStaticsGuard::new(Arc::downgrade(&globals));
+        let watcher = Arc::new(WatcherValueMap::default());
+        let guard = SimStaticsGuard::new(Arc::downgrade(&globals), Arc::downgrade(&watcher));
         let stack: Box<dyn FnMut() -> ProcessingStack> = Box::new(ProcessingStack::default);
         Self {
             stack: stack.into(),
             guard,
             modules: ModuleTree::default(),
             globals,
+            watcher,
             inner,
         }
     }
@@ -257,6 +263,11 @@ impl<A> Sim<A> {
     /// Returns a handle to the simulation globals.
     pub fn globals(&self) -> Arc<Globals> {
         self.globals.clone()
+    }
+
+    /// Returns a handle to the simulation watcher.
+    pub fn watcher(&self, context: &str) -> Watcher {
+        self.watcher.clone().watcher_for(context.to_string())
     }
 
     /// Creates a new module block within the simulation.
@@ -490,6 +501,7 @@ where
     A: EventLifecycle<Sim<A>>,
 {
     fn at_sim_start(rt: &mut Runtime<Sim<A>>) {
+        // (1) Get Topology
         let mut top = rt
             .app
             .globals

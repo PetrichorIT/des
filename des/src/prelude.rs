@@ -38,6 +38,7 @@ cfg_net! {
     pub use crate::net::Sim;
     pub use crate::net::ScopedSim;
     pub use crate::net::Globals;
+    pub use crate::net::Watcher;
 
     pub use crate::net::channel::Channel;
     pub use crate::net::channel::ChannelMetrics;
