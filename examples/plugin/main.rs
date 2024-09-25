@@ -17,24 +17,6 @@ impl Module for A {
 }
 
 #[derive(Default)]
-struct PacketCounter {
-    count: usize,
-}
-
-impl ProcessingElement for PacketCounter {
-    fn incoming(&mut self, msg: Message) -> Option<Message> {
-        self.count += 1;
-        Some(msg)
-    }
-}
-
-impl Drop for PacketCounter {
-    fn drop(&mut self) {
-        assert_eq!(self.count, 2);
-    }
-}
-
-#[derive(Default)]
 struct B {}
 
 impl Module for B {

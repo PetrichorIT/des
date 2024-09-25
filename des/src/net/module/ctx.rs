@@ -3,6 +3,7 @@ use spin::RwLock;
 
 use super::{
     meta::Metadata, DummyModule, ModuleId, ModuleRef, ModuleRefWeak, ModuleReferencingError,
+    UnwindBehaviour,
 };
 use crate::{
     prelude::{GateRef, ObjectPath},
@@ -11,6 +12,7 @@ use crate::{
 };
 use std::{
     any::Any,
+    cell::Cell,
     fmt::Debug,
     sync::{atomic::AtomicBool, Arc},
 };
@@ -41,6 +43,7 @@ pub struct ModuleContext {
     pub(crate) path: ObjectPath,
     pub(crate) gates: RwLock<Vec<GateRef>>,
 
+    pub(crate) unwind_behaviour: Cell<UnwindBehaviour>,
     pub(super) meta: RwLock<Metadata>,
     pub(crate) scope_token: ScopeToken,
 
@@ -70,6 +73,7 @@ impl ModuleContext {
             active: AtomicBool::new(true),
             id: ModuleId::gen(),
             path,
+            unwind_behaviour: Cell::default(),
 
             gates: RwLock::new(Vec::new()),
 
@@ -97,9 +101,9 @@ impl ModuleContext {
             scope_token: new_scope(path.clone()),
 
             active: AtomicBool::new(true),
-
             id: ModuleId::gen(),
             path,
+            unwind_behaviour: Cell::default(),
 
             gates: RwLock::new(Vec::new()),
 
@@ -216,6 +220,24 @@ impl ModuleContext {
     /// Panics when concurrently accessed from multiple threads.
     pub fn set_meta<T: Any + Clone>(&self, value: T) {
         self.meta.try_write().expect("Failed lock").set(value);
+    }
+
+    /// Returns the unwind behaviour of this module.
+    ///
+    /// # Panics
+    ///
+    /// Panics when concurrently accesed from multiple threads.
+    pub fn unwind_behaviour(&self) -> UnwindBehaviour {
+        self.unwind_behaviour.get()
+    }
+
+    /// Sets the unwind behaviour of this module.
+    ///
+    /// # Panics
+    ///
+    /// Panics when concurrently accesed from multiple threads.
+    pub fn set_unwind_behaviour(&self, new: UnwindBehaviour) {
+        self.unwind_behaviour.set(new);
     }
 
     /// Returns a reference to a parent module

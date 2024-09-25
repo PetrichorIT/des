@@ -32,6 +32,9 @@ pub use self::watcher::*;
 mod blocks;
 pub use self::blocks::*;
 
+mod unwind;
+use self::unwind::{Harness, SimWideUnwind};
+
 static GUARD: Mutex<()> = Mutex::new(());
 
 /// A networking simulation.

@@ -335,7 +335,7 @@ cfg_async! {
                         match fut.await {
                             Ok(()) => {},
                             Err(e) => {
-                                panic!("node {} paniced at failable operation: {e}", current().path());
+                                super::panic(format!("node {} paniced at failable operation: {e}", current().path()));
                             },
                         }
                     })
@@ -391,11 +391,11 @@ cfg_async! {
             if let Some(result) = self.join.try_join_next() {
                 match result {
                     Ok(()) => {},
-                    Err(e) if e.is_panic() => panic!("{e}"),
+                    Err(e) if e.is_panic() => super::panic(e.to_string()),
                     Err(e) => println!("{e}")
                 }
-            } else if self.require_join {
-                assert!(self.joined.load(Ordering::SeqCst), "Main task could not be joined");
+            } else if self.require_join && !self.joined.load(Ordering::SeqCst) {
+                super::panic("Main task could not be joined");
             }
          }
 

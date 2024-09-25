@@ -1,6 +1,8 @@
+use std::panic::panic_any;
 use std::sync::Arc;
 
 use super::Globals;
+use super::SimWideUnwind;
 use super::Watcher;
 
 /// Returns the globals of the runtime.
@@ -29,4 +31,10 @@ pub fn globals() -> Arc<Globals> {
 #[must_use]
 pub fn watcher() -> Watcher {
     Watcher::current()
+}
+
+/// Panics the entire simulation, cirumventing the unwind catchers that catch module local
+/// panics.
+pub fn panic(s: impl Into<String>) {
+    panic_any(SimWideUnwind(Box::new(s.into())))
 }

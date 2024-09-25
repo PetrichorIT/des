@@ -1,10 +1,8 @@
-use std::{
-    fmt::Error,
-    io::ErrorKind,
-    sync::atomic::{AtomicUsize, Ordering},
-};
-
+use common::*;
 use des::{prelude::*, registry};
+use des_net_utils::ndl::error;
+use serial_test::serial;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[path = "common/mock.rs"]
 mod mock;
@@ -101,9 +99,6 @@ mod common {
         }
     }
 }
-use common::*;
-use des_net_utils::ndl::{self, error};
-use serial_test::serial;
 
 #[test]
 #[serial]

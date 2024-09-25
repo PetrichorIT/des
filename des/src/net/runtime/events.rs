@@ -7,12 +7,12 @@ use crate::{
     time::SimTime,
     tracing::enter_scope,
 };
-use std::{mem, sync::atomic::Ordering::SeqCst};
+use std::sync::atomic::Ordering::SeqCst;
 
 #[cfg(feature = "async")]
-use crate::net::module::with_mod_ctx;
-#[cfg(feature = "async")]
 use tokio::task::yield_now;
+
+use super::Harness;
 
 ///
 /// The event set for a [`NetworkApplication`].
@@ -227,39 +227,23 @@ impl ChannelUnbusyNotif {
     }
 }
 
-#[cfg(not(feature = "async"))]
-fn with_harness<R>(f: impl FnOnce() -> R) -> R {
-    f()
-}
-
-#[cfg(feature = "async")]
-fn with_harness<R>(f: impl FnOnce() -> R) -> R {
-    let Some((rt, task_set)) = with_mod_ctx(|ctx| ctx.async_ext.write().rt.current()) else {
-        panic!("WHERE MY RT");
-    };
-
-    task_set.block_on(&rt, async move {
-        let ret = f();
-        tokio::task::yield_now().await;
-        ret
-    })
-}
-
 impl ModuleRef {
     pub(crate) fn reset(&self) {
         let mut brw = self.processing.borrow_mut();
 
         #[cfg(feature = "async")]
-        with_mod_ctx(|ctx| ctx.async_ext.write().reset());
+        self.ctx.async_ext.write().reset();
 
-        with_harness(move || brw.handler.reset());
+        Harness::new(&self.ctx)
+            .exec(move || brw.handler.reset())
+            .pass();
     }
 
     #[cfg(feature = "async")]
     pub(crate) fn async_wakeup(&self) {
         if self.ctx.active.load(SeqCst) {
             self.processing.borrow_mut().incoming_upstream(None);
-            with_harness(|| {});
+            Harness::new(&self.ctx).exec(|| {}).catch();
             self.processing.borrow_mut().incoming_downstream();
         } else {
             #[cfg(feature = "tracing")]
@@ -290,12 +274,14 @@ impl ModuleRef {
             // Peek
             processing.state = ProcessingState::Peek;
             if let Some(msg) = msg {
-                with_harness(|| {
-                    let msg = msg;
-                    processing.handler.handle_message(msg);
-                });
+                Harness::new(&self.ctx)
+                    .exec(|| {
+                        let msg = msg;
+                        processing.handler.handle_message(msg);
+                    })
+                    .catch();
             } else {
-                with_harness(|| {});
+                Harness::new(&self.ctx).exec(|| {}).catch();
             }
 
             // Downstream
@@ -310,7 +296,9 @@ impl ModuleRef {
         let mut processing = self.processing.borrow_mut();
 
         processing.incoming_upstream(None);
-        with_harness(|| processing.handler.at_sim_start(stage));
+        Harness::new(&self.ctx)
+            .exec(|| processing.handler.at_sim_start(stage))
+            .catch();
         processing.incoming_downstream();
     }
 
@@ -323,17 +311,17 @@ impl ModuleRef {
         let mut processing = self.processing.borrow_mut();
 
         processing.incoming_upstream(None);
-        with_harness(|| processing.handler.at_sim_end());
+        Harness::new(&self.ctx)
+            .exec(|| processing.handler.at_sim_end())
+            .catch();
         #[cfg(feature = "async")]
         {
-            let Some((rt, task_set)) = with_mod_ctx(|ctx| ctx.async_ext.write().rt.current())
-            else {
+            let Some((rt, task_set)) = self.ctx.async_ext.write().rt.current() else {
                 panic!("WHERE MY RT");
             };
+
             let mut joins = Vec::new();
-            with_mod_ctx(|ctx| {
-                mem::swap(&mut ctx.async_ext.write().require_joins, &mut joins);
-            });
+            std::mem::swap(&mut self.ctx.async_ext.write().require_joins, &mut joins);
 
             let _guard = rt.enter();
             task_set.block_on(&rt, yield_now());

@@ -156,18 +156,12 @@ fn par_remove() {
 #[serial]
 #[should_panic = "failed to unwrap addr"]
 fn par_panic() {
-    let mut sim = Sim::new(());
-    sim.node(
-        "",
-        ModuleFn::new(
-            || {
-                let _ = par("addr").expect("failed to unwrap addr");
-            },
-            |_, _| {},
-        ),
-    );
-
-    let _ = Builder::seeded(123).build(sim).run();
+    let sim = Sim::new(());
+    let mut sim = Builder::seeded(123).build(sim);
+    sim.start();
+    let _ = par_for("addr", "alice").expect("failed to unwrap addr");
+    sim.dispatch_all();
+    let _ = sim.finish();
 }
 
 #[test]

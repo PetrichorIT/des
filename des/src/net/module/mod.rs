@@ -20,6 +20,9 @@ pub use error::*;
 mod api;
 pub use api::*;
 
+mod unwind;
+pub use unwind::*;
+
 mod dummy;
 pub(crate) use dummy::*;
 

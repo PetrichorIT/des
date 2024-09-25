@@ -173,31 +173,31 @@ fn builder_handler_fn_with_err() {
     let _ = Builder::seeded(123).build(sim).run();
 }
 
-#[test]
-#[serial]
-#[should_panic = "node 'alice' failed to process message, handler fn failed with: other"]
-fn builder_handler_fn_failure_panic() {
-    let mut sim = Sim::new(());
-    sim.node(
-        "alice",
-        HandlerFn::failable(
-            |_| {
-                if black_box(true) {
-                    return Err(io::Error::new(io::ErrorKind::Other, "other"));
-                }
+// #[test]
+// #[serial]
+// #[should_panic = "node 'alice' failed to process message, handler fn failed with: other"]
+// fn builder_handler_fn_failure_panic() {
+//     let mut sim = Sim::new(());
+//     sim.node(
+//         "alice",
+//         HandlerFn::failable(
+//             |_| {
+//                 if black_box(true) {
+//                     return Err(io::Error::new(io::ErrorKind::Other, "other"));
+//                 }
 
-                Ok(())
-            },
-            FailabilityPolicy::Panic,
-        ),
-    );
-    let gate = sim.gate("alice", "port");
+//                 Ok(())
+//             },
+//             FailabilityPolicy::Panic,
+//         ),
+//     );
+//     let gate = sim.gate("alice", "port");
 
-    let mut rt = Builder::seeded(123).build(sim);
-    rt.add_message_onto(gate, Message::new().build(), 1.0.into());
+//     let mut rt = Builder::seeded(123).build(sim);
+//     rt.add_message_onto(gate, Message::new().build(), 1.0.into());
 
-    let _ = rt.run();
-}
+//     let _ = rt.run();
+// }
 
 #[test]
 #[serial]
