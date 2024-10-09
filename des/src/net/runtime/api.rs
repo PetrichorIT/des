@@ -35,6 +35,8 @@ pub fn watcher() -> Watcher {
 
 /// Panics the entire simulation, cirumventing the unwind catchers that catch module local
 /// panics.
-pub fn panic(s: impl Into<String>) {
-    panic_any(SimWideUnwind(Box::new(s.into())))
+pub fn panic(s: impl Into<String>) -> ! {
+    let s = s.into();
+    eprintln!("{}", s);
+    panic_any(SimWideUnwind(Box::new(s)))
 }

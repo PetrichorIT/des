@@ -28,9 +28,9 @@
 mod duration;
 pub use duration::*;
 
-use crate::sync::RwLock;
 use std::fmt::{Debug, Display};
 use std::ops::{Deref, Div, Sub, SubAssign};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
 cfg_async! {
     pub mod error;
@@ -48,7 +48,7 @@ cfg_async! {
     pub use interval::*;
 }
 
-static SIMTIME: RwLock<SimTime> = RwLock::new(SimTime::ZERO);
+static SIMTIME: (AtomicU64, AtomicU32) = (AtomicU64::new(0), AtomicU32::new(0));
 
 ///
 /// A specific point of time in the simulation.
@@ -68,14 +68,18 @@ impl SimTime {
     /// ```
     #[must_use]
     pub fn now() -> Self {
-        *SIMTIME.read()
+        SimTime(Duration::new(
+            SIMTIME.0.load(Ordering::SeqCst),
+            SIMTIME.1.load(Ordering::SeqCst),
+        ))
     }
 
     ///
     /// Sets the sim time
     ///
     pub(crate) fn set_now(time: SimTime) {
-        *SIMTIME.write() = time;
+        SIMTIME.0.store(time.as_secs(), Ordering::SeqCst);
+        SIMTIME.1.store(time.subsec_nanos(), Ordering::SeqCst);
     }
 
     ///

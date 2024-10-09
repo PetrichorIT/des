@@ -214,7 +214,7 @@ impl<L: Layer> Registry<L> {
     /// Adds a custom symbol mapping to the registry.
     ///
     /// This mapping uses the provided clousure to generate types, instead of `RegistryCreatable`.
-    /// This allows for the assignment of multiple types to one symbol, using Box<dyn Module> as
+    /// This allows for the assignment of multiple types to one symbol, using `Box<dyn Module>` as
     /// a return type.
     ///
     /// Note that a custom directive that allways returns `Some(...)` is equivalent
