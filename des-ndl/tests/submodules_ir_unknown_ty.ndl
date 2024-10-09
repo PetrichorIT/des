@@ -1,7 +1,0 @@
-module M {
-    submodules {
-        a: A
-    }
-}
-
-entry M;

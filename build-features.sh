@@ -1,7 +1,7 @@
 #!/bin/bash
 
-echo "[des-ndl]"
-cargo build -p des-ndl
+echo "[des-net-utils]"
+cargo build -p des-net-utils
 
 echo "[des-macros-core]"
 cargo build -p des-macros-core
@@ -15,8 +15,6 @@ echo "[des] cqueue"
 cargo build -p des --features cqueue
 echo "[des] net"
 cargo build -p des --features net
-echo "[des] net + ndl"
-cargo build -p des --features net --features ndl
 echo "[des] net + async"
 cargo build -p des --features net --features async
 
@@ -32,10 +30,8 @@ echo "[des] tracing"
 cargo build -p des --features tracing
 echo "[des] tracing + net"
 cargo build -p des --features tracing --features net
-echo "[des] tracing + net + async + ndl"
-cargo build -p des --features tracing --features net --features async --features ndl
-echo "[des] tracing + net + async + ndl + unstable-tokio-enable-time"
-cargo build -p des --features tracing --features net --features async --features ndl --features unstable-tokio-enable-time
+echo "[des] tracing + net + async + unstable-tokio-enable-time"
+cargo build -p des --features tracing --features net --features async --features unstable-tokio-enable-time
 
 
 

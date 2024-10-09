@@ -1,17 +1,18 @@
-use std::sync::atomic::Ordering::SeqCst;
-
 use crate::{
     net::{
-        message::Message,
-        gate::Connection,
-        module::ModuleRef,
-        runtime::buf_process,
-        channel::ChannelRef,
-        NetworkApplication,
+        channel::ChannelRef, gate::Connection, message::Message, module::ModuleRef,
+        processing::ProcessingState, runtime::buf_process, Sim,
     },
-    runtime::{EventSet, EventSink, Runtime, EventLifecycle},
-    time::SimTime, tracing::enter_scope,
+    runtime::{EventLifecycle, EventSet, EventSink, Runtime},
+    time::SimTime,
+    tracing::enter_scope,
 };
+use std::sync::atomic::Ordering::SeqCst;
+
+#[cfg(feature = "async")]
+use tokio::task::yield_now;
+
+use super::Harness;
 
 ///
 /// The event set for a [`NetworkApplication`].
@@ -28,11 +29,11 @@ pub enum NetEvents {
     AsyncWakeupEvent(AsyncWakeupEvent),
 }
 
-impl<A> EventSet<NetworkApplication<A>> for NetEvents
+impl<A> EventSet<Sim<A>> for NetEvents
 where
-    A: EventLifecycle<NetworkApplication<A>>,
+    A: EventLifecycle<Sim<A>>,
 {
-    fn handle(self, rt: &mut Runtime<NetworkApplication<A>>) {
+    fn handle(self, rt: &mut Runtime<Sim<A>>) {
         match self {
             Self::MessageExitingConnection(event) => event.handle(rt),
             Self::HandleMessageEvent(event) => event.handle(rt),
@@ -47,15 +48,14 @@ where
 #[derive(Debug)]
 pub struct MessageExitingConnection {
     pub(crate) con: Connection, // exiting the following connecrtion
-    pub(crate) msg: Message, // with this message
+    pub(crate) msg: Message,    // with this message
 }
 
 impl MessageExitingConnection {
     // This function executes an event with a sink not a runtime as an parameter.
     // That allows for the executing of events not handles by the runtime itself
     // aka. the calling with an abitrary event sink.
-    pub(crate) fn handle_with_sink(self, sink: &mut impl EventSink<NetEvents>)
-    {
+    pub(crate) fn handle_with_sink(self, sink: &mut impl EventSink<NetEvents>) {
         let mut msg = self.msg;
         msg.header.last_gate = Some(self.con.endpoint.clone());
 
@@ -95,8 +95,8 @@ impl MessageExitingConnection {
             if let Some(ch) = next.channel() {
                 ch.send_message(msg, next, sink);
                 return;
-            } 
-            
+            }
+
             // No channel means next hop is on the same time slot,
             // so continue.
             cur = next;
@@ -105,7 +105,7 @@ impl MessageExitingConnection {
         // The loop has ended. This means we are at the end of a gate chain
         // cur has not been checked for anything
         enter_scope(cur.endpoint.owner().scope_token());
-       
+
         #[cfg(feature = "tracing")]
         tracing::info!(
             "Gate '{}' forwarding message [{}] to module #{}",
@@ -126,9 +126,9 @@ impl MessageExitingConnection {
 }
 
 impl MessageExitingConnection {
-    fn handle<A>(self, rt: &mut Runtime<NetworkApplication<A>>)
+    fn handle<A>(self, rt: &mut Runtime<Sim<A>>)
     where
-        A: EventLifecycle<NetworkApplication<A>>,
+        A: EventLifecycle<Sim<A>>,
     {
         self.handle_with_sink(rt);
     }
@@ -141,9 +141,9 @@ pub struct HandleMessageEvent {
 }
 
 impl HandleMessageEvent {
-    fn handle<A>(self, rt: &mut Runtime<NetworkApplication<A>>)
+    fn handle<A>(self, rt: &mut Runtime<Sim<A>>)
     where
-        A: EventLifecycle<NetworkApplication<A>>,
+        A: EventLifecycle<Sim<A>>,
     {
         enter_scope(self.module.scope_token());
 
@@ -165,13 +165,13 @@ impl HandleMessageEvent {
 
 #[derive(Debug)]
 pub struct ModuleRestartEvent {
-    pub(crate) module: ModuleRef
+    pub(crate) module: ModuleRef,
 }
 
 impl ModuleRestartEvent {
-    fn handle<A>(self, rt: &mut Runtime<NetworkApplication<A>>)
+    fn handle<A>(self, rt: &mut Runtime<Sim<A>>)
     where
-        A: EventLifecycle<NetworkApplication<A>>,
+        A: EventLifecycle<Sim<A>>,
     {
         enter_scope(self.module.scope_token());
 
@@ -190,14 +190,14 @@ impl ModuleRestartEvent {
 #[cfg(feature = "async")]
 #[derive(Debug)]
 pub struct AsyncWakeupEvent {
-    pub(crate) module: ModuleRef
+    pub(crate) module: ModuleRef,
 }
 
 #[cfg(feature = "async")]
 impl AsyncWakeupEvent {
-    fn handle<A>(self, rt: &mut Runtime<NetworkApplication<A>>)
+    fn handle<A>(self, rt: &mut Runtime<Sim<A>>)
     where
-        A: EventLifecycle<NetworkApplication<A>>,
+        A: EventLifecycle<Sim<A>>,
     {
         enter_scope(self.module.scope_token());
 
@@ -219,60 +219,73 @@ pub struct ChannelUnbusyNotif {
 }
 
 impl ChannelUnbusyNotif {
-    fn handle<A>(self, rt: &mut Runtime<NetworkApplication<A>>)
+    fn handle<A>(self, rt: &mut Runtime<Sim<A>>)
     where
-        A: EventLifecycle<NetworkApplication<A>>,
+        A: EventLifecycle<Sim<A>>,
     {
         self.channel.unbusy(rt);
     }
 }
 
 impl ModuleRef {
-    pub(crate) fn num_sim_start_stages(&self) -> usize {
-        self.processing.borrow().handler.num_sim_start_stages()
-    }
-
     pub(crate) fn reset(&self) {
         let mut brw = self.processing.borrow_mut();
-        brw.handler.reset();
+
+        #[cfg(feature = "async")]
+        self.ctx.async_ext.write().reset();
+
+        Harness::new(&self.ctx)
+            .exec(move || brw.handler.reset())
+            .pass();
     }
 
     #[cfg(feature = "async")]
     pub(crate) fn async_wakeup(&self) {
         if self.ctx.active.load(SeqCst) {
             self.processing.borrow_mut().incoming_upstream(None);
-            if self.processing.borrow().handler.__indicate_async() {
-                self.processing.borrow().run_without_event();
-            }
+            Harness::new(&self.ctx).exec(|| {}).catch();
             self.processing.borrow_mut().incoming_downstream();
-        }else {
+        } else {
             #[cfg(feature = "tracing")]
             tracing::debug!("Ignoring message since module is inactive");
         }
-    } 
+    }
 
     pub(crate) fn module_restart(&self) {
-         #[cfg(feature = "tracing")]
-         tracing::debug!("Restarting module");
-         // restart the module itself.
-         self.ctx.active.store(true, SeqCst);
+        #[cfg(feature = "tracing")]
+        tracing::debug!("Restarting module");
+        // restart the module itself.
+        self.ctx.active.store(true, SeqCst);
 
-         // Do sim start procedure
-         let stages = self.num_sim_start_stages();
-         for stage in 0..stages {
-             self.at_sim_start(stage);
-         }
-
-         #[cfg(feature = "async")]
-         self.finish_sim_start();
+        // Do sim start procedure
+        let stages = self.num_sim_start_stages();
+        for stage in 0..stages {
+            self.at_sim_start(stage);
+        }
     }
 
     pub(crate) fn handle_message(&self, msg: Message) {
-
-
         if self.ctx.active.load(SeqCst) {
-            // (0) Run upstream plugins.
-            self.processing.borrow_mut().incoming(Some(msg));
+            let mut processing = self.processing.borrow_mut();
+
+            // Upstream
+            let msg = processing.incoming_upstream(Some(msg));
+
+            // Peek
+            processing.state = ProcessingState::Peek;
+            if let Some(msg) = msg {
+                Harness::new(&self.ctx)
+                    .exec(|| {
+                        let msg = msg;
+                        processing.handler.handle_message(msg);
+                    })
+                    .catch();
+            } else {
+                Harness::new(&self.ctx).exec(|| {}).catch();
+            }
+
+            // Downstream
+            processing.incoming_downstream();
         } else {
             #[cfg(feature = "tracing")]
             tracing::debug!("Ignoring message since module is inactive");
@@ -280,33 +293,48 @@ impl ModuleRef {
     }
 
     pub(crate) fn at_sim_start(&self, stage: usize) {
-        self.processing.borrow_mut().incoming_upstream(None);
-        self.processing.borrow_mut().handler.at_sim_start(stage);
-        self.processing.borrow_mut().incoming_downstream();
+        let mut processing = self.processing.borrow_mut();
 
+        processing.incoming_upstream(None);
+        Harness::new(&self.ctx)
+            .exec(|| processing.handler.at_sim_start(stage))
+            .catch();
+        processing.incoming_downstream();
     }
 
-    #[cfg(feature = "async")]
-    pub(crate) fn finish_sim_start(&self) {
-        if self.processing.borrow().handler.__indicate_async() {
-            self.processing.borrow_mut().incoming_upstream(None);
-            self.processing.borrow_mut().handler.finish_sim_start();
-            self.processing.borrow_mut().incoming_downstream();
-        }
+    pub(crate) fn num_sim_start_stages(&self) -> usize {
+        // No harness since this method bust be called before startin initalization to check the number of loops
+        self.processing.borrow().handler.num_sim_start_stages()
     }
 
     pub(crate) fn at_sim_end(&self) {
-        self.processing.borrow_mut().incoming_upstream(None);
-        self.processing.borrow_mut().handler.at_sim_end();
-        self.processing.borrow_mut().incoming_downstream();
-    }
+        let mut processing = self.processing.borrow_mut();
 
-    #[cfg(feature = "async")]
-    pub(crate) fn finish_sim_end(&self) {
-        if self.processing.borrow().handler.__indicate_async() {
-            self.processing.borrow_mut().incoming_upstream(None);
-            self.processing.borrow_mut().handler.finish_sim_end();
-            self.processing.borrow_mut().incoming_downstream();
+        processing.incoming_upstream(None);
+        Harness::new(&self.ctx)
+            .exec(|| processing.handler.at_sim_end())
+            .catch();
+        #[cfg(feature = "async")]
+        {
+            let Some((rt, task_set)) = self.ctx.async_ext.write().rt.current() else {
+                panic!("WHERE MY RT");
+            };
+
+            let mut joins = Vec::new();
+            std::mem::swap(&mut self.ctx.async_ext.write().require_joins, &mut joins);
+
+            let _guard = rt.enter();
+            task_set.block_on(&rt, yield_now());
+
+            for join in joins {
+                assert!(join.is_finished(), "could not join task: not yet finished");
+
+                let join_result = rt.block_on(join);
+                if let Err(e) = join_result {
+                    panic!("could not join task: {e}")
+                }
+            }
         }
+        processing.incoming_downstream();
     }
 }

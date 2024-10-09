@@ -1,0 +1,36 @@
+entry: Main
+modules:
+  Node:
+    gates:
+    - in
+    - out
+  Main:
+    submodules:
+      ring[5]: Node
+    connections:
+    - peers:
+      - ring[0]/out
+      - ring[1]/in
+      link: Delay
+    - peers:
+      - ring[1]/out
+      - ring[2]/in
+      link: Delay
+    - peers:
+      - ring[2]/out
+      - ring[3]/in
+      link: Delay
+    - peers:
+      - ring[3]/out
+      - ring[4]/in
+      link: Delay
+    - peers:
+      - ring[4]/out
+      - ring[0]/in
+      link: Delay
+links:
+  Delay:
+    latency: 0.1
+    jitter: 0.0
+    bitrate: 10000000
+    queuesize: '1000'

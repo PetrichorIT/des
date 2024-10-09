@@ -1,0 +1,30 @@
+entry: A
+modules:
+  A:
+    submodules:
+      bob[100]: Bob
+  Bob:
+    gates:
+    - netIn[3]
+    - netOut[3]
+    - uplink
+    submodules:
+      child: Alice
+    connections:
+    - peers:
+      - netOut
+      - child/netIn
+      link: Link
+    - peers:
+      - netIn
+      - child/netOut
+      link: Link
+  Alice:
+    gates:
+    - netIn[3]
+    - netOut[3]
+links:
+  Link:
+    latency: 0.1
+    jitter: 0.1
+    bitrate: 10000

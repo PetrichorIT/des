@@ -1,5 +1,0 @@
-include sub;
-
-module M: B {}
-
-entry M;

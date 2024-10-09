@@ -1,0 +1,16 @@
+entry: Main
+modules:
+  A:
+    gates:
+    - port
+  Main:
+    submodules:
+      b: B
+      a: A
+    connections:
+    - peers:
+      - a/port
+      - b/port
+  B:
+    gates:
+    - port

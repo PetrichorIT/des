@@ -32,12 +32,13 @@ cfg_net! {
     pub use crate::net::message::MessageId;
     pub use crate::net::message::MessageKind;
     pub use crate::net::message::MessageHeader;
-    pub use crate::net::message::MessageType;
 
     pub use crate::net::message::{send, send_in, send_at, schedule_in, schedule_at};
 
-    pub use crate::net::NetworkApplication;
-    pub use crate::net::NetworkApplicationGlobals;
+    pub use crate::net::Sim;
+    pub use crate::net::ScopedSim;
+    pub use crate::net::Globals;
+    pub use crate::net::Watcher;
 
     pub use crate::net::channel::Channel;
     pub use crate::net::channel::ChannelMetrics;
@@ -47,6 +48,8 @@ cfg_net! {
     pub use crate::net::gate::Gate;
     pub use crate::net::gate::GateRef;
 
+    pub use crate::net::topology::Topology;
+
     pub use crate::net::module::Module;
     pub use crate::net::module::ModuleId;
     pub use crate::net::module::ModuleRef;
@@ -55,25 +58,15 @@ cfg_net! {
     pub use crate::net::module::{
         current, shutdow_and_restart_at, shutdow_and_restart_in, shutdown
     };
-    pub use crate::net::{par, par_for};
+
 
     pub use crate::net::ObjectPath;
-    pub use crate::net::ParMap;
-
-    pub use crate::net::TopoEdge;
-    pub use crate::net::TopoNode;
-    pub use crate::net::Topology;
+    pub use crate::net::{par, par_for};
 
     pub use crate::net::processing::ProcessingElement;
 
-    cfg_ndl! {
-        pub use crate::ndl::NdlApplication;
-        pub use crate::ndl::Registry;
-    }
-
-    cfg_async! {
-        pub use crate::net::module::AsyncModule;
-    }
+    pub use crate::net::ndl::Registry;
+    pub use crate::net::ndl::RegistryCreatable;
 
     pub use std::net::IpAddr;
     pub use std::net::Ipv4Addr;

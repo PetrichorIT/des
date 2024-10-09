@@ -4,29 +4,17 @@ use std::sync::{
     Arc,
 };
 
-use des::{
-    net::channel::{ChannelDropBehaviour, ChannelProbe},
-    prelude::*,
-};
+use des::{net::channel::ChannelProbe, prelude::*};
+use rand::{rngs::StdRng, SeedableRng};
 use serial_test::serial;
 
-#[macro_use]
-mod common;
-
+#[derive(Default)]
 struct DropChanModule {
     send: usize,
     received: usize,
 }
-impl_build_named!(DropChanModule);
 
 impl Module for DropChanModule {
-    fn new() -> Self {
-        Self {
-            send: 0,
-            received: 0,
-        }
-    }
-
     fn at_sim_start(&mut self, _stage: usize) {
         send(Message::new().content([0u8; 512]).build(), "out");
         send(Message::new().content([1u8; 512]).build(), "out");
@@ -46,45 +34,31 @@ impl Module for DropChanModule {
 #[test]
 #[serial]
 fn channel_dropping_message() {
-    let mut rt = NetworkApplication::new(());
+    let mut rt = Sim::new(());
+    rt.node("root", DropChanModule::default());
 
-    let module = DropChanModule::build_named(ObjectPath::from("root".to_string()), &mut rt);
+    let g_in = rt.gate("root", "in");
+    let g_out = rt.gate("root", "out");
 
-    let g_in = module.create_gate("in");
-    let g_out = module.create_gate("out");
-
-    let channel = Channel::new(
-        ObjectPath::appended_channel(&module.path(), "chan"),
-        ChannelMetrics {
-            bitrate: 1000,
-            latency: Duration::from_millis(100),
-            jitter: Duration::ZERO,
-            drop_behaviour: ChannelDropBehaviour::default(),
-        },
-    );
+    let channel = Channel::new(ChannelMetrics {
+        bitrate: 1000,
+        latency: Duration::from_millis(100),
+        jitter: Duration::ZERO,
+        drop_behaviour: ChannelDropBehaviour::default(),
+    });
     g_in.connect(g_out, Some(channel));
-
-    rt.register_module(module);
 
     let rt = Builder::seeded(123).build(rt);
     let _ = rt.run();
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct BufferChanModule {
     send: usize,
     received: usize,
 }
-impl_build_named!(BufferChanModule);
 
 impl Module for BufferChanModule {
-    fn new() -> Self {
-        Self {
-            send: 0,
-            received: 0,
-        }
-    }
-
     fn at_sim_start(&mut self, _stage: usize) {
         send(Message::new().content([0u8; 512]).build(), "out");
         send(Message::new().content([1u8; 512]).build(), "out");
@@ -110,37 +84,26 @@ fn channel_buffering_message() {
     //     .interal_max_log_level(log::LevelFilter::Trace)
     //     .set_logger();
 
-    let mut rt = NetworkApplication::new(());
+    let mut rt = Sim::new(());
+    rt.node("root", BufferChanModule::default());
 
-    let module = BufferChanModule::build_named(ObjectPath::from("root".to_string()), &mut rt);
+    let g_in = rt.gate("root", "in");
+    let g_out = rt.gate("root", "out");
 
-    let g_in = module.create_gate("in");
-    let g_out = module.create_gate("out");
-
-    let channel = Channel::new(
-        ObjectPath::appended_channel(&module.path(), "chan"),
-        ChannelMetrics {
-            bitrate: 1000,
-            latency: Duration::from_millis(100),
-            jitter: Duration::ZERO,
-            drop_behaviour: ChannelDropBehaviour::Queue(Some(600)),
-        },
-    );
+    let channel = Channel::new(ChannelMetrics {
+        bitrate: 1000,
+        latency: Duration::from_millis(100),
+        jitter: Duration::ZERO,
+        drop_behaviour: ChannelDropBehaviour::Queue(Some(600)),
+    });
     g_in.connect(g_out, Some(channel));
-
-    rt.register_module(module);
 
     let rt = Builder::seeded(123).build(rt);
     let _ = rt.run();
 }
 
 struct SendMessageModule;
-impl_build_named!(SendMessageModule);
 impl Module for SendMessageModule {
-    fn new() -> Self {
-        Self
-    }
-
     fn at_sim_start(&mut self, _stage: usize) {
         schedule_in(Message::new().kind(10).build(), Duration::from_secs(1));
     }
@@ -162,45 +125,50 @@ fn channel_instant_busy() {
     //     .interal_max_log_level(log::LevelFilter::Trace)
     //     .set_logger();
 
-    let mut rt = NetworkApplication::new(());
+    let mut rt = Sim::new(());
+    rt.node("root", SendMessageModule);
 
-    let module = SendMessageModule::build_named(ObjectPath::from("root".to_string()), &mut rt);
+    let g_in = rt.gate("root", "in");
+    let g_out = rt.gate("root", "out");
 
-    let g_in = module.create_gate("in");
-    let g_out = module.create_gate("out");
-
-    let channel = Channel::new(
-        ObjectPath::appended_channel(&module.path(), "chan"),
-        ChannelMetrics {
-            bitrate: 1000,
-            latency: Duration::from_millis(100),
-            jitter: Duration::ZERO,
-            drop_behaviour: ChannelDropBehaviour::default(),
-        },
-    );
+    let channel = Channel::new(ChannelMetrics::new(
+        1000,
+        Duration::from_millis(100),
+        Duration::ZERO,
+        ChannelDropBehaviour::default(),
+    ));
 
     g_in.connect(g_out, Some(channel));
-    rt.register_module(module);
 
     let rt = Builder::seeded(123).build(rt);
     let _ = rt.run();
 }
 
+#[derive(Default)]
 struct ChannelProbing(Arc<AtomicUsize>);
-impl_build_named!(ChannelProbing);
 impl Module for ChannelProbing {
-    fn new() -> Self {
-        Self(Arc::new(AtomicUsize::new(0)))
-    }
     fn at_sim_start(&mut self, _stage: usize) {
-        current()
-            .gate("port", 0)
-            .unwrap()
-            .channel()
-            .unwrap()
-            .attach_probe(Probe(self.0.clone()));
+        let chan = current().gate("port", 0).unwrap().channel().unwrap();
 
-        send(Message::new().build(), "port")
+        chan.attach_probe(Probe(self.0.clone()));
+        assert_eq!(chan.metrics().bitrate, 1234);
+
+        let msg = Message::new().build();
+        let busy_time = chan.calculate_busy(&msg);
+        let tft = SimTime::now() + busy_time;
+        dbg!(busy_time);
+        assert_eq!(
+            tft + Duration::from_millis(100),
+            SimTime::from_duration(chan.calculate_duration(&msg, &mut StdRng::seed_from_u64(123)))
+        );
+
+        assert_eq!(chan.transmission_finish_time(), SimTime::MIN);
+        assert_eq!(format!("{chan:?}"), format!("Channel {{ metrics: ChannelMetrics {{ bitrate: 1234, latency: 100ms, jitter: 0ns, drop_behaviour: Drop }}, state: Idle }}"));
+
+        send(msg, "port");
+
+        assert_eq!(chan.transmission_finish_time(), tft);
+        assert_eq!(format!("{chan:?}"), format!("Channel {{ metrics: ChannelMetrics {{ bitrate: 1234, latency: 100ms, jitter: 0ns, drop_behaviour: Drop }}, state: Busy {{ until: {tft}, bytes: 0, packets: 0 }} }}"));
     }
 
     fn at_sim_end(&mut self) {
@@ -222,29 +190,60 @@ fn channel_probes() {
     //     .interal_max_log_level(log::LevelFilter::Trace)
     //     .set_logger();
 
-    let mut rt = NetworkApplication::new(());
+    let mut rt = Sim::new(());
+    rt.node("alice", ChannelProbing::default());
+    rt.node("bob", ChannelProbing::default());
 
-    let alice = ChannelProbing::build_named(ObjectPath::from("alice".to_string()), &mut rt);
-    let bob = ChannelProbing::build_named(ObjectPath::from("bob".to_string()), &mut rt);
+    let alice_port = rt.gate("alice", "port");
+    let bob_port = rt.gate("bob", "port");
 
-    let alice_port = alice.create_gate("port");
-    let bob_port = bob.create_gate("port");
-
-    let chan = Channel::new(
-        ObjectPath::appended_channel(&alice.path(), "chan"),
-        ChannelMetrics {
-            bitrate: 1000,
-            latency: Duration::from_millis(100),
-            jitter: Duration::ZERO,
-            drop_behaviour: ChannelDropBehaviour::default(),
-        },
-    );
+    let chan = Channel::new(ChannelMetrics {
+        bitrate: 1234,
+        latency: Duration::from_millis(100),
+        jitter: Duration::ZERO,
+        drop_behaviour: ChannelDropBehaviour::default(),
+    });
 
     alice_port.connect(bob_port, Some(chan));
 
-    rt.register_module(alice);
-    rt.register_module(bob);
-
     let rt = Builder::seeded(123).build(rt);
     let _ = rt.run();
+}
+
+struct LatencyOnly(usize);
+
+impl Module for LatencyOnly {
+    fn at_sim_start(&mut self, _stage: usize) {
+        for _ in 0..10 {
+            send(Message::new().build(), "out");
+        }
+    }
+
+    fn handle_message(&mut self, _msg: Message) {
+        self.0 += 1;
+    }
+
+    fn at_sim_end(&mut self) {
+        assert_eq!(self.0, 10);
+    }
+}
+
+#[test]
+#[serial]
+fn latency_only_channel() {
+    let mut sim = Sim::new(());
+    sim.node("alice", LatencyOnly(0));
+    let gout = sim.gate("alice", "out");
+    let gin = sim.gate("alice", "in");
+    gout.connect(
+        gin,
+        Some(Channel::new(ChannelMetrics::new(
+            0,
+            Duration::from_secs(1),
+            Duration::ZERO,
+            ChannelDropBehaviour::Drop,
+        ))),
+    );
+
+    let _ = Builder::seeded(123).build(sim).run();
 }

@@ -168,50 +168,8 @@ impl Message {
     /// Returns an error if either there is no content, or
     /// the content is not of type T.
     pub fn try_cast<T: 'static + MessageBody + Send>(self) -> Result<(T, MessageHeader), Self> {
-        // SAFTY:
-        // Since T is 'Send' this is safe within the bounds of Messages safty contract
-        unsafe { self.try_cast_unsafe::<T>() }
-    }
-
-    ///
-    /// Performs a [`try_cast_unsafe`](Message::try_cast_unsafe) unwraping the result.
-    ///
-    /// # Safety
-    ///
-    /// See [`try_cast_unsafe`](Message::try_cast_unsafe)
-    ///
-    /// # Panics
-    ///
-    /// Panics if he cast fails.
-    #[must_use]
-    pub unsafe fn cast_unsafe<T: 'static + MessageBody>(self) -> (T, MessageHeader) {
-        self.try_cast_unsafe().expect("Could not cast to type T")
-    }
-
-    ///
-    /// Consumes the message casting the stored ptr
-    /// into a Box of type T.
-    ///
-    /// ## Safety
-    ///
-    /// The caller must ensure that the stored data is a valid instance
-    /// of type T. If this cannot be guarnteed this is UB.
-    /// Note that DES guarntees that the data refernced by ptr will not
-    /// be freed until this function is called, and ownership is thereby moved..
-    /// Note that this function allows T to be !Send. Be aware of safty problems arriving
-    /// from this.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if either there is no content,
-    /// or the content is not of type T.
-    ///
-
-    pub unsafe fn try_cast_unsafe<T: 'static + MessageBody>(
-        self,
-    ) -> Result<(T, MessageHeader), Self> {
         let Message { header, content } = self;
-        let content = match content.map(|c| c.try_cast_unsafe::<T>()) {
+        let content = match content.map(AnyBox::try_cast) {
             Some(Ok(c)) => c,
             Some(Err(content)) => {
                 return Err(Self {
@@ -251,10 +209,10 @@ impl Message {
     /// Tries to create a duplicate of the message, assuming its content is of type T.
     ///
     /// - If the messages body is of type T, the body will be cloned as specified by T
-    /// and the dup will succeed.
+    ///   and the dup will succeed.
     /// - If the message body is not of type T, this function will return `None`.
     /// - If the message has no body it will succeed independent of T and clone only the
-    /// attached metadata.
+    ///   attached metadata.
     ///
     #[must_use]
     pub fn try_dup<T>(&self) -> Option<Self>
@@ -267,7 +225,7 @@ impl Message {
             None
         };
 
-        let header = Box::new(self.header.dup());
+        let header = Box::new(self.header.dup(SimTime::now()));
 
         Some(Self { header, content })
     }
@@ -385,18 +343,6 @@ impl MessageBuilder {
         self
     }
 
-    /// Sets the field `content`.
-    #[must_use]
-    #[allow(clippy::cast_possible_truncation)]
-    pub fn content_boxed<T>(mut self, content: Box<T>) -> Self
-    where
-        T: 'static + MessageBody + Send,
-    {
-        self.header.length = content.byte_len() as u32;
-        self.content = Some(AnyBox::new(*content));
-        self
-    }
-
     /// Builds a message from the builder.
     #[must_use]
     pub fn build(self) -> Message {
@@ -421,3 +367,54 @@ impl Debug for MessageBuilder {
 // SAFTY:
 // Dervived from safty invariants of [Message].
 unsafe impl Send for MessageBuilder {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::any::type_name;
+
+    #[test]
+    fn message_fmt() {
+        let msg = Message::new()
+            .id(123)
+            .src([1; 6])
+            .dest([2; 6])
+            .content(String::from("Hello world!"))
+            .build();
+
+        #[cfg(debug_assertions)]
+        assert_eq!(
+            msg.str(),
+            format!("Message {{ 12 bytes {}  }}", type_name::<String>())
+        );
+
+        assert!(msg.can_cast::<String>());
+        assert_eq!(msg.content::<String>(), "Hello world!");
+    }
+
+    #[test]
+    fn message_builder_fmt() {
+        assert_eq!(format!("{:?}", MessageBuilder::default()), "MessageBuilder");
+    }
+
+    #[test]
+    fn message_cast() {
+        struct A(i32);
+        impl MessageBody for A {
+            fn byte_len(&self) -> usize {
+                0
+            }
+        }
+
+        let msg = Message::new()
+            .header(MessageHeader::default())
+            .id(123)
+            .receiver_module_id(ModuleId(1))
+            .sender_module_id(ModuleId(2))
+            .content(A(42))
+            .build();
+        let (value, header) = msg.cast::<A>();
+        assert_eq!(header.id, 123);
+        assert_eq!(value.0, 42);
+    }
+}

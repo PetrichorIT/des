@@ -1,8 +1,0 @@
-include direct;
-
-link Main: Direct {
-    shared: 1.0
-}
-
-module MainM {}
-entry MainM;

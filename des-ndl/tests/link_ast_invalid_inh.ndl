@@ -1,5 +1,0 @@
-link A: A + B + {
-    jitter: 0.0,
-    bitrate: 1000,
-    latency: 0.0
-}

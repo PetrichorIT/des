@@ -2,7 +2,7 @@
 
 use std::io;
 
-use des::net::{Par, par_export};
+use des::net::{par_export, ModuleFn, Par};
 use des::prelude::*;
 use serial_test::serial;
 
@@ -11,26 +11,28 @@ fn par_for_r(module: &str, key: &str) -> Par {
 }
 
 const EXAMPLE_TYPES: &str = "
-    netA.*.text = \"My name\"
-    netA.s0.usize = 123
-    netA.s1.usize = 420
-    netA.s1.isize = -120
+    netA.*.text: \"My name\"
+    netA.s0.usize: 123
+    netA.s1.usize: 420
+    netA.s1.isize: -120
 ";
 
 const EXAMPLE_NETWORK: &str = "
-    netA.*.dnsServer = 1.1.1.1
-    netA.s0.ip = 0.0.0.1
-    netA.s1.ip = 0.0.0.1
-    netA.s1.ipv6 = fe80
+    netA.*.dnsServer: 1.1.1.1
+    netA.s0.ip: 0.0.0.1
+    netA.s1.ip: 0.0.0.1
+    netA.s1.ipv6: fe80
 ";
 
 #[test]
 #[serial]
 fn non_parse_read() {
-    let rt = NetworkApplication::new(());
+    let rt = Sim::new(());
     let par = &rt.globals().parameters;
 
     par.build(EXAMPLE_NETWORK);
+
+    assert!(par_for_r("netB.s1", "dnsServer").is_none());
 
     // Case "netA.s0"
     assert_eq!(
@@ -69,7 +71,7 @@ fn non_parse_read() {
 #[test]
 #[serial]
 fn parse_integers() {
-    let rt = NetworkApplication::new(());
+    let rt = Sim::new(());
     let par = &rt.globals().parameters;
 
     par.build(EXAMPLE_TYPES);
@@ -77,7 +79,7 @@ fn parse_integers() {
     // Case "netA.s0"
     assert_eq!(
         *par_for_r("netA.s0", "text").unwrap(),
-        "\"My name\"".to_string()
+        "My name".to_string()
     );
     assert_eq!(
         par_for_r("netA.s0", "usize")
@@ -91,7 +93,7 @@ fn parse_integers() {
     // Case "netA.s1"
     assert_eq!(
         *par_for_r("netA.s1", "text").unwrap(),
-        "\"My name\"".to_string()
+        "My name".to_string()
     );
     assert_eq!(
         par_for_r("netA.s1", "usize")
@@ -111,7 +113,7 @@ fn parse_integers() {
     // Case "netA.other"
     assert_eq!(
         par_for_r("netA.other", "text").as_option(),
-        Some("\"My name\"".to_string())
+        Some("My name".to_string())
     );
     assert_eq!(par_for_r("netA.other", "usize").as_option(), None);
     assert_eq!(par_for_r("netA.other", "isize").as_option(), None);
@@ -120,29 +122,62 @@ fn parse_integers() {
 #[test]
 #[serial]
 fn parse_strings() {
-    let rt = NetworkApplication::new(());
+    let rt = Sim::new(());
     let par = &rt.globals().parameters;
     par.build(EXAMPLE_TYPES);
 
     let handle = par_for_r("netA.other", "text").unwrap();
 
-    assert_eq!(&*handle, "\"My name\"");
+    assert_eq!(&*handle, "My name");
     assert_eq!(handle.into_inner(), "My name".to_string());
 }
 
 #[test]
 #[serial]
-fn par_export_test() -> io::Result<()> {
-    let rt = NetworkApplication::new(());
-    rt.globals().parameters.build(EXAMPLE_NETWORK);
+fn par_remove() {
+    let mut sim = Sim::new(());
+    sim.globals().parameters.build("counter: 123");
+    sim.node(
+        "",
+        ModuleFn::new(
+            || {
+                assert!(par("counter").is_some());
+                let _ = par("counter").unset();
+                assert!(par("counter").is_none());
+            },
+            |_, _| {},
+        ),
+    );
 
+    let _ = Builder::seeded(123).build(sim).run();
+}
+
+#[test]
+#[serial]
+#[should_panic = "failed to unwrap addr"]
+fn par_panic() {
+    let sim = Sim::new(());
+    let mut sim = Builder::seeded(123).build(sim);
+    sim.start();
+    let _ = par_for("addr", "alice").expect("failed to unwrap addr");
+    sim.dispatch_all();
+    let _ = sim.finish();
+}
+
+#[test]
+#[serial]
+fn par_export_test() -> io::Result<()> {
+    let rt = Sim::new(());
+    rt.globals().parameters.build(EXAMPLE_NETWORK);
 
     let mut str = Vec::new();
     par_export(&mut str)?;
 
     let str = String::from_utf8_lossy(&str);
-    assert_eq!(str, "netA.*.dnsServer = 1.1.1.1\nnetA.s0.ip = 0.0.0.1\nnetA.s1.ipv6 = fe80\nnetA.s1.ip = 0.0.0.1\n");
-
+    assert_eq!(
+        str,
+        "netA._.dnsServer: 1.1.1.1\nnetA.s1.ipv6: fe80\nnetA.s1.ip: 0.0.0.1\nnetA.s0.ip: 0.0.0.1\n"
+    );
 
     Ok(())
 }

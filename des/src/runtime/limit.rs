@@ -75,3 +75,52 @@ impl Display for RuntimeLimit {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn raw_limits() {
+        let limit = RuntimeLimit::None;
+        assert_eq!(limit.to_string(), "None");
+        assert!(!limit.applies(123, 100.0.into()));
+        assert!(!limit.applies(0, 0.0.into()));
+        assert!(!limit.applies(usize::MAX, SimTime::MAX));
+
+        let limit = RuntimeLimit::EventCount(100);
+        assert_eq!(limit.to_string(), "MaxEventCount(100)");
+        assert!(!limit.applies(23, 100.0.into()));
+        assert!(limit.applies(101, 0.0.into()));
+        assert!(limit.applies(101, SimTime::MAX));
+        assert!(limit.applies(230, 23.0.into()));
+
+        let limit = RuntimeLimit::SimTime(100.0.into());
+        assert_eq!(limit.to_string(), "MaxSimTime(100s)");
+        assert!(!limit.applies(0, 10.0.into()));
+        assert!(!limit.applies(0, 100.0.into()));
+        assert!(limit.applies(0, 100.000001.into()));
+        assert!(limit.applies(0, SimTime::MAX));
+    }
+
+    #[test]
+    fn combined_limits() {
+        use RuntimeLimit::*;
+
+        let limit = CombinedAnd(Box::new(EventCount(100)), Box::new(SimTime(100.0.into())));
+        assert_eq!(limit.to_string(), "MaxEventCount(100) and MaxSimTime(100s)");
+        assert!(!limit.applies(200, 10.0.into()));
+        assert!(!limit.applies(0, 200.0.into()));
+        assert!(limit.applies(101, 100.000001.into()));
+
+        let limit = CombinedOr(Box::new(EventCount(100)), Box::new(SimTime(100.0.into())));
+        assert_eq!(limit.to_string(), "MaxEventCount(100) or MaxSimTime(100s)");
+        assert!(!limit.applies(20, 10.0.into()));
+        assert!(limit.applies(0, 200.0.into()));
+        assert!(limit.applies(101, 10.0.into()));
+
+        let mut other = RuntimeLimit::EventCount(100);
+        other.add(SimTime(100.0.into()));
+        assert_eq!(limit, other);
+    }
+}

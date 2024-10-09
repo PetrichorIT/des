@@ -13,7 +13,7 @@ use rand::{
 
 use crate::prelude::SimTime;
 
-use super::{Application, FutureEventSet, Profiler, Runtime, RuntimeLimit, RNG};
+use super::{Application, FutureEventSet, Profiler, Runtime, RuntimeLimit, State, RNG};
 
 /// A lock the ensures only one runtime exits at a time.
 static SIMULATION_LOCK: Mutex<()> = Mutex::new(());
@@ -204,6 +204,7 @@ impl Builder {
             quiet: self.quiet,
             profiler: Profiler::default(),
 
+            state: State::Ready,
             app,
         }
     }

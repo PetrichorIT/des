@@ -1,9 +1,4 @@
-use std::cmp;
-use std::fmt::{Debug, Display};
-use std::marker::PhantomData;
-
 use crate::runtime::Runtime;
-use crate::time::SimTime;
 
 ///
 /// A trait that defines an runtime application
@@ -42,7 +37,7 @@ where
     /// Since events sets are usually macro-generated this is just a match statement that calls
     /// the handle function on the given variant, as defined by the trait [Event].
     ///
-    fn handle(self, rt: &mut Runtime<A>);
+    fn handle(self, runtime: &mut Runtime<A>);
 }
 
 ///
@@ -67,7 +62,7 @@ where
     /// but could lead to unexpected behaviour if not done properly in custom
     /// event set implementations.
     ///
-    fn handle(self, rt: &mut Runtime<App>);
+    fn handle(self, runtime: &mut Runtime<App>);
 }
 
 ///
@@ -93,13 +88,14 @@ pub trait EventLifecycle<A = Self> {
     ///     type Lifecycle = Self;
     /// }
     /// impl EventLifecycle for MyApp {
-    ///     fn at_sim_start(rt: &mut Runtime<Self>) {
-    ///         rt.app.workers.iter_mut().for_each(|w| w.initalize());
+    ///     fn at_sim_start(runtime: &mut Runtime<Self>) {
+    ///         runtime.app.workers.iter_mut().for_each(|w| w.initalize());
     ///     }
     /// }
     /// ```
     ///
-    fn at_sim_start(_rt: &mut Runtime<A>)
+    #[allow(unused_variables)]
+    fn at_sim_start(runtime: &mut Runtime<A>)
     where
         A: Application,
     {
@@ -130,11 +126,16 @@ pub trait EventLifecycle<A = Self> {
     /// }
     /// ```
     ///
-    fn at_sim_end(_rt: &mut Runtime<A>)
+    #[allow(unused_variables)]
+    fn at_sim_end(runtime: &mut Runtime<A>)
     where
         A: Application,
     {
     }
+}
+
+impl<A: Application> EventSet<A> for () {
+    fn handle(self, _: &mut Runtime<A>) {}
 }
 
 impl<A> EventLifecycle<A> for () {}
@@ -144,102 +145,16 @@ impl<A> EventLifecycle<A> for () {}
 ///
 pub(crate) type EventId = usize;
 
-///
-/// A bin-heap node of a event from the applicaitons event set.
-///
-/// # Allocation
-///
-/// This node does not contain nested heap allocations by default,
-/// only if the generic event itself requires heap allocations.
-/// Nonetheless this node will be stored on the heap as it is
-/// only used inside a [`std::collections::BinaryHeap`].
-///
-pub(crate) struct EventNode<A>
-where
-    A: Application,
-{
-    /// The deadline timestamp for the event.
-    pub(crate) time: SimTime,
-    /// A runtime-specific unique identifier.
-    pub(crate) id: EventId,
-    /// The actual event.
-    pub(crate) event: A::EventSet,
-
-    /// A marker to preserve the type information concerning the application
-    /// not only the Event set.
-    pub(crate) _phantom: PhantomData<A>,
+impl<F: FnMut() -> R, R> Application for F {
+    type EventSet = ();
+    type Lifecycle = Self;
 }
 
-impl<A> cmp::PartialEq for EventNode<A>
-where
-    A: Application,
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
-    }
-}
-
-impl<A> cmp::Eq for EventNode<A> where A: Application {}
-
-impl<A> cmp::PartialOrd for EventNode<A>
-where
-    A: Application,
-{
-    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-
-    fn lt(&self, other: &Self) -> bool {
-        other.time < self.time
-    }
-
-    fn le(&self, other: &Self) -> bool {
-        other.time <= self.time
-    }
-
-    fn gt(&self, other: &Self) -> bool {
-        other.time > self.time
-    }
-
-    fn ge(&self, other: &Self) -> bool {
-        other.time >= self.time
-    }
-}
-
-impl<A> cmp::Ord for EventNode<A>
-where
-    A: Application,
-{
-    fn cmp(&self, other: &Self) -> cmp::Ordering {
-        // Inverted call should act as reverse
-        other.time.cmp(&self.time)
-    }
-}
-
-impl<A> Debug for EventNode<A>
-where
-    A: Application,
-    A::EventSet: Debug,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "EventNode {{ id: {} time: {} event: {:?} }}",
-            self.id, self.time, self.event
-        )
-    }
-}
-
-impl<A> Display for EventNode<A>
-where
-    A: Application,
-    A::EventSet: Display,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "EventNode {{ id: {} time: {} event: {} }}",
-            self.id, self.time, self.event
-        )
+impl<F: FnMut() -> R, R> EventLifecycle<F> for F {
+    fn at_sim_start(runtime: &mut Runtime<F>)
+    where
+        F: Application,
+    {
+        (runtime.app)();
     }
 }

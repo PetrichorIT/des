@@ -1,12 +1,9 @@
-///
 /// A trait that allows a type to be mesured in bits / bytes.
 ///
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub trait MessageBody {
-    ///
     /// The length of the message body in bytes.
-    ///
     fn byte_len(&self) -> usize;
 }
 
@@ -218,14 +215,15 @@ impl MessageBody for net::SocketAddr {
 }
 
 // # Time
+use crate::time;
 
-impl MessageBody for crate::time::Duration {
+impl MessageBody for time::Duration {
     fn byte_len(&self) -> usize {
         16
     }
 }
 
-impl MessageBody for crate::time::SimTime {
+impl MessageBody for time::SimTime {
     fn byte_len(&self) -> usize {
         16
     }
@@ -350,5 +348,130 @@ where
 {
     fn byte_len(&self) -> usize {
         self.byte_len
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{super::*, *};
+
+    #[test]
+    fn custom_message_body() {
+        let slice = "Hello world!";
+
+        let mut body = CustomSizeBody::new(16, slice);
+        assert_eq!(body.inner(), &"Hello world!");
+        assert_eq!(body.inner_mut(), &mut "Hello world!");
+
+        let msg = Message::new().content(body).build();
+        assert_eq!(msg.length(), 16 + 64);
+
+        let content = msg.content::<CustomSizeBody<&str>>();
+        assert_eq!((*content.inner()).as_ptr(), slice.as_ptr());
+
+        let content = content.clone();
+        assert_eq!(content.into_inner(), "Hello world!");
+    }
+
+    #[test]
+    fn auto_impl() {
+        assert_eq!(
+            [1, 2, 3, 4u8]
+                .into_iter()
+                .collect::<VecDeque<_>>()
+                .byte_len(),
+            4
+        );
+
+        assert_eq!(
+            [1, 2, 3, 4u8]
+                .into_iter()
+                .collect::<LinkedList<_>>()
+                .byte_len(),
+            4
+        );
+
+        assert_eq!(
+            [1, 2, 3, 4u8]
+                .into_iter()
+                .collect::<HashSet<_>>()
+                .byte_len(),
+            4
+        );
+
+        assert_eq!(
+            [1, 2, 3, 4u8]
+                .into_iter()
+                .collect::<BTreeSet<_>>()
+                .byte_len(),
+            4
+        );
+
+        assert_eq!(
+            [1, 2, 3, 4u8]
+                .into_iter()
+                .collect::<BinaryHeap<_>>()
+                .byte_len(),
+            4
+        );
+
+        assert_eq!(
+            [(1, 1), (2, 2), (3, 3), (4u8, 4u16)]
+                .into_iter()
+                .collect::<HashMap<_, _>>()
+                .byte_len(),
+            12
+        );
+
+        assert_eq!(
+            [(1, 1), (2, 2), (3, 3), (4u8, 4u16)]
+                .into_iter()
+                .collect::<BTreeMap<_, _>>()
+                .byte_len(),
+            12
+        );
+
+        assert_eq!((&[1, 2, 3, 4u8][..3]).byte_len(), 3);
+
+        assert_eq!(net::Ipv4Addr::new(1, 2, 3, 4).byte_len(), 4);
+        assert_eq!(net::Ipv6Addr::new(1, 2, 3, 4, 0, 0, 0, 0).byte_len(), 16);
+        assert_eq!(
+            net::IpAddr::V4(net::Ipv4Addr::new(1, 2, 3, 4)).byte_len(),
+            4
+        );
+        assert_eq!(
+            net::IpAddr::V6(net::Ipv6Addr::new(1, 2, 3, 4, 0, 0, 0, 0)).byte_len(),
+            16
+        );
+
+        assert_eq!(
+            net::SocketAddrV4::new(net::Ipv4Addr::new(1, 2, 3, 4), 0).byte_len(),
+            4 + 2
+        );
+        assert_eq!(
+            net::SocketAddrV6::new(net::Ipv6Addr::new(1, 2, 3, 4, 0, 0, 0, 0), 0, 0, 0).byte_len(),
+            16 + 2
+        );
+        assert_eq!(
+            net::SocketAddr::V4(net::SocketAddrV4::new(net::Ipv4Addr::new(1, 2, 3, 4), 0))
+                .byte_len(),
+            4 + 2
+        );
+        assert_eq!(
+            net::SocketAddr::V6(net::SocketAddrV6::new(
+                net::Ipv6Addr::new(1, 2, 3, 4, 0, 0, 0, 0),
+                0,
+                0,
+                0
+            ))
+            .byte_len(),
+            16 + 2
+        );
+
+        assert_eq!(time::Duration::from_secs(123).byte_len(), 16);
+        assert_eq!(
+            time::SimTime::from_duration(time::Duration::from_secs(123)).byte_len(),
+            16
+        );
     }
 }

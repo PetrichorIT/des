@@ -11,6 +11,7 @@ use std::{
     any::type_name,
     cell::UnsafeCell,
     fmt::{Debug, Display},
+    mem,
     sync::MutexGuard,
 };
 
@@ -29,9 +30,7 @@ pub use builder::*;
 mod metrics;
 
 pub(crate) const FT_NET: bool = cfg!(feature = "net");
-pub(crate) const FT_NDL: bool = cfg!(feature = "ndl");
 pub(crate) const FT_CQUEUE: bool = cfg!(feature = "cqueue");
-pub(crate) const FT_INTERNAL_METRICS: bool = cfg!(feature = "metrics");
 pub(crate) const FT_ASYNC: bool = cfg!(feature = "async");
 
 pub(crate) const SYM_CHECKMARK: char = '\u{2713}';
@@ -87,16 +86,17 @@ where
 /// parameter with an associated event set yourself. To do this follow this steps:
 ///
 /// - Create an 'App' struct that implements the trait [`Application`].
-/// This struct will hold the systems state and define the event set used in the simulation.
+///   This struct will hold the systems state and define the event set used in the simulation.
 /// - Create your events that handle the logic of you simulation. They must implement [`Event`] with the generic
-/// parameter A, where A is your 'App' struct.
+///   parameter A, where A is your 'App' struct.
 /// - To bind those two together create a enum that implements [`EventSet`] that holds all your events.
+///
 /// This can be done via a macro. The use this event set as the associated event set in 'App'.
 ///
 /// # Usage with module system
 ///
 /// If you want to use the module system for network-like simulations
-/// than you must create a [`NetworkApplication<A>`] as app parameter for the core [`Runtime`].
+/// than you must create a [`Sim<A>`] as app parameter for the core [`Runtime`].
 /// This network runtime comes preconfigured with an event set and all managment
 /// event nessecary for the simulation. All you have to do is to pass the app into [`Builder::build`]
 /// to create a runnable instance and the run it.
@@ -109,6 +109,8 @@ where
 {
     /// The contained runtime application, defining globals and the used event set.
     pub app: App,
+
+    state: State,
 
     // Rt limits
     limit: RuntimeLimit,
@@ -124,6 +126,12 @@ where
     permit: MutexGuard<'static, ()>,
 
     future_event_set: FutureEventSet<App>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum State {
+    Ready,
+    Running,
 }
 
 impl<A> Runtime<A>
@@ -148,14 +156,14 @@ where
     /// Returns the number of events that were dispatched on this [`Runtime`] instance.
     ///
     #[inline]
-    pub fn num_events_dispatched(&self) -> usize {
+    pub fn num_events_scheduled(&self) -> usize {
         self.event_id
     }
 
     ///
     /// Returns the number of events that were recieved & handled on this [`Runtime`] instance.
     ///
-    pub fn num_events_received(&self) -> usize {
+    pub fn num_events_dispatched(&self) -> usize {
         self.itr
     }
 
@@ -166,13 +174,6 @@ where
     pub fn sim_time(&self) -> SimTime {
         SimTime::now()
     }
-
-    // ///
-    // /// Returns the random number generator by mutable refernce
-    // ///
-    // pub(crate) fn rng(&mut self) -> *mut StdRng {
-    //     self::rng()
-    // }
 
     ///
     /// Returns the rng.
@@ -201,71 +202,6 @@ impl<A> Runtime<A>
 where
     A: Application,
 {
-    ///
-    /// Creates a new [`Runtime`] Instance using an application as core,
-    /// and accepting events of type [`Event<A>`](crate::runtime::Event).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use des::prelude::*;
-    ///
-    /// // Assumme Application is implemented for App.
-    /// #[derive(Debug)]
-    /// struct App(usize,  String);
-    /// # impl Application for App {
-    /// #   type EventSet = Events;
-    /// #   type Lifecycle = ();
-    /// # }
-    /// # enum Events {}
-    /// # impl EventSet<App> for Events {
-    /// #   fn handle(self, rt: &mut Runtime<App>) {}
-    /// # }
-    ///
-    /// let app = App(42, String::from("Hello there!"));
-    /// let rt = Builder::new().build(app);
-    /// ```
-    ///
-    // #[must_use]
-    // pub fn new(app: A) -> Self {
-    //     Self::new_with(app, RuntimeOptions::default())
-    // }
-
-    ///
-    /// Creates a new [`Runtime`] Instance using an application as core,
-    /// and accepting events of type [`Event<A>`](crate::runtime::Event), using a custom set of
-    /// [`RuntimeOptions`].
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use des::prelude::*;
-    ///
-    /// // Assumme Application is implemented for App.
-    /// #[derive(Debug)]
-    /// struct App(usize,  String);
-    /// # impl Application for App {
-    /// #   type EventSet = Events;
-    /// #   type Lifecycle = ();
-    /// # }
-    /// # enum Events {}
-    /// # impl EventSet<App> for Events {
-    /// #   fn handle(self, rt: &mut Runtime<App>) {}
-    /// # }
-    ///
-    /// let app = App(42, String::from("Hello there!"));
-    /// let rt = Builder::seeded(42).max_itr(69).build(app);
-    /// ```
-    ///
-    /// # Panics
-    ///
-    /// Panics if no RNG can be created from the OS-RNG.
-    ///
-    // #[must_use]
-    // pub fn new_with(app: A, mut options: RuntimeOptions) -> Self {
-    //     todo!()
-    // }
-
     fn poison_cleanup() {
         // NOP
     }
@@ -315,21 +251,32 @@ where
     /// }
     ///
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the simulation has not been started.
     #[must_use]
     pub fn run(mut self) -> RuntimeResult<A> {
+        assert_eq!(
+            self.state,
+            State::Ready,
+            "Sim::run can only be used for simulations in the ready state"
+        );
         // (0) Start sim-start
         self.start();
 
         // (1) Event main loop
-        if !self.future_event_set.is_empty() {
-            while self.next() {}
-        }
+        self.dispatch_all();
 
         // (2) Finish sim-end
         self.finish()
     }
 
-    fn start(&mut self) {
+    /// Starts the simulation manually. If `Sim::run` is not used, use the combination
+    /// of start, tick and finish to complete a full execution cycle.
+    ///
+    /// `start` must be called before any calls to the main loop.
+    pub fn start(&mut self) {
         macro_rules! symbol {
             ($i:ident) => {
                 if $i {
@@ -341,70 +288,102 @@ where
         }
 
         // (0) Publish sim-start message
-        println!("\u{23A1}");
-        println!("\u{23A2} Simulation starting");
-        println!(
-            "\u{23A2}  net [{}] metrics [{}] cqueue [{}] ndl[{}] async[{}]",
-            symbol!(FT_NET),
-            symbol!(FT_INTERNAL_METRICS),
-            symbol!(FT_CQUEUE),
-            symbol!(FT_NDL),
-            symbol!(FT_ASYNC),
-        );
-        println!(
-            "\u{23A2}  Executor := {}",
-            self.future_event_set.descriptor()
-        );
-        println!("\u{23A2}  Event limit := {}", self.limit);
-        println!("\u{23A3}");
+        if !self.quiet {
+            println!("\u{23A1}");
+            println!("\u{23A2} Simulation starting");
+            println!(
+                "\u{23A2}  net [{}] cqueue [{}] async[{}]",
+                symbol!(FT_NET),
+                symbol!(FT_CQUEUE),
+                symbol!(FT_ASYNC),
+            );
+            println!(
+                "\u{23A2}  Executor := {}",
+                self.future_event_set.descriptor()
+            );
+            println!("\u{23A2}  Event limit := {}", self.limit);
+            println!("\u{23A3}");
+        }
 
         // (1) Start profiler
         self.profiler.start();
 
         // (2) sim-starting on application object
         A::Lifecycle::at_sim_start(self);
+
+        self.state = State::Running;
     }
 
-    /// Processes the next event in the future event list by calling its handler.
-    /// Returns `true` if there is another event in queue, false if not.
+    /// Executes the next n events in the runtime queue.
     ///
-    /// This function requires the caller to guarantee that at least one
-    /// event exists in the future event set.
-    #[allow(clippy::should_implement_trait)]
-    fn next(&mut self) -> bool {
-        debug_assert!(!self.future_event_set.is_empty());
+    /// # Panics
+    ///
+    /// This function panics if the simulation has not been started.
+    pub fn dispatch_n_events(&mut self, n: usize) -> bool {
+        assert_eq!(
+            self.state,
+            State::Running,
+            "dispatching is only allowed for running simulations"
+        );
 
-        let (event, time) = self.future_event_set.fetch_next();
+        let mut limit = RuntimeLimit::EventCount(self.num_events_dispatched() + n);
+        mem::swap(&mut self.limit, &mut limit);
+        self.dispatch_all();
+        self.limit = limit;
 
-        self.itr += 1;
+        false
+    }
 
-        if self.limit.applies(self.itr, time) {
-            self.future_event_set.add(time, event);
-            return false;
-        }
+    /// Executes runtime events until the runtime reaches the designated time
+    /// # Panics
+    ///
+    /// This function panics if the simulation has not been started.
+    pub fn dispatch_events_until(&mut self, t: SimTime) -> bool {
+        assert_eq!(
+            self.state,
+            State::Running,
+            "dispatching is only allowed for running simulations"
+        );
 
-        // Let this be the only position where SimTime is changed
-        SimTime::set_now(time);
+        let mut limit = RuntimeLimit::SimTime(t);
+        mem::swap(&mut self.limit, &mut limit);
+        self.dispatch_all();
+        self.limit = limit;
 
-        // {
-        //     #[cfg(feature = "tracing")]
-        //     let span = tracing::span!(tracing::Level::TRACE, "event", id = self.itr);
-        //     #[cfg(feature = "tracing")]
-        //     let _g = span.enter();
+        false
+    }
 
-        event.handle(self);
-        // }
-
-        !self.future_event_set.is_empty()
+    /// Executes runtime events until the runtime reaches the designated time
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the simulation has not been started.
+    pub fn dispatch_all(&mut self) {
+        assert_eq!(
+            self.state,
+            State::Running,
+            "dispatching is only allowed for running simulations"
+        );
+        while !self.dispatch_event() {}
     }
 
     /// Decontructs the runtime and returns the application and the final `sim_time`.
     ///
     /// This funtions should only be used when running the simulation with manual calls
     /// to [`next`](Runtime::next).
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the runtime is has not yet been started.
     #[allow(unused_mut)]
     #[must_use]
-    fn finish(mut self) -> RuntimeResult<A> {
+    pub fn finish(mut self) -> RuntimeResult<A> {
+        assert_eq!(
+            self.state,
+            State::Running,
+            "only a running simulation can be finished"
+        );
+
         // Call the fin-handler on the allocated application
         A::Lifecycle::at_sim_end(&mut self);
         self.profiler.finish(self.itr);
@@ -457,6 +436,34 @@ where
                 time,
             }
         }
+    }
+
+    /// Processes the next event in the future event list by calling its handler.
+    /// Returns `true` if the simulation should stop.
+    ///
+    /// This function requires the caller to guarantee that at least one
+    /// event exists in the future event set.
+    #[allow(clippy::should_implement_trait)]
+    fn dispatch_event(&mut self) -> bool {
+        if self.future_event_set.is_empty() {
+            return true;
+        }
+
+        let (event, time) = self.future_event_set.fetch_next();
+
+        if self.limit.applies(self.itr + 1, time) {
+            self.future_event_set.add(time, event);
+            return true;
+        }
+
+        self.itr += 1;
+
+        // Let this be the only position where SimTime is changed
+        SimTime::set_now(time);
+
+        event.handle(self);
+
+        false
     }
 
     ///
@@ -544,6 +551,7 @@ where
     ///
     pub fn add_event(&mut self, event: impl Into<A::EventSet>, time: SimTime) {
         self.future_event_set.add(time, event);
+        self.event_id += 1;
     }
 }
 
@@ -555,7 +563,7 @@ pub enum RuntimeResult<A> {
     /// The simulation has finished with an event count of `1`.
     /// This ususally inidcates that some parameter was invalid,
     /// or the user forgot to insert a startup event. However a
-    /// at_sim_start event has been called.
+    /// `at_sim_start` event has been called.
     EmptySimulation {
         /// The application provided upon runtime creation, only changed through
         /// the `at_sim_start` method of modules.
@@ -743,10 +751,10 @@ impl<A> RuntimeResult<A> {
 }
 
 cfg_net! {
-    use crate::net::{gate::{GateRef, Connection},  HandleMessageEvent, message::Message, MessageExitingConnection, module::ModuleRef, NetEvents, NetworkApplication};
+    use crate::net::{gate::{GateRef, Connection},  HandleMessageEvent, message::Message, MessageExitingConnection, module::ModuleRef, NetEvents, Sim};
 
-    impl<A> Runtime<NetworkApplication<A>> where
-        A: EventLifecycle<NetworkApplication<A>>,{
+    impl<A> Runtime<Sim<A>> where
+        A: EventLifecycle<Sim<A>>,{
         ///
         /// Adds a message event into a [`Runtime<NetworkApplication<A>>`] onto a gate.
         ///
@@ -793,9 +801,9 @@ where
             "Runtime<{}> {{ sim_time: {} (itr {} / {}) dispached: {} enqueued: {} }}",
             type_name::<A>(),
             self.sim_time(),
-            self.num_events_received(),
-            self.limit,
             self.num_events_dispatched(),
+            self.limit,
+            self.num_events_scheduled(),
             self.future_event_set.len()
         )
     }
@@ -811,9 +819,9 @@ where
             "Runtime<{}> {{ sim_time: {} (itr {} / {}) dispached: {} enqueued: {} }}",
             type_name::<A>(),
             self.sim_time(),
-            self.num_events_received(),
-            self.limit,
             self.num_events_dispatched(),
+            self.limit,
+            self.num_events_scheduled(),
             self.future_event_set.len()
         )
     }

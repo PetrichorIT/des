@@ -1,17 +1,9 @@
 use des::prelude::*;
 use serial_test::serial;
 
-#[macro_use]
-mod common;
-
 struct Parent;
-impl_build_named!(Parent);
 
 impl Module for Parent {
-    fn new() -> Self {
-        Self
-    }
-
     fn at_sim_start(&mut self, _stage: usize) {
         current().set_meta(32u64);
         schedule_in(Message::new().build(), Duration::from_secs(1));
@@ -21,19 +13,20 @@ impl Module for Parent {
         assert_eq!(current().meta::<u64>(), Some(32));
         assert_eq!(current().meta::<bool>(), None);
 
-        assert_eq!(current().child("child-a").unwrap().meta::<String>(), Some("child-a".to_string()));
-        assert_eq!(current().child("child-b").unwrap().meta::<String>(), Some("child-b".to_string()));
+        assert_eq!(
+            current().child("a").unwrap().meta::<String>(),
+            Some("a".to_string())
+        );
+        assert_eq!(
+            current().child("b").unwrap().meta::<String>(),
+            Some("b".to_string())
+        );
     }
 }
 
 struct Child;
-impl_build_named!(Child);
 
 impl Module for Child {
-    fn new() -> Self {
-        Self
-    }
-
     fn at_sim_start(&mut self, _stage: usize) {
         current().set_meta(current().name());
         schedule_in(Message::new().build(), Duration::from_secs(1));
@@ -44,7 +37,6 @@ impl Module for Child {
     }
 }
 
-
 #[test]
 #[serial]
 fn read_meta_through_tree() {
@@ -52,16 +44,11 @@ fn read_meta_through_tree() {
     //     .interal_max_log_level(log::LevelFilter::Trace)
     //     .set_logger();
 
-    let mut rt = NetworkApplication::new(());
+    let mut rt = Sim::new(());
 
-    let parent = Parent::build_named(ObjectPath::from("root".to_string()), &mut rt);
-    let child_a = Child::build_named_with_parent("child-a", parent.clone(), &mut rt);
-    let child_b = Child::build_named_with_parent("child-b", parent.clone(), &mut rt);
-
-    rt.register_module(parent);
-    rt.register_module(child_a);
-    rt.register_module(child_b);
-
+    rt.node("root", Parent);
+    rt.node("root.a", Child);
+    rt.node("root.b", Child);
 
     let rt = Builder::seeded(123).build(rt);
 
@@ -70,13 +57,7 @@ fn read_meta_through_tree() {
 }
 
 struct Overrider;
-impl_build_named!(Overrider);
-
 impl Module for Overrider {
-    fn new() -> Self {
-        Self
-    }
-
     fn at_sim_start(&mut self, _stage: usize) {
         current().set_meta(32u64);
         schedule_in(Message::new().build(), Duration::from_secs(1));
@@ -91,14 +72,12 @@ impl Module for Overrider {
 #[test]
 #[serial]
 fn meta_override_previous_value() {
-// Logger::new()
+    // Logger::new()
     //     .interal_max_log_level(log::LevelFilter::Trace)
     //     .set_logger();
 
-    let mut rt = NetworkApplication::new(());
-
-    let parent = Overrider::build_named(ObjectPath::from("root".to_string()), &mut rt);
-    rt.register_module(parent);
+    let mut rt = Sim::new(());
+    rt.node("root", Overrider);
 
     let rt = Builder::seeded(123).build(rt);
 

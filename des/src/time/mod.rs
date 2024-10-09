@@ -28,10 +28,9 @@
 mod duration;
 pub use duration::*;
 
-use crate::sync::RwLock;
-use std::f64::EPSILON;
 use std::fmt::{Debug, Display};
 use std::ops::{Deref, Div, Sub, SubAssign};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
 cfg_async! {
     pub mod error;
@@ -49,7 +48,7 @@ cfg_async! {
     pub use interval::*;
 }
 
-static SIMTIME: RwLock<SimTime> = RwLock::new(SimTime::ZERO);
+static SIMTIME: (AtomicU64, AtomicU32) = (AtomicU64::new(0), AtomicU32::new(0));
 
 ///
 /// A specific point of time in the simulation.
@@ -69,14 +68,18 @@ impl SimTime {
     /// ```
     #[must_use]
     pub fn now() -> Self {
-        *SIMTIME.read()
+        SimTime(Duration::new(
+            SIMTIME.0.load(Ordering::SeqCst),
+            SIMTIME.1.load(Ordering::SeqCst),
+        ))
     }
 
     ///
     /// Sets the sim time
     ///
     pub(crate) fn set_now(time: SimTime) {
-        *SIMTIME.write() = time;
+        SIMTIME.0.store(time.as_secs(), Ordering::SeqCst);
+        SIMTIME.1.store(time.subsec_nanos(), Ordering::SeqCst);
     }
 
     ///
@@ -171,7 +174,7 @@ impl SimTime {
 impl PartialEq<f64> for SimTime {
     fn eq(&self, other: &f64) -> bool {
         let diff = (self.0.as_secs_f64() - *other).abs();
-        diff < EPSILON
+        diff < f64::EPSILON
     }
 }
 
@@ -250,5 +253,30 @@ impl From<SimTime> for f64 {
 impl From<f64> for SimTime {
     fn from(value: f64) -> Self {
         SimTime(Duration::from_secs_f64(value))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ops() {
+        assert_eq!(
+            f64::from(SimTime::from_duration(Duration::from_millis(300))),
+            0.3
+        );
+
+        assert_eq!(SimTime::from(60.0) / 3.0, SimTime::from(20.0));
+        assert_eq!(SimTime::from(60.0) / SimTime::from(3.0), 20.0);
+
+        assert_eq!(
+            SimTime::from(30.0) - SimTime::from(10.0),
+            Duration::from_secs(20)
+        );
+        assert_eq!(SimTime::from(30.0) - Duration::from_secs(10), 20.0);
+        let mut time = SimTime::from(30.0);
+        time -= Duration::from_secs(10);
+        assert_eq!(time, 20.0);
     }
 }

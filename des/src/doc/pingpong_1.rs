@@ -2,11 +2,11 @@
 //!
 //! # The task
 //!
-//! Two nodes 'Ping' and 'Pong' can communicate with each other
-//! using a bidirection channel. 'Ping' sends 30 ping-messages
-//! with at an interval of 1s. 'Pong' receives the messages and
-//! responds with a pong-message, that 'Ping' receives. Both
-//! 'Ping' and 'Pong' count the number of messages received and send
+//! Two nodes `Pinger` and `Ponger` want to communicate with each other
+//! using a bidirection channel. `Pinger` sends a total of 30 `Ping`-messages
+//! in intervals of 1s. `Ponger` receives these messages and
+//! responds with a `Pong`-Message, that 'Pinger' receives. Both
+//! `Pinger` and `Ponger` count the number of messages received and send
 //! by them.
 //!
 //! # The simulation

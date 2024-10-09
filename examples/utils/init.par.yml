@@ -1,0 +1,5 @@
+bob[0].char: \#
+bob[1].char: '*'
+
+bob[0].child.limit: 10
+bob[1].child.limit: 2

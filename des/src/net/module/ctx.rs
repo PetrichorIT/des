@@ -1,28 +1,41 @@
 use fxhash::{FxBuildHasher, FxHashMap};
+use spin::RwLock;
 
 use super::{
     meta::Metadata, DummyModule, ModuleId, ModuleRef, ModuleRefWeak, ModuleReferencingError,
+    UnwindBehaviour,
 };
 use crate::{
     prelude::{GateRef, ObjectPath},
-    sync::{RwLock, SwapLock},
+    sync::SwapLock,
     tracing::{new_scope, ScopeToken},
 };
 use std::{
     any::Any,
+    cell::Cell,
     fmt::Debug,
     sync::{atomic::AtomicBool, Arc},
 };
 
 #[cfg(feature = "async")]
-use crate::net::module::core::AsyncCoreExt;
+use crate::net::module::rt::AsyncCoreExt;
 
 pub(crate) static MOD_CTX: SwapLock<Option<Arc<ModuleContext>>> = SwapLock::new(None);
-pub(crate) static SETUP_FN: RwLock<fn(&ModuleContext)> = RwLock::new(_default_setup);
 
-pub(crate) fn _default_setup(_: &ModuleContext) {}
+pub(crate) fn module_ctx_drop() {
+    MOD_CTX.swap(&mut None);
+}
 
+/// The topological components of a module, not including the attached
+/// software.
 ///
+/// The term `within node-context` refers to the presence of a `ModuleContext`
+/// in the global scope, that indicates that a module is currently active.
+///
+/// This type is internally used to create the simulations layout, but
+/// creating module contexts on your own is highly discouraged, since
+/// managing these structures is rather complicated. However the nessecary
+/// constructors are still available, so use them with care.
 pub struct ModuleContext {
     pub(crate) active: AtomicBool,
     pub(crate) id: ModuleId,
@@ -30,6 +43,7 @@ pub struct ModuleContext {
     pub(crate) path: ObjectPath,
     pub(crate) gates: RwLock<Vec<GateRef>>,
 
+    pub(crate) unwind_behaviour: Cell<UnwindBehaviour>,
     pub(super) meta: RwLock<Metadata>,
     pub(crate) scope_token: ScopeToken,
 
@@ -40,9 +54,16 @@ pub struct ModuleContext {
 }
 
 impl ModuleContext {
-    /// Creates a new standalone instance
+    /// Creates a new standalone instance of a new node.
+    ///
+    /// Note that this function returns a `ModuleRef`.
+    /// A `ModuleRef` contains both the topological properties of a node
+    /// if form of a `ModuleContext` as well as some attached software.
+    /// The sofware attched to the returned reference is a dummy module
+    /// that should be replaced before the simulation is started.
+    #[must_use]
     pub fn standalone(path: ObjectPath) -> ModuleRef {
-        let this = ModuleRef::dummy(Arc::new(Self {
+        ModuleRef::dummy(Arc::new(Self {
             #[cfg(feature = "async")]
             async_ext: RwLock::new(AsyncCoreExt::new()),
 
@@ -52,20 +73,24 @@ impl ModuleContext {
             active: AtomicBool::new(true),
             id: ModuleId::gen(),
             path,
+            unwind_behaviour: Cell::default(),
 
             gates: RwLock::new(Vec::new()),
 
             parent: None,
             children: RwLock::new(FxHashMap::with_hasher(FxBuildHasher::default())),
-        }));
-
-        SETUP_FN.read()(&this);
-
-        this
+        }))
     }
 
-    /// Creates a child
+    /// Creates a instance within a module tree.
+    ///
+    /// Note that this function returns a `ModuleRef`.
+    /// A `ModuleRef` contains both the topological properties of a node
+    /// if form of a `ModuleContext` as well as some attached software.
+    /// The sofware attched to the returned reference is a dummy module
+    /// that should be replaced before the simulation is started.
     #[allow(clippy::needless_pass_by_value)]
+    #[must_use]
     pub fn child_of(name: &str, parent: ModuleRef) -> ModuleRef {
         let path = ObjectPath::appended(&parent.ctx.path, name);
         let this = ModuleRef::dummy(Arc::new(Self {
@@ -76,17 +101,15 @@ impl ModuleContext {
             scope_token: new_scope(path.clone()),
 
             active: AtomicBool::new(true),
-
             id: ModuleId::gen(),
             path,
+            unwind_behaviour: Cell::default(),
 
             gates: RwLock::new(Vec::new()),
 
             parent: Some(ModuleRefWeak::new(&parent)),
             children: RwLock::new(FxHashMap::with_hasher(FxBuildHasher::default())),
         }));
-
-        SETUP_FN.read()(&this);
 
         parent
             .ctx
@@ -118,10 +141,9 @@ impl ModuleContext {
     ///
     /// struct MyModule;
     /// impl Module for MyModule {
-    ///     fn new() -> Self { Self }
     ///     fn handle_message(&mut self, msg: Message) {
     ///         let id = current().id();
-    ///         assert_eq!(id, msg.header().receiver_module_id);    
+    ///         assert_eq!(id, msg.header().receiver_module_id);
     ///     }
     /// }
     /// ```
@@ -139,10 +161,9 @@ impl ModuleContext {
     ///
     /// struct MyModule;
     /// impl Module for MyModule {
-    ///     fn new() -> Self { Self }
     ///     fn handle_message(&mut self, msg: Message) {
     ///         let path = current().path();
-    ///         println!("[{path}] recv message: {}", msg.str())  
+    ///         println!("[{path}] recv message: {}", msg.str())
     ///     }
     /// }
     /// ```
@@ -177,6 +198,8 @@ impl ModuleContext {
 
     /// Retrieves metadata about a module, based on a type.
     ///
+    /// # Examples
+    ///
     /// # Panics
     ///
     /// Panics when concurrently accessed from multiple threads.
@@ -197,6 +220,24 @@ impl ModuleContext {
     /// Panics when concurrently accessed from multiple threads.
     pub fn set_meta<T: Any + Clone>(&self, value: T) {
         self.meta.try_write().expect("Failed lock").set(value);
+    }
+
+    /// Returns the unwind behaviour of this module.
+    ///
+    /// # Panics
+    ///
+    /// Panics when concurrently accesed from multiple threads.
+    pub fn unwind_behaviour(&self) -> UnwindBehaviour {
+        self.unwind_behaviour.get()
+    }
+
+    /// Sets the unwind behaviour of this module.
+    ///
+    /// # Panics
+    ///
+    /// Panics when concurrently accesed from multiple threads.
+    pub fn set_unwind_behaviour(&self, new: UnwindBehaviour) {
+        self.unwind_behaviour.set(new);
     }
 
     /// Returns a reference to a parent module
@@ -277,6 +318,14 @@ impl Debug for ModuleContext {
 unsafe impl Send for ModuleContext {}
 unsafe impl Sync for ModuleContext {}
 
+impl Drop for ModuleContext {
+    fn drop(&mut self) {
+        for gate in self.gates() {
+            gate.dissolve_paths();
+        }
+    }
+}
+
 pub(crate) fn with_mod_ctx<R>(f: impl FnOnce(&Arc<ModuleContext>) -> R) -> R {
     let lock = MOD_CTX.read();
     let ctx = lock
@@ -295,68 +344,5 @@ pub(crate) fn try_with_mod_ctx<R>(f: impl FnOnce(&Arc<ModuleContext>) -> R) -> O
         Some(r)
     } else {
         None
-    }
-}
-
-// pub(crate) fn with_mod_ctx_lock() -> SwapLockReadGuard<'static, Option<Arc<ModuleContext>>> {
-//     MOD_CTX.read()
-// }
-
-cfg_async! {
-    use tokio::runtime::Runtime;
-    use tokio::task::JoinHandle;
-    use tokio::task::LocalSet;
-    use tokio::sync::mpsc::{UnboundedReceiver, error::SendError};
-    use super::ext::WaitingMessage;
-    use std::rc::Rc;
-
-    pub(crate) fn async_get_rt() -> Option<(Arc<Runtime>, Rc<LocalSet>)> {
-        with_mod_ctx(|ctx| ctx.async_ext.write().rt.current())
-    }
-
-    pub(super) fn async_ctx_reset() {
-        with_mod_ctx(|ctx| ctx.async_ext.write().reset());
-    }
-
-    // Wait queue
-
-    pub(super) fn async_wait_queue_tx_send(msg: WaitingMessage) -> Result<(), SendError<WaitingMessage>> {
-        with_mod_ctx(|ctx| ctx.async_ext.write().wait_queue_tx.send(msg))
-    }
-
-    pub(super) fn async_wait_queue_rx_take() -> Option<UnboundedReceiver<WaitingMessage>> {
-        with_mod_ctx(|ctx| ctx.async_ext.write().wait_queue_rx.take())
-    }
-
-    pub(super) fn async_set_wait_queue_join(join: JoinHandle<()>) {
-        with_mod_ctx(|ctx| ctx.async_ext.write().wait_queue_join = Some(join));
-    }
-
-    // Sim Staart
-
-    pub(super) fn async_sim_start_rx_take() -> Option<UnboundedReceiver<usize>> {
-        with_mod_ctx(|ctx| ctx.async_ext.write().sim_start_rx.take())
-    }
-
-    pub(super) fn async_set_sim_start_join(join: JoinHandle<()>) {
-        with_mod_ctx(|ctx| ctx.async_ext.write().sim_start_join = Some(join));
-    }
-
-    pub(super) fn async_sim_start_tx_send(stage: usize) -> Result<(), SendError<usize>>  {
-        with_mod_ctx(|ctx| ctx.async_ext.write().sim_start_tx.send(stage))
-    }
-
-    pub(super) fn async_sim_start_join_take() -> Option<JoinHandle<()>> {
-        with_mod_ctx(|ctx| ctx.async_ext.write().sim_start_join.take())
-    }
-
-    // SIM END
-
-    pub(super) fn async_sim_end_join_set(join: JoinHandle<()>)  {
-        with_mod_ctx(|ctx| ctx.async_ext.write().sim_end_join = Some(join));
-    }
-
-    pub(super) fn async_sim_end_join_take() -> Option<JoinHandle<()>> {
-        with_mod_ctx(|ctx| ctx.async_ext.write().sim_end_join.take())
     }
 }
