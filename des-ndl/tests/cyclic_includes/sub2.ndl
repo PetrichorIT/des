@@ -1,3 +1,0 @@
-include sub1;
-
-module B {}

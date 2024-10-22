@@ -3,6 +3,7 @@ use crate::time::SimTime;
 mod event_set;
 pub(crate) use event_set::*;
 
+#[allow(unused)]
 pub(crate) trait EventSink<E> {
     fn add(&mut self, event: E, time: SimTime);
 }

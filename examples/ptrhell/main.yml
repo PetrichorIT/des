@@ -1,0 +1,45 @@
+entry: Network
+modules:
+  Network:
+    gates:
+    - fromAlice
+    - fromBob
+    - toAlice
+    - toBob
+    submodules:
+      bob: Bob
+      alice: Alice
+    connections:
+    - peers:
+      - alice/netOut
+      - fromAlice
+    - peers:
+      - fromAlice
+      - toBob
+      link: SlowLink
+    - peers:
+      - toBob
+      - bob/netIn
+    - peers:
+      - bob/netOut
+      - fromBob
+    - peers:
+      - fromBob
+      - toAlice
+      link: SlowLink
+    - peers:
+      - toAlice
+      - alice/netIn
+  Bob:
+    gates:
+    - netOut
+    - netIn
+  Alice:
+    gates:
+    - netOut
+    - netIn
+links:
+  SlowLink:
+    latency: 0.1
+    jitter: 0.1
+    bitrate: 10000

@@ -1,12 +1,10 @@
 #![allow(dead_code)]
 
+use super::MessageBody;
 use crate::net::{gate::GateRef, module::ModuleId};
 use crate::time::SimTime;
 
-use std::fmt::{Debug, Display};
-use std::sync::Arc;
-
-use super::MessageBody;
+use std::fmt::Debug;
 
 ///
 /// A ID that defines the meaning of the message in the simulation context.
@@ -48,16 +46,16 @@ pub struct MessageHeader {
 
 // # DUP
 impl MessageHeader {
-    pub(super) fn dup(&self) -> Self {
+    pub(super) fn dup(&self, now: SimTime) -> Self {
         Self {
             id: self.id,
             kind: self.kind,
-            creation_time: SimTime::now(),
+            creation_time: now,
             send_time: SimTime::MIN,
 
             sender_module_id: self.sender_module_id,
             receiver_module_id: self.receiver_module_id,
-            last_gate: self.last_gate.as_ref().map(Arc::clone),
+            last_gate: self.last_gate.clone(),
 
             src: self.src,
             dest: self.dest,
@@ -93,21 +91,39 @@ impl MessageBody for MessageHeader {
     }
 }
 
-/// The internal typ of the message set by the des not the user.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
-pub enum MessageType {
-    /// A user defined message.
-    #[default]
-    UserDefined,
-    /// A custom internal message. Those should never appear in 'handle_message'.
-    Internal,
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-impl Display for MessageType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::UserDefined => write!(f, "UserDefined"),
-            Self::Internal => write!(f, "Internal"),
-        }
+    #[test]
+    fn header_duplication() {
+        let header = MessageHeader {
+            id: 42,
+            kind: 69,
+            creation_time: 100.0.into(),
+            send_time: 150.0.into(),
+            sender_module_id: ModuleId(12),
+            receiver_module_id: ModuleId(14),
+            last_gate: None,
+            src: [1; 6],
+            dest: [2; 6],
+            length: 32,
+        };
+
+        assert_eq!(
+            header.dup(200.0.into()),
+            MessageHeader {
+                id: 42,
+                kind: 69,
+                creation_time: 200.0.into(),
+                send_time: SimTime::MIN,
+                sender_module_id: ModuleId(12),
+                receiver_module_id: ModuleId(14),
+                last_gate: None,
+                src: [1; 6],
+                dest: [2; 6],
+                length: 32,
+            }
+        )
     }
 }

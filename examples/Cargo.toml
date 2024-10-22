@@ -3,51 +3,44 @@ edition = "2021"
 name = "examples"
 version = "0.1.0"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+# See more keys and their definitions at https://doc.ruslang.org/cargo/reference/manifest.html
 
 
-[[bin]]
-name = "t-waiter"
-path = "waiter/main.rs"
-
-[[bin]]
-name = "t-ndl"
-path = "ndl/main.rs"
-
-[[bin]]
-name = "t-utils"
-path = "utils/main.rs"
-
-[[bin]]
-name = "t-ptrhell"
-path = "ptrhell/main.rs"
-
-[[bin]]
-name = "t-proto"
-path = "proto/main.rs"
-
-[[bin]]
-name = "t-droptest"
-path = "droptest/main.rs"
-
-[[bin]]
-name = "t-cqueue"
-path = "cqueue/main.rs"
-
-[[bin]]
-name = "t-multisim"
-path = "multisim/main.rs"
-
-[[bin]]
-name = "t-plugin"
-path = "plugin/main.rs"
-
-[[bin]]
-name = "t-ndl2"
-path = "ndl2/main.rs"
-
-[dependencies]
+[dev-dependencies]
 des = { path = "../des", features = ["full"] }
 rand = "*"
 tracing = "*"
 tokio = "*"
+
+
+[[example]]
+name = "waiter"
+path = "waiter.rs"
+
+[[example]]
+name = "ndl"
+path = "ndl/main.rs"
+
+[[example]]
+name = "utils"
+path = "utils/main.rs"
+
+[[example]]
+name = "ptrhell"
+path = "ptrhell/main.rs"
+
+[[example]]
+name = "cqueue"
+path = "cqueue.rs"
+
+[[example]]
+name = "multisim"
+path = "multisim.rs"
+
+[[example]]
+name = "plugin"
+path = "plugin/main.rs"
+
+[[example]]
+name = "ndl2"
+path = "ndl2/main.rs"

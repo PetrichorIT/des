@@ -1,8 +1,7 @@
 use std::{
     alloc::{self, Layout},
-    fmt::Debug,
     mem::{align_of, size_of},
-    ptr::NonNull,
+    ptr::{self, NonNull},
 };
 
 struct ListNode {
@@ -16,7 +15,7 @@ impl ListNode {
     }
 
     fn start_addr(&self) -> usize {
-        self as *const Self as usize
+        ptr::from_ref(self) as usize
     }
 
     fn end_addr(&self) -> usize {
@@ -52,10 +51,6 @@ impl CQueueLLAllocatorInner {
         this
     }
 
-    pub(super) fn metrics(&self) -> (usize, usize) {
-        (self.allocated_mem, self.page_size * self.page_size)
-    }
-
     #[cfg(test)]
     pub(crate) fn info(&self) {}
 
@@ -69,7 +64,7 @@ impl CQueueLLAllocatorInner {
 
     pub fn handle(&self) -> CQueueLLAllocator {
         CQueueLLAllocator {
-            inner: (self as *const CQueueLLAllocatorInner).cast_mut(),
+            inner: ptr::from_ref(self).cast_mut(),
         }
     }
 
@@ -164,16 +159,6 @@ impl CQueueLLAllocatorInner {
     }
 }
 
-#[allow(clippy::missing_fields_in_debug)]
-impl Debug for CQueueLLAllocatorInner {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CQueueLLAllocatorInner")
-            .field("allocated_memory", &self.allocated_mem)
-            .field("pages", &self.pages.len())
-            .finish()
-    }
-}
-
 impl Drop for CQueueLLAllocatorInner {
     fn drop(&mut self) {
         let layout = Layout::from_size_align(self.page_size, self.page_size)
@@ -236,13 +221,5 @@ impl CQueueLLAllocator {
         let allocator = unsafe { &mut *self.inner };
         allocator.allocated_mem -= size;
         allocator.add_free_region(ptr.as_ptr() as usize, size);
-    }
-}
-
-impl Debug for CQueueLLAllocator {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CQueueLLAllocator")
-            .field("ptr", &self.inner)
-            .finish()
     }
 }

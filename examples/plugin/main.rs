@@ -1,19 +1,9 @@
-use des::{
-    net::{
-        module::{set_setup_fn, ModuleContext},
-        processing::ProcessingElement,
-    },
-    prelude::*,
-    registry,
-};
+use des::{prelude::*, registry};
 
+#[derive(Default)]
 struct A {}
 
 impl Module for A {
-    fn new() -> Self {
-        Self {}
-    }
-
     fn at_sim_start(&mut self, _stage: usize) {
         send(Message::new().content(42).build(), "out");
         send(Message::new().content(69).build(), "out");
@@ -27,50 +17,17 @@ impl Module for A {
 }
 
 #[derive(Default)]
-struct PacketCounter {
-    count: usize,
-}
-
-impl ProcessingElement for PacketCounter {
-    fn incoming(&mut self, msg: Message) -> Option<Message> {
-        self.count += 1;
-        Some(msg)
-    }
-}
-
-impl Drop for PacketCounter {
-    fn drop(&mut self) {
-        assert_eq!(self.count, 2);
-    }
-}
-
 struct B {}
 
 impl Module for B {
-    fn stack(&self) -> impl ProcessingElement + 'static
-    where
-        Self: Sized,
-    {
-        PacketCounter::default()
-    }
-
-    fn new() -> Self {
-        Self {}
-    }
-
     fn handle_message(&mut self, msg: Message) {
         send(msg, "out")
     }
 }
 
+#[derive(Default)]
 struct Main;
-impl Module for Main {
-    fn new() -> Self {
-        Self
-    }
-}
-
-fn empty(_: &ModuleContext) {}
+impl Module for Main {}
 
 fn main() {
     // Logger::new().set_logger();
@@ -82,10 +39,7 @@ fn main() {
 
     // Subscriber::default().init().unwrap();
 
-    set_setup_fn(empty);
-
-    let app = NdlApplication::new("examples/plugin/main.ndl", registry![A, B, Main]).unwrap();
-    let app = NetworkApplication::new(app);
+    let app = Sim::ndl("examples/plugin/main.yml", registry![A, B, Main]).unwrap();
     let rt = Builder::new().build(app);
     let _res = rt.run();
 }

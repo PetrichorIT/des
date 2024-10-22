@@ -8,8 +8,9 @@ use std::collections::VecDeque;
 use std::fmt::{Debug, Display};
 use std::sync::{Arc, RwLock};
 
-use crate::net::runtime::ChannelUnbusyNotif;
-use crate::net::{message::Message, MessageExitingConnection, NetEvents, ObjectPath};
+use crate::net::{
+    message::Message, runtime::ChannelUnbusyNotif, MessageExitingConnection, NetEvents,
+};
 use crate::runtime::{rng, EventSink};
 use crate::time::{Duration, SimTime};
 
@@ -24,7 +25,6 @@ pub struct Channel {
 }
 
 struct ChannelInner {
-    path: ObjectPath,
     metrics: ChannelMetrics,
     busy: bool,
     transmission_finish_time: SimTime,
@@ -78,30 +78,20 @@ pub enum ChannelDropBehaviour {
 impl ChannelInner {
     fn dup(&self) -> Self {
         Self {
-            path: self.path.clone(),
             metrics: self.metrics,
             busy: false,
             transmission_finish_time: SimTime::ZERO,
             buffer: Buffer::default(),
-            probe: Box::new(DummyChannelProbe)
+            probe: Box::new(DummyChannelProbe),
         }
     }
 }
 
 impl Channel {
-
     pub(super) fn dup(&self) -> Self {
-        Channel { inner: RwLock::new(self.inner.read().unwrap().dup()) }
-    }
-
-    /// The object path of the channel.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the simulation core was poisoned.
-    #[must_use]
-    pub fn path(&self) -> ObjectPath {
-        self.inner.read().unwrap().path.clone()
+        Channel {
+            inner: RwLock::new(self.inner.read().unwrap().dup()),
+        }
     }
 
     /// A description of the channels capabilities,
@@ -165,10 +155,9 @@ impl Channel {
     /// Creates a new channel using the given metrics,
     /// with an initially unbusy state.
     #[must_use]
-    pub fn new(path: ObjectPath, metrics: ChannelMetrics) -> ChannelRef {
+    pub fn new(metrics: ChannelMetrics) -> ChannelRef {
         ChannelRef::new(Channel {
             inner: RwLock::new(ChannelInner {
-                path,
                 metrics,
                 busy: false,
                 transmission_finish_time: SimTime::ZERO,
@@ -214,13 +203,10 @@ impl Channel {
 
         if chan.busy {
             let ChannelInner {
-                metrics,
-                buffer,
-                path,
-                ..
+                metrics, buffer, ..
             } = &mut *chan;
 
-            metrics.drop_behaviour.handle(path, buffer, msg, via);
+            metrics.drop_behaviour.handle(buffer, msg, via);
         } else {
             let ChannelInner { probe, metrics, .. } = &mut *chan;
             probe.on_message_transmit(metrics, &msg);
@@ -228,17 +214,19 @@ impl Channel {
             let dur = metrics.calculate_duration(&msg, rng_ref);
             let busy = metrics.calculate_busy(&msg);
 
-            let transmissin_finish = SimTime::now() + busy;
+            if busy != Duration::ZERO {
+                let transmissin_finish = SimTime::now() + busy;
 
-            drop(chan);
-            self.set_busy_until(transmissin_finish);
+                drop(chan);
+                self.set_busy_until(transmissin_finish);
 
-            sink.add(
-                NetEvents::ChannelUnbusyNotif(ChannelUnbusyNotif {
-                    channel: self.clone(),
-                }),
-                transmissin_finish,
-            );
+                sink.add(
+                    NetEvents::ChannelUnbusyNotif(ChannelUnbusyNotif {
+                        channel: self.clone(),
+                    }),
+                    transmissin_finish,
+                );
+            }
 
             let next_event_time = SimTime::now() + dur;
 
@@ -270,15 +258,14 @@ impl Channel {
 }
 
 impl ChannelDropBehaviour {
-    fn handle(&self, _path: &ObjectPath, buffer: &mut Buffer, msg: Message, via: Connection) {
+    fn handle(&self, buffer: &mut Buffer, msg: Message, via: Connection) {
         match self {
             Self::Drop => {
                 #[cfg(feature = "tracing")]
                 tracing::warn!(
-                    "Gate '{}' dropping message [{}] pushed onto busy channel {}",
+                    "Gate '{}' dropping message [{}] pushed onto busy channel",
                     via.prev_hop().unwrap().name(),
                     msg.str(),
-                    _path
                 );
                 drop(msg);
             }
@@ -286,19 +273,17 @@ impl ChannelDropBehaviour {
                 if buffer.acc_bytes + msg.length() > limit.unwrap_or(usize::MAX) {
                     #[cfg(feature = "tracing")]
                     tracing::warn!(
-                        "Gate '{}' dropping message [{}] pushed onto busy channel {}",
+                        "Gate '{}' dropping message [{}] pushed onto busy channel",
                         via.prev_hop().unwrap().name(),
                         msg.str(),
-                        _path
                     );
                     drop(msg);
                 } else {
                     #[cfg(feature = "tracing")]
                     tracing::trace!(
-                        "Gate '{}' added message [{}] to queue of channel {}",
+                        "Gate '{}' added message [{}] to queue of channel",
                         via.prev_hop().unwrap().name(),
                         msg.str(),
-                        _path
                     );
                     buffer.enqueue(msg, via);
                 }
@@ -337,7 +322,6 @@ impl Debug for Channel {
         let this = self.inner.read().unwrap();
 
         f.debug_struct("Channel")
-            .field("path", &this.path)
             .field("metrics", &this.metrics)
             .field("state", &FmtChannelState::from(&this))
             .finish()
@@ -364,12 +348,7 @@ impl ChannelMetrics {
     /// Calcualtes the duration a message travels on a link.
     #[allow(clippy::if_same_then_else)]
     pub fn calculate_duration(&self, msg: &Message, rng: &mut dyn RngCore) -> Duration {
-        if self.bitrate == 0 {
-            return Duration::ZERO;
-        }
-
-        let len = msg.length() * 8;
-        let transmission_time = Duration::from_secs_f64(len as f64 / self.bitrate as f64);
+        let transmission_time = self.calculate_busy(msg);
         if self.jitter == Duration::ZERO {
             self.latency + transmission_time
         } else {

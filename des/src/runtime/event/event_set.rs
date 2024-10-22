@@ -1,8 +1,71 @@
 cfg_not_cqueue! {
     mod default_impl {
-        use crate::{runtime::{Application, EventNode}, time::SimTime};
-        use std::collections::{BinaryHeap, VecDeque};
+        use crate::{runtime::{Application, EventId}, time::SimTime};
+        use std::{collections::{BinaryHeap, VecDeque}, cmp, marker};
         use crate::runtime::Builder;
+
+        #[derive(Debug)]
+        pub(crate) struct EventNode<A>
+        where
+            A: Application,
+        {
+            /// The deadline timestamp for the event.
+            pub(crate) time: SimTime,
+            /// A runtime-specific unique identifier.
+            pub(crate) id: EventId,
+            /// The actual event.
+            pub(crate) event: A::EventSet,
+
+            /// A marker to preserve the type information concerning the application
+            /// not only the Event set.
+            pub(crate) _phantom: marker::PhantomData<A>,
+        }
+
+        impl<A> cmp::PartialEq for EventNode<A>
+        where
+            A: Application,
+        {
+            fn eq(&self, other: &Self) -> bool {
+                self.id == other.id
+            }
+        }
+
+        impl<A> cmp::Eq for EventNode<A> where A: Application {}
+
+        impl<A> cmp::PartialOrd for EventNode<A>
+        where
+            A: Application,
+        {
+            fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+                Some(self.cmp(other))
+            }
+
+            fn lt(&self, other: &Self) -> bool {
+                other.time < self.time
+            }
+
+            fn le(&self, other: &Self) -> bool {
+                other.time <= self.time
+            }
+
+            fn gt(&self, other: &Self) -> bool {
+                other.time > self.time
+            }
+
+            fn ge(&self, other: &Self) -> bool {
+                other.time >= self.time
+            }
+        }
+
+        impl<A> cmp::Ord for EventNode<A>
+        where
+            A: Application,
+        {
+            fn cmp(&self, other: &Self) -> cmp::Ordering {
+                // Inverted call should act as reverse
+                other.time.cmp(&self.time)
+            }
+        }
 
 
 
@@ -65,7 +128,7 @@ cfg_not_cqueue! {
                     self.last_event_simtime = event.time;
                     event
                 } else {
-                    let event = self.heap.pop().unwrap();
+                    let event = self.heap.pop().expect("unreachable: fetch_next shall only be called with the guarantee that an event exists");
                     self.last_event_simtime = event.time;
                     event
                 };

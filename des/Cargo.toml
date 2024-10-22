@@ -11,22 +11,21 @@ license = "MIT"
 name = "des"
 readme = "../README.md"
 repository = "https://github.com/PetrichorIT/des"
-version = "0.5.1"
+version = "0.6.0"
 
 [features]
 # Include nothing by default
-default = ["full"]
+default = []
 
 # Include everything used for default test runs.
-full = ["net", "ndl", "cqueue", "async", "macros"]
+full = ["net", "cqueue", "async", "macros"]
 
 macros = ["dep:des-macros", "dep:futures"]
 async = ["net", "dep:tokio"]
 cqueue = ["dep:des-cqueue"]
 multi-threaded = []
-net = ["dep:des-macros"]
-ndl = ["dep:des-ndl"]
-tracing = []
+net = ["dep:des-macros", "dep:des-net-utils", "dep:serde", "dep:serde_yml"]
+tracing = ["net"]
 
 unstable-tokio-enable-time = ["async", "tokio/time"]
 
@@ -34,22 +33,19 @@ unstable-tokio-enable-time = ["async", "tokio/time"]
 # Rand primives must be set since they are bound to the
 # runtime and sould be seedable by the user.
 rand = { version = "*", features = ["std_rng"] }
-# Sysinfo is used for collection information on 
-# system stats for metrics.
-sysinfo = "*"
 
 # Spin must be used in the logger event in single-threaded runnin
 # due to issues like #8
 spin = { version = "*" }
 tracing = { version = "*" }
-tracing-subscriber = { version = "*", features = ["env-filter"]}
+tracing-subscriber = { version = "*", features = ["env-filter"] }
 nu-ansi-term = "*"
-termcolor = "*"
 fxhash = "0.2"
 pin-project-lite = "0.2"
 
 # All other dependencies are optional
-
+serde = { version = "*", optional = true, features = ["derive"] }
+serde_yml = { version = "*", optional = true }
 tokio = { version = "*", features = [
     "rt",
     "sync",
@@ -60,12 +56,17 @@ futures = { version = "*", optional = true }
 
 des-cqueue = { path = "../des-cqueue", optional = true }
 des-macros = { path = "../des-macros", optional = true }
-des-ndl = { path = "../des-ndl", optional = true }
-
+des-net-utils = { path = "../des-net-utils", optional = true }
 
 [dev-dependencies]
 futures = "0.3"
-serial_test = "2.0.0"
+serial_test = "3.1.1"
 
 [package.metadata.docs.rs]
 all-features = true
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = [
+    'cfg(doc_cfg)',
+    "cfg(tokio_unstable)",
+] }

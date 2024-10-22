@@ -10,16 +10,6 @@ macro_rules! cfg_net {
     }
 }
 
-macro_rules! cfg_ndl {
-    ($($item:item)*) => {
-        $(
-            #[cfg(feature = "ndl")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "ndl")))]
-            $item
-        )*
-    }
-}
-
 macro_rules! cfg_macros {
     ($($item:item)*) => {
         $(

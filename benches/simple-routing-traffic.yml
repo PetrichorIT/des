@@ -1,0 +1,26 @@
+entry: Main
+modules:
+  Main:
+    submodules:
+      node[10]: Host
+      switch: Switch
+    connections:
+      - peers:
+          - node/port
+          - switch/port
+        link: LAN
+
+  Host:
+    gates:
+      - port
+
+  Switch:
+    gates:
+      - port[10]
+
+links:
+  LAN:
+    bitrate: 800000
+    jitter: 0.0
+    latency: 0.01
+    queuesize: "8000"

@@ -1,0 +1,6 @@
+entry: Main
+modules:
+  Main:
+    submodules:
+      alice: Single
+  Single: {}

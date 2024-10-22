@@ -3,9 +3,7 @@ use super::{
     SimTime,
 };
 use pin_project_lite::pin_project;
-use std::{
-    cmp::Ordering, future::Future, pin::Pin, sync::atomic::AtomicUsize, task::Poll, time::Duration,
-};
+use std::{future::Future, pin::Pin, sync::atomic::AtomicUsize, task::Poll, time::Duration};
 
 /// Waits until `duration` has elapsed.
 ///
@@ -86,11 +84,14 @@ pin_project! {
     /// use it with [`select!`] or by calling `poll`, you have to pin it first.
     /// If you use it with `.await`, this does not apply.
     ///
+    #[project(!Unpin)]
     #[must_use  = "futures do nothing unless you `.await` or poll them"]
     #[derive(Debug)]
     pub struct Sleep {
         deadline: SimTime,
         id: usize,
+
+        #[pin]
         handle: Option<TimerSlotEntryHandle>
     }
 }
@@ -159,7 +160,7 @@ impl Sleep {
     }
 
     fn reset_inner(self: Pin<&mut Self>, deadline: SimTime) {
-        let me = self.project();
+        let mut me = self.project();
         if let Some(handle) = me.handle.take() {
             // Reogranize timer calls.
             handle.reset(deadline);
@@ -174,9 +175,18 @@ impl Future for Sleep {
         self: Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
-        let me = self.project();
-        match (*me.deadline).cmp(&SimTime::now()) {
-            Ordering::Greater => {
+        // A poll might come from one of three sources
+        // a) inital poll
+        // b) poll at scheduled deadline
+        // c) spurious wakeup i.e. tokio::select
+
+        let scheduled = self.handle.is_some();
+
+        // Project initaly
+
+        let mut me = self.project();
+        if *me.deadline > SimTime::now() {
+            if !scheduled {
                 let handle = Driver::with_current(|ctx| {
                     ctx.queue.add(
                         TimerSlotEntry {
@@ -186,11 +196,14 @@ impl Future for Sleep {
                         *me.deadline,
                     )
                 });
-
                 *me.handle = Some(handle);
-                Poll::Pending
             }
-            _ => Poll::Ready(()),
+            Poll::Pending
+        } else {
+            if let Some(mut handle) = me.handle.take() {
+                handle.resolve();
+            }
+            Poll::Ready(())
         }
     }
 }

@@ -1,37 +1,27 @@
 use std::sync::Arc;
 
-use super::{try_with_mod_ctx, ModuleContext, SETUP_FN};
+use super::{try_with_mod_ctx, ModuleContext};
 use crate::{
     net::runtime::buf_schedule_shutdown,
     time::{Duration, SimTime},
 };
 
-/// Overwrite the setup fn all modules run.
-///
-/// All modules require common functionality based on the baseline setup of the
-/// simulation. Such common functionality is usually provided by plugins,
-/// but manually creating them on each module type is bothersome, and errorprone.
-/// To cirumvent that, a common setup function is provided that initalizes some plugins
-/// on all modules.
-pub fn set_setup_fn(f: fn(&ModuleContext)) {
-    *SETUP_FN.write() = f;
-}
-
 /// Retuns a handle to the context of the current module. This
-/// handle can be used on inspect and change the modules simulation 
+/// handle can be used on inspect and change the modules simulation
 /// properties, independent of the modules processing elements.
-/// 
+///
+/// > *This function requires a node-context within the simulation*
+///
 /// **This handle is only fully valid, during the execution of the current event,
 /// thus is should never be stored.**
-/// 
+///
 /// # Example
-/// 
+///
 /// ```
 /// # use des::prelude::*;
-/// 
+///
 /// struct MyModule;
 /// impl Module for MyModule {
-///     fn new() -> Self { Self }
 ///     fn handle_message(&mut self, msg: Message) {
 ///         let id = current().id();
 ///         if id == msg.header().sender_module_id {
@@ -40,19 +30,21 @@ pub fn set_setup_fn(f: fn(&ModuleContext)) {
 ///     }
 /// }
 /// ```
-/// 
+///
 /// # Panics
-/// 
+///
 /// This function will panic if not called within a modules context.
 #[must_use]
 pub fn current() -> Arc<ModuleContext> {
-    try_with_mod_ctx(Arc::clone).expect("cannot retrieve current module context, no module currently in scope")
+    try_with_mod_ctx(Arc::clone)
+        .expect("cannot retrieve current module context, no module currently in scope")
 }
-
 
 // BUF CTX based
 
 /// Shuts down all activity for the module.
+///
+/// > *This function requires a node-context within the simulation*
 ///
 /// A module that is shut down, will not longer be able to
 /// handle incoming messages, or run any user-defined code.
@@ -65,10 +57,10 @@ pub fn shutdown() {
     buf_schedule_shutdown(None);
 }
 
-
-///
 /// Shuts down all activity for the module.
 /// Restarts after the given duration.
+///
+/// > *This function requires a node-context within the simulation*
 ///
 /// On restart the module will be reinitalized
 /// using `Module::reset`  and then `Module::at_sim_start`.
@@ -86,13 +78,6 @@ pub fn shutdown() {
 /// }
 ///
 /// impl Module for MyModule {
-///     fn new() -> Self {
-///         Self {
-///             volatile: 0,
-///             persistent: 0,
-///         }
-///     }
-///
 ///     fn reset(&mut self) {
 ///         self.volatile = 0;
 ///     }
@@ -116,7 +101,7 @@ pub fn shutdown() {
 ///
 /// fn main() {
 ///     let app = /* ... */
-/// #    NetworkApplication::new(());
+/// #    Sim::new(());
 ///     let rt = Builder::new().build(app).run();
 ///     // outputs 'Start at 0s with volatile := 0 and persistent := 0'
 ///     // outputs 'Start at 10s with volatile := 0 and persistent := 1024'
@@ -130,9 +115,10 @@ pub fn shutdow_and_restart_in(dur: Duration) {
     buf_schedule_shutdown(Some(SimTime::now() + dur));
 }
 
-///
 /// Shuts down all activity for the module.
 /// Restarts at the given time.
+///
+/// > *This function requires a node-context within the simulation*
 ///
 /// The user must ensure that the restart time
 /// point is greater or equal to the current simtime.
@@ -140,4 +126,16 @@ pub fn shutdow_and_restart_in(dur: Duration) {
 /// See [`shutdow_and_restart_in`] for more information.
 pub fn shutdow_and_restart_at(restart_at: SimTime) {
     buf_schedule_shutdown(Some(restart_at));
+}
+
+cfg_async! {
+    use tokio::task::JoinHandle;
+
+    /// Schedules a task to be joined when the simulatio ends
+    ///
+    /// This function will **not** block, but rather defer the joining
+    /// to the simulation shutdown phase.
+    pub fn join(handle: JoinHandle<()>) {
+        current().async_ext.write().require_joins.push(handle);
+    }
 }

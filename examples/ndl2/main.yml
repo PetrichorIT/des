@@ -1,0 +1,24 @@
+entry: Main
+modules:
+  Sub:
+    gates:
+    - in
+    - out
+  Main:
+    submodules:
+      b: Sub
+      a: Sub
+    connections:
+    - peers:
+      - a/out
+      - b/in
+      link: SomeLink
+    - peers:
+      - b/out
+      - a/in
+      link: SomeLink
+links:
+  SomeLink:
+    latency: 0.5
+    jitter: 0.0
+    bitrate: 10000

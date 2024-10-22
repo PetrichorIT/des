@@ -3,13 +3,10 @@ use std::ops::Deref;
 use des::prelude::*;
 use tracing::info;
 
+#[derive(Default)]
 pub struct Alice();
 
 impl Module for Alice {
-    fn new() -> Self {
-        Self()
-    }
-
     fn handle_message(&mut self, msg: Message) {
         let mut pkt = msg;
         info!(
@@ -27,13 +24,10 @@ impl Module for Alice {
     }
 }
 
+#[derive(Default)]
 pub struct Bob();
 
 impl Module for Bob {
-    fn new() -> Self {
-        Self()
-    }
-
     fn at_sim_start(&mut self, _stage: usize) {
         schedule_in(
             Message::new()

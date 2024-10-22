@@ -4,14 +4,10 @@ use des::prelude::*;
 
 use tracing::info;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Alice();
 
 impl Module for Alice {
-    fn new() -> Self {
-        Self()
-    }
-
     fn handle_message(&mut self, msg: Message) {
         let pkt = msg;
         info!(
@@ -29,14 +25,10 @@ impl Module for Alice {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Bob();
 
 impl Module for Bob {
-    fn new() -> Self {
-        Self()
-    }
-
     fn num_sim_start_stages(&self) -> usize {
         2
     }
