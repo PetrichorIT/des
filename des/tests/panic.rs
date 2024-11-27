@@ -1,6 +1,6 @@
 use des::{
     net::{
-        module::{Module, UnwindBehaviour},
+        module::{Module, Stereotyp},
         panic, Sim,
     },
     prelude::{current, Message},
@@ -128,7 +128,10 @@ fn unwind_sim_panic_at_sim_end() {
 struct PanicWithUnwindAllways;
 impl Module for PanicWithUnwindAllways {
     fn at_sim_start(&mut self, _stage: usize) {
-        current().set_unwind_behaviour(UnwindBehaviour::Unwind);
+        current().set_stereotyp(Stereotyp {
+            on_panic_catch: false,
+            ..Stereotyp::HOST
+        });
     }
     fn handle_message(&mut self, _msg: Message) {
         panic!("Oh no");

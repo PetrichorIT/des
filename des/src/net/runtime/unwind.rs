@@ -1,4 +1,4 @@
-use crate::net::module::{ModuleContext, UnwindBehaviour};
+use crate::net::module::ModuleContext;
 use std::{
     any::Any,
     panic::{catch_unwind, resume_unwind, AssertUnwindSafe},
@@ -47,7 +47,7 @@ impl<'a> Harness<'a> {
             self.ctx.active.store(false, Ordering::SeqCst);
             match unwind.downcast::<SimWideUnwind>() {
                 Ok(sim_unwind) => resume_unwind(sim_unwind.0),
-                Err(other_unwind) if self.ctx.unwind_behaviour.get() == UnwindBehaviour::Unwind => {
+                Err(other_unwind) if !self.ctx.stereotyp.get().on_panic_catch => {
                     resume_unwind(other_unwind)
                 }
                 _ => {}

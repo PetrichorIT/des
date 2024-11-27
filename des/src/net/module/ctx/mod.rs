@@ -1,15 +1,14 @@
-use fxhash::{FxBuildHasher, FxHashMap};
-use spin::RwLock;
-
 use super::{
     meta::Metadata, DummyModule, ModuleId, ModuleRef, ModuleRefWeak, ModuleReferencingError,
-    UnwindBehaviour,
 };
 use crate::{
     prelude::{GateRef, ObjectPath},
     sync::SwapLock,
     tracing::{new_scope, ScopeToken},
 };
+use fxhash::{FxBuildHasher, FxHashMap};
+use spawner::Spawner;
+use spin::RwLock;
 use std::{
     any::Any,
     cell::Cell,
@@ -17,14 +16,21 @@ use std::{
     sync::{atomic::AtomicBool, Arc},
 };
 
-#[cfg(feature = "async")]
-use crate::net::module::rt::AsyncCoreExt;
-
 pub(crate) static MOD_CTX: SwapLock<Option<Arc<ModuleContext>>> = SwapLock::new(None);
 
 pub(crate) fn module_ctx_drop() {
     MOD_CTX.swap(&mut None);
 }
+
+cfg_async! {
+    pub(super) mod rt;
+    use self::rt::AsyncCoreExt;
+}
+
+mod spawner;
+
+mod stereotyp;
+pub use stereotyp::Stereotyp;
 
 /// The topological components of a module, not including the attached
 /// software.
@@ -40,10 +46,12 @@ pub struct ModuleContext {
     pub(crate) active: AtomicBool,
     pub(crate) id: ModuleId,
 
+    pub(crate) sref: RwLock<Option<ModuleRefWeak>>,
+
     pub(crate) path: ObjectPath,
     pub(crate) gates: RwLock<Vec<GateRef>>,
 
-    pub(crate) unwind_behaviour: Cell<UnwindBehaviour>,
+    pub(crate) stereotyp: Cell<Stereotyp>,
     pub(super) meta: RwLock<Metadata>,
     pub(crate) scope_token: ScopeToken,
 
@@ -67,13 +75,15 @@ impl ModuleContext {
             #[cfg(feature = "async")]
             async_ext: RwLock::new(AsyncCoreExt::new()),
 
+            sref: RwLock::new(None),
+
             meta: RwLock::new(Metadata::new()),
             scope_token: new_scope(path.clone()),
 
             active: AtomicBool::new(true),
             id: ModuleId::gen(),
             path,
-            unwind_behaviour: Cell::default(),
+            stereotyp: Cell::default(),
 
             gates: RwLock::new(Vec::new()),
 
@@ -97,13 +107,15 @@ impl ModuleContext {
             #[cfg(feature = "async")]
             async_ext: RwLock::new(AsyncCoreExt::new()),
 
+            sref: RwLock::new(None),
+
             meta: RwLock::new(Metadata::new()),
             scope_token: new_scope(path.clone()),
 
             active: AtomicBool::new(true),
             id: ModuleId::gen(),
             path,
-            unwind_behaviour: Cell::default(),
+            stereotyp: Cell::default(),
 
             gates: RwLock::new(Vec::new()),
 
@@ -130,6 +142,11 @@ impl ModuleContext {
         let mut this = None;
         MOD_CTX.swap(&mut this);
         this
+    }
+
+    ///
+    pub fn spawner(&self) -> Spawner<'_> {
+        Spawner { ctx: self }
     }
 
     /// Returns a runtime-unqiue identifier for the currently active module.
@@ -227,8 +244,8 @@ impl ModuleContext {
     /// # Panics
     ///
     /// Panics when concurrently accesed from multiple threads.
-    pub fn unwind_behaviour(&self) -> UnwindBehaviour {
-        self.unwind_behaviour.get()
+    pub fn stereotyp(&self) -> Stereotyp {
+        self.stereotyp.get()
     }
 
     /// Sets the unwind behaviour of this module.
@@ -236,8 +253,8 @@ impl ModuleContext {
     /// # Panics
     ///
     /// Panics when concurrently accesed from multiple threads.
-    pub fn set_unwind_behaviour(&self, new: UnwindBehaviour) {
-        self.unwind_behaviour.set(new);
+    pub fn set_stereotyp(&self, new: Stereotyp) {
+        self.stereotyp.set(new);
     }
 
     /// Returns a reference to a parent module

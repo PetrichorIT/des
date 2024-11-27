@@ -8,8 +8,8 @@ use std::{
 };
 
 mod ctx;
-pub use self::ctx::ModuleContext;
 pub(crate) use self::ctx::*;
+pub use self::ctx::{ModuleContext, Stereotyp};
 
 mod refs;
 pub use refs::*;
@@ -20,9 +20,6 @@ pub use error::*;
 mod api;
 pub use api::*;
 
-mod unwind;
-pub use unwind::*;
-
 mod dummy;
 pub(crate) use dummy::*;
 
@@ -32,10 +29,6 @@ mod meta;
 mod tests;
 
 use super::processing::{ProcessingStack, Processor};
-
-cfg_async! {
-    pub(super) mod rt;
-}
 
 /// A unique identifier for a module.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

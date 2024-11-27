@@ -444,7 +444,9 @@ impl<'a, A> ScopedSim<'a, A> {
             scope: self.scope.appended(path),
         }
     }
+}
 
+impl<'a, A> ScopedSim<'a, A> {
     /// The current scope from an absoute prespective.
     #[must_use]
     pub fn scope(&self) -> &ObjectPath {

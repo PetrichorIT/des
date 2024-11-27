@@ -291,6 +291,7 @@ cfg_async! {
         tx: Sender<Message>,
         rx: Option<Receiver<Message>>,
 
+        require_recv: bool,
         require_join: bool,
     }
 
@@ -305,6 +306,14 @@ cfg_async! {
             self
         }
 
+        /// Configures the handler so, that all incoming packets must be
+        /// read from the `rx` queue. If that does not happen, the module will panic.
+        #[must_use]
+        pub fn require_recv(mut self) -> Self {
+            self.require_join = true;
+            self
+        }
+
         /// Creates a new instance using the generator function.
         pub fn new<Gen, Fut>(mut gen: Gen) -> Self
         where
@@ -314,7 +323,14 @@ cfg_async! {
             Fut: Send + 'static,
         {
             let (tx, rx) = mpsc::channel(8);
-            Self { gen: Box::new(move |rx| Box::pin(gen(rx))), join: JoinSet::new(), joined: Arc::default(), tx, rx: Some(rx), require_join: false }
+            Self {
+                gen: Box::new(move |rx| Box::pin(gen(rx))),
+                join: JoinSet::new(),
+                joined: Arc::default(), tx,
+                rx: Some(rx),
+                require_join: false,
+                require_recv: false
+            }
         }
 
         /// Creates a new instance using the generator function.
@@ -344,7 +360,8 @@ cfg_async! {
                 joined: Arc::default(),
                 tx,
                 rx: Some(rx),
-                require_join: false
+                require_join: false,
+                require_recv: false,
             }
         }
 
@@ -384,7 +401,11 @@ cfg_async! {
         }
 
          fn handle_message(&mut self, msg: Message) {
-            self.tx.try_send(msg).expect("async module blocked");
+            if let Err(e) = self.tx.try_send(msg) {
+                if self.require_recv {
+                    crate::net::panic(format!("failed to receive an incoming packet: {e}"))
+                }
+            };
         }
 
          fn at_sim_end(&mut self) {

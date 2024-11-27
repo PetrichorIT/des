@@ -65,10 +65,13 @@ impl ModuleRef {
     ) -> Self {
         let procesing = module.to_processing_chain(stack);
         let handler = Arc::new(RefCell::new(procesing));
-        Self {
+        let this = Self {
             ctx,
             processing: handler,
-        }
+        };
+
+        *this.ctx.sref.write() = Some(ModuleRefWeak::new(&this));
+        this
     }
 
     #[allow(unused)]
