@@ -6,7 +6,7 @@ use crate::{
     macros::support::SyncWrap,
     time::{Duration, SimTime},
 };
-use rand::{distributions::Standard, prelude::Distribution, Rng, RngCore};
+use rand::{distr::StandardUniform, prelude::Distribution, Rng, RngCore};
 use std::{
     any::type_name,
     cell::UnsafeCell,
@@ -63,9 +63,9 @@ pub fn rng() -> &'static mut dyn RngCore {
 #[must_use]
 pub fn random<T>() -> T
 where
-    Standard: Distribution<T>,
+    StandardUniform: Distribution<T>,
 {
-    rng().gen::<T>()
+    rng().random::<T>()
 }
 
 ///
@@ -184,7 +184,7 @@ where
     #[allow(clippy::unused_self)]
     pub fn random<T>(&mut self) -> T
     where
-        Standard: Distribution<T>,
+        StandardUniform: Distribution<T>,
     {
         self::random()
     }

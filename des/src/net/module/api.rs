@@ -1,4 +1,4 @@
-use std::{future::Future, sync::Arc};
+use std::sync::Arc;
 
 use super::{try_with_mod_ctx, ModuleContext};
 use crate::{
@@ -137,6 +137,7 @@ pub fn shutdow_and_restart_at(restart_at: SimTime) {
 }
 
 cfg_async! {
+    use std::future::Future;
 
     /// Schedules a task to be joined when the simulatio ends
     ///
@@ -150,6 +151,7 @@ cfg_async! {
         current().async_ext.write().must_join.spawn(fut);
     }
 
+    /// Other spawner
     pub fn tryjoin_spawn<F>(fut: F)
     where
         F: Future<Output = ()>,

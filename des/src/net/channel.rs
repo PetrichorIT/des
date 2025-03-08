@@ -1,7 +1,7 @@
 //! Physical link abstractions.
 #![allow(clippy::cast_precision_loss)]
 
-use rand::distributions::Uniform;
+use rand::distr::Uniform;
 use rand::prelude::StdRng;
 use rand::{Rng, RngCore};
 use std::collections::VecDeque;
@@ -352,7 +352,7 @@ impl ChannelMetrics {
         if self.jitter == Duration::ZERO {
             self.latency + transmission_time
         } else {
-            let perc = rng.sample(Uniform::new(0.0f64, self.jitter.as_secs_f64()));
+            let perc = rng.sample(Uniform::new(0.0f64, self.jitter.as_secs_f64()).unwrap());
             self.latency + transmission_time + Duration::from_secs_f64(perc)
         }
     }

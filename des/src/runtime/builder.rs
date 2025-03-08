@@ -7,7 +7,7 @@ use std::{
 use std::time::Duration;
 
 use rand::{
-    rngs::{OsRng, StdRng},
+    rngs::{StdRng, ThreadRng},
     RngCore, SeedableRng,
 };
 
@@ -41,7 +41,7 @@ impl Builder {
     pub fn new() -> Builder {
         Builder {
             quiet: false,
-            rng: Box::new(StdRng::from_rng(OsRng).expect("Failed to create RNG")),
+            rng: Box::new(StdRng::from_rng(&mut ThreadRng::default())),
             limit: RuntimeLimit::None,
 
             start_time: SimTime::MIN,

@@ -2,7 +2,7 @@ use des::{
     prelude::*,
     runtime::{RuntimeError, RuntimeLimit},
 };
-use rand::{distributions::Standard, prelude::SliceRandom, Rng};
+use rand::{distr::StandardUniform, prelude::SliceRandom, Rng};
 use serial_test::serial;
 
 /// The Event ste
@@ -25,7 +25,7 @@ impl EventSet<App> for MyEventSet {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 struct RegisterToRtWithTime {
-    id: usize,
+    id: u64,
 }
 
 impl RegisterToRtWithTime {
@@ -38,7 +38,7 @@ impl RegisterToRtWithTime {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 struct B {
-    id: usize,
+    id: u64,
 }
 
 impl B {
@@ -127,7 +127,7 @@ fn ensure_event_order() {
     let mut rng = StdRng::seed_from_u64(123);
 
     for _i in 0..128 {
-        time += rng.sample::<f64, Standard>(Standard);
+        time += rng.sample::<f64, StandardUniform>(StandardUniform);
         id += 1;
 
         events.push((
@@ -235,6 +235,8 @@ const N: usize = 100_000;
 #[test]
 #[serial]
 fn full_test_n_100_000() {
+    rand::random::<u64>();
+
     let mut rt: Runtime<App> = Builder::seeded(123).build(App {
         event_list: Vec::with_capacity(N),
     });
@@ -244,7 +246,7 @@ fn full_test_n_100_000() {
     // create a event set
     let mut t = SimTime::ZERO;
     for _ in 0..N {
-        let num_box_elements = rt.random::<usize>() % 100;
+        let num_box_elements = rt.random::<u64>() % 100;
         let num_box_elements = if num_box_elements < 5 {
             num_box_elements + 1
         } else {
@@ -265,7 +267,7 @@ fn full_test_n_100_000() {
     }
 
     let mut dispatched = events.clone();
-    dispatched.shuffle(&mut rand::thread_rng());
+    dispatched.shuffle(&mut rand::rng());
 
     let mut c = 0;
     for eventbox in dispatched {
@@ -317,7 +319,7 @@ fn full_test_n_100_000() {
 fn random_event(rt: &mut Runtime<App>) -> MyEventSet {
     if rt.random::<bool>() {
         MyEventSet::RegisterToRtWithTime(RegisterToRtWithTime {
-            id: rt.random::<usize>(),
+            id: rt.random::<u64>(),
         })
     } else {
         MyEventSet::B(B { id: rt.random() })
