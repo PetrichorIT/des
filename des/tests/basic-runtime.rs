@@ -1,4 +1,7 @@
-use des::{prelude::*, runtime::RuntimeLimit};
+use des::{
+    prelude::*,
+    runtime::{RuntimeError, RuntimeLimit},
+};
 use rand::{distributions::Standard, prelude::SliceRandom, Rng};
 use serial_test::serial;
 
@@ -64,7 +67,7 @@ fn zero_event_runtime() {
     });
 
     let res = rt.run();
-    assert!(matches!(res, RuntimeResult::EmptySimulation { .. }))
+    assert!(matches!(res.unwrap().2.event_count, 0))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -104,7 +107,7 @@ fn one_event_runtime() {
 
     let res = rt.run();
     match res {
-        RuntimeResult::Finished { time, profiler, .. } => {
+        Ok((_, time, profiler)) => {
             assert_eq!(time, SimTime::from_duration(Duration::new(16, 0)));
             assert_eq!(profiler.event_count, 17);
         }
@@ -144,11 +147,7 @@ fn ensure_event_order() {
     }
 
     match rt.run() {
-        RuntimeResult::Finished {
-            app,
-            time: rt_fin_time,
-            profiler,
-        } => {
+        Ok((app, rt_fin_time, profiler)) => {
             assert_eq!(rt_fin_time, time);
             assert_eq!(profiler.event_count, 128);
 
@@ -171,8 +170,6 @@ fn ensure_event_order() {
 #[cfg(not(feature = "cqueue"))]
 #[serial]
 fn ensure_event_order_same_time() {
-    StandardLogger::active(false);
-
     let one = SimTime::from_duration(Duration::new(1, 0));
     let two = SimTime::from_duration(Duration::new(2, 0));
 
@@ -208,13 +205,9 @@ fn ensure_event_order_same_time() {
     }
 
     match rt.run() {
-        RuntimeResult::Finished {
-            app,
-            time: rt_fin_time,
-            event_count,
-        } => {
+        Ok((app, rt_fin_time, profiler)) => {
             assert_eq!(rt_fin_time, two);
-            assert_eq!(event_count, 5);
+            assert_eq!(profiler.event_count, 5);
 
             let mut last_id = 0;
             for (_, event) in app.event_list {
@@ -339,8 +332,9 @@ impl EventLifecycle for DeferredApplication {
     fn at_sim_start(rt: &mut Runtime<Self>) {
         rt.app.started = true;
     }
-    fn at_sim_end(rt: &mut Runtime<Self>) {
+    fn at_sim_end(rt: &mut Runtime<Self>) -> Result<(), RuntimeError> {
         rt.app.ended = true;
+        Ok(())
     }
 }
 impl Application for DeferredApplication {
@@ -366,7 +360,7 @@ fn deferred_sim_start() {
     assert_eq!(rt.app.ended, false);
 
     let app = match rt.run() {
-        RuntimeResult::EmptySimulation { app } => app,
+        Ok((app, _, _)) => app,
         _ => panic!("Which events?"),
     };
 

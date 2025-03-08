@@ -18,8 +18,9 @@ impl Module for Sub {
 #[derive(Default)]
 struct Main;
 impl Module for Main {
-    fn at_sim_end(&mut self) {
-        tracing::info!(target: "custom", "at sim end")
+    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+        tracing::info!(target: "custom", "at sim end");
+        Ok(())
     }
 }
 

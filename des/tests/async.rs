@@ -3,10 +3,11 @@
 
 use des::{
     net::{
-        module::{join, Module},
-        AsyncFn,
+        module::{join_spawn, Module},
+        AsyncFn, JoinError,
     },
     prelude::*,
+    runtime::RuntimeError,
     time::{self, sleep, timeout, timeout_at, MissedTickBehavior},
 };
 use std::sync::{
@@ -60,11 +61,7 @@ fn quasai_sync_non_blocking() {
 
     let result = rt.run();
     match result {
-        RuntimeResult::Finished {
-            app,
-            time,
-            profiler,
-        } => {
+        Ok((app, time, profiler)) => {
             assert_eq!(time, SimTime::ZERO);
             assert_eq!(profiler.event_count, 10);
         }
@@ -131,15 +128,14 @@ impl Module for MutipleTasksModule {
         self.sender = Some(txa);
     }
 
-    fn at_sim_end(&mut self) {
+    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
         for i in 0..self.handles.len() {
             assert!(
                 self.handles.try_join_next().is_some(),
                 "Failed to join {i}-th handle"
             );
         }
-
-        // first yield
+        Ok(())
     }
 
     fn handle_message(&mut self, msg: Message) {
@@ -163,11 +159,7 @@ fn mutiple_active_tasks() {
 
     let result = rt.run();
     match result {
-        RuntimeResult::Finished {
-            app,
-            time,
-            profiler,
-        } => {
+        Ok((app, time, profiler)) => {
             assert_eq!(time, SimTime::ZERO);
 
             //  3 * (Gate + HandleMessage)
@@ -240,11 +232,7 @@ fn one_module_timers() {
 
     let result = rt.run();
     match result {
-        RuntimeResult::Finished {
-            app,
-            time,
-            profiler,
-        } => {
+        Ok((app, time, profiler)) => {
             assert_eq!(time, 4.0);
             assert_eq!(profiler.event_count, 6);
         }
@@ -279,11 +267,7 @@ fn one_module_delayed_recv() {
 
     let result = rt.run();
     match result {
-        RuntimeResult::Finished {
-            app,
-            time,
-            profiler,
-        } => {
+        Ok((app, time, profiler)) => {
             assert_eq!(time, 4.0);
 
             // 1) Gate #1 (0s)
@@ -345,11 +329,7 @@ fn mutiple_module_delayed_recv() {
 
     let result = rt.run();
     match result {
-        RuntimeResult::Finished {
-            app,
-            time,
-            profiler,
-        } => {
+        Ok((app, time, profiler)) => {
             assert_eq!(time, 4.0); // parallel exec is possible
             assert_eq!(profiler.event_count, 12);
         }
@@ -431,11 +411,7 @@ fn semaphore_in_waiting_task() {
 
     let result = rt.run();
     match result {
-        RuntimeResult::Finished {
-            app,
-            time,
-            profiler,
-        } => {
+        Ok((app, time, profiler)) => {
             assert_eq!(time, 3.0);
             assert_eq!(profiler.event_count, 10);
         }
@@ -677,35 +653,61 @@ fn async_time_interval_missed_tick_behaviour() {
 struct JoinOnModule;
 impl Module for JoinOnModule {
     fn at_sim_start(&mut self, _stage: usize) {
-        join(tokio::spawn(async move {
+        join_spawn(async move {
             std::future::pending::<()>().await;
-        }));
+        });
     }
 }
 
 #[test]
 #[serial]
-#[should_panic = "could not join task: not yet finished"]
 fn async_join_on_module_fail() {
     let mut sim = Sim::new(());
     sim.node("main", JoinOnModule);
 
-    let _ = Builder::seeded(123).build(sim).run();
+    let v = Builder::seeded(123).build(sim).run();
+    assert!(v
+        .unwrap_err()
+        .as_any()
+        .downcast_ref::<JoinError>()
+        .is_some())
 }
 
 struct PanicIsJoinable;
 impl Module for PanicIsJoinable {
     fn at_sim_start(&mut self, _stage: usize) {
-        join(tokio::spawn(async move { panic!("Panic-Source") }));
+        join_spawn(async move { panic!("Panic-Source") });
     }
 }
 
 #[test]
 #[serial]
-#[should_panic = "could not join task: task"]
 fn async_join_paniced_will_join_but_fail() {
     let mut sim = Sim::new(());
     sim.node("main", PanicIsJoinable);
+
+    let v = Builder::seeded(123).build(sim).run();
+    assert!(v
+        .unwrap_err()
+        .as_any()
+        .downcast_ref::<JoinError>()
+        .is_some())
+}
+
+struct SpawnButNeverJoin;
+impl Module for SpawnButNeverJoin {
+    fn at_sim_start(&mut self, _stage: usize) {
+        join_spawn(async move {
+            std::future::pending::<()>().await;
+        });
+    }
+}
+
+#[test]
+#[serial]
+fn runtime_require_join() {
+    let mut sim = Sim::new(());
+    sim.node("main", SpawnButNeverJoin);
 
     let _ = Builder::seeded(123).build(sim).run();
 }

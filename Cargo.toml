@@ -12,5 +12,4 @@ members = [
     "des-net-utils",
     "benches",
     "examples",
-    "playground",
 ]

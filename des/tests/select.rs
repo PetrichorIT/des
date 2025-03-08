@@ -35,7 +35,7 @@ fn deterministic_branching() {
 
         let rt = Builder::seeded(123).build(rt);
         let v = rt.run();
-        assert!(matches!(v, RuntimeResult::EmptySimulation { .. }));
+        assert!(matches!(v.unwrap().2.event_count, 0));
     }
 
     let a = A.load(std::sync::atomic::Ordering::SeqCst);

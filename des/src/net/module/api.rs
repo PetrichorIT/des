@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{future::Future, sync::Arc};
 
 use super::{try_with_mod_ctx, ModuleContext};
 use crate::{
@@ -38,6 +38,14 @@ use crate::{
 pub fn current() -> Arc<ModuleContext> {
     try_with_mod_ctx(Arc::clone)
         .expect("cannot retrieve current module context, no module currently in scope")
+}
+
+/// Retuns a handle to the context of the current module if some exists.
+///
+/// See [`current`].
+#[must_use]
+pub fn try_current() -> Option<Arc<ModuleContext>> {
+    try_with_mod_ctx(Arc::clone)
 }
 
 // BUF CTX based
@@ -129,13 +137,29 @@ pub fn shutdow_and_restart_at(restart_at: SimTime) {
 }
 
 cfg_async! {
-    use tokio::task::JoinHandle;
 
     /// Schedules a task to be joined when the simulatio ends
     ///
     /// This function will **not** block, but rather defer the joining
     /// to the simulation shutdown phase.
-    pub fn join(handle: JoinHandle<()>) {
-        current().async_ext.write().require_joins.push(handle);
+    pub fn join_spawn<F>(fut: F)
+    where
+        F: Future<Output = ()>,
+        F: Send + 'static
+    {
+        current().async_ext.write().must_join.spawn(fut);
+    }
+
+    pub fn tryjoin_spawn<F>(fut: F)
+    where
+        F: Future<Output = ()>,
+        F: Send + 'static
+    {
+        current().async_ext.write().try_join.spawn(fut);
+    }
+
+    pub(crate) fn reset_join_handles() {
+        current().async_ext.write().must_join.detach_all();
+        current().async_ext.write().try_join.detach_all();
     }
 }

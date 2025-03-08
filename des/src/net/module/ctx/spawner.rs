@@ -55,6 +55,6 @@ impl Spawner<'_> {
         };
 
         // TODO: must prevent message sending
-        handle.at_sim_end();
+        let _ = handle.at_sim_end();
     }
 }

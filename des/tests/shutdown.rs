@@ -160,8 +160,9 @@ impl Module for StatefullModule {
         }
     }
 
-    fn at_sim_end(&mut self) {
-        assert_eq!(self.state, 5)
+    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+        assert_eq!(self.state, 5);
+        Ok(())
     }
 }
 
@@ -311,9 +312,10 @@ impl Module for WillIgnoreInncomingInDowntime {
         msg.content_mut::<CountDropsMessage>().counter = Arc::new(AtomicUsize::new(0));
     }
 
-    fn at_sim_end(&mut self) {
+    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
         assert_eq!(self.received.load(Ordering::SeqCst), 8);
         assert_eq!(self.drops.load(Ordering::SeqCst), 2);
+        Ok(())
     }
 }
 
@@ -369,11 +371,11 @@ impl Module for EndNode {
         }
     }
 
-    fn at_sim_end(&mut self) {
+    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
         assert_eq!(self.sent, 10);
         assert_eq!(self.recv, 7);
-
         assert_eq!(self.drops.load(Ordering::SeqCst), 3);
+        Ok(())
     }
 }
 

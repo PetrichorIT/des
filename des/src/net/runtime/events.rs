@@ -3,14 +3,15 @@ use crate::{
         channel::ChannelRef, gate::Connection, message::Message, module::ModuleRef,
         processing::ProcessingState, runtime::buf_process, Sim,
     },
+    prelude::RuntimeError,
     runtime::{EventLifecycle, EventSet, EventSink, Runtime},
     time::SimTime,
     tracing::enter_scope,
 };
-use std::sync::atomic::Ordering::SeqCst;
+use std::{fmt::Debug, sync::atomic::Ordering::SeqCst};
 
 #[cfg(feature = "async")]
-use tokio::task::yield_now;
+use tokio::task::{self, yield_now};
 
 use super::Harness;
 
@@ -307,34 +308,118 @@ impl ModuleRef {
         self.processing.borrow().handler.num_sim_start_stages()
     }
 
-    pub(crate) fn at_sim_end(&self) {
+    pub(crate) fn at_sim_end(&self) -> Result<(), RuntimeError> {
         let mut processing = self.processing.borrow_mut();
 
         processing.incoming_upstream(None);
+
+        let mut result = Ok(());
         Harness::new(&self.ctx)
-            .exec(|| processing.handler.at_sim_end())
+            .exec(|| result = processing.handler.at_sim_end())
             .catch();
+
         #[cfg(feature = "async")]
         {
             let Some((rt, task_set)) = self.ctx.async_ext.write().rt.current() else {
                 panic!("WHERE MY RT");
             };
 
-            let mut joins = Vec::new();
-            std::mem::swap(&mut self.ctx.async_ext.write().require_joins, &mut joins);
-
             let _guard = rt.enter();
             task_set.block_on(&rt, yield_now());
 
-            for join in joins {
-                assert!(join.is_finished(), "could not join task: not yet finished");
+            let mut lock = self.ctx.async_ext.write();
 
-                let join_result = rt.block_on(join);
-                if let Err(e) = join_result {
-                    panic!("could not join task: {e}")
+            while let Some(join_result) = lock.try_join.try_join_next() {
+                match join_result {
+                    Ok(()) => {}
+                    Err(e) if e.is_panic() => {
+                        return Err(JoinError {
+                            path: self.path(),
+                            kind: Kind::Paniced(e.into_panic()),
+                        }
+                        .into())
+                    }
+                    Err(e) => {
+                        return Err(JoinError {
+                            path: self.path(),
+                            kind: Kind::Tokio(e),
+                        }
+                        .into())
+                    }
                 }
             }
+
+            while let Some(join_result) = lock.must_join.try_join_next() {
+                println!("- {join_result:?}");
+                match join_result {
+                    Ok(()) => {}
+                    Err(e) if e.is_panic() => {
+                        return Err(JoinError {
+                            path: self.path(),
+                            kind: Kind::Paniced(e.into_panic()),
+                        }
+                        .into())
+                    }
+                    Err(e) => {
+                        return Err(JoinError {
+                            path: self.path(),
+                            kind: Kind::Tokio(e),
+                        }
+                        .into())
+                    }
+                }
+            }
+
+            if !lock.must_join.is_empty() {
+                return Err(JoinError {
+                    path: self.path(),
+                    kind: Kind::NotFinished,
+                }
+                .into());
+            }
         }
+
         processing.incoming_downstream();
+        result
     }
+}
+
+cfg_async! {
+    use std::{any::Any, error::Error as StdError, fmt::Display};
+    use crate::prelude::ObjectPath;
+
+    /// An error when the simulation fails to join a task at the end of the simulation
+    pub struct JoinError {
+        /// The error source
+        pub path: ObjectPath,
+        /// The error kind
+        pub kind: Kind,
+    }
+
+    #[derive(Debug)]
+    pub enum Kind {
+        /// The task is not yet finished
+        NotFinished,
+        /// A panic occurred in the task
+        Paniced(Box<dyn Any + Send + 'static>),
+        /// The join failed with an tokio error.
+        Tokio(task::JoinError),
+    }
+
+    impl Debug for JoinError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.debug_struct("JoinError")
+                .field("path", &self.path.to_string())
+                .field("kind", &self.kind)
+                .finish()
+        }
+    }
+
+    impl Display for JoinError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "{}: {:?}", self.path, self.kind)
+        }
+    }
+
+    impl StdError for JoinError {}
 }

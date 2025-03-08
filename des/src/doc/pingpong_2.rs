@@ -99,9 +99,10 @@
 //!         }
 //!     }
 //!
-//!     fn at_sim_end(&mut self) {
+//!     fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
 //!         assert_eq!(self.pings_send, 30);
 //!         assert_eq!(self.pongs_recv, 30);
+//!         Ok(())
 //!     }
 //! }
 //! ```
@@ -138,9 +139,10 @@
 //!         self.pongs_send += 1;
 //!     }
 //!
-//!     fn at_sim_end(&mut self) {
+//!     fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
 //!         assert_eq!(self.pongs_send, 30);
 //!         assert_eq!(self.pings_recv, 30);
+//!         Ok(())
 //!     }
 //! }
 //! ```

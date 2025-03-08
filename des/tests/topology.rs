@@ -10,7 +10,7 @@ fn main() {
         .map_err(|e| println!("{e}"))
         .unwrap();
     let rt = Builder::new().build(app);
-    let app = rt.run().into_app();
+    let app = rt.run().unwrap().0;
     let mut topo = app
         .globals()
         .topology

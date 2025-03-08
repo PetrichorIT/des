@@ -8,7 +8,7 @@
 
 pub use crate::runtime::Builder;
 pub use crate::runtime::Runtime;
-pub use crate::runtime::RuntimeResult;
+pub use crate::runtime::RuntimeError;
 
 pub use crate::time::Duration;
 pub use crate::time::SimTime;

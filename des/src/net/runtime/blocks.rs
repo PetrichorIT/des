@@ -247,8 +247,8 @@ cfg_async! {
     use tokio::{
         sync::mpsc::{self, Receiver, Sender},
     };
-    use std::{future::Future, fmt::Formatter, pin::Pin, sync::{Arc,atomic::{AtomicBool, Ordering}}};
-    use tokio::task::JoinSet;
+    use std::{future::Future, fmt::Formatter, pin::Pin};
+    use crate::{runtime::RuntimeError, net::module::{join_spawn, tryjoin_spawn, reset_join_handles}};
 
 
     /// A helper that enables user to treat a module as a async stream of messages,
@@ -285,9 +285,6 @@ cfg_async! {
     {
         gen: BoxedGen,
 
-        join: JoinSet<()>,
-        joined: Arc<AtomicBool>,
-
         tx: Sender<Message>,
         rx: Option<Receiver<Message>>,
 
@@ -310,7 +307,7 @@ cfg_async! {
         /// read from the `rx` queue. If that does not happen, the module will panic.
         #[must_use]
         pub fn require_recv(mut self) -> Self {
-            self.require_join = true;
+            self.require_recv = true;
             self
         }
 
@@ -325,8 +322,7 @@ cfg_async! {
             let (tx, rx) = mpsc::channel(8);
             Self {
                 gen: Box::new(move |rx| Box::pin(gen(rx))),
-                join: JoinSet::new(),
-                joined: Arc::default(), tx,
+                tx,
                 rx: Some(rx),
                 require_join: false,
                 require_recv: false
@@ -356,11 +352,9 @@ cfg_async! {
                         }
                     })
                 }),
-                join: JoinSet::new(),
-                joined: Arc::default(),
                 tx,
                 rx: Some(rx),
-                require_join: false,
+                require_join: false, // TODO: make error without join
                 require_recv: false,
             }
         }
@@ -379,8 +373,7 @@ cfg_async! {
 
     impl Module for AsyncFn {
         fn reset(&mut self) {
-            self.join.abort_all();
-            self.joined.store(false, Ordering::SeqCst);
+            reset_join_handles();
         }
 
          fn at_sim_start(&mut self, _: usize) {
@@ -390,14 +383,16 @@ cfg_async! {
                 rx
             });
 
-            let joined = self.joined.clone();
             let fut = (self.gen)(rx);
             let fut = async move {
                 fut.await;
-                joined.store(true, Ordering::SeqCst);
             };
 
-            self.join.spawn(fut);
+            if self.require_join {
+                join_spawn(fut)
+            } else {
+                tryjoin_spawn(fut)
+            }
         }
 
          fn handle_message(&mut self, msg: Message) {
@@ -408,16 +403,8 @@ cfg_async! {
             };
         }
 
-         fn at_sim_end(&mut self) {
-            if let Some(result) = self.join.try_join_next() {
-                match result {
-                    Ok(()) => {},
-                    Err(e) if e.is_panic() => super::panic(e.to_string()),
-                    Err(e) => println!("{e}")
-                }
-            } else if self.require_join && !self.joined.load(Ordering::SeqCst) {
-                super::panic("Main task could not be joined");
-            }
+         fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+            Ok(())
          }
 
     }

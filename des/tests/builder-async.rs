@@ -8,7 +8,11 @@ use std::{
     },
 };
 
-use des::{net::AsyncFn, prelude::*, time::sleep};
+use des::{
+    net::{AsyncFn, JoinError},
+    prelude::*,
+    time::sleep,
+};
 use serial_test::serial;
 
 #[test]
@@ -149,7 +153,6 @@ fn builder_async_failable() {
 
 #[test]
 #[serial]
-#[should_panic]
 fn builder_async_failable_with_fail() {
     let mut sim = Sim::new(());
     sim.node(
@@ -162,7 +165,12 @@ fn builder_async_failable_with_fail() {
             Ok(())
         }),
     );
-    let _ = Builder::new().build(sim).run();
+    let v = Builder::new().build(sim).run();
+    assert!(v
+        .unwrap_err()
+        .as_any()
+        .downcast_ref::<JoinError>()
+        .is_some())
 }
 
 #[test]
@@ -179,7 +187,6 @@ fn builder_async_no_join() {
 
 #[test]
 #[serial]
-#[should_panic = "Main task could not be joined"]
 fn builder_async_require_join() {
     let mut sim = Sim::new(());
     sim.node(
@@ -187,7 +194,12 @@ fn builder_async_require_join() {
         AsyncFn::io(|_| async move { std::future::pending().await }).require_join(),
     );
 
-    let _ = Builder::seeded(123).build(sim).run();
+    let v = Builder::seeded(123).build(sim).run();
+    assert!(v
+        .unwrap_err()
+        .as_any()
+        .downcast_ref::<JoinError>()
+        .is_some());
 }
 
 #[test]

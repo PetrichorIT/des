@@ -1,3 +1,5 @@
+use crate::prelude::RuntimeError;
+
 use super::Module;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -16,7 +18,7 @@ impl Module for DummyModule {
         panic!("A dummy module is only a placeholder in the load process. No `dyn Module` functions should be called.")
     }
 
-    fn at_sim_end(&mut self) {
+    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
         panic!("A dummy module is only a placeholder in the load process. No `dyn Module` functions should be called.")
     }
 }

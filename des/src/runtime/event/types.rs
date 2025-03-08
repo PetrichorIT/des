@@ -1,4 +1,4 @@
-use crate::runtime::Runtime;
+use crate::runtime::{Runtime, RuntimeError};
 
 ///
 /// A trait that defines an runtime application
@@ -120,17 +120,19 @@ pub trait EventLifecycle<A = Self> {
     ///     type Lifecycle = Self;
     /// }
     /// impl EventLifecycle for MyApp {
-    ///     fn at_sim_end(rt: &mut Runtime<Self>) {
+    ///     fn at_sim_end(rt: &mut Runtime<Self>) -> Result<(), RuntimeError> {
     ///         rt.app.workers.iter_mut().for_each(|w| w.finish());
+    ///         Ok(())
     ///     }
     /// }
     /// ```
     ///
     #[allow(unused_variables)]
-    fn at_sim_end(runtime: &mut Runtime<A>)
+    fn at_sim_end(runtime: &mut Runtime<A>) -> Result<(), RuntimeError>
     where
         A: Application,
     {
+        Ok(())
     }
 }
 

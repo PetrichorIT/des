@@ -76,13 +76,14 @@ mod common {
             }
         }
 
-        fn at_sim_end(&mut self) {
+        fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
             if let Some(v) = par("expected")
                 .as_option()
                 .map(|v| v.parse::<usize>().unwrap())
             {
                 assert_eq!(v, self.rcv, "failed at module: {}", current().path());
             }
+            Ok(())
         }
     }
 

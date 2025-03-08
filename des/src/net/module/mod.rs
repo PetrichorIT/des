@@ -1,6 +1,6 @@
 //! Network nodes with custom state.
 
-use crate::net::message::Message;
+use crate::{net::message::Message, prelude::RuntimeError};
 use std::{
     any::Any,
     fmt,
@@ -147,7 +147,9 @@ pub trait Module: Any {
     /// A callback function that is invoked should the simulation finish.
     /// All events emitted by this function will NOT be processed.
     ///
-    fn at_sim_end(&mut self) {}
+    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+        Ok(())
+    }
 }
 
 pub(crate) trait ModuleExt: Module {

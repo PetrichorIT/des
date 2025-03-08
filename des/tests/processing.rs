@@ -52,8 +52,9 @@ impl Module for PluginCreation {
         self.sum += msg.header().id as usize;
     }
 
-    fn at_sim_end(&mut self) {
+    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
         assert_eq!(self.sum, (0..100).sum::<usize>() + 100);
+        Ok(())
     }
 }
 
@@ -132,7 +133,7 @@ fn plugin_priority_defer() {
     let rt = Builder::seeded(123).build(app);
     let result = rt.run();
 
-    let RuntimeResult::Finished { time, profiler, .. } = result else {
+    let Ok((_, time, profiler)) = result else {
         panic!("Unexpected runtime result")
     };
 
@@ -187,8 +188,9 @@ impl Module for PluginAtShutdown {
         }
     }
 
-    fn at_sim_end(&mut self) {
+    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
         assert_eq!(self.arc.load(SeqCst), 20);
+        Ok(())
     }
 }
 

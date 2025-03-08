@@ -26,8 +26,9 @@ impl Module for DropChanModule {
         self.received += 1;
     }
 
-    fn at_sim_end(&mut self) {
-        assert_ne!(self.send, self.received)
+    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+        assert_ne!(self.send, self.received);
+        Ok(())
     }
 }
 
@@ -71,9 +72,10 @@ impl Module for BufferChanModule {
         self.received += 1;
     }
 
-    fn at_sim_end(&mut self) {
+    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
         assert_eq!(self.send, 3);
         assert_eq!(self.received, 2);
+        Ok(())
     }
 }
 
@@ -171,8 +173,9 @@ impl Module for ChannelProbing {
         assert_eq!(format!("{chan:?}"), format!("Channel {{ metrics: ChannelMetrics {{ bitrate: 1234, latency: 100ms, jitter: 0ns, drop_behaviour: Drop }}, state: Busy {{ until: {tft}, bytes: 0, packets: 0 }} }}"));
     }
 
-    fn at_sim_end(&mut self) {
+    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
         assert_eq!(self.0.load(Ordering::SeqCst), 1);
+        Ok(())
     }
 }
 
@@ -223,8 +226,9 @@ impl Module for LatencyOnly {
         self.0 += 1;
     }
 
-    fn at_sim_end(&mut self) {
+    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
         assert_eq!(self.0, 10);
+        Ok(())
     }
 }
 

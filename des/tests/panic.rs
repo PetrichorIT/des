@@ -4,7 +4,7 @@ use des::{
         panic, Sim,
     },
     prelude::{current, Message},
-    runtime::Builder,
+    runtime::{Builder, RuntimeError},
 };
 use serial_test::serial;
 
@@ -48,7 +48,7 @@ fn catch_panic_at_sim_start() {
 
 struct PanicAtSimEnd;
 impl Module for PanicAtSimEnd {
-    fn at_sim_end(&mut self) {
+    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
         panic!("Oh no");
     }
 }
@@ -107,7 +107,7 @@ fn unwind_sim_panic_at_sim_start() {
 
 struct SimPanicAtSimEnd;
 impl Module for SimPanicAtSimEnd {
-    fn at_sim_end(&mut self) {
+    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
         panic("Oh no");
     }
 }

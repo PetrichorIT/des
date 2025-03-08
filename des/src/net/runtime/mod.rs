@@ -5,6 +5,7 @@ use super::module::MOD_CTX;
 use super::processing::ProcessingStack;
 use super::topology::Topology;
 use super::util::NoDebug;
+use crate::runtime::RuntimeError;
 use crate::{
     net::module::{ModuleContext, ModuleExt},
     prelude::{Application, EventLifecycle, GateRef, Module, ModuleRef, ObjectPath, Runtime},
@@ -22,6 +23,9 @@ pub use self::api::*;
 
 mod events;
 pub(crate) use self::events::*;
+
+#[cfg(feature = "async")]
+pub use self::events::JoinError;
 
 mod ctx;
 pub(crate) use self::ctx::*;
@@ -552,8 +556,8 @@ where
         A::at_sim_start(rt);
     }
 
-    fn at_sim_end(rt: &mut Runtime<Sim<A>>) {
-        A::at_sim_end(rt);
+    fn at_sim_end(rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError> {
+        A::at_sim_end(rt)?;
 
         for module in rt.app.modules.iter().cloned().collect::<Vec<_>>() {
             enter_scope(module.scope_token());
@@ -561,13 +565,14 @@ where
             #[cfg(feature = "tracing")]
             tracing::info!("Calling 'at_sim_end'");
             module.activate();
-            module.at_sim_end();
+            module.at_sim_end()?;
             module.deactivate(rt);
 
             // NOTE: no buf_process since no furthe events will be processed.
         }
 
         leave_scope();
+        Ok(())
     }
 }
 

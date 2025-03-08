@@ -134,7 +134,7 @@ fn span_regognition() {
         let _ = Builder::seeded(123).build(sim).run();
         assert_eq!(
             writer.content(),
-            "[ 0ns ] INFO a my-span{key=123}: tracing: node(a) says(1) at(0s)\n[ 0ns ] TRACE a.b tracing: node(b) says(1) at(0s)\n"
+            "[ 0ns ] INFO a tracing: my-span{key=123}: node(a) says(1) at(0s)\n[ 0ns ] TRACE a.b tracing: node(b) says(1) at(0s)\n"
         );
     });
 }
@@ -179,7 +179,7 @@ fn multi_span_regognition() {
         let _ = Builder::seeded(123).build(sim).run();
         assert_eq!(
             writer.content(),
-            "[ 0ns ] INFO a my-span{key=123}:say_hello: tracing: hello\n[ 0ns ] TRACE a.b other-span: tracing: node(b) says(1) at(0s)\n"
+            "[ 0ns ] INFO a tracing: my-span{key=123}:say_hello: hello\n[ 0ns ] TRACE a.b tracing: other-span: node(b) says(1) at(0s)\n"
         );
     });
 }

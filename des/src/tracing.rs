@@ -167,6 +167,8 @@ where
             maybe_ansi!(style, ansi, writer: "{} ", meta.level().as_str())?;
         }
 
+        maybe_ansi!(dimmed, ansi, writer: "{}: ", meta.target())?;
+
         if let Some(scope) = ctx.event_scope() {
             let mut seen = false;
             for span in scope.from_root() {
@@ -187,8 +189,6 @@ where
                 writer.write_char(' ')?;
             }
         }
-
-        maybe_ansi!(dimmed, ansi, writer: "{}: ", meta.target())?;
 
         ctx.format_fields(writer.by_ref(), event)?;
         writeln!(writer)

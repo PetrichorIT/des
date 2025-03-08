@@ -30,7 +30,7 @@
 //! event_set!(
 //!     enum PingPongEventSet {
 //!         type App = PingPongApp;
-//!     
+//!
 //!         IntervalEvent(IntervalEvent),
 //!         PingArrival(PingArrival),
 //!         PongArrival(PongArrival),
@@ -75,11 +75,12 @@
 //!     type Lifecycle = Self;
 //! }
 //! impl EventLifecycle for PingPongApp {
-//!     fn at_sim_end(rt: &mut Runtime<Self>) {
+//!     fn at_sim_end(rt: &mut Runtime<Self>) -> Result<(), RuntimeError> {
 //!         assert_eq!(rt.app.pings_send, 30);
 //!         assert_eq!(rt.app.pings_recv, 30);
 //!         assert_eq!(rt.app.pongs_send, 30);
-//!         assert_eq!(rt.app.pongs_recv, 30);    
+//!         assert_eq!(rt.app.pongs_recv, 30);
+//!         Ok(())
 //!     }
 //! }
 //! # struct PingPongEventSet;

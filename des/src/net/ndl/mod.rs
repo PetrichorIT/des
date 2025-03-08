@@ -50,11 +50,12 @@ use crate::{
     time::Duration,
 };
 use des_net_utils::ndl::{
-    def::{self, Kardinality},
     error::{self, Result},
     transform, tree,
 };
 use std::{fs::File, path::Path};
+
+pub use des_net_utils::ndl::def::*;
 
 mod registry;
 pub use self::registry::*;
@@ -130,7 +131,7 @@ impl<A> Sim<A> {
     /// b) or the registry fails to provide software for some NDL-defined module.
     pub fn nodes_from_ndl<L: Layer>(
         &mut self,
-        def: &def::Def,
+        def: &Def,
         mut registry: impl AsMut<Registry<L>>,
     ) -> Result<()> {
         let parsed = transform(def)?;
