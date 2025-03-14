@@ -248,7 +248,7 @@ cfg_async! {
         sync::mpsc::{self, Receiver, Sender},
     };
     use std::{future::Future, fmt::Formatter, pin::Pin};
-    use crate::{runtime::RuntimeError, net::module::{join_spawn, tryjoin_spawn, reset_join_handles}};
+    use crate::{runtime::RuntimeError, net::module::{reset_join_handles, join, try_join}};
 
 
     /// A helper that enables user to treat a module as a async stream of messages,
@@ -347,7 +347,7 @@ cfg_async! {
                         match fut.await {
                             Ok(()) => {},
                             Err(e) => {
-                                super::panic(format!("node {} paniced at failable operation: {e}", current().path()));
+                                panic!("node {} paniced at failable operation: {e}", current().path());
                             },
                         }
                     })
@@ -389,17 +389,15 @@ cfg_async! {
             };
 
             if self.require_join {
-                join_spawn(fut)
+                join(tokio::spawn(fut));
             } else {
-                tryjoin_spawn(fut)
+                try_join(tokio::spawn(fut));
             }
         }
 
          fn handle_message(&mut self, msg: Message) {
             if let Err(e) = self.tx.try_send(msg) {
-                if self.require_recv {
-                    crate::net::panic(format!("failed to receive an incoming packet: {e}"))
-                }
+                assert!(!self.require_recv, "failed to receive an incoming packet: {e}");
             };
         }
 

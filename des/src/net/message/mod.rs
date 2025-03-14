@@ -2,6 +2,7 @@
 
 use crate::net::{gate::GateRef, module::ModuleId};
 use crate::time::SimTime;
+use std::any::Any;
 use std::fmt::Debug;
 use std::panic::UnwindSafe;
 
@@ -36,6 +37,14 @@ impl Message {
     #[must_use]
     pub fn new() -> MessageBuilder {
         MessageBuilder::new()
+    }
+
+    /// From parts
+    pub fn from_parts(header: MessageHeader, body: Option<impl Any>) -> Self {
+        Self {
+            header: Box::new(header),
+            content: body.map(AnyBox::new),
+        }
     }
 
     /// Returns the length of the complete message

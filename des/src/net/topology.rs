@@ -611,7 +611,7 @@ pub struct EdgesIter<'a, N, C> {
     buffer: &'a [Vec<EdgeRaw<C>>],
 }
 
-impl<'a, N, C> EdgesIter<'a, N, C> {
+impl<N, C> EdgesIter<'_, N, C> {
     fn empty() -> Self {
         Self {
             nodes: &[],
@@ -688,7 +688,7 @@ impl<N, C> Topology<N, C> {
 
 // ==== impl Edge<'_> ====
 
-impl<'a, N> EdgeEndpoint<'a, N> {
+impl<N> EdgeEndpoint<'_, N> {
     /// Returns the gate the endpoint is attached to.
     #[must_use]
     pub fn gate(&self) -> GateRef {
@@ -696,7 +696,7 @@ impl<'a, N> EdgeEndpoint<'a, N> {
     }
 }
 
-impl<'a, N> Deref for EdgeEndpoint<'a, N> {
+impl<N> Deref for EdgeEndpoint<'_, N> {
     type Target = Node<N>;
     fn deref(&self) -> &Self::Target {
         self.node

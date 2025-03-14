@@ -127,6 +127,11 @@ pub trait EventLifecycle<A = Self> {
     /// }
     /// ```
     ///
+    /// # Errors
+    ///
+    /// This function may return an error, if some situation occured, that
+    /// indicates an overall failure of the simulation. This error will be propagated
+    /// to [`Runtime::run`].
     #[allow(unused_variables)]
     fn at_sim_end(runtime: &mut Runtime<A>) -> Result<(), RuntimeError>
     where

@@ -147,6 +147,9 @@ pub trait Module: Any {
     /// A callback function that is invoked should the simulation finish.
     /// All events emitted by this function will NOT be processed.
     ///
+    /// # Errors
+    ///
+    /// May return an error if the module deems the simulation has failed.
     fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
         Ok(())
     }

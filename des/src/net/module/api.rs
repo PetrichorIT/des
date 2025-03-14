@@ -137,31 +137,29 @@ pub fn shutdow_and_restart_at(restart_at: SimTime) {
 }
 
 cfg_async! {
-    use std::future::Future;
+    use tokio::task::JoinHandle;
+
 
     /// Schedules a task to be joined when the simulatio ends
     ///
     /// This function will **not** block, but rather defer the joining
     /// to the simulation shutdown phase.
-    pub fn join_spawn<F>(fut: F)
-    where
-        F: Future<Output = ()>,
-        F: Send + 'static
+    pub fn join(handle: JoinHandle<()>)
     {
-        current().async_ext.write().must_join.spawn(fut);
+        current().async_ext.write().must_join.push(handle);
     }
 
-    /// Other spawner
-    pub fn tryjoin_spawn<F>(fut: F)
-    where
-        F: Future<Output = ()>,
-        F: Send + 'static
+    /// Will try to join a task when the simulation ends.
+    ///
+    /// This will catch panics that occured within the task, but
+    /// if the task is still running, no error will be returned.
+    pub fn try_join(handle: JoinHandle<()>)
     {
-        current().async_ext.write().try_join.spawn(fut);
+        current().async_ext.write().try_join.push(handle);
     }
 
     pub(crate) fn reset_join_handles() {
-        current().async_ext.write().must_join.detach_all();
-        current().async_ext.write().try_join.detach_all();
+        current().async_ext.write().must_join.clear();
+        current().async_ext.write().try_join.clear();
     }
 }

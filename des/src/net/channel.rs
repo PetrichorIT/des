@@ -346,7 +346,7 @@ impl ChannelMetrics {
     }
 
     /// Calcualtes the duration a message travels on a link.
-    #[allow(clippy::if_same_then_else)]
+    #[allow(clippy::if_same_then_else, clippy::missing_panics_doc)]
     pub fn calculate_duration(&self, msg: &Message, rng: &mut dyn RngCore) -> Duration {
         let transmission_time = self.calculate_busy(msg);
         if self.jitter == Duration::ZERO {

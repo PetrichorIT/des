@@ -1,21 +1,22 @@
 use des_net_utils::par::ParMap;
 
-use super::module::module_ctx_drop;
-use super::module::MOD_CTX;
-use super::processing::ProcessingStack;
-use super::topology::Topology;
-use super::util::NoDebug;
-use crate::runtime::RuntimeError;
 use crate::{
-    net::module::{ModuleContext, ModuleExt},
+    net::{
+        module::{module_ctx_drop, try_current, ModuleContext, ModuleExt, MOD_CTX},
+        processing::ProcessingStack,
+        topology::Topology,
+        util::NoDebug,
+    },
     prelude::{Application, EventLifecycle, GateRef, Module, ModuleRef, ObjectPath, Runtime},
+    runtime::RuntimeError,
+    time::SimTime,
     tracing::{enter_scope, leave_scope},
 };
-use std::sync::{MutexGuard, TryLockError, Weak};
 use std::{
-    fs, io, ops,
+    fs, io, mem, ops,
+    panic::{set_hook, take_hook, PanicHookInfo},
     path::Path,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, MutexGuard, TryLockError, Weak},
 };
 
 mod api;
@@ -37,7 +38,8 @@ mod blocks;
 pub use self::blocks::*;
 
 mod unwind;
-use self::unwind::{Harness, SimWideUnwind};
+use self::unwind::Harness;
+pub use self::unwind::PanicError;
 
 static GUARD: Mutex<()> = Mutex::new(());
 
@@ -78,6 +80,8 @@ static GUARD: Mutex<()> = Mutex::new(());
 #[derive(Debug)]
 pub struct Sim<A> {
     pub(crate) stack: NoDebug<Box<dyn FnMut() -> ProcessingStack>>,
+    pub(crate) error: RuntimeError,
+
     modules: ModuleTree,
     globals: Arc<Globals>,
     watcher: Arc<WatcherValueMap>,
@@ -191,6 +195,7 @@ impl<A> Sim<A> {
         let stack: Box<dyn FnMut() -> ProcessingStack> = Box::new(ProcessingStack::default);
         Self {
             stack: stack.into(),
+            error: RuntimeError::empty(),
             guard,
             modules: ModuleTree::default(),
             globals,
@@ -450,7 +455,7 @@ impl<'a, A> ScopedSim<'a, A> {
     }
 }
 
-impl<'a, A> ScopedSim<'a, A> {
+impl<A> ScopedSim<'_, A> {
     /// The current scope from an absoute prespective.
     #[must_use]
     pub fn scope(&self) -> &ObjectPath {
@@ -510,6 +515,8 @@ where
     A: EventLifecycle<Sim<A>>,
 {
     fn at_sim_start(rt: &mut Runtime<Sim<A>>) {
+        set_hook(Box::new(panic_hook));
+
         // (1) Get Topology
         let mut top = rt
             .app
@@ -543,7 +550,7 @@ where
                     #[cfg(feature = "tracing")]
                     tracing::info!("Calling at_sim_start({}).", stage);
 
-                    module.at_sim_start(stage);
+                    rt.app.error.extend(module.at_sim_start(stage).err());
                     module.deactivate(rt);
 
                     super::buf_process(&module, rt);
@@ -559,21 +566,62 @@ where
     fn at_sim_end(rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError> {
         A::at_sim_end(rt)?;
 
+        let mut error = RuntimeError::empty();
+        mem::swap(&mut error, &mut rt.app.error);
+
+        if !rt.app.error.is_empty() {
+            return Err(error);
+        }
+
         for module in rt.app.modules.iter().cloned().collect::<Vec<_>>() {
             enter_scope(module.scope_token());
 
             #[cfg(feature = "tracing")]
             tracing::info!("Calling 'at_sim_end'");
             module.activate();
-            module.at_sim_end()?;
+            let _ = module.at_sim_end().map_err(|e| error.merge(e));
             module.deactivate(rt);
 
             // NOTE: no buf_process since no furthe events will be processed.
         }
 
+        let _ = take_hook();
         leave_scope();
-        Ok(())
+        if error.is_empty() {
+            Ok(())
+        } else {
+            Err(error)
+        }
     }
+}
+
+fn panic_hook(info: &PanicHookInfo) {
+    if let Some(current) = try_current() {
+        if let Some(location) = info.location() {
+            eprintln!(
+                "module '{}' panicked at {}:{}:{} after {}",
+                current.path(),
+                location.file(),
+                location.line(),
+                location.column(),
+                SimTime::now()
+            );
+        }
+    } else {
+        eprintln!("thread 'main' panicked:");
+    }
+
+    if let Some(str) = info.payload().downcast_ref::<&str>() {
+        eprintln!("{str}");
+        return;
+    }
+
+    if let Some(str) = info.payload().downcast_ref::<String>() {
+        eprintln!("{str}");
+        return;
+    }
+
+    eprintln!("Box<dyn Any>");
 }
 
 ///

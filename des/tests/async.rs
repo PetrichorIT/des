@@ -3,7 +3,7 @@
 
 use des::{
     net::{
-        module::{join_spawn, Module},
+        module::{join, Module},
         AsyncFn, JoinError,
     },
     prelude::*,
@@ -653,9 +653,9 @@ fn async_time_interval_missed_tick_behaviour() {
 struct JoinOnModule;
 impl Module for JoinOnModule {
     fn at_sim_start(&mut self, _stage: usize) {
-        join_spawn(async move {
+        join(tokio::spawn(async move {
             std::future::pending::<()>().await;
-        });
+        }));
     }
 }
 
@@ -666,8 +666,7 @@ fn async_join_on_module_fail() {
     sim.node("main", JoinOnModule);
 
     let v = Builder::seeded(123).build(sim).run();
-    assert!(v
-        .unwrap_err()
+    assert!(v.unwrap_err()[0]
         .as_any()
         .downcast_ref::<JoinError>()
         .is_some())
@@ -676,7 +675,7 @@ fn async_join_on_module_fail() {
 struct PanicIsJoinable;
 impl Module for PanicIsJoinable {
     fn at_sim_start(&mut self, _stage: usize) {
-        join_spawn(async move { panic!("Panic-Source") });
+        join(tokio::spawn(async move { panic!("Panic-Source") }));
     }
 }
 
@@ -687,8 +686,7 @@ fn async_join_paniced_will_join_but_fail() {
     sim.node("main", PanicIsJoinable);
 
     let v = Builder::seeded(123).build(sim).run();
-    assert!(v
-        .unwrap_err()
+    assert!(v.unwrap_err()[0]
         .as_any()
         .downcast_ref::<JoinError>()
         .is_some())
@@ -697,9 +695,9 @@ fn async_join_paniced_will_join_but_fail() {
 struct SpawnButNeverJoin;
 impl Module for SpawnButNeverJoin {
     fn at_sim_start(&mut self, _stage: usize) {
-        join_spawn(async move {
+        join(tokio::spawn(async move {
             std::future::pending::<()>().await;
-        });
+        }));
     }
 }
 

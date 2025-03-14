@@ -255,10 +255,14 @@ where
     ///
     /// ```
     ///
+    /// # Errors
+    ///
+    /// Returns an error if the application has determined that a simulation critical
+    /// failure has occurred.
+    ///
     /// # Panics
     ///
     /// This function panics if the simulation has not been started.
-    #[must_use]
     pub fn run(mut self) -> Result<(A, SimTime, Profiler), RuntimeError> {
         assert_eq!(
             self.state,
@@ -375,11 +379,15 @@ where
     /// This funtions should only be used when running the simulation with manual calls
     /// to [`next`](Runtime::next).
     ///
+    /// # Errors
+    ///
+    /// Returns an error if the application has determined that a simulation critical
+    /// failure has occurred.
+    ///
     /// # Panics
     ///
     /// This function panics if the runtime is has not yet been started.
     #[allow(unused_mut)]
-    #[must_use]
     pub fn finish(mut self) -> Result<(A, SimTime, Profiler), RuntimeError> {
         assert_eq!(
             self.state,

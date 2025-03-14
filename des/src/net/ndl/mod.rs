@@ -178,7 +178,7 @@ impl<A> Sim<A> {
     }
 }
 
-impl<'a, A> ScopedSim<'a, A> {
+impl<A> ScopedSim<'_, A> {
     fn ndl<L: Layer>(mut self, node: &tree::Node, registry: &mut Registry<L>) -> Result<ModuleRef> {
         let symbol = node.typ.to_string();
         let scope = &self.scope;

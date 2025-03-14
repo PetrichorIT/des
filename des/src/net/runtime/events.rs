@@ -11,9 +11,11 @@ use crate::{
 use std::{fmt::Debug, sync::atomic::Ordering::SeqCst};
 
 #[cfg(feature = "async")]
+use std::iter::once;
+#[cfg(feature = "async")]
 use tokio::task::{self, yield_now};
 
-use super::Harness;
+use super::{Harness, PanicError};
 
 ///
 /// The event set for a [`NetworkApplication`].
@@ -157,7 +159,7 @@ impl HandleMessageEvent {
         let module = &self.module;
 
         module.activate();
-        module.handle_message(message);
+        rt.app.error.extend(module.handle_message(message).err());
         module.deactivate(rt);
 
         buf_process(module, rt);
@@ -181,7 +183,7 @@ impl ModuleRestartEvent {
 
         let module = &self.module;
         module.activate();
-        module.module_restart();
+        rt.app.error.extend(module.module_restart().err());
         module.deactivate(rt);
 
         buf_process(module, rt);
@@ -207,7 +209,7 @@ impl AsyncWakeupEvent {
 
         let module = &self.module;
         module.activate();
-        module.async_wakeup();
+        rt.app.error.extend(module.async_wakeup().err());
         module.deactivate(rt);
 
         buf_process(module, rt);
@@ -229,7 +231,7 @@ impl ChannelUnbusyNotif {
 }
 
 impl ModuleRef {
-    pub(crate) fn reset(&self) {
+    pub(crate) fn reset(&self) -> Result<(), PanicError> {
         let mut brw = self.processing.borrow_mut();
 
         #[cfg(feature = "async")]
@@ -237,22 +239,24 @@ impl ModuleRef {
 
         Harness::new(&self.ctx)
             .exec(move || brw.handler.reset())
-            .pass();
+            .pass()?;
+        Ok(())
     }
 
     #[cfg(feature = "async")]
-    pub(crate) fn async_wakeup(&self) {
+    pub(crate) fn async_wakeup(&self) -> Result<(), PanicError> {
         if self.ctx.active.load(SeqCst) {
             self.processing.borrow_mut().incoming_upstream(None);
-            Harness::new(&self.ctx).exec(|| {}).catch();
+            Harness::new(&self.ctx).exec(|| {}).catch()?;
             self.processing.borrow_mut().incoming_downstream();
         } else {
             #[cfg(feature = "tracing")]
             tracing::debug!("Ignoring message since module is inactive");
         }
+        Ok(())
     }
 
-    pub(crate) fn module_restart(&self) {
+    pub(crate) fn module_restart(&self) -> Result<(), PanicError> {
         #[cfg(feature = "tracing")]
         tracing::debug!("Restarting module");
         // restart the module itself.
@@ -261,11 +265,12 @@ impl ModuleRef {
         // Do sim start procedure
         let stages = self.num_sim_start_stages();
         for stage in 0..stages {
-            self.at_sim_start(stage);
+            self.at_sim_start(stage)?;
         }
+        Ok(())
     }
 
-    pub(crate) fn handle_message(&self, msg: Message) {
+    pub(crate) fn handle_message(&self, msg: Message) -> Result<(), PanicError> {
         if self.ctx.active.load(SeqCst) {
             let mut processing = self.processing.borrow_mut();
 
@@ -280,9 +285,9 @@ impl ModuleRef {
                         let msg = msg;
                         processing.handler.handle_message(msg);
                     })
-                    .catch();
+                    .catch()?;
             } else {
-                Harness::new(&self.ctx).exec(|| {}).catch();
+                Harness::new(&self.ctx).exec(|| {}).catch()?;
             }
 
             // Downstream
@@ -291,16 +296,18 @@ impl ModuleRef {
             #[cfg(feature = "tracing")]
             tracing::debug!("Ignoring message since module is inactive");
         }
+        Ok(())
     }
 
-    pub(crate) fn at_sim_start(&self, stage: usize) {
+    pub(crate) fn at_sim_start(&self, stage: usize) -> Result<(), PanicError> {
         let mut processing = self.processing.borrow_mut();
 
         processing.incoming_upstream(None);
         Harness::new(&self.ctx)
             .exec(|| processing.handler.at_sim_start(stage))
-            .catch();
+            .catch()?;
         processing.incoming_downstream();
+        Ok(())
     }
 
     pub(crate) fn num_sim_start_stages(&self) -> usize {
@@ -316,10 +323,12 @@ impl ModuleRef {
         let mut result = Ok(());
         Harness::new(&self.ctx)
             .exec(|| result = processing.handler.at_sim_end())
-            .catch();
+            .catch()?;
 
         #[cfg(feature = "async")]
         {
+            let mut error = RuntimeError::empty();
+
             let Some((rt, task_set)) = self.ctx.async_ext.write().rt.current() else {
                 panic!("WHERE MY RT");
             };
@@ -329,53 +338,46 @@ impl ModuleRef {
 
             let mut lock = self.ctx.async_ext.write();
 
-            while let Some(join_result) = lock.try_join.try_join_next() {
-                match join_result {
-                    Ok(()) => {}
+            for handle in lock.try_join.drain(..) {
+                if !handle.is_finished() {
+                    continue;
+                }
+
+                match rt.block_on(handle) {
                     Err(e) if e.is_panic() => {
-                        return Err(JoinError {
+                        error.extend(once(JoinError {
                             path: self.path(),
                             kind: Kind::Paniced(e.into_panic()),
-                        }
-                        .into())
+                        }));
                     }
-                    Err(e) => {
-                        return Err(JoinError {
-                            path: self.path(),
-                            kind: Kind::Tokio(e),
-                        }
-                        .into())
-                    }
+                    _ => {}
                 }
             }
 
-            while let Some(join_result) = lock.must_join.try_join_next() {
-                println!("- {join_result:?}");
-                match join_result {
+            for handle in lock.must_join.drain(..) {
+                if !handle.is_finished() {
+                    error.extend(once(JoinError {
+                        path: self.path(),
+                        kind: Kind::NotFinished,
+                    }));
+                    continue;
+                }
+
+                match rt.block_on(handle) {
                     Ok(()) => {}
-                    Err(e) if e.is_panic() => {
-                        return Err(JoinError {
-                            path: self.path(),
-                            kind: Kind::Paniced(e.into_panic()),
-                        }
-                        .into())
-                    }
-                    Err(e) => {
-                        return Err(JoinError {
-                            path: self.path(),
-                            kind: Kind::Tokio(e),
-                        }
-                        .into())
-                    }
+                    Err(e) if e.is_panic() => error.extend(once(JoinError {
+                        path: self.path(),
+                        kind: Kind::Paniced(e.into_panic()),
+                    })),
+                    Err(e) => error.extend(once(JoinError {
+                        path: self.path(),
+                        kind: Kind::Tokio(e),
+                    })),
                 }
             }
 
-            if !lock.must_join.is_empty() {
-                return Err(JoinError {
-                    path: self.path(),
-                    kind: Kind::NotFinished,
-                }
-                .into());
+            if !error.is_empty() {
+                result = Err(error);
             }
         }
 

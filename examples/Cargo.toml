@@ -44,3 +44,7 @@ path = "plugin/main.rs"
 [[example]]
 name = "ndl2"
 path = "ndl2/main.rs"
+
+[[example]]
+name = "panic"
+path = "panic/main.rs"

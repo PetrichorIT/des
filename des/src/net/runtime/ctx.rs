@@ -125,7 +125,7 @@ pub(crate) fn buf_schedule_at(msg: Message, arrival_time: SimTime) {
 
 pub(crate) fn buf_schedule_shutdown(restart: Option<SimTime>) {
     assert!(
-        restart.map_or(true, |r| r >= SimTime::now()),
+        restart.is_none_or(|r| r >= SimTime::now()),
         "Restart point cannot be in the past"
     );
 
@@ -172,7 +172,7 @@ where
         // Reset the internal state
         // Note that the module is not active, so it must be manually reactivated
         module.activate();
-        module.reset();
+        rt.app.error.extend(module.reset().err());
         module.deactivate(rt);
 
         // Reschedule wakeup

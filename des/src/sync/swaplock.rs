@@ -77,16 +77,14 @@ impl<'a, T> SwapLockReadGuard<'a, T> {
     }
 }
 
-impl<'a, T> Deref for SwapLockReadGuard<'a, T> {
+impl<T> Deref for SwapLockReadGuard<'_, T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
-        unsafe {
-            &(*self.lock.inner.get())
-        }
+        unsafe { &(*self.lock.inner.get()) }
     }
 }
 
-impl<'a, T> Drop for SwapLockReadGuard<'a, T> {
+impl<T> Drop for SwapLockReadGuard<'_, T> {
     fn drop(&mut self) {
         let ptr: *const SwapLock<T> = self.lock;
         self.lock.read_count.fetch_sub(1, SeqCst);

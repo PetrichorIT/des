@@ -166,8 +166,7 @@ fn builder_async_failable_with_fail() {
         }),
     );
     let v = Builder::new().build(sim).run();
-    assert!(v
-        .unwrap_err()
+    assert!(v.unwrap_err()[0]
         .as_any()
         .downcast_ref::<JoinError>()
         .is_some())
@@ -195,8 +194,7 @@ fn builder_async_require_join() {
     );
 
     let v = Builder::seeded(123).build(sim).run();
-    assert!(v
-        .unwrap_err()
+    assert!(v.unwrap_err()[0]
         .as_any()
         .downcast_ref::<JoinError>()
         .is_some());
