@@ -49,6 +49,11 @@ pub fn par_for(key: impl AsRef<str>, module: impl AsRef<str>) -> Par {
     Par::new(globals().parameters.clone(), key.as_ref(), module.as_ref())
 }
 
+/// KEYS
+pub fn par_keys(module: impl AsRef<str>) -> Vec<String> {
+    globals().parameters.keys(module.as_ref())
+}
+
 /// Exports the current simulation parameter tree to some output device.
 ///
 /// The output will be encoded as a key-value list where each key-value

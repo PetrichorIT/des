@@ -45,13 +45,28 @@ impl ParMap {
         }
     }
 
-    pub(super) fn get_rlock(&self, key: &str, inc: usize) -> Option<String> {
+    pub fn get(&self, key: &str) -> Option<String> {
+        let val = self.get_rlock(key, 1)?;
+        self.release_rlock(key);
+        Some(val)
+    }
+
+    pub fn get_rlock(&self, key: &str, inc: usize) -> Option<String> {
         self.tree.read().unwrap().get_rlock(key, inc)
     }
 
-    pub(super) fn release_rlock(&self, key: &str) {
+    pub fn release_rlock(&self, key: &str) {
         let done = self.tree.read().unwrap().release_rlock(key);
         assert!(done);
+    }
+
+    pub fn keys(&self, module: &str) -> Vec<String> {
+        let mut keys = Vec::new();
+        self.tree
+            .write()
+            .expect("failed to get lock")
+            .keys(module, &mut keys);
+        keys
     }
 
     pub fn insert(&self, key: &str, value: String) -> bool {
@@ -114,6 +129,19 @@ impl ParTree {
                 } else {
                     false
                 }
+            }
+        }
+    }
+
+    fn keys(&self, key: &str, result: &mut Vec<String>) {
+        if let Some((comp, remainder)) = key.split_once('.') {
+            for branch in self.branches.iter().filter(|b| b.matching.matches_r(comp)) {
+                branch.node.keys(remainder, result);
+            }
+        } else {
+            // last recursion
+            for branch in self.branches.iter().filter(|b| b.matching.matches_r(key)) {
+                result.extend(branch.node.pars.keys().cloned());
             }
         }
     }

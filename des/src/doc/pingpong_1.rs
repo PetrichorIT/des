@@ -176,6 +176,7 @@
 //! }
 //! # #[derive(Debug)]
 //! # struct PingPongApp { pings_send: usize, pings_recv: usize, pongs_send: usize, pongs_recv: usize }
+//! # #[derive(Debug)]
 //! # struct PingPongEventSet {}
 //! # struct IntervalEvent;
 //! # impl Application for PingPongApp { type EventSet = PingPongEventSet;type Lifecycle = ();  }

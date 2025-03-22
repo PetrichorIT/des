@@ -15,7 +15,6 @@ use std::sync::{Arc, Weak};
 pub(crate) struct ModuleRefWeak {
     ctx: Weak<ModuleContext>,
     handler: Weak<RefCell<Processor>>,
-    // handler_ptr: *mut u8,
 }
 
 impl ModuleRefWeak {
@@ -23,7 +22,6 @@ impl ModuleRefWeak {
         Self {
             ctx: Arc::downgrade(&strong.ctx),
             handler: Arc::downgrade(&strong.processing),
-            // handler_ptr: strong.handler_ptr,
         }
     }
 
@@ -31,7 +29,6 @@ impl ModuleRefWeak {
         Some(ModuleRef {
             ctx: self.ctx.upgrade()?,
             processing: self.handler.upgrade()?,
-            // handler_ptr: self.handler_ptr,
         })
     }
 }

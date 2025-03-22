@@ -1,4 +1,4 @@
-use std::{marker::PhantomData, ops::Deref, sync::Arc};
+use std::{io, marker::PhantomData, ops::Deref, sync::Arc};
 
 mod map;
 mod yaml;
@@ -50,6 +50,12 @@ pub enum ParError {
     CouldNotAquireWriteLock,
 }
 
+impl From<ParError> for io::Error {
+    fn from(_: ParError) -> Self {
+        io::Error::new(io::ErrorKind::Other, "Par Error")
+    }
+}
+
 mod private {
     pub trait ParState {}
 }
@@ -78,6 +84,10 @@ impl<S> Par<S>
 where
     S: private::ParState,
 {
+    pub fn key(&self) -> &str {
+        self.key.split(".").last().expect("unreachable")
+    }
+
     /// Returns a handle allowing [`Deref`] on the contained
     /// value, consuming self.
     ///

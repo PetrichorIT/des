@@ -123,7 +123,7 @@ where
 
     // Misc
     quiet: bool,
-    profiler: Profiler,
+    profiler: Profiler<App::EventSet>,
 
     #[allow(dead_code)]
     permit: MutexGuard<'static, ()>,
@@ -263,7 +263,7 @@ where
     /// # Panics
     ///
     /// This function panics if the simulation has not been started.
-    pub fn run(mut self) -> Result<(A, SimTime, Profiler), RuntimeError> {
+    pub fn run(mut self) -> Result<(A, SimTime, Profiler<A::EventSet>), RuntimeError> {
         assert_eq!(
             self.state,
             State::Ready,
@@ -388,7 +388,7 @@ where
     ///
     /// This function panics if the runtime is has not yet been started.
     #[allow(unused_mut)]
-    pub fn finish(mut self) -> Result<(A, SimTime, Profiler), RuntimeError> {
+    pub fn finish(mut self) -> Result<(A, SimTime, Profiler<A::EventSet>), RuntimeError> {
         assert_eq!(
             self.state,
             State::Running,
@@ -435,6 +435,12 @@ where
                     time
                 );
                 println!("\u{23A3}");
+            }
+
+            self.profiler.remaining.reserve(self.future_event_set.len());
+            while !self.future_event_set.is_empty() {
+                let event_frame = self.future_event_set.fetch_next();
+                self.profiler.remaining.push(event_frame);
             }
 
             Ok((self.app, time, self.profiler))

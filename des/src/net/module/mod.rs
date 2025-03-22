@@ -7,26 +7,22 @@ use std::{
     sync::atomic::{AtomicU16, Ordering},
 };
 
-mod ctx;
-pub(crate) use self::ctx::*;
-pub use self::ctx::{ModuleContext, Stereotyp};
-
-mod refs;
-pub use refs::*;
-
-mod error;
-pub use error::*;
-
 mod api;
-pub use api::*;
-
+mod ctx;
 mod dummy;
-pub(crate) use dummy::*;
-
+mod error;
 mod meta;
+mod refs;
 
 #[cfg(test)]
 mod tests;
+
+pub(crate) use self::ctx::*;
+pub use self::ctx::{ModuleContext, Stereotyp};
+pub use api::*;
+pub(crate) use dummy::*;
+pub use error::*;
+pub use refs::*;
 
 use super::processing::{ProcessingStack, Processor};
 

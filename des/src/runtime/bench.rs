@@ -3,11 +3,13 @@ use std::{
     time::{Duration, Instant, SystemTime},
 };
 
+use crate::time::SimTime;
+
 use super::{FT_ASYNC, FT_CQUEUE, FT_NET};
 
 /// A run profiler
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Profiler {
+pub struct Profiler<E> {
     /// The target executable.
     pub target: PathBuf,
     /// The exec
@@ -24,13 +26,16 @@ pub struct Profiler {
     /// The duration of the simulation.
     pub duration: Duration,
 
+    /// The remaining events.
+    pub remaining: Vec<(E, SimTime)>,
+
     /// The number of events that where executed.
     pub event_count: usize,
     /// The active features.
     pub features: Vec<String>,
 }
 
-impl Profiler {
+impl<E> Profiler<E> {
     /// Starts the profile.
     pub(super) fn start(&mut self) {
         self.time_start = Instant::now();
@@ -54,7 +59,7 @@ fn is_release() -> bool {
     true
 }
 
-impl Default for Profiler {
+impl<E> Default for Profiler<E> {
     fn default() -> Self {
         let target = std::env::current_exe().unwrap_or_default();
         let target_is_release = is_release();
@@ -87,6 +92,8 @@ impl Default for Profiler {
             simulation_start: SystemTime::now(),
             time_start: Instant::now(),
             duration: Duration::ZERO,
+
+            remaining: Vec::new(),
 
             event_count: 0,
             features,

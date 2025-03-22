@@ -420,8 +420,25 @@ impl<A> Sim<A> {
         } else {
             ModuleContext::standalone(path)
         };
-        ctx.activate();
 
+        println!("--> Prop writing");
+
+        // read in Props
+        let keys = self.globals.parameters.keys(ctx.path().as_str());
+        dbg!(&keys);
+        let mut props = ctx.props.write();
+        for key in keys {
+            if let Some(value) = self
+                .globals
+                .parameters
+                .get(&format!("{}.{}", ctx.path(), key))
+            {
+                props.set_str(key, value);
+            }
+        }
+        drop(props);
+
+        ctx.activate();
         let pe = module.to_processing_chain((self.stack)());
         ctx.upgrade_dummy(pe);
 

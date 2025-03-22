@@ -7,12 +7,14 @@ use crate::{
     tracing::{new_scope, ScopeToken},
 };
 use fxhash::{FxBuildHasher, FxHashMap};
+
 use spawner::Spawner;
 use spin::RwLock;
 use std::{
     any::Any,
     cell::Cell,
     fmt::Debug,
+    io::Error,
     sync::{atomic::AtomicBool, Arc},
 };
 
@@ -27,9 +29,11 @@ cfg_async! {
     use self::rt::AsyncCoreExt;
 }
 
+mod props;
 mod spawner;
-
 mod stereotyp;
+
+use props::{Prop, PropTyp, Props};
 pub use stereotyp::Stereotyp;
 
 /// The topological components of a module, not including the attached
@@ -50,6 +54,8 @@ pub struct ModuleContext {
 
     pub(crate) path: ObjectPath,
     pub(crate) gates: RwLock<Vec<GateRef>>,
+
+    pub(crate) props: RwLock<Props>,
 
     pub(crate) stereotyp: Cell<Stereotyp>,
     pub(super) meta: RwLock<Metadata>,
@@ -79,6 +85,8 @@ impl ModuleContext {
 
             meta: RwLock::new(Metadata::new()),
             scope_token: new_scope(path.clone()),
+
+            props: RwLock::new(Props::default()),
 
             active: AtomicBool::new(true),
             id: ModuleId::gen(),
@@ -111,6 +119,8 @@ impl ModuleContext {
 
             meta: RwLock::new(Metadata::new()),
             scope_token: new_scope(path.clone()),
+
+            props: RwLock::new(Props::default()),
 
             active: AtomicBool::new(true),
             id: ModuleId::gen(),
@@ -188,6 +198,32 @@ impl ModuleContext {
     /// [`Module`]: crate::net::module::Module
     pub fn path(&self) -> ObjectPath {
         self.path.clone()
+    }
+
+    /// Returns a handle to a typed property on this module.
+    ///
+    /// ```
+    /// use des::prelude::*;
+    ///
+    /// struct ModuleWithProps;
+    /// impl Module for ModuleWithProps {
+    ///     fn at_sim_start(&mut self, _: usize) {
+    ///         let addr = current().prop::<Ipv4Addr>("addr").expect("cannot retrive prop");
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// This function might return an error, if the property was previously defined to
+    /// be a different type `T`, or the provided init file could not be parsed into the requested `T`.
+    pub fn prop<T: PropTyp>(&self, key: &str) -> Result<Prop<T>, Error> {
+        self.props.write().get(key)
+    }
+
+    /// Returns the keys to all available props.
+    pub fn props(&self) -> Vec<String> {
+        self.props.read().keys()
     }
 
     /// Returns the name for the currently active module.
