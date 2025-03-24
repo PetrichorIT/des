@@ -10,7 +10,7 @@ use serial_test::serial;
 fn parse_props() -> Result<(), RuntimeError> {
     let mut sim = Sim::new(());
 
-    sim.include_par(
+    sim.include_cfg(
         "preset.number: 123\n\
         preset.number_neg: -371\n\
         preset.string: Non terminated String\n\
@@ -47,7 +47,7 @@ fn parse_props() -> Result<(), RuntimeError> {
         }),
     );
 
-    sim.include_par(
+    sim.include_cfg(
         "\
         list.one: ['1.1.1.1']\n\
         list.more_delmitied: [1,2,3,4,5,6]\n\

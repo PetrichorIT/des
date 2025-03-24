@@ -61,8 +61,6 @@ cfg_net! {
 
 
     pub use crate::net::ObjectPath;
-    pub use crate::net::{par, par_for};
-
     pub use crate::net::processing::ProcessingElement;
 
     pub use crate::net::ndl::Registry;

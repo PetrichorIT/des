@@ -1,4 +1,4 @@
-use des_net_utils::{par::ParMap, props::Cfg};
+use des_net_utils::props::Cfg;
 use serde_yml::{from_str, Value};
 
 use crate::{
@@ -86,7 +86,7 @@ pub struct Sim<A> {
     pub(crate) error: RuntimeError,
 
     modules: ModuleTree,
-    cfg: Cfg,
+    pub(crate) cfg: Cfg,
     globals: Arc<Globals>,
     watcher: Arc<WatcherValueMap>,
     /// A inner field of a network simulation that can be used to attach
@@ -245,11 +245,11 @@ impl<A> Sim<A> {
     /// use std::net::IpAddr;
     ///
     /// let mut sim = Sim::new(());
-    /// sim.include_par("alice.addr: 198.2.1.45\nalice.role: host");
+    /// sim.include_cfg("alice.addr: 198.2.1.45\nalice.role: host");
     /// sim.node("alice", ModuleFn::new(
     ///     || {
-    ///         let addr = par("addr").unwrap().parse::<IpAddr>().unwrap();
-    ///         let role = par("role").unwrap().to_string();
+    ///         let addr = current().prop::<Option<Ipv4Addr>>("addr").unwrap().get().unwrap();
+    ///         let role = current().prop::<String>("role").unwrap().get();
     ///     },
     ///     |_, _| {}
     /// ));
@@ -261,11 +261,16 @@ impl<A> Sim<A> {
     ///
     /// let _ = Builder::new().build(sim).run();
     /// ```
-    pub fn include_par(&mut self, raw: &str) {
-        self.globals.parameters.build(raw);
+    pub fn include_cfg(&mut self, raw: &str) {
         if let Ok(value) = from_str::<Value>(raw) {
             self.cfg.add(value);
         }
+    }
+
+    /// See [`Sim::include_par`]
+    pub fn with_cfg(mut self, raw: &str) -> Self {
+        self.include_cfg(raw);
+        self
     }
 
     /// Tries to read and include parameters from a file into the simulation.
@@ -275,8 +280,8 @@ impl<A> Sim<A> {
     /// # Errors
     ///
     /// This function may fail if the reading from a file fails.
-    pub fn include_par_file(&mut self, path: impl AsRef<Path>) -> io::Result<()> {
-        self.include_par(&fs::read_to_string(path)?);
+    pub fn include_cfg_file(&mut self, path: impl AsRef<Path>) -> io::Result<()> {
+        self.include_cfg(&fs::read_to_string(path)?);
         Ok(())
     }
 
@@ -410,7 +415,7 @@ impl<A> Sim<A> {
         }
     }
 
-    fn raw(&mut self, path: ObjectPath, module: impl Module) -> ModuleRef {
+    pub(super) fn raw(&mut self, path: ObjectPath, module: impl Module) -> ModuleRef {
         // Check dup
         assert!(
             self.modules.get(&path).is_none(),
@@ -649,19 +654,11 @@ fn panic_hook(info: &PanicHookInfo) {
 ///
 #[derive(Debug)]
 pub struct Globals {
-    ///
-    /// The current state of the parameter tree, derived from *.par
-    /// files and parameter changes at runtime.
-    ///
-    pub parameters: Arc<ParMap>,
-
-    ///
     /// The topology of the network from a module viewpoint.
-    ///
     pub topology: Mutex<Topology<(), ()>>,
 
     /// Root modules
-    roots: Mutex<Vec<ModuleRef>>,
+    pub roots: Mutex<Vec<ModuleRef>>,
 }
 
 impl Globals {
@@ -694,7 +691,6 @@ impl Globals {
 impl Default for Globals {
     fn default() -> Self {
         Self {
-            parameters: Arc::new(ParMap::default()),
             topology: Mutex::new(Topology::default()),
             roots: Mutex::new(Vec::default()),
         }

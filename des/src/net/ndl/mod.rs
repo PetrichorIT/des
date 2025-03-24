@@ -151,7 +151,7 @@ impl<A> Sim<A> {
         // Check dup
         assert!(
             self.modules().get(path).is_none(),
-            "cannot crate module at {path}, allready exists"
+            "cannot crate module at {path}, already exists"
         );
 
         // Check node path location
@@ -166,11 +166,20 @@ impl<A> Sim<A> {
             ModuleContext::standalone(path.clone())
         };
         ctx.activate();
+        *ctx.props.write() = self
+            .cfg
+            .capture_for(&ctx.path.as_str().split('.').collect::<Vec<_>>());
 
         let software = registry.resolve(path, ty, &mut *self.stack).ok_or(
             error::ErrorKind::MissingRegistrySymbol(path.to_string(), ty.to_string()),
         )?;
         ctx.upgrade_dummy(software);
+
+        self.globals()
+            .roots
+            .lock()
+            .expect("failed to lock globals")
+            .push(ctx.clone());
 
         // TODO: deactivate module
         self.modules_mut().add(ctx.clone());

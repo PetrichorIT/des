@@ -16,7 +16,8 @@ impl Module for Alice {
             pkt.content::<String>().deref()
         );
 
-        if pkt.content::<String>().len() > par("limit").unwrap().parse::<usize>().unwrap() {
+        let limit = current().prop::<usize>("limit").unwrap().get();
+        if pkt.content::<String>().len() > limit {
             // TERMINATE
         } else {
             // pkt.content_mut::<String>().push('#');
@@ -63,7 +64,8 @@ impl Module for Bob {
             pkt.content::<String>().deref()
         );
 
-        pkt.content_mut::<String>().push_str(&par("char").unwrap());
+        pkt.content_mut::<String>()
+            .push_str(&current().prop::<String>("char").unwrap().get());
 
         send(pkt, ("netOut", 2));
     }

@@ -23,20 +23,13 @@ mod common {
     }
     impl Module for Node {
         fn at_sim_start(&mut self, _stage: usize) {
-            self.dst = par("dst")
-                .as_option()
-                .map(|s| s.parse::<usize>().unwrap())
-                .unwrap_or(0);
-            self.rem = par("c")
-                .as_option()
-                .map(|s| s.parse::<usize>().unwrap())
-                .unwrap_or(0);
-            self.delay = Duration::from_secs_f64(
-                par("delay")
-                    .as_option()
-                    .map(|s| s.parse::<f64>().unwrap())
-                    .unwrap_or(1.0),
-            );
+            self.dst = current().prop::<usize>("dst").unwrap().get();
+            self.rem = current().prop::<usize>("c").unwrap().get();
+            self.delay =
+                Duration::from_secs_f64(match current().prop::<f64>("delay").unwrap().get() {
+                    0.0 => 1.0,
+                    other => other,
+                });
 
             tracing::info!(
                 "sim_start(dst := {}, c := {}, delay := {})",
@@ -77,12 +70,9 @@ mod common {
         }
 
         fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
-            if let Some(v) = par("expected")
-                .as_option()
-                .map(|v| v.parse::<usize>().unwrap())
-            {
-                assert_eq!(v, self.rcv, "failed at module: {}", current().path());
-            }
+            let v = current().prop::<usize>("expected").unwrap().get();
+            assert_eq!(v, self.rcv, "failed at module: {}", current().path());
+
             Ok(())
         }
     }
@@ -106,12 +96,12 @@ mod common {
 fn small_network() -> Result<(), Box<dyn std::error::Error>> {
     // Logger::new().set_logger();
 
-    let mut app = Sim::ndl(
-        "tests/ndl/small_network/main.yml",
-        registry![Main, Node, Router, Debugger],
-    )?;
-    app.include_par_file("tests/ndl/small_network/main.par.yml")
-        .unwrap();
+    let app = Sim::new(())
+        .with_cfg(include_str!("ndl/small_network/main.par.yml"))
+        .with_ndl(
+            "tests/ndl/small_network/main.yml",
+            registry![Main, Node, Router, Debugger],
+        )?;
 
     let r = Builder::seeded(123)
         .max_time(1000.0.into())
@@ -128,12 +118,12 @@ fn small_network() -> Result<(), Box<dyn std::error::Error>> {
 fn ring_topology() -> Result<(), Box<dyn std::error::Error>> {
     // Logger::new().set_logger();
 
-    let mut app = Sim::ndl(
-        "tests/ndl/ring_topo/main.yml",
-        registry![Main, Node, Router, Debugger],
-    )?;
-    app.include_par_file("tests/ndl/ring_topo/main.par.yml")
-        .unwrap();
+    let app = Sim::new(())
+        .with_cfg(include_str!("ndl/ring_topo/main.par.yml"))
+        .with_ndl(
+            "tests/ndl/ring_topo/main.yml",
+            registry![Main, Node, Router, Debugger],
+        )?;
 
     let r = Builder::seeded(123)
         .max_time(1000.0.into())
@@ -150,7 +140,11 @@ struct Single;
 impl RegistryCreatable for Single {
     fn create(path: &ObjectPath, _: &str) -> Self {
         println!("{path}");
-        assert!(par("addr").is_some());
+        assert!(current()
+            .prop::<Option<IpAddr>>("addr")
+            .unwrap()
+            .get()
+            .is_some());
         Self
     }
 }
@@ -161,7 +155,7 @@ impl Module for Single {}
 #[serial]
 fn build_with_preexisting_sim() -> Result<(), Box<dyn std::error::Error>> {
     let mut sim = Sim::new(());
-    sim.include_par("alice.addr: 1.1.1.1\n");
+    sim.include_cfg("alice.addr: 1.1.1.1\n");
     sim = sim.with_ndl("tests/ndl/single.yml", registry![Single, else _])?;
 
     let _ = Builder::seeded(123).build(sim).run();
