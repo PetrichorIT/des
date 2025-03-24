@@ -1,13 +1,13 @@
-use super::{
-    meta::Metadata, DummyModule, ModuleId, ModuleRef, ModuleRefWeak, ModuleReferencingError,
-};
+use super::{DummyModule, ModuleId, ModuleRef, ModuleRefWeak, ModuleReferencingError};
 use crate::{
     prelude::{GateRef, ObjectPath},
     sync::SwapLock,
     tracing::{new_scope, ScopeToken},
 };
+use des_net_utils::props::{Prop, Props};
 use fxhash::{FxBuildHasher, FxHashMap};
 
+use serde::de::DeserializeOwned;
 use spawner::Spawner;
 use spin::RwLock;
 use std::{
@@ -29,11 +29,9 @@ cfg_async! {
     use self::rt::AsyncCoreExt;
 }
 
-mod props;
 mod spawner;
 mod stereotyp;
 
-use props::{Prop, PropTyp, Props};
 pub use stereotyp::Stereotyp;
 
 /// The topological components of a module, not including the attached
@@ -50,7 +48,7 @@ pub struct ModuleContext {
     pub(crate) active: AtomicBool,
     pub(crate) id: ModuleId,
 
-    pub(crate) sref: RwLock<Option<ModuleRefWeak>>,
+    pub(crate) me: RwLock<Option<ModuleRefWeak>>,
 
     pub(crate) path: ObjectPath,
     pub(crate) gates: RwLock<Vec<GateRef>>,
@@ -58,7 +56,6 @@ pub struct ModuleContext {
     pub(crate) props: RwLock<Props>,
 
     pub(crate) stereotyp: Cell<Stereotyp>,
-    pub(super) meta: RwLock<Metadata>,
     pub(crate) scope_token: ScopeToken,
 
     #[cfg(feature = "async")]
@@ -81,9 +78,7 @@ impl ModuleContext {
             #[cfg(feature = "async")]
             async_ext: RwLock::new(AsyncCoreExt::new()),
 
-            sref: RwLock::new(None),
-
-            meta: RwLock::new(Metadata::new()),
+            me: RwLock::new(None),
             scope_token: new_scope(path.clone()),
 
             props: RwLock::new(Props::default()),
@@ -115,9 +110,7 @@ impl ModuleContext {
             #[cfg(feature = "async")]
             async_ext: RwLock::new(AsyncCoreExt::new()),
 
-            sref: RwLock::new(None),
-
-            meta: RwLock::new(Metadata::new()),
+            me: RwLock::new(None),
             scope_token: new_scope(path.clone()),
 
             props: RwLock::new(Props::default()),
@@ -208,7 +201,7 @@ impl ModuleContext {
     /// struct ModuleWithProps;
     /// impl Module for ModuleWithProps {
     ///     fn at_sim_start(&mut self, _: usize) {
-    ///         let addr = current().prop::<Ipv4Addr>("addr").expect("cannot retrive prop");
+    ///         let sid = current().prop::<u32>("sid").expect("cannot retrive prop");
     ///     }
     /// }
     /// ```
@@ -217,7 +210,7 @@ impl ModuleContext {
     ///
     /// This function might return an error, if the property was previously defined to
     /// be a different type `T`, or the provided init file could not be parsed into the requested `T`.
-    pub fn prop<T: PropTyp>(&self, key: &str) -> Result<Prop<T>, Error> {
+    pub fn prop<T: Default + DeserializeOwned + Any>(&self, key: &str) -> Result<Prop<T>, Error> {
         self.props.write().get(key)
     }
 
@@ -247,32 +240,6 @@ impl ModuleContext {
             .iter()
             .find(|&g| g.name() == name && g.pos() == pos)
             .cloned()
-    }
-
-    /// Retrieves metadata about a module, based on a type.
-    ///
-    /// # Examples
-    ///
-    /// # Panics
-    ///
-    /// Panics when concurrently accessed from multiple threads.
-    pub fn meta<T: Any + Clone>(&self) -> Option<T> {
-        Some(
-            self.meta
-                .try_read()
-                .expect("Failed lock")
-                .get::<T>()?
-                .clone(),
-        )
-    }
-
-    /// Sets a metadata object.
-    ///
-    /// # Panics
-    ///
-    /// Panics when concurrently accessed from multiple threads.
-    pub fn set_meta<T: Any + Clone>(&self, value: T) {
-        self.meta.try_write().expect("Failed lock").set(value);
     }
 
     /// Returns the unwind behaviour of this module.

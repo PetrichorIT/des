@@ -16,7 +16,7 @@ fn parse_props() -> Result<(), RuntimeError> {
         preset.string: Non terminated String\n\
         preset.string_t: \"This is a nice, : string\"\n\
         preset.bool: true\n\
-        preset.v4: 192.168.2.101\n\
+        preset.v4: '192.168.2.101'\n\
         preset.v6: fe80::132\n\
         ",
     );
@@ -24,23 +24,23 @@ fn parse_props() -> Result<(), RuntimeError> {
     sim.node(
         "preset",
         AsyncFn::io(|_| async move {
-            assert_eq!(current().prop::<usize>("number")?.get(), Some(123));
-            assert_eq!(current().prop::<i16>("number_neg")?.get(), Some(-371));
+            assert_eq!(current().prop::<usize>("number")?.get(), 123);
+            assert_eq!(current().prop::<i16>("number_neg")?.get(), -371);
             assert_eq!(
                 current().prop::<String>("string")?.get(),
-                Some("Non terminated String".to_string())
+                "Non terminated String".to_string()
             );
             assert_eq!(
                 current().prop::<String>("string_t")?.get(),
-                Some("This is a nice, : string".to_string())
+                "This is a nice, : string".to_string()
             );
-            assert_eq!(current().prop::<bool>("bool")?.get(), Some(true));
+            assert_eq!(current().prop::<bool>("bool")?.get(), true);
             assert_eq!(
-                current().prop::<Ipv4Addr>("v4")?.get(),
+                current().prop::<Option<Ipv4Addr>>("v4")?.get(),
                 Some(Ipv4Addr::new(192, 168, 2, 101))
             );
             assert_eq!(
-                current().prop::<Ipv6Addr>("v6")?.get(),
+                current().prop::<Option<Ipv6Addr>>("v6")?.get(),
                 Some(Ipv6Addr::new(0xfe80, 0, 0, 0, 0, 0, 0, 0x132))
             );
             Ok(())
@@ -49,9 +49,9 @@ fn parse_props() -> Result<(), RuntimeError> {
 
     sim.include_par(
         "\
-        list.one: 1.1.1.1\n\
-        list.more_delmitied: 1,2,3,4,5,6,\n\
-        list.more_no_trailing: 1,2,3,4,5,6\n\
+        list.one: ['1.1.1.1']\n\
+        list.more_delmitied: [1,2,3,4,5,6]\n\
+        list.more_no_trailing: [1,2,3,4,5,6]\n\
         ",
     );
 
@@ -60,15 +60,15 @@ fn parse_props() -> Result<(), RuntimeError> {
         AsyncFn::io(|_| async move {
             assert_eq!(
                 current().prop::<Vec<Ipv4Addr>>("one")?.get(),
-                Some(vec![Ipv4Addr::new(1, 1, 1, 1)])
+                vec![Ipv4Addr::new(1, 1, 1, 1)]
             );
             assert_eq!(
                 current().prop::<Vec<usize>>("more_delmitied")?.get(),
-                Some(vec![1, 2, 3, 4, 5, 6])
+                vec![1, 2, 3, 4, 5, 6]
             );
             assert_eq!(
                 current().prop::<Vec<u8>>("more_no_trailing")?.get(),
-                Some(vec![1, 2, 3, 4, 5, 6])
+                vec![1, 2, 3, 4, 5, 6]
             );
 
             Ok(())
@@ -91,36 +91,9 @@ fn disallow_casting() -> Result<(), RuntimeError> {
         AsyncFn::io(|_| async move {
             // define prop
             current().prop::<i8>("i8")?.set(123);
-            assert_eq!(current().prop::<i8>("i8")?.get(), Some(123));
+            assert_eq!(current().prop::<i8>("i8")?.get(), 123);
             assert_eq!(
                 current().prop::<i32>("i8").unwrap_err().kind(),
-                ErrorKind::InvalidInput
-            );
-            Ok(())
-        }),
-    );
-
-    Builder::seeded(132)
-        .max_time(100.0.into())
-        .build(sim)
-        .run()
-        .map(|_| ())
-}
-
-#[test]
-fn allow_ty_override_with_data_loss() -> Result<(), RuntimeError> {
-    let mut sim = Sim::new(());
-
-    sim.node(
-        "alice",
-        AsyncFn::io(|_| async move {
-            // define prop
-            current().prop::<i8>("i8")?.set(123);
-            let p = current().prop::<i8>("i8")?.override_type::<i32>(321);
-
-            assert_eq!(p.get(), Some(321));
-            assert_eq!(
-                current().prop::<i8>("i8").unwrap_err().kind(),
                 ErrorKind::InvalidInput
             );
             Ok(())

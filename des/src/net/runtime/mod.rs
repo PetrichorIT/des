@@ -1,4 +1,5 @@
-use des_net_utils::par::ParMap;
+use des_net_utils::{par::ParMap, props::Cfg};
+use serde_yml::{from_str, Value};
 
 use crate::{
     net::{
@@ -40,6 +41,8 @@ pub use self::blocks::*;
 mod unwind;
 use self::unwind::Harness;
 pub use self::unwind::PanicError;
+
+use super::module::ModuleReferencingError;
 
 static GUARD: Mutex<()> = Mutex::new(());
 
@@ -83,6 +86,7 @@ pub struct Sim<A> {
     pub(crate) error: RuntimeError,
 
     modules: ModuleTree,
+    cfg: Cfg,
     globals: Arc<Globals>,
     watcher: Arc<WatcherValueMap>,
     /// A inner field of a network simulation that can be used to attach
@@ -198,6 +202,7 @@ impl<A> Sim<A> {
             error: RuntimeError::empty(),
             guard,
             modules: ModuleTree::default(),
+            cfg: Cfg::default(),
             globals,
             watcher,
             inner,
@@ -258,6 +263,9 @@ impl<A> Sim<A> {
     /// ```
     pub fn include_par(&mut self, raw: &str) {
         self.globals.parameters.build(raw);
+        if let Ok(value) = from_str::<Value>(raw) {
+            self.cfg.add(value);
+        }
     }
 
     /// Tries to read and include parameters from a file into the simulation.
@@ -421,26 +429,20 @@ impl<A> Sim<A> {
             ModuleContext::standalone(path)
         };
 
-        println!("--> Prop writing");
-
         // read in Props
-        let keys = self.globals.parameters.keys(ctx.path().as_str());
-        dbg!(&keys);
-        let mut props = ctx.props.write();
-        for key in keys {
-            if let Some(value) = self
-                .globals
-                .parameters
-                .get(&format!("{}.{}", ctx.path(), key))
-            {
-                props.set_str(key, value);
-            }
-        }
-        drop(props);
+        *ctx.props.write() = self
+            .cfg
+            .capture_for(&ctx.path.as_str().split('.').collect::<Vec<_>>());
 
         ctx.activate();
         let pe = module.to_processing_chain((self.stack)());
         ctx.upgrade_dummy(pe);
+
+        self.globals
+            .roots
+            .lock()
+            .expect("failed to lock globals")
+            .push(ctx.clone());
 
         // TODO: deactivate module
         self.modules.add(ctx.clone());
@@ -657,6 +659,36 @@ pub struct Globals {
     /// The topology of the network from a module viewpoint.
     ///
     pub topology: Mutex<Topology<(), ()>>,
+
+    /// Root modules
+    roots: Mutex<Vec<ModuleRef>>,
+}
+
+impl Globals {
+    ///
+    pub fn node(&self, path: &str) -> Result<ModuleRef, ModuleReferencingError> {
+        let path = ObjectPath::from(path);
+        let mut parts = vec![path];
+
+        // select root point
+        while let Some(parent) = parts[parts.len() - 1].nonzero_parent() {
+            parts.push(parent)
+        }
+
+        let roots = self.roots.lock().expect("failed go lock");
+        let mount_module = parts.pop().expect("failed");
+        let mut mount = roots
+            .iter()
+            .find(|v| v.path == mount_module)
+            .ok_or(ModuleReferencingError::NoEntry(mount_module.to_string()))?
+            .clone();
+
+        while let Some(next) = parts.pop() {
+            mount = mount.child(next.name())?.clone();
+        }
+
+        Ok(mount)
+    }
 }
 
 impl Default for Globals {
@@ -664,6 +696,7 @@ impl Default for Globals {
         Self {
             parameters: Arc::new(ParMap::default()),
             topology: Mutex::new(Topology::default()),
+            roots: Mutex::new(Vec::default()),
         }
     }
 }

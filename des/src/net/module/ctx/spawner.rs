@@ -17,7 +17,7 @@ impl Spawner<'_> {
         let mut gates = Vec::new();
 
         let name = name.as_ref();
-        let sref = self.ctx.sref.read().as_ref().unwrap().upgrade().unwrap();
+        let sref = self.ctx.me.read().as_ref().unwrap().upgrade().unwrap();
         for i in 0..size {
             gates.push(Gate::new(&sref, name, size, i));
         }
@@ -31,7 +31,7 @@ impl Spawner<'_> {
         module: T,
         stack: ProcessingStack,
     ) -> ModuleRef {
-        let sref = self.ctx.sref.read().as_ref().unwrap().upgrade().unwrap();
+        let sref = self.ctx.me.read().as_ref().unwrap().upgrade().unwrap();
         let ctx = ModuleContext::child_of(name.as_ref(), sref);
 
         ctx.activate();

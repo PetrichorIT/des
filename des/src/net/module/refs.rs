@@ -67,7 +67,7 @@ impl ModuleRef {
             processing: handler,
         };
 
-        *this.ctx.sref.write() = Some(ModuleRefWeak::new(&this));
+        *this.ctx.me.write() = Some(ModuleRefWeak::new(&this));
         this
     }
 

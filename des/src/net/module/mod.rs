@@ -11,7 +11,6 @@ mod api;
 mod ctx;
 mod dummy;
 mod error;
-mod meta;
 mod refs;
 
 #[cfg(test)]

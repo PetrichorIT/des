@@ -39,7 +39,9 @@ impl ParMap {
     ///
     /// See [`Sim::include_par`](crate::net::Sim) for more infomation.
     pub fn build(&self, raw_text: &str) {
-        let map = yaml_to_par_map(raw_text).expect("failed to parse par");
+        let Ok(map) = yaml_to_par_map(raw_text) else {
+            return;
+        };
         for (key, value) in map {
             self.insert(key.trim(), value.trim().to_string());
         }

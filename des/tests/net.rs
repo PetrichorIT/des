@@ -1,4 +1,8 @@
-use des::prelude::*;
+use des::{
+    net::{globals, AsyncFn, HandlerFn},
+    prelude::*,
+};
+use serial_test::serial;
 
 #[derive(Default)]
 struct Receiver {
@@ -32,6 +36,7 @@ impl Module for Sender {
 }
 
 #[test]
+#[serial]
 fn connectivity() {
     let mut app = Sim::new(());
 
@@ -53,4 +58,37 @@ fn connectivity() {
 
     let app = Builder::seeded(123).build(app);
     let _ = app.run().unwrap();
+}
+
+#[test]
+#[serial]
+fn select_node_from_globals() -> Result<(), RuntimeError> {
+    let mut sim = Sim::new(());
+
+    sim.node("alice", HandlerFn::new(|_| {}));
+    sim.node("alice.submodule", HandlerFn::new(|_| {}));
+    sim.node("alice.submodule.child", HandlerFn::new(|_| {}));
+    sim.node("bob", HandlerFn::new(|_| {}));
+
+    sim.node(
+        "tester",
+        AsyncFn::io(|_| async move {
+            assert_eq!(globals().node("alice").unwrap().path(), "alice".into());
+            assert_eq!(
+                globals().node("alice.submodule").unwrap().path(),
+                "alice.submodule".into()
+            );
+            assert_eq!(
+                globals().node("alice.submodule.child").unwrap().path(),
+                "alice.submodule.child".into()
+            );
+            assert_eq!(globals().node("bob").unwrap().path(), "bob".into());
+
+            assert!(globals().node("steve").is_err());
+
+            Ok(())
+        }),
+    );
+
+    Builder::seeded(123).build(sim).run().map(|_| ())
 }

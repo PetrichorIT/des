@@ -124,8 +124,6 @@
 #[doc(hidden)]
 pub mod macros;
 
-pub(crate) mod sync;
-
 pub mod prelude;
 
 pub mod doc;
@@ -140,6 +138,8 @@ cfg_net! {
 cfg_macros! {
     pub use des_macros::*;
 }
+
+pub use des_net_utils::sync;
 
 // # Features
 //
