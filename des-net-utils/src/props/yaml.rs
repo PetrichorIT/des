@@ -6,22 +6,26 @@ use super::Props;
 /// can be used to assign properties to a component.
 #[derive(Debug, Default)]
 pub struct Cfg {
-    parts: Vec<Value>,
+    value: Value,
 }
 
 impl Cfg {
-    /// Adds a configuration parameter to the collection.
-    pub fn add(&mut self, cfg: Value) {
-        self.parts.push(compartmentalize(cfg));
+    /// Creates a new configuration paramters
+    pub fn new(value: Value) -> Self {
+        Self {
+            value: compartmentalize(value),
+        }
     }
 
     /// Generates the preset properties for a component based on the configuration.
-    pub fn capture_for(&self, path: &[&str]) -> Props {
-        let mut props = Props::default();
-        for part in &self.parts {
-            extract_from_cfg(part, path, &mut props);
-        }
-        props
+    pub fn capture_for(&self, path: &[&str], props: &mut Props) {
+        props.update_from(&self.value, path);
+    }
+
+    pub fn capture_for_into(&self, path: &[&str]) -> Props {
+        let mut new_props = Props::default();
+        self.capture_for(path, &mut new_props);
+        new_props
     }
 }
 
@@ -40,8 +44,7 @@ fn compartmentalize(base: Value) -> Value {
 fn compartmentalize_map(map: &mut Mapping) {
     let keys = map
         .keys()
-        .map(Value::as_str)
-        .flatten()
+        .flat_map(Value::as_str)
         .filter(|k| k.contains(ANY))
         .map(str::to_string)
         .collect::<Vec<_>>();
@@ -77,23 +80,23 @@ fn compartmentalize_map(map: &mut Mapping) {
     }
 }
 
-fn extract_from_cfg(base: &Value, path: &[&str], props: &mut Props) {
-    if path.is_empty() {
-        if let Value::Mapping(map) = base {
-            for (k, v) in map {
-                let Value::String(k) = k else {
-                    continue;
-                };
-                if k.contains(ANY) {
-                    continue;
+impl Props {
+    pub fn update_from(&mut self, base: &Value, path: &[&str]) {
+        if path.is_empty() {
+            if let Value::Mapping(map) = base {
+                for (k, v) in map {
+                    let Value::String(k) = k else {
+                        continue;
+                    };
+                    if k.contains(ANY) {
+                        continue;
+                    }
+                    self.set(k.clone(), v.clone());
                 }
-                props.set(k.clone(), v.clone());
             }
-        }
-    } else {
-        if let Value::Mapping(map) = base {
+        } else if let Value::Mapping(map) = base {
             if let Some(value) = map.get(ANY) {
-                extract_from_cfg(value, &path[1..], props);
+                self.update_from(value, &path[1..]);
             }
 
             let mut key = String::new();
@@ -106,21 +109,20 @@ fn extract_from_cfg(base: &Value, path: &[&str], props: &mut Props) {
                 let Some(entry) = map.get(&key[..]) else {
                     continue;
                 };
-                extract_from_cfg(entry, &path[(i + 1)..], props);
+                self.update_from(entry, &path[(i + 1)..]);
             }
 
             // extract direct prefixes
             for matching_key in map
                 .keys()
-                .map(Value::as_str)
-                .flatten()
+                .flat_map(Value::as_str)
                 .filter(|k| k.starts_with(&key) && k.len() > key.len())
             {
                 let Some(entry) = map.get(matching_key) else {
                     continue;
                 };
                 let remaining = &matching_key[(key.len() + 1)..];
-                props.set(remaining.to_string(), entry.clone());
+                self.set(remaining.to_string(), entry.clone());
             }
         }
     }
@@ -192,8 +194,7 @@ mod tests {
 
     #[test]
     fn capture_parameter_set() -> serde_yml::Result<()> {
-        let mut cfg = Cfg::default();
-        cfg.add(from_str::<Value>(
+        let cfg = Cfg::new(from_str::<Value>(
             "\
             alice.addr: 1.1.1.1\n\
             alice.tcp.sack: yes\n\
@@ -205,19 +206,21 @@ mod tests {
         )?);
 
         assert_eq!(
-            cfg.capture_for(&["alice"]).keys(),
+            cfg.capture_for_into(&["alice"]).keys(),
             ["addr", "tcp.sack", "log", "mac", "tcp.mss"]
         );
 
-        assert_eq!(cfg.capture_for(&["alice", "tcp"]).keys(), ["sack", "mss"]);
+        assert_eq!(
+            cfg.capture_for_into(&["alice", "tcp"]).keys(),
+            ["sack", "mss"]
+        );
 
         Ok(())
     }
 
     #[test]
     fn capture_parameter_set_does_not_contain_any() -> serde_yml::Result<()> {
-        let mut cfg = Cfg::default();
-        cfg.add(from_str::<Value>(
+        let cfg = Cfg::new(from_str::<Value>(
             "\
             alice.addr: 1.1.1.1\n\
             alice.<any>.component: yes\n\
@@ -225,12 +228,15 @@ mod tests {
             ",
         )?);
 
-        assert_eq!(cfg.capture_for(&["alice"]).keys(), ["addr", "tcp.mss"]);
+        assert_eq!(cfg.capture_for_into(&["alice"]).keys(), ["addr", "tcp.mss"]);
         assert_eq!(
-            cfg.capture_for(&["alice", "tcp"]).keys(),
+            cfg.capture_for_into(&["alice", "tcp"]).keys(),
             ["component", "mss"]
         );
-        assert_eq!(cfg.capture_for(&["alice", "udp"]).keys(), ["component"]);
+        assert_eq!(
+            cfg.capture_for_into(&["alice", "udp"]).keys(),
+            ["component"]
+        );
 
         Ok(())
     }

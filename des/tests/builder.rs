@@ -110,6 +110,7 @@ fn builder_module_block() {
     struct Block;
     impl Module for Def {}
     impl ModuleBlock for Block {
+        type Ret = ();
         fn build<A>(self, mut sim: ScopedSim<'_, A>) {
             sim.root(Def);
             let _ = sim.gate("", &format!("port-{}", sim.scope()));

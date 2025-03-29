@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use super::{Globals, HandleMessageEvent, MessageExitingConnection, Sim, Watcher, WatcherValueMap};
+use super::{Globals, HandleMessageEvent, MessageExitingConnection, Sim};
 use crate::net::gate::Connection;
 use crate::net::module::{current, with_mod_ctx, MOD_CTX};
 use crate::net::ModuleRestartEvent;
@@ -26,8 +26,6 @@ struct BufferContext {
     shutdown: Option<Option<SimTime>>,
     // globals
     globals: Option<Weak<Globals>>,
-    // watcher
-    watcher: Option<Weak<WatcherValueMap>>,
 }
 
 impl BufferContext {
@@ -37,7 +35,6 @@ impl BufferContext {
             loopback: Vec::new(),
             shutdown: None,
             globals: None,
-            watcher: None,
         }
     }
 }
@@ -56,22 +53,9 @@ impl Globals {
     }
 }
 
-impl Watcher {
-    pub(crate) fn current() -> Watcher {
-        let ctx = BUF_CTX.lock();
-        ctx.watcher
-            .as_ref()
-            .expect("no watcher attached to this event")
-            .upgrade()
-            .expect("watch already dropped: simulation shutting down")
-            .watcher_for(current().path().to_string())
-    }
-}
-
-pub(crate) fn buf_init(globals: Weak<Globals>, watcher: Weak<WatcherValueMap>) {
+pub(crate) fn buf_init(globals: Weak<Globals>) {
     let mut ctx = BUF_CTX.lock();
     ctx.globals = Some(globals);
-    ctx.watcher = Some(watcher);
 
     // TODO: remove ?
     // SAFTEY:

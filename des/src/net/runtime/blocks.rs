@@ -21,12 +21,16 @@ use super::ScopedSim;
 ///
 /// See [`ScopedSim`] for more information.
 pub trait ModuleBlock {
+    /// The returns type of the build method. This will be returned by `Sim::node`
+    type Ret;
+
     /// Build the described module block within the context of scoped part of
     /// a simulation.
-    fn build<A>(self, sim: ScopedSim<'_, A>);
+    fn build<A>(self, sim: ScopedSim<'_, A>) -> Self::Ret;
 }
 
 impl<M: Module> ModuleBlock for M {
+    type Ret = ();
     fn build<A>(self, sim: ScopedSim<'_, A>) {
         sim.base.raw(sim.scope, self);
     }

@@ -29,7 +29,7 @@ impl Props {
     /// Sets a YAML value for a property. This will be used as the preinitialized
     /// value and will be decoded once the property is accessed.
     pub fn set(&mut self, key: String, val: Value) {
-        self.mapping.insert(key, Entry::Yaml(val));
+        self.mapping.entry(key).or_insert(Entry::Yaml(val));
     }
 
     /// The keys of all properties.
@@ -38,6 +38,7 @@ impl Props {
     }
 
     /// Retrieves a property value via a `Prop` handle.
+    #[allow(clippy::arc_with_non_send_sync)]
     pub fn get<T>(&mut self, key: &str) -> Result<Prop<T>, Error>
     where
         T: Any,

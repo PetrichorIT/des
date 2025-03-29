@@ -32,9 +32,6 @@ pub use self::events::JoinError;
 mod ctx;
 pub(crate) use self::ctx::*;
 
-mod watcher;
-pub use self::watcher::*;
-
 mod blocks;
 pub use self::blocks::*;
 
@@ -86,9 +83,8 @@ pub struct Sim<A> {
     pub(crate) error: RuntimeError,
 
     modules: ModuleTree,
-    pub(crate) cfg: Cfg,
+    pub(crate) cfgs: Vec<Cfg>,
     globals: Arc<Globals>,
-    watcher: Arc<WatcherValueMap>,
     /// A inner field of a network simulation that can be used to attach
     /// custom lifetime handlers to a simulation
     pub inner: A,
@@ -104,7 +100,7 @@ struct SimStaticsGuard {
 }
 
 impl SimStaticsGuard {
-    fn new(globals: Weak<Globals>, watcher: Weak<WatcherValueMap>) -> Self {
+    fn new(globals: Weak<Globals>) -> Self {
         let guard = GUARD.try_lock();
         let guard = match guard {
             Ok(guard) => guard,
@@ -120,7 +116,7 @@ impl SimStaticsGuard {
             },
         };
 
-        buf_init(globals, watcher);
+        buf_init(globals);
         Self { guard }
     }
 }
@@ -149,6 +145,7 @@ impl Drop for SimStaticsGuard {
 /// # use des::net::{ModuleBlock, ModuleFn, HandlerFn};
 /// struct LAN {}
 /// impl ModuleBlock for LAN {
+///     type Ret = ();
 ///     fn build<A>(self, mut sim: ScopedSim<'_, A>) {
 ///         sim.root(HandlerFn::new(|_| {}));
 ///         let gates = sim.gates("", "port", 5);
@@ -194,17 +191,15 @@ impl<A> Sim<A> {
     /// This allready binds the simulation globals to this instance.
     pub fn new(inner: A) -> Self {
         let globals = Arc::new(Globals::default());
-        let watcher = Arc::new(WatcherValueMap::default());
-        let guard = SimStaticsGuard::new(Arc::downgrade(&globals), Arc::downgrade(&watcher));
+        let guard = SimStaticsGuard::new(Arc::downgrade(&globals));
         let stack: Box<dyn FnMut() -> ProcessingStack> = Box::new(ProcessingStack::default);
         Self {
             stack: stack.into(),
             error: RuntimeError::empty(),
             guard,
             modules: ModuleTree::default(),
-            cfg: Cfg::default(),
+            cfgs: Vec::new(),
             globals,
-            watcher,
             inner,
         }
     }
@@ -263,11 +258,21 @@ impl<A> Sim<A> {
     /// ```
     pub fn include_cfg(&mut self, raw: &str) {
         if let Ok(value) = from_str::<Value>(raw) {
-            self.cfg.add(value);
+            let cfg = Cfg::new(value);
+
+            // update config of already existing modules
+            for module in self.modules.iter() {
+                cfg.capture_for(
+                    &module.path.as_str().split('.').collect::<Vec<_>>(),
+                    &mut module.props.write(),
+                );
+            }
+            self.cfgs.push(cfg);
         }
     }
 
     /// See [`Sim::include_par`]
+    #[must_use]
     pub fn with_cfg(mut self, raw: &str) -> Self {
         self.include_cfg(raw);
         self
@@ -288,11 +293,6 @@ impl<A> Sim<A> {
     /// Returns a handle to the simulation globals.
     pub fn globals(&self) -> Arc<Globals> {
         self.globals.clone()
-    }
-
-    /// Returns a handle to the simulation watcher.
-    pub fn watcher(&self, context: &str) -> Watcher {
-        self.watcher.clone().watcher_for(context.to_string())
     }
 
     /// Creates a new module block within the simulation.
@@ -332,9 +332,9 @@ impl<A> Sim<A> {
     ///
     /// let _ = Builder::new().build(sim).run();
     /// ```
-    pub fn node(&mut self, path: impl Into<ObjectPath>, module_block: impl ModuleBlock) {
+    pub fn node<M: ModuleBlock>(&mut self, path: impl Into<ObjectPath>, module_block: M) -> M::Ret {
         let scoped = ScopedSim::new(self, path.into());
-        module_block.build(scoped);
+        module_block.build(scoped)
     }
 
     /// Retrieves a module by reference from the simulation.
@@ -435,16 +435,17 @@ impl<A> Sim<A> {
         };
 
         // read in Props
-        *ctx.props.write() = self
-            .cfg
-            .capture_for(&ctx.path.as_str().split('.').collect::<Vec<_>>());
+        let path_parts = ctx.path.as_str().split('.').collect::<Vec<_>>();
+        for cfg in &self.cfgs {
+            cfg.capture_for(&path_parts, &mut ctx.props.write());
+        }
 
         ctx.activate();
         let pe = module.to_processing_chain((self.stack)());
         ctx.upgrade_dummy(pe);
 
         self.globals
-            .roots
+            .modules
             .lock()
             .expect("failed to lock globals")
             .push(ctx.clone());
@@ -658,33 +659,26 @@ pub struct Globals {
     pub topology: Mutex<Topology<(), ()>>,
 
     /// Root modules
-    pub roots: Mutex<Vec<ModuleRef>>,
+    pub(crate) modules: Mutex<Vec<ModuleRef>>,
 }
 
 impl Globals {
+    /// Returns a handle to a module from the global scope.
+    /// This can be used to access arbitrary modules, independent of the current execution context.
     ///
-    pub fn node(&self, path: &str) -> Result<ModuleRef, ModuleReferencingError> {
-        let path = ObjectPath::from(path);
-        let mut parts = vec![path];
+    /// # Errors
+    ///
+    /// Returns an module referencing error, if not module with the given path exists.
+    #[allow(clippy::missing_panics_doc)]
+    pub fn node(&self, path: impl Into<ObjectPath>) -> Result<ModuleRef, ModuleReferencingError> {
+        let path = path.into();
 
-        // select root point
-        while let Some(parent) = parts[parts.len() - 1].nonzero_parent() {
-            parts.push(parent)
-        }
-
-        let roots = self.roots.lock().expect("failed go lock");
-        let mount_module = parts.pop().expect("failed");
-        let mut mount = roots
+        let modules = self.modules.lock().expect("failed to get lock");
+        modules
             .iter()
-            .find(|v| v.path == mount_module)
-            .ok_or(ModuleReferencingError::NoEntry(mount_module.to_string()))?
-            .clone();
-
-        while let Some(next) = parts.pop() {
-            mount = mount.child(next.name())?.clone();
-        }
-
-        Ok(mount)
+            .find(|m| m.path == path)
+            .ok_or(ModuleReferencingError::NoEntry(path.to_string()))
+            .cloned()
     }
 }
 
@@ -692,7 +686,7 @@ impl Default for Globals {
     fn default() -> Self {
         Self {
             topology: Mutex::new(Topology::default()),
-            roots: Mutex::new(Vec::default()),
+            modules: Mutex::new(Vec::default()),
         }
     }
 }

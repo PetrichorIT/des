@@ -50,18 +50,90 @@ use crate::{
     time::Duration,
 };
 use des_net_utils::ndl::{
-    error::{self, Result},
-    transform, tree,
+    error::{self, ErrorKind, Result},
+    transform,
+    tree::{self, Node},
 };
-use std::{fs::File, path::Path};
+use std::{
+    fs::{self, File},
+    path::Path,
+};
 
 pub use des_net_utils::ndl::def::*;
 
 mod registry;
 pub use self::registry::*;
 
-// mod registry;
-// pub use self::registry::*;
+use super::ModuleBlock;
+
+/// Inject modules described using the Node Description Language (NDL).
+///
+/// A NDL topology describes a module tree, that can be dynamically created
+/// using modules provided in a [`Registry`]. This module tree can either be
+/// attached at a specific location in the simulation module tree using
+/// [`Sim::node`] with [`Ndl`] as the provided module block, or as a global
+/// tree using constructors like [`Sim::ndl`].
+///
+/// The tree is initalized depth first. This means for each module:
+/// - First the gate of the current module are created
+/// - Then all children are created, including gates **and** connections
+/// - Then all connections are resolved, since connections statements may depend
+///   on the existence of gates in child nodes
+///
+/// To initalize a node, the parameter `registry` is used to provide
+/// an implementation of the [`Module`] trait. Should the registry
+/// fail to provide an implementation, the node creation will fail.
+#[derive(Debug)]
+pub struct Ndl<'a, L: Layer> {
+    registry: &'a mut Registry<L>,
+    node: Node,
+}
+
+impl<'a, L: Layer> Ndl<'a, L> {
+    /// Loads a NDL topology description from a raw `Def` and a provided registry.
+    ///
+    /// # Errors
+    ///
+    /// This function may return an error, if the provided NDL topology is
+    /// invalid or if the registry fails to provide an implementation for a module.
+    pub fn new(registry: &'a mut Registry<L>, def: &Def) -> Result<Self> {
+        Ok(Self {
+            registry,
+            node: transform(def)?,
+        })
+    }
+
+    /// Loads a NDL topology description from a file and a provided registry.
+    ///
+    /// # Errors
+    ///
+    /// This function may return an error, if the provided NDL topology is
+    /// invalid or if the registry fails to provide an implementation for a module.
+    pub fn from_str(registry: &'a mut Registry<L>, str: &str) -> Result<Self> {
+        let def = serde_yml::from_str(str).map_err(|e| ErrorKind::Io(e.to_string()))?;
+        Self::new(registry, &def)
+    }
+
+    /// Loads a NDL topology description from a file and a provided registry.
+    ///
+    /// # Errors
+    ///
+    /// This function may return an error, if the provided NDL topology is
+    /// invalid or if the registry fails to provide an implementation for a module.
+    pub fn from_file(registry: &'a mut Registry<L>, path: impl AsRef<Path>) -> Result<Self> {
+        let str = fs::read_to_string(path).map_err(|e| ErrorKind::Io(e.to_string()))?;
+        Self::from_str(registry, &str)
+    }
+}
+
+impl<L: Layer> ModuleBlock for Ndl<'_, L> {
+    type Ret = Result<ModuleRef>;
+    fn build<A>(self, sim: ScopedSim<'_, A>) -> Self::Ret {
+        sim.ndl(&self.node, self.registry)
+    }
+}
+
+//
 
 impl Sim<()> {
     /// Creates a NDL application with the inner application `()`.
@@ -155,20 +227,24 @@ impl<A> Sim<A> {
         );
 
         // Check node path location
-        let ctx = if let Some(parent) = path.parent() {
+        let ctx = if let Some(parent) = path.nonzero_parent() {
             // (a) Check that the parent exists
             let parent = self
                 .get(&parent)
                 .expect("cannot create module, parent missing in NDL build");
 
             ModuleContext::child_of(path.name(), parent)
+        } else if let Some(zero_parent) = self.get(&ObjectPath::from("")) {
+            ModuleContext::child_of(path.name(), zero_parent)
         } else {
             ModuleContext::standalone(path.clone())
         };
+
         ctx.activate();
-        *ctx.props.write() = self
-            .cfg
-            .capture_for(&ctx.path.as_str().split('.').collect::<Vec<_>>());
+        let path_parts = ctx.path.as_str().split('.').collect::<Vec<_>>();
+        for cfg in &self.cfgs {
+            cfg.capture_for(&path_parts, &mut ctx.props.write());
+        }
 
         let software = registry.resolve(path, ty, &mut *self.stack).ok_or(
             error::ErrorKind::MissingRegistrySymbol(path.to_string(), ty.to_string()),
@@ -176,7 +252,7 @@ impl<A> Sim<A> {
         ctx.upgrade_dummy(software);
 
         self.globals()
-            .roots
+            .modules
             .lock()
             .expect("failed to lock globals")
             .push(ctx.clone());

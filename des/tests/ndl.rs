@@ -1,5 +1,5 @@
 use common::*;
-use des::{prelude::*, registry};
+use des::{net::ndl::Ndl, prelude::*, registry};
 use des_net_utils::ndl::error;
 use serial_test::serial;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -12,7 +12,9 @@ mod common {
 
     #[derive(Default)]
     pub struct Main;
-    impl Module for Main {}
+    impl Module for Main {
+        fn at_sim_start(&mut self, _stage: usize) {}
+    }
 
     #[derive(Default)]
     pub struct Node {
@@ -94,14 +96,15 @@ mod common {
 #[test]
 #[serial]
 fn small_network() -> Result<(), Box<dyn std::error::Error>> {
-    // Logger::new().set_logger();
-
-    let app = Sim::new(())
-        .with_cfg(include_str!("ndl/small_network/main.par.yml"))
-        .with_ndl(
-            "tests/ndl/small_network/main.yml",
-            registry![Main, Node, Router, Debugger],
-        )?;
+    let mut app = Sim::new(());
+    app.include_cfg(include_str!("ndl/small_network/main.par.yml"));
+    app.node(
+        "",
+        Ndl::from_str(
+            &mut registry![Main, Node, Router, Debugger],
+            include_str!("ndl/small_network/main.yml"),
+        )?,
+    )?;
 
     let r = Builder::seeded(123)
         .max_time(1000.0.into())
@@ -118,12 +121,15 @@ fn small_network() -> Result<(), Box<dyn std::error::Error>> {
 fn ring_topology() -> Result<(), Box<dyn std::error::Error>> {
     // Logger::new().set_logger();
 
-    let app = Sim::new(())
-        .with_cfg(include_str!("ndl/ring_topo/main.par.yml"))
-        .with_ndl(
-            "tests/ndl/ring_topo/main.yml",
-            registry![Main, Node, Router, Debugger],
-        )?;
+    let mut app = Sim::new(());
+    app.include_cfg(include_str!("ndl/ring_topo/main.par.yml"));
+    app.node(
+        "",
+        Ndl::from_str(
+            &mut registry![Main, Node, Router, Debugger],
+            include_str!("ndl/ring_topo/main.yml"),
+        )?,
+    )?;
 
     let r = Builder::seeded(123)
         .max_time(1000.0.into())
@@ -138,8 +144,7 @@ fn ring_topology() -> Result<(), Box<dyn std::error::Error>> {
 struct Single;
 
 impl RegistryCreatable for Single {
-    fn create(path: &ObjectPath, _: &str) -> Self {
-        println!("{path}");
+    fn create(_path: &ObjectPath, _: &str) -> Self {
         assert!(current()
             .prop::<Option<IpAddr>>("addr")
             .unwrap()
@@ -156,7 +161,13 @@ impl Module for Single {}
 fn build_with_preexisting_sim() -> Result<(), Box<dyn std::error::Error>> {
     let mut sim = Sim::new(());
     sim.include_cfg("alice.addr: 1.1.1.1\n");
-    sim = sim.with_ndl("tests/ndl/single.yml", registry![Single, else _])?;
+    sim.node(
+        "",
+        Ndl::from_str(
+            &mut registry![Single, else _],
+            include_str!("ndl/single.yml"),
+        )?,
+    )?;
 
     let _ = Builder::seeded(123).build(sim).run();
     Ok(())
@@ -165,10 +176,15 @@ fn build_with_preexisting_sim() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 #[serial]
 fn non_std_gate_connections() -> Result<(), Box<dyn std::error::Error>> {
-    let sim = Sim::ndl(
-        "tests/ndl/local-con.yml",
-        Registry::new().with_default_fallback(),
+    let mut sim = Sim::new(());
+    sim.node(
+        "",
+        Ndl::from_str(
+            &mut Registry::new().with_default_fallback(),
+            include_str!("ndl/local-con.yml"),
+        )?,
     )?;
+
     let _ = Builder::seeded(123).build(sim).run();
     Ok(())
 }
@@ -176,11 +192,17 @@ fn non_std_gate_connections() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 #[serial]
 fn registry_missing_symbol() {
-    let sim: Result<Sim<()>, error::Error> = Sim::ndl(
-        "tests/ndl/ab-deep.yml",
-        Registry::new().symbol::<Debugger>("Main"),
+    let mut sim = Sim::new(());
+    let err = sim.node(
+        "",
+        Ndl::from_str(
+            &mut Registry::new().symbol::<Debugger>("Main"),
+            include_str!("ndl/ab-deep.yml"),
+        )
+        .expect("this should not fail"),
     );
-    let error = sim.unwrap_err();
+
+    let error = err.unwrap_err();
     assert_eq!(
         error,
         error::ErrorKind::MissingRegistrySymbol("b".to_string(), "B".to_string())
@@ -201,7 +223,7 @@ fn registry_fmt() {
 fn registry_custom_resolver() -> Result<(), Box<dyn std::error::Error>> {
     static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
-    let registry = Registry::new()
+    let mut registry = Registry::new()
         .symbol::<Debugger>("A")
         .symbol::<Debugger>("Main")
         .symbol_fn("B", |_| {
@@ -209,7 +231,12 @@ fn registry_custom_resolver() -> Result<(), Box<dyn std::error::Error>> {
             Debugger
         });
 
-    let sim = Sim::ndl("tests/ndl/ab.yml", registry)?;
+    let mut sim = Sim::new(());
+    sim.node(
+        "",
+        Ndl::from_str(&mut registry, include_str!("ndl/ab.yml"))?,
+    )?;
+
     let _ = Builder::seeded(123).build(sim).run();
 
     assert_eq!(COUNTER.load(Ordering::SeqCst), 1);
@@ -228,11 +255,15 @@ impl Module for Sender {
 #[test]
 #[serial]
 fn registry_default_fallback_does_not_panic() -> Result<(), Box<dyn std::error::Error>> {
-    let registry = Registry::new()
+    let mut registry = Registry::new()
         .symbol::<Sender>("A")
         .with_default_fallback();
 
-    let sim = Sim::ndl("tests/ndl/ab.yml", registry)?;
+    let mut sim = Sim::new(());
+    sim.node(
+        "",
+        Ndl::from_str(&mut registry, include_str!("ndl/ab.yml"))?,
+    )?;
     let _ = Builder::seeded(123).build(sim).run();
 
     Ok(())

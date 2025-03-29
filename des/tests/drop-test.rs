@@ -71,6 +71,7 @@ struct A {
 }
 
 impl ModuleBlock for Harness<A> {
+    type Ret = ();
     fn build<A>(self, mut sim: des::prelude::ScopedSim<'_, A>) {
         let counter = self.counter.clone();
         sim.root(self.0);
