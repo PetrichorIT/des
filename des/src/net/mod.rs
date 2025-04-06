@@ -4,7 +4,6 @@
 
 mod path;
 mod runtime;
-mod util;
 
 pub mod channel;
 pub mod gate;

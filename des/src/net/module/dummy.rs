@@ -1,12 +1,10 @@
-use crate::prelude::RuntimeError;
-
-use super::Module;
+use crate::prelude::{Message, Module, RuntimeError};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) struct DummyModule {}
+pub(crate) struct DummyModule;
 
 impl Module for DummyModule {
-    fn handle_message(&mut self, _msg: crate::prelude::Message) {
+    fn handle_message(&mut self, _msg: Message) {
         panic!("A dummy module is only a placeholder in the load process. No `dyn Module` functions should be called.")
     }
 

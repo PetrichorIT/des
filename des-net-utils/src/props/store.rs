@@ -11,7 +11,7 @@ use serde_yml::{from_value, Value};
 
 use crate::sync::Mutex;
 
-use super::Prop;
+use super::{Optional, Prop};
 
 /// The properties associated with a component.
 #[derive(Debug, Default)]
@@ -22,7 +22,7 @@ pub struct Props {
 #[derive(Debug)]
 pub(super) enum Entry {
     Yaml(Value),
-    Value(Arc<Mutex<Box<dyn Any>>>),
+    Value(Arc<Mutex<Option<Box<dyn Any>>>>),
 }
 
 impl Props {
@@ -39,21 +39,21 @@ impl Props {
 
     /// Retrieves a property value via a `Prop` handle.
     #[allow(clippy::arc_with_non_send_sync)]
-    pub fn get<T>(&mut self, key: &str) -> Result<Prop<T>, Error>
+    pub fn get<T>(&mut self, key: &str) -> Result<Prop<T, Optional>, Error>
     where
         T: Any,
         T: DeserializeOwned,
-        T: Default,
     {
         let entry = self
             .mapping
             .entry(key.to_string())
-            .or_insert_with(|| Entry::Value(Arc::new(Mutex::new(Box::new(T::default())))));
+            .or_insert_with(|| Entry::Value(Arc::new(Mutex::new(None))));
 
         match &*entry {
             Entry::Value(slot) => {
                 let lock = slot.lock();
-                if (*lock).is::<T>() {
+
+                if lock.as_ref().map_or(true, |inner| (**inner).is::<T>()) {
                     Ok(Prop {
                         slot: slot.clone(),
                         _phantom: PhantomData,
@@ -73,7 +73,8 @@ impl Props {
             Entry::Yaml(str) => {
                 let parsed =
                     from_value::<T>(str.clone()).map_err(|e| Error::new(ErrorKind::Other, e))?;
-                let slot: Arc<Mutex<Box<dyn Any>>> = Arc::new(Mutex::new(Box::new(parsed)));
+                let slot: Arc<Mutex<Option<Box<dyn Any>>>> =
+                    Arc::new(Mutex::new(Some(Box::new(parsed))));
                 *entry = Entry::Value(slot.clone());
 
                 Ok(Prop {
@@ -95,19 +96,19 @@ mod tests {
         let mut props = Props::default();
 
         props.set("u8".to_string(), Value::Number(Number::from(32u8)));
-        assert_eq!(props.get::<u8>("u8")?.get(), 32);
+        assert_eq!(props.get::<u8>("u8")?.or_default().get(), 32);
 
         props.set(
             "u8_but_usize".to_string(),
             Value::Number(Number::from(32u8)),
         );
-        assert_eq!(props.get::<usize>("u8_but_usize")?.get(), 32);
+        assert_eq!(props.get::<usize>("u8_but_usize")?.or_default().get(), 32);
 
         props.set(
             "u8_but_isize".to_string(),
             Value::Number(Number::from(32u8)),
         );
-        assert_eq!(props.get::<isize>("u8_but_isize")?.get(), 32);
+        assert_eq!(props.get::<isize>("u8_but_isize")?.or_default().get(), 32);
 
         Ok(())
     }
@@ -117,7 +118,7 @@ mod tests {
         let mut props = Props::default();
 
         props.set("string".to_string(), Value::String("hello".to_string()));
-        assert_eq!(props.get::<String>("string")?.get(), "hello");
+        assert_eq!(props.get::<String>("string")?.or_default().get(), "hello");
 
         Ok(())
     }
@@ -127,7 +128,7 @@ mod tests {
         let mut props = Props::default();
 
         props.set("bool".to_string(), Value::Bool(true));
-        assert_eq!(props.get::<bool>("bool")?.get(), true);
+        assert_eq!(props.get::<bool>("bool")?.or_default().get(), true);
 
         Ok(())
     }
@@ -140,7 +141,7 @@ mod tests {
         assert!(props.get::<u8>("string").is_err());
 
         // value remains unchanged
-        assert_eq!(props.get::<String>("string")?.get(), "hello");
+        assert_eq!(props.get::<String>("string")?.or_default().get(), "hello");
 
         Ok(())
     }
@@ -148,7 +149,7 @@ mod tests {
     #[test]
     fn get_default_no_yaml() -> Result<(), Error> {
         let mut props = Props::default();
-        assert_eq!(props.get::<String>("string")?.get(), "");
+        assert_eq!(props.get::<String>("string")?.or_default().get(), "");
 
         Ok(())
     }

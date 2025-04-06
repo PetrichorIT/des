@@ -9,6 +9,7 @@ use std::any::{Any, TypeId};
 use std::cell::{Ref, RefCell, RefMut};
 use std::fmt::Debug;
 use std::ops::Deref;
+use std::sync::atomic::Ordering;
 use std::sync::{Arc, Weak};
 
 #[derive(Clone)]
@@ -134,10 +135,12 @@ impl ModuleRef {
             // a call of 'RefCell::borrow' thus upholding the borrowing invariants.
             //
             // Should the type check fail, the Ref is dropped so the borrow is freed.
+            //
+            // An alternative impl would be as_any() on the trait Module. However
+            // this function does not have a usable default impl (for some reason),
+            // so this is more ergonomic for consumers.
             Some(Ref::map(brw, |brw| unsafe {
                 let hpt: *const dyn Module = &*brw.handler;
-                // hpt.cast::<T>()
-                // &*(hpt as *const T)
                 &*(hpt.cast::<T>())
             }))
         } else {
@@ -187,6 +190,10 @@ impl ModuleRef {
             // a call of 'RefCell::borrow' thus upholding the borrowing invariants.
             //
             // Should the type check fail, the Ref is dropped so the borrow is freed.
+            //
+            // An alternative impl would be as_any() on the trait Module. However
+            // this function does not have a usable default impl (for some reason),
+            // so this is more ergonomic for consumers.
             Some(RefMut::map(brw, |brw| unsafe {
                 let hpt: *mut dyn Module = &mut *brw.handler;
                 &mut *(hpt.cast::<T>())
@@ -201,7 +208,7 @@ impl ModuleRef {
     /// Whether the module is currently active or shut down.
     #[must_use]
     pub fn is_active(&self) -> bool {
-        self.ctx.active.load(std::sync::atomic::Ordering::SeqCst)
+        self.ctx.active.load(Ordering::SeqCst)
     }
 
     pub(crate) fn scope_token(&self) -> crate::tracing::ScopeToken {

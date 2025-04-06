@@ -25,13 +25,14 @@ mod common {
     }
     impl Module for Node {
         fn at_sim_start(&mut self, _stage: usize) {
-            self.dst = current().prop::<usize>("dst").unwrap().get();
-            self.rem = current().prop::<usize>("c").unwrap().get();
-            self.delay =
-                Duration::from_secs_f64(match current().prop::<f64>("delay").unwrap().get() {
+            self.dst = current().prop::<usize>("dst").unwrap().or_default().get();
+            self.rem = current().prop::<usize>("c").unwrap().or_default().get();
+            self.delay = Duration::from_secs_f64(
+                match current().prop::<f64>("delay").unwrap().or_default().get() {
                     0.0 => 1.0,
                     other => other,
-                });
+                },
+            );
 
             tracing::info!(
                 "sim_start(dst := {}, c := {}, delay := {})",
@@ -72,7 +73,11 @@ mod common {
         }
 
         fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
-            let v = current().prop::<usize>("expected").unwrap().get();
+            let v = current()
+                .prop::<usize>("expected")
+                .unwrap()
+                .or_default()
+                .get();
             assert_eq!(v, self.rcv, "failed at module: {}", current().path());
 
             Ok(())

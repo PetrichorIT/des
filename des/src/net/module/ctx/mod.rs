@@ -193,6 +193,16 @@ impl ModuleContext {
         self.path.clone()
     }
 
+    /// Returns the `ModuleRef` associated with this context.
+    pub fn me(&self) -> ModuleRef {
+        self.me
+            .read()
+            .as_ref()
+            .expect("failed")
+            .upgrade()
+            .expect("cannot upgrade")
+    }
+
     /// Returns a handle to a typed property on this module.
     ///
     /// ```
@@ -210,7 +220,7 @@ impl ModuleContext {
     ///
     /// This function might return an error, if the property was previously defined to
     /// be a different type `T`, or the provided init file could not be parsed into the requested `T`.
-    pub fn prop<T: Default + DeserializeOwned + Any>(&self, key: &str) -> Result<Prop<T>, Error> {
+    pub fn prop<T: DeserializeOwned + Any>(&self, key: &str) -> Result<Prop<T>, Error> {
         self.props.write().get(key)
     }
 

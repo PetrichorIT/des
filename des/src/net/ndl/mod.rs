@@ -257,7 +257,13 @@ impl<A> Sim<A> {
             .expect("failed to lock globals")
             .push(ctx.clone());
 
-        // TODO: deactivate module
+        let mut sink = Vec::new();
+        ctx.deactivate(&mut sink);
+        assert!(
+            sink.is_empty(),
+            "events cannot be dispatched in constructors"
+        );
+
         self.modules_mut().add(ctx.clone());
         Ok(ctx)
     }
@@ -294,7 +300,7 @@ impl<A> ScopedSim<'_, A> {
             let from = access_gate(&ctx.ctx, &connection.peers[0].accessors).expect("gate");
             let to = access_gate(&ctx.ctx, &connection.peers[1].accessors).expect("gate");
 
-            from.connect_dedup(
+            from.connect(
                 to,
                 connection
                     .link

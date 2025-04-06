@@ -23,6 +23,8 @@ pub(crate) use dummy::*;
 pub use error::*;
 pub use refs::*;
 
+pub use des_net_utils::props::{Optional, Present, Prop};
+
 use super::processing::{ProcessingStack, Processor};
 
 /// A unique identifier for a module.

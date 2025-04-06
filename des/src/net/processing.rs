@@ -63,9 +63,9 @@
 //! once the next event arrives.
 //!
 
-use std::{any::Any, ops::Deref};
+use std::{any::Any, fmt::Debug, ops::Deref};
 
-use super::{module::Module, util::NoDebug};
+use super::module::Module;
 use crate::prelude::Message;
 
 /// A subprogramm between the module application and the network layer.
@@ -253,15 +253,21 @@ impl ProcessingState {
 }
 
 /// A stack of processing elements
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct ProcessingStack {
-    items: NoDebug<Vec<Box<dyn ProcessingElement>>>,
+    items: Vec<Box<dyn ProcessingElement>>,
 }
 
 impl ProcessingStack {
     /// Merge a new stack onto the the current one.
     pub fn append(&mut self, expansion: impl Into<ProcessingStack>) {
-        self.items.extend(expansion.into().items.into_inner());
+        self.items.extend(expansion.into().items);
+    }
+}
+
+impl Debug for ProcessingStack {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ProcessingStack").finish()
     }
 }
 

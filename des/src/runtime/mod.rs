@@ -171,11 +171,26 @@ where
     }
 
     ///
+    pub fn num_events_remaining(&self) -> usize {
+        self.future_event_set.len()
+    }
+
+    ///
     /// Returns the current simulation time.
     ///
     #[allow(clippy::unused_self)]
     pub fn sim_time(&self) -> SimTime {
         SimTime::now()
+    }
+
+    ///
+    pub fn was_started(&self) -> bool {
+        matches!(self.state, State::Running)
+    }
+
+    ///
+    pub fn has_reached_limit(&self) -> bool {
+        self.limit.applies(self.itr + 1, self.sim_time())
     }
 
     ///

@@ -13,14 +13,9 @@ use std::sync::{Arc, Weak};
 
 static BUF_CTX: Mutex<BufferContext> = Mutex::new(BufferContext::new());
 
-type LoopbackBuffer = Vec<(Message, SimTime)>;
-
 struct BufferContext {
     // All new events that will be scheduled
     events: Vec<(NetEvents, SimTime)>,
-
-    // (Message, SendTime)
-    loopback: LoopbackBuffer,
     // shudown,
     #[allow(clippy::option_option)]
     shutdown: Option<Option<SimTime>>,
@@ -32,7 +27,6 @@ impl BufferContext {
     const fn new() -> Self {
         Self {
             events: Vec::new(),
-            loopback: Vec::new(),
             shutdown: None,
             globals: None,
         }
@@ -104,7 +98,13 @@ pub(crate) fn buf_schedule_at(msg: Message, arrival_time: SimTime) {
     // used, and we dont block any channels. additionally this ensures that
     // timeouts are allways ordered later than packets, which is good
     let mut ctx = BUF_CTX.lock();
-    ctx.loopback.push((msg, arrival_time));
+    ctx.events.push((
+        NetEvents::HandleMessageEvent(HandleMessageEvent {
+            module: current().me(),
+            message: msg,
+        }),
+        arrival_time,
+    ));
 }
 
 pub(crate) fn buf_schedule_shutdown(restart: Option<SimTime>) {
@@ -126,17 +126,6 @@ where
     // (0) Add delayed events from 'send'
     for (event, time) in ctx.events.drain(..) {
         rt.add_event(event, time);
-    }
-
-    // (1) Send loopback events from 'scheduleAt'
-    for (message, time) in ctx.loopback.drain(..) {
-        rt.add_event(
-            NetEvents::HandleMessageEvent(HandleMessageEvent {
-                module: module.clone(),
-                message,
-            }),
-            time,
-        );
     }
 
     // (2) Handle shutdown if indicated

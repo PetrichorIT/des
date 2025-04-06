@@ -6,7 +6,6 @@ use crate::{
         module::{module_ctx_drop, try_current, ModuleContext, ModuleExt, MOD_CTX},
         processing::ProcessingStack,
         topology::Topology,
-        util::NoDebug,
     },
     prelude::{Application, EventLifecycle, GateRef, Module, ModuleRef, ObjectPath, Runtime},
     runtime::RuntimeError,
@@ -14,6 +13,7 @@ use crate::{
     tracing::{enter_scope, leave_scope},
 };
 use std::{
+    fmt::Debug,
     fs, io, mem, ops,
     panic::{set_hook, take_hook, PanicHookInfo},
     path::Path,
@@ -77,9 +77,8 @@ static GUARD: Mutex<()> = Mutex::new(());
 ///
 /// let _ = Builder::new().build(sim).run(); // prints 'Hello simulation'
 /// ```
-#[derive(Debug)]
 pub struct Sim<A> {
-    pub(crate) stack: NoDebug<Box<dyn FnMut() -> ProcessingStack>>,
+    pub(crate) stack: Box<dyn FnMut() -> ProcessingStack>,
     pub(crate) error: RuntimeError,
 
     modules: ModuleTree,
@@ -176,6 +175,11 @@ pub struct ScopedSim<'a, A> {
 }
 
 impl<A> Sim<A> {
+    ///
+    pub fn nodes(&self) -> impl Iterator<Item = ObjectPath> + '_ {
+        self.modules.iter().map(|ctx| &ctx.path).cloned()
+    }
+
     #[inline]
     pub(crate) fn modules(&self) -> &ModuleTree {
         &self.modules
@@ -293,6 +297,11 @@ impl<A> Sim<A> {
     /// Returns a handle to the simulation globals.
     pub fn globals(&self) -> Arc<Globals> {
         self.globals.clone()
+    }
+
+    ///
+    pub fn topology(&self) -> Topology<(), ()> {
+        Topology::from_modules(&self.modules)
     }
 
     /// Creates a new module block within the simulation.
@@ -450,9 +459,25 @@ impl<A> Sim<A> {
             .expect("failed to lock globals")
             .push(ctx.clone());
 
-        // TODO: deactivate module
+        let mut sink = Vec::new();
+        ctx.deactivate(&mut sink);
+        assert!(
+            sink.is_empty(),
+            "events cannot be dispatched in constructors"
+        );
+
         self.modules.add(ctx.clone());
         ctx
+    }
+}
+
+impl<A: Debug> Debug for Sim<A> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Sim")
+            .field("inner", &self.inner)
+            .field("modules", &self.modules)
+            .field("cfgs", &self.cfgs)
+            .finish()
     }
 }
 
