@@ -30,10 +30,9 @@ pub struct Bob();
 impl Module for Bob {
     fn at_sim_start(&mut self, _stage: usize) {
         schedule_in(
-            Message::new()
+            Message::default()
                 .kind(0xff)
-                .content("Init".to_string())
-                .build(),
+                .with_content("Init".to_string()),
             Duration::ZERO,
         )
     }
@@ -44,13 +43,12 @@ impl Module for Bob {
             drop(msg);
             info!(target: "Bob", "Dropped init msg");
             send(
-                Message::new()
+                Message::default()
                     .kind(1)
                     // .src(0x7f_00_00_01, 80)
                     // .dest(0x7f_00_00_02, 80)
                     .id(0)
-                    .content("Ping".to_string())
-                    .build(),
+                    .with_content("Ping".to_string()),
                 ("netOut", 2),
             );
         } else {

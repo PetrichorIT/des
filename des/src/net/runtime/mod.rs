@@ -175,7 +175,7 @@ pub struct ScopedSim<'a, A> {
 }
 
 impl<A> Sim<A> {
-    ///
+    /// Returns an iterator over all nodes in the simulation.
     pub fn nodes(&self) -> impl Iterator<Item = ObjectPath> + '_ {
         self.modules.iter().map(|ctx| &ctx.path).cloned()
     }
@@ -198,7 +198,7 @@ impl<A> Sim<A> {
         let guard = SimStaticsGuard::new(Arc::downgrade(&globals));
         let stack: Box<dyn FnMut() -> ProcessingStack> = Box::new(ProcessingStack::default);
         Self {
-            stack: stack.into(),
+            stack,
             error: RuntimeError::empty(),
             guard,
             modules: ModuleTree::default(),
@@ -214,7 +214,7 @@ impl<A> Sim<A> {
     /// this function was called.
     pub fn set_stack<T: Into<ProcessingStack>>(&mut self, mut stack: impl FnMut() -> T + 'static) {
         let boxed: Box<dyn FnMut() -> ProcessingStack> = Box::new(move || stack().into());
-        self.stack = boxed.into();
+        self.stack = boxed;
     }
 
     /// Sets the default processing stack for the simulation.
@@ -299,7 +299,7 @@ impl<A> Sim<A> {
         self.globals.clone()
     }
 
-    ///
+    /// Returns the topology of the simulation.
     pub fn topology(&self) -> Topology<(), ()> {
         Topology::from_modules(&self.modules)
     }
@@ -471,6 +471,7 @@ impl<A> Sim<A> {
     }
 }
 
+#[allow(clippy::missing_fields_in_debug)]
 impl<A: Debug> Debug for Sim<A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Sim")

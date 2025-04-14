@@ -41,7 +41,7 @@ mod common {
                 self.delay.as_secs_f64()
             );
             if self.rem > 0 {
-                schedule_in(Message::new().kind(1).build(), self.delay)
+                schedule_in(Message::default().kind(1), self.delay)
             }
         }
 
@@ -49,10 +49,10 @@ mod common {
             match msg.header().kind {
                 1 => {
                     self.rem -= 1;
-                    send(Message::new().kind(2).id(self.dst as u16).build(), "out");
+                    send(Message::default().kind(2).id(self.dst as u16), "out");
 
                     if self.rem > 0 {
-                        schedule_in(Message::new().kind(1).build(), self.delay)
+                        schedule_in(Message::default().kind(1), self.delay)
                     }
                 }
                 2 => {
@@ -253,7 +253,7 @@ fn registry_custom_resolver() -> Result<(), Box<dyn std::error::Error>> {
 struct Sender;
 impl Module for Sender {
     fn at_sim_start(&mut self, _stage: usize) {
-        send(Message::new().build(), "port")
+        send(Message::default(), "port")
     }
 }
 

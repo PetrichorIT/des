@@ -2,6 +2,7 @@
 
 use crate::net::channel::ChannelRef;
 use std::fmt::Debug;
+use std::hash::Hash;
 use std::sync::{Arc, Mutex, Weak};
 
 use super::module::{ModuleContext, ModuleRef, ModuleRefWeak};
@@ -396,7 +397,17 @@ impl PartialEq for Gate {
             && self.pos == other.pos
     }
 }
+
 impl Eq for Gate {}
+
+impl Hash for Gate {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.owner().hash(state);
+        self.name().hash(state);
+        self.pos().hash(state);
+        self.size().hash(state);
+    }
+}
 
 mod private {
     pub trait Sealed {}

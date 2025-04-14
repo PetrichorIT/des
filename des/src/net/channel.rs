@@ -265,7 +265,7 @@ impl ChannelDropBehaviour {
                 tracing::warn!(
                     "Gate '{}' dropping message [{}] pushed onto busy channel",
                     via.prev_hop().unwrap().name(),
-                    msg.str(),
+                    msg,
                 );
                 drop(msg);
             }
@@ -275,7 +275,7 @@ impl ChannelDropBehaviour {
                     tracing::warn!(
                         "Gate '{}' dropping message [{}] pushed onto busy channel",
                         via.prev_hop().unwrap().name(),
-                        msg.str(),
+                        msg,
                     );
                     drop(msg);
                 } else {
@@ -283,7 +283,7 @@ impl ChannelDropBehaviour {
                     tracing::trace!(
                         "Gate '{}' added message [{}] to queue of channel",
                         via.prev_hop().unwrap().name(),
-                        msg.str(),
+                        msg,
                     );
                     buffer.enqueue(msg, via);
                 }

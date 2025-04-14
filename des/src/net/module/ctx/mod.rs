@@ -14,6 +14,7 @@ use std::{
     any::Any,
     cell::Cell,
     fmt::Debug,
+    hash::Hash,
     io::Error,
     sync::{atomic::AtomicBool, Arc},
 };
@@ -183,7 +184,7 @@ impl ModuleContext {
     /// impl Module for MyModule {
     ///     fn handle_message(&mut self, msg: Message) {
     ///         let path = current().path();
-    ///         println!("[{path}] recv message: {}", msg.str())
+    ///         println!("[{path}] recv message: {}", msg)
     ///     }
     /// }
     /// ```
@@ -194,6 +195,10 @@ impl ModuleContext {
     }
 
     /// Returns the `ModuleRef` associated with this context.
+    ///
+    /// # Panics
+    ///
+    /// Cannot be called during teardown.
     pub fn me(&self) -> ModuleRef {
         self.me
             .read()
@@ -342,6 +347,13 @@ impl ModuleContext {
 impl Debug for ModuleContext {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ModuleContext").finish()
+    }
+}
+
+impl Hash for ModuleContext {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+        self.path.hash(state);
     }
 }
 

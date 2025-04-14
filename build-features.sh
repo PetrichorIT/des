@@ -13,6 +13,8 @@ echo "[des]"
 cargo build -p des
 echo "[des] cqueue"
 cargo build -p des --features cqueue
+echo "[des] serde"
+cargo build -p des --features cqueue
 echo "[des] net"
 cargo build -p des --features net
 echo "[des] net + async"

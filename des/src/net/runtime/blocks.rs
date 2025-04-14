@@ -402,7 +402,7 @@ cfg_async! {
          fn handle_message(&mut self, msg: Message) {
             if let Err(e) = self.tx.try_send(msg) {
                 assert!(!self.require_recv, "failed to receive an incoming packet: {e}");
-            };
+            }
         }
 
          fn at_sim_end(&mut self) -> Result<(), RuntimeError> {

@@ -287,9 +287,7 @@ impl From<()> for ProcessingStack {
 impl<P: ProcessingElement> From<P> for ProcessingStack {
     fn from(value: P) -> Self {
         let boxed: Box<dyn ProcessingElement> = Box::new(value);
-        ProcessingStack {
-            items: vec![boxed].into(),
-        }
+        ProcessingStack { items: vec![boxed] }
     }
 }
 

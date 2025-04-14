@@ -78,7 +78,7 @@ impl MessageExitingConnection {
                 tracing::warn!(
                     "Gate '{}' dropped message [{}] since owner module {} is inactive",
                     cur.endpoint.name(),
-                    msg.str(),
+                    msg,
                     cur.endpoint.owner().path()
                 );
 
@@ -91,7 +91,7 @@ impl MessageExitingConnection {
             tracing::info!(
                 "Gate '{}' forwarding message [{}] to next gate delayed: {}",
                 cur.endpoint.name(),
-                msg.str(),
+                msg,
                 cur.channel().is_some()
             );
 
@@ -113,7 +113,7 @@ impl MessageExitingConnection {
         tracing::info!(
             "Gate '{}' forwarding message [{}] to module #{}",
             cur.endpoint.name(),
-            msg.str(),
+            msg,
             cur.endpoint.owner().id()
         );
 
@@ -154,7 +154,7 @@ impl HandleMessageEvent {
         message.header.receiver_module_id = self.module.ctx.id;
 
         #[cfg(feature = "tracing")]
-        tracing::info!("Handling message {:?}", message.str());
+        tracing::info!("Handling message {:?}", message);
 
         let module = &self.module;
 

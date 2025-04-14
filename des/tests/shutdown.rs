@@ -73,7 +73,7 @@ fn stateless_module_shudown() {
     let mut rt = Builder::seeded(123).build(rt);
     rt.add_message_onto(
         gate,
-        Message::new().build(),
+        Message::default(),
         SimTime::from_duration(Duration::from_secs(10)),
     );
 
@@ -117,12 +117,12 @@ fn stateless_module_restart() {
     let mut rt = Builder::seeded(123).build(rt);
     rt.add_message_onto(
         gate.clone(),
-        Message::new().id(9).build(),
+        Message::default().id(9),
         SimTime::from_duration(Duration::from_secs(10)),
     );
     rt.add_message_onto(
         gate,
-        Message::new().id(10).build(),
+        Message::default().id(10),
         SimTime::from_duration(Duration::from_secs(30)),
     );
 
@@ -180,12 +180,12 @@ fn statefull_module_restart() {
     let mut rt = Builder::seeded(123).build(rt);
     rt.add_message_onto(
         gate.clone(),
-        Message::new().id(9).build(),
+        Message::default().id(9),
         SimTime::from_duration(Duration::from_secs(10)),
     );
     rt.add_message_onto(
         gate,
-        Message::new().id(10).build(),
+        Message::default().id(10),
         SimTime::from_duration(Duration::from_secs(30)),
     );
 
@@ -263,7 +263,7 @@ fn restart_via_async_handle() {
     assert_eq!(DROPPED_RESTART_VIA_HANDLE.load(Ordering::SeqCst), 2)
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 struct CountDropsMessage {
     counter: Arc<AtomicUsize>,
 }
@@ -290,11 +290,9 @@ impl Module for WillIgnoreInncomingInDowntime {
             // schedule events for seconds 1..=10
             for i in 1..=10 {
                 schedule_in(
-                    Message::new()
-                        .content(CountDropsMessage {
-                            counter: self.drops.clone(),
-                        })
-                        .build(),
+                    Message::default().with_content(CountDropsMessage {
+                        counter: self.drops.clone(),
+                    }),
                     Duration::from_secs(i),
                 );
             }
@@ -339,7 +337,7 @@ struct EndNode {
 
 impl Module for EndNode {
     fn at_sim_start(&mut self, _: usize) {
-        schedule_in(Message::new().kind(1).build(), Duration::from_secs(1));
+        schedule_in(Message::default().kind(1), Duration::from_secs(1));
     }
 
     fn handle_message(&mut self, mut msg: Message) {
@@ -351,15 +349,12 @@ impl Module for EndNode {
 
                 self.sent += 1;
                 send(
-                    Message::new()
-                        .kind(2)
-                        .content(CountDropsMessage {
-                            counter: self.drops.clone(),
-                        })
-                        .build(),
+                    Message::default().kind(2).with_content(CountDropsMessage {
+                        counter: self.drops.clone(),
+                    }),
                     "port",
                 );
-                schedule_in(Message::new().kind(1).build(), Duration::from_secs(1));
+                schedule_in(Message::default().kind(1), Duration::from_secs(1));
             }
             2 => {
                 self.recv += 1;
@@ -384,7 +379,7 @@ struct Transit;
 impl Module for Transit {
     fn at_sim_start(&mut self, _stage: usize) {
         if SimTime::now() == SimTime::ZERO {
-            schedule_in(Message::new().build(), Duration::from_secs_f64(5.5));
+            schedule_in(Message::default(), Duration::from_secs_f64(5.5));
         }
     }
 
@@ -456,7 +451,7 @@ fn shutdown_will_drop_transiting_delayed_channels() {
 fn shutdown_prevents_accessing_parents() {
     let mut sim = Sim::new(());
     sim.node("a", ModuleFn::new(
-        || schedule_in(Message::new().build(), Duration::from_secs(10)),
+        || schedule_in(Message::default(), Duration::from_secs(10)),
         |_, _| {
             let err = current().child("b").unwrap_err();
             assert_eq!(err, ModuleReferencingError::CurrentlyInactive("The child module 'b' of 'a' is currently shut down, thus cannot be accessed".to_string()));
@@ -465,7 +460,7 @@ fn shutdown_prevents_accessing_parents() {
     sim.node(
         "a.b",
         ModuleFn::new(
-            || schedule_in(Message::new().build(), Duration::from_secs(5)),
+            || schedule_in(Message::default(), Duration::from_secs(5)),
             |_, _| {
                 shutdown();
             },
@@ -474,7 +469,7 @@ fn shutdown_prevents_accessing_parents() {
     sim.node(
         "a.b.c",
         ModuleFn::new(
-            || schedule_in(Message::new().build(), Duration::from_secs(10)),
+            || schedule_in(Message::default(), Duration::from_secs(10)),
             |_, _| {
                 let err = current().parent().unwrap_err();
                 assert_eq!(err, ModuleReferencingError::CurrentlyInactive("The parent module of 'a.b.c' is currently shut down, thus cannot be accessed".to_string()));

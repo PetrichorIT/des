@@ -171,6 +171,8 @@ where
     }
 
     ///
+    /// Returns the number of events that are remaining to be dispatched on this [`Runtime`] instance.
+    ///
     pub fn num_events_remaining(&self) -> usize {
         self.future_event_set.len()
     }
@@ -183,12 +185,12 @@ where
         SimTime::now()
     }
 
-    ///
+    /// Indicates whether the simulation was already started.
     pub fn was_started(&self) -> bool {
         matches!(self.state, State::Running)
     }
 
-    ///
+    /// Indicates whether the simulation has reached its limit.
     pub fn has_reached_limit(&self) -> bool {
         self.limit.applies(self.itr + 1, self.sim_time())
     }

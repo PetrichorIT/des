@@ -41,7 +41,7 @@ impl Module for PluginCreation {
     fn at_sim_start(&mut self, _stage: usize) {
         for i in 0..100 {
             schedule_at(
-                Message::new().id(i).build(),
+                Message::default().id(i),
                 SimTime::now() + Duration::from_secs(i as u64),
             )
         }
@@ -115,7 +115,7 @@ impl Module for PluginPriorityDefer {
 
     fn at_sim_start(&mut self, _stage: usize) {
         for i in 0..100 {
-            schedule_in(Message::new().build(), Duration::from_secs(i));
+            schedule_in(Message::default(), Duration::from_secs(i));
         }
     }
 
@@ -174,7 +174,7 @@ impl Module for PluginAtShutdown {
             // Schedule events at all time points 1..=20
             for i in 1..=20 {
                 schedule_at(
-                    Message::new().build(),
+                    Message::default(),
                     SimTime::from_duration(Duration::from_secs(i)),
                 )
             }
@@ -237,7 +237,7 @@ fn module_as_processing_element() {
     let gate = sim.gate("a", "port");
 
     let mut rt = Builder::seeded(123).build(sim);
-    rt.add_message_onto(gate, Message::new().build(), 1.0.into());
+    rt.add_message_onto(gate, Message::default(), 1.0.into());
 
     let _ = rt.run();
     assert!(DONE.load(Ordering::SeqCst));
@@ -269,7 +269,7 @@ fn custom_default_pe() {
     let gate = sim.gate("a", "port");
 
     let mut rt = Builder::seeded(123).build(sim);
-    rt.add_message_onto(gate, Message::new().build(), 1.0.into());
+    rt.add_message_onto(gate, Message::default(), 1.0.into());
 
     let _ = rt.run();
     assert!(DONE.load(Ordering::SeqCst));

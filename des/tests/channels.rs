@@ -16,8 +16,8 @@ struct DropChanModule {
 
 impl Module for DropChanModule {
     fn at_sim_start(&mut self, _stage: usize) {
-        send(Message::new().content([0u8; 512]).build(), "out");
-        send(Message::new().content([1u8; 512]).build(), "out");
+        send(Message::default().with_content([0u8; 512]), "out");
+        send(Message::default().with_content([1u8; 512]), "out");
 
         self.send += 2;
     }
@@ -61,9 +61,9 @@ struct BufferChanModule {
 
 impl Module for BufferChanModule {
     fn at_sim_start(&mut self, _stage: usize) {
-        send(Message::new().content([0u8; 512]).build(), "out");
-        send(Message::new().content([1u8; 512]).build(), "out");
-        send(Message::new().content([1u8; 512]).build(), "out");
+        send(Message::default().with_content([0u8; 512]), "out");
+        send(Message::default().with_content([1u8; 512]), "out");
+        send(Message::default().with_content([1u8; 512]), "out");
 
         self.send += 3;
     }
@@ -107,12 +107,12 @@ fn channel_buffering_message() {
 struct SendMessageModule;
 impl Module for SendMessageModule {
     fn at_sim_start(&mut self, _stage: usize) {
-        schedule_in(Message::new().kind(10).build(), Duration::from_secs(1));
+        schedule_in(Message::default().kind(10), Duration::from_secs(1));
     }
 
     fn handle_message(&mut self, msg: Message) {
         if msg.header().kind == 10 {
-            send(Message::new().content("Hello world").build(), "out");
+            send(Message::default().with_content("Hello world"), "out");
             let gate = current().gate("out", 0).unwrap();
             let ch = gate.channel().unwrap();
             assert!(ch.is_busy());
@@ -155,7 +155,7 @@ impl Module for ChannelProbing {
         chan.attach_probe(Probe(self.0.clone()));
         assert_eq!(chan.metrics().bitrate, 1234);
 
-        let msg = Message::new().build();
+        let msg = Message::default();
         let busy_time = chan.calculate_busy(&msg);
         let tft = SimTime::now() + busy_time;
         dbg!(busy_time);
@@ -218,7 +218,7 @@ struct LatencyOnly(usize);
 impl Module for LatencyOnly {
     fn at_sim_start(&mut self, _stage: usize) {
         for _ in 0..10 {
-            send(Message::new().build(), "out");
+            send(Message::default(), "out");
         }
     }
 

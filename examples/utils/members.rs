@@ -39,12 +39,11 @@ impl Module for Bob {
             0 => {
                 info!("Initalizing");
                 send(
-                    Message::new()
+                    Message::default()
                         .kind(1)
                         // .src(0x7f_00_00_01, 80)
                         // .dest(0x7f_00_00_02, 80)
-                        .content("Ping".to_string())
-                        .build(),
+                        .with_content("Ping".to_string()),
                     ("netOut", 2),
                 );
             }

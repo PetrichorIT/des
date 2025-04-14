@@ -23,7 +23,7 @@ use crate::{
 /// impl Module for MyModule {
 ///     fn handle_message(&mut self, _msg: Message) {
 ///         send(
-///             Message::new().id(123).content("Hello world").build(),
+///             Message::default().id(123).with_content("Hello world"),
 ///             "out"
 ///         );
 ///     }
@@ -56,7 +56,7 @@ pub fn send(msg: impl Into<Message>, gate: impl IntoModuleGate) {
 ///
 /// impl Module for MyModule {
 ///     fn at_sim_start(&mut self, _: usize) {
-///         send_in(Message::new().kind(42).build(), "out", Duration::from_secs(2));
+///         send_in(Message::default().kind(42), "out", Duration::from_secs(2));
 ///         assert!(
 ///             !current()
 ///                 .gate("out", 0).unwrap()
@@ -98,7 +98,11 @@ pub fn send_in(msg: impl Into<Message>, gate: impl IntoModuleGate, dur: Duration
 /// Panics if the send time is in the past.
 #[allow(clippy::needless_pass_by_value)]
 pub fn send_at(msg: impl Into<Message>, gate: impl IntoModuleGate, send_time: SimTime) {
-    assert!(send_time >= SimTime::now());
+    assert!(
+        send_time >= SimTime::now(),
+        "cannot send a message with a send_time {send_time:?}, less than the current simulation time {:?}",
+        SimTime::now()
+    );
     // (0) Cast the message.
     let msg: Message = msg.into();
 
@@ -109,11 +113,6 @@ pub fn send_at(msg: impl Into<Message>, gate: impl IntoModuleGate, send_time: Si
     });
 
     if let Some(gate) = gate {
-        // plugin capture
-        // let Some(msg) = plugin::plugin_output_stream(msg) else {
-        //     return
-        // };
-
         buf_send_at(msg, gate, send_time);
     } else {
         #[cfg(feature = "tracing")]
@@ -134,7 +133,7 @@ pub fn send_at(msg: impl Into<Message>, gate: impl IntoModuleGate, send_time: Si
 /// struct Timer { period: Duration }
 /// impl Module for Timer {
 ///     fn at_sim_start(&mut self, _: usize) {
-///         schedule_in(Message::new().content("wakeup").build(), self.period);
+///         schedule_in(Message::default().with_content("wakeup"), self.period);
 ///     }
 ///
 ///     fn handle_message(&mut self, msg: Message) {
@@ -164,13 +163,11 @@ pub fn schedule_in(msg: impl Into<Message>, dur: Duration) {
 ///
 /// Panics if the specified time is in the past.
 pub fn schedule_at(msg: impl Into<Message>, arrival_time: SimTime) {
-    assert!(arrival_time >= SimTime::now());
+    assert!(
+        arrival_time >= SimTime::now(),
+        "cannot schedule a message with a arrival_time {arrival_time:?}, less than the current simulation time {:?}",
+        SimTime::now()
+    );
     let msg: Message = msg.into();
-
-    // plugin capture
-    // let Some(msg) = plugin::plugin_output_stream(msg) else {
-    //     return
-    // };
-
     buf_schedule_at(msg, arrival_time);
 }

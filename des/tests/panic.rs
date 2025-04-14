@@ -23,7 +23,7 @@ fn catch_panic_at_handle_message() {
     let gate = sim.gate("alice", "port");
 
     let mut rt = Builder::seeded(123).build(sim);
-    rt.add_message_onto(gate, Message::new().build(), 5.0.into());
+    rt.add_message_onto(gate, Message::default(), 5.0.into());
     let _ = rt.run();
 }
 
@@ -42,7 +42,7 @@ fn catch_panic_at_sim_start() {
     let gate = sim.gate("alice", "port");
 
     let mut rt = Builder::seeded(123).build(sim);
-    rt.add_message_onto(gate, Message::new().build(), 5.0.into());
+    rt.add_message_onto(gate, Message::default(), 5.0.into());
     let _ = rt.run();
 }
 
@@ -61,7 +61,7 @@ fn catch_panic_at_sim_end() {
     let gate = sim.gate("alice", "port");
 
     let mut rt = Builder::seeded(123).build(sim);
-    rt.add_message_onto(gate, Message::new().build(), 5.0.into());
+    rt.add_message_onto(gate, Message::default(), 5.0.into());
     let _ = rt.run();
 }
 
@@ -87,7 +87,7 @@ fn unwind_sim_panic_at_handle_message() {
     let gate = sim.gate("alice", "port");
 
     let mut rt = Builder::seeded(123).build(sim);
-    rt.add_message_onto(gate, Message::new().build(), 5.0.into());
+    rt.add_message_onto(gate, Message::default(), 5.0.into());
     let err = rt.run().unwrap_err();
     assert_eq!(
         err[0].as_any().downcast_ref::<PanicError>().unwrap().path,
@@ -114,7 +114,7 @@ fn unwind_sim_panic_at_sim_start() {
     let gate = sim.gate("alice", "port");
 
     let mut rt = Builder::seeded(123).build(sim);
-    rt.add_message_onto(gate, Message::new().build(), 5.0.into());
+    rt.add_message_onto(gate, Message::default(), 5.0.into());
     let err = rt.run().unwrap_err();
     assert_eq!(
         err[0].as_any().downcast_ref::<PanicError>().unwrap().path,
@@ -141,7 +141,7 @@ fn unwind_sim_panic_at_sim_end() {
     let gate = sim.gate("alice", "port");
 
     let mut rt = Builder::seeded(123).build(sim);
-    rt.add_message_onto(gate, Message::new().build(), 5.0.into());
+    rt.add_message_onto(gate, Message::default(), 5.0.into());
     let err = rt.run().unwrap_err();
     assert_eq!(
         err[0].as_any().downcast_ref::<PanicError>().unwrap().path,
@@ -170,7 +170,7 @@ fn unwind_behaviour_unwind_allways_panics() {
     let gate = sim.gate("alice", "port");
 
     let mut rt = Builder::seeded(123).build(sim);
-    rt.add_message_onto(gate, Message::new().build(), 5.0.into());
+    rt.add_message_onto(gate, Message::default(), 5.0.into());
     let err = rt.run().unwrap_err();
     assert_eq!(
         err[0].as_any().downcast_ref::<PanicError>().unwrap().path,

@@ -53,7 +53,7 @@ impl Props {
             Entry::Value(slot) => {
                 let lock = slot.lock();
 
-                if lock.as_ref().map_or(true, |inner| (**inner).is::<T>()) {
+                if lock.as_ref().is_none_or(|inner| (**inner).is::<T>()) {
                     Ok(Prop {
                         slot: slot.clone(),
                         _phantom: PhantomData,

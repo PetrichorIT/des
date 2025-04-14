@@ -8,6 +8,7 @@ use super::{DummyModule, Module, ModuleContext, ModuleExt};
 use std::any::{Any, TypeId};
 use std::cell::{Ref, RefCell, RefMut};
 use std::fmt::Debug;
+use std::hash::Hash;
 use std::ops::Deref;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Weak};
@@ -315,6 +316,12 @@ impl ModuleRef {
 impl PartialEq for ModuleRef {
     fn eq(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.ctx, &other.ctx)
+    }
+}
+
+impl Hash for ModuleRef {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.ctx.hash(state);
     }
 }
 

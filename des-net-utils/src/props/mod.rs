@@ -63,13 +63,13 @@ impl<T: Any> Prop<T, Optional> {
         let mut slot = self.slot.lock();
         assert!(
             slot.as_ref()
-                .map_or(true, |prev_value| (**prev_value).is::<T>()),
+                .is_none_or(|prev_value| (**prev_value).is::<T>()),
             "cannot use this prop, since other instance has changed the type"
         );
         *slot = Some(Box::new(value));
     }
 
-    pub fn then(self) -> Option<Prop<T, Present>> {
+    pub fn present(self) -> Option<Prop<T, Present>> {
         let slot = self.slot.lock();
         if slot.is_some() {
             drop(slot);
@@ -83,16 +83,16 @@ impl<T: Any> Prop<T, Optional> {
     }
 
     pub fn expect(self, msg: &str) -> Prop<T, Present> {
-        self.then().expect(msg)
+        self.present().expect(msg)
     }
 
-    pub fn or_default(self) -> Prop<T, Present>
+    pub fn or_else<F>(self, f: F) -> Prop<T, Present>
     where
-        T: Default,
+        F: FnOnce() -> T,
     {
         let mut lock = self.slot.lock();
         if lock.is_none() {
-            *lock = Some(Box::new(T::default()));
+            *lock = Some(Box::new(f()));
         }
         drop(lock);
 
@@ -100,6 +100,17 @@ impl<T: Any> Prop<T, Optional> {
             slot: self.slot,
             _phantom: PhantomData,
         }
+    }
+
+    pub fn or(self, value: T) -> Prop<T, Present> {
+        self.or_else(|| value)
+    }
+
+    pub fn or_default(self) -> Prop<T, Present>
+    where
+        T: Default,
+    {
+        self.or_else(T::default)
     }
 }
 
@@ -136,7 +147,7 @@ impl<T: Any> Prop<T, Present> {
         let mut slot = self.slot.lock();
         assert!(
             slot.as_ref()
-                .map_or(true, |prev_value| (**prev_value).is::<T>()),
+                .is_none_or(|prev_value| (**prev_value).is::<T>()),
             "cannot use this prop, since other instance has changed the type"
         );
         *slot = Some(Box::new(value));

@@ -81,9 +81,9 @@ fn builder_async_fn_message_recv() {
     let gate = sim.gate("alice", "port");
 
     let mut rt = Builder::seeded(123).build(sim);
-    rt.add_message_onto(gate.clone(), Message::new().id(1).build(), 1.0.into());
-    rt.add_message_onto(gate.clone(), Message::new().id(2).build(), 2.0.into());
-    rt.add_message_onto(gate.clone(), Message::new().id(3).build(), 3.0.into());
+    rt.add_message_onto(gate.clone(), Message::default().id(1), 1.0.into());
+    rt.add_message_onto(gate.clone(), Message::default().id(2), 2.0.into());
+    rt.add_message_onto(gate.clone(), Message::default().id(3), 3.0.into());
 
     let _ = rt.run();
     assert_eq!(counter.load(Ordering::SeqCst), 6);
@@ -101,7 +101,7 @@ fn builder_async_fn_channeled() {
         AsyncFn::new(|_| async move {
             for i in 0..16 {
                 sleep(Duration::from_secs(i)).await;
-                send(Message::new().id(i as u16).build(), "port");
+                send(Message::default().id(i as u16), "port");
             }
         }),
     );

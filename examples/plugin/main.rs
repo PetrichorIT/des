@@ -5,14 +5,14 @@ struct A {}
 
 impl Module for A {
     fn at_sim_start(&mut self, _stage: usize) {
-        send(Message::new().content(42).build(), "out");
-        send(Message::new().content(69).build(), "out");
+        send(Message::default().with_content(42), "out");
+        send(Message::default().with_content(69), "out");
     }
 
     fn handle_message(&mut self, msg: Message) {
         let span = ::tracing::span!(::tracing::Level::INFO, "a-recv", age = 2, size = 3);
         let _g = span.enter();
-        tracing::info!("recv: {} {}", msg.str(), msg.content::<i32>())
+        tracing::info!("recv: {} {}", msg, msg.content::<i32>())
     }
 }
 

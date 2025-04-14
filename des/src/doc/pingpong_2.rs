@@ -79,19 +79,19 @@
 //! impl Module for Pinger {
 //!     fn at_sim_start(&mut self, stage: usize) {
 //!         /* Schedule the first interval tick at t=0 */
-//!         schedule_at(Message::new().kind(INTERVAL).build(), SimTime::ZERO);
+//!         schedule_at(Message::default().kind(INTERVAL), SimTime::ZERO);
 //!     }
 //!
 //!     fn handle_message(&mut self, msg: Message) {
 //!         match msg.header().kind {
 //!             INTERVAL => {
 //!                 /* Send a ping message */
-//!                 send(Message::new().kind(PING).build(), "to-pong");
+//!                 send(Message::default().kind(PING), "to-pong");
 //!                 self.pings_send += 1;
 //!
 //!                 /* Reschedule the interval until t=30 */
 //!                 if SimTime::now().as_secs() < 30 {
-//!                     schedule_in(Message::new().kind(INTERVAL).build(), Duration::from_secs(1))
+//!                     schedule_in(Message::default().kind(INTERVAL), Duration::from_secs(1))
 //!                 }
 //!             },
 //!             PONG => self.pongs_recv += 1,
@@ -135,7 +135,7 @@
 //!         assert_eq!(msg.header().kind, PING);
 //!         self.pings_recv += 1;
 //!
-//!         send(Message::new().kind(PONG).build(), "to-ping");
+//!         send(Message::default().kind(PONG), "to-ping");
 //!         self.pongs_send += 1;
 //!     }
 //!

@@ -42,10 +42,10 @@
 //!             let mut interval = des::time::interval(Duration::from_secs(1));
 //!             for _ in 0..32 {
 //!                 interval.tick().await;
-//!                 send(Message::new().kind(PING).build(), "to-pong");
+//!                 send(Message::default().kind(PING), "to-pong");
 //!             }
 //!         });
-//!     
+//!
 //!         for _ in 0..32 {
 //!             let msg = rx.recv().await.unwrap();
 //!             assert_eq!(msg.header().kind, PONG);
@@ -54,7 +54,7 @@
 //!
 //!     sim.node("ponger", AsyncFn::new(|mut rx| async move {
 //!         while let Some(msg) = rx.recv().await {
-//!             send(Message::new().kind(PONG).build(), "to-ping");
+//!             send(Message::default().kind(PONG), "to-ping");
 //!         }
 //!     }));
 //!

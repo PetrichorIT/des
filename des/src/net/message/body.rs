@@ -1,3 +1,250 @@
+use std::{
+    any::{type_name, Any, TypeId},
+    fmt::{self, Debug},
+    mem,
+    ptr::null_mut,
+};
+
+/// A message body, which stores an arbitrary value, potentially cloneable and debuggable.
+pub struct Body {
+    data: *mut (),
+    length: usize,
+    vtable: &'static VTable,
+}
+
+impl Body {
+    /// Creates a new message body, using a cloneable and debuggable value.
+    pub fn new<T>(value: T) -> Self
+    where
+        T: MessageBody + Any + Clone + Debug,
+    {
+        let length = value.byte_len();
+        let boxed = Box::new(value);
+        Self {
+            data: Box::into_raw(boxed).cast(),
+            length,
+            vtable: vtable::<T>(),
+        }
+    }
+
+    /// Creates a new message body, using a cloneable and debuggable value, with a specified length.
+    pub fn new_with_len<T>(value: T, length: usize) -> Self
+    where
+        T: Any + Clone + Debug,
+    {
+        let boxed = Box::new(value);
+        Self {
+            data: Box::into_raw(boxed).cast(),
+            length,
+            vtable: vtable::<T>(),
+        }
+    }
+
+    /// Creates a new message body, using a non-cloneable, but debuggable value.
+    ///
+    /// Calls to`Message::clone` / `Body::clone` will panic.
+    pub fn new_non_clonable<T>(value: T) -> Self
+    where
+        T: MessageBody + Any + Debug,
+    {
+        let length = value.byte_len();
+        let boxed = Box::new(value);
+        Self {
+            data: Box::into_raw(boxed).cast(),
+            length,
+            vtable: vtable_non_clonable::<T>(),
+        }
+    }
+
+    /// Creates a new message body, using a cloneable, but non-debuggable value.
+    ///
+    /// The trait `Debug` is still implemented for `Body`, but will not show any
+    /// information about the inner value.
+    pub fn new_non_debugable<T>(value: T) -> Self
+    where
+        T: Any + Clone,
+    {
+        let boxed = Box::new(value);
+        Self {
+            data: Box::into_raw(boxed).cast(),
+            length: mem::size_of::<T>(),
+            vtable: vtable_non_debugable::<T>(),
+        }
+    }
+
+    /// The length of the message body.
+    #[must_use]
+    pub fn length(&self) -> usize {
+        self.length
+    }
+
+    /// Tests which inner type is stored in the message body.
+    ///
+    /// See also `Any::is`.
+    #[must_use]
+    pub fn is<T: Any>(&self) -> bool {
+        let id = unsafe { (self.vtable.type_id)() };
+        id == TypeId::of::<T>()
+    }
+
+    /// Tries to cast the message body to the given type.
+    ///
+    /// See also `Any::downcast`.
+    ///
+    /// # Errors
+    ///
+    /// If the contained type is not `T`, this function returns `self` unchanged.
+    pub fn try_cast<T: Any>(mut self) -> Result<T, Self> {
+        if self.is::<T>() {
+            // take the ptr so that drop does not do shit
+            let boxed =
+                unsafe { Box::from_raw(mem::replace(&mut self.data, null_mut()).cast::<T>()) };
+            Ok(*boxed)
+        } else {
+            Err(self)
+        }
+    }
+
+    /// Tries to cast the message body as a reference to the given type.
+    ///
+    /// See also `Any::downcast_ref`.
+    #[must_use]
+    pub fn try_content<T: Any>(&self) -> Option<&T> {
+        self.is::<T>().then(|| unsafe { &*self.data.cast::<T>() })
+    }
+
+    /// Tries to cast the message body as a mutable reference to the given type.
+    ///
+    /// See also `Any::downcast_mut`.
+    pub fn try_content_mut<T: Any>(&mut self) -> Option<&mut T> {
+        self.is::<T>()
+            .then(|| unsafe { &mut *self.data.cast::<T>() })
+    }
+
+    /// Tries to clone the body. This operation fails if the inner type `T`
+    /// is not cloneable
+    pub fn try_clone(&self) -> Option<Self> {
+        let cloned = unsafe { (self.vtable.try_clone)(self.data) };
+        cloned.map(|data| Self {
+            data,
+            length: self.length,
+            vtable: self.vtable,
+        })
+    }
+}
+
+impl Clone for Body {
+    fn clone(&self) -> Self {
+        self.try_clone()
+            .expect("expected contained value to be cloneable")
+    }
+}
+
+impl Debug for Body {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Body")
+            .field("length", &self.length)
+            .field("type", &unsafe { (self.vtable.type_name)() })
+            .field(
+                "value",
+                &DebugPrinter {
+                    ptr: self.data,
+                    f: self.vtable.debug,
+                },
+            )
+            .finish()
+    }
+}
+
+impl Drop for Body {
+    fn drop(&mut self) {
+        unsafe { (self.vtable.drop)(self.data) }
+    }
+}
+
+struct DebugPrinter {
+    ptr: *mut (),
+    f: unsafe fn(*const (), &mut fmt::Formatter<'_>) -> fmt::Result,
+}
+
+impl Debug for DebugPrinter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        unsafe { (self.f)(self.ptr, f) }
+    }
+}
+
+struct VTable {
+    type_id: unsafe fn() -> TypeId,
+    type_name: unsafe fn() -> &'static str,
+    debug: unsafe fn(*const (), &mut fmt::Formatter<'_>) -> fmt::Result,
+    try_clone: unsafe fn(*const ()) -> Option<*mut ()>,
+    drop: unsafe fn(*mut ()),
+}
+
+fn vtable<T: Any + Debug + Clone>() -> &'static VTable {
+    &VTable {
+        type_id: vtype_id::<T>,
+        type_name: vtype_name::<T>,
+        debug: vdebug::<T>,
+        try_clone: vclone::<T>,
+        drop: vdrop::<T>,
+    }
+}
+
+fn vtable_non_clonable<T: Any + Debug>() -> &'static VTable {
+    &VTable {
+        type_id: vtype_id::<T>,
+        type_name: vtype_name::<T>,
+        debug: vdebug::<T>,
+        try_clone: vclone_panic,
+        drop: vdrop::<T>,
+    }
+}
+
+fn vtable_non_debugable<T: Any + Clone>() -> &'static VTable {
+    &VTable {
+        type_id: vtype_id::<T>,
+        type_name: vtype_name::<T>,
+        debug: vdebug_unknown,
+        try_clone: vclone::<T>,
+        drop: vdrop::<T>,
+    }
+}
+
+unsafe fn vtype_id<T: Any>() -> TypeId {
+    TypeId::of::<T>()
+}
+
+unsafe fn vtype_name<T>() -> &'static str {
+    type_name::<T>()
+}
+
+unsafe fn vdebug<T: Debug>(ptr: *const (), f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    let value = unsafe { &*ptr.cast::<T>() };
+    value.fmt(f)
+}
+
+unsafe fn vdebug_unknown(_: *const (), f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "?")
+}
+
+unsafe fn vclone<T: Clone>(ptr: *const ()) -> Option<*mut ()> {
+    let value = T::clone(unsafe { &*ptr.cast::<T>() });
+    Some(Box::into_raw(Box::new(value)).cast())
+}
+
+unsafe fn vclone_panic(_: *const ()) -> Option<*mut ()> {
+    None
+}
+
+unsafe fn vdrop<T>(ptr: *mut ()) {
+    if !ptr.is_null() {
+        unsafe {
+            drop(Box::from_raw(&mut *ptr.cast::<T>()));
+        }
+    }
+}
+
 /// A trait that allows a type to be mesured in bits / bytes.
 ///
 /// * This type is only available of DES is build with the `"net"` feature.*
@@ -9,39 +256,40 @@ pub trait MessageBody {
 
 // # Primitives
 
-macro_rules! msg_body_primitiv {
-    ($t: ty) => {
-        impl MessageBody for $t {
-            fn byte_len(&self) -> usize {
-                std::mem::size_of::<Self>()
+macro_rules! msg_body_from_mem_size {
+    ($($t: ty),*) => {
+        $(
+            impl MessageBody for $t {
+                fn byte_len(&self) -> usize {
+                    std::mem::size_of::<Self>()
+                }
             }
-        }
+        )*
+
     };
 }
 
-msg_body_primitiv!(());
+msg_body_from_mem_size!(
+    (),
+    u8,
+    u16,
+    u32,
+    u64,
+    u128,
+    usize,
+    i8,
+    i16,
+    i32,
+    i64,
+    i128,
+    isize,
+    f32,
+    f64,
+    bool,
+    char
+);
 
-msg_body_primitiv!(u8);
-msg_body_primitiv!(u16);
-msg_body_primitiv!(u32);
-msg_body_primitiv!(u64);
-msg_body_primitiv!(u128);
-msg_body_primitiv!(usize);
-
-msg_body_primitiv!(i8);
-msg_body_primitiv!(i16);
-msg_body_primitiv!(i32);
-msg_body_primitiv!(i64);
-msg_body_primitiv!(i128);
-msg_body_primitiv!(isize);
-
-msg_body_primitiv!(f64);
-msg_body_primitiv!(f32);
-
-msg_body_primitiv!(bool);
-msg_body_primitiv!(char);
-
-macro_rules! msg_body_lenable {
+macro_rules! msg_body_from_len {
     ($t: ty) => {
         impl MessageBody for $t {
             fn byte_len(&self) -> usize {
@@ -51,15 +299,14 @@ macro_rules! msg_body_lenable {
     };
 }
 
-msg_body_lenable!(&'static str);
-msg_body_lenable!(String);
+msg_body_from_len!(&'static str);
+msg_body_from_len!(String);
 
 // # Basic types
 
 impl<T: MessageBody> MessageBody for Box<T> {
     fn byte_len(&self) -> usize {
         use std::ops::Deref;
-
         self.deref().byte_len()
     }
 }
@@ -231,146 +478,77 @@ impl MessageBody for time::SimTime {
 
 // # Tuples
 
-impl<A, B> MessageBody for (A, B)
-where
-    A: MessageBody,
-    B: MessageBody,
-{
-    fn byte_len(&self) -> usize {
-        self.0.byte_len() + self.1.byte_len()
-    }
+macro_rules! msg_body_for_tupels {
+    ( $( $name:ident ),+ ) => {
+        impl<$($name: MessageBody),+> MessageBody for ($($name,)+)
+        {
+            #[allow(non_snake_case)]
+            fn byte_len(&self) -> usize {
+                let ($($name,)+) = self;
+                $($name.byte_len() +)+0
+            }
+        }
+    };
 }
 
-impl<A, B, C> MessageBody for (A, B, C)
-where
-    A: MessageBody,
-    B: MessageBody,
-    C: MessageBody,
-{
-    fn byte_len(&self) -> usize {
-        self.0.byte_len() + self.1.byte_len() + self.2.byte_len()
-    }
-}
-
-impl<A, B, C, D> MessageBody for (A, B, C, D)
-where
-    A: MessageBody,
-    B: MessageBody,
-    C: MessageBody,
-    D: MessageBody,
-{
-    fn byte_len(&self) -> usize {
-        self.0.byte_len() + self.1.byte_len() + self.2.byte_len() + self.3.byte_len()
-    }
-}
-
-impl<A, B, C, D, E> MessageBody for (A, B, C, D, E)
-where
-    A: MessageBody,
-    B: MessageBody,
-    C: MessageBody,
-    D: MessageBody,
-    E: MessageBody,
-{
-    fn byte_len(&self) -> usize {
-        self.0.byte_len()
-            + self.1.byte_len()
-            + self.2.byte_len()
-            + self.3.byte_len()
-            + self.4.byte_len()
-    }
-}
-
-impl<A, B, C, D, E, F> MessageBody for (A, B, C, D, E, F)
-where
-    A: MessageBody,
-    B: MessageBody,
-    C: MessageBody,
-    D: MessageBody,
-    E: MessageBody,
-    F: MessageBody,
-{
-    fn byte_len(&self) -> usize {
-        self.0.byte_len()
-            + self.1.byte_len()
-            + self.2.byte_len()
-            + self.3.byte_len()
-            + self.4.byte_len()
-            + self.5.byte_len()
-    }
-}
-
-///
-/// A message body that does mimics a custom size
-/// independet of actualy size.
-///
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct CustomSizeBody<T> {
-    byte_len: usize,
-    inner: T,
-}
-
-impl<T> CustomSizeBody<T> {
-    ///
-    /// Creates a new instance of `Self`.
-    ///
-    #[must_use]
-    pub fn new(byte_len: usize, inner: T) -> Self {
-        Self { byte_len, inner }
-    }
-
-    ///
-    /// Returns a reference to the real contained body.
-    ///
-    pub fn inner(&self) -> &T {
-        &self.inner
-    }
-
-    ///
-    /// Returns a mutable reference to the real contained body.
-    ///
-    pub fn inner_mut(&mut self) -> &mut T {
-        &mut self.inner
-    }
-
-    ///
-    /// Returns the body, consuming `self`.
-    ///
-    #[must_use]
-    pub fn into_inner(self) -> T {
-        self.inner
-    }
-}
-
-impl<T> MessageBody for CustomSizeBody<T>
-where
-    T: Clone,
-{
-    fn byte_len(&self) -> usize {
-        self.byte_len
-    }
-}
+msg_body_for_tupels!(A);
+msg_body_for_tupels!(A, B);
+msg_body_for_tupels!(A, B, C);
+msg_body_for_tupels!(A, B, C, D);
+msg_body_for_tupels!(A, B, C, D, E);
+msg_body_for_tupels!(A, B, C, D, E, F);
+msg_body_for_tupels!(A, B, C, D, E, F, G);
+msg_body_for_tupels!(A, B, C, D, E, F, G, H);
+msg_body_for_tupels!(A, B, C, D, E, F, G, H, I);
+msg_body_for_tupels!(A, B, C, D, E, F, G, H, I, J);
 
 #[cfg(test)]
 mod tests {
-    use super::{super::*, *};
+    use super::*;
 
     #[test]
-    fn custom_message_body() {
-        let slice = "Hello world!";
+    fn body_maintains_type_identity() {
+        assert!(Body::new("Hello world!").is::<&str>());
+        assert!(!Body::new("Hello world!").is::<String>());
 
-        let mut body = CustomSizeBody::new(16, slice);
-        assert_eq!(body.inner(), &"Hello world!");
-        assert_eq!(body.inner_mut(), &mut "Hello world!");
+        assert!(Body::new("Hello world!".to_string()).is::<String>());
+        assert!(!Body::new("Hello world!".to_string()).is::<&str>());
 
-        let msg = Message::new().content(body).build();
-        assert_eq!(msg.length(), 16 + 64);
+        assert!(Body::new(1u8).is::<u8>());
+        assert!(!Body::new(1u8).is::<usize>());
 
-        let content = msg.content::<CustomSizeBody<&str>>();
-        assert_eq!((*content.inner()).as_ptr(), slice.as_ptr());
+        assert!(Body::new_non_debugable(true).is::<bool>());
+        assert!(!Body::new_non_debugable(true).is::<u8>());
 
-        let content = content.clone();
-        assert_eq!(content.into_inner(), "Hello world!");
+        assert!(Body::new_non_clonable('a').is::<char>());
+        assert!(!Body::new_non_clonable('a').is::<u8>());
+    }
+
+    #[test]
+    fn body_allows_downcasting() {
+        assert_eq!(
+            Body::new("Hello world!").try_cast::<&str>().unwrap(),
+            "Hello world!"
+        );
+        assert_eq!(Body::new(42u8).try_cast::<u8>().unwrap(), 42);
+        assert_eq!(Body::new(true).try_cast::<bool>().unwrap(), true);
+
+        assert_eq!(
+            Body::new("Hello world!").try_content::<&str>().unwrap(),
+            &"Hello world!"
+        );
+        assert_eq!(Body::new(42u8).try_content::<u8>().unwrap(), &42);
+        assert_eq!(Body::new(true).try_content::<bool>().unwrap(), &true);
+
+        assert_eq!(
+            Body::new("Hello world!").try_content_mut::<&str>().unwrap(),
+            &mut "Hello world!"
+        );
+        assert_eq!(Body::new(42u8).try_content_mut::<u8>().unwrap(), &mut 42);
+        assert_eq!(
+            Body::new(true).try_content_mut::<bool>().unwrap(),
+            &mut true
+        );
     }
 
     #[test]

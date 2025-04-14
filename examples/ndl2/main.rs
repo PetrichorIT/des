@@ -5,7 +5,7 @@ struct Sub;
 impl Module for Sub {
     fn at_sim_start(&mut self, _stage: usize) {
         if current().name() == "a" {
-            send(Message::new().build(), "out");
+            send(Message::default(), "out");
         }
     }
 
