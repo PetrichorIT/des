@@ -284,6 +284,7 @@ impl Message {
     }
 
     /// Tries to clone the message. This operation fails if the body is not clonable
+    #[must_use]
     pub fn try_clone(&self) -> Option<Self> {
         Some(Self {
             header: self.header.clone(),

@@ -275,7 +275,7 @@ impl<A> Sim<A> {
         }
     }
 
-    /// See [`Sim::include_par`]
+    /// See [`Sim::include_cfg`]
     #[must_use]
     pub fn with_cfg(mut self, raw: &str) -> Self {
         self.include_cfg(raw);
@@ -284,7 +284,7 @@ impl<A> Sim<A> {
 
     /// Tries to read and include parameters from a file into the simulation.
     ///
-    /// See [`Sim::include_par`] for more infomation.
+    /// See [`Sim::include_cfg`] for more infomation.
     ///
     /// # Errors
     ///

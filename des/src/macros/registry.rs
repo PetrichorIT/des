@@ -3,7 +3,7 @@
 ///
 /// The listing of types can be optionally suffixed with
 /// `else <some_type>`  to declare a fallback module
-/// in the [`Registry`](crate::ndl::Registry). The suffix `else _`
+/// in the [`Registry`](crate::net::ndl::Registry). The suffix `else _`
 /// declarse the default fallback module.
 ///
 /// # Example

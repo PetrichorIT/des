@@ -27,6 +27,9 @@
 
 mod duration;
 pub use duration::*;
+use serde::de::Visitor;
+use serde::ser::SerializeMap;
+use serde::{Deserialize, Serialize};
 
 use std::fmt::{Debug, Display};
 use std::ops::{Deref, Div, Sub, SubAssign};
@@ -54,7 +57,7 @@ static SIMTIME: (AtomicU64, AtomicU32) = (AtomicU64::new(0), AtomicU32::new(0));
 /// A specific point of time in the simulation.
 ///
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+
 pub struct SimTime(Duration);
 
 impl SimTime {
@@ -168,6 +171,64 @@ impl SimTime {
     pub const MIN: SimTime = SimTime(Duration::ZERO);
     /// The greatest instance of a [`SimTime`].
     pub const MAX: SimTime = SimTime(Duration::MAX);
+}
+
+// Serialize
+
+impl Serialize for SimTime {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        if serializer.is_human_readable() {
+            serializer.serialize_f64(self.as_secs_f64())
+        } else {
+            let mut map = serializer.serialize_map(Some(2))?;
+            map.serialize_entry("secs", &self.as_secs())?;
+            map.serialize_entry("nanos", &self.subsec_nanos())?;
+            map.end()
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for SimTime {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct SimTimeVisitor;
+        impl<'de> Visitor<'de> for SimTimeVisitor {
+            type Value = SimTime;
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("an positive floating point value or an encoded Duration")
+            }
+
+            fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(SimTime::from_duration(Duration::from_secs_f64(v)))
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::MapAccess<'de>,
+            {
+                let mut secs = 0;
+                let mut nanos = 0;
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        "secs" => secs = map.next_value()?,
+                        "nanos" => nanos = map.next_value()?,
+                        _ => return Err(serde::de::Error::unknown_field(key, &["secs", "nanos"])),
+                    }
+                }
+                Ok(SimTime::from_duration(Duration::new(secs, nanos)))
+            }
+        }
+
+        deserializer.deserialize_any(SimTimeVisitor)
+    }
 }
 
 // CMP

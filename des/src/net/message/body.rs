@@ -123,6 +123,7 @@ impl Body {
 
     /// Tries to clone the body. This operation fails if the inner type `T`
     /// is not cloneable
+    #[must_use]
     pub fn try_clone(&self) -> Option<Self> {
         let cloned = unsafe { (self.vtable.try_clone)(self.data) };
         cloned.map(|data| Self {

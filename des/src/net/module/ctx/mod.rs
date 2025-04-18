@@ -4,14 +4,12 @@ use crate::{
     sync::SwapLock,
     tracing::{new_scope, ScopeToken},
 };
-use des_net_utils::props::{Prop, Props};
+use des_net_utils::props::{Prop, PropType, Props, RawProp};
 use fxhash::{FxBuildHasher, FxHashMap};
 
-use serde::de::DeserializeOwned;
 use spawner::Spawner;
 use spin::RwLock;
 use std::{
-    any::Any,
     cell::Cell,
     fmt::Debug,
     hash::Hash,
@@ -210,6 +208,10 @@ impl ModuleContext {
 
     /// Returns a handle to a typed property on this module.
     ///
+    /// See [`Prop`] for more information.
+    ///
+    /// # Examples
+    ///
     /// ```
     /// use des::prelude::*;
     ///
@@ -223,14 +225,35 @@ impl ModuleContext {
     ///
     /// # Errors
     ///
-    /// This function might return an error, if the property was previously defined to
-    /// be a different type `T`, or the provided init file could not be parsed into the requested `T`.
-    pub fn prop<T: DeserializeOwned + Any>(&self, key: &str) -> Result<Prop<T>, Error> {
+    /// This function is a shorthand for `prop_raw(key).typed::<T>()`.
+    /// See [`RawProp::typed`] for information on errors.
+    pub fn prop<T: PropType>(&self, key: &str) -> Result<Prop<T>, Error> {
         self.props.write().get(key)
     }
 
+    /// Returns a untyped property handle for the property under the given key.
+    ///
+    /// See [`RawProp`] for more information.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use des::prelude::*;
+    ///
+    /// struct ModuleWithProps;
+    /// impl Module for ModuleWithProps {
+    ///     fn at_sim_start(&mut self, _: usize) {
+    ///         let sid = current().prop_raw("cfg").as_value();
+    ///         //...
+    ///     }
+    /// }
+    /// ```
+    pub fn prop_raw(&self, key: &str) -> RawProp {
+        self.props.write().get_raw(key)
+    }
+
     /// Returns the keys to all available props.
-    pub fn props(&self) -> Vec<String> {
+    pub fn props_keys(&self) -> Vec<String> {
         self.props.read().keys()
     }
 

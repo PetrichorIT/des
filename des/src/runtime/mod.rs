@@ -394,7 +394,7 @@ where
     /// Decontructs the runtime and returns the application and the final `sim_time`.
     ///
     /// This funtions should only be used when running the simulation with manual calls
-    /// to [`next`](Runtime::next).
+    /// to `dispatch_*`.
     ///
     /// # Errors
     ///

@@ -1,3 +1,4 @@
+use fxhash::FxHashMap;
 use serde_yml::{Mapping, Value};
 
 use super::Props;
@@ -126,6 +127,24 @@ impl Props {
             }
         }
     }
+}
+
+pub fn unify(props: &[(&str, &Value)]) -> Mapping {
+    let mut groups = FxHashMap::<&str, Vec<(&str, &Value)>>::default();
+    for prop in props {
+        let (group, rem) = prop.0.split_once('.').unwrap_or((prop.0, ""));
+        groups.entry(group).or_default().push((rem, prop.1))
+    }
+
+    let mut mapping = Mapping::default();
+    for (group, members) in groups {
+        mapping.insert(
+            Value::String(group.to_string()),
+            Value::Mapping(unify(&members)),
+        );
+    }
+
+    mapping
 }
 
 #[cfg(test)]

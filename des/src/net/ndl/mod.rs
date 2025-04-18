@@ -3,7 +3,7 @@
 //! # What is NDL ?
 //!
 //! NDL is a decriptory language for defining network topologies.
-//! Refer to [`des_ndl`] for more information.
+//! Refer to [`ndl`](crate::net::ndl) for more information.
 //!
 //! # How to use it ?
 //!
@@ -81,7 +81,7 @@ use super::ModuleBlock;
 ///   on the existence of gates in child nodes
 ///
 /// To initalize a node, the parameter `registry` is used to provide
-/// an implementation of the [`Module`] trait. Should the registry
+/// an implementation of the [`Module`](crate::net::module::Module) trait. Should the registry
 /// fail to provide an implementation, the node creation will fail.
 #[derive(Debug)]
 pub struct Ndl<'a, L: Layer> {
@@ -138,7 +138,7 @@ impl<L: Layer> ModuleBlock for Ndl<'_, L> {
 impl Sim<()> {
     /// Creates a NDL application with the inner application `()`.
     ///
-    /// See [`Sim::ndl_with`] for more information.
+    /// See [`Sim::with_ndl`] for more information.
     ///
     /// # Errors
     ///
@@ -194,7 +194,7 @@ impl<A> Sim<A> {
 
     /// Builds a NDL based application with onto an allready existing [`Sim`] object.
     ///
-    /// See [`Sim::ndl_with`] for more infomation.
+    /// See [`Sim::with_ndl`](Sim) for more infomation.
     ///
     /// # Errors
     ///

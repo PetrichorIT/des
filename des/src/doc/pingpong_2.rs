@@ -299,4 +299,4 @@
 //! [`Sim::gate`]: crate::net::Sim::gate
 //! [`Sim::ndl`]: crate::net::Sim::ndl
 //! [`Builder`]: crate::runtime::Builder
-//! [`Registry`]: crate::ndl::Registry
+//! [`Registry`]: crate::net::ndl::Registry

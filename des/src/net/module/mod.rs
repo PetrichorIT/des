@@ -23,7 +23,7 @@ pub(crate) use dummy::*;
 pub use error::*;
 pub use refs::*;
 
-pub use des_net_utils::props::{Optional, Present, Prop};
+pub use des_net_utils::props::{Prop, PropType, RawProp};
 
 use super::processing::{ProcessingStack, Processor};
 
