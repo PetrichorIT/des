@@ -15,6 +15,7 @@ pub struct AtomicUsize {
 }
 
 impl AtomicUsize {
+    #[must_use]
     pub const fn new(v: usize) -> Self {
         Self {
             v: UnsafeCell::new(v),
@@ -49,6 +50,8 @@ impl AtomicUsize {
         ret
     }
 
+    /// # Errors
+    /// Returns an error if the current value is not equal to the expected value.
     pub fn compare_exchange(
         &self,
         cur: usize,

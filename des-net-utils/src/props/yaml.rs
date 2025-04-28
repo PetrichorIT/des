@@ -12,6 +12,7 @@ pub struct Cfg {
 
 impl Cfg {
     /// Creates a new configuration paramters
+    #[must_use]
     pub fn new(value: Value) -> Self {
         Self {
             value: compartmentalize(value),
@@ -23,6 +24,7 @@ impl Cfg {
         props.update_from(&self.value, path);
     }
 
+    #[must_use]
     pub fn capture_for_into(&self, path: &[&str]) -> Props {
         let mut new_props = Props::default();
         self.capture_for(path, &mut new_props);
@@ -45,7 +47,7 @@ fn compartmentalize(base: Value) -> Value {
 fn compartmentalize_map(map: &mut Mapping) {
     let keys = map
         .keys()
-        .flat_map(Value::as_str)
+        .filter_map(Value::as_str)
         .filter(|k| k.contains(ANY))
         .map(str::to_string)
         .collect::<Vec<_>>();
@@ -116,7 +118,7 @@ impl Props {
             // extract direct prefixes
             for matching_key in map
                 .keys()
-                .flat_map(Value::as_str)
+                .filter_map(Value::as_str)
                 .filter(|k| k.starts_with(&key) && k.len() > key.len())
             {
                 let Some(entry) = map.get(matching_key) else {
@@ -129,11 +131,12 @@ impl Props {
     }
 }
 
+#[must_use]
 pub fn unify(props: &[(&str, &Value)]) -> Mapping {
     let mut groups = FxHashMap::<&str, Vec<(&str, &Value)>>::default();
     for prop in props {
         let (group, rem) = prop.0.split_once('.').unwrap_or((prop.0, ""));
-        groups.entry(group).or_default().push((rem, prop.1))
+        groups.entry(group).or_default().push((rem, prop.1));
     }
 
     let mut mapping = Mapping::default();

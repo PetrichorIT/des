@@ -22,8 +22,7 @@ pub(super) enum Entry {
 impl Entry {
     pub(super) fn is_some(&self) -> bool {
         match self {
-            Entry::None => false,
-            Entry::Yaml(_) => false,
+            Entry::None | Entry::Yaml(_) => false,
             Entry::Some(_) => true,
         }
     }
@@ -31,23 +30,20 @@ impl Entry {
     pub(super) fn is_none(&self) -> bool {
         match self {
             Entry::None => true,
-            Entry::Yaml(_) => false,
-            Entry::Some(_) => false,
+            Entry::Yaml(_) | Entry::Some(_) => false,
         }
     }
 
     pub(super) fn as_option(&self) -> Option<&dyn PropType> {
         match self {
-            Entry::None => None,
-            Entry::Yaml(_) => None, // harder
+            Entry::None | Entry::Yaml(_) => None,
             Entry::Some(val) => Some(&**val),
         }
     }
 
     pub(super) fn as_option_mut(&mut self) -> Option<&mut dyn PropType> {
         match self {
-            Entry::None => None,
-            Entry::Yaml(_) => None, // harder
+            Entry::None | Entry::Yaml(_) => None,
             Entry::Some(val) => Some(&mut **val),
         }
     }
@@ -63,6 +59,7 @@ impl Props {
     }
 
     /// The keys of all properties.
+    #[must_use]
     pub fn keys(&self) -> Vec<String> {
         self.mapping.keys().cloned().collect()
     }
@@ -78,6 +75,8 @@ impl Props {
         }
     }
 
+    /// # Errors
+    /// Returns an error if the typing of the property fails.
     pub fn get<T: PropType>(&mut self, key: &str) -> Result<Prop<T, false>, Error> {
         self.get_raw(key).typed::<T>()
     }

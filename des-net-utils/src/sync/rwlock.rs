@@ -43,6 +43,8 @@ impl<T> RwLock<T> {
         self.value.into_inner()
     }
 
+    /// # Panics
+    /// Panics if there are any read handles still alive.
     pub fn read(&self) -> RwLockReadGuard<'_, T> {
         self.try_read()
             .expect("Failed to get read lock on single thread")
@@ -54,6 +56,8 @@ impl<T> RwLock<T> {
         Some(RwLockReadGuard { permit, value })
     }
 
+    /// # Panics
+    /// Panics if there are any read handles still alive.
     pub fn write(&self) -> RwLockWriteGuard<'_, T> {
         self.try_write()
             .expect("Failed to get read lock on single thread")

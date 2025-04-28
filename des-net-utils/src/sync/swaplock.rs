@@ -39,6 +39,8 @@ impl<T> SwapLock<T> {
         self.read_count.store(0, SeqCst);
     }
 
+    /// # Panics
+    /// Panics if there are any read handles still alive.
     pub fn swap(&self, other: &mut T) {
         // SAFTEY REASONS
         assert!(
@@ -74,6 +76,7 @@ impl<'a, T> SwapLockReadGuard<'a, T> {
         }
     }
 
+    #[must_use]
     pub fn as_real_inner(&self) -> &T {
         unsafe { &(*self.lock.inner.get()) }
     }

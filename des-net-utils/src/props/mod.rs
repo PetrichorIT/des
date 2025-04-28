@@ -123,6 +123,7 @@ impl RawProp {
     ///
     /// This method returns `None` if the property is in the `Absent` state.
     /// This method returns the configuration value, if the property is in the `InitalizedFromParam` state.
+    #[must_use]
     pub fn as_value(&self) -> Option<Value> {
         self.access(|entry| match entry {
             Entry::None => None,
@@ -135,10 +136,10 @@ impl RawProp {
     ///
     /// This method only returns `false` if the property is in the `Present` state, with
     /// a value of a different type.
+    #[must_use]
     pub fn is<T: PropType>(&self) -> bool {
         self.access(|entry| match entry {
-            Entry::None => true,
-            Entry::Yaml(_) => true,
+            Entry::None | Entry::Yaml(_) => true,
             Entry::Some(value) => value.as_any().is::<T>(),
         })
     }
@@ -193,18 +194,18 @@ impl RawProp {
 /// - `Initialized`: The property holds a value of type `T`. Only calls with the correct type `T` will return a `Prop` handle.
 /// - `InitializedFromParam`: The property has been initialized with a YAML value loaded from a configuration file. Upon calling
 ///   `ModuleContext::prop`, the property will try to parse the YAML value into a value of type `T`. If successful, the property will
-///    transition to the `Initialized` state. Else no handle will be returned.
+///   transition to the `Initialized` state. Else no handle will be returned.
 ///
 /// # The `PropType` trait
 ///
 /// All properties must implement the `PropType` trait, that is a composite trait of the following three traits:
 ///
 /// - `Any`: Since properties store arbitrary types, the `Any` trait allows downcasting if needed. This allows typed
-///          access using the `Prop<T>` handles.
+///   access using the `Prop<T>` handles.
 /// - `Serialize`: All properties must provide an implementation to serialize their values into a YAML `Value`. This
 ///   allows external sources to interact with the property, without concrete knowledge of the property's type.
 /// - `Deserialize`: All properties must provide an implementation to deserialize their values from a YAML `Value`. This allows
-///    inital values in the `InitializedFromParam` state.
+///   inital values in the `InitializedFromParam` state.
 pub struct Prop<T, const PRESENT: bool = false> {
     raw: RawProp,
     _phantom: PhantomData<T>,
@@ -228,6 +229,8 @@ impl<T: PropType> Prop<T, false> {
     /// This method returns an owned value of the globally shared property, that can be freely used
     /// and modified. Changes to the returned value will not affect the stored property. Use
     /// `set` or `update` to update the stored property.
+    #[must_use]
+    #[allow(clippy::redundant_closure_for_method_calls)]
     pub fn get(&self) -> Option<T>
     where
         T: Clone,
@@ -243,21 +246,29 @@ impl<T: PropType> Prop<T, false> {
     ///
     /// > Note that `Prop::update` is not provided for the non-upgraded prop handle. To mutate the internal value, upgrade the handle first,
     /// > or use `RawProp::clear` to reset the value.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the prop-type has changed since the creation of
+    /// the handle.
     pub fn map<F, R>(&self, f: F) -> R
     where
         F: FnOnce(Option<&T>) -> R,
     {
         self.raw.access(|slot| {
-            f(slot
-                .as_option()
-                .map(|v| v.as_any().downcast_ref().expect("unreachable")))
+            f(slot.as_option().map(|v| {
+                v.as_any()
+                    .downcast_ref()
+                    .expect("prop-type has changed, this handle is invalid")
+            }))
         })
     }
 
     /// Returns an upgraded prop handle, if the property is in the `Present` state,
     /// otherwise returns `None`.
+    #[must_use]
     pub fn upgrade(self) -> Option<Prop<T, true>> {
-        if self.raw.access(|v| v.is_some()) {
+        if self.raw.access(Entry::is_some) {
             Some(Prop {
                 raw: self.raw,
                 _phantom: PhantomData,
@@ -268,6 +279,11 @@ impl<T: PropType> Prop<T, false> {
     }
 
     /// A shorthand for `present().expect(msg)`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the upgrade fails.
+    #[must_use]
     pub fn expect(self, msg: &str) -> Prop<T, true> {
         self.upgrade().expect(msg)
     }
@@ -322,17 +338,23 @@ impl<T: PropType> Prop<T, true> {
     /// This method returns an owned value of the globally shared property, that can be freely used
     /// and modified. Changes to the returned value will not affect the stored property. Use
     /// `set` or `update` to update the stored property.
+    #[must_use]
     pub fn get(&self) -> T
     where
         T: Clone,
     {
-        self.map(|value| value.clone())
+        self.map(T::clone)
     }
 
     /// Executes a closure on the value of the property.
     ///
     /// This method can be used to perform operations on the property's value without modifying or cloning it.
     /// Note that any returend value `R` must not reference the global property.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the properties type has changed, since the creation
+    /// of the handle.
     pub fn map<F, R>(&self, f: F) -> R
     where
         F: FnOnce(&T) -> R,
@@ -343,7 +365,7 @@ impl<T: PropType> Prop<T, true> {
                 .expect("unreachable")
                 .as_any()
                 .downcast_ref()
-                .expect("unreachable"))
+                .expect("prop-type has changed, handle is invalid"))
         })
     }
 
@@ -351,6 +373,11 @@ impl<T: PropType> Prop<T, true> {
     ///
     /// This method can be used to perform operations on the property's value without modifying or cloning it.
     /// Note that any returend value `R` must not reference the global property.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the properties type has changed, since the creation
+    /// of the handle.
     pub fn update<F, R>(&mut self, f: F) -> Option<R>
     where
         F: FnOnce(&mut T) -> R,
@@ -361,7 +388,7 @@ impl<T: PropType> Prop<T, true> {
                 .expect("unreachable")
                 .as_any_mut()
                 .downcast_mut()
-                .expect("unreachable")))
+                .expect("prop-type has changed, handle is invalid")))
         })
     }
 }
@@ -372,6 +399,11 @@ impl<T: PropType> Prop<T, true> {
 /// aka the properties internal state.
 impl<T: PropType, const PRESENT: bool> Prop<T, PRESENT> {
     /// Sets the value of a property.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the properties type has changed, since the creation
+    /// of the handle.
     pub fn set(&mut self, value: T) {
         self.raw.access_mut(|slot| {
             assert!(
@@ -384,6 +416,7 @@ impl<T: PropType, const PRESENT: bool> Prop<T, PRESENT> {
     }
 
     /// See [`RawProp::as_value`],
+    #[must_use]
     pub fn as_value(&self) -> Option<Value> {
         self.raw.as_value()
     }

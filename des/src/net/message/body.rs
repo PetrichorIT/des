@@ -229,6 +229,7 @@ unsafe fn vdebug_unknown(_: *const (), f: &mut fmt::Formatter<'_>) -> fmt::Resul
     write!(f, "?")
 }
 
+#[allow(clippy::unnecessary_wraps)]
 unsafe fn vclone<T: Clone>(ptr: *const ()) -> Option<*mut ()> {
     let value = T::clone(unsafe { &*ptr.cast::<T>() });
     Some(Box::into_raw(Box::new(value)).cast())

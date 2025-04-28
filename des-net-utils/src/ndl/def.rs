@@ -66,7 +66,7 @@ pub struct ModuleGenericsDef {
 
 /// The definition of a module blueprint.
 ///
-/// A module corresponds to a **des::net** module. Therefore this definition contains
+/// A module corresponds to a **`des::net`** module. Therefore this definition contains
 /// gates local to this modules, submodules created under the namespace of this module
 /// and connections between gates of either this module or its children. Additionally
 /// a module can inherit definitions from another prototyp. This relation is not represented
@@ -146,6 +146,7 @@ pub enum Kardinality {
 //
 
 impl TypClause<ModuleGenericsDef> {
+    #[must_use]
     pub fn inner_ty_to_outer_ty<'a>(&'a self, s: &'a String) -> &'a String {
         for arg in &self.args {
             if arg.binding == *s {
@@ -244,6 +245,7 @@ impl FromStr for ModuleGenericsDef {
 }
 
 impl ModuleDef {
+    #[must_use]
     pub fn required_symbols<'a>(
         &'a self,
         typ: &'a TypClause<ModuleGenericsDef>,
@@ -284,7 +286,7 @@ impl Display for ConnectionEndpointDef {
             "{}",
             self.accessors
                 .iter()
-                .map(|v| v.to_string())
+                .map(FieldDef::to_string)
                 .reduce(|a, b| a + "/" + &b)
                 .unwrap_or(String::new()),
         )
@@ -362,6 +364,7 @@ impl FromStr for FieldDef {
 }
 
 impl Kardinality {
+    #[must_use]
     pub fn as_size(&self) -> usize {
         match self {
             Kardinality::Atom => 1,
