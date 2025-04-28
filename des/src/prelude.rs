@@ -53,12 +53,11 @@ cfg_net! {
     pub use crate::net::module::ModuleRef;
     pub use crate::net::module::ModuleReferencingError;
 
-    pub use crate::net::module::{
-        current, shutdow_and_restart_at, shutdow_and_restart_in, shutdown
-    };
+    pub use crate::net::module::{current, try_current};
 
 
     pub use crate::net::ObjectPath;
+    pub use crate::net::JoinError;
     pub use crate::net::processing::ProcessingElement;
 
     pub use crate::net::ndl::Registry;

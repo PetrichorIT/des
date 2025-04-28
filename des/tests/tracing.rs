@@ -1,5 +1,5 @@
 use des::{
-    net::{AsyncFn, Sim},
+    net::{blocks::AsyncFn, Sim},
     runtime::Builder,
     tracing::format,
 };

@@ -184,7 +184,7 @@ impl Module for PluginAtShutdown {
     fn handle_message(&mut self, _msg: Message) {
         if SimTime::now().as_secs() == 10 {
             // will be back online at second 11
-            shutdow_and_restart_in(Duration::from_millis(500));
+            current().shutdow_and_restart_in(Duration::from_millis(500));
         }
     }
 

@@ -1,7 +1,7 @@
 #![cfg(feature = "async")]
 
 use des::{
-    net::{module::Module, ModuleFn},
+    net::{blocks::ModuleFn, module::Module},
     prelude::*,
     time::sleep,
 };
@@ -52,7 +52,7 @@ impl Module for StatelessModule {
     }
 
     fn handle_message(&mut self, _msg: Message) {
-        shutdown();
+        current().shutdown();
     }
 }
 
@@ -96,8 +96,8 @@ impl Module for StatelessModuleRestart {
 
     fn handle_message(&mut self, msg: Message) {
         match msg.header().id {
-            9 => shutdow_and_restart_at(SimTime::now() + Duration::from_secs(10)),
-            10 => shutdown(),
+            9 => current().shutdow_and_restart_at(SimTime::now() + Duration::from_secs(10)),
+            10 => current().shutdown(),
             _ => unreachable!(),
         }
     }
@@ -154,8 +154,8 @@ impl Module for StatefullModule {
 
     fn handle_message(&mut self, msg: Message) {
         match msg.header().id {
-            9 => shutdow_and_restart_at(SimTime::now() + Duration::from_secs(10)),
-            10 => shutdown(),
+            9 => current().shutdow_and_restart_at(SimTime::now() + Duration::from_secs(10)),
+            10 => current().shutdown(),
             _ => unreachable!(),
         }
     }
@@ -202,7 +202,7 @@ impl Module for ShutdownViaHandleModule {
             loop {
                 sleep(Duration::from_secs(1)).await;
                 if drop_test.step() > 10 {
-                    shutdown()
+                    current().shutdown()
                 }
             }
         });
@@ -237,9 +237,11 @@ impl Module for RestartViaHandleModule {
 
                 if v == 10 {
                     if SimTime::now() < SimTime::from_duration(Duration::from_secs(20)) {
-                        shutdow_and_restart_at(SimTime::from_duration(Duration::from_secs(30)));
+                        current().shutdow_and_restart_at(SimTime::from_duration(
+                            Duration::from_secs(30),
+                        ));
                     } else {
-                        shutdown();
+                        current().shutdown();
                     }
                 }
             }
@@ -302,7 +304,7 @@ impl Module for WillIgnoreInncomingInDowntime {
     fn handle_message(&mut self, mut msg: Message) {
         self.received.fetch_add(1, Ordering::SeqCst);
         if SimTime::now().as_secs() == 6 {
-            shutdow_and_restart_in(Duration::from_secs_f64(2.5));
+            current().shutdow_and_restart_in(Duration::from_secs_f64(2.5));
             // will miss incoming messages '7 and '8
         }
 
@@ -385,7 +387,7 @@ impl Module for Transit {
 
     fn handle_message(&mut self, _msg: Message) {
         // happens at 5.5 so '6 '7 '8 will be lost
-        shutdow_and_restart_in(Duration::from_secs(3));
+        current().shutdow_and_restart_in(Duration::from_secs(3));
     }
 }
 
@@ -462,7 +464,7 @@ fn shutdown_prevents_accessing_parents() {
         ModuleFn::new(
             || schedule_in(Message::default(), Duration::from_secs(5)),
             |_, _| {
-                shutdown();
+                current().shutdown();
             },
         ),
     );

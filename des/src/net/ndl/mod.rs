@@ -64,7 +64,7 @@ pub use des_net_utils::ndl::def::*;
 mod registry;
 pub use self::registry::*;
 
-use super::ModuleBlock;
+use super::blocks::ModuleBlock;
 
 /// Inject modules described using the Node Description Language (NDL).
 ///

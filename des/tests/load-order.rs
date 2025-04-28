@@ -1,6 +1,6 @@
 #![cfg(feature = "net")]
 
-use des::net::ModuleFn;
+use des::net::blocks::ModuleFn;
 use des::prelude::*;
 use std::sync::{atomic::AtomicU16, Arc};
 

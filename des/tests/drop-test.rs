@@ -8,7 +8,7 @@ use std::{
 
 use des::{
     net::ndl::Registry,
-    net::{module::Module, ModuleBlock, Sim},
+    net::{blocks::ModuleBlock, module::Module, Sim},
     runtime::Builder,
 };
 use serial_test::serial;

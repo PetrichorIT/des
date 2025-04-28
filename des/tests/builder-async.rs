@@ -8,11 +8,7 @@ use std::{
     },
 };
 
-use des::{
-    net::{AsyncFn, JoinError},
-    prelude::*,
-    time::sleep,
-};
+use des::{net::blocks::AsyncFn, prelude::*, time::sleep};
 use serial_test::serial;
 
 #[test]
@@ -210,7 +206,7 @@ fn builder_async_restart() {
         COUNTER.fetch_add(1, Ordering::SeqCst);
 
         des::time::sleep(Duration::from_secs(10)).await;
-        shutdow_and_restart_in(Duration::from_secs(5));
+        current().shutdow_and_restart_in(Duration::from_secs(5));
         std::future::pending().await
     });
     assert_eq!(format!("{software:?}"), "AsyncFn");

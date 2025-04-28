@@ -2,7 +2,7 @@
 
 use std::io::ErrorKind;
 
-use des::{net::AsyncFn, prelude::*};
+use des::{net::blocks::AsyncFn, prelude::*};
 use serial_test::serial;
 
 #[test]

@@ -2,10 +2,7 @@
 #![allow(unused_variables)]
 
 use des::{
-    net::{
-        module::{join, Module},
-        AsyncFn, JoinError,
-    },
+    net::{blocks::AsyncFn, module::Module, JoinError},
     prelude::*,
     runtime::RuntimeError,
     time::{self, sleep, timeout, timeout_at, MissedTickBehavior},
@@ -653,7 +650,7 @@ fn async_time_interval_missed_tick_behaviour() {
 struct JoinOnModule;
 impl Module for JoinOnModule {
     fn at_sim_start(&mut self, _stage: usize) {
-        join(tokio::spawn(async move {
+        current().join(tokio::spawn(async move {
             std::future::pending::<()>().await;
         }));
     }
@@ -675,7 +672,7 @@ fn async_join_on_module_fail() {
 struct PanicIsJoinable;
 impl Module for PanicIsJoinable {
     fn at_sim_start(&mut self, _stage: usize) {
-        join(tokio::spawn(async move { panic!("Panic-Source") }));
+        current().join(tokio::spawn(async move { panic!("Panic-Source") }));
     }
 }
 
@@ -695,7 +692,7 @@ fn async_join_paniced_will_join_but_fail() {
 struct SpawnButNeverJoin;
 impl Module for SpawnButNeverJoin {
     fn at_sim_start(&mut self, _stage: usize) {
-        join(tokio::spawn(async move {
+        current().join(tokio::spawn(async move {
             std::future::pending::<()>().await;
         }));
     }

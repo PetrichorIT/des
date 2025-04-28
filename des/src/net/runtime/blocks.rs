@@ -1,9 +1,10 @@
-use std::{error::Error, time::Duration};
+//! Custom module blocks that simplify the `Module` API.
 
 use crate::{
     net::{message::Message, module::Module},
-    prelude::{current, shutdow_and_restart_in},
+    prelude::current,
 };
+use std::{error::Error, time::Duration};
 
 use super::ScopedSim;
 
@@ -70,7 +71,7 @@ pub enum FailabilityPolicy {
 ///
 /// ```
 /// # use des::prelude::*;
-/// # use des::net::HandlerFn;
+/// # use des::net::blocks::HandlerFn;
 /// let mut sim = Sim::new(());
 /// sim.node("alice", HandlerFn::new(|msg| {
 ///     /* Do something stateless (e.g. random routing) */
@@ -145,7 +146,7 @@ where
 ///
 /// ```
 /// # use des::prelude::*;
-/// # use des::net::ModuleFn;
+/// # use des::net::blocks::ModuleFn;
 /// struct State {
 ///     /* ...data */
 /// }
@@ -217,7 +218,7 @@ where
                     }
                     FailabilityPolicy::Restart => {
                         tracing::error!("failed to process message, handler fn failed with: {e}");
-                        shutdow_and_restart_in(Duration::ZERO);
+                        current().shutdow_and_restart_in(Duration::ZERO);
                     }
                 },
             }),
@@ -252,7 +253,7 @@ cfg_async! {
         sync::mpsc::{self, Receiver, Sender},
     };
     use std::{future::Future, fmt::Formatter, pin::Pin};
-    use crate::{runtime::RuntimeError, net::module::{reset_join_handles, join, try_join}};
+    use crate::{runtime::RuntimeError};
 
 
     /// A helper that enables user to treat a module as a async stream of messages,
@@ -271,7 +272,7 @@ cfg_async! {
     ///
     /// ```
     /// # use des::prelude::*;
-    /// # use des::net::AsyncFn;
+    /// # use des::net::blocks::AsyncFn;
     /// let mut sim = Sim::new(());
     /// sim.node("alice", AsyncFn::new(|mut rx| {
     ///     /* Do some setup / sim_start_stuff here */
@@ -377,7 +378,7 @@ cfg_async! {
 
     impl Module for AsyncFn {
         fn reset(&mut self) {
-            reset_join_handles();
+            current().reset_join_handles();
         }
 
          fn at_sim_start(&mut self, _: usize) {
@@ -393,9 +394,9 @@ cfg_async! {
             };
 
             if self.require_join {
-                join(tokio::spawn(fut));
+                current().join(tokio::spawn(fut));
             } else {
-                try_join(tokio::spawn(fut));
+                current().try_join(tokio::spawn(fut));
             }
         }
 

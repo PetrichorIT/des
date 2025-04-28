@@ -1,5 +1,8 @@
 use des::{
-    net::{globals, AsyncFn, HandlerFn},
+    net::{
+        blocks::{AsyncFn, HandlerFn},
+        globals,
+    },
     prelude::*,
 };
 use serial_test::serial;

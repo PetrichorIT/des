@@ -1,4 +1,4 @@
-use des::{net::AsyncFn, prelude::*};
+use des::{net::blocks::AsyncFn, prelude::*};
 use std::panic;
 
 fn main() -> Result<(), RuntimeError> {

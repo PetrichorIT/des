@@ -1,3 +1,4 @@
+use blocks::ModuleBlock;
 use des_net_utils::props::Cfg;
 use serde_yml::{from_str, Value};
 
@@ -32,8 +33,7 @@ pub use self::events::JoinError;
 mod ctx;
 pub(crate) use self::ctx::*;
 
-mod blocks;
-pub use self::blocks::*;
+pub mod blocks;
 
 mod unwind;
 use self::unwind::Harness;
@@ -61,7 +61,7 @@ static GUARD: Mutex<()> = Mutex::new(());
 ///
 /// ```
 /// # use des::prelude::*;
-/// # use des::net::HandlerFn;
+/// # use des::net::blocks::HandlerFn;
 /// struct Inner;
 /// impl EventLifecycle<Sim<Inner>> for Inner {
 ///     fn at_sim_start(rt: &mut Runtime<Sim<Inner>>) {
@@ -141,7 +141,7 @@ impl Drop for SimStaticsGuard {
 ///
 /// ```
 /// # use des::prelude::*;
-/// # use des::net::{ModuleBlock, ModuleFn, HandlerFn};
+/// # use des::net::blocks::{ModuleBlock, ModuleFn, HandlerFn};
 /// struct LAN {}
 /// impl ModuleBlock for LAN {
 ///     type Ret = ();
@@ -240,7 +240,7 @@ impl<A> Sim<A> {
     ///
     /// ```
     /// # use des::prelude::*;
-    /// # use des::net::ModuleFn;
+    /// # use des::net::blocks::ModuleFn;
     /// use std::net::IpAddr;
     ///
     /// let mut sim = Sim::new(());

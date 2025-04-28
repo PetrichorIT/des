@@ -1,4 +1,14 @@
 //! Generic network messages.
+//!
+//! Traditionally modules communicate via messages through the simulated fabric.
+//! This module contains the abstract [`Message` type](Message) that represents arbitrary
+//! payloads and the APIs to send messages. The receiving of messages is handled
+//! by [`module`](crate::net::module).
+//!
+//! See [`Message`], [`Header`] and [`Body`] to learn about the creation and usage of messages
+//! as objects. Use the functions [`send`], [`send_at`] and [`send_in`] to send messages onto
+//! gate chains, to communicate with other modules. Schedule messages directed at yourself
+//! using [`schedule_at`] and [`schedule_in`].
 
 use crate::net::{gate::GateRef, module::ModuleId};
 use crate::time::SimTime;

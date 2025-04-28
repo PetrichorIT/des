@@ -30,7 +30,7 @@
 //!
 //! ```
 //! use des::prelude::*;
-//! use des::net::AsyncFn;
+//! use des::net::blocks::AsyncFn;
 //!
 //! const PING: MessageKind = 42;
 //! const PONG: MessageKind = 43;

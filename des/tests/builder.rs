@@ -1,7 +1,7 @@
 #![cfg(feature = "net")]
 
 use des::{
-    net::{FailabilityPolicy, HandlerFn, ModuleBlock, ModuleFn},
+    net::blocks::{FailabilityPolicy, HandlerFn, ModuleBlock, ModuleFn},
     prelude::*,
 };
 use serial_test::serial;

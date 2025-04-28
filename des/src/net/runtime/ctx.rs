@@ -16,9 +16,6 @@ static BUF_CTX: Mutex<BufferContext> = Mutex::new(BufferContext::new());
 struct BufferContext {
     // All new events that will be scheduled
     events: Vec<(NetEvents, SimTime)>,
-    // shudown,
-    #[allow(clippy::option_option)]
-    shutdown: Option<Option<SimTime>>,
     // globals
     globals: Option<Weak<Globals>>,
 }
@@ -27,7 +24,6 @@ impl BufferContext {
     const fn new() -> Self {
         Self {
             events: Vec::new(),
-            shutdown: None,
             globals: None,
         }
     }
@@ -107,16 +103,6 @@ pub(crate) fn buf_schedule_at(msg: Message, arrival_time: SimTime) {
     ));
 }
 
-pub(crate) fn buf_schedule_shutdown(restart: Option<SimTime>) {
-    assert!(
-        restart.is_none_or(|r| r >= SimTime::now()),
-        "Restart point cannot be in the past"
-    );
-
-    let mut ctx = BUF_CTX.lock();
-    ctx.shutdown = Some(restart);
-}
-
 pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<Sim<A>>)
 where
     A: EventLifecycle<Sim<A>>,
@@ -129,7 +115,7 @@ where
     }
 
     // (2) Handle shutdown if indicated
-    if let Some(restart) = ctx.shutdown.take() {
+    if let Some(restart) = module.shutdown_task.write().take() {
         // Mark the modules state
         #[cfg(feature = "tracing")]
         tracing::debug!("Shuttind down module and restaring at {:?}", restart);
