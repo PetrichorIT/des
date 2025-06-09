@@ -89,9 +89,8 @@ pub(crate) use dummy::*;
 pub use error::*;
 pub use refs::*;
 
-pub use des_net_utils::props::{Prop, PropType, RawProp};
-
 use super::processing::{ProcessingStack, Processor};
+pub use des_net_utils::props::{Prop, PropType, RawProp};
 
 /// A unique identifier for a module.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

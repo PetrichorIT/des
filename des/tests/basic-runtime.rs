@@ -13,7 +13,7 @@ enum MyEventSet {
     RepeatWithDelay(RepeatWithDelay),
 }
 
-impl EventSet<App> for MyEventSet {
+impl Event<App> for MyEventSet {
     fn handle(self, rt: &mut Runtime<App>) {
         match self {
             Self::RegisterToRtWithTime(a) => a.handle(rt),
@@ -349,7 +349,7 @@ impl Application for DeferredApplication {
 }
 
 struct DeferredES;
-impl EventSet<DeferredApplication> for DeferredES {
+impl Event<DeferredApplication> for DeferredES {
     fn handle(self, _rt: &mut Runtime<DeferredApplication>) {}
 }
 
@@ -381,7 +381,7 @@ impl Application for CustomStartApp {
 }
 
 struct CustomStartEvent;
-impl EventSet<CustomStartApp> for CustomStartEvent {
+impl Event<CustomStartApp> for CustomStartEvent {
     fn handle(self, _: &mut Runtime<CustomStartApp>) {}
 }
 
@@ -418,7 +418,7 @@ impl EventLifecycle for PausableApp {
 }
 
 struct PausableAppEvent(usize);
-impl EventSet<PausableApp> for PausableAppEvent {
+impl Event<PausableApp> for PausableAppEvent {
     fn handle(mut self, runtime: &mut Runtime<PausableApp>) {
         self.0 += 1;
         runtime.add_event_in(self, Duration::from_secs(1))

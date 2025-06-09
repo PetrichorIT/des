@@ -141,7 +141,7 @@ impl Builder {
     /// #   type Lifecycle = ();
     /// # }
     /// # enum Events {}
-    /// # impl EventSet<App> for Events {
+    /// # impl Event<App> for Events {
     /// #   fn handle(self, rt: &mut Runtime<App>) {}
     /// # }
     ///

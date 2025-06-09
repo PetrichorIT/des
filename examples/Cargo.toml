@@ -12,6 +12,18 @@ rand = "*"
 tracing = "*"
 tokio = "*"
 
+[[example]]
+name = "pingpong-custom-sim"
+path = "pingpong/0-custom-sim.rs"
+
+[[example]]
+name = "pingpong-net"
+path = "pingpong/1-net.rs"
+
+[[example]]
+name = "pingpong-async"
+path = "pingpong/2-async.rs"
+
 
 [[example]]
 name = "waiter"

@@ -9,35 +9,11 @@ pub trait Application: Sized {
     ///
     /// The set of events used in the simulation.
     ///
-    type EventSet: EventSet<Self>;
+    type EventSet: Event<Self>;
     ///
     /// A global type, defining the behavior at sim start / sim end
     ///
     type Lifecycle: EventLifecycle<Self>;
-}
-
-///
-/// A type that can be used as a wrapper around all events
-/// handled by an application A.
-///
-/// Note that ther is a cyclic dependecy between the event set
-/// and the application.
-/// This is due to the fact that Events allways defined those two parameters
-/// to be related (since specific events of the event set require runtime params),
-/// but this type information is willingly elided, to fit into the rust generics system.
-///
-pub trait EventSet<A>
-where
-    A: Application,
-{
-    ///
-    /// A function to handle an upcoming event represented as a instance
-    /// of the event set.
-    ///
-    /// Since events sets are usually macro-generated this is just a match statement that calls
-    /// the handle function on the given variant, as defined by the trait [Event].
-    ///
-    fn handle(self, runtime: &mut Runtime<A>);
 }
 
 ///
@@ -79,7 +55,7 @@ pub trait EventLifecycle<A = Self> {
     /// # struct Worker;
     /// # impl Worker { fn initalize(&mut self) {}}
     /// # enum MyEventSet { EventA, EventB }
-    /// # impl EventSet<MyApp> for MyEventSet {
+    /// # impl Event<MyApp> for MyEventSet {
     /// #   fn handle(self, rt: &mut Runtime<MyApp>) {}
     /// # }
     /// struct MyApp { workers: Vec<Worker> };
@@ -111,7 +87,7 @@ pub trait EventLifecycle<A = Self> {
     /// # struct Worker;
     /// # impl Worker { fn finish(&mut self) {}}
     /// # enum MyEventSet { EventA, EventB }
-    /// # impl EventSet<MyApp> for MyEventSet {
+    /// # impl Event<MyApp> for MyEventSet {
     /// #   fn handle(self, rt: &mut Runtime<MyApp>) {}
     /// # }
     /// struct MyApp { workers: Vec<Worker> };
@@ -141,7 +117,7 @@ pub trait EventLifecycle<A = Self> {
     }
 }
 
-impl<A: Application> EventSet<A> for () {
+impl<A: Application> Event<A> for () {
     fn handle(self, _: &mut Runtime<A>) {}
 }
 

@@ -92,7 +92,7 @@ where
 ///   This struct will hold the systems state and define the event set used in the simulation.
 /// - Create your events that handle the logic of you simulation. They must implement [`Event`] with the generic
 ///   parameter A, where A is your 'App' struct.
-/// - To bind those two together create a enum that implements [`EventSet`] that holds all your events.
+/// - To bind those two together create a enum that implements [`Event`] that holds all your events.
 ///
 /// This can be done via a macro. The use this event set as the associated event set in 'App'.
 ///
@@ -105,7 +105,6 @@ where
 /// to create a runnable instance and the run it.
 ///
 /// [`Event`]: crate::runtime::Event
-/// [`EventSet`]: crate::runtime::EventSet
 pub struct Runtime<App>
 where
     App: Application,
@@ -252,7 +251,7 @@ where
     ///     EventA,
     ///     EventB
     /// }
-    /// impl EventSet<MyApp> for MyEventSet {
+    /// impl Event<MyApp> for MyEventSet {
     ///     fn handle(self, rt: &mut Runtime<MyApp>) {
     ///         dbg!(self, SimTime::now());
     ///     }
@@ -511,7 +510,7 @@ where
     /// #     EventA,
     /// #     EventB
     /// # }
-    /// # impl EventSet<MyApp> for MyEventSet {
+    /// # impl Event<MyApp> for MyEventSet {
     /// #     fn handle(self, rt: &mut Runtime<MyApp>) {}
     /// # }
     /// #
@@ -555,7 +554,7 @@ where
     /// #     EventA,
     /// #     EventB
     /// # }
-    /// # impl EventSet<MyApp> for MyEventSet {
+    /// # impl Event<MyApp> for MyEventSet {
     /// #     fn handle(self, rt: &mut Runtime<MyApp>) {}
     /// # }
     /// #

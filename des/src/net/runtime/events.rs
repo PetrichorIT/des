@@ -4,7 +4,7 @@ use crate::{
         processing::ProcessingState, runtime::buf_process, Sim,
     },
     prelude::RuntimeError,
-    runtime::{EventLifecycle, EventSet, EventSink, Runtime},
+    runtime::{Event, EventLifecycle, EventSink, Runtime},
     time::SimTime,
     tracing::enter_scope,
 };
@@ -32,7 +32,7 @@ pub enum NetEvents {
     AsyncWakeupEvent(AsyncWakeupEvent),
 }
 
-impl<A> EventSet<Sim<A>> for NetEvents
+impl<A> Event<Sim<A>> for NetEvents
 where
     A: EventLifecycle<Sim<A>>,
 {

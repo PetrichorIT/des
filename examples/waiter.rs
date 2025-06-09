@@ -57,7 +57,7 @@ enum Events {
     CustomerArrival(CustomerArrival),
 }
 
-impl EventSet<Application> for Events {
+impl Event<Application> for Events {
     fn handle(self, rt: &mut Runtime<Application>) {
         match self {
             Self::ServerDone(event) => event.handle(rt),
