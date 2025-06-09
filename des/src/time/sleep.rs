@@ -37,8 +37,6 @@ use std::{future::Future, pin::Pin, sync::atomic::AtomicUsize, task::Poll, time:
 ///
 /// [`Sleep`]: struct@crate::time::Sleep
 /// [`interval`]: crate::time::interval()
-/// [`Builder::enable_time`]: crate::runtime::Builder::enable_time
-/// [`Builder::enable_all`]: crate::runtime::Builder::enable_all
 pub fn sleep(duration: Duration) -> Sleep {
     match SimTime::now().checked_add(duration) {
         Some(deadline) => Sleep::new(deadline),
@@ -71,8 +69,6 @@ pub fn sleep(duration: Duration) -> Sleep {
 ///
 /// [`Sleep`]: struct@crate::time::Sleep
 /// [`interval`]: crate::time::interval()
-/// [`Builder::enable_time`]: crate::runtime::Builder::enable_time
-/// [`Builder::enable_all`]: crate::runtime::Builder::enable_all
 pub fn sleep_until(deadline: SimTime) -> Sleep {
     Sleep::new(deadline)
 }

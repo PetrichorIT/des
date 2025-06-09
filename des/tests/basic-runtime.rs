@@ -230,7 +230,11 @@ pub struct EventBox {
     events: Vec<MyEventSet>,
 }
 
+#[cfg(not(feature = "miri"))]
 const N: usize = 100_000;
+
+#[cfg(feature = "miri")]
+const N: usize = 1_000;
 
 #[test]
 #[serial]

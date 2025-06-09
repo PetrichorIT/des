@@ -28,6 +28,8 @@ multi-threaded = []
 net = ["dep:des-macros", "dep:des-net-utils", "serde", "dep:serde_yml"]
 tracing = ["net"]
 
+miri = []
+
 unstable-tokio-enable-time = ["async", "tokio/time"]
 
 [dependencies]

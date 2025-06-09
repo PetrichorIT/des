@@ -126,23 +126,9 @@ impl ModuleRef {
         let rf = &*brw.handler;
         let ty = rf.type_id();
         if ty == TypeId::of::<T>() {
-            // SAFTEY:
-            // The pointer 'handler_ptr' will allways point to the object
-            // refered to by the 'handler': Since 'handler' is owned through
-            // an 'Arc' its memory position will NOT changed. Thus 'handler_ptr'
-            // allways points to valid memory. Pointer aligment is guranteed.
-            //
-            // Since the created &T is encapluslated in a Ref<&T> this functions acts as
-            // a call of 'RefCell::borrow' thus upholding the borrowing invariants.
-            //
-            // Should the type check fail, the Ref is dropped so the borrow is freed.
-            //
-            // An alternative impl would be as_any() on the trait Module. However
-            // this function does not have a usable default impl (for some reason),
-            // so this is more ergonomic for consumers.
-            Some(Ref::map(brw, |brw| unsafe {
-                let hpt: *const dyn Module = &*brw.handler;
-                &*(hpt.cast::<T>())
+            Some(Ref::map(brw, |brw| {
+                let v: &dyn Any = &*brw.handler;
+                v.downcast_ref::<T>().expect("unreachable")
             }))
         } else {
             None
@@ -181,23 +167,9 @@ impl ModuleRef {
         let rf = &*brw.handler;
         let ty = rf.type_id();
         if ty == TypeId::of::<T>() {
-            // SAFTEY:
-            // The pointer 'handler_ptr' will allways point to the object
-            // refered to by the 'handler': Since 'handler' is owned through
-            // an 'Arc' its memory position will NOT changed. Thus 'handler_ptr'
-            // allways points to valid memory. Pointer aligment is guranteed.
-            //
-            // Since the created &T is encapluslated in a Ref<&T> this functions acts as
-            // a call of 'RefCell::borrow' thus upholding the borrowing invariants.
-            //
-            // Should the type check fail, the Ref is dropped so the borrow is freed.
-            //
-            // An alternative impl would be as_any() on the trait Module. However
-            // this function does not have a usable default impl (for some reason),
-            // so this is more ergonomic for consumers.
-            Some(RefMut::map(brw, |brw| unsafe {
-                let hpt: *mut dyn Module = &mut *brw.handler;
-                &mut *(hpt.cast::<T>())
+            Some(RefMut::map(brw, |brw| {
+                let v: &mut dyn Any = &mut *brw.handler;
+                v.downcast_mut::<T>().expect("unreachable")
             }))
         } else {
             None

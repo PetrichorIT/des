@@ -79,4 +79,4 @@
 //!
 //! [`Module`]: crate::net::module::Module
 //! [`des::time`]: crate::time
-//! [`Sim::include_par`]: crate::net::runtime::Sim::include_par
+//! [`Sim::include_cfg`]: crate::net::Sim::include_cfg

@@ -61,7 +61,12 @@ fn is_release() -> bool {
 
 impl<E> Default for Profiler<E> {
     fn default() -> Self {
-        let target = std::env::current_exe().unwrap_or_default();
+        let target = if cfg!(feature = "miri") {
+            PathBuf::from("sim-run") // default for miri run, to ignore external calls
+        } else {
+            std::env::current_exe().unwrap_or_default()
+        };
+
         let target_is_release = is_release();
 
         let mut exec = target
@@ -89,7 +94,11 @@ impl<E> Default for Profiler<E> {
             exec,
             target_is_release,
 
-            simulation_start: SystemTime::now(),
+            simulation_start: if cfg!(feature = "miri") {
+                SystemTime::UNIX_EPOCH
+            } else {
+                SystemTime::now()
+            },
             time_start: Instant::now(),
             duration: Duration::ZERO,
 

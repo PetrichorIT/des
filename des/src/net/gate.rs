@@ -481,14 +481,14 @@ mod tests {
     #[test]
     fn kind_and_iter() {
         let owner = ModuleContext::standalone("root".into());
-        let gate_a = Gate::new(&owner, "port-a", 1, 0);
+        let gate_a = owner.create_raw_gate("port-a", 1, 0);
         assert_eq!(gate_a.kind(), GateKind::Standalone);
 
-        let gate_b = Gate::new(&owner, "port-b", 1, 0);
+        let gate_b = owner.create_raw_gate("port-b", 1, 0);
         gate_a.clone().connect(gate_b.clone(), None);
         assert_eq!(gate_a.kind(), GateKind::Endpoint);
 
-        let gate_c = Gate::new(&owner, "port-c", 1, 0);
+        let gate_c = owner.create_raw_gate("port-c", 1, 0);
         gate_a.clone().connect(gate_c.clone(), None);
         assert_eq!(gate_a.kind(), GateKind::Transit);
 
@@ -506,10 +506,10 @@ mod tests {
     #[test]
     fn dedup() {
         let owner = ModuleContext::standalone("root".into());
-        let gate = Gate::new(&owner, "port", 1, 0);
+        let gate = owner.create_raw_gate("port-a", 1, 0);
         assert_eq!(gate.kind(), GateKind::Standalone);
 
-        let gate_b = Gate::new(&owner, "port-b", 1, 0);
+        let gate_b = owner.create_raw_gate("port-b", 1, 0);
         gate.clone().connect(gate_b.clone(), None);
         assert_eq!(gate.kind(), GateKind::Endpoint);
 
@@ -520,7 +520,7 @@ mod tests {
     #[test]
     fn into_gate() {
         let ctx = ModuleContext::standalone("root".into());
-        let gate_a = ctx.create_gate("port-a");
+        let gate_a = ctx.create_raw_gate("port-a", 1, 0);
 
         assert_eq!((&gate_a).as_gate(&ctx.ctx), Some(gate_a.clone()));
         assert_eq!(

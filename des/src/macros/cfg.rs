@@ -79,3 +79,23 @@ macro_rules! cfg_not_cqueue {
         )*
     }
 }
+
+macro_rules! cfg_miri {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "miri")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "miri")))]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_not_miri {
+    ($($item:item)*) => {
+        $(
+            #[cfg(not(feature = "miri"))]
+            #[cfg_attr(docsrs, doc(cfg(not(feature = "miri"))))]
+            $item
+        )*
+    }
+}

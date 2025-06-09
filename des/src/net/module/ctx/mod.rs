@@ -222,7 +222,6 @@ impl ModuleContext {
     /// }
     /// ```
     ///
-    /// [`Module::new`]: crate::net::module::Module::new
     /// [`Module::reset`]: crate::net::module::Module::reset
     /// [`Module::at_sim_start`]: crate::net::module::Module::at_sim_start
     pub fn shutdow_and_restart_in(&self, dur: Duration) {

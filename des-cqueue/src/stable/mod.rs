@@ -104,7 +104,7 @@ impl<E> CQueue<E> {
         // essentialy t*n
         let t_all = t.as_nanos() * n as u128;
 
-        let alloc = Box::new(CQueueLLAllocatorInner::new());
+        let mut alloc = Box::new(CQueueLLAllocatorInner::new());
 
         Self {
             n,

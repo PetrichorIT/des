@@ -12,7 +12,7 @@ pub struct LocalBox<E> {
 }
 
 impl<E> LocalBox<E> {
-    pub fn new_in(value: E, alloc: CQueueLLAllocator) -> LocalBox<E> {
+    pub fn new_in(value: E, mut alloc: CQueueLLAllocator) -> LocalBox<E> {
         let bytes = alloc.allocate(Layout::new::<E>()).unwrap();
         let ptr = bytes.cast::<E>();
         unsafe {
