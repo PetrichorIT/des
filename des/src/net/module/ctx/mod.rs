@@ -216,7 +216,7 @@ impl ModuleContext {
     /// fn main() {
     ///     let app = /* ... */
     /// #    Sim::new(());
-    ///     let rt = Builder::new().build(app).run();
+    ///     let rt = Builder::new().build(app.freeze()).run();
     ///     // outputs 'Start at 0s with volatile := 0 and persistent := 0'
     ///     // outputs 'Start at 10s with volatile := 0 and persistent := 1024'
     /// }

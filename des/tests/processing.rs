@@ -67,7 +67,7 @@ fn plugin_raw_creation() {
     app.set_stack(|| lcommon::IncrementIncomingId);
     app.node("root", PluginCreation::default());
 
-    let rt = Builder::seeded(123).build(app);
+    let rt = Builder::seeded(123).build(app.freeze());
     let result = rt.run().unwrap();
 
     assert_eq!(result.1, SimTime::from_duration(Duration::from_secs(99)));
@@ -130,7 +130,7 @@ fn plugin_priority_defer() {
     let mut app = Sim::new(());
     app.node("root", PluginPriorityDefer::default());
 
-    let rt = Builder::seeded(123).build(app);
+    let rt = Builder::seeded(123).build(app.freeze());
     let result = rt.run();
 
     let Ok((_, time, profiler)) = result else {
@@ -204,7 +204,7 @@ fn plugin_shutdown_non_persistent_data() {
     let mut app = Sim::new(());
     app.node("root", PluginAtShutdown::default());
 
-    let rt = Builder::seeded(123).build(app);
+    let rt = Builder::seeded(123).build(app.freeze());
 
     let res = rt.run();
     let _res = res.unwrap();
@@ -236,7 +236,7 @@ fn module_as_processing_element() {
     sim.node("a", B);
     let gate = sim.gate("a", "port");
 
-    let mut rt = Builder::seeded(123).build(sim);
+    let mut rt = Builder::seeded(123).build(sim.freeze());
     rt.add_message_onto(gate, Message::default(), 1.0.into());
 
     let _ = rt.run();
@@ -268,7 +268,7 @@ fn custom_default_pe() {
     sim.node("a", A);
     let gate = sim.gate("a", "port");
 
-    let mut rt = Builder::seeded(123).build(sim);
+    let mut rt = Builder::seeded(123).build(sim.freeze());
     rt.add_message_onto(gate, Message::default(), 1.0.into());
 
     let _ = rt.run();

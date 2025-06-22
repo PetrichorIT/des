@@ -86,7 +86,7 @@ fn parse_props() -> Result<(), RuntimeError> {
 
     Builder::seeded(132)
         .max_time(100.0.into())
-        .build(sim)
+        .build(sim.freeze())
         .run()
         .map(|_| ())
 }
@@ -111,7 +111,7 @@ fn disallow_casting() -> Result<(), RuntimeError> {
 
     Builder::seeded(132)
         .max_time(100.0.into())
-        .build(sim)
+        .build(sim.freeze())
         .run()
         .map(|_| ())
 }

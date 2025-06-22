@@ -8,7 +8,7 @@
   - non hierachical builders, all from top level
   - automatic parent detection (required)
   - automatic dup detection
-  
+
 ### Questions
 
 - `reset` when `dyn Module` does not allow for the usage of `new` (maybe just `reset` is good)
@@ -79,7 +79,7 @@ fn main() {
     sim.connect("alice.port", "bob.port");
     // sim.connect_with(..., channel)s
 
-    let rt = Builder::seeded(123).build(sim);
+    let rt = Builder::seeded(123).build(sim.freeze());
 
 }
 ```

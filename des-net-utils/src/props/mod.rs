@@ -84,7 +84,7 @@ impl<T: DeserializeOwned + Serialize + Any> PropType for T {
     where
         Self: Sized,
     {
-        serde_yml::from_value(value).map_err(|e| Error::new(ErrorKind::Other, e))
+        serde_yml::from_value(value).map_err(Error::other)
     }
 }
 

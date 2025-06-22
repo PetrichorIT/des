@@ -299,11 +299,7 @@ impl Topology<(), ()> {
     /// This function panics if not called from a simulation context.
     #[must_use]
     pub fn current() -> Self {
-        globals()
-            .topology
-            .lock()
-            .expect("failed to fetch lock, from simulation context")
-            .clone()
+        globals().topology()
     }
 
     /// Generates a topology based on all reachable destinations from a root node.

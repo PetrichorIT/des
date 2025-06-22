@@ -21,7 +21,7 @@ fn test_mock_output() {
 
     with_default(subscriber, || {
         let sim = Sim::new(());
-        let _ = Builder::seeded(123).build(sim).run();
+        let _ = Builder::seeded(123).build(sim.freeze()).run();
 
         tracing::info!(GENERAL = "Kenobi", "Hello there");
         assert_eq!(
@@ -58,7 +58,7 @@ fn scope_regognition() {
             }),
         );
 
-        let _ = Builder::seeded(123).build(sim).run();
+        let _ = Builder::seeded(123).build(sim.freeze()).run();
         assert_eq!(
             writer.content(),
             "[ 0ns ] INFO a tracing: node(a) says(1) at(0s)\n[ 0ns ] ERROR a tracing: node(a) says(2) at(0s)\n[ 0ns ] TRACE a.b tracing: node(b) says(1) at(0s)\n"
@@ -94,7 +94,7 @@ fn time_regognition() {
             }),
         );
 
-        let _ = Builder::seeded(123).build(sim).run();
+        let _ = Builder::seeded(123).build(sim.freeze()).run();
         assert_eq!(
             writer.content(),
             "[ 0ns ] INFO a tracing: node(a) says(1) at(0s)\n[ 0ns ] TRACE a.b tracing: node(b) says(1) at(0s)\n[ 5s ] ERROR a tracing: node(a) says(2) at(5s)\n"
@@ -131,7 +131,7 @@ fn span_regognition() {
             }),
         );
 
-        let _ = Builder::seeded(123).build(sim).run();
+        let _ = Builder::seeded(123).build(sim.freeze()).run();
         assert_eq!(
             writer.content(),
             "[ 0ns ] INFO a tracing: my-span{key=123}: node(a) says(1) at(0s)\n[ 0ns ] TRACE a.b tracing: node(b) says(1) at(0s)\n"
@@ -176,7 +176,7 @@ fn multi_span_regognition() {
             }),
         );
 
-        let _ = Builder::seeded(123).build(sim).run();
+        let _ = Builder::seeded(123).build(sim.freeze()).run();
         assert_eq!(
             writer.content(),
             "[ 0ns ] INFO a tracing: my-span{key=123}:say_hello: hello\n[ 0ns ] TRACE a.b tracing: other-span: node(b) says(1) at(0s)\n"
@@ -207,7 +207,7 @@ fn with_ansi() {
             AsyncFn::new(|_| async { tracing::info!("Hello World!") }),
         );
 
-        let _ = Builder::seeded(123).build(sim).run();
+        let _ = Builder::seeded(123).build(sim.freeze()).run();
         assert_eq!(
             writer.content(),
             "\u{1b}[2m[ 0ns ] \u{1b}[0m\u{1b}[32ma \u{1b}[0m\u{1b}[2mtracing: \u{1b}[0mHello World!\n"

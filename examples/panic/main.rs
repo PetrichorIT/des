@@ -7,7 +7,7 @@ fn main() -> Result<(), RuntimeError> {
     sim.node("bob", B);
     sim.node("eve", B);
 
-    Builder::seeded(123).build(sim).run().map(|_| ())
+    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
 }
 
 struct B;

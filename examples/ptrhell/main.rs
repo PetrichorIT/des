@@ -8,7 +8,7 @@ fn main() {
 
     let app = Sim::ndl("examples/ptrhell/main.yml", registry![Bob, Alice, Network]).unwrap();
 
-    let rt = Builder::seeded(0x123).build(app);
+    let rt = Builder::seeded(0x123).build(app.freeze());
 
     let (_, time, p) = rt.run().unwrap();
 

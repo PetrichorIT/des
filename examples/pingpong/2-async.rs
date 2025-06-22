@@ -74,7 +74,7 @@ fn build_network() -> Sim<()> {
     );
     ping_gate.connect(pong_gate, Some(Channel::new(metrics)));
 
-    sim
+    sim.freeze()
 }
 
 // Alternativly, the tokio runtime can also be used in the normal `Module` API.

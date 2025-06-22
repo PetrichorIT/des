@@ -59,7 +59,7 @@ fn connectivity() {
         })),
     );
 
-    let app = Builder::seeded(123).build(app);
+    let app = Builder::seeded(123).build(app.freeze());
     let _ = app.run().unwrap();
 }
 
@@ -76,22 +76,28 @@ fn select_node_from_globals() -> Result<(), RuntimeError> {
     sim.node(
         "tester",
         AsyncFn::io(|_| async move {
-            assert_eq!(globals().node("alice").unwrap().path(), "alice".into());
             assert_eq!(
-                globals().node("alice.submodule").unwrap().path(),
+                globals().get(&"alice".into()).unwrap().path(),
+                "alice".into()
+            );
+            assert_eq!(
+                globals().get(&"alice.submodule".into()).unwrap().path(),
                 "alice.submodule".into()
             );
             assert_eq!(
-                globals().node("alice.submodule.child").unwrap().path(),
+                globals()
+                    .get(&"alice.submodule.child".into())
+                    .unwrap()
+                    .path(),
                 "alice.submodule.child".into()
             );
-            assert_eq!(globals().node("bob").unwrap().path(), "bob".into());
+            assert_eq!(globals().get(&"bob".into()).unwrap().path(), "bob".into());
 
-            assert!(globals().node("steve").is_err());
+            assert!(globals().get(&"steve".into()).is_none());
 
             Ok(())
         }),
     );
 
-    Builder::seeded(123).build(sim).run().map(|_| ())
+    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
 }

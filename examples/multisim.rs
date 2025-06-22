@@ -40,7 +40,7 @@ fn create_runtime_and_wait(
     // Create runtime
     let app = Sim::new(());
 
-    let rt = Builder::new().build(app);
+    let rt = Builder::new().build(app.freeze());
     let prev = active.fetch_add(1, SeqCst);
     assert_eq!(prev, 0);
     counter.fetch_add(1, SeqCst);

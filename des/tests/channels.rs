@@ -49,7 +49,7 @@ fn channel_dropping_message() {
     });
     g_in.connect(g_out, Some(channel));
 
-    let rt = Builder::seeded(123).build(rt);
+    let rt = Builder::seeded(123).build(rt.freeze());
     let _ = rt.run();
 }
 
@@ -100,7 +100,7 @@ fn channel_buffering_message() {
     });
     g_in.connect(g_out, Some(channel));
 
-    let rt = Builder::seeded(123).build(rt);
+    let rt = Builder::seeded(123).build(rt.freeze());
     let _ = rt.run();
 }
 
@@ -142,7 +142,7 @@ fn channel_instant_busy() {
 
     g_in.connect(g_out, Some(channel));
 
-    let rt = Builder::seeded(123).build(rt);
+    let rt = Builder::seeded(123).build(rt.freeze());
     let _ = rt.run();
 }
 
@@ -209,7 +209,7 @@ fn channel_probes() {
 
     alice_port.connect(bob_port, Some(chan));
 
-    let rt = Builder::seeded(123).build(rt);
+    let rt = Builder::seeded(123).build(rt.freeze());
     let _ = rt.run();
 }
 
@@ -249,5 +249,5 @@ fn latency_only_channel() {
         ))),
     );
 
-    let _ = Builder::seeded(123).build(sim).run();
+    let _ = Builder::seeded(123).build(sim.freeze()).run();
 }

@@ -28,7 +28,7 @@
 ///     let registry = registry![DnsServer, Client, Server, else _];
 ///     # return Ok(());
 ///     let app = Sim::ndl("path/to/ndl", registry)?;
-///     let rt = Builder::new().build(app);
+///     let rt = Builder::new().build(app.freeze());
 ///     let r = rt.run();
 /// }
 /// ```

@@ -9,14 +9,11 @@ fn main() {
     let app = Sim::ndl("tests/ndl/top.yml", Registry::new().with_default_fallback())
         .map_err(|e| println!("{e}"))
         .unwrap();
-    let rt = Builder::new().build(app);
+    let rt = Builder::new().build(app.freeze());
     let app = rt.run().unwrap().0;
     let mut topo = app
         .globals()
-        .topology
-        .lock()
-        .unwrap()
-        .clone()
+        .topology()
         .with_edge_cost_attachment()
         .with_node_connectivity_attachment();
 

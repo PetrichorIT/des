@@ -34,5 +34,5 @@ fn load_order() {
         ModuleFn::new(move || stage!(s2 == 2), |_, _| {}),
     );
 
-    let _ = Builder::seeded(123).build(sim).run();
+    let _ = Builder::seeded(123).build(sim.freeze()).run();
 }

@@ -11,7 +11,7 @@ impl Module for A {}
 fn main() {
     let app = Sim::ndl("examples/ndl/main.yml", registry![A, Alice, Bob]).unwrap();
 
-    let rt = Builder::seeded(0x123).build(app);
+    let rt = Builder::seeded(0x123).build(app.freeze());
 
     let (_, time, profile) = rt.run().unwrap();
 

@@ -113,7 +113,7 @@ fn small_network() -> Result<(), Box<dyn std::error::Error>> {
 
     let r = Builder::seeded(123)
         .max_time(1000.0.into())
-        .build(app)
+        .build(app.freeze())
         .run()
         .unwrap();
 
@@ -138,7 +138,7 @@ fn ring_topology() -> Result<(), Box<dyn std::error::Error>> {
 
     let r = Builder::seeded(123)
         .max_time(1000.0.into())
-        .build(app)
+        .build(app.freeze())
         .run()
         .unwrap();
 
@@ -174,7 +174,7 @@ fn build_with_preexisting_sim() -> Result<(), Box<dyn std::error::Error>> {
         )?,
     )?;
 
-    let _ = Builder::seeded(123).build(sim).run();
+    let _ = Builder::seeded(123).build(sim.freeze()).run();
     Ok(())
 }
 
@@ -190,7 +190,7 @@ fn non_std_gate_connections() -> Result<(), Box<dyn std::error::Error>> {
         )?,
     )?;
 
-    let _ = Builder::seeded(123).build(sim).run();
+    let _ = Builder::seeded(123).build(sim.freeze()).run();
     Ok(())
 }
 
@@ -242,7 +242,7 @@ fn registry_custom_resolver() -> Result<(), Box<dyn std::error::Error>> {
         Ndl::from_str(&mut registry, include_str!("ndl/ab.yml"))?,
     )?;
 
-    let _ = Builder::seeded(123).build(sim).run();
+    let _ = Builder::seeded(123).build(sim.freeze()).run();
 
     assert_eq!(COUNTER.load(Ordering::SeqCst), 1);
 
@@ -269,7 +269,7 @@ fn registry_default_fallback_does_not_panic() -> Result<(), Box<dyn std::error::
         "",
         Ndl::from_str(&mut registry, include_str!("ndl/ab.yml"))?,
     )?;
-    let _ = Builder::seeded(123).build(sim).run();
+    let _ = Builder::seeded(123).build(sim.freeze()).run();
 
     Ok(())
 }

@@ -57,7 +57,7 @@ static SIMTIME: (AtomicU64, AtomicU32) = (AtomicU64::new(0), AtomicU32::new(0));
 /// A specific point of time in the simulation.
 ///
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-
+#[repr(transparent)]
 pub struct SimTime(Duration);
 
 impl SimTime {

@@ -70,7 +70,7 @@ fn stateless_module_shudown() {
     rt.node("root", StatelessModule);
     let gate = rt.gate("root", "in");
 
-    let mut rt = Builder::seeded(123).build(rt);
+    let mut rt = Builder::seeded(123).build(rt.freeze());
     rt.add_message_onto(
         gate,
         Message::default(),
@@ -114,7 +114,7 @@ fn stateless_module_restart() {
     rt.node("root", StatelessModuleRestart);
     let gate = rt.gate("root", "in");
 
-    let mut rt = Builder::seeded(123).build(rt);
+    let mut rt = Builder::seeded(123).build(rt.freeze());
     rt.add_message_onto(
         gate.clone(),
         Message::default().id(9),
@@ -177,7 +177,7 @@ fn statefull_module_restart() {
     rt.node("root", StatefullModule::default());
     let gate = rt.gate("root", "in");
 
-    let mut rt = Builder::seeded(123).build(rt);
+    let mut rt = Builder::seeded(123).build(rt.freeze());
     rt.add_message_onto(
         gate.clone(),
         Message::default().id(9),
@@ -219,7 +219,7 @@ fn shutdown_via_async_handle() {
     let mut rt = Sim::new(());
     rt.node("root", ShutdownViaHandleModule);
 
-    let rt = Builder::seeded(123).build(rt);
+    let rt = Builder::seeded(123).build(rt.freeze());
 
     let _ = rt.run().unwrap();
     assert_eq!(DROPPED_SHUTDOWN_VIA_HANDLE.load(Ordering::SeqCst), 1)
@@ -259,7 +259,7 @@ fn restart_via_async_handle() {
     let mut rt = Sim::new(());
     rt.node("root", RestartViaHandleModule);
 
-    let rt = Builder::seeded(123).build(rt);
+    let rt = Builder::seeded(123).build(rt.freeze());
 
     let _ = rt.run().unwrap();
     assert_eq!(DROPPED_RESTART_VIA_HANDLE.load(Ordering::SeqCst), 2)
@@ -325,7 +325,7 @@ fn shutdown_will_ignore_incoming() {
     let mut rt = Sim::new(());
     rt.node("root", WillIgnoreInncomingInDowntime::default());
 
-    let rt = Builder::seeded(123).build(rt);
+    let rt = Builder::seeded(123).build(rt.freeze());
 
     let _ = rt.run().unwrap();
 }
@@ -407,7 +407,7 @@ fn shutdown_will_drop_transiting() {
     ping.connect(con.clone(), None);
     con.connect(pong, None);
 
-    let rt = Builder::seeded(123).max_itr(500).build(app);
+    let rt = Builder::seeded(123).max_itr(500).build(app.freeze());
     let _ = rt.run().unwrap();
 }
 
@@ -444,7 +444,7 @@ fn shutdown_will_drop_transiting_delayed_channels() {
         })),
     );
 
-    let rt = Builder::seeded(123).max_itr(500).build(app);
+    let rt = Builder::seeded(123).max_itr(500).build(app.freeze());
     let _ = rt.run().unwrap();
 }
 
@@ -479,5 +479,5 @@ fn shutdown_prevents_accessing_parents() {
         ),
     );
 
-    let _ = Builder::seeded(123).build(sim).run();
+    let _ = Builder::seeded(123).build(sim.freeze()).run();
 }

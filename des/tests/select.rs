@@ -33,7 +33,7 @@ fn deterministic_branching() {
         let mut rt = Sim::new(());
         rt.node("root", Main);
 
-        let rt = Builder::seeded(123).build(rt);
+        let rt = Builder::seeded(123).build(rt.freeze());
         let v = rt.run();
         assert!(matches!(v.unwrap().2.event_count, 0));
     }

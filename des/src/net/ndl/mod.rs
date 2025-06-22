@@ -39,13 +39,16 @@
 //!             return;
 //!         },
 //!     };
-//!     let rt = Builder::new().build(app);
+//!     let rt = Builder::new().build(app.freeze());
 //!     let _ = rt.run();
 //! }
 //! ```
 
 use crate::{
-    net::{self, channel::ChannelDropBehaviour, module::ModuleContext, ScopedSim, Sim},
+    net::{
+        self, channel::ChannelDropBehaviour, module::ModuleContext, Sim, SimBuilder,
+        SimBuilderScoped,
+    },
     prelude::{Channel, ChannelMetrics, ModuleRef, ObjectPath},
     time::Duration,
 };
@@ -71,7 +74,7 @@ use super::blocks::ModuleBlock;
 /// A NDL topology describes a module tree, that can be dynamically created
 /// using modules provided in a [`Registry`]. This module tree can either be
 /// attached at a specific location in the simulation module tree using
-/// [`Sim::node`] with [`Ndl`] as the provided module block, or as a global
+/// [`SimBuilder::node`] with [`Ndl`] as the provided module block, or as a global
 /// tree using constructors like [`Sim::ndl`].
 ///
 /// The tree is initalized depth first. This means for each module:
@@ -128,7 +131,7 @@ impl<'a, L: Layer> Ndl<'a, L> {
 
 impl<L: Layer> ModuleBlock for Ndl<'_, L> {
     type Ret = Result<ModuleRef>;
-    fn build<A>(self, sim: ScopedSim<'_, A>) -> Self::Ret {
+    fn build<A>(self, sim: SimBuilderScoped<'_, A>) -> Self::Ret {
         sim.ndl(&self.node, self.registry)
     }
 }
@@ -138,7 +141,7 @@ impl<L: Layer> ModuleBlock for Ndl<'_, L> {
 impl Sim<()> {
     /// Creates a NDL application with the inner application `()`.
     ///
-    /// See [`Sim::with_ndl`] for more information.
+    /// See [`SimBuilder::with_ndl`] for more information.
     ///
     /// # Errors
     ///
@@ -147,12 +150,12 @@ impl Sim<()> {
     pub fn ndl<L: Layer>(
         path: impl AsRef<Path>,
         registry: impl AsMut<Registry<L>>,
-    ) -> Result<Self> {
+    ) -> Result<SimBuilder<()>> {
         Sim::new(()).with_ndl(path, registry)
     }
 }
 
-impl<A> Sim<A> {
+impl<A> SimBuilder<A> {
     /// Creates an NDL application from a topology description at `path`, with
     /// software defined by `registry` and an inner application `inner`.
     ///
@@ -208,7 +211,7 @@ impl<A> Sim<A> {
     ) -> Result<()> {
         let parsed = transform(def)?;
 
-        let scoped = ScopedSim::new(self, ObjectPath::default());
+        let scoped = SimBuilderScoped::new(self, ObjectPath::default());
         let _ = scoped.ndl(&parsed, registry.as_mut())?;
 
         Ok(())
@@ -222,7 +225,7 @@ impl<A> Sim<A> {
     ) -> Result<ModuleRef> {
         // Check dup
         assert!(
-            self.modules().get(path).is_none(),
+            self.get(path).is_none(),
             "cannot crate module at {path}, already exists"
         );
 
@@ -251,12 +254,6 @@ impl<A> Sim<A> {
         )?;
         ctx.upgrade_dummy(software);
 
-        self.globals()
-            .modules
-            .lock()
-            .expect("failed to lock globals")
-            .push(ctx.clone());
-
         let mut sink = Vec::new();
         ctx.deactivate(&mut sink);
         assert!(
@@ -264,12 +261,12 @@ impl<A> Sim<A> {
             "events cannot be dispatched in constructors"
         );
 
-        self.modules_mut().add(ctx.clone());
+        self.with_modules_mut(|mods| mods.add(ctx.clone()));
         Ok(ctx)
     }
 }
 
-impl<A> ScopedSim<'_, A> {
+impl<A> SimBuilderScoped<'_, A> {
     fn ndl<L: Layer>(mut self, node: &tree::Node, registry: &mut Registry<L>) -> Result<ModuleRef> {
         let symbol = node.typ.to_string();
         let scope = &self.scope;

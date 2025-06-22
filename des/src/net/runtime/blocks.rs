@@ -6,7 +6,7 @@ use crate::{
 };
 use std::{error::Error, time::Duration};
 
-use super::ScopedSim;
+use super::SimBuilderScoped;
 
 /// A trait that descibes that an object can be build into a block of modules
 /// at a given scope within the simulation.
@@ -20,19 +20,19 @@ use super::ScopedSim;
 /// - on module specifically at the position defined by the scope
 /// - on module at the scope position, an more as direct or indirect children of the first module.
 ///
-/// See [`ScopedSim`] for more information.
+/// See [`SimBuilderScoped`] for more information.
 pub trait ModuleBlock {
     /// The returns type of the build method. This will be returned by `Sim::node`
     type Ret;
 
     /// Build the described module block within the context of scoped part of
     /// a simulation.
-    fn build<A>(self, sim: ScopedSim<'_, A>) -> Self::Ret;
+    fn build<A>(self, sim: SimBuilderScoped<'_, A>) -> Self::Ret;
 }
 
 impl<M: Module> ModuleBlock for M {
     type Ret = ();
-    fn build<A>(self, sim: ScopedSim<'_, A>) {
+    fn build<A>(self, sim: SimBuilderScoped<'_, A>) {
         sim.base.raw(sim.scope, self);
     }
 }
@@ -77,7 +77,7 @@ pub enum FailabilityPolicy {
 ///     /* Do something stateless (e.g. random routing) */
 /// }));
 ///
-/// let _ = Builder::new().build(sim).run();
+/// let _ = Builder::new().build(sim.freeze()).run();
 /// ```
 #[derive(Debug)]
 pub struct HandlerFn<Handler> {
@@ -162,7 +162,7 @@ where
 ///     }
 /// ));
 ///
-/// let _ = Builder::new().build(sim).run();
+/// let _ = Builder::new().build(sim.freeze()).run();
 /// ```
 #[derive(Debug)]
 pub struct ModuleFn<Gen, State, Handler> {
@@ -284,7 +284,7 @@ cfg_async! {
     /// }));
     /// /* ... */
     ///
-    /// let _ = Builder::new().build(sim).run();
+    /// let _ = Builder::new().build(sim.freeze()).run();
     /// ```
     pub struct AsyncFn
     {

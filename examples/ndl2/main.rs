@@ -36,6 +36,6 @@ fn main() {
             panic!("exiting due to previouis error")
         }
     };
-    let rt = Builder::seeded(123).max_itr(10).build(app);
+    let rt = Builder::seeded(123).max_itr(10).build(app.freeze());
     let _ = rt.run();
 }

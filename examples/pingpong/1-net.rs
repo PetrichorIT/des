@@ -66,7 +66,7 @@ fn build_network() -> Sim<()> {
     );
     ping_gate.connect(pong_gate, Some(Channel::new(metrics)));
 
-    sim
+    sim.freeze()
 }
 
 // ## Messages
