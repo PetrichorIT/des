@@ -25,9 +25,9 @@ pub type MessageKind = u16;
 ///
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 #[allow(missing_docs)]
-pub struct MessageHeader {
+pub struct Header {
     pub id: MessageId,     // Custom
     pub kind: MessageKind, // Ethertype
     pub creation_time: SimTime,
@@ -38,34 +38,28 @@ pub struct MessageHeader {
     pub last_gate: Option<GateRef>,   // Path info
 
     pub src: [u8; 6],
-    pub dest: [u8; 6],
-
-    // The packet length in bytes.
-    pub length: u32,
+    pub dst: [u8; 6],
 }
 
-// # DUP
-impl MessageHeader {
-    pub(super) fn dup(&self, now: SimTime) -> Self {
+impl Clone for Header {
+    fn clone(&self) -> Self {
         Self {
             id: self.id,
             kind: self.kind,
-            creation_time: now,
-            send_time: SimTime::MIN,
+            creation_time: SimTime::now(),
+            send_time: self.send_time,
 
             sender_module_id: self.sender_module_id,
             receiver_module_id: self.receiver_module_id,
             last_gate: self.last_gate.clone(),
 
             src: self.src,
-            dest: self.dest,
-
-            length: self.length,
+            dst: self.dst,
         }
     }
 }
 
-impl Default for MessageHeader {
+impl Default for Header {
     fn default() -> Self {
         Self {
             id: 0,
@@ -78,52 +72,13 @@ impl Default for MessageHeader {
             last_gate: None,
 
             src: [0; 6],
-            dest: [0; 6],
-
-            length: 0,
+            dst: [0; 6],
         }
     }
 }
 
-impl MessageBody for MessageHeader {
+impl MessageBody for Header {
     fn byte_len(&self) -> usize {
         64 // TODO  compute correct header size
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn header_duplication() {
-        let header = MessageHeader {
-            id: 42,
-            kind: 69,
-            creation_time: 100.0.into(),
-            send_time: 150.0.into(),
-            sender_module_id: ModuleId(12),
-            receiver_module_id: ModuleId(14),
-            last_gate: None,
-            src: [1; 6],
-            dest: [2; 6],
-            length: 32,
-        };
-
-        assert_eq!(
-            header.dup(200.0.into()),
-            MessageHeader {
-                id: 42,
-                kind: 69,
-                creation_time: 200.0.into(),
-                send_time: SimTime::MIN,
-                sender_module_id: ModuleId(12),
-                receiver_module_id: ModuleId(14),
-                last_gate: None,
-                src: [1; 6],
-                dest: [2; 6],
-                length: 32,
-            }
-        )
     }
 }

@@ -243,6 +243,7 @@ impl<L: Layer> Registry<L> {
     /// let mut sim = Sim::ndl("path/to/ndl", registry);
     /// /* ... */
     /// ```
+    #[allow(clippy::type_complexity)]
     pub fn symbol_fn<F, M>(
         self,
         ty: impl AsRef<str>,

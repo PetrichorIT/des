@@ -139,7 +139,7 @@ impl TimerQueue {
             .pending
             .borrow()
             .front()
-            .map_or(false, |slot| slot.time <= cur)
+            .is_some_and(|slot| slot.time <= cur)
         {
             let mut buffer = Vec::new();
             let mut pending = self.pending.borrow_mut();

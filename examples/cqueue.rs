@@ -21,7 +21,7 @@ impl EventLifecycle<App> for App {
 }
 
 struct EvSet {}
-impl EventSet<App> for EvSet {
+impl Event<App> for EvSet {
     fn handle(self, rt: &mut Runtime<App>) {
         rt.add_event_in(EvSet {}, rt.app.event_delay);
         // NOP

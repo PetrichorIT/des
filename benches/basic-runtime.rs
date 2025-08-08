@@ -2,7 +2,7 @@ use std::{hint::black_box, time::Duration};
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use des::{
-    runtime::{Application, Builder, EventLifecycle, EventSet},
+    runtime::{Application, Builder, Event as EventSet, EventLifecycle},
     time::SimTime,
 };
 

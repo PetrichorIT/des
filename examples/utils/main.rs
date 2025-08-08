@@ -13,12 +13,12 @@ fn main() -> std::io::Result<()> {
     let mut app = Sim::ndl("examples/utils/main.yml", registry![A, Alice, Bob])
         .map_err(|e| println!("{e}"))
         .unwrap();
-    app.include_par_file("examples/utils/init.par.yml").unwrap();
+    app.include_cfg_file("examples/utils/init.par.yml").unwrap();
 
-    let rt = Builder::seeded(0x123).quiet().build(app);
+    let rt = Builder::seeded(0x123).quiet().build(app.freeze());
     let (app, time, p) = rt.run().unwrap();
 
-    let topo = app.globals().topology.lock().unwrap().clone();
+    let topo = app.globals().topology();
 
     assert_eq!(topo.nodes().len(), 4 + 1);
     assert_eq!(topo.edges().count(), 2 * 14);

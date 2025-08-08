@@ -13,7 +13,7 @@ struct Host {
 
 impl Host {
     fn msg(&self) -> Message {
-        Message::new().kind(random::<u16>() % 10).build()
+        Message::default().kind(random::<u16>() % 10)
     }
 }
 
@@ -56,7 +56,10 @@ fn criterion_benchmark(c: &mut Criterion) {
 
                     for _ in 0..iters {
                         let sim = Sim::ndl("simple-routing-traffic.yml", &mut registry).unwrap();
-                        let rt = Builder::seeded(123).quiet().max_itr(10_000).build(sim);
+                        let rt = Builder::seeded(123)
+                            .quiet()
+                            .max_itr(10_000)
+                            .build(sim.freeze());
                         let start = Instant::now();
                         let _ = rt.run();
                         sum += start.elapsed()

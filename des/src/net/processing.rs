@@ -63,9 +63,9 @@
 //! once the next event arrives.
 //!
 
-use std::{any::Any, ops::Deref};
+use std::{any::Any, fmt::Debug, ops::Deref};
 
-use super::{module::Module, util::NoDebug};
+use super::module::Module;
 use crate::prelude::Message;
 
 /// A subprogramm between the module application and the network layer.
@@ -74,17 +74,17 @@ use crate::prelude::Message;
 /// API. Common patterns are:
 ///
 /// - **Observer**: The element does not modifiy the message stream, it just observes it.
-///    This plugin can be used to get statistics over message streams or to log
-///    debug output.
+///   This plugin can be used to get statistics over message streams or to log
+///   debug output.
 /// - **Scope-Provider**: This element provides some kind of scope to all items further
-///    from the network layer than itself. A scope can be defined using a static variable
-///    or just consist of a time meassurement between [`event_start`] / [`event_end`].
+///   from the network layer than itself. A scope can be defined using a static variable
+///   or just consist of a time meassurement between [`event_start`] / [`event_end`].
 /// - **Capture**: This kind of processing element captures parts of the input stream and redirects
-///     it in some abitraty way, using other APIs. This pattern can be used to implement buffering
-///     or mergeing of frameneted IP packets.
+///   it in some abitraty way, using other APIs. This pattern can be used to implement buffering
+///   or mergeing of frameneted IP packets.
 /// - **Meta-Provider**: This kind of processing element attaches / modifies part of the incoming or
-///    outgoing message stream to provide some new level of abstraction e.g. a VPN
-///    or simulated network Interfaces.
+///   outgoing message stream to provide some new level of abstraction e.g. a VPN
+///   or simulated network Interfaces.
 ///
 /// [`event_start`]: ProcessingElement::event_start
 /// [`event_end`]: ProcessingElement::event_end
@@ -253,15 +253,21 @@ impl ProcessingState {
 }
 
 /// A stack of processing elements
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct ProcessingStack {
-    items: NoDebug<Vec<Box<dyn ProcessingElement>>>,
+    items: Vec<Box<dyn ProcessingElement>>,
 }
 
 impl ProcessingStack {
     /// Merge a new stack onto the the current one.
     pub fn append(&mut self, expansion: impl Into<ProcessingStack>) {
-        self.items.extend(expansion.into().items.into_inner());
+        self.items.extend(expansion.into().items);
+    }
+}
+
+impl Debug for ProcessingStack {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ProcessingStack").finish()
     }
 }
 
@@ -281,9 +287,7 @@ impl From<()> for ProcessingStack {
 impl<P: ProcessingElement> From<P> for ProcessingStack {
     fn from(value: P) -> Self {
         let boxed: Box<dyn ProcessingElement> = Box::new(value);
-        ProcessingStack {
-            items: vec![boxed].into(),
-        }
+        ProcessingStack { items: vec![boxed] }
     }
 }
 

@@ -41,7 +41,7 @@ impl Module for PluginCreation {
     fn at_sim_start(&mut self, _stage: usize) {
         for i in 0..100 {
             schedule_at(
-                Message::new().id(i).build(),
+                Message::default().id(i),
                 SimTime::now() + Duration::from_secs(i as u64),
             )
         }
@@ -52,8 +52,9 @@ impl Module for PluginCreation {
         self.sum += msg.header().id as usize;
     }
 
-    fn at_sim_end(&mut self) {
+    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
         assert_eq!(self.sum, (0..100).sum::<usize>() + 100);
+        Ok(())
     }
 }
 
@@ -66,7 +67,7 @@ fn plugin_raw_creation() {
     app.set_stack(|| lcommon::IncrementIncomingId);
     app.node("root", PluginCreation::default());
 
-    let rt = Builder::seeded(123).build(app);
+    let rt = Builder::seeded(123).build(app.freeze());
     let result = rt.run().unwrap();
 
     assert_eq!(result.1, SimTime::from_duration(Duration::from_secs(99)));
@@ -114,7 +115,7 @@ impl Module for PluginPriorityDefer {
 
     fn at_sim_start(&mut self, _stage: usize) {
         for i in 0..100 {
-            schedule_in(Message::new().build(), Duration::from_secs(i));
+            schedule_in(Message::default(), Duration::from_secs(i));
         }
     }
 
@@ -129,10 +130,10 @@ fn plugin_priority_defer() {
     let mut app = Sim::new(());
     app.node("root", PluginPriorityDefer::default());
 
-    let rt = Builder::seeded(123).build(app);
+    let rt = Builder::seeded(123).build(app.freeze());
     let result = rt.run();
 
-    let RuntimeResult::Finished { time, profiler, .. } = result else {
+    let Ok((_, time, profiler)) = result else {
         panic!("Unexpected runtime result")
     };
 
@@ -173,7 +174,7 @@ impl Module for PluginAtShutdown {
             // Schedule events at all time points 1..=20
             for i in 1..=20 {
                 schedule_at(
-                    Message::new().build(),
+                    Message::default(),
                     SimTime::from_duration(Duration::from_secs(i)),
                 )
             }
@@ -183,12 +184,13 @@ impl Module for PluginAtShutdown {
     fn handle_message(&mut self, _msg: Message) {
         if SimTime::now().as_secs() == 10 {
             // will be back online at second 11
-            shutdow_and_restart_in(Duration::from_millis(500));
+            current().shutdow_and_restart_in(Duration::from_millis(500));
         }
     }
 
-    fn at_sim_end(&mut self) {
+    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
         assert_eq!(self.arc.load(SeqCst), 20);
+        Ok(())
     }
 }
 
@@ -202,7 +204,7 @@ fn plugin_shutdown_non_persistent_data() {
     let mut app = Sim::new(());
     app.node("root", PluginAtShutdown::default());
 
-    let rt = Builder::seeded(123).build(app);
+    let rt = Builder::seeded(123).build(app.freeze());
 
     let res = rt.run();
     let _res = res.unwrap();
@@ -234,8 +236,8 @@ fn module_as_processing_element() {
     sim.node("a", B);
     let gate = sim.gate("a", "port");
 
-    let mut rt = Builder::seeded(123).build(sim);
-    rt.add_message_onto(gate, Message::new().build(), 1.0.into());
+    let mut rt = Builder::seeded(123).build(sim.freeze());
+    rt.add_message_onto(gate, Message::default(), 1.0.into());
 
     let _ = rt.run();
     assert!(DONE.load(Ordering::SeqCst));
@@ -266,8 +268,8 @@ fn custom_default_pe() {
     sim.node("a", A);
     let gate = sim.gate("a", "port");
 
-    let mut rt = Builder::seeded(123).build(sim);
-    rt.add_message_onto(gate, Message::new().build(), 1.0.into());
+    let mut rt = Builder::seeded(123).build(sim.freeze());
+    rt.add_message_onto(gate, Message::default(), 1.0.into());
 
     let _ = rt.run();
     assert!(DONE.load(Ordering::SeqCst));

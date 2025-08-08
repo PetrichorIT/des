@@ -31,7 +31,7 @@
 //!     EventB { ack: bool },
 //! }
 //!
-//! impl EventSet<MyApp> for MyEventSet {
+//! impl Event<MyApp> for MyEventSet {
 //!     fn handle(self, _rt: &mut Runtime<MyApp>) {
 //!         // Do something
 //!     }
@@ -57,16 +57,16 @@
 //!
 //! This simulation will now provide a [`runtime`] with
 //! [`time`] managment and a future event set to execute events.
-//! If a event is executed [`MyEventSet::handle`](crate::runtime::EventSet::handle)
+//! If a event is executed [`MyEventSet::handle`](crate::runtime::Event::handle)
 //! will be called with the runtime as parameter. If new events are to be created
 //! as result of a event execution this mutable reference can be used
 //! to add new events to the future event set.
 //!
 //! The [`Application`](crate::runtime::Application) object (in this case `MyApp`) is used as a global context handle that
 //! it stored inside the runtime. It can be accessed via 'rt.app' and can be used
-//! to record state during the simulation. Note that the [`EventSet`](crate::runtime::EventSet)
+//! to record state during the simulation. Note that the [`Event`](crate::runtime::Event)
 //! and the [`Application`](crate::runtime::Application) are linked via a trait with generic parameters. This means
-//! that `MyEvents` could implement [`EventSet`](crate::runtime::EventSet) a second time for another application.
+//! that `MyEvents` could implement [`Event`](crate::runtime::Event) a second time for another application.
 //!
 //! # Using a module oriented system
 //!
@@ -114,6 +114,8 @@
 //! aswell as simulation specifc network primitives replacing the standart
 //! [`net`](https://docs.rs/tokio/latest/tokio/net/index.html) module.
 //!
+//! Look for the `pingpong-*` examples for more detailed explanations.
+//!
 //! [`time`]: crate::time
 //! [`net`]: crate::net
 //! [`runtime`]: crate::runtime
@@ -123,18 +125,14 @@
 #[macro_use]
 #[doc(hidden)]
 pub mod macros;
-
-pub(crate) mod sync;
-
 pub mod prelude;
-
-pub mod doc;
 pub mod runtime;
 pub mod time;
 
 cfg_net! {
     pub mod net;
     pub mod tracing;
+    pub(crate) use des_net_utils::sync;
 }
 
 cfg_macros! {

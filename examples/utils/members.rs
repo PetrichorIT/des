@@ -16,7 +16,8 @@ impl Module for Alice {
             pkt.content::<String>().deref()
         );
 
-        if pkt.content::<String>().len() > par("limit").unwrap().parse::<usize>().unwrap() {
+        let limit = current().prop::<usize>("limit").unwrap().or_default().get();
+        if pkt.content::<String>().len() > limit {
             // TERMINATE
         } else {
             // pkt.content_mut::<String>().push('#');
@@ -38,12 +39,11 @@ impl Module for Bob {
             0 => {
                 info!("Initalizing");
                 send(
-                    Message::new()
+                    Message::default()
                         .kind(1)
                         // .src(0x7f_00_00_01, 80)
                         // .dest(0x7f_00_00_02, 80)
-                        .content("Ping".to_string())
-                        .build(),
+                        .with_content("Ping".to_string()),
                     ("netOut", 2),
                 );
             }
@@ -63,7 +63,8 @@ impl Module for Bob {
             pkt.content::<String>().deref()
         );
 
-        pkt.content_mut::<String>().push_str(&par("char").unwrap());
+        pkt.content_mut::<String>()
+            .push_str(&current().prop::<String>("char").unwrap().get().unwrap());
 
         send(pkt, ("netOut", 2));
     }

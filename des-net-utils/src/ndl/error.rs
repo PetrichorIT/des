@@ -37,21 +37,25 @@ pub struct Span {
 }
 
 impl Error {
+    #[must_use]
     pub fn span_module(mut self, module: &str) -> Self {
         self.span.module = Some(module.to_string());
         self
     }
 
+    #[must_use]
     pub fn span_submodule(mut self, submodule: &str) -> Self {
         self.span.submodule = Some(submodule.to_string());
         self
     }
 
+    #[must_use]
     pub fn span_gate(mut self, gate: &str) -> Self {
         self.span.gate = Some(gate.to_string());
         self
     }
 
+    #[must_use]
     pub fn span_connection(mut self, connection: usize) -> Self {
         self.span.connection = Some(connection);
         self
@@ -81,6 +85,7 @@ impl Display for Error {
 
 impl std::error::Error for Error {}
 
+#[allow(clippy::enum_glob_use)]
 impl Display for ErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use ErrorKind::*;
@@ -137,7 +142,7 @@ impl Display for ErrorKind {
                 f,
                 "Invalid assignment, '{clause}' does not conform to all required interfaces"
             ),
-            _ => write!(f, "Error"),
+            Other => write!(f, "Error"),
         }
     }
 }

@@ -8,7 +8,7 @@ use std::{
 
 use des::{
     net::ndl::Registry,
-    net::{module::Module, ModuleBlock, Sim},
+    net::{blocks::ModuleBlock, module::Module, Sim},
     runtime::Builder,
 };
 use serial_test::serial;
@@ -39,7 +39,7 @@ fn drop_check_modules_net_from_sim_builder() {
         }),
     );
 
-    let rtr = Builder::seeded(123).build(sim).run();
+    let rtr = Builder::seeded(123).build(sim.freeze()).run();
     drop(rtr);
 
     assert_eq!(drop_counter.load(std::sync::atomic::Ordering::SeqCst), 3);
@@ -59,7 +59,7 @@ fn drop_check_modules_net_from_ndl() -> Result<(), Box<dyn Error>> {
         .with_default_fallback();
 
     let sim = Sim::ndl("tests/ndl/drop-test.yml", registry)?;
-    let rtr = Builder::seeded(123).build(sim).run();
+    let rtr = Builder::seeded(123).build(sim.freeze()).run();
     drop(rtr);
 
     assert_eq!(drop_counter.load(std::sync::atomic::Ordering::SeqCst), 2);
@@ -71,7 +71,8 @@ struct A {
 }
 
 impl ModuleBlock for Harness<A> {
-    fn build<A>(self, mut sim: des::prelude::ScopedSim<'_, A>) {
+    type Ret = ();
+    fn build<A>(self, mut sim: des::prelude::SimBuilderScoped<'_, A>) {
         let counter = self.counter.clone();
         sim.root(self.0);
         sim.node("b", B { counter });

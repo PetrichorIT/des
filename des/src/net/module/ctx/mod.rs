@@ -1,30 +1,39 @@
-use fxhash::{FxBuildHasher, FxHashMap};
-use spin::RwLock;
-
-use super::{
-    meta::Metadata, DummyModule, ModuleId, ModuleRef, ModuleRefWeak, ModuleReferencingError,
-    UnwindBehaviour,
-};
+use super::{DummyModule, ModuleId, ModuleRef, ModuleRefWeak, ModuleReferencingError};
 use crate::{
     prelude::{GateRef, ObjectPath},
     sync::SwapLock,
+    time::SimTime,
     tracing::{new_scope, ScopeToken},
 };
+use des_net_utils::props::{Prop, PropType, Props, RawProp};
+use fxhash::{FxBuildHasher, FxHashMap};
+
+use spawner::Spawner;
+use spin::RwLock;
 use std::{
-    any::Any,
     cell::Cell,
     fmt::Debug,
+    hash::Hash,
+    io::Error,
     sync::{atomic::AtomicBool, Arc},
+    time::Duration,
 };
-
-#[cfg(feature = "async")]
-use crate::net::module::rt::AsyncCoreExt;
 
 pub(crate) static MOD_CTX: SwapLock<Option<Arc<ModuleContext>>> = SwapLock::new(None);
 
 pub(crate) fn module_ctx_drop() {
     MOD_CTX.swap(&mut None);
 }
+
+cfg_async! {
+    pub(super) mod rt;
+    use self::rt::AsyncCoreExt;
+}
+
+mod spawner;
+mod stereotyp;
+
+pub use stereotyp::Stereotyp;
 
 /// The topological components of a module, not including the attached
 /// software.
@@ -40,17 +49,24 @@ pub struct ModuleContext {
     pub(crate) active: AtomicBool,
     pub(crate) id: ModuleId,
 
+    pub(crate) me: RwLock<Option<ModuleRefWeak>>,
+
     pub(crate) path: ObjectPath,
     pub(crate) gates: RwLock<Vec<GateRef>>,
 
-    pub(crate) unwind_behaviour: Cell<UnwindBehaviour>,
-    pub(super) meta: RwLock<Metadata>,
+    pub(crate) props: RwLock<Props>,
+
+    pub(crate) stereotyp: Cell<Stereotyp>,
     pub(crate) scope_token: ScopeToken,
 
     #[cfg(feature = "async")]
     pub(crate) async_ext: RwLock<AsyncCoreExt>,
     pub(crate) parent: Option<ModuleRefWeak>,
     pub(crate) children: RwLock<FxHashMap<String, ModuleRef>>,
+
+    // RUNTIME VALUES
+    #[allow(clippy::option_option)]
+    pub(crate) shutdown_task: RwLock<Option<Option<SimTime>>>,
 }
 
 impl ModuleContext {
@@ -67,18 +83,22 @@ impl ModuleContext {
             #[cfg(feature = "async")]
             async_ext: RwLock::new(AsyncCoreExt::new()),
 
-            meta: RwLock::new(Metadata::new()),
+            me: RwLock::new(None),
             scope_token: new_scope(path.clone()),
+
+            props: RwLock::new(Props::default()),
 
             active: AtomicBool::new(true),
             id: ModuleId::gen(),
             path,
-            unwind_behaviour: Cell::default(),
+            stereotyp: Cell::default(),
 
             gates: RwLock::new(Vec::new()),
 
             parent: None,
             children: RwLock::new(FxHashMap::with_hasher(FxBuildHasher::default())),
+
+            shutdown_task: RwLock::default(),
         }))
     }
 
@@ -97,18 +117,22 @@ impl ModuleContext {
             #[cfg(feature = "async")]
             async_ext: RwLock::new(AsyncCoreExt::new()),
 
-            meta: RwLock::new(Metadata::new()),
+            me: RwLock::new(None),
             scope_token: new_scope(path.clone()),
+
+            props: RwLock::new(Props::default()),
 
             active: AtomicBool::new(true),
             id: ModuleId::gen(),
             path,
-            unwind_behaviour: Cell::default(),
+            stereotyp: Cell::default(),
 
             gates: RwLock::new(Vec::new()),
 
             parent: Some(ModuleRefWeak::new(&parent)),
             children: RwLock::new(FxHashMap::with_hasher(FxBuildHasher::default())),
+
+            shutdown_task: RwLock::default(),
         }));
 
         parent
@@ -130,6 +154,96 @@ impl ModuleContext {
         let mut this = None;
         MOD_CTX.swap(&mut this);
         this
+    }
+
+    /// Shuts down all activity for the module.
+    ///
+    /// > *This function requires a node-context within the simulation*
+    ///
+    /// A module that is shut down, will not longer be able to
+    /// handle incoming messages, or run any user-defined code.
+    /// All plugin activity will be suspendend. However the
+    /// custom state will be kept for debug purposes.
+    ///
+    /// This function must be used within a module context
+    /// otherwise its effects should be consider UB.
+    pub fn shutdown(&self) {
+        *self.shutdown_task.write() = Some(None);
+    }
+
+    /// Shuts down all activity for the module.
+    /// Restarts after the given duration.
+    ///
+    /// > *This function requires a node-context within the simulation*
+    ///
+    /// On restart the module will be reinitalized
+    /// using `Module::reset`  and then `Module::at_sim_start`.
+    /// Use the reset function to get the custom state to a resonable default
+    /// state, which may or may not be defined by `Module::new`.
+    /// However you can simulate persistent-beyond-shutdown data
+    /// by not reseting this data in `Module::reset`.
+    ///
+    /// ```
+    /// # use des::prelude::*;
+    /// # type Data = usize;
+    /// struct MyModule {
+    ///     volatile: Data,
+    ///     persistent: Data,
+    /// }
+    ///
+    /// impl Module for MyModule {
+    ///     fn reset(&mut self) {
+    ///         self.volatile = 0;
+    ///     }
+    ///
+    ///     fn at_sim_start(&mut self, _: usize) {
+    ///         println!(
+    ///             "Start at {} with volatile := {} and persistent := {}",
+    ///             SimTime::now(),
+    ///             self.volatile,
+    ///             self.persistent
+    ///         );
+    ///
+    ///         self.volatile = 42;
+    ///         self.persistent = 1024;
+    ///
+    ///         if SimTime::now() == SimTime::ZERO {
+    ///             current().shutdow_and_restart_in(Duration::from_secs(10));
+    ///         }
+    ///     }
+    /// }
+    ///
+    /// fn main() {
+    ///     let app = /* ... */
+    /// #    Sim::new(());
+    ///     let rt = Builder::new().build(app.freeze()).run();
+    ///     // outputs 'Start at 0s with volatile := 0 and persistent := 0'
+    ///     // outputs 'Start at 10s with volatile := 0 and persistent := 1024'
+    /// }
+    /// ```
+    ///
+    /// [`Module::reset`]: crate::net::module::Module::reset
+    /// [`Module::at_sim_start`]: crate::net::module::Module::at_sim_start
+    pub fn shutdow_and_restart_in(&self, dur: Duration) {
+        *self.shutdown_task.write() = Some(Some(SimTime::now() + dur));
+    }
+
+    /// Shuts down all activity for the module.
+    /// Restarts at the given time.
+    ///
+    /// > *This function requires a node-context within the simulation*
+    ///
+    /// The user must ensure that the restart time
+    /// point is greater or equal to the current simtime.
+    ///
+    /// See [`shutdow_and_restart_in`](ModuleContext::shutdow_and_restart_in) for more information.
+    pub fn shutdow_and_restart_at(&self, restart_at: SimTime) {
+        *self.shutdown_task.write() = Some(Some(restart_at));
+    }
+
+    /// TODO
+    pub fn spawner(&self) -> Spawner<'_> {
+        Spawner { ctx: self }
     }
 
     /// Returns a runtime-unqiue identifier for the currently active module.
@@ -163,7 +277,7 @@ impl ModuleContext {
     /// impl Module for MyModule {
     ///     fn handle_message(&mut self, msg: Message) {
     ///         let path = current().path();
-    ///         println!("[{path}] recv message: {}", msg.str())
+    ///         println!("[{path}] recv message: {}", msg)
     ///     }
     /// }
     /// ```
@@ -171,6 +285,71 @@ impl ModuleContext {
     /// [`Module`]: crate::net::module::Module
     pub fn path(&self) -> ObjectPath {
         self.path.clone()
+    }
+
+    /// Returns the `ModuleRef` associated with this context.
+    ///
+    /// # Panics
+    ///
+    /// Cannot be called during teardown.
+    pub fn me(&self) -> ModuleRef {
+        self.me
+            .read()
+            .as_ref()
+            .expect("failed")
+            .upgrade()
+            .expect("cannot upgrade")
+    }
+
+    /// Returns a handle to a typed property on this module.
+    ///
+    /// See [`Prop`] for more information.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use des::prelude::*;
+    ///
+    /// struct ModuleWithProps;
+    /// impl Module for ModuleWithProps {
+    ///     fn at_sim_start(&mut self, _: usize) {
+    ///         let sid = current().prop::<u32>("sid").expect("cannot retrive prop");
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// This function is a shorthand for `prop_raw(key).typed::<T>()`.
+    /// See [`RawProp::typed`] for information on errors.
+    pub fn prop<T: PropType>(&self, key: &str) -> Result<Prop<T>, Error> {
+        self.props.write().get(key)
+    }
+
+    /// Returns a untyped property handle for the property under the given key.
+    ///
+    /// See [`RawProp`] for more information.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use des::prelude::*;
+    ///
+    /// struct ModuleWithProps;
+    /// impl Module for ModuleWithProps {
+    ///     fn at_sim_start(&mut self, _: usize) {
+    ///         let sid = current().prop_raw("cfg").as_value();
+    ///         //...
+    ///     }
+    /// }
+    /// ```
+    pub fn prop_raw(&self, key: &str) -> RawProp {
+        self.props.write().get_raw(key)
+    }
+
+    /// Returns the keys to all available props.
+    pub fn props_keys(&self) -> Vec<String> {
+        self.props.read().keys()
     }
 
     /// Returns the name for the currently active module.
@@ -196,39 +375,13 @@ impl ModuleContext {
             .cloned()
     }
 
-    /// Retrieves metadata about a module, based on a type.
-    ///
-    /// # Examples
-    ///
-    /// # Panics
-    ///
-    /// Panics when concurrently accessed from multiple threads.
-    pub fn meta<T: Any + Clone>(&self) -> Option<T> {
-        Some(
-            self.meta
-                .try_read()
-                .expect("Failed lock")
-                .get::<T>()?
-                .clone(),
-        )
-    }
-
-    /// Sets a metadata object.
-    ///
-    /// # Panics
-    ///
-    /// Panics when concurrently accessed from multiple threads.
-    pub fn set_meta<T: Any + Clone>(&self, value: T) {
-        self.meta.try_write().expect("Failed lock").set(value);
-    }
-
     /// Returns the unwind behaviour of this module.
     ///
     /// # Panics
     ///
     /// Panics when concurrently accesed from multiple threads.
-    pub fn unwind_behaviour(&self) -> UnwindBehaviour {
-        self.unwind_behaviour.get()
+    pub fn stereotyp(&self) -> Stereotyp {
+        self.stereotyp.get()
     }
 
     /// Sets the unwind behaviour of this module.
@@ -236,8 +389,8 @@ impl ModuleContext {
     /// # Panics
     ///
     /// Panics when concurrently accesed from multiple threads.
-    pub fn set_unwind_behaviour(&self, new: UnwindBehaviour) {
-        self.unwind_behaviour.set(new);
+    pub fn set_stereotyp(&self, new: Stereotyp) {
+        self.stereotyp.set(new);
     }
 
     /// Returns a reference to a parent module
@@ -312,6 +465,13 @@ impl ModuleContext {
 impl Debug for ModuleContext {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ModuleContext").finish()
+    }
+}
+
+impl Hash for ModuleContext {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+        self.path.hash(state);
     }
 }
 

@@ -1,7 +1,7 @@
 //! Physical link abstractions.
 #![allow(clippy::cast_precision_loss)]
 
-use rand::distributions::Uniform;
+use rand::distr::Uniform;
 use rand::prelude::StdRng;
 use rand::{Rng, RngCore};
 use std::collections::VecDeque;
@@ -265,7 +265,7 @@ impl ChannelDropBehaviour {
                 tracing::warn!(
                     "Gate '{}' dropping message [{}] pushed onto busy channel",
                     via.prev_hop().unwrap().name(),
-                    msg.str(),
+                    msg,
                 );
                 drop(msg);
             }
@@ -275,7 +275,7 @@ impl ChannelDropBehaviour {
                     tracing::warn!(
                         "Gate '{}' dropping message [{}] pushed onto busy channel",
                         via.prev_hop().unwrap().name(),
-                        msg.str(),
+                        msg,
                     );
                     drop(msg);
                 } else {
@@ -283,7 +283,7 @@ impl ChannelDropBehaviour {
                     tracing::trace!(
                         "Gate '{}' added message [{}] to queue of channel",
                         via.prev_hop().unwrap().name(),
-                        msg.str(),
+                        msg,
                     );
                     buffer.enqueue(msg, via);
                 }
@@ -346,13 +346,13 @@ impl ChannelMetrics {
     }
 
     /// Calcualtes the duration a message travels on a link.
-    #[allow(clippy::if_same_then_else)]
+    #[allow(clippy::if_same_then_else, clippy::missing_panics_doc)]
     pub fn calculate_duration(&self, msg: &Message, rng: &mut dyn RngCore) -> Duration {
         let transmission_time = self.calculate_busy(msg);
         if self.jitter == Duration::ZERO {
             self.latency + transmission_time
         } else {
-            let perc = rng.sample(Uniform::new(0.0f64, self.jitter.as_secs_f64()));
+            let perc = rng.sample(Uniform::new(0.0f64, self.jitter.as_secs_f64()).unwrap());
             self.latency + transmission_time + Duration::from_secs_f64(perc)
         }
     }

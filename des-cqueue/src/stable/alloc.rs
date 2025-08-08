@@ -62,9 +62,9 @@ impl CQueueLLAllocatorInner {
         self.add_free_region(block as usize, self.page_size);
     }
 
-    pub fn handle(&self) -> CQueueLLAllocator {
+    pub fn handle(&mut self) -> CQueueLLAllocator {
         CQueueLLAllocator {
-            inner: ptr::from_ref(self).cast_mut(),
+            inner: ptr::from_mut(self),
         }
     }
 
@@ -181,7 +181,7 @@ pub struct CQueueLLAllocator {
 }
 
 impl CQueueLLAllocator {
-    pub fn allocate(&self, layout: std::alloc::Layout) -> Result<*mut u8, ()> {
+    pub fn allocate(&mut self, layout: std::alloc::Layout) -> Result<*mut u8, ()> {
         let (size, align) = CQueueLLAllocatorInner::size_align(layout);
         let allocator = unsafe { &mut *self.inner };
 
@@ -195,19 +195,11 @@ impl CQueueLLAllocator {
                 let excess_size = region.end_addr() - alloc_end;
                 if excess_size > 0 {
                     if excess_size < size {
-                        // println!("alloc: dropping {} bytes of memory", excess_size);
                         // alloc_end = alloc_end.checked_add(size).expect("overflow");
                     } else {
                         allocator.add_free_region(alloc_end, excess_size);
                     }
                 }
-                // println!(
-                //     "alloc: Layout {{ size: {}, align: {} }} as Layout {{ size: {}, ptr: {} }}",
-                //     layout.size(),
-                //     layout.align(),
-                //     size,
-                //     alloc_start
-                // );
                 allocator.allocated_mem += size;
                 Ok(alloc_start as *mut u8)
             }
@@ -216,7 +208,7 @@ impl CQueueLLAllocator {
         }
     }
 
-    pub unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
+    pub unsafe fn deallocate(&mut self, ptr: NonNull<u8>, layout: Layout) {
         let (size, _) = CQueueLLAllocatorInner::size_align(layout);
         let allocator = unsafe { &mut *self.inner };
         allocator.allocated_mem -= size;

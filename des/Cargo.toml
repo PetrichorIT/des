@@ -15,17 +15,20 @@ version = "0.6.0"
 
 [features]
 # Include nothing by default
-default = []
+default = ["full"]
 
 # Include everything used for default test runs.
-full = ["net", "cqueue", "async", "macros"]
+full = ["net", "cqueue", "async", "macros", "serde"]
 
+serde = ["dep:serde"]
 macros = ["dep:des-macros", "dep:futures"]
 async = ["net", "dep:tokio"]
 cqueue = ["dep:des-cqueue"]
 multi-threaded = []
-net = ["dep:des-macros", "dep:des-net-utils", "dep:serde", "dep:serde_yml"]
+net = ["dep:des-macros", "dep:des-net-utils", "serde", "dep:serde_yml"]
 tracing = ["net"]
+
+miri = []
 
 unstable-tokio-enable-time = ["async", "tokio/time"]
 

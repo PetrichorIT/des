@@ -2,11 +2,9 @@
 #![allow(unused_variables)]
 
 use des::{
-    net::{
-        module::{join, Module},
-        AsyncFn,
-    },
+    net::{blocks::AsyncFn, module::Module, JoinError},
     prelude::*,
+    runtime::RuntimeError,
     time::{self, sleep, timeout, timeout_at, MissedTickBehavior},
 };
 use std::sync::{
@@ -49,22 +47,18 @@ fn quasai_sync_non_blocking() {
     let gate_a = rt.gate("root", "a");
     let gate_b = rt.gate("other", "b");
 
-    let mut rt = Builder::seeded(123).build(rt);
+    let mut rt = Builder::seeded(123).build(rt.freeze());
 
-    rt.add_message_onto(gate_a.clone(), Message::new().id(1).build(), SimTime::ZERO);
-    rt.add_message_onto(gate_a, Message::new().id(2).build(), SimTime::ZERO);
+    rt.add_message_onto(gate_a.clone(), Message::default().id(1), SimTime::ZERO);
+    rt.add_message_onto(gate_a, Message::default().id(2), SimTime::ZERO);
 
-    rt.add_message_onto(gate_b.clone(), Message::new().id(1).build(), SimTime::ZERO);
-    rt.add_message_onto(gate_b.clone(), Message::new().id(2).build(), SimTime::ZERO);
-    rt.add_message_onto(gate_b, Message::new().id(3).build(), SimTime::ZERO);
+    rt.add_message_onto(gate_b.clone(), Message::default().id(1), SimTime::ZERO);
+    rt.add_message_onto(gate_b.clone(), Message::default().id(2), SimTime::ZERO);
+    rt.add_message_onto(gate_b, Message::default().id(3), SimTime::ZERO);
 
     let result = rt.run();
     match result {
-        RuntimeResult::Finished {
-            app,
-            time,
-            profiler,
-        } => {
+        Ok((app, time, profiler)) => {
             assert_eq!(time, SimTime::ZERO);
             assert_eq!(profiler.event_count, 10);
         }
@@ -131,15 +125,14 @@ impl Module for MutipleTasksModule {
         self.sender = Some(txa);
     }
 
-    fn at_sim_end(&mut self) {
+    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
         for i in 0..self.handles.len() {
             assert!(
                 self.handles.try_join_next().is_some(),
                 "Failed to join {i}-th handle"
             );
         }
-
-        // first yield
+        Ok(())
     }
 
     fn handle_message(&mut self, msg: Message) {
@@ -155,19 +148,15 @@ fn mutiple_active_tasks() {
 
     let gate_a = rt.gate("root", "in");
 
-    let mut rt = Builder::seeded(123).build(rt);
+    let mut rt = Builder::seeded(123).build(rt.freeze());
 
-    rt.add_message_onto(gate_a.clone(), Message::new().id(1).build(), SimTime::ZERO);
-    rt.add_message_onto(gate_a.clone(), Message::new().id(2).build(), SimTime::ZERO);
-    rt.add_message_onto(gate_a, Message::new().kind(42).build(), SimTime::ZERO);
+    rt.add_message_onto(gate_a.clone(), Message::default().id(1), SimTime::ZERO);
+    rt.add_message_onto(gate_a.clone(), Message::default().id(2), SimTime::ZERO);
+    rt.add_message_onto(gate_a, Message::default().kind(42), SimTime::ZERO);
 
     let result = rt.run();
     match result {
-        RuntimeResult::Finished {
-            app,
-            time,
-            profiler,
-        } => {
+        Ok((app, time, profiler)) => {
             assert_eq!(time, SimTime::ZERO);
 
             //  3 * (Gate + HandleMessage)
@@ -195,7 +184,7 @@ struct TimeSleepModule {}
 impl Module for TimeSleepModule {
     fn handle_message(&mut self, msg: Message) {
         tokio::spawn(async move {
-            tracing::debug!("recv msg: {}", msg.str());
+            tracing::debug!("recv msg: {msg}");
             let wait_time = msg.header().kind as u64;
             tracing::info!(
                 "<{}> [{}] Waiting for timer",
@@ -225,26 +214,22 @@ fn one_module_timers() {
 
     let gate_a = rt.gate("root", "a");
 
-    let mut rt = Builder::seeded(123).build(rt);
+    let mut rt = Builder::seeded(123).build(rt.freeze());
 
     rt.add_message_onto(
         gate_a.clone(),
-        Message::new().id(1).kind(1).build(),
+        Message::default().id(1).kind(1),
         SimTime::ZERO,
     );
     rt.add_message_onto(
         gate_a,
-        Message::new().id(2).kind(2).build(),
+        Message::default().id(2).kind(2),
         SimTime::from_duration(Duration::new(2, 0)),
     );
 
     let result = rt.run();
     match result {
-        RuntimeResult::Finished {
-            app,
-            time,
-            profiler,
-        } => {
+        Ok((app, time, profiler)) => {
             assert_eq!(time, 4.0);
             assert_eq!(profiler.event_count, 6);
         }
@@ -264,26 +249,22 @@ fn one_module_delayed_recv() {
 
     let gate_a = rt.gate("root", "in");
 
-    let mut rt = Builder::seeded(123).build(rt);
+    let mut rt = Builder::seeded(123).build(rt.freeze());
 
     rt.add_message_onto(
         gate_a.clone(),
-        Message::new().id(1).kind(2).build(),
+        Message::default().id(1).kind(2),
         SimTime::ZERO,
     );
     rt.add_message_onto(
         gate_a,
-        Message::new().id(2).kind(2).build(),
+        Message::default().id(2).kind(2),
         SimTime::from_duration(Duration::new(2, 0)),
     );
 
     let result = rt.run();
     match result {
-        RuntimeResult::Finished {
-            app,
-            time,
-            profiler,
-        } => {
+        Ok((app, time, profiler)) => {
             assert_eq!(time, 4.0);
 
             // 1) Gate #1 (0s)
@@ -311,7 +292,7 @@ fn mutiple_module_delayed_recv() {
     let gate_a = rt.gate("a", "in");
     let gate_b = rt.gate("b", "in");
 
-    let mut rt = Builder::seeded(123).build(rt);
+    let mut rt = Builder::seeded(123).build(rt.freeze());
 
     // # Module 1
     //  |0  |1  |2  |3  |4  |5  |6
@@ -319,12 +300,12 @@ fn mutiple_module_delayed_recv() {
     //          ....<ID=2_>
     rt.add_message_onto(
         gate_a.clone(),
-        Message::new().id(1).kind(2).build(),
+        Message::default().id(1).kind(2),
         SimTime::from_duration(Duration::new(1, 0)),
     );
     rt.add_message_onto(
         gate_a,
-        Message::new().id(2).kind(2).build(),
+        Message::default().id(2).kind(2),
         SimTime::from_duration(Duration::new(2, 0)),
     );
 
@@ -334,22 +315,18 @@ fn mutiple_module_delayed_recv() {
     //          <ID=20>
     rt.add_message_onto(
         gate_b.clone(),
-        Message::new().id(10).kind(1).build(),
+        Message::default().id(10).kind(1),
         SimTime::from_duration(Duration::new(1, 0)),
     );
     rt.add_message_onto(
         gate_b,
-        Message::new().id(20).kind(2).build(),
+        Message::default().id(20).kind(2),
         SimTime::from_duration(Duration::new(2, 0)),
     );
 
     let result = rt.run();
     match result {
-        RuntimeResult::Finished {
-            app,
-            time,
-            profiler,
-        } => {
+        Ok((app, time, profiler)) => {
             assert_eq!(time, 4.0); // parallel exec is possible
             assert_eq!(profiler.event_count, 12);
         }
@@ -400,42 +377,38 @@ fn semaphore_in_waiting_task() {
     let gate_a = rt.gate("a", "in");
     let gate_b = rt.gate("b", "in");
 
-    let mut rt = Builder::seeded(123).build(rt);
+    let mut rt = Builder::seeded(123).build(rt.freeze());
 
     rt.add_message_onto(
         gate_a.clone(),
-        Message::new().id(1).kind(2).build(),
+        Message::default().id(1).kind(2),
         SimTime::from_duration(Duration::new(1, 0)),
     );
     rt.add_message_onto(
         gate_a,
-        Message::new().id(2).kind(3).build(),
+        Message::default().id(2).kind(3),
         SimTime::from_duration(Duration::new(2, 0)),
     );
 
     rt.add_message_onto(
         gate_b.clone(),
-        Message::new().id(10).kind(2).build(),
+        Message::default().id(10).kind(2),
         SimTime::from_duration(Duration::new(1, 0)),
     );
     rt.add_message_onto(
         gate_b.clone(),
-        Message::new().id(20).kind(2).build(),
+        Message::default().id(20).kind(2),
         SimTime::from_duration(Duration::new(2, 0)),
     );
     rt.add_message_onto(
         gate_b,
-        Message::new().id(20).kind(1).build(),
+        Message::default().id(20).kind(1),
         SimTime::from_duration(Duration::new(3, 0)),
     );
 
     let result = rt.run();
     match result {
-        RuntimeResult::Finished {
-            app,
-            time,
-            profiler,
-        } => {
+        Ok((app, time, profiler)) => {
             assert_eq!(time, 3.0);
             assert_eq!(profiler.event_count, 10);
         }
@@ -462,7 +435,7 @@ fn async_time_sleep_far_future() {
         }),
     );
 
-    let result = Builder::seeded(123).build(sim).run();
+    let result = Builder::seeded(123).build(sim.freeze()).run();
     assert_eq!(result.unwrap().1, 10.0);
 }
 
@@ -481,7 +454,7 @@ fn async_time_sleep_select() {
         .require_join(),
     );
 
-    let result = Builder::seeded(123).build(sim).run().unwrap();
+    let result = Builder::seeded(123).build(sim.freeze()).run().unwrap();
     assert_eq!(result.1, 5.0);
     assert_eq!(result.2.event_count, 1); // Just async wakeup for 5s, 10s will never be scheduled
 }
@@ -502,7 +475,7 @@ fn async_time_sleep_reset() {
         .require_join(),
     );
 
-    let result = Builder::seeded(123).build(sim).run().unwrap();
+    let result = Builder::seeded(123).build(sim.freeze()).run().unwrap();
     assert_eq!(result.1, 10.0);
     assert_eq!(result.2.event_count, 1); // Just async wakeup for 10s, 5s was not yet scheduled
 }
@@ -538,7 +511,7 @@ fn async_time_timeout() {
         .require_join(),
     );
 
-    let result = Builder::seeded(123).build(sim).run().unwrap();
+    let result = Builder::seeded(123).build(sim.freeze()).run().unwrap();
     assert_eq!(result.1, 15.0);
     // why 15s?
     // wakeup 20s will never be scheduled, since
@@ -565,7 +538,7 @@ fn async_time_timeout_far_future() {
         }),
     );
 
-    let result = Builder::seeded(123).build(sim).run().unwrap();
+    let result = Builder::seeded(123).build(sim.freeze()).run().unwrap();
     assert_eq!(result.1, 42.0);
 }
 
@@ -599,7 +572,10 @@ fn async_time_interval() {
         }),
     );
 
-    let _ = Builder::seeded(123).max_time(100.0.into()).build(sim).run();
+    let _ = Builder::seeded(123)
+        .max_time(100.0.into())
+        .build(sim.freeze())
+        .run();
 }
 
 #[test]
@@ -671,13 +647,16 @@ fn async_time_interval_missed_tick_behaviour() {
         }),
     );
 
-    let _ = Builder::seeded(123).max_time(100.0.into()).build(sim).run();
+    let _ = Builder::seeded(123)
+        .max_time(100.0.into())
+        .build(sim.freeze())
+        .run();
 }
 
 struct JoinOnModule;
 impl Module for JoinOnModule {
     fn at_sim_start(&mut self, _stage: usize) {
-        join(tokio::spawn(async move {
+        current().join(tokio::spawn(async move {
             std::future::pending::<()>().await;
         }));
     }
@@ -685,27 +664,51 @@ impl Module for JoinOnModule {
 
 #[test]
 #[serial]
-#[should_panic = "could not join task: not yet finished"]
 fn async_join_on_module_fail() {
     let mut sim = Sim::new(());
     sim.node("main", JoinOnModule);
 
-    let _ = Builder::seeded(123).build(sim).run();
+    let v = Builder::seeded(123).build(sim.freeze()).run();
+    assert!(v.unwrap_err()[0]
+        .as_any()
+        .downcast_ref::<JoinError>()
+        .is_some())
 }
 
 struct PanicIsJoinable;
 impl Module for PanicIsJoinable {
     fn at_sim_start(&mut self, _stage: usize) {
-        join(tokio::spawn(async move { panic!("Panic-Source") }));
+        current().join(tokio::spawn(async move { panic!("Panic-Source") }));
     }
 }
 
 #[test]
 #[serial]
-#[should_panic = "could not join task: task"]
 fn async_join_paniced_will_join_but_fail() {
     let mut sim = Sim::new(());
     sim.node("main", PanicIsJoinable);
 
-    let _ = Builder::seeded(123).build(sim).run();
+    let v = Builder::seeded(123).build(sim.freeze()).run();
+    assert!(v.unwrap_err()[0]
+        .as_any()
+        .downcast_ref::<JoinError>()
+        .is_some())
+}
+
+struct SpawnButNeverJoin;
+impl Module for SpawnButNeverJoin {
+    fn at_sim_start(&mut self, _stage: usize) {
+        current().join(tokio::spawn(async move {
+            std::future::pending::<()>().await;
+        }));
+    }
+}
+
+#[test]
+#[serial]
+fn runtime_require_join() {
+    let mut sim = Sim::new(());
+    sim.node("main", SpawnButNeverJoin);
+
+    let _ = Builder::seeded(123).build(sim.freeze()).run();
 }

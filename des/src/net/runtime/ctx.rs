@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use super::{Globals, HandleMessageEvent, MessageExitingConnection, Sim, Watcher, WatcherValueMap};
+use super::{Globals, HandleMessageEvent, MessageExitingConnection, Sim};
 use crate::net::gate::Connection;
 use crate::net::module::{current, with_mod_ctx, MOD_CTX};
 use crate::net::ModuleRestartEvent;
@@ -13,31 +13,18 @@ use std::sync::{Arc, Weak};
 
 static BUF_CTX: Mutex<BufferContext> = Mutex::new(BufferContext::new());
 
-type LoopbackBuffer = Vec<(Message, SimTime)>;
-
 struct BufferContext {
     // All new events that will be scheduled
     events: Vec<(NetEvents, SimTime)>,
-
-    // (Message, SendTime)
-    loopback: LoopbackBuffer,
-    // shudown,
-    #[allow(clippy::option_option)]
-    shutdown: Option<Option<SimTime>>,
     // globals
     globals: Option<Weak<Globals>>,
-    // watcher
-    watcher: Option<Weak<WatcherValueMap>>,
 }
 
 impl BufferContext {
     const fn new() -> Self {
         Self {
             events: Vec::new(),
-            loopback: Vec::new(),
-            shutdown: None,
             globals: None,
-            watcher: None,
         }
     }
 }
@@ -56,22 +43,9 @@ impl Globals {
     }
 }
 
-impl Watcher {
-    pub(crate) fn current() -> Watcher {
-        let ctx = BUF_CTX.lock();
-        ctx.watcher
-            .as_ref()
-            .expect("no watcher attached to this event")
-            .upgrade()
-            .expect("watch already dropped: simulation shutting down")
-            .watcher_for(current().path().to_string())
-    }
-}
-
-pub(crate) fn buf_init(globals: Weak<Globals>, watcher: Weak<WatcherValueMap>) {
+pub(crate) fn buf_init(globals: Weak<Globals>) {
     let mut ctx = BUF_CTX.lock();
     ctx.globals = Some(globals);
-    ctx.watcher = Some(watcher);
 
     // TODO: remove ?
     // SAFTEY:
@@ -120,17 +94,13 @@ pub(crate) fn buf_schedule_at(msg: Message, arrival_time: SimTime) {
     // used, and we dont block any channels. additionally this ensures that
     // timeouts are allways ordered later than packets, which is good
     let mut ctx = BUF_CTX.lock();
-    ctx.loopback.push((msg, arrival_time));
-}
-
-pub(crate) fn buf_schedule_shutdown(restart: Option<SimTime>) {
-    assert!(
-        restart.map_or(true, |r| r >= SimTime::now()),
-        "Restart point cannot be in the past"
-    );
-
-    let mut ctx = BUF_CTX.lock();
-    ctx.shutdown = Some(restart);
+    ctx.events.push((
+        NetEvents::HandleMessageEvent(HandleMessageEvent {
+            module: current().me(),
+            message: msg,
+        }),
+        arrival_time,
+    ));
 }
 
 pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<Sim<A>>)
@@ -144,19 +114,8 @@ where
         rt.add_event(event, time);
     }
 
-    // (1) Send loopback events from 'scheduleAt'
-    for (message, time) in ctx.loopback.drain(..) {
-        rt.add_event(
-            NetEvents::HandleMessageEvent(HandleMessageEvent {
-                module: module.clone(),
-                message,
-            }),
-            time,
-        );
-    }
-
     // (2) Handle shutdown if indicated
-    if let Some(restart) = ctx.shutdown.take() {
+    if let Some(restart) = module.shutdown_task.write().take() {
         // Mark the modules state
         #[cfg(feature = "tracing")]
         tracing::debug!("Shuttind down module and restaring at {:?}", restart);
@@ -172,7 +131,7 @@ where
         // Reset the internal state
         // Note that the module is not active, so it must be manually reactivated
         module.activate();
-        module.reset();
+        rt.app.error.extend(module.reset().err());
         module.deactivate(rt);
 
         // Reschedule wakeup

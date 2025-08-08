@@ -1,4 +1,11 @@
-use des::prelude::*;
+use des::{
+    net::{
+        blocks::{AsyncFn, HandlerFn},
+        globals,
+    },
+    prelude::*,
+};
+use serial_test::serial;
 
 #[derive(Default)]
 struct Receiver {
@@ -10,8 +17,9 @@ impl Module for Receiver {
         self.counter += 1;
     }
 
-    fn at_sim_end(&mut self) {
+    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
         assert_eq!(self.counter, 10);
+        Ok(())
     }
 }
 
@@ -22,7 +30,7 @@ impl Module for Sender {
     fn at_sim_start(&mut self, _stage: usize) {
         for i in 0..10 {
             send_in(
-                Message::new().id(i as u16).build(),
+                Message::default().id(i as u16),
                 ("port", 0),
                 Duration::from_secs(i),
             );
@@ -31,6 +39,7 @@ impl Module for Sender {
 }
 
 #[test]
+#[serial]
 fn connectivity() {
     let mut app = Sim::new(());
 
@@ -50,6 +59,45 @@ fn connectivity() {
         })),
     );
 
-    let app = Builder::seeded(123).build(app);
+    let app = Builder::seeded(123).build(app.freeze());
     let _ = app.run().unwrap();
+}
+
+#[test]
+#[serial]
+fn select_node_from_globals() -> Result<(), RuntimeError> {
+    let mut sim = Sim::new(());
+
+    sim.node("alice", HandlerFn::new(|_| {}));
+    sim.node("alice.submodule", HandlerFn::new(|_| {}));
+    sim.node("alice.submodule.child", HandlerFn::new(|_| {}));
+    sim.node("bob", HandlerFn::new(|_| {}));
+
+    sim.node(
+        "tester",
+        AsyncFn::io(|_| async move {
+            assert_eq!(
+                globals().get(&"alice".into()).unwrap().path(),
+                "alice".into()
+            );
+            assert_eq!(
+                globals().get(&"alice.submodule".into()).unwrap().path(),
+                "alice.submodule".into()
+            );
+            assert_eq!(
+                globals()
+                    .get(&"alice.submodule.child".into())
+                    .unwrap()
+                    .path(),
+                "alice.submodule.child".into()
+            );
+            assert_eq!(globals().get(&"bob".into()).unwrap().path(), "bob".into());
+
+            assert!(globals().get(&"steve".into()).is_none());
+
+            Ok(())
+        }),
+    );
+
+    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
 }

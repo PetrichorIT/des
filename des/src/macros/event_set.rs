@@ -24,7 +24,7 @@
 ///     #[derive(Debug)]
 ///     pub enum Events {
 ///         type App = App;
-///         
+///
 ///         PingEvent(PingEvent),
 ///         PongEvent(PongEvent),
 ///     };
@@ -50,8 +50,8 @@ macro_rules! event_set {
             )+
         }
 
-        impl< $( $N $(: $b0 $(+$b)* )? ),* > EventSet<$ty< $( $N ),* >> for $ident {
-            fn handle(self, rt: &mut Runtime<$ty< $( $N ),* >>) {
+        impl< $( $N $(: $b0 $(+$b)* )? ),* > ::des::runtime::Event<$ty< $( $N ),* >> for $ident {
+            fn handle(self, rt: &mut ::des::runtime::Runtime<$ty< $( $N ),* >>) {
                 match self {
                     $(
                         Self::$variant(event) => event.handle(rt),

@@ -38,6 +38,10 @@ use tree::{
 ///   initialized with concrete types. (TODO: nested generics for concrete replacement)
 /// - The defined type is a generic argument. A node of the interface type must be used as a placeholder, but its symbol
 ///   must be changed to the generics binding name.
+///
+/// # Errors
+///
+/// Returns an error if the `Def` does not describe a valid network.
 pub fn transform(def: &Def) -> Result<Network> {
     let mut modules = def
         .modules
@@ -148,7 +152,7 @@ fn transform_gates(ident: &str, defs: &[GateDef]) -> Result<FxHashSet<Gate>> {
             Ok(())
         }
     })?;
-    Ok(FxHashSet::from_iter(defs.iter().cloned()))
+    Ok(defs.iter().cloned().collect())
 }
 
 /// Transform the submodules
@@ -301,7 +305,7 @@ fn transform_connection(
         results.push(Connection {
             peers: [lhs, rhs],
             link: link.clone(),
-        })
+        });
     }
 
     Ok(())
@@ -333,7 +337,11 @@ fn transform_connection_endpoint_inner(
         Ok(
             iter_for_kardinality_access(gate_def, accessor, &accessor.ident)?
                 .map(|final_accessor| ConnectionEndpoint {
-                    accessors: Vec::from_iter(position.iter().cloned().chain(once(final_accessor))),
+                    accessors: position
+                        .iter()
+                        .cloned()
+                        .chain(once(final_accessor))
+                        .collect(),
                 })
                 .collect(),
         )
@@ -369,7 +377,7 @@ fn iter_for_kardinality_access<'a>(
     access: &FieldDef,
     ident: &'a str,
 ) -> Result<Box<dyn Iterator<Item = ConnectionEndpointAccessor> + 'a>> {
-    use Kardinality::*;
+    use Kardinality::{Atom, Cluster};
     match (def.kardinality, access.kardinality) {
         // 1:1 into atom
         (Atom, Atom) => Ok(Box::new(once(ConnectionEndpointAccessor {

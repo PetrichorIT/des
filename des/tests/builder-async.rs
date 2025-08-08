@@ -8,7 +8,7 @@ use std::{
     },
 };
 
-use des::{net::AsyncFn, prelude::*, time::sleep};
+use des::{net::blocks::AsyncFn, prelude::*, time::sleep};
 use serial_test::serial;
 
 #[test]
@@ -29,7 +29,7 @@ fn builder_async_fn_quasai_sync() {
     );
 
     assert_eq!(done.load(Ordering::SeqCst), false);
-    let _ = Builder::seeded(123).build(sim).run();
+    let _ = Builder::seeded(123).build(sim.freeze()).run();
     assert_eq!(done.load(Ordering::SeqCst), true);
 }
 
@@ -52,7 +52,7 @@ fn builder_async_fn_sleep() {
     );
 
     assert_eq!(time.load(Ordering::SeqCst), 0);
-    let _ = Builder::seeded(123).build(sim).run();
+    let _ = Builder::seeded(123).build(sim.freeze()).run();
     assert_eq!(time.load(Ordering::SeqCst), 10);
 }
 
@@ -76,10 +76,10 @@ fn builder_async_fn_message_recv() {
     );
     let gate = sim.gate("alice", "port");
 
-    let mut rt = Builder::seeded(123).build(sim);
-    rt.add_message_onto(gate.clone(), Message::new().id(1).build(), 1.0.into());
-    rt.add_message_onto(gate.clone(), Message::new().id(2).build(), 2.0.into());
-    rt.add_message_onto(gate.clone(), Message::new().id(3).build(), 3.0.into());
+    let mut rt = Builder::seeded(123).build(sim.freeze());
+    rt.add_message_onto(gate.clone(), Message::default().id(1), 1.0.into());
+    rt.add_message_onto(gate.clone(), Message::default().id(2), 2.0.into());
+    rt.add_message_onto(gate.clone(), Message::default().id(3), 3.0.into());
 
     let _ = rt.run();
     assert_eq!(counter.load(Ordering::SeqCst), 6);
@@ -97,7 +97,7 @@ fn builder_async_fn_channeled() {
         AsyncFn::new(|_| async move {
             for i in 0..16 {
                 sleep(Duration::from_secs(i)).await;
-                send(Message::new().id(i as u16).build(), "port");
+                send(Message::default().id(i as u16), "port");
             }
         }),
     );
@@ -126,7 +126,7 @@ fn builder_async_fn_channeled() {
         })),
     );
 
-    let _ = Builder::seeded(123).build(sim).run();
+    let _ = Builder::seeded(123).build(sim.freeze()).run();
     assert_eq!(counter.load(Ordering::SeqCst), (0..16).sum());
 }
 
@@ -144,12 +144,11 @@ fn builder_async_failable() {
             Ok(())
         }),
     );
-    let _ = Builder::new().build(sim).run();
+    let _ = Builder::new().build(sim.freeze()).run();
 }
 
 #[test]
 #[serial]
-#[should_panic]
 fn builder_async_failable_with_fail() {
     let mut sim = Sim::new(());
     sim.node(
@@ -162,7 +161,11 @@ fn builder_async_failable_with_fail() {
             Ok(())
         }),
     );
-    let _ = Builder::new().build(sim).run();
+    let v = Builder::new().build(sim.freeze()).run();
+    assert!(v.unwrap_err()[0]
+        .as_any()
+        .downcast_ref::<JoinError>()
+        .is_some())
 }
 
 #[test]
@@ -174,12 +177,11 @@ fn builder_async_no_join() {
         AsyncFn::new(|_| async move { std::future::pending().await }),
     );
 
-    let _ = Builder::seeded(123).build(sim).run();
+    let _ = Builder::seeded(123).build(sim.freeze()).run();
 }
 
 #[test]
 #[serial]
-#[should_panic = "Main task could not be joined"]
 fn builder_async_require_join() {
     let mut sim = Sim::new(());
     sim.node(
@@ -187,7 +189,11 @@ fn builder_async_require_join() {
         AsyncFn::io(|_| async move { std::future::pending().await }).require_join(),
     );
 
-    let _ = Builder::seeded(123).build(sim).run();
+    let v = Builder::seeded(123).build(sim.freeze()).run();
+    assert!(v.unwrap_err()[0]
+        .as_any()
+        .downcast_ref::<JoinError>()
+        .is_some());
 }
 
 #[test]
@@ -200,14 +206,17 @@ fn builder_async_restart() {
         COUNTER.fetch_add(1, Ordering::SeqCst);
 
         des::time::sleep(Duration::from_secs(10)).await;
-        shutdow_and_restart_in(Duration::from_secs(5));
+        current().shutdow_and_restart_in(Duration::from_secs(5));
         std::future::pending().await
     });
     assert_eq!(format!("{software:?}"), "AsyncFn");
 
     sim.node("alice", software);
 
-    let _ = Builder::seeded(123).max_time(25.0.into()).build(sim).run();
+    let _ = Builder::seeded(123)
+        .max_time(25.0.into())
+        .build(sim.freeze())
+        .run();
 
     // once at 0, 15, next would be 30
     assert_eq!(COUNTER.load(Ordering::SeqCst), 2);

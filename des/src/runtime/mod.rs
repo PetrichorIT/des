@@ -6,7 +6,7 @@ use crate::{
     macros::support::SyncWrap,
     time::{Duration, SimTime},
 };
-use rand::{distributions::Standard, prelude::Distribution, Rng, RngCore};
+use rand::{distr::StandardUniform, prelude::Distribution, Rng, RngCore};
 use std::{
     any::type_name,
     cell::UnsafeCell,
@@ -26,6 +26,9 @@ pub use bench::*;
 
 mod builder;
 pub use builder::*;
+
+mod error;
+pub use error::*;
 
 mod metrics;
 
@@ -60,9 +63,9 @@ pub fn rng() -> &'static mut dyn RngCore {
 #[must_use]
 pub fn random<T>() -> T
 where
-    Standard: Distribution<T>,
+    StandardUniform: Distribution<T>,
 {
-    rng().gen::<T>()
+    rng().random::<T>()
 }
 
 ///
@@ -89,7 +92,7 @@ where
 ///   This struct will hold the systems state and define the event set used in the simulation.
 /// - Create your events that handle the logic of you simulation. They must implement [`Event`] with the generic
 ///   parameter A, where A is your 'App' struct.
-/// - To bind those two together create a enum that implements [`EventSet`] that holds all your events.
+/// - To bind those two together create a enum that implements [`Event`] that holds all your events.
 ///
 /// This can be done via a macro. The use this event set as the associated event set in 'App'.
 ///
@@ -102,7 +105,6 @@ where
 /// to create a runnable instance and the run it.
 ///
 /// [`Event`]: crate::runtime::Event
-/// [`EventSet`]: crate::runtime::EventSet
 pub struct Runtime<App>
 where
     App: Application,
@@ -120,7 +122,7 @@ where
 
     // Misc
     quiet: bool,
-    profiler: Profiler,
+    profiler: Profiler<App::EventSet>,
 
     #[allow(dead_code)]
     permit: MutexGuard<'static, ()>,
@@ -168,11 +170,28 @@ where
     }
 
     ///
+    /// Returns the number of events that are remaining to be dispatched on this [`Runtime`] instance.
+    ///
+    pub fn num_events_remaining(&self) -> usize {
+        self.future_event_set.len()
+    }
+
+    ///
     /// Returns the current simulation time.
     ///
     #[allow(clippy::unused_self)]
     pub fn sim_time(&self) -> SimTime {
         SimTime::now()
+    }
+
+    /// Indicates whether the simulation was already started.
+    pub fn was_started(&self) -> bool {
+        matches!(self.state, State::Running)
+    }
+
+    /// Indicates whether the simulation has reached its limit.
+    pub fn has_reached_limit(&self) -> bool {
+        self.limit.applies(self.itr + 1, self.sim_time())
     }
 
     ///
@@ -181,7 +200,7 @@ where
     #[allow(clippy::unused_self)]
     pub fn random<T>(&mut self) -> T
     where
-        Standard: Distribution<T>,
+        StandardUniform: Distribution<T>,
     {
         self::random()
     }
@@ -232,7 +251,7 @@ where
     ///     EventA,
     ///     EventB
     /// }
-    /// impl EventSet<MyApp> for MyEventSet {
+    /// impl Event<MyApp> for MyEventSet {
     ///     fn handle(self, rt: &mut Runtime<MyApp>) {
     ///         dbg!(self, SimTime::now());
     ///     }
@@ -243,7 +262,7 @@ where
     /// let result = runtime.run();
     ///
     /// match result {
-    ///     RuntimeResult::Finished { time, profiler, .. } => {
+    ///     Ok((_, time, profiler))  => {
     ///         assert_eq!(time, SimTime::from(3.0));
     ///         assert_eq!(profiler.event_count, 3);
     ///     },
@@ -252,11 +271,15 @@ where
     ///
     /// ```
     ///
+    /// # Errors
+    ///
+    /// Returns an error if the application has determined that a simulation critical
+    /// failure has occurred.
+    ///
     /// # Panics
     ///
     /// This function panics if the simulation has not been started.
-    #[must_use]
-    pub fn run(mut self) -> RuntimeResult<A> {
+    pub fn run(mut self) -> Result<(A, SimTime, Profiler<A::EventSet>), RuntimeError> {
         assert_eq!(
             self.state,
             State::Ready,
@@ -370,14 +393,18 @@ where
     /// Decontructs the runtime and returns the application and the final `sim_time`.
     ///
     /// This funtions should only be used when running the simulation with manual calls
-    /// to [`next`](Runtime::next).
+    /// to `dispatch_*`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the application has determined that a simulation critical
+    /// failure has occurred.
     ///
     /// # Panics
     ///
     /// This function panics if the runtime is has not yet been started.
     #[allow(unused_mut)]
-    #[must_use]
-    pub fn finish(mut self) -> RuntimeResult<A> {
+    pub fn finish(mut self) -> Result<(A, SimTime, Profiler<A::EventSet>), RuntimeError> {
         assert_eq!(
             self.state,
             State::Running,
@@ -385,7 +412,7 @@ where
         );
 
         // Call the fin-handler on the allocated application
-        A::Lifecycle::at_sim_end(&mut self);
+        A::Lifecycle::at_sim_end(&mut self)?;
         self.profiler.finish(self.itr);
 
         if self.future_event_set.is_empty() && self.itr == 0 {
@@ -396,7 +423,8 @@ where
                 println!("\u{23A3}");
             }
 
-            return RuntimeResult::EmptySimulation { app: self.app };
+            let time = self.sim_time();
+            return Ok((self.app, time, self.profiler));
         }
 
         if self.future_event_set.is_empty() {
@@ -409,11 +437,7 @@ where
                 println!("\u{23A3}");
             }
 
-            RuntimeResult::Finished {
-                app: self.app,
-                profiler: self.profiler,
-                time,
-            }
+            Ok((self.app, time, self.profiler))
         } else {
             let time = self.sim_time();
 
@@ -429,12 +453,13 @@ where
                 println!("\u{23A3}");
             }
 
-            RuntimeResult::PrematureAbort {
-                profiler: self.profiler,
-                active_events: self.future_event_set.len(),
-                app: self.app,
-                time,
+            self.profiler.remaining.reserve(self.future_event_set.len());
+            while !self.future_event_set.is_empty() {
+                let event_frame = self.future_event_set.fetch_next();
+                self.profiler.remaining.push(event_frame);
             }
+
+            Ok((self.app, time, self.profiler))
         }
     }
 
@@ -485,7 +510,7 @@ where
     /// #     EventA,
     /// #     EventB
     /// # }
-    /// # impl EventSet<MyApp> for MyEventSet {
+    /// # impl Event<MyApp> for MyEventSet {
     /// #     fn handle(self, rt: &mut Runtime<MyApp>) {}
     /// # }
     /// #
@@ -496,7 +521,7 @@ where
     ///     runtime.add_event_in(MyEventSet::EventA, Duration::new(12, 0));
     ///
     ///     match runtime.run() {
-    ///         RuntimeResult::Finished { time, profiler, .. } => {
+    ///         Ok((_, time, profiler)) => {
     ///             assert_eq!(time, SimTime::from(22.0));
     ///             assert_eq!(profiler.event_count, 1);
     ///         },
@@ -529,7 +554,7 @@ where
     /// #     EventA,
     /// #     EventB
     /// # }
-    /// # impl EventSet<MyApp> for MyEventSet {
+    /// # impl Event<MyApp> for MyEventSet {
     /// #     fn handle(self, rt: &mut Runtime<MyApp>) {}
     /// # }
     /// #
@@ -540,7 +565,7 @@ where
     ///     runtime.add_event(MyEventSet::EventA, SimTime::from(12.0));
     ///
     ///     match runtime.run() {
-    ///         RuntimeResult::Finished { time, profiler, .. } => {
+    ///         Ok((_, time, profiler)) => {
     ///             assert_eq!(time, SimTime::from(12.0)); // 12 not 10+12 = 22
     ///             assert_eq!(profiler.event_count, 1);
     ///         },
@@ -552,201 +577,6 @@ where
     pub fn add_event(&mut self, event: impl Into<A::EventSet>, time: SimTime) {
         self.future_event_set.add(time, event);
         self.event_id += 1;
-    }
-}
-
-///
-/// The result of an full execution of a runtime object.
-///
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum RuntimeResult<A> {
-    /// The simulation has finished with an event count of `1`.
-    /// This ususally inidcates that some parameter was invalid,
-    /// or the user forgot to insert a startup event. However a
-    /// `at_sim_start` event has been called.
-    EmptySimulation {
-        /// The application provided upon runtime creation, only changed through
-        /// the `at_sim_start` method of modules.
-        app: A,
-    },
-    /// The simulation has fully depleted its event pool with an event count
-    /// greater than `1`. The function `at_sim_end` has been called.
-    Finished {
-        /// The application after the simulation was executed.
-        app: A,
-        /// The time of the final event in the simulation.
-        time: SimTime,
-        /// The runtime profile of the simulation
-        profiler: Profiler,
-    },
-    /// The simulation has not fully deleted its event pool. but a `RuntimeLimit`
-    /// has been reached.
-    PrematureAbort {
-        /// The application in the intermediary state of premature abort,
-        /// but `at_sim_end` has been called.
-        app: A,
-        /// The time of the last event valid withing the limits of the runtime.
-        time: SimTime,
-        /// The size of the current event pool.
-        active_events: usize,
-        /// The runtime profile of the simulation
-        profiler: Profiler,
-    },
-}
-
-impl<A> RuntimeResult<A> {
-    /// Gets the contained application from the runtime result.
-    ///
-    /// An application is contained in each variant of a runtime result.
-    pub fn into_app(self) -> A {
-        match self {
-            Self::EmptySimulation { app }
-            | Self::Finished { app, .. }
-            | Self::PrematureAbort { app, .. } => app,
-        }
-    }
-
-    ///
-    /// Returns the contained [`PrematureAbort`](Self::PrematureAbort) variant
-    /// consuming the `self`value.
-    ///
-    /// # Panics
-    ///
-    /// This function panics if self contains another variant that [`PrematureAbort`](Self::PrematureAbort).
-    ///
-    pub fn unwrap_premature_abort(self) -> (A, SimTime, Profiler, usize) {
-        match self {
-            Self::PrematureAbort { app, time,profiler, active_events} => (app, time, profiler, active_events),
-            _ => panic!("called `RuntimeResult::unwrap_premature_abort` on a value that is not `PrematureAbort`")
-        }
-    }
-
-    ///
-    /// Returns the contained [`Finished`](Self::Finished) variant consuming the `self` value.
-    ///
-    /// # Panics
-    ///
-    /// This function panics should the `self` value contain another variant.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use des::prelude::*;
-    /// # use des::runtime::Profiler;
-    /// # #[derive(Debug, PartialEq, Eq)]
-    /// # struct MyApp;
-    /// # fn main() {
-    /// let p = Profiler::default();
-    /// let result = RuntimeResult::Finished { app: MyApp, time: 1.0.into(), profiler: p.clone() };
-    /// assert_eq!(result.unwrap(), (MyApp, SimTime::from(1.0), p));
-    /// # }
-    /// ```
-    ///
-    /// ```should_panic
-    /// # use des::prelude::*;
-    /// # #[derive(Debug, PartialEq, Eq)]
-    /// # struct MyApp;
-    /// # fn main() {
-    /// let result = RuntimeResult::EmptySimulation { app: MyApp };
-    /// result.unwrap();
-    /// # }
-    /// ```
-    pub fn unwrap(self) -> (A, SimTime, Profiler) {
-        match self {
-            Self::Finished {
-                app,
-                time,
-                profiler,
-            } => (app, time, profiler),
-            _ => panic!("called `RuntimeResult::unwrap` on value that is not 'Finished'"),
-        }
-    }
-
-    ///
-    /// Returns the contained [`Finished`](Self::Finished) variant or
-    /// the provided default.
-    ///
-    /// The argument `default` is eagerly evaulated, for lazy evaluation use
-    /// [`unwrap_or_else`](Self::unwrap_or_else).
-    ///
-    pub fn unwrap_or(self, default: (A, SimTime, Profiler)) -> (A, SimTime, Profiler) {
-        match self {
-            Self::Finished {
-                app,
-                time,
-                profiler,
-            } => (app, time, profiler),
-            _ => default,
-        }
-    }
-
-    ///
-    /// Returns the contained [`Finished`](Self::Finished) variant or lazily
-    /// computes a fallback value from the given closure.
-    ///
-    pub fn unwrap_or_else<F>(self, f: F) -> (A, SimTime, Profiler)
-    where
-        F: FnOnce() -> (A, SimTime, Profiler),
-    {
-        match self {
-            Self::Finished {
-                app,
-                time,
-                profiler,
-            } => (app, time, profiler),
-            _ => f(),
-        }
-    }
-
-    ///
-    /// Maps the `app` property that is contained in all variants to a new
-    /// value of type T, using the given closure.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use des::prelude::*;
-    /// # #[derive(Debug, PartialEq, Eq)]
-    /// struct InnerResult { value: usize }
-    /// # #[derive(Debug, PartialEq, Eq)]
-    /// struct OuterResult { inner: InnerResult }
-    ///
-    /// # fn main() {
-    /// let result = RuntimeResult::EmptySimulation {
-    ///     app: OuterResult { inner: InnerResult { value: 42 } }
-    /// };
-    /// let result = result.map_app(|outer| outer.inner);
-    /// assert_eq!(result, RuntimeResult::EmptySimulation { app: InnerResult { value: 42 } });
-    /// # }
-    /// ```
-    ///
-    pub fn map_app<F, T>(self, f: F) -> RuntimeResult<T>
-    where
-        F: FnOnce(A) -> T,
-    {
-        match self {
-            Self::EmptySimulation { app } => RuntimeResult::EmptySimulation { app: f(app) },
-            Self::Finished {
-                app,
-                time,
-                profiler,
-            } => RuntimeResult::Finished {
-                app: f(app),
-                time,
-                profiler,
-            },
-            Self::PrematureAbort {
-                app,
-                time,
-                profiler,
-                active_events,
-            } => RuntimeResult::PrematureAbort {
-                app: f(app),
-                time,
-                profiler,
-                active_events,
-            },
-        }
     }
 }
 

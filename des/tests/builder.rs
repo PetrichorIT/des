@@ -1,7 +1,7 @@
 #![cfg(feature = "net")]
 
 use des::{
-    net::{FailabilityPolicy, HandlerFn, ModuleBlock, ModuleFn},
+    net::blocks::{FailabilityPolicy, HandlerFn, ModuleBlock, ModuleFn},
     prelude::*,
 };
 use serial_test::serial;
@@ -50,7 +50,7 @@ fn builder_builds_hierachie() {
         ),
     );
 
-    let _ = Builder::seeded(123).build(sim).run();
+    let _ = Builder::seeded(123).build(sim.freeze()).run();
 }
 
 #[test]
@@ -100,7 +100,7 @@ fn builder_gate_cluster() {
     sim.node("alice", Alice);
     let _ = sim.gates("alice", "cluster", 4);
 
-    let _ = Builder::seeded(123).build(sim).run();
+    let _ = Builder::seeded(123).build(sim.freeze()).run();
 }
 
 #[test]
@@ -110,7 +110,8 @@ fn builder_module_block() {
     struct Block;
     impl Module for Def {}
     impl ModuleBlock for Block {
-        fn build<A>(self, mut sim: ScopedSim<'_, A>) {
+        type Ret = ();
+        fn build<A>(self, mut sim: SimBuilderScoped<'_, A>) {
             sim.root(Def);
             let _ = sim.gate("", &format!("port-{}", sim.scope()));
 
@@ -143,10 +144,10 @@ fn builder_handler_fn() {
     let other = sim.gate("alice", "port");
     assert!(Arc::ptr_eq(&gate, &other));
 
-    let mut rt = Builder::seeded(123).build(sim);
-    rt.add_message_onto(gate.clone(), Message::new().id(1).build(), 1.0.into());
-    rt.add_message_onto(gate.clone(), Message::new().id(2).build(), 2.0.into());
-    rt.add_message_onto(gate.clone(), Message::new().id(3).build(), 3.0.into());
+    let mut rt = Builder::seeded(123).build(sim.freeze());
+    rt.add_message_onto(gate.clone(), Message::default().id(1), 1.0.into());
+    rt.add_message_onto(gate.clone(), Message::default().id(2), 2.0.into());
+    rt.add_message_onto(gate.clone(), Message::default().id(3), 3.0.into());
 
     let _ = rt.run();
     assert_eq!(counter.load(Ordering::SeqCst), 6);
@@ -170,7 +171,7 @@ fn builder_handler_fn_with_err() {
         ),
     );
 
-    let _ = Builder::seeded(123).build(sim).run();
+    let _ = Builder::seeded(123).build(sim.freeze()).run();
 }
 
 // #[test]
@@ -193,8 +194,8 @@ fn builder_handler_fn_with_err() {
 //     );
 //     let gate = sim.gate("alice", "port");
 
-//     let mut rt = Builder::seeded(123).build(sim);
-//     rt.add_message_onto(gate, Message::new().build(), 1.0.into());
+//     let mut rt = Builder::seeded(123).build(sim.freeze());
+//     rt.add_message_onto(gate, Message::default(), 1.0.into());
 
 //     let _ = rt.run();
 // }
@@ -218,8 +219,8 @@ fn builder_handler_fn_failure_no_panic() {
     );
     let gate = sim.gate("alice", "port");
 
-    let mut rt = Builder::seeded(123).build(sim);
-    rt.add_message_onto(gate, Message::new().build(), 1.0.into());
+    let mut rt = Builder::seeded(123).build(sim.freeze());
+    rt.add_message_onto(gate, Message::default(), 1.0.into());
 
     let _ = rt.run();
 }
@@ -245,13 +246,9 @@ fn builder_module_fn() {
     );
     let gate = sim.gate("alice", "port");
 
-    let mut rt = Builder::seeded(123).build(sim);
+    let mut rt = Builder::seeded(123).build(sim.freeze());
     for i in 0..10 {
-        rt.add_message_onto(
-            gate.clone(),
-            Message::new().id(i).build(),
-            (i as f64).into(),
-        );
+        rt.add_message_onto(gate.clone(), Message::default().id(i), (i as f64).into());
     }
 
     let _ = rt.run();
@@ -284,10 +281,10 @@ fn builder_module_fn_restart_at_failure() {
     );
     let gate = sim.gate("alice", "port");
 
-    let mut rt = Builder::seeded(123).build(sim);
-    rt.add_message_onto(gate.clone(), Message::new().id(1).build(), 1.0.into());
-    rt.add_message_onto(gate.clone(), Message::new().id(1).build(), 2.0.into());
-    rt.add_message_onto(gate.clone(), Message::new().id(2).build(), 3.0.into());
+    let mut rt = Builder::seeded(123).build(sim.freeze());
+    rt.add_message_onto(gate.clone(), Message::default().id(1), 1.0.into());
+    rt.add_message_onto(gate.clone(), Message::default().id(1), 2.0.into());
+    rt.add_message_onto(gate.clone(), Message::default().id(2), 3.0.into());
 
     let _ = rt.run();
     assert_eq!(starts.load(Ordering::SeqCst), 3);
@@ -314,6 +311,6 @@ fn builder_module_fn_gen_in_module_scope() {
     );
 
     assert_eq!(stage.load(Ordering::SeqCst), 0);
-    let _ = Builder::seeded(123).build(sim).run();
+    let _ = Builder::seeded(123).build(sim.freeze()).run();
     assert_eq!(stage.load(Ordering::SeqCst), 1);
 }

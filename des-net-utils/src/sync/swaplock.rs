@@ -19,25 +19,29 @@ use std::{cell::UnsafeCell, marker::PhantomData, ops::Deref, rc::Rc};
 use super::AtomicUsize;
 
 /// A lock that can only be accessed mutably by swapping the contents.
-pub(crate) struct SwapLock<T> {
+pub struct SwapLock<T> {
     inner: UnsafeCell<T>,
     read_count: AtomicUsize,
 }
 
 impl<T> SwapLock<T> {
-    pub(crate) const fn new(inner: T) -> Self {
+    pub const fn new(inner: T) -> Self {
         Self {
             inner: UnsafeCell::new(inner),
             read_count: AtomicUsize::new(0),
         }
     }
 
-    pub(crate) unsafe fn reset(&self, inner: T) {
+    /// # Safety
+    /// Ensure that this function is only called from the simulation thread
+    pub unsafe fn reset(&self, inner: T) {
         *self.inner.get() = inner;
         self.read_count.store(0, SeqCst);
     }
 
-    pub(crate) fn swap(&self, other: &mut T) {
+    /// # Panics
+    /// Panics if there are any read handles still alive.
+    pub fn swap(&self, other: &mut T) {
         // SAFTEY REASONS
         assert!(
             self.read_count.load(SeqCst) == 0,
@@ -49,7 +53,7 @@ impl<T> SwapLock<T> {
         std::mem::swap(inner, other);
     }
 
-    pub(crate) fn read(&self) -> SwapLockReadGuard<'_, T> {
+    pub fn read(&self) -> SwapLockReadGuard<'_, T> {
         SwapLockReadGuard::new(self)
     }
 }
@@ -57,7 +61,7 @@ impl<T> SwapLock<T> {
 unsafe impl<T: Send> Send for SwapLock<T> {}
 unsafe impl<T: Sync> Sync for SwapLock<T> {}
 
-pub(crate) struct SwapLockReadGuard<'a, T> {
+pub struct SwapLockReadGuard<'a, T> {
     lock: &'a SwapLock<T>,
     _phantom: PhantomData<Rc<T>>,
 }
@@ -72,21 +76,20 @@ impl<'a, T> SwapLockReadGuard<'a, T> {
         }
     }
 
-    pub(crate) fn as_real_inner(&self) -> &T {
+    #[must_use]
+    pub fn as_real_inner(&self) -> &T {
         unsafe { &(*self.lock.inner.get()) }
     }
 }
 
-impl<'a, T> Deref for SwapLockReadGuard<'a, T> {
+impl<T> Deref for SwapLockReadGuard<'_, T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
-        unsafe {
-            &(*self.lock.inner.get())
-        }
+        unsafe { &(*self.lock.inner.get()) }
     }
 }
 
-impl<'a, T> Drop for SwapLockReadGuard<'a, T> {
+impl<T> Drop for SwapLockReadGuard<'_, T> {
     fn drop(&mut self) {
         let ptr: *const SwapLock<T> = self.lock;
         self.lock.read_count.fetch_sub(1, SeqCst);

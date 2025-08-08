@@ -3,7 +3,7 @@
 ///
 /// The listing of types can be optionally suffixed with
 /// `else <some_type>`  to declare a fallback module
-/// in the [`Registry`](crate::ndl::Registry). The suffix `else _`
+/// in the [`Registry`](crate::net::ndl::Registry). The suffix `else _`
 /// declarse the default fallback module.
 ///
 /// # Example
@@ -28,7 +28,7 @@
 ///     let registry = registry![DnsServer, Client, Server, else _];
 ///     # return Ok(());
 ///     let app = Sim::ndl("path/to/ndl", registry)?;
-///     let rt = Builder::new().build(app);
+///     let rt = Builder::new().build(app.freeze());
 ///     let r = rt.run();
 /// }
 /// ```

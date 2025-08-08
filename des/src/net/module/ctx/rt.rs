@@ -6,10 +6,14 @@ use tokio::{
     task::{JoinHandle, LocalSet},
 };
 
+use super::ModuleContext;
+
 pub(crate) struct AsyncCoreExt {
     pub(crate) rt: Rt,
     pub(crate) driver: Option<Driver>,
-    pub(crate) require_joins: Vec<JoinHandle<()>>,
+
+    pub(crate) must_join: Vec<JoinHandle<()>>,
+    pub(crate) try_join: Vec<JoinHandle<()>>,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -17,6 +21,29 @@ pub(crate) enum Rt {
     Builder(Builder),
     Runtime((Arc<Runtime>, Rc<LocalSet>)),
     Shutdown,
+}
+
+impl ModuleContext {
+    /// Schedules a task to be joined when the simulatio ends
+    ///
+    /// This function will **not** block, but rather defer the joining
+    /// to the simulation shutdown phase.
+    pub fn join(&self, handle: JoinHandle<()>) {
+        self.async_ext.write().must_join.push(handle);
+    }
+
+    /// Will try to join a task when the simulation ends.
+    ///
+    /// This will catch panics that occured within the task, but
+    /// if the task is still running, no error will be returned.
+    pub fn try_join(&self, handle: JoinHandle<()>) {
+        self.async_ext.write().try_join.push(handle);
+    }
+
+    pub(crate) fn reset_join_handles(&self) {
+        self.async_ext.write().must_join.clear();
+        self.async_ext.write().try_join.clear();
+    }
 }
 
 impl AsyncCoreExt {
@@ -30,7 +57,9 @@ impl AsyncCoreExt {
         Self {
             rt: Rt::Builder(builder),
             driver: Some(Driver::new()),
-            require_joins: Vec::new(),
+
+            must_join: Vec::new(),
+            try_join: Vec::new(),
         }
     }
 

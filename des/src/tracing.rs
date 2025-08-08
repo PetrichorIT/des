@@ -2,14 +2,13 @@
 
 use std::sync::{
     atomic::{AtomicU64, Ordering},
-    mpsc::{self, Receiver, Sender},
+    mpsc::Sender,
 };
 
 use crate::{
+    net::module::try_current,
     prelude::{ObjectPath, SimTime},
-    sync::{Mutex, RwLock},
 };
-use fxhash::{FxBuildHasher, FxHashMap};
 use nu_ansi_term::{Color, Style};
 use tracing::{Level, Subscriber};
 use tracing_subscriber::{
@@ -90,34 +89,13 @@ pub fn format() -> SimFormat {
 
 /// A formatter that includes simulation specific information into the tracing messages.
 #[derive(Debug)]
-pub struct SimFormat {
-    scopes: RwLock<FxHashMap<u64, Scope>>,
-    rx: Mutex<Receiver<(ScopeToken, ObjectPath)>>,
-}
+pub struct SimFormat;
 
 unsafe impl Sync for SimFormat {}
 
-#[derive(Debug)]
-struct Scope {
-    path: ObjectPath,
-}
-
 impl SimFormat {
     fn init() -> SimFormat {
-        let (tx, rx) = mpsc::channel();
-        SCOPES.lock().unwrap().replace(tx);
-        SimFormat {
-            scopes: RwLock::new(FxHashMap::with_hasher(FxBuildHasher::default())),
-            rx: Mutex::new(rx),
-        }
-    }
-
-    fn fetch_scopes(&self) {
-        let rx = self.rx.lock();
-        let mut scopes = self.scopes.write();
-        while let Ok((new_token, new_scope)) = rx.try_recv() {
-            scopes.insert(new_token.0, Scope { path: new_scope });
-        }
+        SimFormat
     }
 }
 
@@ -154,18 +132,16 @@ where
             Level::ERROR => Style::new().fg(Color::Red),
         };
 
-        self.fetch_scopes();
-        let scope_id = SCOPE_CURRENT_TOKEN.load(Ordering::SeqCst);
-        let scopes = self.scopes.read();
-
-        if let Some(scope) = scopes.get(&scope_id) {
+        if let Some(scope) = try_current().map(|v| v.path()) {
             if !ansi {
                 write!(writer, "{} ", meta.level().as_str())?;
             }
-            maybe_ansi!(style, ansi, writer: "{} ", scope.path)?;
+            maybe_ansi!(style, ansi, writer: "{} ", scope)?;
         } else {
             maybe_ansi!(style, ansi, writer: "{} ", meta.level().as_str())?;
         }
+
+        maybe_ansi!(dimmed, ansi, writer: "{}: ", meta.target())?;
 
         if let Some(scope) = ctx.event_scope() {
             let mut seen = false;
@@ -187,8 +163,6 @@ where
                 writer.write_char(' ')?;
             }
         }
-
-        maybe_ansi!(dimmed, ansi, writer: "{}: ", meta.target())?;
 
         ctx.format_fields(writer.by_ref(), event)?;
         writeln!(writer)

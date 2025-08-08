@@ -1,4 +1,8 @@
-use std::{error::Error, fmt::Display};
+use std::{
+    error::Error as StdError,
+    fmt::{Debug, Display},
+    io,
+};
 
 /// An error while resolving a reference to another module.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -15,28 +19,14 @@ pub enum ModuleReferencingError {
 
 impl Display for ModuleReferencingError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::NoEntry(str)
-            | Self::TypeError(str)
-            | Self::NotYetInitalized(str)
-            | Self::CurrentlyInactive(str) => {
-                write!(f, "{str}")
-            }
-        }
+        <Self as Debug>::fmt(self, f)
     }
 }
 
-impl Error for ModuleReferencingError {}
+impl StdError for ModuleReferencingError {}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn fmt() {
-        assert_eq!(
-            ModuleReferencingError::NoEntry("Hello world!".to_string()).to_string(),
-            "Hello world!"
-        );
+impl From<ModuleReferencingError> for io::Error {
+    fn from(err: ModuleReferencingError) -> Self {
+        io::Error::new(io::ErrorKind::InvalidInput, err)
     }
 }

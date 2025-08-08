@@ -45,6 +45,7 @@ pub type Link = LinkDef;
 pub struct Symbol(String);
 
 impl Node {
+    #[must_use]
     pub fn conform_to(&self, interface: &Node) -> bool {
         if !interface.gates.is_subset(&self.gates) {
             return false;
@@ -78,6 +79,7 @@ impl Deref for Symbol {
 }
 
 impl ConnectionEndpointAccessor {
+    #[must_use]
     pub fn as_name(&self) -> String {
         if let Some(index) = self.index {
             format!("{}[{}]", self.name, index)

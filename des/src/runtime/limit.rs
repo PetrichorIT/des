@@ -6,6 +6,7 @@ use std::{fmt::Display, mem};
 /// a runtime.
 ///
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RuntimeLimit {
     /// A unbounded runtime. A runtime with this limit will
     /// only finish if the all events are handled and no new

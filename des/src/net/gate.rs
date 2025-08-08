@@ -2,25 +2,18 @@
 
 use crate::net::channel::ChannelRef;
 use std::fmt::Debug;
+use std::hash::Hash;
 use std::sync::{Arc, Mutex, Weak};
 
 use super::module::{ModuleContext, ModuleRef, ModuleRefWeak};
 use super::ObjectPath;
 
-///
 /// A  reference to a gate.
-///
 pub type GateRef = Arc<Gate>;
-///
 /// A weak reference to a gate.
-///
 pub(crate) type GateRefWeak = Weak<Gate>;
 
-///
 /// A gate, a message insertion or extraction point used for handeling channels.
-///
-/// * This type is only available of DES is build with the `"net"` feature.*
-#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub struct Gate {
     owner: ModuleRefWeak,
     name: String,
@@ -82,7 +75,7 @@ impl Connection {
         Self::new_unchecked(gate)
     }
 
-    /// Unchecked
+    /// Create a connection, without checking the availability of the used gates.
     pub fn new_unchecked(gate: GateRef) -> Self {
         Self {
             endpoint: gate,
@@ -91,7 +84,7 @@ impl Connection {
         }
     }
 
-    /// NEXT
+    /// Retrives the next hop from the connection, in the direction of iteration.
     ///
     /// # Panics
     ///
@@ -107,7 +100,8 @@ impl Connection {
         lock.connections[idx].clone()
     }
 
-    /// PREV
+    /// Retrives the previous hop from the connection, in the direction of iteration.
+    ///
     /// # Panics
     ///
     /// May panic on lock poisoning
@@ -126,7 +120,7 @@ impl Connection {
         )
     }
 
-    /// Retrieves a handle to a channel attached to the connection
+    /// Retrieves a handle to a channel attached to this connection.
     #[must_use]
     pub fn channel(&self) -> Option<ChannelRef> {
         self.channel.clone()
@@ -151,7 +145,7 @@ impl Connections {
                 return;
             }
         }
-        unreachable!()
+        unreachable!("Connections::put should not be called if no free slots are available")
     }
 }
 
@@ -169,34 +163,26 @@ impl Iterator for PathIter {
 }
 
 impl Gate {
-    ///
     /// Indicator whether a descriptor describes a cluster
     /// or a single gate
-    ///
     #[must_use]
     pub fn is_cluster(&self) -> bool {
         self.size != 1
     }
 
-    ///
     /// The position index of the gate within the descriptor cluster.
-    ///
     #[must_use]
     pub fn pos(&self) -> usize {
         self.pos
     }
 
-    ///
     /// The size of the gate cluster.
-    ///
     #[must_use]
     pub fn size(&self) -> usize {
         self.size
     }
 
-    ///
     /// The human-readable name for the allocated gate cluster.
-    ///
     #[must_use]
     pub fn name(&self) -> &str {
         &self.name
@@ -210,17 +196,13 @@ impl Gate {
         }
     }
 
-    ///
     /// Returns a short identifcator that holds all nessecary information.
-    ///
     #[must_use]
     pub fn str(&self) -> String {
         self.name_with_pos()
     }
 
-    ///
     /// The full tree path of the gate.
-    ///
     #[must_use]
     pub fn path(&self) -> ObjectPath {
         self.owner().ctx.path.appended_gate(self.name_with_pos())
@@ -280,7 +262,16 @@ impl Gate {
             "Cannot connect gate to itself."
         );
 
-        let mut conns = self.connections.try_lock().expect("Failed to get lock");
+        // Check whether the target is allready connected
+        let mut conns = self.connections.try_lock().expect("failed lock");
+        for i in 0..2 {
+            if let Some(ref con) = conns.connections[i] {
+                if Arc::ptr_eq(&con.endpoint, &other) {
+                    return;
+                }
+            }
+        }
+
         let mut other_conns = other.connections.try_lock().expect("failed to get lock");
 
         let conns_pos = conns.len();
@@ -305,31 +296,14 @@ impl Gate {
         });
     }
 
-    /// DEDUP
-    /// # Panics
-    ///
-    /// May panic when accessed during teardown
-    pub fn connect_dedup(self: GateRef, other: GateRef, channel: Option<ChannelRef>) {
-        // Check whether the target is allready connected
-        let conns = self.connections.try_lock().expect("failed lock");
-        for i in 0..2 {
-            if let Some(ref con) = conns.connections[i] {
-                if Arc::ptr_eq(&con.endpoint, &other) {
-                    return;
-                }
-            }
-        }
-
-        drop(conns);
-        self.connect(other, channel);
-    }
-
-    /// CHAN
+    /// Retrives the channel of the first connection on the path.
     pub fn channel(self: &GateRef) -> Option<ChannelRef> {
         self.path_iter()?.nth(0).and_then(|con| con.channel)
     }
 
-    /// ITER
+    /// Returns an iterator over the connections on a gate path.
+    /// If the current gate is a transit gate, no iterator will be returned,
+    /// since the direction of the iterator cannot be determined.
     pub fn path_iter(self: &GateRef) -> Option<impl Iterator<Item = Connection>> {
         if self.kind() == GateKind::Transit {
             None
@@ -340,24 +314,26 @@ impl Gate {
         }
     }
 
-    /// NEXT GATE
+    /// Retrieves the next gate on the path.
+    ///
+    /// If the current gate is a not an endpoint, `None` will be returned.
     pub fn next_gate(self: &GateRef) -> Option<GateRef> {
         self.path_iter()?.nth(0).map(|c| c.endpoint)
     }
 
-    /// END
+    /// Retrieves the last gate on the path.
+    ///
+    /// If the current gate is a not an endpoint, `None` will be returned.
     pub fn path_end(self: &GateRef) -> Option<GateRef> {
         self.path_iter()?.last().map(|c| c.endpoint)
     }
 
-    ///
     /// Returns the owner module by reference of this gate.
     ///
     /// # Panics
     ///
     /// May panic when called in Drop, since the owner may allready
     /// be dropped.
-    ///
     #[must_use]
     pub fn owner(&self) -> ModuleRef {
         self.owner
@@ -365,7 +341,6 @@ impl Gate {
             .expect("cannot refer to gate owner during drop")
     }
 
-    ///
     /// Creats a new gate using the given values.
     ///
     /// # Panics
@@ -422,20 +397,26 @@ impl PartialEq for Gate {
             && self.pos == other.pos
     }
 }
+
 impl Eq for Gate {}
+
+impl Hash for Gate {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.owner().hash(state);
+        self.name().hash(state);
+        self.pos().hash(state);
+        self.size().hash(state);
+    }
+}
 
 mod private {
     pub trait Sealed {}
 }
 
-///
 /// A trait for a type to refrence a module specific gate.
-///
 pub trait IntoModuleGate: private::Sealed {
-    ///
     /// Extracts a gate identifier from a module using the given
     /// value as implicit reference.
-    ///
     fn as_gate(&self, module: &ModuleContext) -> Option<GateRef>;
 }
 
@@ -500,14 +481,14 @@ mod tests {
     #[test]
     fn kind_and_iter() {
         let owner = ModuleContext::standalone("root".into());
-        let gate_a = Gate::new(&owner, "port-a", 1, 0);
+        let gate_a = owner.create_raw_gate("port-a", 1, 0);
         assert_eq!(gate_a.kind(), GateKind::Standalone);
 
-        let gate_b = Gate::new(&owner, "port-b", 1, 0);
+        let gate_b = owner.create_raw_gate("port-b", 1, 0);
         gate_a.clone().connect(gate_b.clone(), None);
         assert_eq!(gate_a.kind(), GateKind::Endpoint);
 
-        let gate_c = Gate::new(&owner, "port-c", 1, 0);
+        let gate_c = owner.create_raw_gate("port-c", 1, 0);
         gate_a.clone().connect(gate_c.clone(), None);
         assert_eq!(gate_a.kind(), GateKind::Transit);
 
@@ -525,21 +506,21 @@ mod tests {
     #[test]
     fn dedup() {
         let owner = ModuleContext::standalone("root".into());
-        let gate = Gate::new(&owner, "port", 1, 0);
+        let gate = owner.create_raw_gate("port-a", 1, 0);
         assert_eq!(gate.kind(), GateKind::Standalone);
 
-        let gate_b = Gate::new(&owner, "port-b", 1, 0);
-        gate.clone().connect_dedup(gate_b.clone(), None);
+        let gate_b = owner.create_raw_gate("port-b", 1, 0);
+        gate.clone().connect(gate_b.clone(), None);
         assert_eq!(gate.kind(), GateKind::Endpoint);
 
-        gate.clone().connect_dedup(gate_b, None);
+        gate.clone().connect(gate_b, None);
         assert_eq!(gate.kind(), GateKind::Endpoint);
     }
 
     #[test]
     fn into_gate() {
         let ctx = ModuleContext::standalone("root".into());
-        let gate_a = ctx.create_gate("port-a");
+        let gate_a = ctx.create_raw_gate("port-a", 1, 0);
 
         assert_eq!((&gate_a).as_gate(&ctx.ctx), Some(gate_a.clone()));
         assert_eq!(

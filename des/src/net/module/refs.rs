@@ -8,14 +8,15 @@ use super::{DummyModule, Module, ModuleContext, ModuleExt};
 use std::any::{Any, TypeId};
 use std::cell::{Ref, RefCell, RefMut};
 use std::fmt::Debug;
+use std::hash::Hash;
 use std::ops::Deref;
+use std::sync::atomic::Ordering;
 use std::sync::{Arc, Weak};
 
 #[derive(Clone)]
 pub(crate) struct ModuleRefWeak {
     ctx: Weak<ModuleContext>,
     handler: Weak<RefCell<Processor>>,
-    // handler_ptr: *mut u8,
 }
 
 impl ModuleRefWeak {
@@ -23,7 +24,6 @@ impl ModuleRefWeak {
         Self {
             ctx: Arc::downgrade(&strong.ctx),
             handler: Arc::downgrade(&strong.processing),
-            // handler_ptr: strong.handler_ptr,
         }
     }
 
@@ -31,7 +31,6 @@ impl ModuleRefWeak {
         Some(ModuleRef {
             ctx: self.ctx.upgrade()?,
             processing: self.handler.upgrade()?,
-            // handler_ptr: self.handler_ptr,
         })
     }
 }
@@ -65,10 +64,13 @@ impl ModuleRef {
     ) -> Self {
         let procesing = module.to_processing_chain(stack);
         let handler = Arc::new(RefCell::new(procesing));
-        Self {
+        let this = Self {
             ctx,
             processing: handler,
-        }
+        };
+
+        *this.ctx.me.write() = Some(ModuleRefWeak::new(&this));
+        this
     }
 
     #[allow(unused)]
@@ -124,21 +126,9 @@ impl ModuleRef {
         let rf = &*brw.handler;
         let ty = rf.type_id();
         if ty == TypeId::of::<T>() {
-            // SAFTEY:
-            // The pointer 'handler_ptr' will allways point to the object
-            // refered to by the 'handler': Since 'handler' is owned through
-            // an 'Arc' its memory position will NOT changed. Thus 'handler_ptr'
-            // allways points to valid memory. Pointer aligment is guranteed.
-            //
-            // Since the created &T is encapluslated in a Ref<&T> this functions acts as
-            // a call of 'RefCell::borrow' thus upholding the borrowing invariants.
-            //
-            // Should the type check fail, the Ref is dropped so the borrow is freed.
-            Some(Ref::map(brw, |brw| unsafe {
-                let hpt: *const dyn Module = &*brw.handler;
-                // hpt.cast::<T>()
-                // &*(hpt as *const T)
-                &*(hpt.cast::<T>())
+            Some(Ref::map(brw, |brw| {
+                let v: &dyn Any = &*brw.handler;
+                v.downcast_ref::<T>().expect("unreachable")
             }))
         } else {
             None
@@ -177,19 +167,9 @@ impl ModuleRef {
         let rf = &*brw.handler;
         let ty = rf.type_id();
         if ty == TypeId::of::<T>() {
-            // SAFTEY:
-            // The pointer 'handler_ptr' will allways point to the object
-            // refered to by the 'handler': Since 'handler' is owned through
-            // an 'Arc' its memory position will NOT changed. Thus 'handler_ptr'
-            // allways points to valid memory. Pointer aligment is guranteed.
-            //
-            // Since the created &T is encapluslated in a Ref<&T> this functions acts as
-            // a call of 'RefCell::borrow' thus upholding the borrowing invariants.
-            //
-            // Should the type check fail, the Ref is dropped so the borrow is freed.
-            Some(RefMut::map(brw, |brw| unsafe {
-                let hpt: *mut dyn Module = &mut *brw.handler;
-                &mut *(hpt.cast::<T>())
+            Some(RefMut::map(brw, |brw| {
+                let v: &mut dyn Any = &mut *brw.handler;
+                v.downcast_mut::<T>().expect("unreachable")
             }))
         } else {
             None
@@ -201,7 +181,7 @@ impl ModuleRef {
     /// Whether the module is currently active or shut down.
     #[must_use]
     pub fn is_active(&self) -> bool {
-        self.ctx.active.load(std::sync::atomic::Ordering::SeqCst)
+        self.ctx.active.load(Ordering::SeqCst)
     }
 
     pub(crate) fn scope_token(&self) -> crate::tracing::ScopeToken {
@@ -308,6 +288,12 @@ impl ModuleRef {
 impl PartialEq for ModuleRef {
     fn eq(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.ctx, &other.ctx)
+    }
+}
+
+impl Hash for ModuleRef {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.ctx.hash(state);
     }
 }
 

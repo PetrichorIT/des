@@ -1,11 +1,11 @@
-use crate::net::module::{ModuleContext, UnwindBehaviour};
+use crate::net::{module::ModuleContext, ObjectPath};
 use std::{
     any::Any,
-    panic::{catch_unwind, resume_unwind, AssertUnwindSafe},
+    error::Error as StdError,
+    fmt::{Debug, Display},
+    panic::{catch_unwind, AssertUnwindSafe},
     sync::atomic::Ordering,
 };
-
-pub(super) struct SimWideUnwind(pub(super) Box<dyn Any + Send + 'static>);
 
 #[must_use]
 pub(super) struct Harness<'a> {
@@ -40,38 +40,53 @@ impl<'a> Harness<'a> {
         self
     }
 
-    pub(super) fn catch(self) {
+    pub(super) fn catch(self) -> Result<(), PanicError> {
         if let Some(unwind) = self.unwind {
-            display_panic(&unwind);
+            // display_panic(&unwind);
 
             self.ctx.active.store(false, Ordering::SeqCst);
-            match unwind.downcast::<SimWideUnwind>() {
-                Ok(sim_unwind) => resume_unwind(sim_unwind.0),
-                Err(other_unwind) if self.ctx.unwind_behaviour.get() == UnwindBehaviour::Unwind => {
-                    resume_unwind(other_unwind)
-                }
-                _ => {}
+            if !self.ctx.stereotyp.get().on_panic_catch {
+                return Err(PanicError {
+                    path: self.ctx.path(),
+                    payload: unwind,
+                });
             }
         }
+        Ok(())
     }
 
-    pub(super) fn pass(self) {
-        if let Some(e) = self.unwind {
-            display_panic(&e);
-            resume_unwind(e);
+    pub(super) fn pass(self) -> Result<(), PanicError> {
+        if let Some(unwind) = self.unwind {
+            return Err(PanicError {
+                path: self.ctx.path(),
+                payload: unwind,
+            });
         }
+        Ok(())
     }
 }
 
-#[cfg(feature = "tracing")]
-#[inline]
-fn display_panic(unwind: &Box<dyn Any + Send + 'static>) {
-    if let Some(str) = unwind.downcast_ref::<&str>() {
-        tracing::error!("module paniced: \n{str}");
-    }
-    println!("{:?}", unwind.type_id())
+/// An non-catchable panic occured.
+pub struct PanicError {
+    /// The source of the panic
+    pub path: ObjectPath,
+    /// The panic payload itself
+    pub payload: Box<dyn Any + Send>,
 }
 
-#[cfg(not(feature = "tracing"))]
-#[inline]
-fn display_panic(_: &Box<dyn Any + Send + 'static>) {}
+impl Debug for PanicError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PanicError")
+            .field("path", &self.path.as_str())
+            .field("payload", &self.payload)
+            .finish()
+    }
+}
+
+impl Display for PanicError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "module '{}' panicked", self.path)
+    }
+}
+
+impl StdError for PanicError {}

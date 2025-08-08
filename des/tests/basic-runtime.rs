@@ -1,5 +1,8 @@
-use des::{prelude::*, runtime::RuntimeLimit};
-use rand::{distributions::Standard, prelude::SliceRandom, Rng};
+use des::{
+    prelude::*,
+    runtime::{RuntimeError, RuntimeLimit},
+};
+use rand::{distr::StandardUniform, prelude::SliceRandom, Rng};
 use serial_test::serial;
 
 /// The Event ste
@@ -10,7 +13,7 @@ enum MyEventSet {
     RepeatWithDelay(RepeatWithDelay),
 }
 
-impl EventSet<App> for MyEventSet {
+impl Event<App> for MyEventSet {
     fn handle(self, rt: &mut Runtime<App>) {
         match self {
             Self::RegisterToRtWithTime(a) => a.handle(rt),
@@ -22,7 +25,7 @@ impl EventSet<App> for MyEventSet {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 struct RegisterToRtWithTime {
-    id: usize,
+    id: u64,
 }
 
 impl RegisterToRtWithTime {
@@ -35,7 +38,7 @@ impl RegisterToRtWithTime {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 struct B {
-    id: usize,
+    id: u64,
 }
 
 impl B {
@@ -64,7 +67,7 @@ fn zero_event_runtime() {
     });
 
     let res = rt.run();
-    assert!(matches!(res, RuntimeResult::EmptySimulation { .. }))
+    assert!(matches!(res.unwrap().2.event_count, 0))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -104,7 +107,7 @@ fn one_event_runtime() {
 
     let res = rt.run();
     match res {
-        RuntimeResult::Finished { time, profiler, .. } => {
+        Ok((_, time, profiler)) => {
             assert_eq!(time, SimTime::from_duration(Duration::new(16, 0)));
             assert_eq!(profiler.event_count, 17);
         }
@@ -124,7 +127,7 @@ fn ensure_event_order() {
     let mut rng = StdRng::seed_from_u64(123);
 
     for _i in 0..128 {
-        time += rng.sample::<f64, Standard>(Standard);
+        time += rng.sample::<f64, StandardUniform>(StandardUniform);
         id += 1;
 
         events.push((
@@ -144,11 +147,7 @@ fn ensure_event_order() {
     }
 
     match rt.run() {
-        RuntimeResult::Finished {
-            app,
-            time: rt_fin_time,
-            profiler,
-        } => {
+        Ok((app, rt_fin_time, profiler)) => {
             assert_eq!(rt_fin_time, time);
             assert_eq!(profiler.event_count, 128);
 
@@ -171,8 +170,6 @@ fn ensure_event_order() {
 #[cfg(not(feature = "cqueue"))]
 #[serial]
 fn ensure_event_order_same_time() {
-    StandardLogger::active(false);
-
     let one = SimTime::from_duration(Duration::new(1, 0));
     let two = SimTime::from_duration(Duration::new(2, 0));
 
@@ -208,13 +205,9 @@ fn ensure_event_order_same_time() {
     }
 
     match rt.run() {
-        RuntimeResult::Finished {
-            app,
-            time: rt_fin_time,
-            event_count,
-        } => {
+        Ok((app, rt_fin_time, profiler)) => {
             assert_eq!(rt_fin_time, two);
-            assert_eq!(event_count, 5);
+            assert_eq!(profiler.event_count, 5);
 
             let mut last_id = 0;
             for (_, event) in app.event_list {
@@ -237,11 +230,17 @@ pub struct EventBox {
     events: Vec<MyEventSet>,
 }
 
+#[cfg(not(feature = "miri"))]
 const N: usize = 100_000;
+
+#[cfg(feature = "miri")]
+const N: usize = 1_000;
 
 #[test]
 #[serial]
 fn full_test_n_100_000() {
+    rand::random::<u64>();
+
     let mut rt: Runtime<App> = Builder::seeded(123).build(App {
         event_list: Vec::with_capacity(N),
     });
@@ -251,7 +250,7 @@ fn full_test_n_100_000() {
     // create a event set
     let mut t = SimTime::ZERO;
     for _ in 0..N {
-        let num_box_elements = rt.random::<usize>() % 100;
+        let num_box_elements = rt.random::<u64>() % 100;
         let num_box_elements = if num_box_elements < 5 {
             num_box_elements + 1
         } else {
@@ -272,7 +271,7 @@ fn full_test_n_100_000() {
     }
 
     let mut dispatched = events.clone();
-    dispatched.shuffle(&mut rand::thread_rng());
+    dispatched.shuffle(&mut rand::rng());
 
     let mut c = 0;
     for eventbox in dispatched {
@@ -324,7 +323,7 @@ fn full_test_n_100_000() {
 fn random_event(rt: &mut Runtime<App>) -> MyEventSet {
     if rt.random::<bool>() {
         MyEventSet::RegisterToRtWithTime(RegisterToRtWithTime {
-            id: rt.random::<usize>(),
+            id: rt.random::<u64>(),
         })
     } else {
         MyEventSet::B(B { id: rt.random() })
@@ -339,8 +338,9 @@ impl EventLifecycle for DeferredApplication {
     fn at_sim_start(rt: &mut Runtime<Self>) {
         rt.app.started = true;
     }
-    fn at_sim_end(rt: &mut Runtime<Self>) {
+    fn at_sim_end(rt: &mut Runtime<Self>) -> Result<(), RuntimeError> {
         rt.app.ended = true;
+        Ok(())
     }
 }
 impl Application for DeferredApplication {
@@ -349,7 +349,7 @@ impl Application for DeferredApplication {
 }
 
 struct DeferredES;
-impl EventSet<DeferredApplication> for DeferredES {
+impl Event<DeferredApplication> for DeferredES {
     fn handle(self, _rt: &mut Runtime<DeferredApplication>) {}
 }
 
@@ -366,7 +366,7 @@ fn deferred_sim_start() {
     assert_eq!(rt.app.ended, false);
 
     let app = match rt.run() {
-        RuntimeResult::EmptySimulation { app } => app,
+        Ok((app, _, _)) => app,
         _ => panic!("Which events?"),
     };
 
@@ -381,7 +381,7 @@ impl Application for CustomStartApp {
 }
 
 struct CustomStartEvent;
-impl EventSet<CustomStartApp> for CustomStartEvent {
+impl Event<CustomStartApp> for CustomStartEvent {
     fn handle(self, _: &mut Runtime<CustomStartApp>) {}
 }
 
@@ -418,7 +418,7 @@ impl EventLifecycle for PausableApp {
 }
 
 struct PausableAppEvent(usize);
-impl EventSet<PausableApp> for PausableAppEvent {
+impl Event<PausableApp> for PausableAppEvent {
     fn handle(mut self, runtime: &mut Runtime<PausableApp>) {
         self.0 += 1;
         runtime.add_event_in(self, Duration::from_secs(1))

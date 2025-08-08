@@ -16,8 +16,8 @@ struct DropChanModule {
 
 impl Module for DropChanModule {
     fn at_sim_start(&mut self, _stage: usize) {
-        send(Message::new().content([0u8; 512]).build(), "out");
-        send(Message::new().content([1u8; 512]).build(), "out");
+        send(Message::default().with_content([0u8; 512]), "out");
+        send(Message::default().with_content([1u8; 512]), "out");
 
         self.send += 2;
     }
@@ -26,8 +26,9 @@ impl Module for DropChanModule {
         self.received += 1;
     }
 
-    fn at_sim_end(&mut self) {
-        assert_ne!(self.send, self.received)
+    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+        assert_ne!(self.send, self.received);
+        Ok(())
     }
 }
 
@@ -48,7 +49,7 @@ fn channel_dropping_message() {
     });
     g_in.connect(g_out, Some(channel));
 
-    let rt = Builder::seeded(123).build(rt);
+    let rt = Builder::seeded(123).build(rt.freeze());
     let _ = rt.run();
 }
 
@@ -60,9 +61,9 @@ struct BufferChanModule {
 
 impl Module for BufferChanModule {
     fn at_sim_start(&mut self, _stage: usize) {
-        send(Message::new().content([0u8; 512]).build(), "out");
-        send(Message::new().content([1u8; 512]).build(), "out");
-        send(Message::new().content([1u8; 512]).build(), "out");
+        send(Message::default().with_content([0u8; 512]), "out");
+        send(Message::default().with_content([1u8; 512]), "out");
+        send(Message::default().with_content([1u8; 512]), "out");
 
         self.send += 3;
     }
@@ -71,9 +72,10 @@ impl Module for BufferChanModule {
         self.received += 1;
     }
 
-    fn at_sim_end(&mut self) {
+    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
         assert_eq!(self.send, 3);
         assert_eq!(self.received, 2);
+        Ok(())
     }
 }
 
@@ -98,19 +100,19 @@ fn channel_buffering_message() {
     });
     g_in.connect(g_out, Some(channel));
 
-    let rt = Builder::seeded(123).build(rt);
+    let rt = Builder::seeded(123).build(rt.freeze());
     let _ = rt.run();
 }
 
 struct SendMessageModule;
 impl Module for SendMessageModule {
     fn at_sim_start(&mut self, _stage: usize) {
-        schedule_in(Message::new().kind(10).build(), Duration::from_secs(1));
+        schedule_in(Message::default().kind(10), Duration::from_secs(1));
     }
 
     fn handle_message(&mut self, msg: Message) {
         if msg.header().kind == 10 {
-            send(Message::new().content("Hello world").build(), "out");
+            send(Message::default().with_content("Hello world"), "out");
             let gate = current().gate("out", 0).unwrap();
             let ch = gate.channel().unwrap();
             assert!(ch.is_busy());
@@ -140,7 +142,7 @@ fn channel_instant_busy() {
 
     g_in.connect(g_out, Some(channel));
 
-    let rt = Builder::seeded(123).build(rt);
+    let rt = Builder::seeded(123).build(rt.freeze());
     let _ = rt.run();
 }
 
@@ -153,7 +155,7 @@ impl Module for ChannelProbing {
         chan.attach_probe(Probe(self.0.clone()));
         assert_eq!(chan.metrics().bitrate, 1234);
 
-        let msg = Message::new().build();
+        let msg = Message::default();
         let busy_time = chan.calculate_busy(&msg);
         let tft = SimTime::now() + busy_time;
         dbg!(busy_time);
@@ -171,8 +173,9 @@ impl Module for ChannelProbing {
         assert_eq!(format!("{chan:?}"), format!("Channel {{ metrics: ChannelMetrics {{ bitrate: 1234, latency: 100ms, jitter: 0ns, drop_behaviour: Drop }}, state: Busy {{ until: {tft}, bytes: 0, packets: 0 }} }}"));
     }
 
-    fn at_sim_end(&mut self) {
+    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
         assert_eq!(self.0.load(Ordering::SeqCst), 1);
+        Ok(())
     }
 }
 
@@ -206,7 +209,7 @@ fn channel_probes() {
 
     alice_port.connect(bob_port, Some(chan));
 
-    let rt = Builder::seeded(123).build(rt);
+    let rt = Builder::seeded(123).build(rt.freeze());
     let _ = rt.run();
 }
 
@@ -215,7 +218,7 @@ struct LatencyOnly(usize);
 impl Module for LatencyOnly {
     fn at_sim_start(&mut self, _stage: usize) {
         for _ in 0..10 {
-            send(Message::new().build(), "out");
+            send(Message::default(), "out");
         }
     }
 
@@ -223,8 +226,9 @@ impl Module for LatencyOnly {
         self.0 += 1;
     }
 
-    fn at_sim_end(&mut self) {
+    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
         assert_eq!(self.0, 10);
+        Ok(())
     }
 }
 
@@ -245,5 +249,5 @@ fn latency_only_channel() {
         ))),
     );
 
-    let _ = Builder::seeded(123).build(sim).run();
+    let _ = Builder::seeded(123).build(sim.freeze()).run();
 }

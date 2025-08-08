@@ -1,11 +1,12 @@
-use std::{error::Error, time::Duration};
+//! Custom module blocks that simplify the `Module` API.
 
 use crate::{
     net::{message::Message, module::Module},
-    prelude::{current, shutdow_and_restart_in},
+    prelude::current,
 };
+use std::{error::Error, time::Duration};
 
-use super::ScopedSim;
+use super::SimBuilderScoped;
 
 /// A trait that descibes that an object can be build into a block of modules
 /// at a given scope within the simulation.
@@ -19,15 +20,19 @@ use super::ScopedSim;
 /// - on module specifically at the position defined by the scope
 /// - on module at the scope position, an more as direct or indirect children of the first module.
 ///
-/// See [`ScopedSim`] for more information.
+/// See [`SimBuilderScoped`] for more information.
 pub trait ModuleBlock {
+    /// The returns type of the build method. This will be returned by `Sim::node`
+    type Ret;
+
     /// Build the described module block within the context of scoped part of
     /// a simulation.
-    fn build<A>(self, sim: ScopedSim<'_, A>);
+    fn build<A>(self, sim: SimBuilderScoped<'_, A>) -> Self::Ret;
 }
 
 impl<M: Module> ModuleBlock for M {
-    fn build<A>(self, sim: ScopedSim<'_, A>) {
+    type Ret = ();
+    fn build<A>(self, sim: SimBuilderScoped<'_, A>) {
         sim.base.raw(sim.scope, self);
     }
 }
@@ -66,13 +71,13 @@ pub enum FailabilityPolicy {
 ///
 /// ```
 /// # use des::prelude::*;
-/// # use des::net::HandlerFn;
+/// # use des::net::blocks::HandlerFn;
 /// let mut sim = Sim::new(());
 /// sim.node("alice", HandlerFn::new(|msg| {
 ///     /* Do something stateless (e.g. random routing) */
 /// }));
 ///
-/// let _ = Builder::new().build(sim).run();
+/// let _ = Builder::new().build(sim.freeze()).run();
 /// ```
 #[derive(Debug)]
 pub struct HandlerFn<Handler> {
@@ -141,7 +146,7 @@ where
 ///
 /// ```
 /// # use des::prelude::*;
-/// # use des::net::ModuleFn;
+/// # use des::net::blocks::ModuleFn;
 /// struct State {
 ///     /* ...data */
 /// }
@@ -157,7 +162,7 @@ where
 ///     }
 /// ));
 ///
-/// let _ = Builder::new().build(sim).run();
+/// let _ = Builder::new().build(sim.freeze()).run();
 /// ```
 #[derive(Debug)]
 pub struct ModuleFn<Gen, State, Handler> {
@@ -213,7 +218,7 @@ where
                     }
                     FailabilityPolicy::Restart => {
                         tracing::error!("failed to process message, handler fn failed with: {e}");
-                        shutdow_and_restart_in(Duration::ZERO);
+                        current().shutdow_and_restart_in(Duration::ZERO);
                     }
                 },
             }),
@@ -247,8 +252,8 @@ cfg_async! {
     use tokio::{
         sync::mpsc::{self, Receiver, Sender},
     };
-    use std::{future::Future, fmt::Formatter, pin::Pin, sync::{Arc,atomic::{AtomicBool, Ordering}}};
-    use tokio::task::JoinSet;
+    use std::{future::Future, fmt::Formatter, pin::Pin};
+    use crate::{runtime::RuntimeError};
 
 
     /// A helper that enables user to treat a module as a async stream of messages,
@@ -267,7 +272,7 @@ cfg_async! {
     ///
     /// ```
     /// # use des::prelude::*;
-    /// # use des::net::AsyncFn;
+    /// # use des::net::blocks::AsyncFn;
     /// let mut sim = Sim::new(());
     /// sim.node("alice", AsyncFn::new(|mut rx| {
     ///     /* Do some setup / sim_start_stuff here */
@@ -279,18 +284,16 @@ cfg_async! {
     /// }));
     /// /* ... */
     ///
-    /// let _ = Builder::new().build(sim).run();
+    /// let _ = Builder::new().build(sim.freeze()).run();
     /// ```
     pub struct AsyncFn
     {
         gen: BoxedGen,
 
-        join: JoinSet<()>,
-        joined: Arc<AtomicBool>,
-
         tx: Sender<Message>,
         rx: Option<Receiver<Message>>,
 
+        require_recv: bool,
         require_join: bool,
     }
 
@@ -305,6 +308,14 @@ cfg_async! {
             self
         }
 
+        /// Configures the handler so, that all incoming packets must be
+        /// read from the `rx` queue. If that does not happen, the module will panic.
+        #[must_use]
+        pub fn require_recv(mut self) -> Self {
+            self.require_recv = true;
+            self
+        }
+
         /// Creates a new instance using the generator function.
         pub fn new<Gen, Fut>(mut gen: Gen) -> Self
         where
@@ -314,7 +325,13 @@ cfg_async! {
             Fut: Send + 'static,
         {
             let (tx, rx) = mpsc::channel(8);
-            Self { gen: Box::new(move |rx| Box::pin(gen(rx))), join: JoinSet::new(), joined: Arc::default(), tx, rx: Some(rx), require_join: false }
+            Self {
+                gen: Box::new(move |rx| Box::pin(gen(rx))),
+                tx,
+                rx: Some(rx),
+                require_join: false,
+                require_recv: false
+            }
         }
 
         /// Creates a new instance using the generator function.
@@ -335,16 +352,15 @@ cfg_async! {
                         match fut.await {
                             Ok(()) => {},
                             Err(e) => {
-                                super::panic(format!("node {} paniced at failable operation: {e}", current().path()));
+                                panic!("node {} paniced at failable operation: {e}", current().path());
                             },
                         }
                     })
                 }),
-                join: JoinSet::new(),
-                joined: Arc::default(),
                 tx,
                 rx: Some(rx),
-                require_join: false
+                require_join: false, // TODO: make error without join
+                require_recv: false,
             }
         }
 
@@ -362,8 +378,7 @@ cfg_async! {
 
     impl Module for AsyncFn {
         fn reset(&mut self) {
-            self.join.abort_all();
-            self.joined.store(false, Ordering::SeqCst);
+            current().reset_join_handles();
         }
 
          fn at_sim_start(&mut self, _: usize) {
@@ -373,30 +388,26 @@ cfg_async! {
                 rx
             });
 
-            let joined = self.joined.clone();
             let fut = (self.gen)(rx);
             let fut = async move {
                 fut.await;
-                joined.store(true, Ordering::SeqCst);
             };
 
-            self.join.spawn(fut);
+            if self.require_join {
+                current().join(tokio::spawn(fut));
+            } else {
+                current().try_join(tokio::spawn(fut));
+            }
         }
 
          fn handle_message(&mut self, msg: Message) {
-            self.tx.try_send(msg).expect("async module blocked");
+            if let Err(e) = self.tx.try_send(msg) {
+                assert!(!self.require_recv, "failed to receive an incoming packet: {e}");
+            }
         }
 
-         fn at_sim_end(&mut self) {
-            if let Some(result) = self.join.try_join_next() {
-                match result {
-                    Ok(()) => {},
-                    Err(e) if e.is_panic() => super::panic(e.to_string()),
-                    Err(e) => println!("{e}")
-                }
-            } else if self.require_join && !self.joined.load(Ordering::SeqCst) {
-                super::panic("Main task could not be joined");
-            }
+         fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+            Ok(())
          }
 
     }

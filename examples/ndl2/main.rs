@@ -5,7 +5,7 @@ struct Sub;
 impl Module for Sub {
     fn at_sim_start(&mut self, _stage: usize) {
         if current().name() == "a" {
-            send(Message::new().build(), "out");
+            send(Message::default(), "out");
         }
     }
 
@@ -18,8 +18,9 @@ impl Module for Sub {
 #[derive(Default)]
 struct Main;
 impl Module for Main {
-    fn at_sim_end(&mut self) {
-        tracing::info!(target: "custom", "at sim end")
+    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+        tracing::info!(target: "custom", "at sim end");
+        Ok(())
     }
 }
 
@@ -35,6 +36,6 @@ fn main() {
             panic!("exiting due to previouis error")
         }
     };
-    let rt = Builder::seeded(123).max_itr(10).build(app);
+    let rt = Builder::seeded(123).max_itr(10).build(app.freeze());
     let _ = rt.run();
 }

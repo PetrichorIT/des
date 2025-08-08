@@ -1,4 +1,4 @@
-use rand::distributions::Standard;
+use rand::distr::StandardUniform;
 use std::{collections::VecDeque, fmt::Debug};
 
 use des::prelude::*;
@@ -57,7 +57,7 @@ enum Events {
     CustomerArrival(CustomerArrival),
 }
 
-impl EventSet<Application> for Events {
+impl Event<Application> for Events {
     fn handle(self, rt: &mut Runtime<Application>) {
         match self {
             Self::ServerDone(event) => event.handle(rt),
@@ -140,7 +140,7 @@ impl CustomerArrival {
 }
 
 fn expdist<A: des::runtime::Application>(rt: &mut Runtime<A>, p: f64) -> f64 {
-    let x: f64 = rt.rng_sample(Standard);
+    let x: f64 = rt.rng_sample(StandardUniform);
     x.ln() / -p
 }
 

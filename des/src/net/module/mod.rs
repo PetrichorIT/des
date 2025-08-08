@@ -1,41 +1,96 @@
 //! Network nodes with custom state.
+//!
+//! A module represents an independent computation and communication entity within as simulation, usually any host or
+//! other network appliance. It is responsible for managing all internal state of this entity. Nodes may communicate with
+//! other nodes via the network abstractions, or export information to the simulation runtime directly, using
+//! dedicated simulation APIs.
+//!
+//! The definitions in this module contain the core abstractions for creating and managing modules and their
+//! lifecycle. Abstractions for sending and receiving messages can be found in the [`message` module](crate::net::message).
+//!
+//! # Custom Implementations using the `Module` trait
+//!
+//! All nodes are created by providing an object, that implements the [`Module` trait]. This trait provides a set of
+//! methods that define the behaviour of the module in response to events and messages. Implementation details of this
+//! object are up to the user. This trait consists mainly of the following methods:
+//!
+//! - `at_sim_start`: A method that will be called whenever the node is started
+//! - `at_sim_end`: A method that will be called whenever the simulation is ending
+//! - `handle_message`: A method that is called whenever a message is received by the module
+//! - `reset`: A message that can reset the module, after a crash or restart.
+//!
+//! Additionally this trait defines the method `stack` that can modify the plugin stack,
+//! provided to the module. This is an advanced feature, that allows modules to inject custom plugins
+//! will still respecting the global plugin stack. See [`processing` module](crate::net::processing) for
+//! more information on plugins and other advanced processing features.
+//!
+//! > Note that APIs like [`SimBuilder::node`](crate::net::runtime::SimBuilder::node) require a object of [trait `ModuleBlock`](crate::net::blocks::ModuleBlock). However
+//! > all implementors of [`Module`] also implement [`ModuleBlock`](crate::net::blocks::ModuleBlock).
+//!
+//! # Common features via the `ModuleContext`
+//!
+//! Modules are a combination of a user-provided implementation (using [`Module`]) and
+//! a simulation internal component, the [`ModuleContext`]. The module context
+//! represents the topology, properties and hierarchical layout of the module within the simulation context and provides
+//! APIs to interact and modify the connecting fabric, the module tree and the property set.
+//!
+//! A modules (simulation-)context can be access either via a [`ModuleRef`] aquired from
+//! various simulation APIs or more commonly the global function [`current`] that returns
+//! a handle to the module context of the currently active module.
+//!
+//! A module context is usually created automatically when using the [`Sim`](crate::net::runtime::Sim) builder,
+//! but manual constructors are available for advanced use cases.
+//!
+//! > The term `within node-context` refers to the presence of a [`ModuleContext`]
+//! > in the global scope, accessable via the [`current`] function.
+//!
+//! # Exposing values using properties
+//!
+//! Properties are key-value pair attached to modules, that are used to expose internal values to outside observers like
+//! other modules, or a simulation-GUI. These values can be set by the module itself using the [`ModuleContext::prop` method]
+//! or provided by a configuration files for inital parameter dissemination.
+//!
+//! # Using Tokio for async-await
+//!
+//! If the crate-feature `async` is active, all module come with a current-thread tokio runtime. This runtime is already
+//! active on any calls to the [`Module`] API, so call to `task::spawn` will be possible. Consider the internal implementation
+//! to be like that:
+//!
+//! ```text
+//! let rt = ...;
+//! rt.enter(|| {
+//!     module.sim_api_fn();
+//! });
+//! ```
+//!
+//! Using the [`join`](ModuleContext::join) function, you can schedule a tokio task to be joined once the simulation ends.
+//! If that is not possible, an error will be returned from the simulation run.
 
-use crate::net::message::Message;
+use crate::{net::message::Message, prelude::RuntimeError};
 use std::{
     any::Any,
     fmt,
     sync::atomic::{AtomicU16, Ordering},
 };
 
-mod ctx;
-pub use self::ctx::ModuleContext;
-pub(crate) use self::ctx::*;
-
-mod refs;
-pub use refs::*;
-
-mod error;
-pub use error::*;
-
 mod api;
-pub use api::*;
-
-mod unwind;
-pub use unwind::*;
-
+mod ctx;
 mod dummy;
-pub(crate) use dummy::*;
-
-mod meta;
+mod error;
+mod refs;
 
 #[cfg(test)]
 mod tests;
 
-use super::processing::{ProcessingStack, Processor};
+pub(crate) use self::ctx::*;
+pub use self::ctx::{ModuleContext, Stereotyp};
+pub use api::*;
+pub(crate) use dummy::*;
+pub use error::*;
+pub use refs::*;
 
-cfg_async! {
-    pub(super) mod rt;
-}
+use super::processing::{ProcessingStack, Processor};
+pub use des_net_utils::props::{Prop, PropType, RawProp};
 
 /// A unique identifier for a module.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -154,7 +209,12 @@ pub trait Module: Any {
     /// A callback function that is invoked should the simulation finish.
     /// All events emitted by this function will NOT be processed.
     ///
-    fn at_sim_end(&mut self) {}
+    /// # Errors
+    ///
+    /// May return an error if the module deems the simulation has failed.
+    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+        Ok(())
+    }
 }
 
 pub(crate) trait ModuleExt: Module {

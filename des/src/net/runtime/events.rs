@@ -3,16 +3,19 @@ use crate::{
         channel::ChannelRef, gate::Connection, message::Message, module::ModuleRef,
         processing::ProcessingState, runtime::buf_process, Sim,
     },
-    runtime::{EventLifecycle, EventSet, EventSink, Runtime},
+    prelude::RuntimeError,
+    runtime::{Event, EventLifecycle, EventSink, Runtime},
     time::SimTime,
     tracing::enter_scope,
 };
-use std::sync::atomic::Ordering::SeqCst;
+use std::{fmt::Debug, sync::atomic::Ordering::SeqCst};
 
 #[cfg(feature = "async")]
-use tokio::task::yield_now;
+use std::iter::once;
+#[cfg(feature = "async")]
+use tokio::task::{self, yield_now};
 
-use super::Harness;
+use super::{Harness, PanicError};
 
 ///
 /// The event set for a [`NetworkApplication`].
@@ -29,7 +32,7 @@ pub enum NetEvents {
     AsyncWakeupEvent(AsyncWakeupEvent),
 }
 
-impl<A> EventSet<Sim<A>> for NetEvents
+impl<A> Event<Sim<A>> for NetEvents
 where
     A: EventLifecycle<Sim<A>>,
 {
@@ -75,7 +78,7 @@ impl MessageExitingConnection {
                 tracing::warn!(
                     "Gate '{}' dropped message [{}] since owner module {} is inactive",
                     cur.endpoint.name(),
-                    msg.str(),
+                    msg,
                     cur.endpoint.owner().path()
                 );
 
@@ -88,7 +91,7 @@ impl MessageExitingConnection {
             tracing::info!(
                 "Gate '{}' forwarding message [{}] to next gate delayed: {}",
                 cur.endpoint.name(),
-                msg.str(),
+                msg,
                 cur.channel().is_some()
             );
 
@@ -110,7 +113,7 @@ impl MessageExitingConnection {
         tracing::info!(
             "Gate '{}' forwarding message [{}] to module #{}",
             cur.endpoint.name(),
-            msg.str(),
+            msg,
             cur.endpoint.owner().id()
         );
 
@@ -151,12 +154,12 @@ impl HandleMessageEvent {
         message.header.receiver_module_id = self.module.ctx.id;
 
         #[cfg(feature = "tracing")]
-        tracing::info!("Handling message {:?}", message.str());
+        tracing::info!("Handling message {:?}", message);
 
         let module = &self.module;
 
         module.activate();
-        module.handle_message(message);
+        rt.app.error.extend(module.handle_message(message).err());
         module.deactivate(rt);
 
         buf_process(module, rt);
@@ -180,7 +183,7 @@ impl ModuleRestartEvent {
 
         let module = &self.module;
         module.activate();
-        module.module_restart();
+        rt.app.error.extend(module.module_restart().err());
         module.deactivate(rt);
 
         buf_process(module, rt);
@@ -206,7 +209,7 @@ impl AsyncWakeupEvent {
 
         let module = &self.module;
         module.activate();
-        module.async_wakeup();
+        rt.app.error.extend(module.async_wakeup().err());
         module.deactivate(rt);
 
         buf_process(module, rt);
@@ -228,7 +231,7 @@ impl ChannelUnbusyNotif {
 }
 
 impl ModuleRef {
-    pub(crate) fn reset(&self) {
+    pub(crate) fn reset(&self) -> Result<(), PanicError> {
         let mut brw = self.processing.borrow_mut();
 
         #[cfg(feature = "async")]
@@ -236,22 +239,24 @@ impl ModuleRef {
 
         Harness::new(&self.ctx)
             .exec(move || brw.handler.reset())
-            .pass();
+            .pass()?;
+        Ok(())
     }
 
     #[cfg(feature = "async")]
-    pub(crate) fn async_wakeup(&self) {
+    pub(crate) fn async_wakeup(&self) -> Result<(), PanicError> {
         if self.ctx.active.load(SeqCst) {
             self.processing.borrow_mut().incoming_upstream(None);
-            Harness::new(&self.ctx).exec(|| {}).catch();
+            Harness::new(&self.ctx).exec(|| {}).catch()?;
             self.processing.borrow_mut().incoming_downstream();
         } else {
             #[cfg(feature = "tracing")]
             tracing::debug!("Ignoring message since module is inactive");
         }
+        Ok(())
     }
 
-    pub(crate) fn module_restart(&self) {
+    pub(crate) fn module_restart(&self) -> Result<(), PanicError> {
         #[cfg(feature = "tracing")]
         tracing::debug!("Restarting module");
         // restart the module itself.
@@ -260,11 +265,12 @@ impl ModuleRef {
         // Do sim start procedure
         let stages = self.num_sim_start_stages();
         for stage in 0..stages {
-            self.at_sim_start(stage);
+            self.at_sim_start(stage)?;
         }
+        Ok(())
     }
 
-    pub(crate) fn handle_message(&self, msg: Message) {
+    pub(crate) fn handle_message(&self, msg: Message) -> Result<(), PanicError> {
         if self.ctx.active.load(SeqCst) {
             let mut processing = self.processing.borrow_mut();
 
@@ -279,9 +285,9 @@ impl ModuleRef {
                         let msg = msg;
                         processing.handler.handle_message(msg);
                     })
-                    .catch();
+                    .catch()?;
             } else {
-                Harness::new(&self.ctx).exec(|| {}).catch();
+                Harness::new(&self.ctx).exec(|| {}).catch()?;
             }
 
             // Downstream
@@ -290,16 +296,18 @@ impl ModuleRef {
             #[cfg(feature = "tracing")]
             tracing::debug!("Ignoring message since module is inactive");
         }
+        Ok(())
     }
 
-    pub(crate) fn at_sim_start(&self, stage: usize) {
+    pub(crate) fn at_sim_start(&self, stage: usize) -> Result<(), PanicError> {
         let mut processing = self.processing.borrow_mut();
 
         processing.incoming_upstream(None);
         Harness::new(&self.ctx)
             .exec(|| processing.handler.at_sim_start(stage))
-            .catch();
+            .catch()?;
         processing.incoming_downstream();
+        Ok(())
     }
 
     pub(crate) fn num_sim_start_stages(&self) -> usize {
@@ -307,34 +315,113 @@ impl ModuleRef {
         self.processing.borrow().handler.num_sim_start_stages()
     }
 
-    pub(crate) fn at_sim_end(&self) {
+    pub(crate) fn at_sim_end(&self) -> Result<(), RuntimeError> {
         let mut processing = self.processing.borrow_mut();
 
         processing.incoming_upstream(None);
+
+        let mut result = Ok(());
         Harness::new(&self.ctx)
-            .exec(|| processing.handler.at_sim_end())
-            .catch();
+            .exec(|| result = processing.handler.at_sim_end())
+            .catch()?;
+
         #[cfg(feature = "async")]
         {
+            let mut error = RuntimeError::empty();
+
             let Some((rt, task_set)) = self.ctx.async_ext.write().rt.current() else {
                 panic!("WHERE MY RT");
             };
 
-            let mut joins = Vec::new();
-            std::mem::swap(&mut self.ctx.async_ext.write().require_joins, &mut joins);
-
             let _guard = rt.enter();
             task_set.block_on(&rt, yield_now());
 
-            for join in joins {
-                assert!(join.is_finished(), "could not join task: not yet finished");
+            let mut lock = self.ctx.async_ext.write();
 
-                let join_result = rt.block_on(join);
-                if let Err(e) = join_result {
-                    panic!("could not join task: {e}")
+            for handle in lock.try_join.drain(..) {
+                if !handle.is_finished() {
+                    continue;
+                }
+
+                match rt.block_on(handle) {
+                    Err(e) if e.is_panic() => {
+                        error.extend(once(JoinError {
+                            path: self.path(),
+                            kind: Kind::Paniced(e.into_panic()),
+                        }));
+                    }
+                    _ => {}
                 }
             }
+
+            for handle in lock.must_join.drain(..) {
+                if !handle.is_finished() {
+                    error.extend(once(JoinError {
+                        path: self.path(),
+                        kind: Kind::NotFinished,
+                    }));
+                    continue;
+                }
+
+                match rt.block_on(handle) {
+                    Ok(()) => {}
+                    Err(e) if e.is_panic() => error.extend(once(JoinError {
+                        path: self.path(),
+                        kind: Kind::Paniced(e.into_panic()),
+                    })),
+                    Err(e) => error.extend(once(JoinError {
+                        path: self.path(),
+                        kind: Kind::Tokio(e),
+                    })),
+                }
+            }
+
+            if !error.is_empty() {
+                result = Err(error);
+            }
         }
+
         processing.incoming_downstream();
+        result
     }
+}
+
+cfg_async! {
+    use std::{any::Any, error::Error as StdError, fmt::Display};
+    use crate::prelude::ObjectPath;
+
+    /// An error when the simulation fails to join a task at the end of the simulation
+    pub struct JoinError {
+        /// The error source
+        pub path: ObjectPath,
+        /// The error kind
+        pub kind: Kind,
+    }
+
+    #[derive(Debug)]
+    pub enum Kind {
+        /// The task is not yet finished
+        NotFinished,
+        /// A panic occurred in the task
+        Paniced(Box<dyn Any + Send + 'static>),
+        /// The join failed with an tokio error.
+        Tokio(task::JoinError),
+    }
+
+    impl Debug for JoinError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.debug_struct("JoinError")
+                .field("path", &self.path.to_string())
+                .field("kind", &self.kind)
+                .finish()
+        }
+    }
+
+    impl Display for JoinError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "{}: {:?}", self.path, self.kind)
+        }
+    }
+
+    impl StdError for JoinError {}
 }
