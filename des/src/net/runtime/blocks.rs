@@ -1,7 +1,10 @@
 //! Custom module blocks that simplify the `Module` API.
 
 use crate::{
-    net::{message::Message, module::Module},
+    net::{
+        message::Message,
+        module::{DummyModule, Module},
+    },
     prelude::current,
 };
 use std::{error::Error, time::Duration};
@@ -34,6 +37,13 @@ impl<M: Module> ModuleBlock for M {
     type Ret = ();
     fn build<A>(self, sim: SimBuilderScoped<'_, A>) {
         sim.base.raw(sim.scope, self);
+    }
+}
+
+impl ModuleBlock for () {
+    type Ret = ();
+    fn build<A>(self, sim: SimBuilderScoped<'_, A>) {
+        sim.base.raw(sim.scope, DummyModule);
     }
 }
 

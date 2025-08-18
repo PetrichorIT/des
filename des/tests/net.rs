@@ -49,9 +49,9 @@ fn connectivity() {
     let rx = app.gate("rx", "port");
     let tx = app.gate("tx", "port");
 
-    rx.connect(
+    rx.connect_with(
         tx,
-        Some(Channel::new(ChannelMetrics {
+        Some(DatarateChannel::new(DatarateChannelMetrics {
             bitrate: 10000,
             latency: Duration::from_millis(100),
             jitter: Duration::ZERO,

@@ -1,7 +1,7 @@
 use crate::{
     net::{
-        channel::ChannelRef, gate::Connection, message::Message, module::ModuleRef,
-        processing::ProcessingState, runtime::buf_process, Sim,
+        Sim, channel::ChannelRef, gate::Connection, message::Message, module::ModuleRef,
+        processing::ProcessingState, runtime::buf_process,
     },
     prelude::RuntimeError,
     runtime::{Event, EventLifecycle, EventSink, Runtime},
@@ -18,17 +18,22 @@ use tokio::task::{self, yield_now};
 use super::{Harness, PanicError};
 
 ///
-/// The event set for a [`NetworkApplication`].
+/// The event set for a [`Sim`].
 ///
 /// * This type is only available of DES is build with the `"net"` feature.
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 #[derive(Debug)]
 pub enum NetEvents {
+    /// A message exiting a connection, implemented by a channel
     MessageExitingConnection(MessageExitingConnection),
+    /// A message arrival at the end of a gate chain.
     HandleMessageEvent(HandleMessageEvent),
+    /// A notification for channels.
     ChannelUnbusyNotif(ChannelUnbusyNotif),
+    /// A notification that a module should now be restarted
     ModuleRestartEvent(ModuleRestartEvent),
     #[cfg(feature = "async")]
+    /// A async wakeup
     AsyncWakeupEvent(AsyncWakeupEvent),
 }
 
@@ -48,10 +53,13 @@ where
     }
 }
 
+/// A message exiting a connection, implemented by a channel.
 #[derive(Debug)]
 pub struct MessageExitingConnection {
-    pub(crate) con: Connection, // exiting the following connecrtion
-    pub(crate) msg: Message,    // with this message
+    /// The connection that was now traversed.
+    pub con: Connection,
+    /// The message.
+    pub msg: Message,
 }
 
 impl MessageExitingConnection {
@@ -96,7 +104,7 @@ impl MessageExitingConnection {
             );
 
             if let Some(ch) = next.channel() {
-                ch.send_message(msg, next, sink);
+                ch.channel.send(msg, next, sink);
                 return;
             }
 
@@ -137,10 +145,13 @@ impl MessageExitingConnection {
     }
 }
 
+/// A message entering a module, by existing a gate-chain or being self-scheduled.
 #[derive(Debug)]
 pub struct HandleMessageEvent {
-    pub(crate) module: ModuleRef,
-    pub(crate) message: Message,
+    /// The module that the message is arriving at..
+    pub module: ModuleRef,
+    /// The message being handled.
+    pub message: Message,
 }
 
 impl HandleMessageEvent {
@@ -166,9 +177,11 @@ impl HandleMessageEvent {
     }
 }
 
+/// A notification to restart a module.
 #[derive(Debug)]
 pub struct ModuleRestartEvent {
-    pub(crate) module: ModuleRef,
+    /// The module that is being restarted.
+    pub module: ModuleRef,
 }
 
 impl ModuleRestartEvent {
@@ -190,10 +203,12 @@ impl ModuleRestartEvent {
     }
 }
 
+/// An async wakeup to indicate to tokio that some progress can now be made.
 #[cfg(feature = "async")]
 #[derive(Debug)]
 pub struct AsyncWakeupEvent {
-    pub(crate) module: ModuleRef,
+    /// The module
+    pub module: ModuleRef,
 }
 
 #[cfg(feature = "async")]
@@ -216,9 +231,12 @@ impl AsyncWakeupEvent {
     }
 }
 
+/// A notification for a channel, that some timer has expired. Usually used
+/// to indicate that the busy phase (aka the sending phase) has completed.
 #[derive(Debug)]
 pub struct ChannelUnbusyNotif {
-    pub(crate) channel: ChannelRef,
+    /// The affected channel
+    pub channel: ChannelRef,
 }
 
 impl ChannelUnbusyNotif {
@@ -226,7 +244,7 @@ impl ChannelUnbusyNotif {
     where
         A: EventLifecycle<Sim<A>>,
     {
-        self.channel.unbusy(rt);
+        self.channel.channel.unbusy_notify(rt);
     }
 }
 
@@ -398,6 +416,7 @@ cfg_async! {
         pub kind: Kind,
     }
 
+    /// The kind of join error.
     #[derive(Debug)]
     pub enum Kind {
         /// The task is not yet finished

@@ -430,10 +430,10 @@ impl Topology<NodeID, ()> {
                 })
                 .collect(),
             edges: edges
-                .into_iter()
+                .iter()
                 .map(|bundle| {
                     bundle
-                        .into_iter()
+                        .iter()
                         .map(|&dst| EdgeRaw {
                             dst,
                             data: (),
@@ -712,7 +712,7 @@ mod tests {
         topo.filter_nodes(|node| ![2].contains(&node.data));
 
         assert!(!topo.connected());
-        assert_eq!(topo.edges().count(), 4)
+        assert_eq!(topo.edges().count(), 4);
     }
 
     #[test]

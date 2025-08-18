@@ -34,9 +34,10 @@ fn main() {
     assert_eq!(topo.nodes().len(), 6);
     assert_eq!(topo.edges().count(), 10);
 
-    assert!(topo
-        .edges_for("router")
-        .any(|edge| edge.to.gate().owner().path().as_str() == "debugger"));
+    assert!(
+        topo.edges_for("router")
+            .any(|edge| edge.to.gate().owner().path().as_str() == "debugger")
+    );
 
     if let Ok(output) = topo.as_svg() {
         fs::File::create("tests/topology.svg")
@@ -61,13 +62,13 @@ fn spanned_topology() {
     sim.node("bob", Fallback);
 
     sim.gate("alice", "to-eve")
-        .connect(sim.gate("alice.eve", "to-alice"), None);
+        .connect(sim.gate("alice.eve", "to-alice"));
     sim.gate("alice", "to-sophie")
-        .connect(sim.gate("alice.sophie", "to-alice"), None);
+        .connect(sim.gate("alice.sophie", "to-alice"));
     sim.gate("alice.eve", "to-travis")
-        .connect(sim.gate("alice.eve.travis", "to-eve"), None);
+        .connect(sim.gate("alice.eve.travis", "to-eve"));
     sim.gate("alice.eve", "to-sophie")
-        .connect(sim.gate("alice.sophie", "to-eve"), None);
+        .connect(sim.gate("alice.sophie", "to-eve"));
 
     let root = sim.get(&"alice".into()).unwrap();
 

@@ -38,7 +38,8 @@ cfg_net! {
     pub use crate::net::Globals;
 
     pub use crate::net::channel::Channel;
-    pub use crate::net::channel::ChannelMetrics;
+    pub use crate::net::channel::DatarateChannel;
+    pub use crate::net::channel::DatarateChannelMetrics;
     pub use crate::net::channel::ChannelRef;
     pub use crate::net::channel::ChannelDropBehaviour;
 

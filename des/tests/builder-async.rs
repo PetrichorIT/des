@@ -3,8 +3,8 @@
 use std::{
     io,
     sync::{
-        atomic::{AtomicBool, AtomicU16, AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicBool, AtomicU16, AtomicUsize, Ordering},
     },
 };
 
@@ -116,9 +116,9 @@ fn builder_async_fn_channeled() {
     let txg = sim.gate("tx", "port");
     let rxg = sim.gate("rx", "port");
 
-    txg.connect(
+    txg.connect_with(
         rxg,
-        Some(Channel::new(ChannelMetrics {
+        Some(DatarateChannel::new(DatarateChannelMetrics {
             bitrate: 10000,
             latency: Duration::from_millis(20),
             jitter: Duration::ZERO,
@@ -162,10 +162,12 @@ fn builder_async_failable_with_fail() {
         }),
     );
     let v = Builder::new().build(sim.freeze()).run();
-    assert!(v.unwrap_err()[0]
-        .as_any()
-        .downcast_ref::<JoinError>()
-        .is_some())
+    assert!(
+        v.unwrap_err()[0]
+            .as_any()
+            .downcast_ref::<JoinError>()
+            .is_some()
+    )
 }
 
 #[test]
@@ -190,10 +192,12 @@ fn builder_async_require_join() {
     );
 
     let v = Builder::seeded(123).build(sim.freeze()).run();
-    assert!(v.unwrap_err()[0]
-        .as_any()
-        .downcast_ref::<JoinError>()
-        .is_some());
+    assert!(
+        v.unwrap_err()[0]
+            .as_any()
+            .downcast_ref::<JoinError>()
+            .is_some()
+    );
 }
 
 #[test]

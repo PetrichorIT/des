@@ -46,10 +46,10 @@
 
 use crate::{
     net::{
-        self, channel::ChannelDropBehaviour, module::ModuleContext, Sim, SimBuilder,
-        SimBuilderScoped,
+        self, Sim, SimBuilder, SimBuilderScoped, channel::ChannelDropBehaviour,
+        module::ModuleContext,
     },
-    prelude::{Channel, ChannelMetrics, ModuleRef, ObjectPath},
+    prelude::{DatarateChannel, DatarateChannelMetrics, ModuleRef, ObjectPath},
     time::Duration,
 };
 use des_net_utils::ndl::{
@@ -297,12 +297,12 @@ impl<A> SimBuilderScoped<'_, A> {
             let from = access_gate(&ctx.ctx, &connection.peers[0].accessors).expect("gate");
             let to = access_gate(&ctx.ctx, &connection.peers[1].accessors).expect("gate");
 
-            from.connect(
+            from.connect_with(
                 to,
                 connection
                     .link
                     .as_ref()
-                    .map(|link| Channel::new(ChannelMetrics::from(link))),
+                    .map(|link| DatarateChannel::new(DatarateChannelMetrics::from(link))),
             );
         }
 
@@ -326,10 +326,10 @@ fn access_gate(
     }
 }
 
-impl From<&tree::Link> for ChannelMetrics {
+impl From<&tree::Link> for DatarateChannelMetrics {
     #[allow(clippy::cast_sign_loss)]
     fn from(value: &tree::Link) -> Self {
-        ChannelMetrics {
+        DatarateChannelMetrics {
             bitrate: value.bitrate as usize,
             jitter: Duration::from_secs_f64(value.jitter),
             latency: Duration::from_secs_f64(value.latency),

@@ -625,7 +625,7 @@ mod tests {
             "Hello world!"
         );
         assert_eq!(Body::new(42u8).try_into_content::<u8>().unwrap(), 42);
-        assert_eq!(Body::new(true).try_into_content::<bool>().unwrap(), true);
+        assert!(Body::new(true).try_into_content::<bool>().unwrap());
 
         assert_eq!(
             Body::new("Hello world!").try_content::<&str>().unwrap(),

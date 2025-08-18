@@ -75,9 +75,9 @@ pub fn send(msg: impl Into<Message>, gate: impl IntoModuleGate) {
 /// sim.node("bob", SomeOtherModule);
 /// let in_gate = sim.gate("bob", "in");
 ///
-/// out_gate.connect(in_gate, Some(
+/// out_gate.connect_with(in_gate, Some(
 ///     /* Channel definition */
-///     # Channel::new(ChannelMetrics { bitrate: 10000, jitter: Duration::ZERO, latency: Duration::from_millis(10), drop_behaviour: ChannelDropBehaviour::Drop })
+///     # DatarateChannel::new(DatarateChannelMetrics { bitrate: 10000, jitter: Duration::ZERO, latency: Duration::from_millis(10), drop_behaviour: ChannelDropBehaviour::Drop })
 /// ));
 ///
 /// let _ = Builder::new().build(sim.freeze()).run();

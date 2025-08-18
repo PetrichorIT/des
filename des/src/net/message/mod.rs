@@ -38,7 +38,8 @@ pub use header::*;
 #[derive(Debug)]
 #[must_use]
 pub struct Message {
-    pub(crate) header: Box<Header>,
+    /// The header contained in the message.
+    pub header: Box<Header>,
     /// The body contained in the message. Default is ().
     pub body: Body,
 }

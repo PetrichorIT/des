@@ -5,6 +5,7 @@
 mod path;
 mod runtime;
 
+// pub mod channel;
 pub mod channel;
 pub mod gate;
 pub mod message;
@@ -13,9 +14,11 @@ pub mod ndl;
 pub mod processing;
 pub mod topology;
 
-pub(crate) use self::runtime::HandleMessageEvent;
-pub(crate) use self::runtime::MessageExitingConnection;
-pub(crate) use self::runtime::NetEvents;
+pub use self::runtime::NetEvents;
+pub use self::runtime::{
+    AsyncWakeupEvent, ChannelUnbusyNotif, HandleMessageEvent, MessageExitingConnection,
+    ModuleRestartEvent,
+};
 
 pub use self::path::*;
 pub use self::runtime::*;

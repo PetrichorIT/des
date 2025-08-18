@@ -1,10 +1,10 @@
 use blocks::ModuleBlock;
 use des_net_utils::props::Cfg;
-use serde_yml::{from_str, Value};
+use serde_yml::{Value, from_str};
 
 use crate::{
     net::{
-        module::{try_current, ModuleContext, ModuleExt, MOD_CTX},
+        module::{MOD_CTX, ModuleContext, ModuleExt, try_current},
         processing::ProcessingStack,
         topology::Topology,
     },
@@ -17,7 +17,7 @@ use std::{
     fmt::Debug,
     fs, io, mem,
     ops::{self, Deref, DerefMut},
-    panic::{set_hook, take_hook, PanicHookInfo},
+    panic::{PanicHookInfo, set_hook, take_hook},
     path::Path,
     sync::{Arc, Mutex},
 };
@@ -26,7 +26,7 @@ mod api;
 pub use self::api::*;
 
 mod events;
-pub(crate) use self::events::*;
+pub use self::events::*;
 
 #[cfg(feature = "async")]
 pub use self::events::JoinError;
@@ -130,7 +130,7 @@ pub struct SimBuilder<A> {
 ///                 # || 123, |_, _| {}
 ///             ));
 ///             let gate = sim.gate(&host, "port");
-///             gate.connect(gates[i].clone(), None);
+///             gate.connect(gates[i].clone());
 ///         }
 ///     }
 /// }
@@ -337,7 +337,7 @@ impl<A> SimBuilder<A> {
     /// let a = sim.gate("alice", "in");
     /// let b = sim.gate("bob", "out");
     ///
-    /// b.connect(a, None);
+    /// b.connect(a);
     ///
     /// let _ = Builder::new().build(sim.freeze()).run();
     /// ```
@@ -449,7 +449,9 @@ impl<A> SimBuilder<A> {
         let ctx = if let Some(parent) = path.nonzero_parent() {
             // (a) Check that the parent exists
             let Some(parent) = self.get(&parent) else {
-                panic!("cannot create node '{path}', since parent node '{parent}' is required, but does not exist");
+                panic!(
+                    "cannot create node '{path}', since parent node '{parent}' is required, but does not exist"
+                );
             };
 
             ModuleContext::child_of(path.name(), parent)
@@ -655,11 +657,7 @@ where
 
         let _ = take_hook();
         leave_scope();
-        if error.is_empty() {
-            Ok(())
-        } else {
-            Err(error)
-        }
+        if error.is_empty() { Ok(()) } else { Err(error) }
     }
 }
 
@@ -743,7 +741,10 @@ impl ModuleTree {
 
                 // search for parent insert at last possible position
                 let Some(mut pos) = self.modules.iter().rposition(|m| m.path == parent) else {
-                    panic!("cannot create node '{}', since parent node '{parent}' is required, but does not exist", module.path)
+                    panic!(
+                        "cannot create node '{}', since parent node '{parent}' is required, but does not exist",
+                        module.path
+                    )
                 };
                 pos += 1;
 

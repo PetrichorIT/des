@@ -1,11 +1,6 @@
 #![cfg(feature = "net")]
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc,
-};
 
-use des::{net::channel::ChannelProbe, prelude::*};
-use rand::{rngs::StdRng, SeedableRng};
+use des::{net::blocks::AsyncFn, prelude::*};
 use serial_test::serial;
 
 #[derive(Default)]
@@ -41,13 +36,13 @@ fn channel_dropping_message() {
     let g_in = rt.gate("root", "in");
     let g_out = rt.gate("root", "out");
 
-    let channel = Channel::new(ChannelMetrics {
+    let channel = DatarateChannel::new(DatarateChannelMetrics {
         bitrate: 1000,
         latency: Duration::from_millis(100),
         jitter: Duration::ZERO,
         drop_behaviour: ChannelDropBehaviour::default(),
     });
-    g_in.connect(g_out, Some(channel));
+    g_in.connect_with(g_out, Some(channel));
 
     let rt = Builder::seeded(123).build(rt.freeze());
     let _ = rt.run();
@@ -92,13 +87,13 @@ fn channel_buffering_message() {
     let g_in = rt.gate("root", "in");
     let g_out = rt.gate("root", "out");
 
-    let channel = Channel::new(ChannelMetrics {
+    let channel = DatarateChannel::new(DatarateChannelMetrics {
         bitrate: 1000,
         latency: Duration::from_millis(100),
         jitter: Duration::ZERO,
         drop_behaviour: ChannelDropBehaviour::Queue(Some(600)),
     });
-    g_in.connect(g_out, Some(channel));
+    g_in.connect_with(g_out, Some(channel));
 
     let rt = Builder::seeded(123).build(rt.freeze());
     let _ = rt.run();
@@ -133,81 +128,14 @@ fn channel_instant_busy() {
     let g_in = rt.gate("root", "in");
     let g_out = rt.gate("root", "out");
 
-    let channel = Channel::new(ChannelMetrics::new(
+    let channel = DatarateChannel::new(DatarateChannelMetrics::new(
         1000,
         Duration::from_millis(100),
         Duration::ZERO,
         ChannelDropBehaviour::default(),
     ));
 
-    g_in.connect(g_out, Some(channel));
-
-    let rt = Builder::seeded(123).build(rt.freeze());
-    let _ = rt.run();
-}
-
-#[derive(Default)]
-struct ChannelProbing(Arc<AtomicUsize>);
-impl Module for ChannelProbing {
-    fn at_sim_start(&mut self, _stage: usize) {
-        let chan = current().gate("port", 0).unwrap().channel().unwrap();
-
-        chan.attach_probe(Probe(self.0.clone()));
-        assert_eq!(chan.metrics().bitrate, 1234);
-
-        let msg = Message::default();
-        let busy_time = chan.calculate_busy(&msg);
-        let tft = SimTime::now() + busy_time;
-        dbg!(busy_time);
-        assert_eq!(
-            tft + Duration::from_millis(100),
-            SimTime::from_duration(chan.calculate_duration(&msg, &mut StdRng::seed_from_u64(123)))
-        );
-
-        assert_eq!(chan.transmission_finish_time(), SimTime::MIN);
-        assert_eq!(format!("{chan:?}"), format!("Channel {{ metrics: ChannelMetrics {{ bitrate: 1234, latency: 100ms, jitter: 0ns, drop_behaviour: Drop }}, state: Idle }}"));
-
-        send(msg, "port");
-
-        assert_eq!(chan.transmission_finish_time(), tft);
-        assert_eq!(format!("{chan:?}"), format!("Channel {{ metrics: ChannelMetrics {{ bitrate: 1234, latency: 100ms, jitter: 0ns, drop_behaviour: Drop }}, state: Busy {{ until: {tft}, bytes: 0, packets: 0 }} }}"));
-    }
-
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
-        assert_eq!(self.0.load(Ordering::SeqCst), 1);
-        Ok(())
-    }
-}
-
-struct Probe(Arc<AtomicUsize>);
-impl ChannelProbe for Probe {
-    fn on_message_transmit(&mut self, _: &ChannelMetrics, _: &Message) {
-        self.0.fetch_add(1, Ordering::SeqCst);
-    }
-}
-
-#[test]
-#[serial]
-fn channel_probes() {
-    // Logger::new()
-    //     .interal_max_log_level(log::LevelFilter::Trace)
-    //     .set_logger();
-
-    let mut rt = Sim::new(());
-    rt.node("alice", ChannelProbing::default());
-    rt.node("bob", ChannelProbing::default());
-
-    let alice_port = rt.gate("alice", "port");
-    let bob_port = rt.gate("bob", "port");
-
-    let chan = Channel::new(ChannelMetrics {
-        bitrate: 1234,
-        latency: Duration::from_millis(100),
-        jitter: Duration::ZERO,
-        drop_behaviour: ChannelDropBehaviour::default(),
-    });
-
-    alice_port.connect(bob_port, Some(chan));
+    g_in.connect_with(g_out, Some(channel));
 
     let rt = Builder::seeded(123).build(rt.freeze());
     let _ = rt.run();
@@ -239,10 +167,10 @@ fn latency_only_channel() {
     sim.node("alice", LatencyOnly(0));
     let gout = sim.gate("alice", "out");
     let gin = sim.gate("alice", "in");
-    gout.connect(
+    gout.connect_with(
         gin,
-        Some(Channel::new(ChannelMetrics::new(
-            0,
+        Some(DatarateChannel::new(DatarateChannelMetrics::new(
+            1000,
             Duration::from_secs(1),
             Duration::ZERO,
             ChannelDropBehaviour::Drop,
@@ -250,4 +178,108 @@ fn latency_only_channel() {
     );
 
     let _ = Builder::seeded(123).build(sim.freeze()).run();
+}
+
+#[test]
+#[serial]
+fn simplex_shared_domain() {
+    let mut sim = Sim::new(());
+
+    sim.node(
+        "receiver",
+        AsyncFn::new(|mut rx| async move {
+            for _ in 0..25 {
+                let msg = rx.recv().await.unwrap();
+                let last = msg.last_gate.clone().unwrap();
+                send(msg, last);
+                tracing::info!("received message");
+            }
+        })
+        .require_join(),
+    );
+
+    let switch = sim.gates("receiver", "mobile", 5);
+    let to_receiver = ChannelRef::from(DatarateChannel::new(DatarateChannelMetrics::new(
+        64 * 8,
+        Duration::ZERO,
+        Duration::ZERO,
+        ChannelDropBehaviour::Queue(None),
+    )));
+    let to_sender = ChannelRef::from(DatarateChannel::new(DatarateChannelMetrics::new(
+        64 * 8,
+        Duration::ZERO,
+        Duration::ZERO,
+        ChannelDropBehaviour::Queue(None),
+    )));
+
+    for i in 0..5 {
+        let key = format!("sender-{i}");
+        sim.node(
+            &key,
+            AsyncFn::new(|_| async move {
+                for _ in 0..5 {
+                    send(Message::default(), "mobile");
+                }
+            }),
+        );
+        let gate = sim.gate(key, "mobile");
+
+        gate.clone().connect_with(
+            switch[i].clone(),
+            Some((to_receiver.clone(), to_sender.clone())),
+        );
+    }
+
+    let rt = Builder::seeded(123).build(sim.freeze()).run().unwrap();
+
+    assert_eq!(rt.2.event_count, 50 * 3);
+    assert_eq!(rt.1, 26.0)
+}
+
+#[test]
+#[serial]
+fn duplex_shared_domain() {
+    let mut sim = Sim::new(());
+
+    sim.node(
+        "receiver",
+        AsyncFn::new(|mut rx| async move {
+            for _ in 0..25 {
+                let msg = rx.recv().await.unwrap();
+                let last = msg.last_gate.clone().unwrap();
+                send(msg, last);
+                tracing::info!("received message");
+            }
+        })
+        .require_join(),
+    );
+
+    let switch = sim.gates("receiver", "mobile", 5);
+    let chan = ChannelRef::from(DatarateChannel::new(DatarateChannelMetrics::new(
+        64 * 8,
+        Duration::ZERO,
+        Duration::ZERO,
+        ChannelDropBehaviour::Queue(None),
+    )));
+
+    for i in 0..5 {
+        let key = format!("sender-{i}");
+        sim.node(
+            &key,
+            AsyncFn::new(|_| async move {
+                for _ in 0..5 {
+                    send(Message::default(), "mobile");
+                }
+            }),
+        );
+        let gate = sim.gate(key, "mobile");
+
+        gate.clone()
+            .connect_with(switch[i].clone(), Some(chan.clone()));
+    }
+
+    let rt = Builder::seeded(123).build(sim.freeze()).run().unwrap();
+
+    assert_eq!(rt.2.event_count, 50 * 3);
+    assert_eq!(rt.1, 50.0)
 }

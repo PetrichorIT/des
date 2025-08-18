@@ -1,6 +1,6 @@
 //! Module-specific network ports.
 
-use crate::net::channel::ChannelRef;
+use crate::net::channel::{ChannelRef, IntoDuplexChannel};
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::sync::{Arc, Mutex, Weak};
@@ -246,7 +246,7 @@ impl Gate {
     /// # return None;
     /// let a = current().gate("out", 0)?;
     /// let b = current().parent().ok()?.gate("in", 0)?;
-    /// a.connect(b, None);
+    /// a.connect(b);
     /// # Some(())
     /// # }
     /// ```
@@ -256,7 +256,41 @@ impl Gate {
     /// This function panic if either of the two gates is allready fully connected in a chain.
     /// This function also panics if only one gate is provided
     #[allow(clippy::needless_pass_by_value)]
-    pub fn connect(self: GateRef, other: GateRef, channel: Option<ChannelRef>) {
+    pub fn connect(self: GateRef, other: GateRef) {
+        self.connect_with::<(ChannelRef, ChannelRef)>(other, None);
+    }
+
+    /// Connects two gates into a gate chain element.
+    ///
+    /// Gates can be organized into a bidirectional gate chain, that
+    /// forwards messages two the other end. Using this function two gates
+    /// are connected and both gates save their connection state. A gate
+    /// can have up to two other gates connected to it, forming a full gate
+    /// chain in response.
+    ///
+    /// If a channel was provided to enable message delaying on this chain element
+    /// both direction will have unique instances of the channel, with identical
+    /// configuration.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use des::prelude::*;
+    /// # fn a() -> Option<()>{
+    /// # return None;
+    /// let a = current().gate("out", 0)?;
+    /// let b = current().parent().ok()?.gate("in", 0)?;
+    /// a.connect(b);
+    /// # Some(())
+    /// # }
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// This function panic if either of the two gates is allready fully connected in a chain.
+    /// This function also panics if only one gate is provided
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn connect_with<C: IntoDuplexChannel>(self: GateRef, other: GateRef, channel: Option<C>) {
         assert!(
             !Arc::ptr_eq(&self, &other),
             "Cannot connect gate to itself."
@@ -281,18 +315,23 @@ impl Gate {
             "Cannot add connection, gates allready connected to multiple points"
         );
 
-        let ch1 = channel.as_ref().map(|c| Arc::new(c.dup()));
-        let ch2 = channel;
+        let (fwd, bck) = match channel {
+            Some(channel) => {
+                let (a, b) = channel.into_duplex();
+                (Some(a), Some(b))
+            }
+            None => (None, None),
+        };
 
         conns.put(Connection {
             endpoint: other.clone(),
             endpoint_id: other_conns_pos,
-            channel: ch1,
+            channel: fwd,
         });
         other_conns.put(Connection {
             endpoint: self.clone(),
             endpoint_id: conns_pos,
-            channel: ch2,
+            channel: bck,
         });
     }
 
@@ -483,11 +522,11 @@ mod tests {
         assert_eq!(gate_a.kind(), GateKind::Standalone);
 
         let gate_b = owner.create_raw_gate("port-b", 1, 0);
-        gate_a.clone().connect(gate_b.clone(), None);
+        gate_a.clone().connect(gate_b.clone());
         assert_eq!(gate_a.kind(), GateKind::Endpoint);
 
         let gate_c = owner.create_raw_gate("port-c", 1, 0);
-        gate_a.clone().connect(gate_c.clone(), None);
+        gate_a.clone().connect(gate_c.clone());
         assert_eq!(gate_a.kind(), GateKind::Transit);
 
         // Chain chould be c -- a -- b
@@ -508,10 +547,10 @@ mod tests {
         assert_eq!(gate.kind(), GateKind::Standalone);
 
         let gate_b = owner.create_raw_gate("port-b", 1, 0);
-        gate.clone().connect(gate_b.clone(), None);
+        gate.clone().connect(gate_b.clone());
         assert_eq!(gate.kind(), GateKind::Endpoint);
 
-        gate.clone().connect(gate_b, None);
+        gate.clone().connect(gate_b);
         assert_eq!(gate.kind(), GateKind::Endpoint);
     }
 
@@ -520,7 +559,7 @@ mod tests {
         let ctx = ModuleContext::standalone("root".into());
         let gate_a = ctx.create_raw_gate("port-a", 1, 0);
 
-        assert_eq!((&gate_a).as_gate(&ctx.ctx), Some(gate_a.clone()));
+        assert_eq!(gate_a.as_gate(&ctx.ctx), Some(gate_a.clone()));
         assert_eq!(
             Arc::downgrade(&gate_a).as_gate(&ctx.ctx),
             Some(gate_a.clone())

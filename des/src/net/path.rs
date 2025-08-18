@@ -261,7 +261,7 @@ mod tests {
         assert_eq!(
             path,
             ObjectPath {
-                data: "".to_string().into(),
+                data: String::new().into(),
                 len: 0,
                 last_element_offset: 0,
                 is_gate: false,
@@ -305,7 +305,7 @@ mod tests {
         assert_eq!(
             parent,
             Some(ObjectPath {
-                data: "".to_string().into(),
+                data: String::new().into(),
                 len: 0,
                 last_element_offset: 0,
                 is_gate: false,
@@ -353,7 +353,7 @@ mod tests {
         assert_eq!(
             ObjectPath::from(""),
             ObjectPath {
-                data: "".to_string().into(),
+                data: String::new().into(),
                 len: 0,
                 last_element_offset: 0,
                 is_gate: false,

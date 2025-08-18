@@ -124,7 +124,7 @@ mod tests {
         let mut props = Props::default();
 
         props.set("bool".to_string(), Value::Bool(true));
-        assert_eq!(props.get::<bool>("bool")?.or_default().get(), true);
+        assert!(props.get::<bool>("bool")?.or_default().get());
 
         Ok(())
     }

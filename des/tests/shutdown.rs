@@ -7,8 +7,8 @@ use des::{
 };
 use serial_test::serial;
 use std::sync::{
-    atomic::{AtomicUsize, Ordering},
     Arc,
+    atomic::{AtomicUsize, Ordering},
 };
 
 struct DropTest {
@@ -406,8 +406,8 @@ fn shutdown_will_drop_transiting() {
     let pong = app.gate("pong", "port");
     let con = app.gate("transit", "connector");
 
-    ping.connect(con.clone(), None);
-    con.connect(pong, None);
+    ping.connect(con.clone());
+    con.connect(pong);
 
     let rt = Builder::seeded(123).max_itr(500).build(app.freeze());
     let _ = rt.run().unwrap();
@@ -427,18 +427,18 @@ fn shutdown_will_drop_transiting_delayed_channels() {
     let pong = app.gate("pong", "port");
     let con = app.gate("transit", "connector");
 
-    ping.connect(
+    ping.connect_with(
         con.clone(),
-        Some(Channel::new(ChannelMetrics {
+        Some(DatarateChannel::new(DatarateChannelMetrics {
             bitrate: 100_000,
             latency: Duration::from_secs_f64(0.004),
             jitter: Duration::ZERO,
             drop_behaviour: ChannelDropBehaviour::default(),
         })),
     );
-    con.connect(
+    con.connect_with(
         pong,
-        Some(Channel::new(ChannelMetrics {
+        Some(DatarateChannel::new(DatarateChannelMetrics {
             bitrate: 100_000,
             latency: Duration::from_secs_f64(0.004),
             jitter: Duration::ZERO,

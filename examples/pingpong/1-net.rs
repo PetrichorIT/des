@@ -58,13 +58,13 @@ fn build_network() -> Sim<()> {
     let ping_gate = sim.gate("pinger", "port");
     let pong_gate = sim.gate("ponger", "port");
 
-    let metrics = ChannelMetrics::new(
+    let metrics = DatarateChannelMetrics::new(
         8_000_000,
         Duration::from_millis(80),
         Duration::ZERO,
         ChannelDropBehaviour::Drop,
     );
-    ping_gate.connect(pong_gate, Some(Channel::new(metrics)));
+    ping_gate.connect_with(pong_gate, Some(DatarateChannel::new(metrics)));
 
     sim.freeze()
 }
@@ -104,7 +104,10 @@ const PONG: MessageKind = 2;
 impl Module for Pinger {
     fn at_sim_start(&mut self, _stage: usize) {
         for i in 0..30 {
-            schedule_in(Message::default().with_kind(INTERVAL), Duration::from_secs(i));
+            schedule_in(
+                Message::default().with_kind(INTERVAL),
+                Duration::from_secs(i),
+            );
         }
     }
 
