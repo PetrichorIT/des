@@ -1,4 +1,4 @@
-use super::{alloc::CQueueLLAllocator, boxed::LocalBox, EventHandle};
+use super::{EventHandle, alloc::CQueueLLAllocator, boxed::LocalBox};
 use std::{fmt::Debug, time::Duration};
 
 pub(crate) struct DualLinkedList<E> {
@@ -26,8 +26,8 @@ impl<T> DualLinkedList<T> {
         let mut head = EventNode::empty(Duration::ZERO, alloc);
         let mut tail = EventNode::empty(Duration::MAX, alloc);
 
-        let head_ptr: *mut EventNode<T> = &mut *head;
-        let tail_ptr: *mut EventNode<T> = &mut *tail;
+        let head_ptr: *mut EventNode<T> = &raw mut *head;
+        let tail_ptr: *mut EventNode<T> = &raw mut *tail;
 
         head.next = tail_ptr;
         tail.prev = head_ptr;
@@ -87,10 +87,10 @@ impl<T> DualLinkedList<T> {
     pub(super) fn add(&mut self, event: T, time: Duration, event_id: usize) {
         let mut node = EventNode::new(event, time, event_id, self.alloc);
         self.len += 1;
-        let node_ptr: *mut EventNode<T> = &mut *node;
+        let node_ptr: *mut EventNode<T> = &raw mut *node;
 
         // From back insert
-        let mut cur: *mut EventNode<T> = &mut *self.tail;
+        let mut cur: *mut EventNode<T> = &raw mut *self.tail;
         loop {
             // SAFTEY:
             // There a two cases
@@ -151,7 +151,7 @@ impl<T> DualLinkedList<T> {
             // 3) node.next.prev will point ot a valid node (head)
             self.head.next = node.next;
             unsafe {
-                (*node.next).prev = &mut *self.head;
+                (*node.next).prev = &raw mut *self.head;
             }
 
             // All references are removed from the DLL thus the node

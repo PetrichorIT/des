@@ -12,7 +12,7 @@ impl Module for Alice {
         info!(
             "Received at {}: Message with content: {}",
             SimTime::now(),
-            pkt.content::<String>().deref()
+            pkt.body.content::<String>().deref()
         );
 
         if pkt.header().id > 60_000 {
@@ -31,7 +31,7 @@ impl Module for Bob {
     fn at_sim_start(&mut self, _stage: usize) {
         schedule_in(
             Message::default()
-                .kind(0xff)
+                .with_kind(0xff)
                 .with_content("Init".to_string()),
             Duration::ZERO,
         )
@@ -44,10 +44,10 @@ impl Module for Bob {
             info!(target: "Bob", "Dropped init msg");
             send(
                 Message::default()
-                    .kind(1)
+                    .with_kind(1)
                     // .src(0x7f_00_00_01, 80)
                     // .dest(0x7f_00_00_02, 80)
-                    .id(0)
+                    .with_id(0)
                     .with_content("Ping".to_string()),
                 ("netOut", 2),
             );
@@ -58,10 +58,10 @@ impl Module for Bob {
             info!(
                 "Received at {}: Message with content: {}",
                 SimTime::now(),
-                pkt.content::<String>().deref()
+                pkt.body.content::<String>().deref()
             );
 
-            pkt.content_mut::<String>().push('#');
+            pkt.body.content_mut::<String>().push('#');
 
             send(pkt, ("netOut", 2));
         }

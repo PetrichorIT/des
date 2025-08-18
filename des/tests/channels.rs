@@ -107,7 +107,7 @@ fn channel_buffering_message() {
 struct SendMessageModule;
 impl Module for SendMessageModule {
     fn at_sim_start(&mut self, _stage: usize) {
-        schedule_in(Message::default().kind(10), Duration::from_secs(1));
+        schedule_in(Message::default().with_kind(10), Duration::from_secs(1));
     }
 
     fn handle_message(&mut self, msg: Message) {

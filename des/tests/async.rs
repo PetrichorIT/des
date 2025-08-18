@@ -49,12 +49,12 @@ fn quasai_sync_non_blocking() {
 
     let mut rt = Builder::seeded(123).build(rt.freeze());
 
-    rt.add_message_onto(gate_a.clone(), Message::default().id(1), SimTime::ZERO);
-    rt.add_message_onto(gate_a, Message::default().id(2), SimTime::ZERO);
+    rt.add_message_onto(gate_a.clone(), Message::default().with_id(1), SimTime::ZERO);
+    rt.add_message_onto(gate_a, Message::default().with_id(2), SimTime::ZERO);
 
-    rt.add_message_onto(gate_b.clone(), Message::default().id(1), SimTime::ZERO);
-    rt.add_message_onto(gate_b.clone(), Message::default().id(2), SimTime::ZERO);
-    rt.add_message_onto(gate_b, Message::default().id(3), SimTime::ZERO);
+    rt.add_message_onto(gate_b.clone(), Message::default().with_id(1), SimTime::ZERO);
+    rt.add_message_onto(gate_b.clone(), Message::default().with_id(2), SimTime::ZERO);
+    rt.add_message_onto(gate_b, Message::default().with_id(3), SimTime::ZERO);
 
     let result = rt.run();
     match result {
@@ -150,9 +150,9 @@ fn mutiple_active_tasks() {
 
     let mut rt = Builder::seeded(123).build(rt.freeze());
 
-    rt.add_message_onto(gate_a.clone(), Message::default().id(1), SimTime::ZERO);
-    rt.add_message_onto(gate_a.clone(), Message::default().id(2), SimTime::ZERO);
-    rt.add_message_onto(gate_a, Message::default().kind(42), SimTime::ZERO);
+    rt.add_message_onto(gate_a.clone(), Message::default().with_id(1), SimTime::ZERO);
+    rt.add_message_onto(gate_a.clone(), Message::default().with_id(2), SimTime::ZERO);
+    rt.add_message_onto(gate_a, Message::default().with_kind(42), SimTime::ZERO);
 
     let result = rt.run();
     match result {
@@ -218,12 +218,12 @@ fn one_module_timers() {
 
     rt.add_message_onto(
         gate_a.clone(),
-        Message::default().id(1).kind(1),
+        Message::default().with_id(1).with_kind(1),
         SimTime::ZERO,
     );
     rt.add_message_onto(
         gate_a,
-        Message::default().id(2).kind(2),
+        Message::default().with_id(2).with_kind(2),
         SimTime::from_duration(Duration::new(2, 0)),
     );
 
@@ -253,12 +253,12 @@ fn one_module_delayed_recv() {
 
     rt.add_message_onto(
         gate_a.clone(),
-        Message::default().id(1).kind(2),
+        Message::default().with_id(1).with_kind(2),
         SimTime::ZERO,
     );
     rt.add_message_onto(
         gate_a,
-        Message::default().id(2).kind(2),
+        Message::default().with_id(2).with_kind(2),
         SimTime::from_duration(Duration::new(2, 0)),
     );
 
@@ -300,12 +300,12 @@ fn mutiple_module_delayed_recv() {
     //          ....<ID=2_>
     rt.add_message_onto(
         gate_a.clone(),
-        Message::default().id(1).kind(2),
+        Message::default().with_id(1).with_kind(2),
         SimTime::from_duration(Duration::new(1, 0)),
     );
     rt.add_message_onto(
         gate_a,
-        Message::default().id(2).kind(2),
+        Message::default().with_id(2).with_kind(2),
         SimTime::from_duration(Duration::new(2, 0)),
     );
 
@@ -315,12 +315,12 @@ fn mutiple_module_delayed_recv() {
     //          <ID=20>
     rt.add_message_onto(
         gate_b.clone(),
-        Message::default().id(10).kind(1),
+        Message::default().with_id(10).with_kind(1),
         SimTime::from_duration(Duration::new(1, 0)),
     );
     rt.add_message_onto(
         gate_b,
-        Message::default().id(20).kind(2),
+        Message::default().with_id(20).with_kind(2),
         SimTime::from_duration(Duration::new(2, 0)),
     );
 
@@ -381,28 +381,28 @@ fn semaphore_in_waiting_task() {
 
     rt.add_message_onto(
         gate_a.clone(),
-        Message::default().id(1).kind(2),
+        Message::default().with_id(1).with_kind(2),
         SimTime::from_duration(Duration::new(1, 0)),
     );
     rt.add_message_onto(
         gate_a,
-        Message::default().id(2).kind(3),
+        Message::default().with_id(2).with_kind(3),
         SimTime::from_duration(Duration::new(2, 0)),
     );
 
     rt.add_message_onto(
         gate_b.clone(),
-        Message::default().id(10).kind(2),
+        Message::default().with_id(10).with_kind(2),
         SimTime::from_duration(Duration::new(1, 0)),
     );
     rt.add_message_onto(
         gate_b.clone(),
-        Message::default().id(20).kind(2),
+        Message::default().with_id(20).with_kind(2),
         SimTime::from_duration(Duration::new(2, 0)),
     );
     rt.add_message_onto(
         gate_b,
-        Message::default().id(20).kind(1),
+        Message::default().with_id(20).with_kind(1),
         SimTime::from_duration(Duration::new(3, 0)),
     );
 

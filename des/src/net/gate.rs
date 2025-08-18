@@ -5,8 +5,8 @@ use std::fmt::Debug;
 use std::hash::Hash;
 use std::sync::{Arc, Mutex, Weak};
 
-use super::module::{ModuleContext, ModuleRef, ModuleRefWeak};
 use super::ObjectPath;
+use super::module::{ModuleContext, ModuleRef, ModuleRefWeak};
 
 /// A  reference to a gate.
 pub type GateRef = Arc<Gate>;
@@ -304,7 +304,7 @@ impl Gate {
     /// Returns an iterator over the connections on a gate path.
     /// If the current gate is a transit gate, no iterator will be returned,
     /// since the direction of the iterator cannot be determined.
-    pub fn path_iter(self: &GateRef) -> Option<impl Iterator<Item = Connection>> {
+    pub fn path_iter(self: &GateRef) -> Option<impl Iterator<Item = Connection> + use<>> {
         if self.kind() == GateKind::Transit {
             None
         } else {
@@ -350,15 +350,13 @@ impl Gate {
     pub fn new(owner: &ModuleRef, name: impl AsRef<str>, size: usize, pos: usize) -> GateRef {
         assert!(size >= 1, "Cannot create with a non-postive size");
 
-        let this = GateRef::new(Self {
+        GateRef::new(Self {
             owner: ModuleRefWeak::new(owner),
             name: name.as_ref().to_string(),
             size,
             pos,
             connections: Mutex::new(Connections::new()),
-        });
-
-        this
+        })
     }
 
     pub(crate) fn dissolve_paths(&self) {

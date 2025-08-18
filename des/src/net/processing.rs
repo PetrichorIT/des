@@ -239,14 +239,14 @@ pub(super) enum ProcessingState {
 impl ProcessingState {
     fn bump_upstream(&mut self) {
         match self {
-            ProcessingState::Upstream(ref mut idx) => *idx += 1,
+            ProcessingState::Upstream(idx) => *idx += 1,
             _ => unreachable!(),
         }
     }
 
     fn bump_downstream(&mut self) {
         match self {
-            ProcessingState::Downstream(ref mut idx) => *idx -= 1,
+            ProcessingState::Downstream(idx) => *idx -= 1,
             _ => unreachable!(),
         }
     }

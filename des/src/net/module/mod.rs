@@ -104,7 +104,7 @@ impl ModuleId {
     pub const NULL: ModuleId = ModuleId(0);
 
     /// Generates a unique module ID.
-    pub fn gen() -> Self {
+    pub fn generate() -> Self {
         Self(MODULE_ID.fetch_add(1, Ordering::SeqCst))
     }
 }
@@ -125,7 +125,9 @@ pub trait Module: Any {
     /// Resets the custom state when a module is restarted.
     fn reset(&mut self) {
         #[cfg(feature = "tracing")]
-        tracing::warn!("Module has been shutdown and restarted, but reset() was not defined. This may lead to invalid custom state.");
+        tracing::warn!(
+            "Module has been shutdown and restarted, but reset() was not defined. This may lead to invalid custom state."
+        );
     }
 
     ///

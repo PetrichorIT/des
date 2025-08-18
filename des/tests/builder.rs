@@ -145,9 +145,9 @@ fn builder_handler_fn() {
     assert!(Arc::ptr_eq(&gate, &other));
 
     let mut rt = Builder::seeded(123).build(sim.freeze());
-    rt.add_message_onto(gate.clone(), Message::default().id(1), 1.0.into());
-    rt.add_message_onto(gate.clone(), Message::default().id(2), 2.0.into());
-    rt.add_message_onto(gate.clone(), Message::default().id(3), 3.0.into());
+    rt.add_message_onto(gate.clone(), Message::default().with_id(1), 1.0.into());
+    rt.add_message_onto(gate.clone(), Message::default().with_id(2), 2.0.into());
+    rt.add_message_onto(gate.clone(), Message::default().with_id(3), 3.0.into());
 
     let _ = rt.run();
     assert_eq!(counter.load(Ordering::SeqCst), 6);
@@ -248,7 +248,7 @@ fn builder_module_fn() {
 
     let mut rt = Builder::seeded(123).build(sim.freeze());
     for i in 0..10 {
-        rt.add_message_onto(gate.clone(), Message::default().id(i), (i as f64).into());
+        rt.add_message_onto(gate.clone(), Message::default().with_id(i), (i as f64).into());
     }
 
     let _ = rt.run();
@@ -282,9 +282,9 @@ fn builder_module_fn_restart_at_failure() {
     let gate = sim.gate("alice", "port");
 
     let mut rt = Builder::seeded(123).build(sim.freeze());
-    rt.add_message_onto(gate.clone(), Message::default().id(1), 1.0.into());
-    rt.add_message_onto(gate.clone(), Message::default().id(1), 2.0.into());
-    rt.add_message_onto(gate.clone(), Message::default().id(2), 3.0.into());
+    rt.add_message_onto(gate.clone(), Message::default().with_id(1), 1.0.into());
+    rt.add_message_onto(gate.clone(), Message::default().with_id(1), 2.0.into());
+    rt.add_message_onto(gate.clone(), Message::default().with_id(2), 3.0.into());
 
     let _ = rt.run();
     assert_eq!(starts.load(Ordering::SeqCst), 3);

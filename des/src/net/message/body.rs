@@ -1,9 +1,13 @@
 use std::{
-    any::{type_name, Any, TypeId},
+    any::{Any, TypeId, type_name},
     fmt::{self, Debug},
     mem,
     ptr::null_mut,
 };
+
+// TODO: the constraints to content<T> that Empty is not allowed can be dropped, since
+// `Empty` is not public, thus the typeid will be unknown.
+struct Empty;
 
 /// A message body, which stores an arbitrary value, potentially cloneable and debuggable.
 pub struct Body {
@@ -12,7 +16,25 @@ pub struct Body {
     vtable: &'static VTable,
 }
 
+// `!Send` since `Body` may contain non-send types.
+
 impl Body {
+    /// Any empty message body
+    #[must_use]
+    pub const fn empty() -> Self {
+        Self {
+            data: null_mut(),
+            length: 0,
+            vtable: &VTable {
+                type_id: vtype_id::<Empty>,
+                type_name: vtype_name::<Empty>,
+                debug: vdebug_empty,
+                try_clone: vclone_nullptr,
+                drop: vdrop::<Empty>,
+            },
+        }
+    }
+
     /// Creates a new message body, using a cloneable and debuggable value.
     pub fn new<T>(value: T) -> Self
     where
@@ -72,6 +94,14 @@ impl Body {
         }
     }
 
+    /// Indicates whether the message body is empty.
+    ///
+    /// Only messages created through `Body::empty` are considered empty.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.is::<Empty>()
+    }
+
     /// The length of the message body.
     #[must_use]
     pub fn length(&self) -> usize {
@@ -86,6 +116,16 @@ impl Body {
         let id = unsafe { (self.vtable.type_id)() };
         id == TypeId::of::<T>()
     }
+    /// Tries to cast the message body to the given type.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the contained type is not `T`.
+    #[must_use]
+    pub fn into_content<T: Any>(self) -> T {
+        self.try_into_content()
+            .expect("could not cast content as type T")
+    }
 
     /// Tries to cast the message body to the given type.
     ///
@@ -94,8 +134,8 @@ impl Body {
     /// # Errors
     ///
     /// If the contained type is not `T`, this function returns `self` unchanged.
-    pub fn try_cast<T: Any>(mut self) -> Result<T, Self> {
-        if self.is::<T>() {
+    pub fn try_into_content<T: Any>(mut self) -> Result<T, Self> {
+        if self.is::<T>() & !self.is_empty() {
             // take the ptr so that drop does not do shit
             let boxed =
                 unsafe { Box::from_raw(mem::replace(&mut self.data, null_mut()).cast::<T>()) };
@@ -107,18 +147,40 @@ impl Body {
 
     /// Tries to cast the message body as a reference to the given type.
     ///
+    /// # Panics
+    ///
+    /// This function panics if the contained type is not `T`.
+    #[must_use]
+    pub fn content<T: Any>(&self) -> &T {
+        self.try_content::<T>()
+            .expect("could not cast content as type T")
+    }
+
+    /// Tries to cast the message body as a reference to the given type.
+    ///
     /// See also `Any::downcast_ref`.
     #[must_use]
     pub fn try_content<T: Any>(&self) -> Option<&T> {
-        self.is::<T>().then(|| unsafe { &*self.data.cast::<T>() })
+        (self.is::<T>() && !self.is_empty()).then(|| unsafe { &*self.data.cast::<T>() })
+    }
+
+    /// Tries to cast the message body as a mutable reference to the given type.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the contained type is not `T`.
+    #[must_use]
+    pub fn content_mut<T: Any>(&mut self) -> &mut T {
+        self.try_content_mut::<T>()
+            .expect("could not cast content as type T")
     }
 
     /// Tries to cast the message body as a mutable reference to the given type.
     ///
     /// See also `Any::downcast_mut`.
+    #[must_use]
     pub fn try_content_mut<T: Any>(&mut self) -> Option<&mut T> {
-        self.is::<T>()
-            .then(|| unsafe { &mut *self.data.cast::<T>() })
+        (self.is::<T>() && !self.is_empty()).then(|| unsafe { &mut *self.data.cast::<T>() })
     }
 
     /// Tries to clone the body. This operation fails if the inner type `T`
@@ -182,7 +244,7 @@ struct VTable {
     drop: unsafe fn(*mut ()),
 }
 
-fn vtable<T: Any + Debug + Clone>() -> &'static VTable {
+const fn vtable<T: Any + Debug + Clone>() -> &'static VTable {
     &VTable {
         type_id: vtype_id::<T>,
         type_name: vtype_name::<T>,
@@ -229,6 +291,10 @@ unsafe fn vdebug_unknown(_: *const (), f: &mut fmt::Formatter<'_>) -> fmt::Resul
     write!(f, "?")
 }
 
+unsafe fn vdebug_empty(_: *const (), f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "Empty")
+}
+
 #[allow(clippy::unnecessary_wraps)]
 unsafe fn vclone<T: Clone>(ptr: *const ()) -> Option<*mut ()> {
     let value = T::clone(unsafe { &*ptr.cast::<T>() });
@@ -239,10 +305,16 @@ unsafe fn vclone_panic(_: *const ()) -> Option<*mut ()> {
     None
 }
 
+#[allow(clippy::unnecessary_wraps)]
+unsafe fn vclone_nullptr(ptr: *const ()) -> Option<*mut ()> {
+    assert!(ptr.is_null(), "expected internal pointer to be null");
+    Some(null_mut())
+}
+
 unsafe fn vdrop<T>(ptr: *mut ()) {
     if !ptr.is_null() {
         unsafe {
-            drop(Box::from_raw(&mut *ptr.cast::<T>()));
+            drop(Box::from_raw(&raw mut *ptr.cast::<T>()));
         }
     }
 }
@@ -316,7 +388,7 @@ impl<T: MessageBody> MessageBody for Box<T> {
 impl<T: MessageBody> MessageBody for Option<T> {
     fn byte_len(&self) -> usize {
         match self {
-            Some(ref content) => content.byte_len(),
+            Some(content) => content.byte_len(),
             None => 0,
         }
     }
@@ -325,8 +397,8 @@ impl<T: MessageBody> MessageBody for Option<T> {
 impl<T: MessageBody, E: MessageBody> MessageBody for Result<T, E> {
     fn byte_len(&self) -> usize {
         match self {
-            Ok(ref val) => val.byte_len(),
-            Err(ref err) => err.byte_len(),
+            Ok(val) => val.byte_len(),
+            Err(err) => err.byte_len(),
         }
     }
 }
@@ -509,6 +581,24 @@ mod tests {
     use super::*;
 
     #[test]
+    fn empty_body() {
+        let empty = Body::empty();
+
+        assert!(empty.is_empty());
+        assert!(empty.is::<Empty>());
+        assert!(empty.try_content::<Empty>().is_none()); // Empty messages cannot be casted (only internal check, since Empty is private)
+
+        assert_eq!(
+            format!("{empty:?}"),
+            "Body { length: 0, type: \"des::net::message::body::Empty\", value: Empty }"
+        );
+
+        assert!(empty.try_clone().is_some()); // tests clone + drop
+
+        assert!(empty.try_into_content::<Empty>().is_err());
+    }
+
+    #[test]
     fn body_maintains_type_identity() {
         assert!(Body::new("Hello world!").is::<&str>());
         assert!(!Body::new("Hello world!").is::<String>());
@@ -529,11 +619,13 @@ mod tests {
     #[test]
     fn body_allows_downcasting() {
         assert_eq!(
-            Body::new("Hello world!").try_cast::<&str>().unwrap(),
+            Body::new("Hello world!")
+                .try_into_content::<&str>()
+                .unwrap(),
             "Hello world!"
         );
-        assert_eq!(Body::new(42u8).try_cast::<u8>().unwrap(), 42);
-        assert_eq!(Body::new(true).try_cast::<bool>().unwrap(), true);
+        assert_eq!(Body::new(42u8).try_into_content::<u8>().unwrap(), 42);
+        assert_eq!(Body::new(true).try_into_content::<bool>().unwrap(), true);
 
         assert_eq!(
             Body::new("Hello world!").try_content::<&str>().unwrap(),

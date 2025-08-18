@@ -1,5 +1,5 @@
 [package]
-edition = "2021"
+edition = "2024"
 name = "des-cqueue"
 version = "0.2.0"
 
@@ -7,4 +7,4 @@ version = "0.2.0"
 
 [dependencies]
 page_size = "*"
-rand = {version = "*", features = ["small_rng"]}
+rand = { version = "*", features = ["small_rng"] }

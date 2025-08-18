@@ -5,14 +5,14 @@ pub struct Alice();
 
 impl Module for Alice {
     fn at_sim_start(&mut self, _: usize) {
-        let msg = Message::default().kind(1).with_content(42usize);
+        let msg = Message::default().with_kind(1).with_content(42usize);
         send(msg, ("netOut", 0));
 
         tracing::info!("SimStared");
     }
 
     fn handle_message(&mut self, msg: Message) {
-        let (msg, head) = msg.cast::<usize>();
+        let (msg, head) = msg.into_content::<usize>();
         tracing::info!(target: "inet", "Received msg: {} - {:?}", msg, head);
     }
 }
@@ -22,11 +22,11 @@ pub struct Bob();
 
 impl Module for Bob {
     fn handle_message(&mut self, msg: Message) {
-        let (msg, head) = msg.cast::<usize>();
+        let (msg, head) = msg.into_content::<usize>();
 
         println!("Received msg: {} - {:?}", msg, head);
 
-        let msg = Message::default().kind(2).with_content(msg);
+        let msg = Message::default().with_kind(2).with_content(msg);
         send(msg, ("netOut", 0))
     }
 }

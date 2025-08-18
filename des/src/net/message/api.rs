@@ -23,7 +23,7 @@ use crate::{
 /// impl Module for MyModule {
 ///     fn handle_message(&mut self, _msg: Message) {
 ///         send(
-///             Message::default().id(123).with_content("Hello world"),
+///             Message::default().with_id(123).with_content("Hello world"),
 ///             "out"
 ///         );
 ///     }
@@ -56,7 +56,7 @@ pub fn send(msg: impl Into<Message>, gate: impl IntoModuleGate) {
 ///
 /// impl Module for MyModule {
 ///     fn at_sim_start(&mut self, _: usize) {
-///         send_in(Message::default().kind(42), "out", Duration::from_secs(2));
+///         send_in(Message::default().with_kind(42), "out", Duration::from_secs(2));
 ///         assert!(
 ///             !current()
 ///                 .gate("out", 0).unwrap()

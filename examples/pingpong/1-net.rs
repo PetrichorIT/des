@@ -104,14 +104,14 @@ const PONG: MessageKind = 2;
 impl Module for Pinger {
     fn at_sim_start(&mut self, _stage: usize) {
         for i in 0..30 {
-            schedule_in(Message::default().kind(INTERVAL), Duration::from_secs(i));
+            schedule_in(Message::default().with_kind(INTERVAL), Duration::from_secs(i));
         }
     }
 
     fn handle_message(&mut self, msg: Message) {
         match msg.header().kind {
             INTERVAL => {
-                send(Message::default().kind(PING), "port");
+                send(Message::default().with_kind(PING), "port");
             }
             PONG => {
                 self.pongs_received += 1;
@@ -137,7 +137,7 @@ impl Module for Ponger {
         match msg.header().kind {
             PING => {
                 self.pings_received += 1;
-                send(Message::default().kind(PONG), "port");
+                send(Message::default().with_kind(PONG), "port");
             }
             _ => panic!("unexpeced"),
         }

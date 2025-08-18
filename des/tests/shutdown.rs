@@ -117,12 +117,12 @@ fn stateless_module_restart() {
     let mut rt = Builder::seeded(123).build(rt.freeze());
     rt.add_message_onto(
         gate.clone(),
-        Message::default().id(9),
+        Message::default().with_id(9),
         SimTime::from_duration(Duration::from_secs(10)),
     );
     rt.add_message_onto(
         gate,
-        Message::default().id(10),
+        Message::default().with_id(10),
         SimTime::from_duration(Duration::from_secs(30)),
     );
 
@@ -180,12 +180,12 @@ fn statefull_module_restart() {
     let mut rt = Builder::seeded(123).build(rt.freeze());
     rt.add_message_onto(
         gate.clone(),
-        Message::default().id(9),
+        Message::default().with_id(9),
         SimTime::from_duration(Duration::from_secs(10)),
     );
     rt.add_message_onto(
         gate,
-        Message::default().id(10),
+        Message::default().with_id(10),
         SimTime::from_duration(Duration::from_secs(30)),
     );
 
@@ -309,7 +309,7 @@ impl Module for WillIgnoreInncomingInDowntime {
         }
 
         // Forget the message, aka assign an temp counter
-        msg.content_mut::<CountDropsMessage>().counter = Arc::new(AtomicUsize::new(0));
+        msg.body.content_mut::<CountDropsMessage>().counter = Arc::new(AtomicUsize::new(0));
     }
 
     fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
@@ -339,7 +339,7 @@ struct EndNode {
 
 impl Module for EndNode {
     fn at_sim_start(&mut self, _: usize) {
-        schedule_in(Message::default().kind(1), Duration::from_secs(1));
+        schedule_in(Message::default().with_kind(1), Duration::from_secs(1));
     }
 
     fn handle_message(&mut self, mut msg: Message) {
@@ -351,18 +351,20 @@ impl Module for EndNode {
 
                 self.sent += 1;
                 send(
-                    Message::default().kind(2).with_content(CountDropsMessage {
-                        counter: self.drops.clone(),
-                    }),
+                    Message::default()
+                        .with_kind(2)
+                        .with_content(CountDropsMessage {
+                            counter: self.drops.clone(),
+                        }),
                     "port",
                 );
-                schedule_in(Message::default().kind(1), Duration::from_secs(1));
+                schedule_in(Message::default().with_kind(1), Duration::from_secs(1));
             }
             2 => {
                 self.recv += 1;
 
                 // forget the message drop counter;
-                msg.content_mut::<CountDropsMessage>().counter = Arc::new(AtomicUsize::new(0));
+                msg.body.content_mut::<CountDropsMessage>().counter = Arc::new(AtomicUsize::new(0));
             }
             _ => unreachable!(),
         }

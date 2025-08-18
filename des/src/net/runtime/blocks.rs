@@ -166,7 +166,7 @@ where
 /// ```
 #[derive(Debug)]
 pub struct ModuleFn<Gen, State, Handler> {
-    gen: Gen,
+    generator: Gen,
     current: Option<State>,
     handler: Handler,
 }
@@ -177,11 +177,11 @@ where
     Handler: FnMut(&mut State, Message),
 {
     /// Creates a wrapper over a function that returns the unit type.
-    pub fn new(gen: Gen, handler: Handler) -> Self {
+    pub fn new(generator: Gen, handler: Handler) -> Self {
         Self {
             handler,
             current: None,
-            gen,
+            generator,
         }
     }
 }
@@ -199,13 +199,13 @@ where
     #[allow(clippy::missing_panics_doc)]
     #[allow(clippy::complexity)]
     pub fn failable(
-        gen: Gen,
+        generator: Gen,
         mut handler: Handler,
         policy: FailabilityPolicy,
     ) -> ModuleFn<Gen, State, Box<dyn FnMut(&mut State, Message)>> {
         ModuleFn {
             current: None,
-            gen,
+            generator,
             handler: Box::new(move |state, msg| match handler(state, msg) {
                 Ok(()) => {}
                 Err(e) => match policy {
@@ -237,7 +237,7 @@ where
     }
 
     fn at_sim_start(&mut self, _stage: usize) {
-        self.current = Some((self.gen)());
+        self.current = Some((self.generator)());
     }
 
     fn handle_message(&mut self, msg: Message) {
@@ -288,7 +288,7 @@ cfg_async! {
     /// ```
     pub struct AsyncFn
     {
-        gen: BoxedGen,
+        generator: BoxedGen,
 
         tx: Sender<Message>,
         rx: Option<Receiver<Message>>,
@@ -317,7 +317,7 @@ cfg_async! {
         }
 
         /// Creates a new instance using the generator function.
-        pub fn new<Gen, Fut>(mut gen: Gen) -> Self
+        pub fn new<Gen, Fut>(mut generator: Gen) -> Self
         where
             Gen: FnMut(Receiver<Message>) -> Fut,
             Gen: Send + 'static,
@@ -326,7 +326,7 @@ cfg_async! {
         {
             let (tx, rx) = mpsc::channel(8);
             Self {
-                gen: Box::new(move |rx| Box::pin(gen(rx))),
+                generator: Box::new(move |rx| Box::pin(generator(rx))),
                 tx,
                 rx: Some(rx),
                 require_join: false,
@@ -336,7 +336,7 @@ cfg_async! {
 
         /// Creates a new instance using the generator function.
         #[allow(clippy::missing_panics_doc)]
-        pub fn failable<Failable, Fut, Err>(mut gen: Failable) -> Self
+        pub fn failable<Failable, Fut, Err>(mut generator: Failable) -> Self
         where
             Failable: FnMut(Receiver<Message>) -> Fut,
             Failable: Send + 'static,
@@ -346,8 +346,8 @@ cfg_async! {
         {
             let (tx, rx) = mpsc::channel(8);
             Self {
-                gen: Box::new(move |rx| {
-                    let fut = gen(rx);
+                generator: Box::new(move |rx| {
+                    let fut = generator(rx);
                     Box::pin(async move {
                         match fut.await {
                             Ok(()) => {},
@@ -365,14 +365,14 @@ cfg_async! {
         }
 
         /// Makes an io::error exepctor
-        pub fn io<Gen, Fut>(gen: Gen) -> Self
+        pub fn io<Gen, Fut>(generator: Gen) -> Self
         where
             Gen: FnMut(Receiver<Message>) -> Fut,
             Gen: Send + 'static,
             Fut: Future<Output = std::io::Result<()>>,
             Fut: Send + 'static,
         {
-            Self::failable(gen)
+            Self::failable(generator)
         }
     }
 
@@ -388,7 +388,7 @@ cfg_async! {
                 rx
             });
 
-            let fut = (self.gen)(rx);
+            let fut = (self.generator)(rx);
             let fut = async move {
                 fut.await;
             };

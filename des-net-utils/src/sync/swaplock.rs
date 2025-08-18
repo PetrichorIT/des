@@ -35,7 +35,7 @@ impl<T> SwapLock<T> {
     /// # Safety
     /// Ensure that this function is only called from the simulation thread
     pub unsafe fn reset(&self, inner: T) {
-        *self.inner.get() = inner;
+        unsafe { *self.inner.get() = inner };
         self.read_count.store(0, SeqCst);
     }
 

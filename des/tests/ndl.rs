@@ -41,7 +41,7 @@ mod common {
                 self.delay.as_secs_f64()
             );
             if self.rem > 0 {
-                schedule_in(Message::default().kind(1), self.delay)
+                schedule_in(Message::default().with_kind(1), self.delay)
             }
         }
 
@@ -49,10 +49,13 @@ mod common {
             match msg.header().kind {
                 1 => {
                     self.rem -= 1;
-                    send(Message::default().kind(2).id(self.dst as u16), "out");
+                    send(
+                        Message::default().with_kind(2).with_id(self.dst as u16),
+                        "out",
+                    );
 
                     if self.rem > 0 {
-                        schedule_in(Message::default().kind(1), self.delay)
+                        schedule_in(Message::default().with_kind(1), self.delay)
                     }
                 }
                 2 => {

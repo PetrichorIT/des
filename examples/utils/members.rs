@@ -13,11 +13,11 @@ impl Module for Alice {
         info!(
             "Received at {}: Message with content: {}",
             SimTime::now(),
-            pkt.content::<String>().deref()
+            pkt.body.content::<String>().deref()
         );
 
         let limit = current().prop::<usize>("limit").unwrap().or_default().get();
-        if pkt.content::<String>().len() > limit {
+        if pkt.body.content::<String>().len() > limit {
             // TERMINATE
         } else {
             // pkt.content_mut::<String>().push('#');
@@ -40,7 +40,7 @@ impl Module for Bob {
                 info!("Initalizing");
                 send(
                     Message::default()
-                        .kind(1)
+                        .with_kind(1)
                         // .src(0x7f_00_00_01, 80)
                         // .dest(0x7f_00_00_02, 80)
                         .with_content("Ping".to_string()),
@@ -60,10 +60,11 @@ impl Module for Bob {
         info!(
             "Received at {}: Message with content: {}",
             SimTime::now(),
-            pkt.content::<String>().deref()
+            pkt.body.content::<String>().deref()
         );
 
-        pkt.content_mut::<String>()
+        pkt.body
+            .content_mut::<String>()
             .push_str(&current().prop::<String>("char").unwrap().get().unwrap());
 
         send(pkt, ("netOut", 2));

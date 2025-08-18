@@ -13,7 +13,7 @@ struct Host {
 
 impl Host {
     fn msg(&self) -> Message {
-        Message::default().kind(random::<u16>() % 10)
+        Message::default().with_kind(random::<u16>() % 10)
     }
 }
 

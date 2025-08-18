@@ -3,7 +3,7 @@ use crate::{
     prelude::{GateRef, ObjectPath},
     sync::SwapLock,
     time::SimTime,
-    tracing::{new_scope, ScopeToken},
+    tracing::{ScopeToken, new_scope},
 };
 use des_net_utils::props::{Prop, PropType, Props, RawProp};
 use fxhash::{FxBuildHasher, FxHashMap};
@@ -15,7 +15,7 @@ use std::{
     fmt::Debug,
     hash::Hash,
     io::Error,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{Arc, atomic::AtomicBool},
     time::Duration,
 };
 
@@ -89,7 +89,7 @@ impl ModuleContext {
             props: RwLock::new(Props::default()),
 
             active: AtomicBool::new(true),
-            id: ModuleId::gen(),
+            id: ModuleId::generate(),
             path,
             stereotyp: Cell::default(),
 
@@ -123,7 +123,7 @@ impl ModuleContext {
             props: RwLock::new(Props::default()),
 
             active: AtomicBool::new(true),
-            id: ModuleId::gen(),
+            id: ModuleId::generate(),
             path,
             stereotyp: Cell::default(),
 
@@ -420,9 +420,10 @@ impl ModuleContext {
             }
 
             if strong.try_as_ref::<DummyModule>().is_some() {
-                Err(ModuleReferencingError::NotYetInitalized(
-                    format!("The parent ptr of module '{}' is existent but not yet initalized, according to the load order.", self.path)
-                ))
+                Err(ModuleReferencingError::NotYetInitalized(format!(
+                    "The parent ptr of module '{}' is existent but not yet initalized, according to the load order.",
+                    self.path
+                )))
             } else {
                 Ok(strong)
             }

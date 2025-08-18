@@ -48,7 +48,7 @@ fn ponger() -> impl ModuleBlock {
         while let Some(msg) = rx.recv().await {
             assert_eq!(msg.header().kind, PING);
             pongs_received += 1;
-            send(Message::default().kind(PONG), "port");
+            send(Message::default().with_kind(PONG), "port");
         }
 
         assert_eq!(pongs_received, 30);
@@ -97,7 +97,7 @@ impl Module for Pinger {
     fn at_sim_start(&mut self, _stage: usize) {
         let handle = tokio::spawn(async move {
             for _ in 0..30 {
-                send(Message::default().kind(PING), "port");
+                send(Message::default().with_kind(PING), "port");
                 time::sleep(Duration::from_secs(1)).await;
             }
         });

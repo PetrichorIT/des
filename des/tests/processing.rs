@@ -41,7 +41,7 @@ impl Module for PluginCreation {
     fn at_sim_start(&mut self, _stage: usize) {
         for i in 0..100 {
             schedule_at(
-                Message::default().id(i),
+                Message::default().with_id(i),
                 SimTime::now() + Duration::from_secs(i as u64),
             )
         }
