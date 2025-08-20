@@ -1,9 +1,9 @@
 use std::{fmt, marker::PhantomData};
 
 use crate::net::{
-    module::{Module, ModuleExt},
-    processing::{ProcessingStack, Processor},
     ObjectPath,
+    module::{Module, to_processing_chain},
+    processing::{ProcessingStack, Processor},
 };
 
 /// A type that can be created based on the nodes path and a
@@ -405,11 +405,10 @@ where
     ) -> Option<Processor> {
         self.inner.resolve(path, symbol, stack).or_else(|| {
             if symbol == self.ty {
-                Some(
-                    self.factory
-                        .create_inner(path, symbol)
-                        .to_processing_chain(stack()),
-                )
+                Some(to_processing_chain(
+                    self.factory.create_inner(path, symbol),
+                    stack(),
+                ))
             } else {
                 None
             }
@@ -433,7 +432,7 @@ where
         Some(
             self.inner
                 .resolve(path, symbol, stack)
-                .unwrap_or_else(|| (self.f)().to_processing_chain(stack())),
+                .unwrap_or_else(|| to_processing_chain((self.f)(), stack())),
         )
     }
 }

@@ -10,7 +10,8 @@ use crate::{
 /// A channel that introduces a delay before forwarding messages.
 #[derive(Debug, Clone)]
 pub struct DelayChannel {
-    delay: Duration,
+    /// The delay duration.
+    pub delay: Duration,
 }
 
 impl DelayChannel {

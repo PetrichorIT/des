@@ -4,7 +4,7 @@ use serde_yml::{Value, from_str};
 
 use crate::{
     net::{
-        module::{MOD_CTX, ModuleContext, ModuleExt, try_current},
+        module::{MOD_CTX, ModuleContext, to_processing_chain, try_current},
         processing::ProcessingStack,
         topology::Topology,
     },
@@ -466,7 +466,7 @@ impl<A> SimBuilder<A> {
         }
 
         ctx.activate();
-        let pe = module.to_processing_chain((self.stack)());
+        let pe = to_processing_chain(module, (self.stack)());
         ctx.upgrade_dummy(pe);
 
         let mut sink = Vec::new();

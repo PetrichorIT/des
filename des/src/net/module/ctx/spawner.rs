@@ -1,6 +1,5 @@
-use super::super::ModuleExt;
 use crate::{
-    net::processing::ProcessingStack,
+    net::{module::to_processing_chain, processing::ProcessingStack},
     prelude::{Gate, Module, ModuleRef},
 };
 
@@ -35,7 +34,7 @@ impl Spawner<'_> {
         let ctx = ModuleContext::child_of(name.as_ref(), sref);
 
         ctx.activate();
-        let pe = module.to_processing_chain(stack);
+        let pe = to_processing_chain(module, stack);
         ctx.upgrade_dummy(pe);
         ctx.deactivate(&mut vec![]);
 

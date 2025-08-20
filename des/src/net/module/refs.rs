@@ -1,10 +1,11 @@
-use crate::net::processing::{ProcessingStack, Processor};
 use crate::net::NetEvents;
+use crate::net::module::to_processing_chain;
+use crate::net::processing::{ProcessingStack, Processor};
 use crate::prelude::{Gate, GateRef};
 use crate::runtime::EventSink;
 use crate::tracing::{enter_scope, leave_scope};
 
-use super::{DummyModule, Module, ModuleContext, ModuleExt};
+use super::{DummyModule, Module, ModuleContext};
 use std::any::{Any, TypeId};
 use std::cell::{Ref, RefCell, RefMut};
 use std::fmt::Debug;
@@ -62,7 +63,7 @@ impl ModuleRef {
         module: T,
         stack: ProcessingStack,
     ) -> Self {
-        let procesing = module.to_processing_chain(stack);
+        let procesing = to_processing_chain(module, stack);
         let handler = Arc::new(RefCell::new(procesing));
         let this = Self {
             ctx,
@@ -88,11 +89,6 @@ impl ModuleRef {
         let celled: RefCell<Processor> = celled;
         self.processing.swap(&celled);
     }
-
-    // NOTE / TODO
-    // Once feature(trait_upcasting) is stabalized, use traitupcasting for
-    // safe interactions with the v-table.
-    // For now us raw pointer casts.
 
     /// Borrows the referenced module as a readonly reference
     /// to the provided type T.
@@ -123,12 +119,13 @@ impl ModuleRef {
     #[must_use]
     pub fn try_as_ref<T: Any>(&self) -> Option<Ref<T>> {
         let brw = self.processing.borrow();
-        let rf = &*brw.handler;
-        let ty = rf.type_id();
-        if ty == TypeId::of::<T>() {
-            Some(Ref::map(brw, |brw| {
-                let v: &dyn Any = &*brw.handler;
-                v.downcast_ref::<T>().expect("unreachable")
+
+        if (*brw.handler).type_id() == TypeId::of::<T>() {
+            Some(Ref::map(brw, |processor| {
+                let as_any: &dyn Any = &*processor.handler;
+                as_any
+                    .downcast_ref::<T>()
+                    .expect("unreachable, was checked outside")
             }))
         } else {
             None
@@ -164,12 +161,13 @@ impl ModuleRef {
     #[must_use]
     pub fn try_as_mut<T: Any>(&self) -> Option<RefMut<T>> {
         let brw = self.processing.borrow_mut();
-        let rf = &*brw.handler;
-        let ty = rf.type_id();
-        if ty == TypeId::of::<T>() {
-            Some(RefMut::map(brw, |brw| {
-                let v: &mut dyn Any = &mut *brw.handler;
-                v.downcast_mut::<T>().expect("unreachable")
+
+        if (*brw.handler).type_id() == TypeId::of::<T>() {
+            Some(RefMut::map(brw, |processor| {
+                let as_any: &mut dyn Any = &mut *processor.handler;
+                as_any
+                    .downcast_mut::<T>()
+                    .expect("unreachable, was checked outside")
             }))
         } else {
             None

@@ -76,9 +76,9 @@ impl<T: StdError + Any + 'static> From<T> for RuntimeError {
     }
 }
 
-/// Runtime rrro
+/// Runtime error
 pub trait LikeRuntimeError: StdError + Any {
-    /// As any
+    /// Just a helper function, you could archive the same result with trait upcasting
     fn as_any(&self) -> &dyn Any;
 }
 

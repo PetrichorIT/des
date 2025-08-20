@@ -2,19 +2,19 @@
 #![allow(unused_variables)]
 
 use des::{
-    net::{blocks::AsyncFn, module::Module, JoinError},
+    net::{JoinError, blocks::AsyncFn, module::Module},
     prelude::*,
     runtime::RuntimeError,
-    time::{self, sleep, timeout, timeout_at, MissedTickBehavior},
+    time::{self, MissedTickBehavior, sleep, timeout, timeout_at},
 };
 use std::sync::{
-    atomic::{AtomicBool, AtomicUsize, Ordering},
     Arc,
+    atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 use tokio::{
     sync::{
-        mpsc::{self, channel, Sender},
         Semaphore,
+        mpsc::{self, Sender, channel},
     },
     task::{JoinHandle, JoinSet},
 };
@@ -669,10 +669,12 @@ fn async_join_on_module_fail() {
     sim.node("main", JoinOnModule);
 
     let v = Builder::seeded(123).build(sim.freeze()).run();
-    assert!(v.unwrap_err()[0]
-        .as_any()
-        .downcast_ref::<JoinError>()
-        .is_some())
+    assert!(
+        v.unwrap_err()[0]
+            .as_any()
+            .downcast_ref::<JoinError>()
+            .is_some()
+    )
 }
 
 struct PanicIsJoinable;
@@ -689,10 +691,12 @@ fn async_join_paniced_will_join_but_fail() {
     sim.node("main", PanicIsJoinable);
 
     let v = Builder::seeded(123).build(sim.freeze()).run();
-    assert!(v.unwrap_err()[0]
-        .as_any()
-        .downcast_ref::<JoinError>()
-        .is_some())
+    assert!(
+        v.unwrap_err()[0]
+            .as_any()
+            .downcast_ref::<JoinError>()
+            .is_some()
+    )
 }
 
 struct SpawnButNeverJoin;

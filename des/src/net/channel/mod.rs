@@ -141,7 +141,7 @@
 //! port_bob.connect_with(tower_port_2, Some(custom_channel_shared.clone()));
 //! ```
 
-use std::{fmt::Debug, sync::Arc};
+use std::{any::Any, fmt::Debug, sync::Arc};
 
 use crate::{
     net::{NetEvents, gate::Connection},
@@ -167,7 +167,7 @@ pub struct ChannelRef {
 }
 
 /// The implementation of a gate-to-gate link.
-pub trait Channel: 'static {
+pub trait Channel: Any + 'static {
     /// Returns the time at which the channel will be free again.
     fn transmission_finish_time(&self) -> Option<SimTime>;
 
@@ -205,6 +205,12 @@ impl ChannelRef {
     #[must_use]
     pub fn transmission_finish_time(&self) -> Option<SimTime> {
         self.channel.transmission_finish_time()
+    }
+
+    /// Returns a reference to the channel if it is of type T.
+    pub fn downcast_ref<T: Any>(&self) -> Option<&T> {
+        let as_any: &dyn Any = &*self.channel;
+        as_any.downcast_ref::<T>()
     }
 }
 

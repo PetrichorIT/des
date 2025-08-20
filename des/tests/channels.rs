@@ -1,6 +1,9 @@
 #![cfg(feature = "net")]
 
-use des::{net::blocks::AsyncFn, prelude::*};
+use des::{
+    net::{blocks::AsyncFn, channel::DelayChannel},
+    prelude::*,
+};
 use serial_test::serial;
 
 #[derive(Default)]
@@ -282,4 +285,24 @@ fn duplex_shared_domain() {
 
     assert_eq!(rt.2.event_count, 50 * 3);
     assert_eq!(rt.1, 50.0)
+}
+
+#[test]
+#[serial]
+fn channel_as_any() {
+    let mut sim = Sim::new(());
+    sim.node("alice", ());
+    sim.node("bob", ());
+
+    let g1 = sim.gate("alice", "port");
+    let g2 = sim.gate("bob", "port");
+
+    g1.clone()
+        .connect_with(g2, Some(DelayChannel::new(Duration::from_millis(100))));
+    let ch = g1.channel().unwrap();
+
+    assert_eq!(
+        ch.downcast_ref::<DelayChannel>().unwrap().delay,
+        Duration::from_millis(100)
+    );
 }

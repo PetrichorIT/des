@@ -219,14 +219,6 @@ pub trait Module: Any {
     }
 }
 
-pub(crate) trait ModuleExt: Module {
-    /// BUILD TODO: Remove
-    fn to_processing_chain(self, stack: ProcessingStack) -> Processor
-    where
-        Self: Sized + 'static,
-    {
-        Processor::new(self.stack(stack), self)
-    }
+pub(crate) fn to_processing_chain<M: Module>(module: M, stack: ProcessingStack) -> Processor {
+    Processor::new(module.stack(stack), module)
 }
-
-impl<T: Module> ModuleExt for T {}

@@ -16,7 +16,6 @@ use crate::{
 use super::{Channel, ChannelDropBehaviour, ChannelRef};
 
 /// A channel that supports both datarate limiting and propagation delay.
-///
 pub struct DatarateChannel {
     inner: sync::RwLock<Inner>,
 }
@@ -93,19 +92,6 @@ impl Clone for DatarateChannel {
 }
 
 impl Channel for DatarateChannel {
-    // fn dup(self: Arc<Self>) -> Arc<dyn Channel>
-    // where
-    //     Self: Sized,
-    // {
-    //     Arc::new(Self {
-    //         inner: sync::RwLock::new(Inner {
-    //             metrics: self.inner.read().expect("failed to get lock").metrics,
-    //             buffer: Buffer::default(),
-    //             transmission_finish_time: None,
-    //         }),
-    //     })
-    // }
-
     fn transmission_finish_time(&self) -> Option<SimTime> {
         self.inner
             .read()
