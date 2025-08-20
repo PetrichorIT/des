@@ -1,6 +1,6 @@
 use crate::{
     net::{
-        Sim, channel::ChannelRef, gate::Connection, message::Message, module::ModuleRef,
+        Error, Sim, channel::ChannelRef, gate::Connection, message::Message, module::ModuleRef,
         processing::ProcessingState, runtime::buf_process,
     },
     prelude::RuntimeError,
@@ -13,9 +13,9 @@ use std::{fmt::Debug, sync::atomic::Ordering::SeqCst};
 #[cfg(feature = "async")]
 use std::iter::once;
 #[cfg(feature = "async")]
-use tokio::task::{self, yield_now};
+use tokio::task::yield_now;
 
-use super::{Harness, PanicError};
+use super::Harness;
 
 ///
 /// The event set for a [`Sim`].
@@ -249,7 +249,7 @@ impl ChannelUnbusyNotif {
 }
 
 impl ModuleRef {
-    pub(crate) fn reset(&self) -> Result<(), PanicError> {
+    pub(crate) fn reset(&self) -> Result<(), Error> {
         let mut brw = self.processing.borrow_mut();
 
         #[cfg(feature = "async")]
@@ -262,7 +262,7 @@ impl ModuleRef {
     }
 
     #[cfg(feature = "async")]
-    pub(crate) fn async_wakeup(&self) -> Result<(), PanicError> {
+    pub(crate) fn async_wakeup(&self) -> Result<(), Error> {
         if self.ctx.active.load(SeqCst) {
             self.processing.borrow_mut().incoming_upstream(None);
             Harness::new(&self.ctx).exec(|| {}).catch()?;
@@ -274,7 +274,7 @@ impl ModuleRef {
         Ok(())
     }
 
-    pub(crate) fn module_restart(&self) -> Result<(), PanicError> {
+    pub(crate) fn module_restart(&self) -> Result<(), Error> {
         #[cfg(feature = "tracing")]
         tracing::debug!("Restarting module");
         // restart the module itself.
@@ -288,7 +288,7 @@ impl ModuleRef {
         Ok(())
     }
 
-    pub(crate) fn handle_message(&self, msg: Message) -> Result<(), PanicError> {
+    pub(crate) fn handle_message(&self, msg: Message) -> Result<(), Error> {
         if self.ctx.active.load(SeqCst) {
             let mut processing = self.processing.borrow_mut();
 
@@ -317,7 +317,7 @@ impl ModuleRef {
         Ok(())
     }
 
-    pub(crate) fn at_sim_start(&self, stage: usize) -> Result<(), PanicError> {
+    pub(crate) fn at_sim_start(&self, stage: usize) -> Result<(), Error> {
         let mut processing = self.processing.borrow_mut();
 
         processing.incoming_upstream(None);
@@ -345,6 +345,8 @@ impl ModuleRef {
 
         #[cfg(feature = "async")]
         {
+            use crate::net::{Error, ErrorKind, JoinErrorKind};
+
             let mut error = RuntimeError::empty();
 
             let Some((rt, task_set)) = self.ctx.async_ext.write().rt.current() else {
@@ -363,9 +365,9 @@ impl ModuleRef {
 
                 match rt.block_on(handle) {
                     Err(e) if e.is_panic() => {
-                        error.extend(once(JoinError {
-                            path: self.path(),
-                            kind: Kind::Paniced(e.into_panic()),
+                        error.extend(once(Error {
+                            origin: self.path(),
+                            kind: ErrorKind::JoinError(JoinErrorKind::Paniced(e.into_panic())),
                         }));
                     }
                     _ => {}
@@ -374,22 +376,22 @@ impl ModuleRef {
 
             for handle in lock.must_join.drain(..) {
                 if !handle.is_finished() {
-                    error.extend(once(JoinError {
-                        path: self.path(),
-                        kind: Kind::NotFinished,
+                    error.extend(once(Error {
+                        origin: self.path(),
+                        kind: ErrorKind::JoinError(JoinErrorKind::NotFinished),
                     }));
                     continue;
                 }
 
                 match rt.block_on(handle) {
                     Ok(()) => {}
-                    Err(e) if e.is_panic() => error.extend(once(JoinError {
-                        path: self.path(),
-                        kind: Kind::Paniced(e.into_panic()),
+                    Err(e) if e.is_panic() => error.extend(once(Error {
+                        origin: self.path(),
+                        kind: ErrorKind::JoinError(JoinErrorKind::Paniced(e.into_panic())),
                     })),
-                    Err(e) => error.extend(once(JoinError {
-                        path: self.path(),
-                        kind: Kind::Tokio(e),
+                    Err(e) => error.extend(once(Error {
+                        origin: self.path(),
+                        kind: ErrorKind::JoinError(JoinErrorKind::Tokio(e)),
                     })),
                 }
             }
@@ -402,45 +404,4 @@ impl ModuleRef {
         processing.incoming_downstream();
         result
     }
-}
-
-cfg_async! {
-    use std::{any::Any, error::Error as StdError, fmt::Display};
-    use crate::prelude::ObjectPath;
-
-    /// An error when the simulation fails to join a task at the end of the simulation
-    pub struct JoinError {
-        /// The error source
-        pub path: ObjectPath,
-        /// The error kind
-        pub kind: Kind,
-    }
-
-    /// The kind of join error.
-    #[derive(Debug)]
-    pub enum Kind {
-        /// The task is not yet finished
-        NotFinished,
-        /// A panic occurred in the task
-        Paniced(Box<dyn Any + Send + 'static>),
-        /// The join failed with an tokio error.
-        Tokio(task::JoinError),
-    }
-
-    impl Debug for JoinError {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            f.debug_struct("JoinError")
-                .field("path", &self.path.to_string())
-                .field("kind", &self.kind)
-                .finish()
-        }
-    }
-
-    impl Display for JoinError {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "{}: {:?}", self.path, self.kind)
-        }
-    }
-
-    impl StdError for JoinError {}
 }

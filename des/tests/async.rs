@@ -2,7 +2,7 @@
 #![allow(unused_variables)]
 
 use des::{
-    net::{JoinError, handlers::AsyncHandler, module::Module},
+    net::{Error, ErrorKind, handlers::AsyncHandler, module::Module},
     prelude::*,
     runtime::RuntimeError,
     time::{self, MissedTickBehavior, sleep, timeout, timeout_at},
@@ -672,8 +672,8 @@ fn async_join_on_module_fail() {
     assert!(
         v.unwrap_err()[0]
             .as_any()
-            .downcast_ref::<JoinError>()
-            .is_some()
+            .downcast_ref::<Error>()
+            .map_or(false, |e| matches!(e.kind, ErrorKind::JoinError(_)))
     )
 }
 
@@ -694,9 +694,9 @@ fn async_join_paniced_will_join_but_fail() {
     assert!(
         v.unwrap_err()[0]
             .as_any()
-            .downcast_ref::<JoinError>()
-            .is_some()
-    )
+            .downcast_ref::<Error>()
+            .map_or(false, |e| matches!(e.kind, ErrorKind::JoinError(_)))
+    );
 }
 
 struct SpawnButNeverJoin;

@@ -1,9 +1,9 @@
 use des::{
     net::{
+        Error, ErrorKind, Sim,
         module::{Module, Stereotyp},
-        ObjectPath, PanicError, Sim,
     },
-    prelude::{current, Message},
+    prelude::{Message, current},
     runtime::{Builder, RuntimeError},
 };
 use serial_test::serial;
@@ -89,10 +89,10 @@ fn unwind_sim_panic_at_handle_message() {
     let mut rt = Builder::seeded(123).build(sim.freeze());
     rt.add_message_onto(gate, Message::default(), 5.0.into());
     let err = rt.run().unwrap_err();
-    assert_eq!(
-        err[0].as_any().downcast_ref::<PanicError>().unwrap().path,
-        ObjectPath::from("alice")
-    );
+    assert!(matches!(
+        err[0].as_any().downcast_ref::<Error>().unwrap().kind,
+        ErrorKind::ModulePanic(_)
+    ));
 }
 
 struct SimPanicAtSimStart;
@@ -116,10 +116,10 @@ fn unwind_sim_panic_at_sim_start() {
     let mut rt = Builder::seeded(123).build(sim.freeze());
     rt.add_message_onto(gate, Message::default(), 5.0.into());
     let err = rt.run().unwrap_err();
-    assert_eq!(
-        err[0].as_any().downcast_ref::<PanicError>().unwrap().path,
-        ObjectPath::from("alice")
-    );
+    assert!(matches!(
+        err[0].as_any().downcast_ref::<Error>().unwrap().kind,
+        ErrorKind::ModulePanic(_)
+    ));
 }
 
 struct SimPanicAtSimEnd;
@@ -143,10 +143,11 @@ fn unwind_sim_panic_at_sim_end() {
     let mut rt = Builder::seeded(123).build(sim.freeze());
     rt.add_message_onto(gate, Message::default(), 5.0.into());
     let err = rt.run().unwrap_err();
-    assert_eq!(
-        err[0].as_any().downcast_ref::<PanicError>().unwrap().path,
-        ObjectPath::from("alice")
-    );
+
+    assert!(matches!(
+        err[0].as_any().downcast_ref::<Error>().unwrap().kind,
+        ErrorKind::ModulePanic(_)
+    ));
 }
 
 struct PanicWithUnwindAllways;
@@ -172,8 +173,8 @@ fn unwind_behaviour_unwind_allways_panics() {
     let mut rt = Builder::seeded(123).build(sim.freeze());
     rt.add_message_onto(gate, Message::default(), 5.0.into());
     let err = rt.run().unwrap_err();
-    assert_eq!(
-        err[0].as_any().downcast_ref::<PanicError>().unwrap().path,
-        ObjectPath::from("alice")
-    );
+    assert!(matches!(
+        err[0].as_any().downcast_ref::<Error>().unwrap().kind,
+        ErrorKind::ModulePanic(_)
+    ));
 }

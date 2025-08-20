@@ -1,9 +1,7 @@
-use crate::net::{module::ModuleContext, ObjectPath};
+use crate::net::{Error, ErrorKind, module::ModuleContext};
 use std::{
     any::Any,
-    error::Error as StdError,
-    fmt::{Debug, Display},
-    panic::{catch_unwind, AssertUnwindSafe},
+    panic::{AssertUnwindSafe, catch_unwind},
     sync::atomic::Ordering,
 };
 
@@ -40,53 +38,28 @@ impl<'a> Harness<'a> {
         self
     }
 
-    pub(super) fn catch(self) -> Result<(), PanicError> {
+    pub(super) fn catch(self) -> Result<(), Error> {
         if let Some(unwind) = self.unwind {
             // display_panic(&unwind);
 
             self.ctx.active.store(false, Ordering::SeqCst);
             if !self.ctx.stereotyp.get().on_panic_catch {
-                return Err(PanicError {
-                    path: self.ctx.path(),
-                    payload: unwind,
+                return Err(Error {
+                    origin: self.ctx.path(),
+                    kind: ErrorKind::ModulePanic(unwind),
                 });
             }
         }
         Ok(())
     }
 
-    pub(super) fn pass(self) -> Result<(), PanicError> {
+    pub(super) fn pass(self) -> Result<(), Error> {
         if let Some(unwind) = self.unwind {
-            return Err(PanicError {
-                path: self.ctx.path(),
-                payload: unwind,
+            return Err(Error {
+                origin: self.ctx.path(),
+                kind: ErrorKind::ModulePanic(unwind),
             });
         }
         Ok(())
     }
 }
-
-/// An non-catchable panic occured.
-pub struct PanicError {
-    /// The source of the panic
-    pub path: ObjectPath,
-    /// The panic payload itself
-    pub payload: Box<dyn Any + Send>,
-}
-
-impl Debug for PanicError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("PanicError")
-            .field("path", &self.path.as_str())
-            .field("payload", &self.payload)
-            .finish()
-    }
-}
-
-impl Display for PanicError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "module '{}' panicked", self.path)
-    }
-}
-
-impl StdError for PanicError {}

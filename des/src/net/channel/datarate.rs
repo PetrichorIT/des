@@ -7,7 +7,9 @@ use std::{
 
 use crate::{
     net::{
-        ChannelUnbusyNotif, MessageExitingConnection, NetEvents, gate::Connection, message::Message,
+        gate::Connection,
+        message::Message,
+        runtime::{ChannelUnbusyNotif, MessageExitingConnection, NetEvents},
     },
     runtime::EventSink,
     time::SimTime,

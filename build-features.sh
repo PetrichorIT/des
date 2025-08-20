@@ -21,13 +21,6 @@ echo "[des] net + async"
 cargo build -p des --features net --features async
 
 
-echo "[des] multi-threaded"
-cargo build -p des --features multi-threaded
-echo "[des] multi-threaded + net"
-cargo build -p des --features multi-threaded --features net
-echo "[des] multi-threaded + net + async"
-cargo build -p des --features multi-threaded --features net --features async
-
 echo "[des] tracing"
 cargo build -p des --features tracing
 echo "[des] tracing + net"

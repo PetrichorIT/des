@@ -2,8 +2,9 @@
 //! Tools for building a module/net oriented simulation.
 //!
 
+mod error;
 mod path;
-mod runtime;
+pub(crate) mod runtime;
 
 // pub mod channel;
 pub mod channel;
@@ -14,11 +15,17 @@ pub mod ndl;
 pub mod processing;
 pub mod topology;
 
-pub use self::runtime::NetEvents;
+pub use self::error::*;
+pub use self::path::*;
 pub use self::runtime::{
-    AsyncWakeupEvent, ChannelUnbusyNotif, HandleMessageEvent, MessageExitingConnection,
-    ModuleRestartEvent,
+    Globals, IntoModuleTree, Sim, SimBuilder, SimBuilderScoped, SimLifecycle, globals, handlers,
 };
 
-pub use self::path::*;
-pub use self::runtime::*;
+/// Internal details only sometimes needed to e.g. implement a custom channel.
+pub mod internals {
+    pub use super::runtime::NetEvents;
+    pub use super::runtime::{
+        AsyncWakeupEvent, ChannelUnbusyNotif, HandleMessageEvent, MessageExitingConnection,
+        ModuleRestartEvent,
+    };
+}

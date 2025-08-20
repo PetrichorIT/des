@@ -1,6 +1,6 @@
-use crate::net::NetEvents;
 use crate::net::module::to_processing_chain;
 use crate::net::processing::{ProcessingStack, Processor};
+use crate::net::runtime::NetEvents;
 use crate::prelude::{Gate, GateRef};
 use crate::runtime::EventSink;
 use crate::tracing::{enter_scope, leave_scope};
@@ -219,7 +219,7 @@ impl ModuleRef {
     pub(crate) fn deactivate(&self, rt: &mut impl EventSink<NetEvents>) {
         #[cfg(feature = "async")]
         {
-            use crate::net::AsyncWakeupEvent;
+            use crate::net::runtime::AsyncWakeupEvent;
             use crate::time::Driver;
 
             let mut ext = self.ctx.async_ext.write();

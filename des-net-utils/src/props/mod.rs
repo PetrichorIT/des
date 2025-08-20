@@ -12,7 +12,7 @@ use std::{
 mod store;
 mod yaml;
 
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use serde_yml::Value;
 pub use store::*;
 pub use yaml::*;
@@ -23,36 +23,6 @@ pub use yaml::*;
 /// This allows the implementation of this trait independently of the other traits, even for foreign systems,
 /// evading the orphan rule.
 pub trait PropType: Any {
-    /// Returns a reference to the underlying `Any` trait object.
-    ///
-    /// This function should always be implemented as follows, and is only nessecary
-    /// because of type systems limitations:
-    /// ```rust
-    /// # use std::any::Any;
-    /// # struct A;
-    /// # impl A {
-    /// fn as_any(&self) -> &dyn Any {
-    ///     self
-    /// }
-    /// # }
-    /// ```
-    fn as_any(&self) -> &dyn Any;
-
-    /// Returns a reference to the underlying `Any` trait object mutably.
-    ///
-    /// This function should always be implemented as follows, and is only nessecary
-    /// because of type systems limitations:
-    /// ```rust
-    /// # use std::any::Any;
-    /// # struct A;
-    /// # impl A {
-    /// fn as_any_mut(&mut self) -> &mut dyn Any {
-    ///     self
-    /// }
-    /// # }
-    /// ```
-    fn as_any_mut(&mut self) -> &mut dyn Any;
-
     /// Reliably transforms the properties value into a `Value`.
     ///
     /// If no serialization is possible, a placeholder value should be returned.
@@ -69,13 +39,6 @@ pub trait PropType: Any {
 }
 
 impl<T: DeserializeOwned + Serialize + Any> PropType for T {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-
     fn as_value(&self) -> Value {
         serde_yml::from_str::<Value>(&serde_yml::to_string(&self).unwrap()).unwrap()
     }
@@ -140,7 +103,7 @@ impl RawProp {
     pub fn is<T: PropType>(&self) -> bool {
         self.access(|entry| match entry {
             Entry::None | Entry::Yaml(_) => true,
-            Entry::Some(value) => value.as_any().is::<T>(),
+            Entry::Some(value) => as_any(&**value).is::<T>(),
         })
     }
 
@@ -257,7 +220,7 @@ impl<T: PropType> Prop<T, false> {
     {
         self.raw.access(|slot| {
             f(slot.as_option().map(|v| {
-                v.as_any()
+                as_any(v)
                     .downcast_ref()
                     .expect("prop-type has changed, this handle is invalid")
             }))
@@ -360,10 +323,7 @@ impl<T: PropType> Prop<T, true> {
         F: FnOnce(&T) -> R,
     {
         self.raw.access(|slot| {
-            f(slot
-                .as_option()
-                .expect("unreachable")
-                .as_any()
+            f(as_any(slot.as_option().expect("unreachable"))
                 .downcast_ref()
                 .expect("prop-type has changed, handle is invalid"))
         })
@@ -383,10 +343,7 @@ impl<T: PropType> Prop<T, true> {
         F: FnOnce(&mut T) -> R,
     {
         self.raw.access_mut(|slot| {
-            Some(f(slot
-                .as_option_mut()
-                .expect("unreachable")
-                .as_any_mut()
+            Some(f(as_any_mut(slot.as_option_mut().expect("unreachable"))
                 .downcast_mut()
                 .expect("prop-type has changed, handle is invalid")))
         })
@@ -408,7 +365,7 @@ impl<T: PropType, const PRESENT: bool> Prop<T, PRESENT> {
         self.raw.access_mut(|slot| {
             assert!(
                 slot.as_option()
-                    .is_none_or(|prev_value| (*prev_value).as_any().is::<T>()),
+                    .is_none_or(|prev_value| as_any(prev_value).is::<T>()),
                 "cannot use this prop, since other instance has changed the type"
             );
             *slot = Entry::Some(Box::new(value));
@@ -439,6 +396,14 @@ impl<T: PropType + Debug> Debug for Prop<T, true> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.map(|value| f.debug_struct("Prop").field("value", &value).finish())
     }
+}
+
+fn as_any(value: &dyn PropType) -> &dyn Any {
+    value
+}
+
+fn as_any_mut(value: &mut dyn PropType) -> &mut dyn Any {
+    value
 }
 
 #[cfg(test)]

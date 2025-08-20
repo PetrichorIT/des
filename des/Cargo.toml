@@ -24,7 +24,6 @@ serde = ["dep:serde"]
 macros = ["dep:des-macros", "dep:futures"]
 async = ["net", "dep:tokio"]
 cqueue = ["dep:des-cqueue"]
-multi-threaded = []
 net = ["dep:des-macros", "dep:des-net-utils", "serde", "dep:serde_yml"]
 tracing = ["net"]
 

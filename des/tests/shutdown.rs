@@ -1,7 +1,7 @@
 #![cfg(feature = "async")]
 
 use des::{
-    net::{handlers::ModuleFn, module::Module},
+    net::{ErrorKind, handlers::ModuleFn, module::Module},
     prelude::*,
     time::sleep,
 };
@@ -454,13 +454,17 @@ fn shutdown_will_drop_transiting_delayed_channels() {
 #[serial]
 fn shutdown_prevents_accessing_parents() {
     let mut sim = Sim::new(());
-    sim.node("a", ModuleFn::new(
-        || schedule_in(Message::default(), Duration::from_secs(10)),
-        |_, _| {
-            let err = current().child("b").unwrap_err();
-            assert_eq!(err, ModuleReferencingError::CurrentlyInactive("The child module 'b' of 'a' is currently shut down, thus cannot be accessed".to_string()));
-        }
-    ));
+    sim.node(
+        "a",
+        ModuleFn::new(
+            || schedule_in(Message::default(), Duration::from_secs(10)),
+            |_, _| {
+                let err = current().child("b").unwrap_err();
+                assert!(matches!(err.kind, ErrorKind::ModuleNotFound(_)));
+                assert_eq!(err.to_string(), "a: ModuleNotFound(\"the child module 'b' is currently inactive, thus cannot be accessed\")");
+            },
+        ),
+    );
     sim.node(
         "a.b",
         ModuleFn::new(
@@ -476,10 +480,11 @@ fn shutdown_prevents_accessing_parents() {
             || schedule_in(Message::default(), Duration::from_secs(10)),
             |_, _| {
                 let err = current().parent().unwrap_err();
-                assert_eq!(err, ModuleReferencingError::CurrentlyInactive("The parent module of 'a.b.c' is currently shut down, thus cannot be accessed".to_string()));
+                assert!(matches!(err.kind, ErrorKind::ModuleNotFound(_)));
+                assert_eq!(err.to_string(), "a.b.c: ModuleNotFound(\"the parent module is currently inactive, thus cannot be accessed\")");
             },
         ),
     );
 
-    let _ = Builder::seeded(123).build(sim.freeze()).run();
+    let _ = Builder::seeded(123).build(sim.freeze()).run().unwrap();
 }

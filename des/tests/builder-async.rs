@@ -8,7 +8,11 @@ use std::{
     },
 };
 
-use des::{net::handlers::AsyncHandler, prelude::*, time::sleep};
+use des::{
+    net::{Error, ErrorKind, handlers::AsyncHandler},
+    prelude::*,
+    time::sleep,
+};
 use serial_test::serial;
 
 #[test]
@@ -165,9 +169,9 @@ fn builder_async_failable_with_fail() {
     assert!(
         v.unwrap_err()[0]
             .as_any()
-            .downcast_ref::<JoinError>()
-            .is_some()
-    )
+            .downcast_ref::<Error>()
+            .map_or(false, |e| matches!(e.kind, ErrorKind::JoinError(_)))
+    );
 }
 
 #[test]
@@ -195,8 +199,8 @@ fn builder_async_require_join() {
     assert!(
         v.unwrap_err()[0]
             .as_any()
-            .downcast_ref::<JoinError>()
-            .is_some()
+            .downcast_ref::<Error>()
+            .map_or(false, |e| matches!(e.kind, ErrorKind::JoinError(_)))
     );
 }
 

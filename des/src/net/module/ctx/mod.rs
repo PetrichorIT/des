@@ -1,5 +1,6 @@
-use super::{DummyModule, ModuleId, ModuleRef, ModuleRefWeak, ModuleReferencingError};
+use super::{DummyModule, ModuleId, ModuleRef, ModuleRefWeak};
 use crate::{
+    net::{Error, ErrorKind},
     prelude::{GateRef, ObjectPath},
     sync::SwapLock,
     time::SimTime,
@@ -14,7 +15,6 @@ use std::{
     cell::Cell,
     fmt::Debug,
     hash::Hash,
-    io::Error,
     sync::{Arc, atomic::AtomicBool},
     time::Duration,
 };
@@ -323,7 +323,10 @@ impl ModuleContext {
     /// This function is a shorthand for `prop_raw(key).typed::<T>()`.
     /// See [`RawProp::typed`] for information on errors.
     pub fn prop<T: PropType>(&self, key: &str) -> Result<Prop<T>, Error> {
-        self.props.write().get(key)
+        self.props.write().get(key).map_err(|e| Error {
+            origin: self.path.clone(),
+            kind: ErrorKind::PropError(e),
+        })
     }
 
     /// Returns a untyped property handle for the property under the given key.
@@ -406,32 +409,36 @@ impl ModuleContext {
     /// # Panics
     ///
     /// May panic when the simulation is currently being dropped.
-    pub fn parent(&self) -> Result<ModuleRef, ModuleReferencingError> {
+    pub fn parent(&self) -> Result<ModuleRef, Error> {
         if let Some(ref parent) = self.parent {
             let strong = parent
                 .upgrade()
                 .expect("Failed to fetch parent, ptr missing in drop");
 
             if !strong.is_active() {
-                return Err(ModuleReferencingError::CurrentlyInactive(format!(
-                    "The parent module of '{}' is currently shut down, thus cannot be accessed",
-                    self.path,
-                )));
+                return Err(Error {
+                    origin: self.path.clone(),
+                    kind: ErrorKind::ModuleNotFound(
+                        "the parent module is currently inactive, thus cannot be accessed".into(),
+                    ),
+                });
             }
 
             if strong.try_as_ref::<DummyModule>().is_some() {
-                Err(ModuleReferencingError::NotYetInitalized(format!(
-                    "The parent ptr of module '{}' is existent but not yet initalized, according to the load order.",
-                    self.path
-                )))
+                Err(Error {
+                    origin: self.path.clone(),
+                    kind: ErrorKind::ModuleNotFound(
+                        "the parent module is not yet initalized, thus cannot be accessed".into(),
+                    ),
+                })
             } else {
                 Ok(strong)
             }
         } else {
-            Err(ModuleReferencingError::NoEntry(format!(
-                "The module '{}' does not posses a parent ptr",
-                self.path
-            )))
+            Err(Error {
+                origin: self.path.clone(),
+                kind: ErrorKind::ModuleNotFound("no parent module exists".into()),
+            })
         }
     }
 
@@ -444,21 +451,25 @@ impl ModuleContext {
     ///
     /// Returns an error if no child was found under the given name,
     /// or the child is currently shut down.
-    pub fn child(&self, name: &str) -> Result<ModuleRef, ModuleReferencingError> {
+    pub fn child(&self, name: &str) -> Result<ModuleRef, Error> {
         if let Some(child) = self.children.read().get(name) {
             if !child.is_active() {
-                return Err(ModuleReferencingError::CurrentlyInactive(format!(
-                    "The child module '{}' of '{}' is currently shut down, thus cannot be accessed",
-                    name, self.path,
-                )));
+                return Err(Error {
+                    origin: self.path.clone(),
+                    kind: ErrorKind::ModuleNotFound(format!(
+                        "the child module '{name}' is currently inactive, thus cannot be accessed"
+                    )),
+                });
             }
 
             Ok(child.clone())
         } else {
-            Err(ModuleReferencingError::NoEntry(format!(
-                "The module '{}' does not posses a child ptr with the name '{}'",
-                self.path, name
-            )))
+            Err(Error {
+                origin: self.path.clone(),
+                kind: ErrorKind::ModuleNotFound(format!(
+                    "the child module '{name}' does not exist"
+                )),
+            })
         }
     }
 }

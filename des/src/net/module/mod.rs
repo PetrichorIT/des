@@ -24,8 +24,8 @@
 //! will still respecting the global plugin stack. See [`processing` module](crate::net::processing) for
 //! more information on plugins and other advanced processing features.
 //!
-//! > Note that APIs like [`SimBuilder::node`](crate::net::runtime::SimBuilder::node) require a object of [trait `ModuleBlock`](crate::net::handlers::ModuleBlock). However
-//! > all implementors of [`Module`] also implement [`ModuleBlock`](crate::net::handlers::ModuleBlock).
+//! > Note that APIs like [`SimBuilder::node`](crate::net::runtime::SimBuilder::node) require a object of [trait `IntoModuleTree`](crate::net::IntoModuleTree). However
+//! > all implementors of [`Module`] also implement [`IntoModuleTree`](crate::net::IntoModuleTree).
 //!
 //! # Common features via the `ModuleContext`
 //!
@@ -76,7 +76,6 @@ use std::{
 mod api;
 mod ctx;
 mod dummy;
-mod error;
 mod refs;
 
 #[cfg(test)]
@@ -86,7 +85,6 @@ pub(crate) use self::ctx::*;
 pub use self::ctx::{ModuleContext, Stereotyp};
 pub use api::*;
 pub(crate) use dummy::*;
-pub use error::*;
 pub use refs::*;
 
 use super::processing::{ProcessingStack, Processor};

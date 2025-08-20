@@ -22,13 +22,10 @@ use std::{
 };
 
 mod api;
-pub use self::api::*;
+pub use self::api::globals;
 
 mod events;
 pub use self::events::*;
-
-#[cfg(feature = "async")]
-pub use self::events::JoinError;
 
 mod ctx;
 pub(crate) use self::ctx::*;
@@ -40,7 +37,6 @@ pub mod handlers;
 
 mod unwind;
 use self::unwind::Harness;
-pub use self::unwind::PanicError;
 
 /// A networking simulation.
 ///
@@ -104,7 +100,7 @@ pub struct SimBuilder<A> {
 /// A helper to manage a scoped part of a networking simulation,
 /// exclusivly used when building the simulation.
 ///
-/// This type is helpful in combination with the trait [`ModuleBlock`]
+/// This type is helpful in combination with the trait [`IntoModuleTree`]
 /// to create reproducable blocks of modules at different
 /// locations within the simulation.
 ///
@@ -654,7 +650,7 @@ where
                     rt.app.error.extend(module.at_sim_start(stage).err());
                     module.deactivate(rt);
 
-                    super::buf_process(&module, rt);
+                    super::runtime::buf_process(&module, rt);
                 }
             }
         }

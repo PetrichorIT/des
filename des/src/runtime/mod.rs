@@ -6,7 +6,7 @@ use crate::{
     macros::support::SyncWrap,
     time::{Duration, SimTime},
 };
-use rand::{distr::StandardUniform, prelude::Distribution, Rng, RngCore};
+use rand::{Rng, RngCore, distr::StandardUniform, prelude::Distribution};
 use std::{
     any::type_name,
     cell::UnsafeCell,
@@ -302,11 +302,7 @@ where
     pub fn start(&mut self) {
         macro_rules! symbol {
             ($i:ident) => {
-                if $i {
-                    SYM_CHECKMARK
-                } else {
-                    SYM_CROSSMARK
-                }
+                if $i { SYM_CHECKMARK } else { SYM_CROSSMARK }
             };
         }
 
@@ -581,7 +577,7 @@ where
 }
 
 cfg_net! {
-    use crate::net::{gate::{GateRef, Connection},  HandleMessageEvent, message::Message, MessageExitingConnection, module::ModuleRef, NetEvents, Sim};
+    use crate::net::{gate::{GateRef, Connection},   message::Message,  module::ModuleRef,  Sim, runtime::{MessageExitingConnection, NetEvents, HandleMessageEvent}};
 
     impl<A> Runtime<Sim<A>> where
         A: EventLifecycle<Sim<A>>,{

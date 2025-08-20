@@ -2,9 +2,9 @@
 
 use super::{Globals, HandleMessageEvent, MessageExitingConnection, Sim};
 use crate::net::gate::Connection;
-use crate::net::module::{current, with_mod_ctx, MOD_CTX};
-use crate::net::ModuleRestartEvent;
-use crate::net::{gate::GateRef, message::Message, NetEvents};
+use crate::net::module::{MOD_CTX, current, with_mod_ctx};
+use crate::net::runtime::{ModuleRestartEvent, NetEvents};
+use crate::net::{gate::GateRef, message::Message};
 use crate::prelude::{EventLifecycle, ModuleRef};
 use crate::runtime::Runtime;
 use crate::sync::Mutex;

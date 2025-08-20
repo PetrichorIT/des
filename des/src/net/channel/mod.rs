@@ -105,7 +105,7 @@
 //! # let tower_port_2 = sim.gate("tower", "port-2");
 //! # let port_alice = sim.gate("alice", "port");
 //! # let port_bob = sim.gate("bob", "port");
-//! # use des::{runtime::EventSink, net::{NetEvents, gate::Connection}};
+//! # use des::{runtime::EventSink, net::{internals::NetEvents, gate::Connection}};
 //! # use std::sync::Arc;
 //! struct CustomChannel {
 //!     // Define your custom channel fields here
@@ -144,7 +144,7 @@
 use std::{any::Any, fmt::Debug, sync::Arc};
 
 use crate::{
-    net::{NetEvents, gate::Connection},
+    net::{gate::Connection, runtime::NetEvents},
     prelude::Message,
     runtime::EventSink,
     time::SimTime,
@@ -208,6 +208,7 @@ impl ChannelRef {
     }
 
     /// Returns a reference to the channel if it is of type T.
+    #[must_use]
     pub fn downcast_ref<T: Any>(&self) -> Option<&T> {
         let as_any: &dyn Any = &*self.channel;
         as_any.downcast_ref::<T>()
@@ -224,7 +225,7 @@ impl<T: Channel> From<T> for ChannelRef {
 
 impl<C: Channel> From<Arc<C>> for ChannelRef {
     fn from(channel: Arc<C>) -> Self {
-        ChannelRef { channel: channel }
+        ChannelRef { channel }
     }
 }
 

@@ -1,5 +1,5 @@
-- remove ModuleReferencingError
 - add abstract gates
   - e.g. abstract gate ports[?], implies that any connection attempt to this gate id will create a new instance port[i]
   - OR allow for multiplexing gates (bad idea since that destroys graph properties)
 - rework spawner / stereotype
+- PropError(<io>) could use better variants if Error was defined upstream ... is the des_utils construction even resonable?

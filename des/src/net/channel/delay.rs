@@ -1,7 +1,10 @@
 use std::{sync::Arc, time::Duration};
 
 use crate::{
-    net::{MessageExitingConnection, NetEvents, gate::Connection},
+    net::{
+        gate::Connection,
+        runtime::{MessageExitingConnection, NetEvents},
+    },
     prelude::{Channel, ChannelRef, Message},
     runtime::EventSink,
     time::SimTime,
