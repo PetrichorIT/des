@@ -2,7 +2,7 @@
 #![allow(unused_variables)]
 
 use des::{
-    net::{JoinError, blocks::AsyncFn, module::Module},
+    net::{JoinError, handlers::AsyncHandler, module::Module},
     prelude::*,
     runtime::RuntimeError,
     time::{self, MissedTickBehavior, sleep, timeout, timeout_at},
@@ -422,7 +422,7 @@ fn async_time_sleep_far_future() {
     let mut sim = Sim::new(());
     sim.node(
         "alice",
-        AsyncFn::new(|rx| async move {
+        AsyncHandler::new(|rx| async move {
             assert_eq!(SimTime::now(), 0.0);
             time::sleep_until(10.0.into()).await;
             assert_eq!(SimTime::now(), 10.0);
@@ -445,7 +445,7 @@ fn async_time_sleep_select() {
     let mut sim = Sim::new(());
     sim.node(
         "alice",
-        AsyncFn::new(|rx| async move {
+        AsyncHandler::new(|rx| async move {
             tokio::select! {
                 _ = time::sleep(Duration::from_secs(10)) => unreachable!(),
                 _ = time::sleep(Duration::from_secs(5)) => println!("resolved"),
@@ -465,7 +465,7 @@ fn async_time_sleep_reset() {
     let mut sim = Sim::new(());
     sim.node(
         "alice",
-        AsyncFn::new(|rx| async move {
+        AsyncHandler::new(|rx| async move {
             let sleep = time::sleep(Duration::from_secs(5));
             tokio::pin!(sleep);
 
@@ -486,7 +486,7 @@ fn async_time_timeout() {
     let mut sim = Sim::new(());
     sim.node(
         "alice",
-        AsyncFn::new(|rx| async move {
+        AsyncHandler::new(|rx| async move {
             let result: Result<i32, time::error::Elapsed> =
                 timeout(Duration::from_secs(10), std::future::pending()).await;
             assert!(result.is_err());
@@ -525,7 +525,7 @@ fn async_time_timeout_far_future() {
     let mut sim = Sim::new(());
     sim.node(
         "alice",
-        AsyncFn::new(|rx| async move {
+        AsyncHandler::new(|rx| async move {
             // add a sleep to get a nonempty sim
             time::sleep(Duration::from_secs(42)).await;
 
@@ -548,7 +548,7 @@ fn async_time_interval() {
     let mut sim = Sim::new(());
     sim.node(
         "alice",
-        AsyncFn::new(|rx| async move {
+        AsyncHandler::new(|rx| async move {
             // (0) No missed ticks
             let counter = Arc::new(AtomicUsize::new(0));
 
@@ -584,7 +584,7 @@ fn async_time_interval_missed_tick_behaviour() {
     let mut sim = Sim::new(());
     sim.node(
         "burst",
-        AsyncFn::new(|rx| async move {
+        AsyncHandler::new(|rx| async move {
             // (0) No missed ticks
             let mut interval = time::interval(Duration::from_secs(1));
             interval.set_missed_tick_behavior(MissedTickBehavior::Burst);
@@ -602,7 +602,7 @@ fn async_time_interval_missed_tick_behaviour() {
 
     sim.node(
         "delay",
-        AsyncFn::new(|rx| async move {
+        AsyncHandler::new(|rx| async move {
             // (0) No missed ticks
             let mut interval = time::interval(Duration::from_secs(1));
             interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
@@ -626,7 +626,7 @@ fn async_time_interval_missed_tick_behaviour() {
 
     sim.node(
         "skip",
-        AsyncFn::new(|rx| async move {
+        AsyncHandler::new(|rx| async move {
             // (0) No missed ticks
             let mut interval = time::interval_at(0.0.into(), Duration::from_secs(1));
             interval.set_missed_tick_behavior(MissedTickBehavior::Skip);

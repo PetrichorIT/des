@@ -1,7 +1,7 @@
 #![cfg(feature = "async")]
 
 use des::{
-    net::{blocks::ModuleFn, module::Module},
+    net::{handlers::ModuleFn, module::Module},
     prelude::*,
     time::sleep,
 };

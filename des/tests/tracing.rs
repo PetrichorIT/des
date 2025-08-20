@@ -1,9 +1,9 @@
 use des::{
-    net::{blocks::AsyncFn, Sim},
+    net::{Sim, handlers::AsyncHandler},
     runtime::Builder,
     tracing::format,
 };
-use tracing::{level_filters::LevelFilter, span, subscriber::with_default, Instrument, Level};
+use tracing::{Instrument, Level, level_filters::LevelFilter, span, subscriber::with_default};
 
 #[path = "common/mock.rs"]
 mod mock;
@@ -46,14 +46,14 @@ fn scope_regognition() {
         let mut sim = Sim::new(());
         sim.node(
             "a",
-            AsyncFn::new(|_| async {
+            AsyncHandler::new(|_| async {
                 tracing::info!("node(a) says(1) at(0s)");
                 tracing::error!("node(a) says(2) at(0s)");
             }),
         );
         sim.node(
             "a.b",
-            AsyncFn::new(|_| async {
+            AsyncHandler::new(|_| async {
                 tracing::trace!("node(b) says(1) at(0s)");
             }),
         );
@@ -81,7 +81,7 @@ fn time_regognition() {
         let mut sim = Sim::new(());
         sim.node(
             "a",
-            AsyncFn::new(|_| async {
+            AsyncHandler::new(|_| async {
                 tracing::info!("node(a) says(1) at(0s)");
                 des::time::sleep(std::time::Duration::from_secs(5)).await;
                 tracing::error!("node(a) says(2) at(5s)");
@@ -89,7 +89,7 @@ fn time_regognition() {
         );
         sim.node(
             "a.b",
-            AsyncFn::new(|_| async {
+            AsyncHandler::new(|_| async {
                 tracing::trace!("node(b) says(1) at(0s)");
             }),
         );
@@ -117,7 +117,7 @@ fn span_regognition() {
         let mut sim = Sim::new(());
         sim.node(
             "a",
-            AsyncFn::new(|_| {
+            AsyncHandler::new(|_| {
                 async {
                     tracing::info!("node(a) says(1) at(0s)");
                 }
@@ -126,7 +126,7 @@ fn span_regognition() {
         );
         sim.node(
             "a.b",
-            AsyncFn::new(|_| async {
+            AsyncHandler::new(|_| async {
                 tracing::trace!("node(b) says(1) at(0s)");
             }),
         );
@@ -159,7 +159,7 @@ fn multi_span_regognition() {
         let mut sim = Sim::new(());
         sim.node(
             "a",
-            AsyncFn::new(|_| {
+            AsyncHandler::new(|_| {
                 async {
                     say_hello().await;
                 }
@@ -168,7 +168,7 @@ fn multi_span_regognition() {
         );
         sim.node(
             "a.b",
-            AsyncFn::new(|_| {
+            AsyncHandler::new(|_| {
                 async {
                     tracing::trace!("node(b) says(1) at(0s)");
                 }
@@ -204,7 +204,7 @@ fn with_ansi() {
         let mut sim = Sim::new(());
         sim.node(
             "a",
-            AsyncFn::new(|_| async { tracing::info!("Hello World!") }),
+            AsyncHandler::new(|_| async { tracing::info!("Hello World!") }),
         );
 
         let _ = Builder::seeded(123).build(sim.freeze()).run();

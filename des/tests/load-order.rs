@@ -1,8 +1,8 @@
 #![cfg(feature = "net")]
 
-use des::net::blocks::ModuleFn;
+use des::net::handlers::ModuleFn;
 use des::prelude::*;
-use std::sync::{atomic::AtomicU16, Arc};
+use std::sync::{Arc, atomic::AtomicU16};
 
 #[test]
 fn load_order() {

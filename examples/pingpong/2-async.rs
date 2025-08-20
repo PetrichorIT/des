@@ -13,7 +13,7 @@
 //! include `tokio` as a dependency.
 
 use des::{
-    net::blocks::{self, ModuleBlock},
+    net::{IntoModuleTree, handlers},
     prelude::*,
     time,
 };
@@ -42,8 +42,8 @@ const PONG: MessageKind = 2;
 // APIs like `tokio::time` or `tokio::net` cannot be used, because these types are working with real OS sockets or clocks
 // not simulated ones in the simulation fabric.
 
-fn ponger() -> impl ModuleBlock {
-    blocks::AsyncFn::new(|mut rx| async move {
+fn ponger() -> impl IntoModuleTree {
+    handlers::AsyncHandler::new(|mut rx| async move {
         let mut pongs_received = 0;
         while let Some(msg) = rx.recv().await {
             assert_eq!(msg.header().kind, PING);

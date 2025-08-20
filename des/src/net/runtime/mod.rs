@@ -1,10 +1,9 @@
-use blocks::ModuleBlock;
 use des_net_utils::props::Cfg;
 use serde_yml::{Value, from_str};
 
 use crate::{
     net::{
-        module::{MOD_CTX, ModuleContext, to_processing_chain, try_current},
+        module::{DummyModule, MOD_CTX, ModuleContext, to_processing_chain, try_current},
         processing::ProcessingStack,
         topology::Topology,
     },
@@ -37,7 +36,7 @@ pub(crate) use self::ctx::*;
 mod guard;
 use guard::SimStaticsGuard;
 
-pub mod blocks;
+pub mod handlers;
 
 mod unwind;
 use self::unwind::Harness;
@@ -61,7 +60,7 @@ pub use self::unwind::PanicError;
 ///
 /// ```
 /// # use des::prelude::*;
-/// # use des::net::blocks::HandlerFn;
+/// # use des::net::handlers::HandlerFn;
 /// struct Inner;
 /// impl EventLifecycle<Sim<Inner>> for Inner {
 ///     fn at_sim_start(rt: &mut Runtime<Sim<Inner>>) {
@@ -116,9 +115,9 @@ pub struct SimBuilder<A> {
 ///
 /// ```
 /// # use des::prelude::*;
-/// # use des::net::blocks::{ModuleBlock, ModuleFn, HandlerFn};
+/// # use des::net::{handlers::{ModuleFn, HandlerFn}, IntoModuleTree};
 /// struct LAN {}
-/// impl ModuleBlock for LAN {
+/// impl IntoModuleTree for LAN {
 ///     type Ret = ();
 ///     fn build<A>(self, mut sim: SimBuilderScoped<'_, A>) {
 ///         sim.root(HandlerFn::new(|_| {}));
@@ -261,7 +260,7 @@ impl<A> SimBuilder<A> {
     ///
     /// ```
     /// # use des::prelude::*;
-    /// # use des::net::blocks::ModuleFn;
+    /// # use des::net::handlers::ModuleFn;
     /// use std::net::IpAddr;
     ///
     /// let mut sim = Sim::new(());
@@ -428,7 +427,11 @@ impl<A> SimBuilder<A> {
     ///
     /// let _ = Builder::new().build(sim.freeze()).run();
     /// ```
-    pub fn node<M: ModuleBlock>(&mut self, path: impl Into<ObjectPath>, module_block: M) -> M::Ret {
+    pub fn node<M: IntoModuleTree>(
+        &mut self,
+        path: impl Into<ObjectPath>,
+        module_block: M,
+    ) -> M::Ret {
         let scoped = SimBuilderScoped::new(self, path.into());
         module_block.build(scoped)
     }
@@ -537,7 +540,7 @@ impl<A> SimBuilderScoped<'_, A> {
     /// Creates a module block within the current scope.
     ///
     /// See [`SimBuilder::node`] for more information.
-    pub fn node(&mut self, path: impl Into<ObjectPath>, module_block: impl ModuleBlock) {
+    pub fn node(&mut self, path: impl Into<ObjectPath>, module_block: impl IntoModuleTree) {
         self.base
             .node(self.scope.appended(path.into().as_str()), module_block);
     }
@@ -555,6 +558,42 @@ impl<A> SimBuilderScoped<'_, A> {
     pub fn gates(&mut self, path: impl Into<ObjectPath>, gate: &str, size: usize) -> Vec<GateRef> {
         self.base
             .gates(self.scope.appended(path.into()), gate, size)
+    }
+}
+
+/// A trait that descibes that an object can be build into a tree of modules
+/// at a given scope within the simulation.
+///
+/// Types that implement `ModuleBlock` should be treated as builders for the actual
+/// block of modules. They can contain abitrary information that may be relevent to the
+/// build process of the actual modules within the block.
+///
+/// A module block can consist of either:
+/// - no module at all
+/// - on module specifically at the position defined by the scope
+/// - on module at the scope position, an more as direct or indirect children of the first module.
+///
+/// See [`SimBuilderScoped`] for more information.
+pub trait IntoModuleTree {
+    /// The returns type of the build method. This will be returned by `Sim::node`
+    type Ret;
+
+    /// Build the described module block within the context of scoped part of
+    /// a simulation.
+    fn build<A>(self, sim: SimBuilderScoped<'_, A>) -> Self::Ret;
+}
+
+impl<M: Module> IntoModuleTree for M {
+    type Ret = ();
+    fn build<A>(self, sim: SimBuilderScoped<'_, A>) {
+        sim.base.raw(sim.scope, self);
+    }
+}
+
+impl IntoModuleTree for () {
+    type Ret = ();
+    fn build<A>(self, sim: SimBuilderScoped<'_, A>) {
+        sim.base.raw(sim.scope, DummyModule);
     }
 }
 

@@ -3,4 +3,3 @@
   - e.g. abstract gate ports[?], implies that any connection attempt to this gate id will create a new instance port[i]
   - OR allow for multiplexing gates (bad idea since that destroys graph properties)
 - rework spawner / stereotype
-- maybe rebuild NDL as a builder macro like `NDL::load("...").apply_to(&mut sim)`

@@ -1,9 +1,9 @@
-use des::{net::blocks::AsyncFn, prelude::*};
+use des::{net::handlers::AsyncHandler, prelude::*};
 use std::panic;
 
 fn main() -> Result<(), RuntimeError> {
     let mut sim = Sim::new(());
-    sim.node("alice", AsyncFn::io(|_| async { Ok(()) }));
+    sim.node("alice", AsyncHandler::io(|_| async { Ok(()) }));
     sim.node("bob", B);
     sim.node("eve", B);
 

@@ -1,7 +1,7 @@
 use des::{
     net::{
-        blocks::{AsyncFn, HandlerFn},
         globals,
+        handlers::{AsyncHandler, HandlerFn},
     },
     prelude::*,
 };
@@ -75,7 +75,7 @@ fn select_node_from_globals() -> Result<(), RuntimeError> {
 
     sim.node(
         "tester",
-        AsyncFn::io(|_| async move {
+        AsyncHandler::io(|_| async move {
             assert_eq!(
                 globals().get(&"alice".into()).unwrap().path(),
                 "alice".into()

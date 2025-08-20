@@ -1,7 +1,10 @@
 #![cfg(feature = "net")]
 
 use des::{
-    net::blocks::{FailabilityPolicy, HandlerFn, ModuleBlock, ModuleFn},
+    net::{
+        IntoModuleTree,
+        handlers::{FailabilityPolicy, HandlerFn, ModuleFn},
+    },
     prelude::*,
 };
 use serial_test::serial;
@@ -10,8 +13,8 @@ use std::{
     hint::black_box,
     io,
     sync::{
-        atomic::{AtomicU16, Ordering},
         Arc,
+        atomic::{AtomicU16, Ordering},
     },
 };
 
@@ -109,7 +112,7 @@ fn builder_module_block() {
     struct Def;
     struct Block;
     impl Module for Def {}
-    impl ModuleBlock for Block {
+    impl IntoModuleTree for Block {
         type Ret = ();
         fn build<A>(self, mut sim: SimBuilderScoped<'_, A>) {
             sim.root(Def);
@@ -248,7 +251,11 @@ fn builder_module_fn() {
 
     let mut rt = Builder::seeded(123).build(sim.freeze());
     for i in 0..10 {
-        rt.add_message_onto(gate.clone(), Message::default().with_id(i), (i as f64).into());
+        rt.add_message_onto(
+            gate.clone(),
+            Message::default().with_id(i),
+            (i as f64).into(),
+        );
     }
 
     let _ = rt.run();

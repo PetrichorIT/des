@@ -24,8 +24,8 @@
 //! will still respecting the global plugin stack. See [`processing` module](crate::net::processing) for
 //! more information on plugins and other advanced processing features.
 //!
-//! > Note that APIs like [`SimBuilder::node`](crate::net::runtime::SimBuilder::node) require a object of [trait `ModuleBlock`](crate::net::blocks::ModuleBlock). However
-//! > all implementors of [`Module`] also implement [`ModuleBlock`](crate::net::blocks::ModuleBlock).
+//! > Note that APIs like [`SimBuilder::node`](crate::net::runtime::SimBuilder::node) require a object of [trait `ModuleBlock`](crate::net::handlers::ModuleBlock). However
+//! > all implementors of [`Module`] also implement [`ModuleBlock`](crate::net::handlers::ModuleBlock).
 //!
 //! # Common features via the `ModuleContext`
 //!

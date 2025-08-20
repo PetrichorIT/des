@@ -1,7 +1,7 @@
 #![cfg(feature = "net")]
 
 use des::{
-    net::{blocks::AsyncFn, channel::DelayChannel},
+    net::{channel::DelayChannel, handlers::AsyncHandler},
     prelude::*,
 };
 use serial_test::serial;
@@ -190,7 +190,7 @@ fn simplex_shared_domain() {
 
     sim.node(
         "receiver",
-        AsyncFn::new(|mut rx| async move {
+        AsyncHandler::new(|mut rx| async move {
             for _ in 0..25 {
                 let msg = rx.recv().await.unwrap();
                 let last = msg.last_gate.clone().unwrap();
@@ -219,7 +219,7 @@ fn simplex_shared_domain() {
         let key = format!("sender-{i}");
         sim.node(
             &key,
-            AsyncFn::new(|_| async move {
+            AsyncHandler::new(|_| async move {
                 for _ in 0..5 {
                     send(Message::default(), "mobile");
                 }
@@ -246,7 +246,7 @@ fn duplex_shared_domain() {
 
     sim.node(
         "receiver",
-        AsyncFn::new(|mut rx| async move {
+        AsyncHandler::new(|mut rx| async move {
             for _ in 0..25 {
                 let msg = rx.recv().await.unwrap();
                 let last = msg.last_gate.clone().unwrap();
@@ -269,7 +269,7 @@ fn duplex_shared_domain() {
         let key = format!("sender-{i}");
         sim.node(
             &key,
-            AsyncFn::new(|_| async move {
+            AsyncHandler::new(|_| async move {
                 for _ in 0..5 {
                     send(Message::default(), "mobile");
                 }

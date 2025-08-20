@@ -1,51 +1,10 @@
 //! Custom module blocks that simplify the `Module` API.
 
 use crate::{
-    net::{
-        message::Message,
-        module::{DummyModule, Module},
-    },
+    net::{message::Message, module::Module},
     prelude::current,
 };
 use std::{error::Error, time::Duration};
-
-use super::SimBuilderScoped;
-
-/// A trait that descibes that an object can be build into a block of modules
-/// at a given scope within the simulation.
-///
-/// Types that implement `ModuleBlock` should be treated as builders for the actual
-/// block of modules. They can contain abitrary information that may be relevent to the
-/// build process of the actual modules within the block.
-///
-/// A module block can consist of either:
-/// - no module at all
-/// - on module specifically at the position defined by the scope
-/// - on module at the scope position, an more as direct or indirect children of the first module.
-///
-/// See [`SimBuilderScoped`] for more information.
-pub trait ModuleBlock {
-    /// The returns type of the build method. This will be returned by `Sim::node`
-    type Ret;
-
-    /// Build the described module block within the context of scoped part of
-    /// a simulation.
-    fn build<A>(self, sim: SimBuilderScoped<'_, A>) -> Self::Ret;
-}
-
-impl<M: Module> ModuleBlock for M {
-    type Ret = ();
-    fn build<A>(self, sim: SimBuilderScoped<'_, A>) {
-        sim.base.raw(sim.scope, self);
-    }
-}
-
-impl ModuleBlock for () {
-    type Ret = ();
-    fn build<A>(self, sim: SimBuilderScoped<'_, A>) {
-        sim.base.raw(sim.scope, DummyModule);
-    }
-}
 
 /// The policy that descibes how a module should proceeed, if a
 /// handler function returns an error.
@@ -81,7 +40,7 @@ pub enum FailabilityPolicy {
 ///
 /// ```
 /// # use des::prelude::*;
-/// # use des::net::blocks::HandlerFn;
+/// # use des::net::handlers::HandlerFn;
 /// let mut sim = Sim::new(());
 /// sim.node("alice", HandlerFn::new(|msg| {
 ///     /* Do something stateless (e.g. random routing) */
@@ -156,7 +115,7 @@ where
 ///
 /// ```
 /// # use des::prelude::*;
-/// # use des::net::blocks::ModuleFn;
+/// # use des::net::handlers::ModuleFn;
 /// struct State {
 ///     /* ...data */
 /// }
@@ -282,9 +241,9 @@ cfg_async! {
     ///
     /// ```
     /// # use des::prelude::*;
-    /// # use des::net::blocks::AsyncFn;
+    /// # use des::net::handlers::AsyncHandler;
     /// let mut sim = Sim::new(());
-    /// sim.node("alice", AsyncFn::new(|mut rx| {
+    /// sim.node("alice", AsyncHandler::new(|mut rx| {
     ///     /* Do some setup / sim_start_stuff here */
     ///     async move {
     ///         while let Some(msg) = rx.recv().await {
@@ -296,7 +255,7 @@ cfg_async! {
     ///
     /// let _ = Builder::new().build(sim.freeze()).run();
     /// ```
-    pub struct AsyncFn
+    pub struct AsyncHandler
     {
         generator: BoxedGen,
 
@@ -310,7 +269,7 @@ cfg_async! {
     type BoxedGen = Box<dyn FnMut(Receiver<Message>) -> BoxedFuture + Send>;
     type BoxedFuture = Pin<Box<dyn Future<Output = ()> + Send>>;
 
-    impl AsyncFn {
+    impl AsyncHandler {
         /// Sets the handler to require a join
         #[must_use]
         pub fn require_join(mut self) -> Self {
@@ -386,7 +345,7 @@ cfg_async! {
         }
     }
 
-    impl Module for AsyncFn {
+    impl Module for AsyncHandler {
         fn reset(&mut self) {
             current().reset_join_handles();
         }
@@ -422,7 +381,7 @@ cfg_async! {
 
     }
 
-    impl std::fmt::Debug for AsyncFn {
+    impl std::fmt::Debug for AsyncHandler {
         fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
             write!(f, "AsyncFn")
         }

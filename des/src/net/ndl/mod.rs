@@ -67,7 +67,7 @@ pub use des_net_utils::ndl::def::*;
 mod registry;
 pub use self::registry::*;
 
-use super::blocks::ModuleBlock;
+use super::IntoModuleTree;
 
 /// Inject modules described using the Node Description Language (NDL).
 ///
@@ -129,7 +129,7 @@ impl<'a, L: Layer> Ndl<'a, L> {
     }
 }
 
-impl<L: Layer> ModuleBlock for Ndl<'_, L> {
+impl<L: Layer> IntoModuleTree for Ndl<'_, L> {
     type Ret = Result<ModuleRef>;
     fn build<A>(self, sim: SimBuilderScoped<'_, A>) -> Self::Ret {
         sim.ndl(&self.node, self.registry)

@@ -3,12 +3,12 @@
 use std::{
     error::Error,
     ops::Deref,
-    sync::{atomic::AtomicUsize, Arc},
+    sync::{Arc, atomic::AtomicUsize},
 };
 
 use des::{
     net::ndl::Registry,
-    net::{blocks::ModuleBlock, module::Module, Sim},
+    net::{IntoModuleTree, Sim, module::Module},
     runtime::Builder,
 };
 use serial_test::serial;
@@ -70,7 +70,7 @@ struct A {
     counter: Arc<AtomicUsize>,
 }
 
-impl ModuleBlock for Harness<A> {
+impl IntoModuleTree for Harness<A> {
     type Ret = ();
     fn build<A>(self, mut sim: des::prelude::SimBuilderScoped<'_, A>) {
         let counter = self.counter.clone();
