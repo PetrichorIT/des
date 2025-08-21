@@ -29,7 +29,7 @@ struct Sender;
 impl Module for Sender {
     fn at_sim_start(&mut self, _stage: usize) {
         for i in 0..10 {
-            send_in(
+            let _ = send_in(
                 Message::default().with_id(i as u16),
                 ("port", 0),
                 Duration::from_secs(i),

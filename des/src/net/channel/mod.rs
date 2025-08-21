@@ -107,6 +107,8 @@
 //! # let port_bob = sim.gate("bob", "port");
 //! # use des::{runtime::EventSink, net::{internals::NetEvents, gate::Connection}};
 //! # use std::sync::Arc;
+//! # use std::any::Any;
+//! # use des::net::channel::SendContext;
 //! struct CustomChannel {
 //!     // Define your custom channel fields here
 //! }
@@ -118,16 +120,18 @@
 //! #        None
 //!     }
 //!
-//!     fn send(
-//!         self: Arc<Self>,
+//!     fn send<'ctx>(
+//!         &mut self,
+//!         src: GateRef,
 //!         message: Message,
 //!         via: Connection,
-//!         sink: &mut dyn EventSink<NetEvents>,
-//!     ) {
+//!         ctx: SendContext<'ctx>
+//!     ) -> Result<(), SendError> {
 //!         // Implement your custom channel send logic here
+//!  #      Ok(())
 //!     }
 //!
-//!     fn unbusy_notify(self: Arc<Self>, sink: &mut dyn EventSink<NetEvents>) {
+//!     fn unbusy_notify<'ctx>(&mut self, info: Box<dyn Any + Send>, sink: SendContext<'ctx>) {
 //!         // Implement your custom channel unbusy notification logic here
 //!     }
 //! }
@@ -141,11 +145,15 @@
 //! port_bob.connect_with(tower_port_2, Some(custom_channel_shared.clone()));
 //! ```
 
-use std::{any::Any, fmt::Debug, sync::Arc};
+use std::{
+    any::Any,
+    fmt::Debug,
+    sync::{Arc, RwLock},
+};
 
 use crate::{
     net::{gate::Connection, runtime::NetEvents},
-    prelude::Message,
+    prelude::{GateRef, Message},
     runtime::EventSink,
     time::SimTime,
 };
@@ -163,24 +171,51 @@ pub use shared::*;
 /// Can be freely cloned, as it is a reference-counted pointer.
 #[derive(Clone)]
 pub struct ChannelRef {
-    pub(super) channel: Arc<dyn Channel>,
+    pub(crate) channel: Arc<RwLock<dyn Channel>>,
 }
 
 /// The implementation of a gate-to-gate link.
-pub trait Channel: Any + 'static {
+pub trait Channel: Any {
     /// Returns the time at which the channel will be free again.
     fn transmission_finish_time(&self) -> Option<SimTime>;
 
-    /// A method to send a message through the channek
+    /// Register a gate to be participating in the communication domain.
+    fn register(&mut self, endpoint: GateRef) {
+        let _ = endpoint;
+    }
+
+    /// A method to send a message through the channel
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the channel cannot send the message.
     fn send(
-        self: Arc<Self>,
+        &mut self,
+        src: GateRef,
         message: Message,
         via: Connection,
-        sink: &mut dyn EventSink<NetEvents>,
-    );
+        ctx: SendContext<'_>,
+    ) -> Result<(), SendError>;
 
     /// A method to notify the channel that it is no longer busy.
-    fn unbusy_notify(self: Arc<Self>, sink: &mut dyn EventSink<NetEvents>);
+    fn unbusy_notify(&mut self, info: Box<dyn Any + Send>, ctx: SendContext<'_>);
+}
+
+/// A context for sending a message through a channel.
+pub struct SendContext<'a> {
+    /// The sink to send the message to.
+    pub sink: &'a mut dyn EventSink<NetEvents>,
+    /// The handle of the channel.
+    pub handle: ChannelRef,
+}
+
+/// An error that occurs when sending a message through a channel.
+#[derive(Debug, Clone)]
+pub struct SendError {
+    /// The message that could not be sent.
+    pub msg: Message,
+    /// The reason why the message could not be sent.
+    pub reason: String,
 }
 
 /// The behaviour a link should follow, if it is oversubscribed
@@ -198,33 +233,45 @@ impl ChannelRef {
     /// Returns true if the channel is currently busy.
     #[must_use]
     pub fn is_busy(&self) -> bool {
-        self.channel.transmission_finish_time().is_some()
+        self.transmission_finish_time().is_some()
     }
 
     /// Returns the time at which the channel will be free again.
     #[must_use]
+    #[allow(clippy::missing_panics_doc)]
     pub fn transmission_finish_time(&self) -> Option<SimTime> {
-        self.channel.transmission_finish_time()
+        self.channel.try_read().unwrap().transmission_finish_time()
     }
 
     /// Returns a reference to the channel if it is of type T.
     #[must_use]
-    pub fn downcast_ref<T: Any>(&self) -> Option<&T> {
-        let as_any: &dyn Any = &*self.channel;
-        as_any.downcast_ref::<T>()
+    pub fn downcast_ref<T: Any, R>(&self, f: impl FnOnce(&T) -> R) -> Option<R> {
+        let lock = self.channel.read().ok()?;
+        let val: &dyn Any = &(*lock);
+        let val = val.downcast_ref::<T>()?;
+        Some(f(val))
+    }
+
+    /// Returns a mutable reference to the channel if it is of type T.
+    #[must_use]
+    pub fn downcast_mut<T: Any, R>(&self, f: impl FnOnce(&mut T) -> R) -> Option<R> {
+        let mut lock = self.channel.write().ok()?;
+        let val: &mut dyn Any = &mut (*lock);
+        let val = val.downcast_mut::<T>()?;
+        Some(f(val))
     }
 }
 
 impl<T: Channel> From<T> for ChannelRef {
     fn from(channel: T) -> Self {
         ChannelRef {
-            channel: Arc::new(channel),
+            channel: Arc::new(RwLock::new(channel)),
         }
     }
 }
 
-impl<C: Channel> From<Arc<C>> for ChannelRef {
-    fn from(channel: Arc<C>) -> Self {
+impl<C: Channel> From<Arc<RwLock<C>>> for ChannelRef {
+    fn from(channel: Arc<RwLock<C>>) -> Self {
         ChannelRef { channel }
     }
 }
@@ -239,7 +286,7 @@ impl Debug for ChannelRef {
         }
 
         impl ChannelRefFmt {
-            fn from(channel: &Arc<dyn Channel>) -> Self {
+            fn from(channel: &dyn Channel) -> Self {
                 if let Some(until) = channel.transmission_finish_time() {
                     Self::Busy { until }
                 } else {
@@ -248,6 +295,14 @@ impl Debug for ChannelRef {
             }
         }
 
-        ChannelRefFmt::from(&self.channel).fmt(f)
+        ChannelRefFmt::from(&*self.channel.try_read().unwrap()).fmt(f)
     }
 }
+
+impl Debug for SendContext<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SendContext").finish()
+    }
+}
+
+unsafe impl Send for ChannelRef {}

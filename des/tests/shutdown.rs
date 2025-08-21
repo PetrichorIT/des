@@ -350,7 +350,7 @@ impl Module for EndNode {
                 }
 
                 self.sent += 1;
-                send(
+                let _ = send(
                     Message::default()
                         .with_kind(2)
                         .with_content(CountDropsMessage {

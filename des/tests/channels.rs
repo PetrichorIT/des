@@ -14,8 +14,8 @@ struct DropChanModule {
 
 impl Module for DropChanModule {
     fn at_sim_start(&mut self, _stage: usize) {
-        send(Message::default().with_content([0u8; 512]), "out");
-        send(Message::default().with_content([1u8; 512]), "out");
+        let _ = send(Message::default().with_content([0u8; 512]), "out");
+        let _ = send(Message::default().with_content([1u8; 512]), "out");
 
         self.send += 2;
     }
@@ -59,9 +59,9 @@ struct BufferChanModule {
 
 impl Module for BufferChanModule {
     fn at_sim_start(&mut self, _stage: usize) {
-        send(Message::default().with_content([0u8; 512]), "out");
-        send(Message::default().with_content([1u8; 512]), "out");
-        send(Message::default().with_content([1u8; 512]), "out");
+        let _ = send(Message::default().with_content([0u8; 512]), "out");
+        let _ = send(Message::default().with_content([1u8; 512]), "out");
+        let _ = send(Message::default().with_content([1u8; 512]), "out");
 
         self.send += 3;
     }
@@ -110,7 +110,7 @@ impl Module for SendMessageModule {
 
     fn handle_message(&mut self, msg: Message) {
         if msg.header().kind == 10 {
-            send(Message::default().with_content("Hello world"), "out");
+            let _ = send(Message::default().with_content("Hello world"), "out");
             let gate = current().gate("out", 0).unwrap();
             let ch = gate.channel().unwrap();
             assert!(ch.is_busy());
@@ -149,7 +149,7 @@ struct LatencyOnly(usize);
 impl Module for LatencyOnly {
     fn at_sim_start(&mut self, _stage: usize) {
         for _ in 0..10 {
-            send(Message::default(), "out");
+            let _ = send(Message::default(), "out");
         }
     }
 
@@ -194,7 +194,7 @@ fn simplex_shared_domain() {
             for _ in 0..25 {
                 let msg = rx.recv().await.unwrap();
                 let last = msg.last_gate.clone().unwrap();
-                send(msg, last);
+                let _ = send(msg, last);
                 tracing::info!("received message");
             }
         })
@@ -221,7 +221,7 @@ fn simplex_shared_domain() {
             &key,
             AsyncHandler::new(|_| async move {
                 for _ in 0..5 {
-                    send(Message::default(), "mobile");
+                    let _ = send(Message::default(), "mobile");
                 }
             }),
         );
@@ -250,7 +250,7 @@ fn duplex_shared_domain() {
             for _ in 0..25 {
                 let msg = rx.recv().await.unwrap();
                 let last = msg.last_gate.clone().unwrap();
-                send(msg, last);
+                let _ = send(msg, last);
                 tracing::info!("received message");
             }
         })
@@ -271,7 +271,7 @@ fn duplex_shared_domain() {
             &key,
             AsyncHandler::new(|_| async move {
                 for _ in 0..5 {
-                    send(Message::default(), "mobile");
+                    let _ = send(Message::default(), "mobile");
                 }
             }),
         );
@@ -302,7 +302,7 @@ fn channel_as_any() {
     let ch = g1.channel().unwrap();
 
     assert_eq!(
-        ch.downcast_ref::<DelayChannel>().unwrap().delay,
+        ch.downcast_ref::<DelayChannel, _>(|v| v.delay).unwrap(),
         Duration::from_millis(100)
     );
 }

@@ -60,3 +60,7 @@ path = "ndl2/main.rs"
 [[example]]
 name = "panic"
 path = "panic/main.rs"
+
+[[example]]
+name = "time-division-multiplexing"
+path = "time-division-multiplexing/main.rs"

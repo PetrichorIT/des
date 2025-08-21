@@ -5,8 +5,8 @@ struct A {}
 
 impl Module for A {
     fn at_sim_start(&mut self, _stage: usize) {
-        send(Message::default().with_content(42), "out");
-        send(Message::default().with_content(69), "out");
+        let _ = send(Message::default().with_content(42), "out");
+        let _ = send(Message::default().with_content(69), "out");
     }
 
     fn handle_message(&mut self, msg: Message) {
@@ -21,7 +21,7 @@ struct B {}
 
 impl Module for B {
     fn handle_message(&mut self, msg: Message) {
-        send(msg, "out")
+        let _ = send(msg, "out");
     }
 }
 

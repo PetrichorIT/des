@@ -3,3 +3,6 @@
   - OR allow for multiplexing gates (bad idea since that destroys graph properties)
 - rework spawner / stereotype
 - PropError(<io>) could use better variants if Error was defined upstream ... is the des_utils construction even resonable?
+- add property to event: relevant (is_empty ignores non-relevant events)
+  - can be used to ignore infinite timer events
+- maybe depc send_in(<delay>) since it does not play nice with send error

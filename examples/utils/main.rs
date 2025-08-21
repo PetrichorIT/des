@@ -18,14 +18,14 @@ impl Module for Alice {
 
         if content.len() <= limit {
             tracing::info!("returning event with {}", content.len());
-            send(msg, "up");
+            let _ = send(msg, "up");
         }
     }
 }
 
 impl Module for Bob {
     fn at_sim_start(&mut self, _stage: usize) {
-        send(Message::default().with_content(String::new()), "down");
+        let _ = send(Message::default().with_content(String::new()), "down");
     }
 
     fn handle_message(&mut self, mut msg: Message) {
@@ -35,7 +35,7 @@ impl Module for Bob {
             "dispatching event with {}",
             msg.body.content::<String>().len()
         );
-        send(msg, "down");
+        let _ = send(msg, "down");
     }
 }
 

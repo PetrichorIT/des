@@ -318,6 +318,15 @@ impl Gate {
         let (fwd, bck) = match channel {
             Some(channel) => {
                 let (a, b) = channel.into_duplex();
+                a.channel
+                    .try_write()
+                    .expect("failed to get lock")
+                    .register(self.clone());
+                b.channel
+                    .try_write()
+                    .expect("failed to get lock")
+                    .register(other.clone());
+
                 (Some(a), Some(b))
             }
             None => (None, None),

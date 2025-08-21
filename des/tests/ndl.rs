@@ -49,7 +49,7 @@ mod common {
             match msg.header().kind {
                 1 => {
                     self.rem -= 1;
-                    send(
+                    let _ = send(
                         Message::default().with_kind(2).with_id(self.dst as u16),
                         "out",
                     );
@@ -67,7 +67,7 @@ mod common {
                         if format!("ring[{}]", msg.header().id) == current().name() {
                             self.rcv += 1;
                         } else {
-                            send(msg, "out")
+                            let _ = send(msg, "out");
                         }
                     }
                 }
@@ -96,7 +96,7 @@ mod common {
     impl Module for Router {
         fn handle_message(&mut self, msg: Message) {
             let g = current().gate("out", msg.header().id as usize).unwrap();
-            send(msg, g);
+            let _ = send(msg, g);
         }
     }
 }
@@ -153,11 +153,13 @@ struct Single;
 
 impl RegistryCreatable for Single {
     fn create(_path: &ObjectPath, _: &str) -> Self {
-        assert!(current()
-            .prop::<Option<IpAddr>>("addr")
-            .unwrap()
-            .get()
-            .is_some());
+        assert!(
+            current()
+                .prop::<Option<IpAddr>>("addr")
+                .unwrap()
+                .get()
+                .is_some()
+        );
         Self
     }
 }
@@ -256,7 +258,7 @@ fn registry_custom_resolver() -> Result<(), Box<dyn std::error::Error>> {
 struct Sender;
 impl Module for Sender {
     fn at_sim_start(&mut self, _stage: usize) {
-        send(Message::default(), "port")
+        let _ = send(Message::default(), "port");
     }
 }
 

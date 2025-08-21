@@ -1,12 +1,12 @@
-use std::{sync::Arc, time::Duration};
+use std::{any::Any, time::Duration};
 
 use crate::{
     net::{
+        channel::{SendContext, SendError},
         gate::Connection,
         runtime::{MessageExitingConnection, NetEvents},
     },
-    prelude::{Channel, ChannelRef, Message},
-    runtime::EventSink,
+    prelude::{Channel, GateRef, Message},
     time::SimTime,
 };
 
@@ -20,37 +20,33 @@ pub struct DelayChannel {
 impl DelayChannel {
     /// Creates a new `DelayChannel` with the specified delay.
     #[must_use]
-    #[allow(clippy::new_ret_no_self)]
-    pub fn new(delay: Duration) -> ChannelRef {
-        ChannelRef {
-            channel: Arc::new(DelayChannel { delay }),
-        }
+    pub fn new(delay: Duration) -> Self {
+        DelayChannel { delay }
     }
 }
 
 impl Channel for DelayChannel {
-    // fn dup(self: Arc<Self>) -> Arc<dyn Channel> {
-    //     Arc::new((*self).clone())
-    // }
-
     fn transmission_finish_time(&self) -> Option<SimTime> {
         None
     }
 
     fn send(
-        self: Arc<Self>,
+        &mut self,
+        _: GateRef,
         message: Message,
         via: Connection,
-        sink: &mut dyn EventSink<NetEvents>,
-    ) {
-        sink.add(
+        ctx: SendContext<'_>,
+    ) -> Result<(), SendError> {
+        ctx.sink.add(
             NetEvents::MessageExitingConnection(MessageExitingConnection {
                 con: via,
                 msg: message,
             }),
             SimTime::now() + self.delay,
         );
+
+        Ok(())
     }
 
-    fn unbusy_notify(self: Arc<Self>, _: &mut dyn EventSink<NetEvents>) {}
+    fn unbusy_notify(&mut self, _: Box<dyn Any + Send>, _: SendContext<'_>) {}
 }

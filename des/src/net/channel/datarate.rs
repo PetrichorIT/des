@@ -1,25 +1,24 @@
-use std::{
-    collections::VecDeque,
-    fmt::Debug,
-    sync::{self, Arc},
-    time::Duration,
-};
+use std::{any::Any, collections::VecDeque, fmt::Debug, sync::Arc, time::Duration};
 
 use crate::{
     net::{
+        channel::{SendContext, SendError},
         gate::Connection,
         message::Message,
         runtime::{ChannelUnbusyNotif, MessageExitingConnection, NetEvents},
     },
-    runtime::EventSink,
+    prelude::GateRef,
     time::SimTime,
 };
 
-use super::{Channel, ChannelDropBehaviour, ChannelRef};
+use super::{Channel, ChannelDropBehaviour};
 
 /// A channel that supports both datarate limiting and propagation delay.
+#[derive(Debug)]
 pub struct DatarateChannel {
-    inner: sync::RwLock<Inner>,
+    metrics: DatarateChannelMetrics,
+    buffer: Buffer,
+    transmission_finish_time: Option<SimTime>,
 }
 
 /// Metrics that define a channels capabilitites.
@@ -35,16 +34,9 @@ pub struct DatarateChannelMetrics {
     pub drop_behaviour: ChannelDropBehaviour,
 }
 
-#[derive(Debug)]
-struct Inner {
-    metrics: DatarateChannelMetrics,
-    buffer: Buffer,
-    transmission_finish_time: Option<SimTime>,
-}
-
 #[derive(Debug, Default)]
 struct Buffer {
-    packets: VecDeque<(Message, Connection)>,
+    packets: VecDeque<(GateRef, Message, Connection)>,
     acc_bytes: usize,
 }
 
@@ -53,29 +45,27 @@ impl DatarateChannel {
     #[must_use]
     pub fn new(metrics: DatarateChannelMetrics) -> Self {
         Self {
-            inner: sync::RwLock::new(Inner {
-                metrics,
-                buffer: Buffer::default(),
-                transmission_finish_time: None,
-            }),
+            metrics,
+            buffer: Buffer::default(),
+            transmission_finish_time: None,
         }
     }
 }
 
 impl Buffer {
-    fn enqueue(&mut self, msg: Message, con: Connection) {
+    fn enqueue(&mut self, src: GateRef, msg: Message, con: Connection) {
         self.acc_bytes += msg.length();
-        self.packets.push_back((msg, con));
+        self.packets.push_back((src, msg, con));
     }
 
-    fn dequeue(&mut self) -> Option<(Message, Connection)> {
-        let (msg, gate) = self.packets.pop_front()?;
+    fn dequeue(&mut self) -> Option<(GateRef, Message, Connection)> {
+        let (src, msg, gate) = self.packets.pop_front()?;
         self.acc_bytes -= msg.length();
-        Some((msg, gate))
+        Some((src, msg, gate))
     }
 }
 
-impl Inner {
+impl DatarateChannel {
     fn is_busy(&self) -> bool {
         self.transmission_finish_time.is_some()
     }
@@ -84,80 +74,92 @@ impl Inner {
 impl Clone for DatarateChannel {
     fn clone(&self) -> Self {
         Self {
-            inner: sync::RwLock::new(Inner {
-                metrics: self.inner.read().expect("failed to get lock").metrics,
-                buffer: Buffer::default(),
-                transmission_finish_time: None,
-            }),
+            metrics: self.metrics,
+            buffer: Buffer::default(),
+            transmission_finish_time: None,
         }
     }
 }
 
 impl Channel for DatarateChannel {
     fn transmission_finish_time(&self) -> Option<SimTime> {
-        self.inner
-            .read()
-            .expect("failed to get lock")
-            .transmission_finish_time
+        self.transmission_finish_time
     }
 
-    fn send(self: Arc<Self>, msg: Message, via: Connection, sink: &mut dyn EventSink<NetEvents>) {
-        let mut inner = self.inner.write().expect("failed to get lock");
-        if inner.is_busy() {
-            let Inner {
-                metrics, buffer, ..
-            } = &mut *inner;
+    fn send(
+        &mut self,
+        src: GateRef,
+        msg: Message,
+        via: Connection,
+        ctx: SendContext<'_>,
+    ) -> Result<(), SendError> {
+        assert!(Arc::ptr_eq(
+            &ctx.handle.channel,
+            &via.channel.as_ref().unwrap().channel
+        ));
 
-            metrics.drop_behaviour.handle(buffer, msg, via);
+        if self.is_busy() {
+            self.metrics
+                .drop_behaviour
+                .handle(&mut self.buffer, src, msg, via)
         } else {
-            let propagation_delay = inner.metrics.calculate_duration(&msg);
-            let transmission_delay = inner.metrics.calculate_busy(&msg);
+            let propagation_delay = self.metrics.calculate_duration(&msg);
+            let transmission_delay = self.metrics.calculate_busy(&msg);
 
             if !transmission_delay.is_zero() {
                 let transmission_finish_time = SimTime::now() + transmission_delay;
-                inner.transmission_finish_time = Some(transmission_finish_time);
+                self.transmission_finish_time = Some(transmission_finish_time);
 
-                sink.add(
+                ctx.sink.add(
                     NetEvents::ChannelUnbusyNotif(ChannelUnbusyNotif {
-                        channel: ChannelRef {
-                            channel: self.clone(),
-                        },
+                        channel: ctx.handle.clone(),
+                        info: Box::new(()),
                     }), // trust me bro
                     transmission_finish_time,
                 );
             }
 
             let arrival_time = SimTime::now() + propagation_delay;
-            sink.add(
+            ctx.sink.add(
                 NetEvents::MessageExitingConnection(MessageExitingConnection { con: via, msg }),
                 arrival_time,
             );
+            Ok(())
         }
     }
 
-    fn unbusy_notify(self: Arc<Self>, sink: &mut dyn EventSink<NetEvents>) {
-        let mut inner = self.inner.write().expect("failed to get lock");
-        debug_assert_eq!(Some(SimTime::now()), inner.transmission_finish_time);
+    fn unbusy_notify(&mut self, _: Box<dyn Any + Send>, ctx: SendContext<'_>) {
+        debug_assert_eq!(Some(SimTime::now()), self.transmission_finish_time);
 
-        inner.transmission_finish_time = None;
-        if let Some((next_msg, next_via)) = inner.buffer.dequeue() {
-            drop(inner);
-            self.send(next_msg, next_via, sink);
+        self.transmission_finish_time = None;
+        if let Some((src, next_msg, next_via)) = self.buffer.dequeue() {
+            let _ = self.send(src, next_msg, next_via, ctx);
         }
     }
 }
 
 impl ChannelDropBehaviour {
-    fn handle(&self, buffer: &mut Buffer, msg: Message, via: Connection) {
+    fn handle(
+        &self,
+        buffer: &mut Buffer,
+        src: GateRef,
+        msg: Message,
+        via: Connection,
+    ) -> Result<(), SendError> {
         match self {
-            Self::Drop => {
-                drop(msg);
-            }
+            Self::Drop => Err(SendError {
+                msg,
+                reason: "could not handle".into(),
+            }),
             Self::Queue(limit) => {
                 if buffer.acc_bytes + msg.length() > limit.unwrap_or(usize::MAX) {
-                    drop(msg);
+                    Err(SendError {
+                        msg,
+                        reason: "could not handle".into(),
+                    })
                 } else {
-                    buffer.enqueue(msg, via);
+                    buffer.enqueue(src, msg, via);
+                    Ok(())
                 }
             }
         }
@@ -199,15 +201,6 @@ impl DatarateChannelMetrics {
         } else {
             let len = msg.length() * 8;
             Duration::from_secs_f64(len as f64 / self.bitrate as f64)
-        }
-    }
-}
-
-impl Debug for DatarateChannel {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.inner.read() {
-            Ok(inner) => inner.fmt(f),
-            Err(_) => write!(f, "?"),
         }
     }
 }

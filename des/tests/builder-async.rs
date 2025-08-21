@@ -101,7 +101,7 @@ fn builder_async_fn_channeled() {
         AsyncHandler::new(|_| async move {
             for i in 0..16 {
                 sleep(Duration::from_secs(i)).await;
-                send(Message::default().with_id(i as u16), "port");
+                let _ = send(Message::default().with_id(i as u16), "port");
             }
         }),
     );

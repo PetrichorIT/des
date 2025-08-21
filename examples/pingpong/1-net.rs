@@ -114,7 +114,7 @@ impl Module for Pinger {
     fn handle_message(&mut self, msg: Message) {
         match msg.header().kind {
             INTERVAL => {
-                send(Message::default().with_kind(PING), "port");
+                let _ = send(Message::default().with_kind(PING), "port");
             }
             PONG => {
                 self.pongs_received += 1;
@@ -140,7 +140,7 @@ impl Module for Ponger {
         match msg.header().kind {
             PING => {
                 self.pings_received += 1;
-                send(Message::default().with_kind(PONG), "port");
+                let _ = send(Message::default().with_kind(PONG), "port");
             }
             _ => panic!("unexpeced"),
         }

@@ -6,7 +6,7 @@ pub struct Alice();
 impl Module for Alice {
     fn at_sim_start(&mut self, _: usize) {
         let msg = Message::default().with_kind(1).with_content(42usize);
-        send(msg, ("netOut", 0));
+        let _ = send(msg, ("netOut", 0));
 
         tracing::info!("SimStared");
     }
@@ -27,7 +27,7 @@ impl Module for Bob {
         println!("Received msg: {} - {:?}", msg, head);
 
         let msg = Message::default().with_kind(2).with_content(msg);
-        send(msg, ("netOut", 0))
+        let _ = send(msg, ("netOut", 0));
     }
 }
 

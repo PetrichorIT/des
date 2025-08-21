@@ -1,7 +1,12 @@
 use crate::{
     net::{
-        Error, Sim, channel::ChannelRef, gate::Connection, message::Message, module::ModuleRef,
-        processing::ProcessingState, runtime::buf_process,
+        Error, Sim,
+        channel::{ChannelRef, SendContext, SendError},
+        gate::Connection,
+        message::Message,
+        module::ModuleRef,
+        processing::ProcessingState,
+        runtime::buf_process,
     },
     prelude::RuntimeError,
     runtime::{Event, EventLifecycle, EventSink, Runtime},
@@ -11,7 +16,7 @@ use crate::{
 use std::{fmt::Debug, sync::atomic::Ordering::SeqCst};
 
 #[cfg(feature = "async")]
-use std::iter::once;
+use std::{any::Any, iter::once};
 #[cfg(feature = "async")]
 use tokio::task::yield_now;
 
@@ -66,7 +71,10 @@ impl MessageExitingConnection {
     // This function executes an event with a sink not a runtime as an parameter.
     // That allows for the executing of events not handles by the runtime itself
     // aka. the calling with an abitrary event sink.
-    pub(crate) fn handle_with_sink(self, sink: &mut impl EventSink<NetEvents>) {
+    pub(crate) fn handle_with_sink(
+        self,
+        sink: &mut impl EventSink<NetEvents>,
+    ) -> Result<(), SendError> {
         let mut msg = self.msg;
         msg.header.last_gate = Some(self.con.endpoint.clone());
 
@@ -75,6 +83,8 @@ impl MessageExitingConnection {
         let mut cur = self.con;
         while let Some(next) = cur.next_hop() {
             enter_scope(cur.endpoint.owner().scope_token());
+
+            let cur_endpoint = cur.endpoint.clone();
 
             // Since a next gate exists log the current gate as
             // transit complete. (do this before drop check to allow for better debugging at drop)
@@ -90,8 +100,10 @@ impl MessageExitingConnection {
                     cur.endpoint.owner().path()
                 );
 
-                drop(msg);
-                return;
+                return Err(SendError {
+                    msg,
+                    reason: "Endpoint module is inactive".into(),
+                });
             }
 
             // Log the current transition to the internal log stream.
@@ -104,8 +116,16 @@ impl MessageExitingConnection {
             );
 
             if let Some(ch) = next.channel() {
-                ch.channel.send(msg, next, sink);
-                return;
+                let ctx = SendContext {
+                    sink,
+                    handle: ch.clone(),
+                };
+                return ch.channel.try_write().expect("failed lock").send(
+                    cur_endpoint,
+                    msg,
+                    next,
+                    ctx,
+                );
             }
 
             // No channel means next hop is on the same time slot,
@@ -133,6 +153,8 @@ impl MessageExitingConnection {
             }),
             SimTime::now(),
         );
+
+        Ok(())
     }
 }
 
@@ -141,7 +163,10 @@ impl MessageExitingConnection {
     where
         A: EventLifecycle<Sim<A>>,
     {
-        self.handle_with_sink(rt);
+        let result = self.handle_with_sink(rt);
+        if let Err(err) = result {
+            tracing::error!("message {} failed to be send: {}", err.msg, err.reason);
+        }
     }
 }
 
@@ -237,6 +262,8 @@ impl AsyncWakeupEvent {
 pub struct ChannelUnbusyNotif {
     /// The affected channel
     pub channel: ChannelRef,
+    /// Additional information about the wakeup event
+    pub info: Box<dyn Any + Send>,
 }
 
 impl ChannelUnbusyNotif {
@@ -244,7 +271,12 @@ impl ChannelUnbusyNotif {
     where
         A: EventLifecycle<Sim<A>>,
     {
-        self.channel.channel.unbusy_notify(rt);
+        let handle = self.channel.clone();
+        self.channel
+            .channel
+            .try_write()
+            .expect("failed to get lock")
+            .unbusy_notify(self.info, SendContext { sink: rt, handle });
     }
 }
 

@@ -1,6 +1,7 @@
 #![allow(missing_docs)]
 
 use super::{Globals, HandleMessageEvent, MessageExitingConnection, Sim};
+use crate::net::channel::SendError;
 use crate::net::gate::Connection;
 use crate::net::module::{MOD_CTX, current, with_mod_ctx};
 use crate::net::runtime::{ModuleRestartEvent, NetEvents};
@@ -60,7 +61,11 @@ pub(crate) fn buf_drop() {
     *ctx = BufferContext::new();
 }
 
-pub(crate) fn buf_send_at(mut msg: Message, gate: GateRef, send_time: SimTime) {
+pub(crate) fn buf_send_at(
+    mut msg: Message,
+    gate: GateRef,
+    send_time: SimTime,
+) -> Result<(), SendError> {
     let mut ctx = BUF_CTX.lock();
     msg.header.sender_module_id = current().id();
 
@@ -75,7 +80,7 @@ pub(crate) fn buf_send_at(mut msg: Message, gate: GateRef, send_time: SimTime) {
             }),
             send_time,
         ));
-        return;
+        return Ok(());
     }
 
     // (0) Else handle the event inlined, for instant effects on the associated
@@ -84,9 +89,10 @@ pub(crate) fn buf_send_at(mut msg: Message, gate: GateRef, send_time: SimTime) {
         con: Connection::new(gate),
         msg,
     };
-    event.handle_with_sink(&mut ctx.events);
+    let result = event.handle_with_sink(&mut ctx.events);
 
     crate::tracing::enter_scope(with_mod_ctx(|ctx| ctx.scope_token));
+    result
 }
 
 pub(crate) fn buf_schedule_at(msg: Message, arrival_time: SimTime) {

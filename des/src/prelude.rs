@@ -42,6 +42,7 @@ cfg_net! {
     pub use crate::net::channel::DatarateChannelMetrics;
     pub use crate::net::channel::ChannelRef;
     pub use crate::net::channel::ChannelDropBehaviour;
+    pub use crate::net::channel::SendError;
 
     pub use crate::net::gate::Gate;
     pub use crate::net::gate::GateRef;

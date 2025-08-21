@@ -20,11 +20,11 @@ impl Host {
 impl Module for Host {
     fn at_sim_start(&mut self, _stage: usize) {
         for _ in 0..self.n {
-            send(self.msg(), "port");
+            let _ = send(self.msg(), "port");
         }
     }
     fn handle_message(&mut self, _msg: Message) {
-        send(self.msg(), "port");
+        let _ = send(self.msg(), "port");
     }
 }
 
@@ -33,7 +33,7 @@ struct Switch;
 impl Module for Switch {
     fn handle_message(&mut self, msg: Message) {
         let idx = msg.header().kind as usize;
-        send(msg, ("port", idx));
+        let _ = send(msg, ("port", idx));
     }
 }
 

@@ -19,7 +19,7 @@ impl Module for Alice {
             // TERMINATE
         } else {
             pkt.header_mut().id += 1;
-            send(pkt, ("netOut", 0))
+            let _ = send(pkt, ("netOut", 0));
         }
     }
 }
@@ -42,7 +42,7 @@ impl Module for Bob {
             info!(target: "Bob", "Initalizing");
             drop(msg);
             info!(target: "Bob", "Dropped init msg");
-            send(
+            let _ = send(
                 Message::default()
                     .with_kind(1)
                     // .src(0x7f_00_00_01, 80)
@@ -63,7 +63,7 @@ impl Module for Bob {
 
             pkt.body.content_mut::<String>().push('#');
 
-            send(pkt, ("netOut", 2));
+            let _ = send(pkt, ("netOut", 2));
         }
     }
 }
