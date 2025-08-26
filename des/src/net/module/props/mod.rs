@@ -14,8 +14,10 @@ mod yaml;
 
 use serde::{Serialize, de::DeserializeOwned};
 use serde_yml::Value;
-pub use store::*;
-pub use yaml::*;
+
+use store::Entry;
+pub(crate) use store::Props;
+pub(crate) use yaml::Cfg;
 
 /// A composite trait that needs to be implemented by all property types.
 ///
@@ -129,6 +131,12 @@ impl RawProp {
         } else {
             Err(Error::new(ErrorKind::InvalidInput, "type missmatch"))
         }
+    }
+}
+
+impl Debug for RawProp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RawProp").finish()
     }
 }
 

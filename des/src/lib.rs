@@ -132,7 +132,7 @@ pub mod time;
 cfg_net! {
     pub mod net;
     pub mod tracing;
-    pub(crate) use des_net_utils::sync;
+    pub(crate) use des_sync_utils as sync;
 }
 
 cfg_macros! {

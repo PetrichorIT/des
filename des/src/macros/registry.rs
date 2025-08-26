@@ -23,7 +23,7 @@
 /// struct Server;
 /// # impl Module for Server {}
 /// /* ... */
-/// # use des_net_utils::ndl::error::Result;
+/// # use des::net::ndl::lang::error::Result;
 /// fn main() -> Result<()> {
 ///     let registry = registry![DnsServer, Client, Server, else _];
 ///     # return Ok(());

@@ -9,7 +9,7 @@ use super::{Prop, PropType, RawProp};
 
 /// The properties associated with a component.
 #[derive(Default)]
-pub struct Props {
+pub(crate) struct Props {
     mapping: FxHashMap<String, Arc<Mutex<Entry>>>,
 }
 
@@ -52,7 +52,7 @@ impl Entry {
 impl Props {
     /// Sets a YAML value for a property. This will be used as the preinitialized
     /// value and will be decoded once the property is accessed.
-    pub fn set(&mut self, key: String, val: Value) {
+    pub(crate) fn set(&mut self, key: String, val: Value) {
         self.mapping
             .entry(key)
             .or_insert(Arc::new(Mutex::new(Entry::Yaml(val))));
@@ -60,11 +60,11 @@ impl Props {
 
     /// The keys of all properties.
     #[must_use]
-    pub fn keys(&self) -> Vec<String> {
+    pub(crate) fn keys(&self) -> Vec<String> {
         self.mapping.keys().cloned().collect()
     }
 
-    pub fn get_raw(&mut self, key: &str) -> RawProp {
+    pub(crate) fn get_raw(&mut self, key: &str) -> RawProp {
         let entry = self
             .mapping
             .entry(key.to_string())
@@ -77,7 +77,7 @@ impl Props {
 
     /// # Errors
     /// Returns an error if the typing of the property fails.
-    pub fn get<T: PropType>(&mut self, key: &str) -> Result<Prop<T, false>, Error> {
+    pub(crate) fn get<T: PropType>(&mut self, key: &str) -> Result<Prop<T, false>, Error> {
         self.get_raw(key).typed::<T>()
     }
 }

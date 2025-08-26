@@ -103,8 +103,10 @@ impl Channel for DatarateChannel {
                 .drop_behaviour
                 .handle(&mut self.buffer, src, msg, via)
         } else {
-            let propagation_delay = self.metrics.calculate_duration(&msg);
+            let propagation_delay = self.metrics.latency;
             let transmission_delay = self.metrics.calculate_busy(&msg);
+
+            let arrival_time = SimTime::now() + propagation_delay + transmission_delay;
 
             if !transmission_delay.is_zero() {
                 let transmission_finish_time = SimTime::now() + transmission_delay;
@@ -119,7 +121,6 @@ impl Channel for DatarateChannel {
                 );
             }
 
-            let arrival_time = SimTime::now() + propagation_delay;
             ctx.sink.add(
                 NetEvents::MessageExitingConnection(MessageExitingConnection { con: via, msg }),
                 arrival_time,
@@ -181,14 +182,6 @@ impl DatarateChannelMetrics {
             jitter,
             drop_behaviour,
         }
-    }
-
-    /// Calcualtes the duration a message travels on a link.
-    #[must_use]
-    #[allow(clippy::if_same_then_else, clippy::missing_panics_doc)]
-    pub fn calculate_duration(&self, msg: &Message) -> Duration {
-        let transmission_time = self.calculate_busy(msg);
-        self.latency + transmission_time
     }
 
     /// Calculate the duration the channel is busy transmitting the

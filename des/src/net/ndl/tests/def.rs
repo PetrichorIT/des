@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
-use des_net_utils::ndl::def::{
+use crate::net::ndl::lang::def::{
     ConnectionDef, ConnectionEndpointDef, FieldDef, Kardinality, LinkDef, ModuleGenericsDef,
     TypClause,
 };
 use fxhash::FxHashMap;
-use serde_test::{assert_de_tokens, assert_de_tokens_error, assert_tokens, Token};
+use serde_test::{Token, assert_de_tokens, assert_de_tokens_error, assert_tokens};
 
 #[test]
 fn test_module_typ_def() {

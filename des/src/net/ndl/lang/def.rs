@@ -1,7 +1,11 @@
+//! The language syntax that defines NDL representation.
+//!
+//! Can be represented in a varierty of formats, but YAML is the assumed default.
+
 use std::{fmt::Display, marker::PhantomData, str::FromStr};
 
 use fxhash::{FxHashMap, FxHashSet};
-use serde::{de::Visitor, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::Visitor};
 
 /// A full network description definition.
 ///
@@ -48,7 +52,7 @@ pub struct LinkDef {
     pub other: FxHashMap<String, String>,
 }
 
-/// The typ definition of a module. This name contains a identifier and a list of
+/// The type definition of a module. This name contains a identifier and a list of
 /// potential generic arguments, to be used in the module.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct TypClause<Arg> {
@@ -58,9 +62,12 @@ pub struct TypClause<Arg> {
     pub args: Vec<Arg>,
 }
 
+/// The generics to a module definition.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ModuleGenericsDef {
+    /// The internal binding name of the generic type provided.
     pub binding: String,
+    /// The required type bound, that the type must be a child of.
     pub bound: String,
 }
 
@@ -99,9 +106,12 @@ pub struct ModuleDef {
 /// A gate or gate-cluster on a module.
 pub type GateDef = FieldDef;
 
+/// A definition of a submodule, either with a concrete type or a dynamic type.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SubmoduleTypDef {
+    /// A concrete submodule type, that must be known at module definition time.
     Concrete(String),
+    /// A dynamic submodule type, that must be known at module usage time.
     Dyn(String),
 }
 
@@ -120,6 +130,7 @@ pub struct ConnectionDef {
 /// A connection endpoint.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ConnectionEndpointDef {
+    /// A access path to a set of gates.
     pub accessors: Vec<FieldDef>,
 }
 
@@ -147,7 +158,7 @@ pub enum Kardinality {
 
 impl TypClause<ModuleGenericsDef> {
     #[must_use]
-    pub fn inner_ty_to_outer_ty<'a>(&'a self, s: &'a String) -> &'a String {
+    pub(super) fn inner_ty_to_outer_ty<'a>(&'a self, s: &'a String) -> &'a String {
         for arg in &self.args {
             if arg.binding == *s {
                 return &arg.bound;
@@ -246,7 +257,7 @@ impl FromStr for ModuleGenericsDef {
 
 impl ModuleDef {
     #[must_use]
-    pub fn required_symbols<'a>(
+    pub(super) fn required_symbols<'a>(
         &'a self,
         typ: &'a TypClause<ModuleGenericsDef>,
     ) -> FxHashSet<&'a String> {
@@ -365,17 +376,10 @@ impl FromStr for FieldDef {
 
 impl Kardinality {
     #[must_use]
-    pub fn as_size(&self) -> usize {
+    pub(crate) fn as_size(&self) -> usize {
         match self {
             Kardinality::Atom => 1,
             Kardinality::Cluster(n) => *n,
-        }
-    }
-
-    pub fn index_iter(&self) -> Box<dyn Iterator<Item = Option<usize>>> {
-        match self {
-            Kardinality::Atom => Box::new(std::iter::once(None)),
-            Kardinality::Cluster(n) => Box::new((0..*n).map(Some)),
         }
     }
 }

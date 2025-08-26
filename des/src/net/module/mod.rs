@@ -76,6 +76,7 @@ use std::{
 mod api;
 mod ctx;
 mod dummy;
+mod props;
 mod refs;
 
 #[cfg(test)]
@@ -85,10 +86,10 @@ pub(crate) use self::ctx::*;
 pub use self::ctx::{ModuleContext, Stereotyp};
 pub use api::*;
 pub(crate) use dummy::*;
+pub use props::*;
 pub use refs::*;
 
 use super::processing::{ProcessingStack, Processor};
-pub use des_net_utils::props::{Prop, PropType, RawProp};
 
 /// A unique identifier for a module.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

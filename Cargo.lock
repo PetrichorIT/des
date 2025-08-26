@@ -234,13 +234,15 @@ version = "0.6.2"
 dependencies = [
  "des-cqueue",
  "des-macros",
- "des-net-utils",
+ "des-sync-utils",
  "futures",
  "fxhash",
  "nu-ansi-term",
  "pin-project-lite",
  "rand",
  "serde",
+ "serde_json",
+ "serde_test",
  "serde_yml",
  "serial_test",
  "spin",
@@ -279,14 +281,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "des-net-utils"
+name = "des-sync-utils"
 version = "0.1.0"
 dependencies = [
  "fxhash",
- "serde",
- "serde_json",
- "serde_test",
- "serde_yml",
 ]
 
 [[package]]

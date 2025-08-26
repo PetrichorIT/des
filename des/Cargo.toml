@@ -24,7 +24,7 @@ serde = ["dep:serde"]
 macros = ["dep:des-macros", "dep:futures"]
 async = ["net", "dep:tokio"]
 cqueue = ["dep:des-cqueue"]
-net = ["dep:des-macros", "dep:des-net-utils", "serde", "dep:serde_yml"]
+net = ["dep:des-macros", "dep:des-sync-utils", "serde", "dep:serde_yml"]
 tracing = ["net"]
 
 miri = []
@@ -58,11 +58,13 @@ futures = { version = "*", optional = true }
 
 des-cqueue = { path = "../des-cqueue", optional = true }
 des-macros = { path = "../des-macros", optional = true }
-des-net-utils = { path = "../des-net-utils", optional = true }
+des-sync-utils = { path = "../des-sync-utils", optional = true }
 
 [dev-dependencies]
 futures = "0.3"
 serial_test = "3.1.1"
+serde_json = "1.0"
+serde_test = "1.0"
 
 [package.metadata.docs.rs]
 all-features = true

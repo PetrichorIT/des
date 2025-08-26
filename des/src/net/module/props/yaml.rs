@@ -1,4 +1,3 @@
-use fxhash::FxHashMap;
 use serde_yml::{Mapping, Value};
 
 use super::Props;
@@ -6,29 +5,22 @@ use super::Props;
 /// A collection of configuration parameters, which
 /// can be used to assign properties to a component.
 #[derive(Debug, Default)]
-pub struct Cfg {
+pub(crate) struct Cfg {
     value: Value,
 }
 
 impl Cfg {
     /// Creates a new configuration paramters
     #[must_use]
-    pub fn new(value: Value) -> Self {
+    pub(crate) fn new(value: Value) -> Self {
         Self {
             value: compartmentalize(value),
         }
     }
 
     /// Generates the preset properties for a component based on the configuration.
-    pub fn capture_for(&self, path: &[&str], props: &mut Props) {
+    pub(crate) fn capture_for(&self, path: &[&str], props: &mut Props) {
         props.update_from(&self.value, path);
-    }
-
-    #[must_use]
-    pub fn capture_for_into(&self, path: &[&str]) -> Props {
-        let mut new_props = Props::default();
-        self.capture_for(path, &mut new_props);
-        new_props
     }
 }
 
@@ -84,7 +76,7 @@ fn compartmentalize_map(map: &mut Mapping) {
 }
 
 impl Props {
-    pub fn update_from(&mut self, base: &Value, path: &[&str]) {
+    pub(crate) fn update_from(&mut self, base: &Value, path: &[&str]) {
         if path.is_empty() {
             if let Value::Mapping(map) = base {
                 for (k, v) in map {
@@ -131,30 +123,20 @@ impl Props {
     }
 }
 
-#[must_use]
-pub fn unify(props: &[(&str, &Value)]) -> Mapping {
-    let mut groups = FxHashMap::<&str, Vec<(&str, &Value)>>::default();
-    for prop in props {
-        let (group, rem) = prop.0.split_once('.').unwrap_or((prop.0, ""));
-        groups.entry(group).or_default().push((rem, prop.1));
-    }
-
-    let mut mapping = Mapping::default();
-    for (group, members) in groups {
-        mapping.insert(
-            Value::String(group.to_string()),
-            Value::Mapping(unify(&members)),
-        );
-    }
-
-    mapping
-}
-
 #[cfg(test)]
 mod tests {
     use serde_yml::from_str;
 
     use super::*;
+
+    impl Cfg {
+        #[must_use]
+        pub(crate) fn capture_for_into(&self, path: &[&str]) -> Props {
+            let mut new_props = Props::default();
+            self.capture_for(path, &mut new_props);
+            new_props
+        }
+    }
 
     #[test]
     fn compartmentalized() -> serde_yml::Result<()> {

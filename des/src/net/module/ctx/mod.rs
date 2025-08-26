@@ -1,4 +1,4 @@
-use super::{DummyModule, ModuleId, ModuleRef, ModuleRefWeak};
+use super::{DummyModule, ModuleId, ModuleRef, ModuleRefWeak, Prop, PropType, Props, RawProp};
 use crate::{
     net::{Error, ErrorKind},
     prelude::{GateRef, ObjectPath},
@@ -6,7 +6,6 @@ use crate::{
     time::SimTime,
     tracing::{ScopeToken, new_scope},
 };
-use des_net_utils::props::{Prop, PropType, Props, RawProp};
 use fxhash::{FxBuildHasher, FxHashMap};
 
 use spawner::Spawner;

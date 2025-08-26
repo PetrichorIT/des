@@ -1,3 +1,5 @@
+//! The language internals of NDL repesentation
+
 use fxhash::{FxHashMap, FxHashSet};
 use std::iter::once;
 
@@ -69,7 +71,7 @@ pub fn transform(def: &Def) -> Result<Network> {
         let next = next + idx;
 
         modules.swap(idx, next);
-        provider_set.insert(modules[idx].0 .0.ident.clone());
+        provider_set.insert(modules[idx].0.0.ident.clone());
         idx += 1;
     }
 

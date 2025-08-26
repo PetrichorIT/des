@@ -4,7 +4,7 @@ use des::{
     net::{
         Sim,
         channel::{SendContext, SendError},
-        gate::Connection,
+        gate::{Connection, IntoModuleGate},
         handlers::HandlerFn,
         internals::{ChannelUnbusyNotif, MessageExitingConnection, NetEvents},
     },
@@ -13,6 +13,8 @@ use des::{
     time::{SimTime, interval, sleep_until},
 };
 
+// Create a sender module that sends messages in 200ms intervals,
+// blocking when the channel cannot currently serve the module.
 struct Sender;
 
 impl Module for Sender {
@@ -22,24 +24,28 @@ impl Module for Sender {
             interval.set_missed_tick_behavior(des::time::MissedTickBehavior::Delay);
             for i in 0..10 {
                 interval.tick().await;
-                send_radio(
-                    Message::default().with_id(i),
-                    current().gate("port", 0).unwrap(),
-                )
-                .await;
+                send_radio(Message::default().with_id(i), "port").await;
             }
         });
     }
 }
 
+/// A time-divided radio channel that requires registration of all transmitters.
 struct TimeDividedRadioChannel {
+    // Internally the radio domain still acts as a "DatarateChannel",
+    // thus a propagation delay and bitrate is required.
     prop_delay: Duration,
     datarate: usize,
-
+    // If the transmitter is currently active, store the time it will be idle again.
     transmission_finish_time: SimTime,
+
+    // To manage time division multiplexing, keep track of all registered transmitters,
+    // the current time slot (and it deadline) and the configurated length of each time slot.
     period: Duration,
     slots: Vec<GateRef>,
-    state: (SimTime, usize),
+
+    current_active_slot: usize,
+    current_slot_end_time: SimTime,
 }
 
 #[derive(Debug)]
@@ -57,78 +63,83 @@ impl TimeDividedRadioChannel {
 
             transmission_finish_time: SimTime::ZERO,
             slots: Vec::default(),
-            state: (SimTime::ZERO, 0),
+
+            current_active_slot: 0,
+            current_slot_end_time: SimTime::ZERO,
         }
     }
 
-    fn send_window_for(&self, gate: GateRef) -> SimTime {
-        assert!(!self.state.0.is_zero(), "Channel not yet initalized");
+    /// Checks whether a given sender can send a given message over the medium.
+    /// Will either succeed with Ok(transmit_time) or Err(wait_until)
+    ///
+    /// There are three possible reasons a send request might be rejected:
+    /// - The senders window is not currently active (-> wait until the senders window)
+    /// - The senders window is active, but the transmittor is currently busy sending the previous message (-> wait until the transmittor is free)
+    /// - The remaining space in the active window is not sufficient to transmit the message (-> wait until the next window)
+    fn should_wait_until(
+        &self,
+        gate: GateRef,
+        msg: &Message,
+        now: SimTime,
+    ) -> Result<Duration, SimTime> {
+        assert_ne!(now, self.current_slot_end_time, "we are in a healthy slot");
+
+        if gate != self.slots[self.current_active_slot] {
+            return Err(self.next_window_for(gate));
+        }
+
+        let msg_bitlen = msg.length() * 8;
+        let msg_transmit_time = Duration::from_secs_f64(msg_bitlen as f64 / self.datarate as f64);
+        assert!(
+            msg_transmit_time <= self.period,
+            "This message is simply impossible to transmit"
+        );
+
+        if self.transmission_finish_time > now {
+            return Err(self.transmission_finish_time);
+        }
+
+        let remaining_time_in_slot = self.current_slot_end_time - now;
+        if remaining_time_in_slot < msg_transmit_time {
+            return Err(self.next_window_for(gate));
+        }
+
+        Ok(msg_transmit_time)
+    }
+
+    fn next_window_for(&self, gate: GateRef) -> SimTime {
         let pos = self
             .slots
             .iter()
             .position(|slot| slot == &gate)
             .expect("gate not registered");
 
-        if pos == self.state.1 {
-            self.transmission_finish_time
+        // Calculates the expected next window. If another node is registred in the mean time,
+        // this window may be to early, but never to late: thus another call will solve the issue.
+        let delta = if pos > self.current_active_slot {
+            pos - self.current_active_slot
         } else {
-            self.slot_for(gate)
-        }
-    }
-
-    fn slot_for(&self, gate: GateRef) -> SimTime {
-        assert!(!self.state.0.is_zero(), "Channel not yet initalized");
-        let pos = self
-            .slots
-            .iter()
-            .position(|slot| slot == &gate)
-            .expect("gate not registered");
-
-        let cur = self.state.1;
-
-        let delta = if pos > cur {
-            pos - cur
-        } else {
-            (pos + self.slots.len()) - cur
+            (pos + self.slots.len()) - self.current_active_slot
         };
 
-        let deadline = self.state.0 + self.period * (delta - 1) as u32;
-        assert!(
-            deadline > SimTime::now(),
-            "{deadline} is not valid (now = {})",
-            SimTime::now()
-        );
+        let deadline = self.current_slot_end_time + self.period * (delta - 1) as u32;
         deadline
     }
 
-    fn next_slot<'ctx>(&mut self, ctx: &mut SendContext<'ctx>) {
+    /// Advances the channel to the next slot, by incrementing the current slot index
+    /// and rescheduling the notification.
+    fn advance_window<'ctx>(&mut self, ctx: &mut SendContext<'ctx>, now: SimTime) {
         let n = self.slots.len();
-        let i = (self.state.1 + 1) % n;
-        let deadline = SimTime::now() + self.period;
-        self.state = (deadline, i);
+        self.current_active_slot = (self.current_active_slot + 1) % n;
+        self.current_slot_end_time = now + self.period;
 
         ctx.sink.add(
             NetEvents::ChannelUnbusyNotif(ChannelUnbusyNotif {
                 channel: ctx.handle.clone(),
-                info: Box::new(NotifType::NextSlot(deadline)),
+                info: Box::new(NotifType::NextSlot(self.current_slot_end_time)),
             }),
-            deadline,
+            self.current_slot_end_time,
         );
-    }
-
-    fn is_current_slot(&mut self, gate: GateRef, ctx: &mut SendContext<'_>) -> bool {
-        let is_match = self.slots[self.state.1] == gate;
-        if is_match {
-            return true;
-        }
-
-        let new_slot_beginning_but_not_yet_notified = self.state.0 == SimTime::now();
-        if new_slot_beginning_but_not_yet_notified {
-            self.next_slot(ctx);
-            return true;
-        }
-
-        false
     }
 }
 
@@ -151,14 +162,21 @@ impl Channel for TimeDividedRadioChannel {
     ) -> Result<(), SendError> {
         assert!(self.slots.contains(&src), "invalid call");
 
-        if self.state.0.is_zero() {
-            self.next_slot(&mut ctx);
+        let now = SimTime::now();
+
+        // Initalize the self-notifications if not yet done or
+        // advance the slot if it just ended, but notif was not yet processed
+        if self.current_slot_end_time.is_zero() || self.current_slot_end_time == now {
+            self.advance_window(&mut ctx, now);
         }
 
-        if self.is_current_slot(src, &mut ctx) {
-            if self.transmission_finish_time <= SimTime::now() {
-                let transmit_time = (message.length() * 8) as f64 / self.datarate as f64;
-                self.transmission_finish_time = SimTime::now() + transmit_time;
+        match self.should_wait_until(src, &message, now) {
+            Err(wait) => Err(SendError {
+                msg: message,
+                reason: format!("wait for {}", wait),
+            }),
+            Ok(msg_transmit) => {
+                self.transmission_finish_time = now + msg_transmit;
 
                 ctx.sink.add(
                     NetEvents::ChannelUnbusyNotif(ChannelUnbusyNotif {
@@ -173,48 +191,47 @@ impl Channel for TimeDividedRadioChannel {
                         con: via,
                         msg: message,
                     }),
-                    SimTime::now() + self.prop_delay,
+                    now + self.prop_delay, // TODO: + msg_transmit
                 );
 
                 Ok(())
-            } else {
-                Err(SendError {
-                    msg: message,
-                    reason: "channel busy".into(),
-                })
             }
-        } else {
-            return Err(SendError {
-                msg: message,
-                reason: "not your sending slot".into(),
-            });
         }
     }
 
     fn unbusy_notify<'ctx>(&mut self, info: Box<dyn Any + Send>, mut ctx: SendContext<'ctx>) {
         let info = info.downcast_ref::<NotifType>().unwrap();
         match info {
-            NotifType::NextSlot(time) if *time == self.state.0 => self.next_slot(&mut ctx),
+            NotifType::NextSlot(time) if *time == self.current_slot_end_time => {
+                self.advance_window(&mut ctx, SimTime::now())
+            }
             NotifType::NextSlot(_) => (), // slot moveover was allready handled by other activation
-            NotifType::TransmittorReady => {}
+            NotifType::TransmittorReady => {} // do somthing once the sender is active again
         }
     }
 }
 
-async fn send_radio(message: impl Into<Message>, gate: GateRef) {
+/// Since send operations can fail, due to TDM a custom send function is needed to preserve
+/// the `send`-like API.
+///
+/// This function trys to send the message and if it fails, accesses the channel to get the next
+/// send window according to the channels internals, sleeping until then.
+async fn send_radio(message: impl Into<Message>, gate: impl IntoModuleGate) {
     let mut msg = message.into();
+    let gate = gate.as_gate(&current()).expect("failed to get gate");
     loop {
-        match send(msg, gate.clone()) {
+        match send(msg, &gate) {
             Ok(()) => break,
             Err(e) => {
                 msg = e.msg;
                 let chan = gate
                     .channel()
-                    .unwrap()
+                    .expect("we know there is a channel")
                     .downcast_ref::<TimeDividedRadioChannel, _>(|chan| {
-                        chan.send_window_for(gate.clone())
+                        chan.should_wait_until(gate.clone(), &msg, SimTime::now())
+                            .expect_err("we expect to wait")
                     })
-                    .unwrap(); // TODO remove
+                    .expect("and we know its of type TimteDivivdedRadioChannel");
 
                 sleep_until(chan).await;
             }
@@ -226,16 +243,17 @@ fn main() {
     des::tracing::init();
 
     let mut sim = Sim::new(());
-
     sim.node(
         "tower",
         HandlerFn::new(|msg| tracing::info!("#{} from {}", msg.id, msg.header.sender_module_id)),
     );
 
+    // Create a channel, that will be shared by casting it to a ChannelRef
     let chan =
         TimeDividedRadioChannel::new(Duration::from_millis(0), 6_400, Duration::from_millis(500));
     let shared = ChannelRef::from(chan);
 
+    // Reuse the channel for all gate-connections
     for i in 0..3 {
         sim.node(format!("client-{i}"), Sender);
         let g = sim.gate(&format!("client-{i}"), "port");

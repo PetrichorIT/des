@@ -1,9 +1,8 @@
-use des_net_utils::props::Cfg;
 use serde_yml::{Value, from_str};
 
 use crate::{
     net::{
-        module::{DummyModule, MOD_CTX, ModuleContext, to_processing_chain, try_current},
+        module::{Cfg, DummyModule, MOD_CTX, ModuleContext, to_processing_chain, try_current},
         processing::ProcessingStack,
         topology::Topology,
     },

@@ -94,6 +94,12 @@ impl Body {
         }
     }
 
+    /// The type name of the contained value.
+    #[must_use]
+    pub fn type_name(&self) -> &str {
+        unsafe { (self.vtable.type_name)() }
+    }
+
     /// Indicates whether the message body is empty.
     ///
     /// Only messages created through `Body::empty` are considered empty.

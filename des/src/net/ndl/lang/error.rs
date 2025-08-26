@@ -1,62 +1,90 @@
+//! Errors that can occur during NDL parsing.
+
 use super::def::{FieldDef, ModuleGenericsDef, TypClause};
 use std::fmt::Display;
 
+/// A result with an NDL error.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// An error that can occur during NDL parsing.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Error {
+    /// The kind of error that has occurred.
     pub kind: ErrorKind,
+    /// Context information about the error.
     pub span: Box<Span>,
 }
 
+/// A categorization of all possible errors that can occur during NDL parsing.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ErrorKind {
+    /// Unknown / Uncategorizable
     Other,
-    /// (Path, Symbol)
+    /// Upon building a simulation, a symbol could not be connected to a implementation, since the registry
+    /// has not provided a valid implementation for the symbol.
     MissingRegistrySymbol(String, String),
+    /// A symbol was already defined in the current scope.
     SymbolAlreadyDefined(String),
+    /// An IO error occurred.
     Io(String),
+    /// An unknown link was encountered.
     UnknownLink(String),
+    /// An unknown module was encountered
     UnknownModule(String),
+    /// A set of types cannot be resolved, since they are defined cyclically.
     UnresolvableDependency(Vec<String>),
+    /// A gate is invalid for the requested usage.
     InvalidGate(String, String),
+    /// A submodule is invalid for the requested usage.
     InvalidSubmodule(String, String),
+    /// A referenced gate does not exist.
     UnknownGateInConnection(FieldDef),
+    /// A referenced submodule does not exist.
     UnknownSubmoduleInConnection(FieldDef),
+    /// The indexing of a connection element is out of bounds.
     ConnectionIndexOutOfBounds(FieldDef),
+    /// The peers of a requested connection are sets of different sizes.
     UnequalPeers(usize, usize),
+    /// A type statement is invalid
     InvalidTypStatement(TypClause<String>, Vec<ModuleGenericsDef>),
+    /// A generic bound was not satisfied.
     AssignedTypDoesNotConformToInterface(TypClause<String>),
 }
+
+/// Context information about the error.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Span {
+    /// The module where the error occurred.
     pub module: Option<String>,
+    /// The submodule where the error occurred.
     pub submodule: Option<String>,
+    /// The gate where the error occurred.
     pub gate: Option<String>,
+    /// The connection where the error occurred.
     pub connection: Option<usize>,
 }
 
 impl Error {
     #[must_use]
-    pub fn span_module(mut self, module: &str) -> Self {
+    pub(super) fn span_module(mut self, module: &str) -> Self {
         self.span.module = Some(module.to_string());
         self
     }
 
     #[must_use]
-    pub fn span_submodule(mut self, submodule: &str) -> Self {
+    pub(super) fn span_submodule(mut self, submodule: &str) -> Self {
         self.span.submodule = Some(submodule.to_string());
         self
     }
 
     #[must_use]
-    pub fn span_gate(mut self, gate: &str) -> Self {
+    pub(super) fn span_gate(mut self, gate: &str) -> Self {
         self.span.gate = Some(gate.to_string());
         self
     }
 
     #[must_use]
-    pub fn span_connection(mut self, connection: usize) -> Self {
+    pub(super) fn span_connection(mut self, connection: usize) -> Self {
         self.span.connection = Some(connection);
         self
     }

@@ -46,25 +46,25 @@
 
 use crate::{
     net::{
-        self, Sim, SimBuilder, SimBuilderScoped, channel::ChannelDropBehaviour,
+        self, Sim, SimBuilder, SimBuilderScoped,
+        channel::ChannelDropBehaviour,
         module::ModuleContext,
+        ndl::lang::error::{ErrorKind, Result},
     },
     prelude::{DatarateChannel, DatarateChannelMetrics, ModuleRef, ObjectPath},
     time::Duration,
-};
-use des_net_utils::ndl::{
-    error::{self, ErrorKind, Result},
-    transform,
-    tree::{self, Node},
 };
 use std::{
     fs::{self, File},
     path::Path,
 };
 
-pub use des_net_utils::ndl::def::*;
-
+pub mod lang;
 mod registry;
+
+#[cfg(test)]
+mod tests;
+
 pub use self::registry::*;
 
 use super::IntoModuleTree;
@@ -89,7 +89,7 @@ use super::IntoModuleTree;
 #[derive(Debug)]
 pub struct Ndl<'a, L: Layer> {
     registry: &'a mut Registry<L>,
-    node: Node,
+    node: lang::tree::Node,
 }
 
 impl<'a, L: Layer> Ndl<'a, L> {
@@ -99,10 +99,10 @@ impl<'a, L: Layer> Ndl<'a, L> {
     ///
     /// This function may return an error, if the provided NDL topology is
     /// invalid or if the registry fails to provide an implementation for a module.
-    pub fn new(registry: &'a mut Registry<L>, def: &Def) -> Result<Self> {
+    pub fn new(registry: &'a mut Registry<L>, def: &lang::def::Def) -> Result<Self> {
         Ok(Self {
             registry,
-            node: transform(def)?,
+            node: lang::transform(def)?,
         })
     }
 
@@ -189,8 +189,9 @@ impl<A> SimBuilder<A> {
         path: impl AsRef<Path>,
         registry: impl AsMut<Registry<L>>,
     ) -> Result<Self> {
-        let f = File::open(path).map_err(|e| error::ErrorKind::Io(e.to_string()))?;
-        let def = serde_yml::from_reader(f).map_err(|e| error::ErrorKind::Io(e.to_string()))?;
+        let f = File::open(path).map_err(|e| lang::error::ErrorKind::Io(e.to_string()))?;
+        let def =
+            serde_yml::from_reader(f).map_err(|e| lang::error::ErrorKind::Io(e.to_string()))?;
         self.nodes_from_ndl(&def, registry)?;
         Ok(self)
     }
@@ -206,10 +207,10 @@ impl<A> SimBuilder<A> {
     /// b) or the registry fails to provide software for some NDL-defined module.
     pub fn nodes_from_ndl<L: Layer>(
         &mut self,
-        def: &Def,
+        def: &lang::def::Def,
         mut registry: impl AsMut<Registry<L>>,
     ) -> Result<()> {
-        let parsed = transform(def)?;
+        let parsed = lang::transform(def)?;
 
         let scoped = SimBuilderScoped::new(self, ObjectPath::default());
         let _ = scoped.ndl(&parsed, registry.as_mut())?;
@@ -250,7 +251,7 @@ impl<A> SimBuilder<A> {
         }
 
         let software = registry.resolve(path, ty, &mut *self.stack).ok_or(
-            error::ErrorKind::MissingRegistrySymbol(path.to_string(), ty.to_string()),
+            lang::error::ErrorKind::MissingRegistrySymbol(path.to_string(), ty.to_string()),
         )?;
         ctx.upgrade_dummy(software);
 
@@ -267,7 +268,11 @@ impl<A> SimBuilder<A> {
 }
 
 impl<A> SimBuilderScoped<'_, A> {
-    fn ndl<L: Layer>(mut self, node: &tree::Node, registry: &mut Registry<L>) -> Result<ModuleRef> {
+    fn ndl<L: Layer>(
+        mut self,
+        node: &lang::tree::Node,
+        registry: &mut Registry<L>,
+    ) -> Result<ModuleRef> {
         let symbol = node.typ.to_string();
         let scope = &self.scope;
 
@@ -279,11 +284,11 @@ impl<A> SimBuilderScoped<'_, A> {
 
         for submodule in &node.submodules {
             match submodule.name.kardinality {
-                Kardinality::Atom => {
+                lang::def::Kardinality::Atom => {
                     let subscope = self.subscope(&submodule.name.ident);
                     subscope.ndl(&submodule.typ, registry)?;
                 }
-                Kardinality::Cluster(n) => {
+                lang::def::Kardinality::Cluster(n) => {
                     for k in 0..n {
                         let ident = &submodule.name.ident;
                         let subscope = self.subscope(format!("{ident}[{k}]"));
@@ -312,7 +317,7 @@ impl<A> SimBuilderScoped<'_, A> {
 
 fn access_gate(
     ctx: &ModuleContext,
-    accessors: &[tree::ConnectionEndpointAccessor],
+    accessors: &[lang::tree::ConnectionEndpointAccessor],
 ) -> Option<net::gate::GateRef> {
     assert!(!accessors.is_empty(), "accessors must be non-empty");
     let accessor = &accessors[0];
@@ -326,9 +331,9 @@ fn access_gate(
     }
 }
 
-impl From<&tree::Link> for DatarateChannelMetrics {
+impl From<&lang::tree::Link> for DatarateChannelMetrics {
     #[allow(clippy::cast_sign_loss)]
-    fn from(value: &tree::Link) -> Self {
+    fn from(value: &lang::tree::Link) -> Self {
         DatarateChannelMetrics {
             bitrate: value.bitrate as usize,
             jitter: Duration::from_secs_f64(value.jitter),

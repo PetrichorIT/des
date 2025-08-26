@@ -1,4 +1,4 @@
-use des_net_utils::ndl::{
+use crate::net::ndl::lang::{
     def::{Def, FieldDef, Kardinality},
     error::ErrorKind,
     transform,

@@ -1,6 +1,6 @@
 use common::*;
+use des::net::ndl::lang::error;
 use des::{net::ndl::Ndl, prelude::*, registry};
-use des_net_utils::ndl::error;
 use serial_test::serial;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
