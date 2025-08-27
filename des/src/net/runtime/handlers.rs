@@ -333,7 +333,7 @@ cfg_async! {
             }
         }
 
-        /// Makes an io::error exepctor
+        /// Makes an `std::io::error` exepector
         pub fn io<Gen, Fut>(generator: Gen) -> Self
         where
             Gen: FnMut(Receiver<Message>) -> Fut,

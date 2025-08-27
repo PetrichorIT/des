@@ -299,10 +299,10 @@ impl Gate {
         // Check whether the target is allready connected
         let mut conns = self.connections.try_lock().expect("failed lock");
         for i in 0..2 {
-            if let Some(ref con) = conns.connections[i] {
-                if Arc::ptr_eq(&con.endpoint, &other) {
-                    return;
-                }
+            if let Some(ref con) = conns.connections[i]
+                && Arc::ptr_eq(&con.endpoint, &other)
+            {
+                return;
             }
         }
 

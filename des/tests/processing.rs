@@ -2,33 +2,19 @@
 use des::net::processing::*;
 use des::prelude::*;
 use serial_test::serial;
+use std::sync::Arc;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::Arc;
 
 mod lcommon {
     use des::net::processing::*;
     use des::prelude::*;
-
-    pub struct ConsumeAllIncoming;
-    impl ProcessingElement for ConsumeAllIncoming {
-        fn incoming(&mut self, _msg: Message) -> Option<Message> {
-            None
-        }
-    }
 
     pub struct IncrementIncomingId;
     impl ProcessingElement for IncrementIncomingId {
         fn incoming(&mut self, mut msg: Message) -> Option<Message> {
             msg.header_mut().id += 1;
             Some(msg)
-        }
-    }
-
-    pub struct PanicOnIncoming;
-    impl ProcessingElement for PanicOnIncoming {
-        fn incoming(&mut self, _msg: Message) -> Option<Message> {
-            panic!("common::PanicOnIncoming")
         }
     }
 }

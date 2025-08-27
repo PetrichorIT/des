@@ -97,6 +97,8 @@ impl Body {
     /// The type name of the contained value.
     #[must_use]
     pub fn type_name(&self) -> &str {
+        // SAFETY: The vtable is guaranteed to be valid, since type_name is a static function on a T: 'static
+        // thus will never be invalid
         unsafe { (self.vtable.type_name)() }
     }
 

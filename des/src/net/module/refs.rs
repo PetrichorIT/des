@@ -98,7 +98,7 @@ impl ModuleRef {
     /// Panics if either the module is not of type T,
     /// or the module is allready borrowed mutably.
     #[must_use]
-    pub fn as_ref<T: Any>(&self) -> Ref<T> {
+    pub fn as_ref<T: Any>(&self) -> Ref<'_, T> {
         self.try_as_ref::<T>()
             .expect("Failed to cast ModuleRef to readonly reference to type T")
     }
@@ -117,7 +117,7 @@ impl ModuleRef {
     /// or the reference module is `self` and a module-specific function is called.
     ///
     #[must_use]
-    pub fn try_as_ref<T: Any>(&self) -> Option<Ref<T>> {
+    pub fn try_as_ref<T: Any>(&self) -> Option<Ref<'_, T>> {
         let brw = self.processing.borrow();
 
         if (*brw.handler).type_id() == TypeId::of::<T>() {
@@ -140,7 +140,7 @@ impl ModuleRef {
     /// Panics if either the module is not of type T,
     /// or the module is allready borrowed on any way.
     #[must_use]
-    pub fn as_mut<T: Any>(&self) -> RefMut<T> {
+    pub fn as_mut<T: Any>(&self) -> RefMut<'_, T> {
         self.try_as_mut()
             .expect("Failed to cast ModuleRef to mutable reference to type T")
     }
@@ -159,7 +159,7 @@ impl ModuleRef {
     /// or the reference module is `self` and a module-specific function is called.
     ///
     #[must_use]
-    pub fn try_as_mut<T: Any>(&self) -> Option<RefMut<T>> {
+    pub fn try_as_mut<T: Any>(&self) -> Option<RefMut<'_, T>> {
         let brw = self.processing.borrow_mut();
 
         if (*brw.handler).type_id() == TypeId::of::<T>() {
@@ -231,23 +231,23 @@ impl ModuleRef {
                 ext.driver = Some(Driver::new());
                 return;
             };
-            if let Some(next_wakeup) = driver.next() {
-                if next_wakeup < driver.next_wakeup {
-                    #[cfg(feature = "tracing")]
-                    tracing::trace!(
-                        "scheduling new wakeup at {} (prev {})",
-                        next_wakeup,
-                        driver.next_wakeup
-                    );
+            if let Some(next_wakeup) = driver.next()
+                && next_wakeup < driver.next_wakeup
+            {
+                #[cfg(feature = "tracing")]
+                tracing::trace!(
+                    "scheduling new wakeup at {} (prev {})",
+                    next_wakeup,
+                    driver.next_wakeup
+                );
 
-                    driver.next_wakeup = next_wakeup;
-                    rt.add(
-                        NetEvents::AsyncWakeupEvent(AsyncWakeupEvent {
-                            module: self.clone(),
-                        }),
-                        next_wakeup,
-                    );
-                }
+                driver.next_wakeup = next_wakeup;
+                rt.add(
+                    NetEvents::AsyncWakeupEvent(AsyncWakeupEvent {
+                        module: self.clone(),
+                    }),
+                    next_wakeup,
+                );
             }
             ext.driver = Some(driver);
         }

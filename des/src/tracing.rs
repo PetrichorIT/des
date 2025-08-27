@@ -12,11 +12,11 @@ use crate::{
 use nu_ansi_term::{Color, Style};
 use tracing::{Level, Subscriber};
 use tracing_subscriber::{
+    EnvFilter,
     filter::Directive,
-    fmt::{format::Writer, FormatEvent, FormatFields, FormattedFields},
+    fmt::{FormatEvent, FormatFields, FormattedFields, format::Writer},
     registry::LookupSpan,
     util::SubscriberInitExt,
-    EnvFilter,
 };
 
 /// A token describing a logger scope.
@@ -149,13 +149,14 @@ where
                 maybe_ansi!(bold, ansi, writer: "{}", span.metadata().name())?;
                 seen = true;
                 let ext = span.extensions();
-                if let Some(fields) = &ext.get::<FormattedFields<N>>() {
-                    if !fields.is_empty() {
-                        maybe_ansi!(bold, ansi, writer: "{{")?;
-                        write!(writer, "{fields}")?;
-                        maybe_ansi!(bold, ansi, writer: "}}")?;
-                    }
+                if let Some(fields) = &ext.get::<FormattedFields<N>>()
+                    && !fields.is_empty()
+                {
+                    maybe_ansi!(bold, ansi, writer: "{{")?;
+                    write!(writer, "{fields}")?;
+                    maybe_ansi!(bold, ansi, writer: "}}")?;
                 }
+
                 maybe_ansi!(dimmed, ansi, writer: ":")?;
             }
 

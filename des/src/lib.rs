@@ -138,13 +138,3 @@ cfg_net! {
 cfg_macros! {
     pub use des_macros::*;
 }
-
-// # Features
-//
-// | Feature          | Description                                                              |
-// |------------------|--------------------------------------------------------------------------|
-// | net              | Adds a module oriented design-abstraction that provides its own events.  |
-// | cqueue           | Configures the runtime to use a calender queue for better performance.   |
-// | metrics | Collects internal metrics about the runtime, to improve parametrization. |
-// | async            | Provides utilites and modifications for simulating asynchronous systems including a full reexport of safe tokio funtions. |
-//
