@@ -63,9 +63,9 @@ fn main() -> std::io::Result<()> {
 
     std::fs::File::create("examples/utils/graph.svg")?.write_all(topo.as_svg()?.as_bytes())?;
 
-    // Chain 0: iterations [0, 1, 2, ..., 10] a [ChannelUnbusy, ExitingConn, HandleMessage] + 3
+    // Chain 0: iterations [0, 1, 2, ..., 10] a [ExitingConn, HandleMessage] + 3
     // Chain 1: iterations [0, 1, 2] a 2 events + one 3th event
-    assert_eq!(p.event_count, ((6 * 11 + 3) + (6 * 3 + 3)));
+    assert_eq!(p.event_count, ((4 * 11 + 2) + (6 * 2 + 2)));
 
     // Chain 0 longest:
     // - start at 1

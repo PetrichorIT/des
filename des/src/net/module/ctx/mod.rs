@@ -322,10 +322,10 @@ impl ModuleContext {
     /// This function is a shorthand for `prop_raw(key).typed::<T>()`.
     /// See [`RawProp::typed`] for information on errors.
     pub fn prop<T: PropType>(&self, key: &str) -> Result<Prop<T>, Error> {
-        self.props.write().get(key).map_err(|e| Error {
-            origin: self.path.clone(),
-            kind: ErrorKind::PropError(e),
-        })
+        self.props
+            .write()
+            .get(key)
+            .map_err(|e| Error::new(self.path.clone(), ErrorKind::PropError(e)))
     }
 
     /// Returns a untyped property handle for the property under the given key.
@@ -415,29 +415,29 @@ impl ModuleContext {
                 .expect("Failed to fetch parent, ptr missing in drop");
 
             if !strong.is_active() {
-                return Err(Error {
-                    origin: self.path.clone(),
-                    kind: ErrorKind::ModuleNotFound(
+                return Err(Error::new(
+                    self.path.clone(),
+                    ErrorKind::ModuleNotFound(
                         "the parent module is currently inactive, thus cannot be accessed".into(),
                     ),
-                });
+                ));
             }
 
             if strong.try_as_ref::<DummyModule>().is_some() {
-                Err(Error {
-                    origin: self.path.clone(),
-                    kind: ErrorKind::ModuleNotFound(
+                Err(Error::new(
+                    self.path.clone(),
+                    ErrorKind::ModuleNotFound(
                         "the parent module is not yet initalized, thus cannot be accessed".into(),
                     ),
-                })
+                ))
             } else {
                 Ok(strong)
             }
         } else {
-            Err(Error {
-                origin: self.path.clone(),
-                kind: ErrorKind::ModuleNotFound("no parent module exists".into()),
-            })
+            Err(Error::new(
+                self.path.clone(),
+                ErrorKind::ModuleNotFound("no parent module exists".into()),
+            ))
         }
     }
 
@@ -453,22 +453,20 @@ impl ModuleContext {
     pub fn child(&self, name: &str) -> Result<ModuleRef, Error> {
         if let Some(child) = self.children.read().get(name) {
             if !child.is_active() {
-                return Err(Error {
-                    origin: self.path.clone(),
-                    kind: ErrorKind::ModuleNotFound(format!(
+                return Err(Error::new(
+                    self.path.clone(),
+                    ErrorKind::ModuleNotFound(format!(
                         "the child module '{name}' is currently inactive, thus cannot be accessed"
                     )),
-                });
+                ));
             }
 
             Ok(child.clone())
         } else {
-            Err(Error {
-                origin: self.path.clone(),
-                kind: ErrorKind::ModuleNotFound(format!(
-                    "the child module '{name}' does not exist"
-                )),
-            })
+            Err(Error::new(
+                self.path.clone(),
+                ErrorKind::ModuleNotFound(format!("the child module '{name}' does not exist")),
+            ))
         }
     }
 }

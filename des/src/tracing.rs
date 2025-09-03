@@ -10,13 +10,14 @@ use crate::{
     prelude::{ObjectPath, SimTime},
 };
 use nu_ansi_term::{Color, Style};
-use tracing::{Level, Subscriber};
+use tracing::{Level, Subscriber, dispatcher};
+use tracing_error::ErrorLayer;
 use tracing_subscriber::{
-    EnvFilter,
+    EnvFilter, Layer, Registry,
     filter::Directive,
-    fmt::{FormatEvent, FormatFields, FormattedFields, format::Writer},
+    fmt::{self, FormatEvent, FormatFields, FormattedFields, format::Writer},
+    layer::SubscriberExt,
     registry::LookupSpan,
-    util::SubscriberInitExt,
 };
 
 /// A token describing a logger scope.
@@ -71,14 +72,27 @@ pub const FALLBACK_LOG_LEVEL: Level = Level::TRACE;
 ///
 /// Panics when subscriber initilization fails.
 pub fn init() {
-    let subscriber = tracing_subscriber::fmt();
-    let subscriber = subscriber.event_format(format());
-    let subscriber = subscriber.with_env_filter(
-        EnvFilter::builder()
-            .with_default_directive(Directive::from(FALLBACK_LOG_LEVEL))
-            .from_env_lossy(),
-    );
-    subscriber.finish().init();
+    let filter = EnvFilter::builder()
+        .with_default_directive(Directive::from(FALLBACK_LOG_LEVEL))
+        .from_env_lossy();
+
+    let fmt_layer = fmt::layer().event_format(format()).with_filter(filter);
+
+    let reg = Registry::default()
+        .with(fmt_layer)
+        .with(ErrorLayer::default());
+
+    dispatcher::set_global_default(reg.into()).expect("failed to set global default subscriber");
+
+    // let subscriber = tracing_subscriber::fmt();
+    // let subscriber = subscriber.event_format(format());
+    // let subscriber = subscriber.with_env_filter(
+    //     EnvFilter::builder()
+    //         .with_default_directive(Directive::from(FALLBACK_LOG_LEVEL))
+    //         .from_env_lossy(),
+    // );
+
+    // subscriber.finish().init();
 }
 
 /// An instance of a simulation formatter.

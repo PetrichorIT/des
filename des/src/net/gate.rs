@@ -349,6 +349,11 @@ impl Gate {
         self.path_iter()?.nth(0).and_then(|con| con.channel)
     }
 
+    /// Retrieves the next channel on the path.
+    pub fn next_channel(self: &GateRef) -> Option<ChannelRef> {
+        self.path_iter()?.filter_map(|con| con.channel).next()
+    }
+
     /// Returns an iterator over the connections on a gate path.
     /// If the current gate is a transit gate, no iterator will be returned,
     /// since the direction of the iterator cannot be determined.

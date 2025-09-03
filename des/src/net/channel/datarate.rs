@@ -18,7 +18,8 @@ use super::{Channel, ChannelDropBehaviour};
 pub struct DatarateChannel {
     metrics: DatarateChannelMetrics,
     buffer: Buffer,
-    transmission_finish_time: Option<SimTime>,
+    transmission_finish_time: SimTime,
+    scheduled: Option<SimTime>,
 }
 
 /// Metrics that define a channels capabilitites.
@@ -47,7 +48,8 @@ impl DatarateChannel {
         Self {
             metrics,
             buffer: Buffer::default(),
-            transmission_finish_time: None,
+            transmission_finish_time: SimTime::ZERO,
+            scheduled: None,
         }
     }
 }
@@ -66,8 +68,8 @@ impl Buffer {
 }
 
 impl DatarateChannel {
-    fn is_busy(&self) -> bool {
-        self.transmission_finish_time.is_some()
+    fn is_busy(&self, now: SimTime) -> bool {
+        self.transmission_finish_time > now
     }
 }
 
@@ -76,14 +78,15 @@ impl Clone for DatarateChannel {
         Self {
             metrics: self.metrics,
             buffer: Buffer::default(),
-            transmission_finish_time: None,
+            transmission_finish_time: SimTime::ZERO,
+            scheduled: None,
         }
     }
 }
 
 impl Channel for DatarateChannel {
     fn transmission_finish_time(&self) -> Option<SimTime> {
-        self.transmission_finish_time
+        Some(self.transmission_finish_time)
     }
 
     fn send(
@@ -98,27 +101,41 @@ impl Channel for DatarateChannel {
             &via.channel.as_ref().unwrap().channel
         ));
 
-        if self.is_busy() {
-            self.metrics
-                .drop_behaviour
-                .handle(&mut self.buffer, src, msg, via)
+        let now = SimTime::now();
+
+        if self.is_busy(now) {
+            match self.metrics.drop_behaviour {
+                ChannelDropBehaviour::Drop => Err(SendError {
+                    msg: msg,
+                    reason: "could not handle".into(),
+                }),
+                ChannelDropBehaviour::Queue(limit)
+                    if self.buffer.acc_bytes + msg.length() > limit.unwrap_or(usize::MAX) =>
+                {
+                    Err(SendError {
+                        msg: msg,
+                        reason: "could not handle: limit exceeded".into(),
+                    })
+                }
+                ChannelDropBehaviour::Queue(_) => {
+                    self.buffer.enqueue(src, msg, via);
+                    Ok(())
+                }
+            }
         } else {
             let propagation_delay = self.metrics.latency;
             let transmission_delay = self.metrics.calculate_busy(&msg);
 
-            let arrival_time = SimTime::now() + propagation_delay + transmission_delay;
+            let arrival_time = now + propagation_delay + transmission_delay;
 
             if !transmission_delay.is_zero() {
-                let transmission_finish_time = SimTime::now() + transmission_delay;
-                self.transmission_finish_time = Some(transmission_finish_time);
+                self.transmission_finish_time = now + transmission_delay;
 
-                ctx.sink.add(
-                    NetEvents::ChannelUnbusyNotif(ChannelUnbusyNotif {
-                        channel: ctx.handle.clone(),
-                        info: Box::new(()),
-                    }), // trust me bro
-                    transmission_finish_time,
-                );
+                // Do not yet schedule an unbusy notification, since
+                // it might be unnessecary if now further events are buffered:
+                // - is_buys() works without the explicit reset from notif()
+                // - only sending queued packets requires an explicit wakeup, so delay notif until we know
+                //   there will be queued packets
             }
 
             ctx.sink.add(
@@ -127,41 +144,32 @@ impl Channel for DatarateChannel {
             );
             Ok(())
         }
+        .map(|()| {
+            // Send succesful <==> new tft
+            // now add a notif event if we **must** wakeup at the tft
+            // aka. we have elements in the buffer && we have not yet
+            // scheduled a appropriate tft (success could just be in buffer)
+            if !self.buffer.packets.is_empty()
+                && self.scheduled != Some(self.transmission_finish_time)
+            {
+                ctx.sink.add(
+                    NetEvents::ChannelUnbusyNotif(ChannelUnbusyNotif {
+                        channel: ctx.handle.clone(),
+                        info: Box::new(()),
+                    }),
+                    self.transmission_finish_time,
+                );
+                self.scheduled = Some(self.transmission_finish_time);
+            }
+        })
     }
 
     fn unbusy_notify(&mut self, _: Box<dyn Any + Send>, ctx: SendContext<'_>) {
-        debug_assert_eq!(Some(SimTime::now()), self.transmission_finish_time);
-
-        self.transmission_finish_time = None;
-        if let Some((src, next_msg, next_via)) = self.buffer.dequeue() {
-            let _ = self.send(src, next_msg, next_via, ctx);
-        }
-    }
-}
-
-impl ChannelDropBehaviour {
-    fn handle(
-        &self,
-        buffer: &mut Buffer,
-        src: GateRef,
-        msg: Message,
-        via: Connection,
-    ) -> Result<(), SendError> {
-        match self {
-            Self::Drop => Err(SendError {
-                msg,
-                reason: "could not handle".into(),
-            }),
-            Self::Queue(limit) => {
-                if buffer.acc_bytes + msg.length() > limit.unwrap_or(usize::MAX) {
-                    Err(SendError {
-                        msg,
-                        reason: "could not handle".into(),
-                    })
-                } else {
-                    buffer.enqueue(src, msg, via);
-                    Ok(())
-                }
+        let now = SimTime::now();
+        if self.transmission_finish_time == now {
+            self.scheduled = None;
+            if let Some((src, next_msg, next_via)) = self.buffer.dequeue() {
+                let _ = self.send(src, next_msg, next_via, ctx);
             }
         }
     }

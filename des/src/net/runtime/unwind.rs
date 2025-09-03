@@ -44,10 +44,7 @@ impl<'a> Harness<'a> {
 
             self.ctx.active.store(false, Ordering::SeqCst);
             if !self.ctx.stereotyp.get().on_panic_catch {
-                return Err(Error {
-                    origin: self.ctx.path(),
-                    kind: ErrorKind::ModulePanic(unwind),
-                });
+                return Err(Error::new(self.ctx.path(), ErrorKind::ModulePanic(unwind)));
             }
         }
         Ok(())
@@ -55,10 +52,7 @@ impl<'a> Harness<'a> {
 
     pub(super) fn pass(self) -> Result<(), Error> {
         if let Some(unwind) = self.unwind {
-            return Err(Error {
-                origin: self.ctx.path(),
-                kind: ErrorKind::ModulePanic(unwind),
-            });
+            return Err(Error::new(self.ctx.path(), ErrorKind::ModulePanic(unwind)));
         }
         Ok(())
     }

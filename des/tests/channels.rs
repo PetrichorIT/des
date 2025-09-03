@@ -3,8 +3,10 @@
 use des::{
     net::{channel::DelayChannel, handlers::AsyncHandler},
     prelude::*,
+    time::sleep_until,
 };
 use serial_test::serial;
+use tokio::spawn;
 
 #[derive(Default)]
 struct DropChanModule {
@@ -235,7 +237,8 @@ fn simplex_shared_domain() {
 
     let rt = Builder::seeded(123).build(sim.freeze()).run().unwrap();
 
-    assert_eq!(rt.2.event_count, 50 * 3);
+    //
+    assert_eq!(rt.2.event_count, 124);
     assert_eq!(rt.1, 26.0)
 }
 
@@ -283,7 +286,12 @@ fn duplex_shared_domain() {
 
     let rt = Builder::seeded(123).build(sim.freeze()).run().unwrap();
 
-    assert_eq!(rt.2.event_count, 50 * 3);
+    // 50 messages over datarate channel with infinite buffer
+    // - 50 handle message events
+    // - 50 Exiting + 50 handle message events
+    // - 48 Channel Notif (only from once two events in queue, thus not for first and not for last message)
+
+    assert_eq!(rt.2.event_count, 50 + 50 + 48);
     assert_eq!(rt.1, 50.0)
 }
 
@@ -305,4 +313,82 @@ fn channel_as_any() {
         ch.downcast_ref::<DelayChannel, _>(|v| v.delay).unwrap(),
         Duration::from_millis(100)
     );
+}
+
+struct Empty;
+impl Module for Empty {}
+
+#[test]
+#[serial]
+fn datarate_channel_can_send_at_tft_independent_of_event_order() {
+    let mut sim = Sim::new(());
+    let mut metrics = DatarateChannelMetrics {
+        bitrate: 64,
+        latency: Duration::from_millis(100),
+        jitter: Duration::ZERO,
+        drop_behaviour: ChannelDropBehaviour::Drop,
+    };
+
+    sim.node(
+        "alice",
+        AsyncHandler::new(move |mut rx| async move {
+            let offset = Duration::from_secs(1);
+            let tft = SimTime::from_duration(metrics.calculate_busy(&Message::default())) + offset;
+
+            // to get the "wrong" event order we must shedule the spurious wakeup before the channel unbusy
+            let handle = spawn(async move {
+                sleep_until(tft).await;
+
+                // channel(s) has not yet received the unbusy event
+                current()
+                    .gate("port-no-buffer", 0)
+                    .unwrap()
+                    .channel()
+                    .unwrap()
+                    .downcast_ref::<DatarateChannel, _>(|drc| {
+                        assert_eq!(drc.transmission_finish_time(), Some(tft));
+                    })
+                    .unwrap();
+
+                // however sending should still work
+                send(Message::default(), "port-no-buffer").expect("success");
+                send(Message::default(), "port-buffer").expect("success");
+            });
+
+            // funny buisness to ensure sleep_until in the task actually create a wakeup event.
+            schedule_in(Message::default(), offset);
+            let _ = rx.recv().await.unwrap();
+
+            send(Message::default(), "port-no-buffer").expect("success");
+            send(Message::default(), "port-buffer").expect("success");
+
+            sleep_until(tft / 2.0).await;
+            // both channels are still busy
+            send(Message::default(), "port-no-buffer").expect_err("channel should block");
+            send(Message::default(), "port-buffer").expect("one message can be buffered");
+            send(Message::default(), "port-buffer").expect_err("but not another one");
+
+            handle.await.unwrap();
+        })
+        .require_join(),
+    );
+
+    sim.node("bob", Empty);
+
+    let g1 = sim.gate("alice", "port-no-buffer");
+    let g2 = sim.gate("alice", "port-buffer");
+
+    let t1 = sim.gate("bob", "port-no-buffer");
+    let t2 = sim.gate("bob", "port-buffer");
+
+    let no_buffer = DatarateChannel::new(metrics.clone());
+
+    metrics.drop_behaviour = ChannelDropBehaviour::Queue(Some(64)); // 64 bytes
+
+    let buffer = DatarateChannel::new(metrics);
+
+    g1.connect_with(t1, Some(no_buffer));
+    g2.connect_with(t2, Some(buffer));
+
+    let _ = Builder::seeded(123).build(sim.freeze()).run().unwrap();
 }

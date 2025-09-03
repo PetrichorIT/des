@@ -1,9 +1,12 @@
 use std::{
     any::Any,
+    backtrace::{Backtrace, BacktraceStatus},
     error::Error as StdError,
     fmt::{Debug, Display},
     io,
 };
+
+use tracing_error::{SpanTrace, SpanTraceStatus};
 
 use crate::net::ObjectPath;
 
@@ -14,12 +17,31 @@ pub struct Error {
     pub origin: ObjectPath,
     /// The kind of error.
     pub kind: ErrorKind,
+    /// The backtrace of the error.
+    pub backtrace: Backtrace,
+    /// The span trace of the error.
+    pub context: SpanTrace,
+}
+
+impl Error {
+    /// Creates a new error.
+    #[inline]
+    pub fn new(origin: ObjectPath, kind: ErrorKind) -> Self {
+        Self {
+            origin,
+            kind,
+            backtrace: Backtrace::capture(),
+            context: SpanTrace::capture(),
+        }
+    }
 }
 
 /// The kind of error.
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum ErrorKind {
+    /// Uncategoried
+    Other,
     /// An error that occured at the end of the simulation, when joining the remaining tasks
     #[cfg(feature = "async")]
     JoinError(JoinErrorKind),
@@ -33,7 +55,14 @@ pub enum ErrorKind {
 
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {:?}", self.origin, self.kind)
+        write!(f, "{}: {:?}", self.origin, self.kind)?;
+        if self.backtrace.status() == BacktraceStatus::Captured {
+            write!(f, "\nin:\n{}", self.backtrace)?;
+        }
+        if self.context.status() == SpanTraceStatus::CAPTURED {
+            write!(f, "\nin:\n{}", self.context)?;
+        }
+        Ok(())
     }
 }
 

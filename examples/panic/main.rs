@@ -1,5 +1,4 @@
 use des::{net::handlers::AsyncHandler, prelude::*};
-use std::panic;
 
 fn main() -> Result<(), RuntimeError> {
     let mut sim = Sim::new(());
@@ -17,6 +16,13 @@ impl Module for B {
             on_panic_catch: false,
             ..Default::default()
         });
-        panic!("it ends to fast {}", 1)
+
+        current()
+            .prop::<String>("this is a funny key")?
+            .set("value".into());
+        current().prop::<u32>("this is a funny key")?;
+
+        // panic!("it ends to fast {}", 1)
+        Ok(())
     }
 }

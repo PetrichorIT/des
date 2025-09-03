@@ -397,10 +397,10 @@ impl ModuleRef {
 
                 match rt.block_on(handle) {
                     Err(e) if e.is_panic() => {
-                        error.extend(once(Error {
-                            origin: self.path(),
-                            kind: ErrorKind::JoinError(JoinErrorKind::Paniced(e.into_panic())),
-                        }));
+                        error.extend(once(Error::new(
+                            self.path(),
+                            ErrorKind::JoinError(JoinErrorKind::Paniced(e.into_panic())),
+                        )));
                     }
                     _ => {}
                 }
@@ -408,23 +408,23 @@ impl ModuleRef {
 
             for handle in lock.must_join.drain(..) {
                 if !handle.is_finished() {
-                    error.extend(once(Error {
-                        origin: self.path(),
-                        kind: ErrorKind::JoinError(JoinErrorKind::NotFinished),
-                    }));
+                    error.extend(once(Error::new(
+                        self.path(),
+                        ErrorKind::JoinError(JoinErrorKind::NotFinished),
+                    )));
                     continue;
                 }
 
                 match rt.block_on(handle) {
                     Ok(()) => {}
-                    Err(e) if e.is_panic() => error.extend(once(Error {
-                        origin: self.path(),
-                        kind: ErrorKind::JoinError(JoinErrorKind::Paniced(e.into_panic())),
-                    })),
-                    Err(e) => error.extend(once(Error {
-                        origin: self.path(),
-                        kind: ErrorKind::JoinError(JoinErrorKind::Tokio(e)),
-                    })),
+                    Err(e) if e.is_panic() => error.extend(once(Error::new(
+                        self.path(),
+                        ErrorKind::JoinError(JoinErrorKind::Paniced(e.into_panic())),
+                    ))),
+                    Err(e) => error.extend(once(Error::new(
+                        self.path(),
+                        ErrorKind::JoinError(JoinErrorKind::Tokio(e)),
+                    ))),
                 }
             }
 

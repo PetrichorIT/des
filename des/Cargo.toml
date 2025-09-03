@@ -59,6 +59,7 @@ futures = { version = "*", optional = true }
 des-cqueue = { path = "../des-cqueue", optional = true }
 des-macros = { path = "../des-macros", optional = true }
 des-sync-utils = { path = "../des-sync-utils", optional = true }
+tracing-error = "0.2.1"
 
 [dev-dependencies]
 futures = "0.3"

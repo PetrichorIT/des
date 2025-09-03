@@ -47,17 +47,24 @@ impl RuntimeError {
 
 impl Debug for RuntimeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "RuntimeErrors {:?}", self.inner)
+        writeln!(f, "simulation failed with some errors:")?;
+        let n = self.inner.len();
+        for (i, err) in self.inner.iter().enumerate() {
+            let lines = err.to_string();
+            for line in lines.lines() {
+                writeln!(f, "{line}")?;
+            }
+            if i != n - 1 {
+                writeln!(f)?;
+            }
+        }
+        Ok(())
     }
 }
 
 impl Display for RuntimeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "RuntimeErrors:")?;
-        for err in &self.inner {
-            writeln!(f, "- {err}")?;
-        }
-        Ok(())
+        <Self as Debug>::fmt(self, f)
     }
 }
 
