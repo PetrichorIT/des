@@ -322,10 +322,7 @@ impl ModuleContext {
     /// This function is a shorthand for `prop_raw(key).typed::<T>()`.
     /// See [`RawProp::typed`] for information on errors.
     pub fn prop<T: PropType>(&self, key: &str) -> Result<Prop<T>, Error> {
-        self.props
-            .write()
-            .get(key)
-            .map_err(|e| Error::new(self.path.clone(), ErrorKind::PropError(e)))
+        self.props.write().get(key)
     }
 
     /// Returns a untyped property handle for the property under the given key.

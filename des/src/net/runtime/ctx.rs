@@ -6,10 +6,11 @@ use crate::net::gate::Connection;
 use crate::net::module::{MOD_CTX, current, with_mod_ctx};
 use crate::net::runtime::{ModuleRestartEvent, NetEvents};
 use crate::net::{gate::GateRef, message::Message};
-use crate::prelude::{EventLifecycle, ModuleRef};
-use crate::runtime::Runtime;
+use crate::prelude::{EventLifecycle, ModuleRef, RuntimeError};
+use crate::runtime::{LikeRuntimeError, Runtime};
 use crate::sync::Mutex;
 use crate::time::SimTime;
+use std::iter::once;
 use std::sync::{Arc, Weak};
 
 static BUF_CTX: Mutex<BufferContext> = Mutex::new(BufferContext::new());
@@ -19,6 +20,8 @@ struct BufferContext {
     events: Vec<(NetEvents, SimTime)>,
     // globals
     globals: Option<Weak<Globals>>,
+    // errors
+    error: RuntimeError,
 }
 
 impl BufferContext {
@@ -26,6 +29,7 @@ impl BufferContext {
         Self {
             events: Vec::new(),
             globals: None,
+            error: RuntimeError::empty(),
         }
     }
 }
@@ -150,4 +154,9 @@ where
             );
         }
     }
+}
+
+pub(crate) fn buf_fail(e: impl LikeRuntimeError) {
+    let mut ctx = BUF_CTX.lock();
+    ctx.error.extend(once(Box::new(e)));
 }

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use super::{try_with_mod_ctx, ModuleContext};
+use super::{ModuleContext, try_with_mod_ctx};
 
 /// Retuns a handle to the context of the current module. This
 /// handle can be used on inspect and change the modules simulation

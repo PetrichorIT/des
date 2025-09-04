@@ -1,9 +1,9 @@
-use std::{io::Error, sync::Arc};
+use std::sync::Arc;
 
 use fxhash::FxHashMap;
 use serde_yml::Value;
 
-use crate::sync::Mutex;
+use crate::{net::Error, sync::Mutex};
 
 use super::{Prop, PropType, RawProp};
 

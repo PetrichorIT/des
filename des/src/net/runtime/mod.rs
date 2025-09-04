@@ -21,7 +21,7 @@ use std::{
 };
 
 mod api;
-pub use self::api::globals;
+pub use self::api::{fail, globals};
 
 mod events;
 pub use self::events::*;

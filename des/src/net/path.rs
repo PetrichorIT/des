@@ -94,11 +94,7 @@ impl ObjectPath {
     #[must_use]
     pub fn nonzero_parent(&self) -> Option<ObjectPath> {
         let parent = self.parent()?;
-        if parent.is_root() {
-            None
-        } else {
-            Some(parent)
-        }
+        if parent.is_root() { None } else { Some(parent) }
     }
 
     /// Returns a new instance with another module appended to the path.

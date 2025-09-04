@@ -1,10 +1,12 @@
 //! Module properties
 
-use crate::sync::Mutex;
+use crate::{
+    net::{Error, ErrorKind},
+    sync::Mutex,
+};
 use std::{
-    any::Any,
+    any::{Any, type_name},
     fmt::Debug,
-    io::{Error, ErrorKind},
     marker::PhantomData,
     sync::Arc,
 };
@@ -49,7 +51,8 @@ impl<T: DeserializeOwned + Serialize + Any> PropType for T {
     where
         Self: Sized,
     {
-        serde_yml::from_value(value).map_err(Error::other)
+        serde_yml::from_value(value)
+            .map_err(|e| Error::new_current(ErrorKind::PropParsingError(Box::new(e))))
     }
 }
 
@@ -129,7 +132,10 @@ impl RawProp {
                 _phantom: PhantomData,
             })
         } else {
-            Err(Error::new(ErrorKind::InvalidInput, "type missmatch"))
+            Err(Error::new_current(ErrorKind::PropTypeError(format!(
+                "prop is not of type '{}'",
+                type_name::<T>()
+            ))))
         }
     }
 }

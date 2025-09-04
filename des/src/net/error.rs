@@ -8,7 +8,7 @@ use std::{
 
 use tracing_error::{SpanTrace, SpanTraceStatus};
 
-use crate::net::ObjectPath;
+use crate::{net::ObjectPath, prelude::try_current};
 
 /// An simulation error produced by the `net` feature.
 #[derive(Debug)]
@@ -34,6 +34,17 @@ impl Error {
             context: SpanTrace::capture(),
         }
     }
+
+    /// Creates a new error.
+    #[inline]
+    pub fn new_current(kind: ErrorKind) -> Self {
+        Self {
+            origin: try_current().map(|v| v.path()).unwrap_or_default(),
+            kind,
+            backtrace: Backtrace::capture(),
+            context: SpanTrace::capture(),
+        }
+    }
 }
 
 /// The kind of error.
@@ -50,7 +61,9 @@ pub enum ErrorKind {
     /// An error that occurs when a simulation object panicked.
     ModulePanic(Box<dyn Any + Send + 'static>),
     /// A property error.
-    PropError(io::Error),
+    PropParsingError(Box<dyn StdError + Send + Sync>),
+    /// A property error.
+    PropTypeError(String),
 }
 
 impl Display for Error {
@@ -68,10 +81,18 @@ impl Display for Error {
 
 impl StdError for Error {}
 
+impl From<io::Error> for Error {
+    fn from(value: io::Error) -> Self {
+        Error::new(
+            try_current().map_or(ObjectPath::from(""), |c| c.path.clone()),
+            ErrorKind::PropParsingError(Box::new(value)),
+        )
+    }
+}
+
 impl From<Error> for io::Error {
     fn from(value: Error) -> Self {
         match value.kind {
-            ErrorKind::PropError(io) => io,
             _ => io::Error::other(value.to_string()),
         }
     }
