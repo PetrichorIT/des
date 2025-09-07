@@ -256,7 +256,7 @@ impl ModuleContext {
     /// impl Module for MyModule {
     ///     fn handle_message(&mut self, msg: Message) {
     ///         let id = current().id();
-    ///         assert_eq!(id, msg.header().receiver_module_id);
+    ///         assert_eq!(id, msg.header.receiver_module_id);
     ///     }
     /// }
     /// ```

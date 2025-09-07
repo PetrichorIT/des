@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "[des-net-utils]"
-cargo build -p des-net-utils
+cargo build -p des-sync-utils
 
 echo "[des-macros-core]"
 cargo build -p des-macros-core

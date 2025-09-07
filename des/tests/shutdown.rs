@@ -95,7 +95,7 @@ impl Module for StatelessModuleRestart {
     }
 
     fn handle_message(&mut self, msg: Message) {
-        match msg.header().id {
+        match msg.header.id {
             9 => current().shutdow_and_restart_at(SimTime::now() + Duration::from_secs(10)),
             10 => current().shutdown(),
             _ => unreachable!(),
@@ -153,7 +153,7 @@ impl Module for StatefullModule {
     }
 
     fn handle_message(&mut self, msg: Message) {
-        match msg.header().id {
+        match msg.header.id {
             9 => current().shutdow_and_restart_at(SimTime::now() + Duration::from_secs(10)),
             10 => current().shutdown(),
             _ => unreachable!(),
@@ -343,7 +343,7 @@ impl Module for EndNode {
     }
 
     fn handle_message(&mut self, mut msg: Message) {
-        match msg.header().kind {
+        match msg.header.kind {
             1 => {
                 if SimTime::now().as_secs() > 10 {
                     return;
@@ -461,7 +461,7 @@ fn shutdown_prevents_accessing_parents() {
             |_, _| {
                 let err = current().child("b").unwrap_err();
                 assert!(matches!(err.kind, ErrorKind::ModuleNotFound(_)));
-                assert_eq!(err.to_string(), "ModuleNotFound(\"the child module 'b' is currently inactive, thus cannot be accessed\")");
+                assert_eq!(format!("{:?}", err.kind), "ModuleNotFound(\"the child module 'b' is currently inactive, thus cannot be accessed\")");
             },
         ),
     );

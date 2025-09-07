@@ -297,13 +297,11 @@ impl Hash for ModuleRef {
 
 impl Debug for ModuleRef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct(&format!(
-            "ModuleRef {{ name: {}, handler: {}, ctx: {} }}",
-            self.ctx.path,
-            Arc::strong_count(&self.processing),
-            Arc::strong_count(&self.ctx),
-        ))
-        .finish()
+        f.debug_struct("ModuleRef")
+            .field("name", &self.ctx.path.to_string())
+            .field("handler", &Arc::strong_count(&self.processing))
+            .field("ctx", &Arc::strong_count(&self.ctx))
+            .finish()
     }
 }
 
@@ -326,7 +324,7 @@ mod tests {
         assert_eq!(module.path.as_str(), "root.a.b");
         assert_eq!(
             format!("{module:?}"),
-            "ModuleRef { name: root.a.b, handler: 2, ctx: 2 }"
+            "ModuleRef { name: \"root.a.b\", handler: 2, ctx: 2 }"
         );
         assert_eq!(format!("{weak:?}"), "ModuleRefWeak");
 

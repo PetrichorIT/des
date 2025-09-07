@@ -111,7 +111,7 @@ impl Module for SendMessageModule {
     }
 
     fn handle_message(&mut self, msg: Message) {
-        if msg.header().kind == 10 {
+        if msg.header.kind == 10 {
             let _ = send(Message::default().with_content("Hello world"), "out");
             let gate = current().gate("out", 0).unwrap();
             let ch = gate.channel().unwrap();

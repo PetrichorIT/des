@@ -140,7 +140,7 @@ fn builder_handler_fn() {
     sim.node(
         "alice",
         HandlerFn::new(move |msg| {
-            c2.fetch_add(msg.header().id, Ordering::SeqCst);
+            c2.fetch_add(msg.header.id, Ordering::SeqCst);
         }),
     );
     let gate = sim.gate("alice", "port");
@@ -277,7 +277,7 @@ fn builder_module_fn_restart_at_failure() {
                 0
             },
             |_, msg| {
-                if msg.header().id == 1 {
+                if msg.header.id == 1 {
                     Err(io::Error::new(io::ErrorKind::Other, "other"))
                 } else {
                     Ok(())

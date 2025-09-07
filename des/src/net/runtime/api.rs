@@ -1,6 +1,10 @@
 use std::sync::Arc;
 
-use crate::{net::runtime::buf_fail, runtime::LikeRuntimeError};
+use crate::{
+    net::runtime::{NetEvents, buf_fail, buf_schedule_event},
+    runtime::LikeRuntimeError,
+    time::SimTime,
+};
 
 use super::Globals;
 
@@ -29,4 +33,9 @@ pub fn globals() -> Arc<Globals> {
 ///
 pub fn fail(e: impl LikeRuntimeError) {
     buf_fail(e);
+}
+
+/// SCHED EVENT
+pub fn schedule_event(event: NetEvents, time: SimTime) {
+    buf_schedule_event(event, time);
 }

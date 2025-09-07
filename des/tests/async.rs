@@ -32,8 +32,8 @@ struct QuasaiSyncModule {
 
 impl Module for QuasaiSyncModule {
     fn handle_message(&mut self, msg: Message) {
-        println!("[{}] Received msg: {}", current().name(), msg.header().id);
-        self.counter += msg.header().id as usize;
+        println!("[{}] Received msg: {}", current().name(), msg.header.id);
+        self.counter += msg.header.id as usize;
     }
 }
 
@@ -89,7 +89,7 @@ impl Module for MutipleTasksModule {
 
         self.handles.spawn(async move {
             while let Some(v) = rxa.recv().await {
-                let k = v.header().kind;
+                let k = v.header.kind;
                 txb.send(v).await.unwrap();
 
                 if k == 42 {
@@ -101,7 +101,7 @@ impl Module for MutipleTasksModule {
 
         self.handles.spawn(async move {
             while let Some(v) = rxb.recv().await {
-                let k = v.header().kind;
+                let k = v.header.kind;
                 txc.send(v).await.unwrap();
 
                 if k == 42 {
@@ -113,8 +113,8 @@ impl Module for MutipleTasksModule {
 
         self.handles.spawn(async move {
             while let Some(v) = rxc.recv().await {
-                let k = v.header().kind;
-                result.fetch_add(v.header().id as usize, std::sync::atomic::Ordering::SeqCst);
+                let k = v.header.kind;
+                result.fetch_add(v.header.id as usize, std::sync::atomic::Ordering::SeqCst);
 
                 if k == 42 {
                     rxc.close();
@@ -185,7 +185,7 @@ impl Module for TimeSleepModule {
     fn handle_message(&mut self, msg: Message) {
         tokio::spawn(async move {
             tracing::debug!("recv msg: {msg}");
-            let wait_time = msg.header().kind as u64;
+            let wait_time = msg.header.kind as u64;
             tracing::info!(
                 "<{}> [{}] Waiting for timer",
                 current().name(),
@@ -196,7 +196,7 @@ impl Module for TimeSleepModule {
                 "<{}> [{}] Done waiting for id: {}",
                 current().name(),
                 SimTime::now(),
-                msg.header().id
+                msg.header.id
             );
         });
     }
@@ -363,7 +363,7 @@ impl Module for SemaphoreModule {
     }
 
     fn handle_message(&mut self, msg: Message) {
-        self.semaphore.add_permits(msg.header().kind as usize);
+        self.semaphore.add_permits(msg.header.kind as usize);
     }
 }
 

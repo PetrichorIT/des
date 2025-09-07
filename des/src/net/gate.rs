@@ -351,7 +351,7 @@ impl Gate {
 
     /// Retrieves the next channel on the path.
     pub fn next_channel(self: &GateRef) -> Option<ChannelRef> {
-        self.path_iter()?.filter_map(|con| con.channel).next()
+        self.path_iter()?.find_map(|con| con.channel)
     }
 
     /// Returns an iterator over the connections on a gate path.

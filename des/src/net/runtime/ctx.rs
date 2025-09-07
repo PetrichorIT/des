@@ -113,6 +113,11 @@ pub(crate) fn buf_schedule_at(msg: Message, arrival_time: SimTime) {
     ));
 }
 
+pub(crate) fn buf_schedule_event(event: NetEvents, time: SimTime) {
+    let mut ctx = BUF_CTX.lock();
+    ctx.events.push((event, time));
+}
+
 pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<Sim<A>>)
 where
     A: EventLifecycle<Sim<A>>,

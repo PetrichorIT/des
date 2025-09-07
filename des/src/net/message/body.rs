@@ -246,7 +246,7 @@ impl Debug for DebugPrinter {
 
 struct VTable {
     type_id: unsafe fn() -> TypeId,
-    type_name: unsafe fn() -> &'static str,
+    type_name: unsafe fn() -> &'static str, // we are using this indirection, since type_name is not yet const -> vtable gen should be const
     debug: unsafe fn(*const (), &mut fmt::Formatter<'_>) -> fmt::Result,
     try_clone: unsafe fn(*const ()) -> Option<*mut ()>,
     drop: unsafe fn(*mut ()),

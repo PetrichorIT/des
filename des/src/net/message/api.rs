@@ -161,7 +161,7 @@ pub fn send_at(
 ///     }
 ///
 ///     fn handle_message(&mut self, msg: Message) {
-///         assert_eq!(msg.try_content::<&str>(), Some(&"wakeup"));
+///         assert_eq!(msg.body.try_content::<&str>(), Some(&"wakeup"));
 ///         /* Do something periodicly */
 ///         schedule_in(msg, self.period);
 ///     }

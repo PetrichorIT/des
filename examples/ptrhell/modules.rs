@@ -12,7 +12,7 @@ impl Module for Alice {
     }
 
     fn handle_message(&mut self, msg: Message) {
-        let (msg, head) = msg.into_content::<usize>();
+        let (msg, head, _) = msg.into_content::<usize>();
         tracing::info!(target: "inet", "Received msg: {} - {:?}", msg, head);
     }
 }
@@ -22,7 +22,7 @@ pub struct Bob();
 
 impl Module for Bob {
     fn handle_message(&mut self, msg: Message) {
-        let (msg, head) = msg.into_content::<usize>();
+        let (msg, head, _) = msg.into_content::<usize>();
 
         println!("Received msg: {} - {:?}", msg, head);
 

@@ -6,16 +6,11 @@ use std::sync::Arc;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
-mod lcommon {
-    use des::net::processing::*;
-    use des::prelude::*;
-
-    pub struct IncrementIncomingId;
-    impl ProcessingElement for IncrementIncomingId {
-        fn incoming(&mut self, mut msg: Message) -> Option<Message> {
-            msg.header_mut().id += 1;
-            Some(msg)
-        }
+pub struct IncrementIncomingId;
+impl ProcessingElement for IncrementIncomingId {
+    fn incoming(&mut self, mut msg: Message) -> Option<Message> {
+        msg.header.id += 1;
+        Some(msg)
     }
 }
 
@@ -34,8 +29,8 @@ impl Module for PluginCreation {
     }
 
     fn handle_message(&mut self, msg: Message) {
-        assert_eq!(SimTime::now().as_secs() + 1, msg.header().id as u64);
-        self.sum += msg.header().id as usize;
+        assert_eq!(SimTime::now().as_secs() + 1, msg.header.id as u64);
+        self.sum += msg.header.id as usize;
     }
 
     fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
@@ -50,7 +45,7 @@ fn plugin_raw_creation() {
     // Logger::new().set_logger();
 
     let mut app = Sim::new(());
-    app.set_stack(|| lcommon::IncrementIncomingId);
+    app.set_stack(|| IncrementIncomingId);
     app.node("root", PluginCreation::default());
 
     let rt = Builder::seeded(123).build(app.freeze());
@@ -259,4 +254,45 @@ fn custom_default_pe() {
 
     let _ = rt.run();
     assert!(DONE.load(Ordering::SeqCst));
+}
+
+struct AddEthInFlag;
+struct EthFlag;
+impl ProcessingElement for AddEthInFlag {
+    fn incoming(&mut self, msg: Message) -> Option<Message> {
+        Some(msg.with_extension(EthFlag))
+    }
+}
+
+struct M {
+    c: usize,
+}
+impl Module for M {
+    fn stack(&self, mut stack: ProcessingStack) -> ProcessingStack {
+        stack.append(AddEthInFlag);
+        stack
+    }
+
+    fn handle_message(&mut self, msg: Message) {
+        assert!(msg.extensions.has::<EthFlag>());
+        self.c += 1;
+    }
+
+    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+        assert_eq!(self.c, 1);
+        Ok(())
+    }
+}
+
+#[test]
+#[serial]
+fn add_extension_in_plugin() -> Result<(), RuntimeError> {
+    let mut sim = Sim::new(());
+    sim.node("m", M { c: 0 });
+    let gate = sim.gate("m", "port");
+
+    let mut rt = Builder::seeded(123).build(sim.freeze());
+    rt.add_message_onto(gate, Message::default(), 1.0.into());
+
+    rt.run().map(|_| ())
 }

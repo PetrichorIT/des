@@ -20,7 +20,7 @@ use super::{ModuleContext, try_with_mod_ctx};
 /// impl Module for MyModule {
 ///     fn handle_message(&mut self, msg: Message) {
 ///         let id = current().id();
-///         if id == msg.header().sender_module_id {
+///         if id == msg.header.sender_module_id {
 ///             println!("Self message received");
 ///         }
 ///     }

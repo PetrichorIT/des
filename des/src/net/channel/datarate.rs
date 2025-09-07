@@ -106,14 +106,14 @@ impl Channel for DatarateChannel {
         if self.is_busy(now) {
             match self.metrics.drop_behaviour {
                 ChannelDropBehaviour::Drop => Err(SendError {
-                    msg: msg,
+                    msg,
                     reason: "could not handle".into(),
                 }),
                 ChannelDropBehaviour::Queue(limit)
                     if self.buffer.acc_bytes + msg.length() > limit.unwrap_or(usize::MAX) =>
                 {
                     Err(SendError {
-                        msg: msg,
+                        msg,
                         reason: "could not handle: limit exceeded".into(),
                     })
                 }

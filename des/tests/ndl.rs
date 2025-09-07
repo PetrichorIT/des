@@ -46,7 +46,7 @@ mod common {
         }
 
         fn handle_message(&mut self, msg: Message) {
-            match msg.header().kind {
+            match msg.header.kind {
                 1 => {
                     self.rem -= 1;
                     let _ = send(
@@ -60,11 +60,11 @@ mod common {
                 }
                 2 => {
                     if current().name().starts_with("node") {
-                        assert_eq!(format!("node[{}]", msg.header().id), current().name());
+                        assert_eq!(format!("node[{}]", msg.header.id), current().name());
                         self.rcv += 1;
                     }
                     if current().name().starts_with("ring") {
-                        if format!("ring[{}]", msg.header().id) == current().name() {
+                        if format!("ring[{}]", msg.header.id) == current().name() {
                             self.rcv += 1;
                         } else {
                             let _ = send(msg, "out");
@@ -95,7 +95,7 @@ mod common {
     pub struct Router;
     impl Module for Router {
         fn handle_message(&mut self, msg: Message) {
-            let g = current().gate("out", msg.header().id as usize).unwrap();
+            let g = current().gate("out", msg.header.id as usize).unwrap();
             let _ = send(msg, g);
         }
     }

@@ -32,7 +32,7 @@ impl Module for Host {
 struct Switch;
 impl Module for Switch {
     fn handle_message(&mut self, msg: Message) {
-        let idx = msg.header().kind as usize;
+        let idx = msg.header.kind as usize;
         let _ = send(msg, ("port", idx));
     }
 }

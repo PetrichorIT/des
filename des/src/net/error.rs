@@ -4,6 +4,7 @@ use std::{
     error::Error as StdError,
     fmt::{Debug, Display},
     io,
+    ops::Deref,
 };
 
 use tracing_error::{SpanTrace, SpanTraceStatus};
@@ -13,6 +14,13 @@ use crate::{net::ObjectPath, prelude::try_current};
 /// An simulation error produced by the `net` feature.
 #[derive(Debug)]
 pub struct Error {
+    /// Boxed internal representation, otherwise the error struct would be too large.
+    pub repr: Box<Repr>,
+}
+
+/// The internal representation of an error.
+#[derive(Debug)]
+pub struct Repr {
     /// The origin of the error.
     pub origin: ObjectPath,
     /// The kind of error.
@@ -26,23 +34,29 @@ pub struct Error {
 impl Error {
     /// Creates a new error.
     #[inline]
+    #[must_use]
     pub fn new(origin: ObjectPath, kind: ErrorKind) -> Self {
         Self {
-            origin,
-            kind,
-            backtrace: Backtrace::capture(),
-            context: SpanTrace::capture(),
+            repr: Box::new(Repr {
+                origin,
+                kind,
+                backtrace: Backtrace::capture(),
+                context: SpanTrace::capture(),
+            }),
         }
     }
 
     /// Creates a new error.
     #[inline]
+    #[must_use]
     pub fn new_current(kind: ErrorKind) -> Self {
         Self {
-            origin: try_current().map(|v| v.path()).unwrap_or_default(),
-            kind,
-            backtrace: Backtrace::capture(),
-            context: SpanTrace::capture(),
+            repr: Box::new(Repr {
+                origin: try_current().map(|v| v.path()).unwrap_or_default(),
+                kind,
+                backtrace: Backtrace::capture(),
+                context: SpanTrace::capture(),
+            }),
         }
     }
 }
@@ -64,6 +78,13 @@ pub enum ErrorKind {
     PropParsingError(Box<dyn StdError + Send + Sync>),
     /// A property error.
     PropTypeError(String),
+}
+
+impl Deref for Error {
+    type Target = Repr;
+    fn deref(&self) -> &Self::Target {
+        &self.repr
+    }
 }
 
 impl Display for Error {
@@ -92,9 +113,7 @@ impl From<io::Error> for Error {
 
 impl From<Error> for io::Error {
     fn from(value: Error) -> Self {
-        match value.kind {
-            _ => io::Error::other(value.to_string()),
-        }
+        io::Error::other(value.to_string())
     }
 }
 

@@ -46,7 +46,7 @@ fn ponger() -> impl IntoModuleTree {
     handlers::AsyncHandler::new(|mut rx| async move {
         let mut pongs_received = 0;
         while let Some(msg) = rx.recv().await {
-            assert_eq!(msg.header().kind, PING);
+            assert_eq!(msg.header.kind, PING);
             pongs_received += 1;
             let _ = send(Message::default().with_kind(PONG), "port");
         }
@@ -105,7 +105,7 @@ impl Module for Pinger {
     }
 
     fn handle_message(&mut self, msg: Message) {
-        assert_eq!(msg.header().kind, PONG);
+        assert_eq!(msg.header.kind, PONG);
         self.pongs_received += 1;
     }
 

@@ -73,7 +73,7 @@ fn builder_async_fn_message_recv() {
             let c2 = c2.clone();
             async move {
                 while let Some(msg) = rx.recv().await {
-                    c2.fetch_add(msg.header().id, Ordering::SeqCst);
+                    c2.fetch_add(msg.header.id, Ordering::SeqCst);
                 }
             }
         }),
@@ -111,7 +111,7 @@ fn builder_async_fn_channeled() {
             let c2 = c2.clone();
             async move {
                 while let Some(msg) = rx.recv().await {
-                    c2.fetch_add(msg.header().id, Ordering::SeqCst);
+                    c2.fetch_add(msg.header.id, Ordering::SeqCst);
                 }
             }
         }),

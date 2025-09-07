@@ -15,10 +15,10 @@ impl Module for Alice {
             pkt.body.content::<String>().deref()
         );
 
-        if pkt.header().id > 60_000 {
+        if pkt.header.id > 60_000 {
             // TERMINATE
         } else {
-            pkt.header_mut().id += 1;
+            pkt.header.id += 1;
             let _ = send(pkt, ("netOut", 0));
         }
     }
@@ -38,7 +38,7 @@ impl Module for Bob {
     }
 
     fn handle_message(&mut self, msg: Message) {
-        if msg.header().kind == 0xff {
+        if msg.header.kind == 0xff {
             info!(target: "Bob", "Initalizing");
             drop(msg);
             info!(target: "Bob", "Dropped init msg");
@@ -53,7 +53,7 @@ impl Module for Bob {
             );
         } else {
             let mut pkt = msg;
-            pkt.header_mut().id += 1;
+            pkt.header.id += 1;
 
             info!(
                 "Received at {}: Message with content: {}",

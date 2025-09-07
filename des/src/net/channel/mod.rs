@@ -234,7 +234,7 @@ impl ChannelRef {
     #[must_use]
     pub fn is_busy(&self) -> bool {
         self.transmission_finish_time()
-            .map_or(false, |tft| tft > SimTime::now())
+            .is_some_and(|tft| tft > SimTime::now())
     }
 
     /// Returns the time at which the channel will be free again.
