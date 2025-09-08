@@ -20,11 +20,13 @@ pub struct Extensions {
 
 impl Extensions {
     /// Whether the extensions are empty.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.extensions.is_empty()
     }
 
     /// The number of extensions attached to the message.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.extensions.len()
     }

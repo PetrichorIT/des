@@ -1,6 +1,6 @@
 use std::{rc::Rc, sync::Arc};
 
-use crate::{prelude::random, time::Driver};
+use crate::{net::processing::TokioRuntime, prelude::random, time::Driver};
 use tokio::{
     runtime::{Builder, RngSeed, Runtime},
     task::{JoinHandle, LocalSet},
@@ -29,7 +29,8 @@ impl ModuleContext {
     /// This function will **not** block, but rather defer the joining
     /// to the simulation shutdown phase.
     pub fn join(&self, handle: JoinHandle<()>) {
-        self.async_ext.write().must_join.push(handle);
+        TokioRuntime::join(handle);
+        // self.async_ext.write().must_join.push(handle);
     }
 
     /// Will try to join a task when the simulation ends.
@@ -37,7 +38,8 @@ impl ModuleContext {
     /// This will catch panics that occured within the task, but
     /// if the task is still running, no error will be returned.
     pub fn try_join(&self, handle: JoinHandle<()>) {
-        self.async_ext.write().try_join.push(handle);
+        TokioRuntime::try_join(handle);
+        // self.async_ext.write().try_join.push(handle);
     }
 
     pub(crate) fn reset_join_handles(&self) {

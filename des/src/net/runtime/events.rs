@@ -5,7 +5,7 @@ use crate::{
         gate::Connection,
         message::Message,
         module::ModuleRef,
-        processing::ProcessingState,
+        processing::TokioRuntime,
         runtime::buf_process,
     },
     prelude::RuntimeError,
@@ -13,12 +13,7 @@ use crate::{
     time::SimTime,
     tracing::enter_scope,
 };
-use std::{fmt::Debug, sync::atomic::Ordering::SeqCst};
-
-#[cfg(feature = "async")]
-use std::{any::Any, iter::once};
-#[cfg(feature = "async")]
-use tokio::task::yield_now;
+use std::{any::Any, fmt::Debug, sync::atomic::Ordering::SeqCst};
 
 use super::Harness;
 
@@ -296,9 +291,9 @@ impl ModuleRef {
     #[cfg(feature = "async")]
     pub(crate) fn async_wakeup(&self) -> Result<(), Error> {
         if self.ctx.active.load(SeqCst) {
-            self.processing.borrow_mut().incoming_upstream(None);
-            Harness::new(&self.ctx).exec(|| {}).catch()?;
-            self.processing.borrow_mut().incoming_downstream();
+            self.processing
+                .borrow_mut()
+                .process_with(None, |_, _| Harness::new(&self.ctx).exec(|| {}).catch())?;
         } else {
             #[cfg(feature = "tracing")]
             tracing::debug!("Ignoring message since module is inactive");
@@ -322,26 +317,20 @@ impl ModuleRef {
 
     pub(crate) fn handle_message(&self, msg: Message) -> Result<(), Error> {
         if self.ctx.active.load(SeqCst) {
-            let mut processing = self.processing.borrow_mut();
-
-            // Upstream
-            let msg = processing.incoming_upstream(Some(msg));
-
-            // Peek
-            processing.state = ProcessingState::Peek;
-            if let Some(msg) = msg {
-                Harness::new(&self.ctx)
-                    .exec(|| {
-                        let msg = msg;
-                        processing.handler.handle_message(msg);
-                    })
-                    .catch()?;
-            } else {
-                Harness::new(&self.ctx).exec(|| {}).catch()?;
-            }
-
-            // Downstream
-            processing.incoming_downstream();
+            self.processing
+                .borrow_mut()
+                .process_with(Some(msg), |handler, msg| {
+                    if let Some(msg) = msg {
+                        Harness::new(&self.ctx)
+                            .exec(|| {
+                                let msg = msg;
+                                handler.handle_message(msg);
+                            })
+                            .catch()
+                    } else {
+                        Harness::new(&self.ctx).exec(|| {}).catch()
+                    }
+                })?;
         } else {
             #[cfg(feature = "tracing")]
             tracing::debug!("Ignoring message since module is inactive");
@@ -350,90 +339,45 @@ impl ModuleRef {
     }
 
     pub(crate) fn at_sim_start(&self, stage: usize) -> Result<(), Error> {
-        let mut processing = self.processing.borrow_mut();
-
-        processing.incoming_upstream(None);
-        Harness::new(&self.ctx)
-            .exec(|| processing.handler.at_sim_start(stage))
-            .catch()?;
-        processing.incoming_downstream();
+        self.processing
+            .borrow_mut()
+            .process_with(None, |handler, _| {
+                Harness::new(&self.ctx)
+                    .exec(|| handler.at_sim_start(stage))
+                    .catch()
+            })?;
         Ok(())
     }
 
     pub(crate) fn num_sim_start_stages(&self) -> usize {
         // No harness since this method bust be called before startin initalization to check the number of loops
+        // Bypass the CTX variables, this should be safe maybe
         self.processing.borrow().handler.num_sim_start_stages()
     }
 
     pub(crate) fn at_sim_end(&self) -> Result<(), RuntimeError> {
+        let mut result = self
+            .processing
+            .borrow_mut()
+            .process_with(None, |handler, _| {
+                let mut result = Ok(());
+
+                Harness::new(&self.ctx)
+                    .exec(|| result = handler.at_sim_end())
+                    .catch()?;
+
+                result
+            });
+
         let mut processing = self.processing.borrow_mut();
+        let Some(tokio) = processing.downcast_element_mut::<TokioRuntime>() else {
+            return result;
+        };
 
-        processing.incoming_upstream(None);
-
-        let mut result = Ok(());
-        Harness::new(&self.ctx)
-            .exec(|| result = processing.handler.at_sim_end())
-            .catch()?;
-
-        #[cfg(feature = "async")]
-        {
-            use crate::net::{Error, ErrorKind, JoinErrorKind};
-
-            let mut error = RuntimeError::empty();
-
-            let Some((rt, task_set)) = self.ctx.async_ext.write().rt.current() else {
-                panic!("WHERE MY RT");
-            };
-
-            let _guard = rt.enter();
-            task_set.block_on(&rt, yield_now());
-
-            let mut lock = self.ctx.async_ext.write();
-
-            for handle in lock.try_join.drain(..) {
-                if !handle.is_finished() {
-                    continue;
-                }
-
-                match rt.block_on(handle) {
-                    Err(e) if e.is_panic() => {
-                        error.extend(once(Error::new(
-                            self.path(),
-                            ErrorKind::JoinError(JoinErrorKind::Paniced(e.into_panic())),
-                        )));
-                    }
-                    _ => {}
-                }
-            }
-
-            for handle in lock.must_join.drain(..) {
-                if !handle.is_finished() {
-                    error.extend(once(Error::new(
-                        self.path(),
-                        ErrorKind::JoinError(JoinErrorKind::NotFinished),
-                    )));
-                    continue;
-                }
-
-                match rt.block_on(handle) {
-                    Ok(()) => {}
-                    Err(e) if e.is_panic() => error.extend(once(Error::new(
-                        self.path(),
-                        ErrorKind::JoinError(JoinErrorKind::Paniced(e.into_panic())),
-                    ))),
-                    Err(e) => error.extend(once(Error::new(
-                        self.path(),
-                        ErrorKind::JoinError(JoinErrorKind::Tokio(e)),
-                    ))),
-                }
-            }
-
-            if !error.is_empty() {
-                result = Err(error);
-            }
+        if let Err(other) = tokio.at_sim_end() {
+            result = Err(other);
         }
 
-        processing.incoming_downstream();
         result
     }
 }

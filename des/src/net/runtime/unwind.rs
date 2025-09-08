@@ -24,15 +24,8 @@ impl<'a> Harness<'a> {
 
     #[cfg(feature = "async")]
     pub(super) fn exec(mut self, f: impl FnOnce()) -> Self {
-        let Some((rt, task_set)) = self.ctx.async_ext.write().rt.current() else {
-            panic!("simulation error: tokio runtime was lost during execution");
-        };
-
         self.unwind = catch_unwind(AssertUnwindSafe(|| {
-            task_set.block_on(&rt, async move {
-                f();
-                tokio::task::yield_now().await;
-            });
+            f();
         }))
         .err();
         self

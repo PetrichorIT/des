@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 pub struct IncrementIncomingId;
 impl ProcessingElement for IncrementIncomingId {
-    fn incoming(&mut self, mut msg: Message) -> Option<Message> {
+    fn process(&mut self, mut msg: Message) -> Option<Message> {
         msg.header.id += 1;
         Some(msg)
     }
@@ -60,14 +60,20 @@ struct ActivitySensor {
     pub shared: Arc<AtomicUsize>,
 }
 impl ProcessingElement for ActivitySensor {
-    fn event_start(&mut self) {
+    fn process_with(
+        &mut self,
+        msg: Option<Message>,
+        inner: &mut dyn FnMut(Option<Message>) -> Option<Message>,
+    ) -> Option<Message> {
         let real = self.shared.fetch_add(1, SeqCst);
         assert_eq!(real, self.expected);
-    }
 
-    fn event_end(&mut self) {
+        let res = inner(msg);
+
         let real = self.shared.fetch_sub(1, SeqCst);
         assert_eq!(real - 1, self.expected);
+
+        res
     }
 }
 
@@ -126,7 +132,7 @@ struct IncrementArcPlugin {
     arc: Arc<AtomicUsize>,
 }
 impl ProcessingElement for IncrementArcPlugin {
-    fn incoming(&mut self, msg: Message) -> Option<Message> {
+    fn process(&mut self, msg: Message) -> Option<Message> {
         self.arc.fetch_add(1, SeqCst);
         Some(msg)
     }
@@ -231,7 +237,7 @@ fn custom_default_pe() {
 
     struct EatAllAndSayDone;
     impl ProcessingElement for EatAllAndSayDone {
-        fn incoming(&mut self, _: Message) -> Option<Message> {
+        fn process(&mut self, _: Message) -> Option<Message> {
             DONE.store(true, Ordering::SeqCst);
             None
         }
@@ -259,7 +265,7 @@ fn custom_default_pe() {
 struct AddEthInFlag;
 struct EthFlag;
 impl ProcessingElement for AddEthInFlag {
-    fn incoming(&mut self, msg: Message) -> Option<Message> {
+    fn process(&mut self, msg: Message) -> Option<Message> {
         Some(msg.with_extension(EthFlag))
     }
 }
