@@ -178,66 +178,12 @@ impl ModuleRef {
     pub fn activate(&self) {
         enter_scope(self.scope_token());
         let prev = ModuleContext::place(Arc::clone(&self.ctx));
-
-        #[cfg(feature = "async")]
-        {
-            use crate::time::{Driver, SimTime, TimerSlot};
-
-            if let Some(prev) = prev {
-                prev.async_ext.write().driver = Driver::unset();
-            }
-
-            let driver = self.ctx.async_ext.write().driver.take();
-            if let Some(mut d) = driver {
-                let bumpable = d.bump();
-                if d.next_wakeup <= SimTime::now() {
-                    d.next_wakeup = SimTime::MAX;
-                }
-                bumpable.into_iter().for_each(TimerSlot::wake_all);
-                d.set();
-            }
-        }
     }
 
     /// INTERNAL
     #[doc(hidden)]
     #[allow(unused)]
     pub(crate) fn deactivate(&self, rt: &mut impl EventSink<NetEvents>) {
-        #[cfg(feature = "async")]
-        {
-            use crate::net::runtime::AsyncWakeupEvent;
-            use crate::time::Driver;
-
-            let mut ext = self.ctx.async_ext.write();
-            let Some(mut driver) = Driver::unset() else {
-                // Somebody stole our driver
-                #[cfg(feature = "tracing")]
-                tracing::error!("IO time driver missing after event execution");
-
-                ext.driver = Some(Driver::new());
-                return;
-            };
-            if let Some(next_wakeup) = driver.next()
-                && next_wakeup < driver.next_wakeup
-            {
-                #[cfg(feature = "tracing")]
-                tracing::trace!(
-                    "scheduling new wakeup at {} (prev {})",
-                    next_wakeup,
-                    driver.next_wakeup
-                );
-
-                driver.next_wakeup = next_wakeup;
-                rt.add(
-                    NetEvents::AsyncWakeupEvent(AsyncWakeupEvent {
-                        module: self.clone(),
-                    }),
-                    next_wakeup,
-                );
-            }
-            ext.driver = Some(driver);
-        }
-
         let _ = ModuleContext::take();
         leave_scope();
     }

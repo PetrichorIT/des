@@ -347,7 +347,7 @@ cfg_async! {
 
     impl Module for AsyncHandler {
         fn reset(&mut self) {
-            current().reset_join_handles();
+            // FIXME: we should reset the join handles here, but this will be reworked next so ignore
         }
 
          fn at_sim_start(&mut self, _: usize) {

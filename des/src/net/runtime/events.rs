@@ -280,7 +280,8 @@ impl ModuleRef {
         let mut brw = self.processing.borrow_mut();
 
         #[cfg(feature = "async")]
-        self.ctx.async_ext.write().reset();
+        brw.downcast_element_mut::<TokioRuntime>()
+            .map(|v| v.reset());
 
         Harness::new(&self.ctx)
             .exec(move || brw.handler.reset())
@@ -370,6 +371,8 @@ impl ModuleRef {
             });
 
         let mut processing = self.processing.borrow_mut();
+        processing.process_with(None, |_, _| {});
+
         let Some(tokio) = processing.downcast_element_mut::<TokioRuntime>() else {
             return result;
         };

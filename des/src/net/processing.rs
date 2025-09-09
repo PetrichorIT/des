@@ -69,7 +69,6 @@ use std::{
     fmt::Debug,
     iter::once,
     ops::Deref,
-    panic::{AssertUnwindSafe, catch_unwind},
     rc::Rc,
     sync::{Arc, LazyLock, Mutex},
 };
@@ -81,8 +80,12 @@ use tokio::{
 
 use super::module::Module;
 use crate::{
-    net::{Error, ErrorKind, JoinErrorKind},
-    prelude::{Message, RuntimeError, random},
+    net::{
+        Error, ErrorKind, JoinErrorKind,
+        runtime::{AsyncWakeupEvent, NetEvents},
+        schedule_event,
+    },
+    prelude::{Message, RuntimeError, current, random},
     time::Driver,
 };
 
@@ -274,15 +277,16 @@ impl From<()> for ProcessingStack {
 impl Default for ProcessingStack {
     fn default() -> Self {
         ProcessingStack {
-            items: vec![Box::new(TokioRuntime::new())],
+            items: vec![Box::new(TimeDriver::new()), Box::new(TokioRuntime::new())],
         }
     }
 }
 
 impl<P: ProcessingElement> From<P> for ProcessingStack {
     fn from(value: P) -> Self {
-        let boxed: Box<dyn ProcessingElement> = Box::new(value);
-        ProcessingStack { items: vec![boxed] }
+        ProcessingStack {
+            items: vec![Box::new(value)],
+        }
     }
 }
 
@@ -293,7 +297,7 @@ macro_rules! for_tuples {
         impl<$($i: ProcessingElement + 'static),*> From<($($i),*)> for ProcessingStack {
             #[allow(non_snake_case)]
             fn from(value: ($($i),*)) -> Self {
-                let mut stack = ProcessingStack::default();
+                let mut stack = ProcessingStack { items: Vec::new()};
                 let ($($i),*) = value;
                 $(
                     stack.append(ProcessingStack::from($i));
@@ -320,7 +324,6 @@ pub struct TokioRuntime {
     pub(super) tasks: Rc<LocalSet>,
     pub(super) rt: LazyCell<Arc<Runtime>>,
     pub(super) handles: Vec<(JoinHandle<()>, bool)>,
-    pub(super) driver: Option<Driver>,
 }
 
 static JOIN_THREADS: LazyLock<Mutex<Vec<(JoinHandle<()>, bool)>>> =
@@ -333,15 +336,19 @@ impl TokioRuntime {
         Self {
             tasks,
             rt: LazyCell::new(|| {
+                #[allow(unused_mut)]
+                let mut builder = Builder::new_current_thread();
+                #[cfg(feature = "unstable-tokio-enable-time")]
+                builder.enable_time();
+
                 Arc::new(
-                    Builder::new_current_thread()
+                    builder
                         .rng_seed(RngSeed::from_bytes(&random::<u64>().to_le_bytes()))
                         .build()
                         .expect("Failed to build tokio runtime"),
                 )
             }),
             handles: Vec::new(),
-            driver: Some(Driver::new()),
         }
     }
 
@@ -357,12 +364,29 @@ impl TokioRuntime {
         join_threads.push((handle, false));
     }
 
+    /// Reset the join handles.
+    pub fn reset_join_handles(&mut self) {
+        let mut join_threads = JOIN_THREADS.lock().unwrap();
+        join_threads.clear();
+        self.handles.clear();
+    }
+
+    /// Reset the runtime.
+    pub fn reset(&mut self) {
+        *self = Self::new();
+    }
+
+    /// Shutdown the runtime.
+    pub fn shutdown(&mut self) {
+        *self = Self::new();
+    }
+
     /// a custom handler for sim-end szenarios, only supported by this proc-element.
     pub fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
         let mut error = RuntimeError::empty();
 
         let _guard = self.rt.enter();
-        self.tasks.block_on(&self.rt, yield_now());
+        // self.tasks.block_on(&self.rt, yield_now());
 
         for (handle, must_join) in self.handles.drain(..) {
             if !handle.is_finished() {
@@ -409,6 +433,75 @@ impl ProcessingElement for TokioRuntime {
                 .expect("failed to get lock, this should be impossible"),
         );
 
+        res
+    }
+}
+
+///
+#[derive(Debug)]
+pub struct TimeDriver {
+    driver: Option<Driver>,
+}
+
+impl TimeDriver {
+    ///
+    pub fn new() -> Self {
+        Self {
+            driver: Some(Driver::new()),
+        }
+    }
+}
+
+impl ProcessingElement for TimeDriver {
+    fn process_with(
+        &mut self,
+        msg: Option<Message>,
+        inner: &mut dyn FnMut(Option<Message>) -> Option<Message>,
+    ) -> Option<Message> {
+        use crate::time::{SimTime, TimerSlot};
+
+        let driver = self.driver.take();
+        if let Some(mut driver) = driver {
+            let bumpable = driver.bump();
+            if driver.next_wakeup <= SimTime::now() {
+                driver.next_wakeup = SimTime::MAX;
+            }
+            bumpable.into_iter().for_each(TimerSlot::wake_all);
+            driver.set();
+        }
+
+        let res = inner(msg);
+
+        let Some(mut driver) = Driver::unset() else {
+            // Somebody stole our driver
+            #[cfg(feature = "tracing")]
+            tracing::error!("IO time driver missing after event execution");
+
+            self.driver = Some(Driver::new());
+            return res;
+        };
+
+        if let Some(next_wakeup) = driver.next()
+            && next_wakeup < driver.next_wakeup
+        {
+            #[cfg(feature = "tracing")]
+            tracing::trace!(
+                "scheduling new wakeup at {} (prev {})",
+                next_wakeup,
+                driver.next_wakeup
+            );
+
+            driver.next_wakeup = next_wakeup;
+
+            schedule_event(
+                NetEvents::AsyncWakeupEvent(AsyncWakeupEvent {
+                    module: current().me(),
+                }),
+                next_wakeup,
+            );
+        }
+
+        self.driver = Some(driver);
         res
     }
 }

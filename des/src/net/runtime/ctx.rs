@@ -13,6 +13,9 @@ use crate::time::SimTime;
 use std::iter::once;
 use std::sync::{Arc, Weak};
 
+#[cfg(feature = "async")]
+use crate::net::processing::TokioRuntime;
+
 static BUF_CTX: Mutex<BufferContext> = Mutex::new(BufferContext::new());
 
 struct BufferContext {
@@ -141,7 +144,11 @@ where
 
         // drop the rt, to prevent all async activity from happening.
         #[cfg(feature = "async")]
-        module.ctx.async_ext.write().rt.shutdown();
+        module
+            .processing
+            .borrow_mut()
+            .downcast_element_mut::<TokioRuntime>()
+            .map(|rt| rt.shutdown());
 
         // Reset the internal state
         // Note that the module is not active, so it must be manually reactivated

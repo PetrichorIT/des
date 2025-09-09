@@ -24,11 +24,6 @@ pub(crate) fn module_ctx_drop() {
     MOD_CTX.swap(&mut None);
 }
 
-cfg_async! {
-    pub(super) mod rt;
-    use self::rt::AsyncCoreExt;
-}
-
 mod spawner;
 mod stereotyp;
 
@@ -58,8 +53,6 @@ pub struct ModuleContext {
     pub(crate) stereotyp: Cell<Stereotyp>,
     pub(crate) scope_token: ScopeToken,
 
-    #[cfg(feature = "async")]
-    pub(crate) async_ext: RwLock<AsyncCoreExt>,
     pub(crate) parent: Option<ModuleRefWeak>,
     pub(crate) children: RwLock<FxHashMap<String, ModuleRef>>,
 
@@ -79,9 +72,6 @@ impl ModuleContext {
     #[must_use]
     pub fn standalone(path: ObjectPath) -> ModuleRef {
         ModuleRef::dummy(Arc::new(Self {
-            #[cfg(feature = "async")]
-            async_ext: RwLock::new(AsyncCoreExt::new()),
-
             me: RwLock::new(None),
             scope_token: new_scope(path.clone()),
 
@@ -113,9 +103,6 @@ impl ModuleContext {
     pub fn child_of(name: &str, parent: ModuleRef) -> ModuleRef {
         let path = ObjectPath::appended(&parent.ctx.path, name);
         let this = ModuleRef::dummy(Arc::new(Self {
-            #[cfg(feature = "async")]
-            async_ext: RwLock::new(AsyncCoreExt::new()),
-
             me: RwLock::new(None),
             scope_token: new_scope(path.clone()),
 
@@ -464,6 +451,29 @@ impl ModuleContext {
                 self.path.clone(),
                 ErrorKind::ModuleNotFound(format!("the child module '{name}' does not exist")),
             ))
+        }
+    }
+}
+
+cfg_async! {
+    use tokio::task::JoinHandle;
+    use crate::net::processing::TokioRuntime;
+
+    impl ModuleContext {
+        /// Schedules a task to be joined when the simulatio ends
+        ///
+        /// This function will **not** block, but rather defer the joining
+        /// to the simulation shutdown phase.
+        pub fn join(&self, handle: JoinHandle<()>) {
+            TokioRuntime::join(handle);
+        }
+
+        /// Will try to join a task when the simulation ends.
+        ///
+        /// This will catch panics that occured within the task, but
+        /// if the task is still running, no error will be returned.
+        pub fn try_join(&self, handle: JoinHandle<()>) {
+            TokioRuntime::try_join(handle);
         }
     }
 }
