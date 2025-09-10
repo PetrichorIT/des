@@ -199,39 +199,6 @@ fn plugin_shutdown_non_persistent_data() {
 
 #[test]
 #[serial]
-fn module_as_processing_element() {
-    static DONE: AtomicBool = AtomicBool::new(false);
-
-    struct A;
-    struct B;
-    impl Module for A {
-        fn handle_message(&mut self, _: Message) {
-            DONE.store(true, Ordering::SeqCst);
-        }
-    }
-    impl Module for B {
-        fn stack(&self, _: ProcessingStack) -> ProcessingStack {
-            A.into()
-        }
-
-        fn handle_message(&mut self, _: Message) {
-            panic!("should never be called");
-        }
-    }
-
-    let mut sim = Sim::new(());
-    sim.node("a", B);
-    let gate = sim.gate("a", "port");
-
-    let mut rt = Builder::seeded(123).build(sim.freeze());
-    rt.add_message_onto(gate, Message::default(), 1.0.into());
-
-    let _ = rt.run();
-    assert!(DONE.load(Ordering::SeqCst));
-}
-
-#[test]
-#[serial]
 fn custom_default_pe() {
     static DONE: AtomicBool = AtomicBool::new(false);
 
@@ -300,5 +267,42 @@ fn add_extension_in_plugin() -> Result<(), RuntimeError> {
     let mut rt = Builder::seeded(123).build(sim.freeze());
     rt.add_message_onto(gate, Message::default(), 1.0.into());
 
+    rt.run().map(|_| ())
+}
+
+struct PEWithValue {
+    value: usize,
+}
+impl ProcessingElement for PEWithValue {}
+
+struct NodeWithPE;
+impl Module for NodeWithPE {
+    fn stack(&self, mut stack: ProcessingStack) -> ProcessingStack {
+        stack.append(PEWithValue { value: 42 });
+        stack
+    }
+}
+
+struct NodeReadingPE;
+impl Module for NodeReadingPE {
+    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+        let parent = current().parent().expect("parent must exist");
+
+        assert!(parent.try_as_ref::<NodeWithPE>().is_some());
+        assert!(parent.try_as_ref::<PEWithValue>().is_some());
+        assert_eq!(parent.try_as_ref::<PEWithValue>().unwrap().value, 42);
+
+        Ok(())
+    }
+}
+
+#[test]
+#[serial]
+fn downcast_proc_elements_from_other_node() -> Result<(), RuntimeError> {
+    let mut sim = Sim::new(());
+    sim.node("alice", NodeWithPE);
+    sim.node("alice.observer", NodeReadingPE);
+
+    let rt = Builder::seeded(123).build(sim.freeze());
     rt.run().map(|_| ())
 }

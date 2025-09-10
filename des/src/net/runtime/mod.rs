@@ -2,8 +2,8 @@ use serde_yml::{Value, from_str};
 
 use crate::{
     net::{
-        module::{Cfg, DummyModule, MOD_CTX, ModuleContext, to_processing_chain, try_current},
-        processing::ProcessingStack,
+        module::{Cfg, DummyModule, MOD_CTX, ModuleContext, try_current},
+        processing::{ModuleImpl, ProcessingStack},
         topology::Topology,
     },
     prelude::{Application, EventLifecycle, GateRef, Module, ModuleRef, ObjectPath, Runtime},
@@ -344,7 +344,7 @@ impl<A> SimBuilder<A> {
         let Some(module) = self.get(&path) else {
             panic!("cannot create gate '{path}.{gate}', because node '{path}' does not exist")
         };
-        if let Some(gate) = module.gate(gate, 0) {
+        if let Some(gate) = module.gate((gate, 0)) {
             gate
         } else {
             module.create_gate(gate)
@@ -368,7 +368,7 @@ impl<A> SimBuilder<A> {
         };
         let mut gates = Vec::new();
         for k in 0..size {
-            if let Some(gate) = module.gate(gate, k) {
+            if let Some(gate) = module.gate((gate, k)) {
                 gates.push(gate);
             } else {
                 break;
@@ -464,7 +464,10 @@ impl<A> SimBuilder<A> {
         }
 
         ctx.activate();
-        let pe = to_processing_chain(module, (self.stack)());
+        let pe = {
+            let stack = (self.stack)();
+            ModuleImpl::new(module.stack(stack), module)
+        };
         ctx.upgrade_dummy(pe);
 
         let mut sink = Vec::new();

@@ -5,17 +5,24 @@ use crate::{
         gate::Connection,
         message::Message,
         module::ModuleRef,
-        processing::TokioRuntime,
         runtime::buf_process,
+        schedule_event,
     },
     prelude::RuntimeError,
     runtime::{Event, EventLifecycle, EventSink, Runtime},
     time::SimTime,
     tracing::enter_scope,
 };
-use std::{any::Any, fmt::Debug, sync::atomic::Ordering::SeqCst};
+use std::{
+    any::Any,
+    fmt::Debug,
+    sync::atomic::Ordering::{self, SeqCst},
+};
 
 use super::Harness;
+
+#[cfg(feature = "async")]
+use crate::net::processing::TokioRuntime;
 
 ///
 /// The event set for a [`Sim`].
@@ -30,6 +37,8 @@ pub enum NetEvents {
     HandleMessageEvent(HandleMessageEvent),
     /// A notification for channels.
     ChannelUnbusyNotif(ChannelUnbusyNotif),
+    /// A notification that a module should now be restarted
+    ModuleShutdownEvent(ModuleShutdownEvent),
     /// A notification that a module should now be restarted
     ModuleRestartEvent(ModuleRestartEvent),
     #[cfg(feature = "async")]
@@ -46,6 +55,7 @@ where
             Self::MessageExitingConnection(event) => event.handle(rt),
             Self::HandleMessageEvent(event) => event.handle(rt),
             Self::ChannelUnbusyNotif(event) => event.handle(rt),
+            Self::ModuleShutdownEvent(event) => event.handle(rt),
             Self::ModuleRestartEvent(event) => event.handle(rt),
             #[cfg(feature = "async")]
             Self::AsyncWakeupEvent(event) => event.handle(rt),
@@ -197,6 +207,36 @@ impl HandleMessageEvent {
     }
 }
 
+/// A notification that a module should now be shutdown.
+#[derive(Debug)]
+pub struct ModuleShutdownEvent {
+    /// The module that is being shutdown.
+    pub module: ModuleRef,
+    /// The time at which the module should be restarted, if any.
+    pub restart_at: Option<SimTime>,
+}
+
+impl ModuleShutdownEvent {
+    fn handle<A>(self, rt: &mut Runtime<Sim<A>>)
+    where
+        A: EventLifecycle<Sim<A>>,
+    {
+        enter_scope(self.module.scope_token());
+
+        #[cfg(feature = "tracing")]
+        tracing::info!("ModuleShutdownEvent");
+
+        let module = &self.module;
+        module.activate();
+        rt.app
+            .error
+            .extend(module.module_shutdown(self.restart_at).err());
+        module.deactivate(rt);
+
+        buf_process(module, rt);
+    }
+}
+
 /// A notification to restart a module.
 #[derive(Debug)]
 pub struct ModuleRestartEvent {
@@ -276,13 +316,27 @@ impl ChannelUnbusyNotif {
 }
 
 impl ModuleRef {
+    /// Resetting a module state as port of a reboot or shutdown sequence
+    ///
+    /// This function must do the following things:
+    /// - reset the modules internal state (this may be `self = Self::new()`), but maybe some
+    ///   persistent state should be preserved.
+    /// - reset the proc-chain
     pub(crate) fn reset(&self) -> Result<(), Error> {
         let mut brw = self.processing.borrow_mut();
 
+        // FIXME: the reset of the proc-chain would be easiers if we could
+        // rebuild the chain from scratch. However we would need the base_stack for
+        // that to work, we dont have it here, since its attached to the Builder instance of `Sim`
+        //
+        // TODO: capture Sim<A> -> easy
+        // TODO: store the used base stack somehow or recreate it?
+        // TODO: then call stack() on the reset module itself
         #[cfg(feature = "async")]
         brw.downcast_element_mut::<TokioRuntime>()
-            .map(|v| v.reset());
+            .map(TokioRuntime::reset);
 
+        // Reset does not capture any proc-elements -> correct ?
         Harness::new(&self.ctx)
             .exec(move || brw.handler.reset())
             .pass()?;
@@ -300,6 +354,39 @@ impl ModuleRef {
             tracing::debug!("Ignoring message since module is inactive");
         }
         Ok(())
+    }
+
+    pub(crate) fn module_shutdown(&self, restart_at: Option<SimTime>) -> Result<(), Error> {
+        if !self.active.load(Ordering::SeqCst) {
+            return Ok(());
+        }
+
+        // Mark the modules state
+        #[cfg(feature = "tracing")]
+        tracing::debug!("Shuttind down module and restaring at {:?}", restart_at);
+        self.ctx.active.store(false, SeqCst);
+
+        // drop the rt, to prevent all async activity from happening.
+        #[cfg(feature = "async")]
+        self.processing
+            .borrow_mut()
+            .downcast_element_mut::<TokioRuntime>()
+            .map(TokioRuntime::shutdown);
+
+        // Reset the internal state
+        // Note that the module is not active, so it must be manually reactivated
+        let res = self.reset();
+
+        // Reschedule wakeup
+        if let Some(restart_at) = restart_at {
+            schedule_event(
+                NetEvents::ModuleRestartEvent(ModuleRestartEvent {
+                    module: self.clone(),
+                }),
+                restart_at,
+            );
+        }
+        res
     }
 
     pub(crate) fn module_restart(&self) -> Result<(), Error> {
@@ -357,6 +444,7 @@ impl ModuleRef {
     }
 
     pub(crate) fn at_sim_end(&self) -> Result<(), RuntimeError> {
+        #[allow(unused_mut)]
         let mut result = self
             .processing
             .borrow_mut()
@@ -373,10 +461,12 @@ impl ModuleRef {
         let mut processing = self.processing.borrow_mut();
         processing.process_with(None, |_, _| {});
 
+        #[cfg(feature = "async")]
         let Some(tokio) = processing.downcast_element_mut::<TokioRuntime>() else {
             return result;
         };
 
+        #[cfg(feature = "async")]
         if let Err(other) = tokio.at_sim_end() {
             result = Err(other);
         }

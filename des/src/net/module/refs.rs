@@ -1,5 +1,4 @@
-use crate::net::module::to_processing_chain;
-use crate::net::processing::{ProcessingStack, Processor};
+use crate::net::processing::{ModuleImpl, ProcessingStack};
 use crate::net::runtime::NetEvents;
 use crate::prelude::{Gate, GateRef};
 use crate::runtime::EventSink;
@@ -17,7 +16,7 @@ use std::sync::{Arc, Weak};
 #[derive(Clone)]
 pub(crate) struct ModuleRefWeak {
     ctx: Weak<ModuleContext>,
-    handler: Weak<RefCell<Processor>>,
+    handler: Weak<RefCell<ModuleImpl>>,
 }
 
 impl ModuleRefWeak {
@@ -38,7 +37,11 @@ impl ModuleRefWeak {
 
 impl Debug for ModuleRefWeak {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ModuleRefWeak").finish()
+        if let Some(mref) = self.upgrade() {
+            mref.fmt(f)
+        } else {
+            f.debug_struct("Weak").finish_non_exhaustive()
+        }
     }
 }
 
@@ -46,7 +49,7 @@ impl Debug for ModuleRefWeak {
 #[derive(Clone)]
 pub struct ModuleRef {
     pub(crate) ctx: Arc<ModuleContext>,
-    pub(crate) processing: Arc<RefCell<Processor>>,
+    pub(crate) processing: Arc<RefCell<ModuleImpl>>,
 }
 
 impl Deref for ModuleRef {
@@ -63,12 +66,9 @@ impl ModuleRef {
         module: T,
         stack: ProcessingStack,
     ) -> Self {
-        let procesing = to_processing_chain(module, stack);
-        let handler = Arc::new(RefCell::new(procesing));
-        let this = Self {
-            ctx,
-            processing: handler,
-        };
+        let stack = ModuleImpl::new(module.stack(stack), module);
+        let processing = Arc::new(RefCell::new(stack));
+        let this = Self { ctx, processing };
 
         *this.ctx.me.write() = Some(ModuleRefWeak::new(&this));
         this
@@ -84,9 +84,9 @@ impl ModuleRef {
     #[allow(unused)]
     // Caller must ensure that handler is indeed a dummy
     #[doc(hidden)]
-    pub fn upgrade_dummy(&self, module: Processor) {
+    pub fn upgrade_dummy(&self, module: ModuleImpl) {
         let celled = RefCell::new(module);
-        let celled: RefCell<Processor> = celled;
+        let celled: RefCell<ModuleImpl> = celled;
         self.processing.swap(&celled);
     }
 
@@ -118,11 +118,13 @@ impl ModuleRef {
     ///
     #[must_use]
     pub fn try_as_ref<T: Any>(&self) -> Option<Ref<'_, T>> {
-        Ref::filter_map(self.processing.borrow(), |processor| {
-            let as_any: &dyn Any = &*processor.handler;
-            as_any.downcast_ref::<T>()
-        })
-        .ok()
+        Ref::filter_map(
+            self.processing.try_borrow()
+                .expect("could not aquire handle to node implementation, since the implementation is currently active"),
+            |processor| {
+                processor.downcast_element_ref::<T>()
+            }
+        ).ok()
     }
 
     /// Borrows the referenced module as a mutable reference
@@ -153,11 +155,13 @@ impl ModuleRef {
     ///
     #[must_use]
     pub fn try_as_mut<T: Any>(&self) -> Option<RefMut<'_, T>> {
-        RefMut::filter_map(self.processing.borrow_mut(), |processor| {
-            let as_any: &mut dyn Any = &mut *processor.handler;
-            as_any.downcast_mut::<T>()
-        })
-        .ok()
+        RefMut::filter_map(
+            self.processing.try_borrow_mut()
+                .expect("could not aquire handle to node implementation, since the implementation is currently active"),
+            |processor| {
+                processor.downcast_element_mut::<T>()
+            }
+        ).ok()
     }
 }
 
@@ -182,7 +186,7 @@ impl ModuleRef {
 
     /// INTERNAL
     #[doc(hidden)]
-    #[allow(unused)]
+    #[allow(unused, clippy::unused_self)]
     pub(crate) fn deactivate(&self, rt: &mut impl EventSink<NetEvents>) {
         let _ = ModuleContext::take();
         leave_scope();
@@ -258,9 +262,16 @@ mod tests {
             format!("{module:?}"),
             "ModuleRef { name: \"root.a.b\", handler: 2, ctx: 2 }"
         );
-        assert_eq!(format!("{weak:?}"), "ModuleRefWeak");
+        assert_eq!(
+            format!("{weak:?}"),
+            "ModuleRef { name: \"root.a.b\", handler: 3, ctx: 3 }"
+        );
 
         assert_eq!(module, m2);
+
+        drop((m2, module));
+
+        assert_eq!(format!("{weak:?}"), "Weak { .. }");
     }
 
     #[test]
@@ -272,7 +283,7 @@ mod tests {
         impl Module for A {}
 
         let module = ModuleContext::standalone("root".into());
-        module.upgrade_dummy(Processor::new(ProcessingStack::default(), A { inner: 42 }));
+        module.upgrade_dummy(ModuleImpl::new(ProcessingStack::default(), A { inner: 42 }));
 
         assert!(module.try_as_ref::<i32>().is_none());
         assert!(module.try_as_mut::<i32>().is_none());

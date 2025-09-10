@@ -113,7 +113,7 @@ impl Module for SendMessageModule {
     fn handle_message(&mut self, msg: Message) {
         if msg.header.kind == 10 {
             let _ = send(Message::default().with_content("Hello world"), "out");
-            let gate = current().gate("out", 0).unwrap();
+            let gate = current().gate("out").unwrap();
             let ch = gate.channel().unwrap();
             assert!(ch.is_busy());
         }
@@ -341,7 +341,7 @@ fn datarate_channel_can_send_at_tft_independent_of_event_order() {
 
                 // channel(s) has not yet received the unbusy event
                 current()
-                    .gate("port-no-buffer", 0)
+                    .gate("port-no-buffer")
                     .unwrap()
                     .channel()
                     .unwrap()

@@ -63,31 +63,9 @@
 //! once the next event arrives.
 //!
 
-use std::{
-    any::Any,
-    cell::LazyCell,
-    fmt::Debug,
-    iter::once,
-    ops::Deref,
-    rc::Rc,
-    sync::{Arc, LazyLock, Mutex},
-};
+use std::{any::Any, fmt::Debug, ops::Deref};
 
-use tokio::{
-    runtime::{Builder, RngSeed, Runtime},
-    task::{JoinHandle, LocalSet, yield_now},
-};
-
-use super::module::Module;
-use crate::{
-    net::{
-        Error, ErrorKind, JoinErrorKind,
-        runtime::{AsyncWakeupEvent, NetEvents},
-        schedule_event,
-    },
-    prelude::{Message, RuntimeError, current, random},
-    time::Driver,
-};
+use crate::{net::module::Module, prelude::Message};
 
 /// A subprogramm between the module application and the network layer.
 ///
@@ -183,27 +161,36 @@ pub trait ProcessingElement: Any {
     }
 }
 
-impl<T: Module> ProcessingElement for T {
-    fn process(&mut self, msg: Message) -> Option<Message> {
-        self.handle_message(msg);
-        None
-    }
-}
-
 /// A untyped set of processing elements, effectivly a processing stack.
 #[doc(hidden)]
 #[allow(missing_debug_implementations)]
-pub struct Processor {
+pub struct ModuleImpl {
     pub(super) stack: ProcessingStack,
     pub(super) handler: Box<dyn Module>,
 }
 
-impl Processor {
+impl ModuleImpl {
     pub(super) fn new(stack: ProcessingStack, handler: impl Module) -> Self {
-        Processor {
+        ModuleImpl {
             stack,
             handler: Box::new(handler),
         }
+    }
+
+    // FIXME:
+    // This lookup operations scales O(n) with the amount of proc-elements
+    // maybe make a lookup using a BTreeMap?
+
+    pub(super) fn downcast_element_ref<T: Any>(&self) -> Option<&T> {
+        for element in &self.stack.items {
+            let as_any: &dyn Any = &**element;
+            if let Some(element) = as_any.downcast_ref::<T>() {
+                return Some(element);
+            }
+        }
+
+        let as_any: &dyn Any = &*self.handler;
+        as_any.downcast_ref::<T>()
     }
 
     pub(super) fn downcast_element_mut<T: Any>(&mut self) -> Option<&mut T> {
@@ -213,8 +200,19 @@ impl Processor {
                 return Some(element);
             }
         }
-        None
+
+        let as_any: &mut dyn Any = &mut *self.handler;
+        as_any.downcast_mut::<T>()
     }
+
+    // NOTE:
+    // it is fundamentally impossible to access proc-elements from within the active module,
+    // since by the design of process_with the element is already mutable borrowed. While we could argue
+    // that the borrow is lifted for the duration of the inner call, modelling this is rather complicated
+    // so better not do it.
+    //
+    // FIXME: Editing the proc-chain at runtime from the active module is fundamentally impossible, since
+    // all elements are already mutable borrowed. Maybe make adding possible by deferring the insertion?
 
     pub(super) fn process_with<R>(
         &mut self,
@@ -229,6 +227,8 @@ impl Processor {
     }
 }
 
+// This recursive function may be horribly inefficient
+// TODO: check asm output / actual performance
 fn chain_processing_elements<R>(
     elements: &mut [Box<dyn ProcessingElement>],
     msg: Option<Message>,
@@ -276,9 +276,16 @@ impl From<()> for ProcessingStack {
 
 impl Default for ProcessingStack {
     fn default() -> Self {
-        ProcessingStack {
-            items: vec![Box::new(TimeDriver::new()), Box::new(TokioRuntime::new())],
-        }
+        #[cfg(feature = "async")]
+        return ProcessingStack {
+            items: vec![
+                Box::new(TimeDriver::default()),
+                Box::new(TokioRuntime::default()),
+            ],
+        };
+
+        #[cfg(not(feature = "async"))]
+        return ProcessingStack { items: Vec::new() };
     }
 }
 
@@ -318,190 +325,222 @@ for_tuples!(A, B, C, D, E, F, G, H);
 for_tuples!(A, B, C, D, E, F, G, H, I);
 for_tuples!(A, B, C, D, E, F, G, H, I, J);
 
-/// A processing element that provides a tokio runtime in the entered state.
-#[derive(Debug)]
-pub struct TokioRuntime {
-    pub(super) tasks: Rc<LocalSet>,
-    pub(super) rt: LazyCell<Arc<Runtime>>,
-    pub(super) handles: Vec<(JoinHandle<()>, bool)>,
-}
+cfg_async! {
+    use std::{
+        cell::LazyCell,
+        iter::once,
+        rc::Rc,
+        sync::{Arc, LazyLock, Mutex},
+    };
 
-static JOIN_THREADS: LazyLock<Mutex<Vec<(JoinHandle<()>, bool)>>> =
-    LazyLock::new(|| Mutex::default());
+    use tokio::{
+        runtime::{Builder, RngSeed, Runtime},
+        task::{JoinHandle, LocalSet, yield_now},
+    };
 
-impl TokioRuntime {
-    /// Create a new TokioRuntime instance.
-    pub fn new() -> Self {
-        let tasks = Rc::new(LocalSet::new());
-        Self {
-            tasks,
-            rt: LazyCell::new(|| {
-                #[allow(unused_mut)]
-                let mut builder = Builder::new_current_thread();
-                #[cfg(feature = "unstable-tokio-enable-time")]
-                builder.enable_time();
+    use crate::{
+        net::{
+            Error, ErrorKind, JoinErrorKind,
+            runtime::{NetEvents, AsyncWakeupEvent},
+            schedule_event,
+        },
+        prelude::{RuntimeError, current, random},
+        time::Driver,
+    };
 
-                Arc::new(
-                    builder
-                        .rng_seed(RngSeed::from_bytes(&random::<u64>().to_le_bytes()))
-                        .build()
-                        .expect("Failed to build tokio runtime"),
-                )
-            }),
-            handles: Vec::new(),
-        }
+    /// A processing element that provides a tokio runtime in the entered state.
+    #[derive(Debug)]
+    pub struct TokioRuntime {
+        pub(super) tasks: Rc<LocalSet>,
+        pub(super) rt: LazyCell<Arc<Runtime>>,
+        pub(super) handles: Vec<(JoinHandle<()>, bool)>,
     }
 
-    /// Join a handle.
-    pub fn join(handle: JoinHandle<()>) {
-        let mut join_threads = JOIN_THREADS.lock().unwrap();
-        join_threads.push((handle, true));
-    }
+    #[allow(clippy::type_complexity)]
+    static JOIN_THREADS: LazyLock<Mutex<Vec<(JoinHandle<()>, bool)>>> =
+        LazyLock::new(Mutex::default);
 
-    /// Try to join a handle.
-    pub fn try_join(handle: JoinHandle<()>) {
-        let mut join_threads = JOIN_THREADS.lock().unwrap();
-        join_threads.push((handle, false));
-    }
+    impl Default for TokioRuntime {
+     fn default() -> Self {
+            let tasks = Rc::new(LocalSet::new());
+            Self {
+                tasks,
+                rt: LazyCell::new(|| {
+                    #[allow(unused_mut)]
+                    let mut builder = Builder::new_current_thread();
+                    #[cfg(feature = "unstable-tokio-enable-time")]
+                    builder.enable_time();
 
-    /// Reset the join handles.
-    pub fn reset_join_handles(&mut self) {
-        let mut join_threads = JOIN_THREADS.lock().unwrap();
-        join_threads.clear();
-        self.handles.clear();
-    }
-
-    /// Reset the runtime.
-    pub fn reset(&mut self) {
-        *self = Self::new();
-    }
-
-    /// Shutdown the runtime.
-    pub fn shutdown(&mut self) {
-        *self = Self::new();
-    }
-
-    /// a custom handler for sim-end szenarios, only supported by this proc-element.
-    pub fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
-        let mut error = RuntimeError::empty();
-
-        let _guard = self.rt.enter();
-        // self.tasks.block_on(&self.rt, yield_now());
-
-        for (handle, must_join) in self.handles.drain(..) {
-            if !handle.is_finished() {
-                if must_join {
-                    error.extend(once(Error::new_current(ErrorKind::JoinError(
-                        JoinErrorKind::NotFinished,
-                    ))));
-                }
-                continue;
-            }
-
-            match self.rt.block_on(handle) {
-                Ok(()) => {}
-                Err(e) if e.is_panic() => error.extend(once(Error::new_current(
-                    ErrorKind::JoinError(JoinErrorKind::Paniced(e.into_panic())),
-                ))),
-                Err(e) => error.extend(once(Error::new_current(ErrorKind::JoinError(
-                    JoinErrorKind::Tokio(e),
-                )))),
-            }
-        }
-
-        if error.is_empty() { Ok(()) } else { Err(error) }
-    }
-}
-
-impl ProcessingElement for TokioRuntime {
-    fn process_with(
-        &mut self,
-        msg: Option<Message>,
-        inner: &mut dyn FnMut(Option<Message>) -> Option<Message>,
-    ) -> Option<Message> {
-        JOIN_THREADS.lock().expect("failed to get lock").clear();
-
-        let res = self.tasks.block_on(&self.rt, async {
-            let res = inner(msg);
-            yield_now().await;
-            res
-        });
-
-        self.handles.append(
-            &mut JOIN_THREADS
-                .lock()
-                .expect("failed to get lock, this should be impossible"),
-        );
-
-        res
-    }
-}
-
-///
-#[derive(Debug)]
-pub struct TimeDriver {
-    driver: Option<Driver>,
-}
-
-impl TimeDriver {
-    ///
-    pub fn new() -> Self {
-        Self {
-            driver: Some(Driver::new()),
-        }
-    }
-}
-
-impl ProcessingElement for TimeDriver {
-    fn process_with(
-        &mut self,
-        msg: Option<Message>,
-        inner: &mut dyn FnMut(Option<Message>) -> Option<Message>,
-    ) -> Option<Message> {
-        use crate::time::{SimTime, TimerSlot};
-
-        let driver = self.driver.take();
-        if let Some(mut driver) = driver {
-            let bumpable = driver.bump();
-            if driver.next_wakeup <= SimTime::now() {
-                driver.next_wakeup = SimTime::MAX;
-            }
-            bumpable.into_iter().for_each(TimerSlot::wake_all);
-            driver.set();
-        }
-
-        let res = inner(msg);
-
-        let Some(mut driver) = Driver::unset() else {
-            // Somebody stole our driver
-            #[cfg(feature = "tracing")]
-            tracing::error!("IO time driver missing after event execution");
-
-            self.driver = Some(Driver::new());
-            return res;
-        };
-
-        if let Some(next_wakeup) = driver.next()
-            && next_wakeup < driver.next_wakeup
-        {
-            #[cfg(feature = "tracing")]
-            tracing::trace!(
-                "scheduling new wakeup at {} (prev {})",
-                next_wakeup,
-                driver.next_wakeup
-            );
-
-            driver.next_wakeup = next_wakeup;
-
-            schedule_event(
-                NetEvents::AsyncWakeupEvent(AsyncWakeupEvent {
-                    module: current().me(),
+                    Arc::new(
+                        builder
+                            .rng_seed(RngSeed::from_bytes(&random::<u64>().to_le_bytes()))
+                            .build()
+                            .expect("Failed to build tokio runtime"),
+                    )
                 }),
-                next_wakeup,
-            );
+                handles: Vec::new(),
+            }
+        }
+    }
+
+    impl TokioRuntime {
+        /// Join a handle.
+        #[allow(clippy::missing_panics_doc)]
+        pub fn join(handle: JoinHandle<()>) {
+            let mut join_threads = JOIN_THREADS.lock().expect("failed to get lock");
+            join_threads.push((handle, true));
         }
 
-        self.driver = Some(driver);
-        res
+        /// Try to join a handle.
+        #[allow(clippy::missing_panics_doc)]
+        pub fn try_join(handle: JoinHandle<()>) {
+            let mut join_threads = JOIN_THREADS.lock().expect("failed to get lock");
+            join_threads.push((handle, false));
+        }
+
+        /// Reset the join handles.
+        #[allow(clippy::missing_panics_doc)]
+        pub fn reset_join_handles(&mut self) {
+            let mut join_threads = JOIN_THREADS.lock().expect("failed to get lock");
+            join_threads.clear();
+            self.handles.clear();
+        }
+
+        /// Reset the runtime.
+        pub fn reset(&mut self) {
+            *self = Self::default();
+        }
+
+        /// Shutdown the runtime.
+        pub fn shutdown(&mut self) {
+            *self = Self::default();
+        }
+
+        /// a custom handler for sim-end szenarios, only supported by this proc-element.
+        ///
+        /// # Errors
+        ///
+        /// Erorors that occured in handles about to be joined.
+        pub fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+            let mut error = RuntimeError::empty();
+
+            let _guard = self.rt.enter();
+            // self.tasks.block_on(&self.rt, yield_now());
+
+            for (handle, must_join) in self.handles.drain(..) {
+                if !handle.is_finished() {
+                    if must_join {
+                        error.extend(once(Error::new_current(ErrorKind::JoinError(
+                            JoinErrorKind::NotFinished,
+                        ))));
+                    }
+                    continue;
+                }
+
+                match self.rt.block_on(handle) {
+                    Ok(()) => {}
+                    Err(e) if e.is_panic() => error.extend(once(Error::new_current(
+                        ErrorKind::JoinError(JoinErrorKind::Paniced(e.into_panic())),
+                    ))),
+                    Err(e) => error.extend(once(Error::new_current(ErrorKind::JoinError(
+                        JoinErrorKind::Tokio(e),
+                    )))),
+                }
+            }
+
+            if error.is_empty() { Ok(()) } else { Err(error) }
+        }
+    }
+
+    impl ProcessingElement for TokioRuntime {
+        fn process_with(
+            &mut self,
+            msg: Option<Message>,
+            inner: &mut dyn FnMut(Option<Message>) -> Option<Message>,
+        ) -> Option<Message> {
+            JOIN_THREADS.lock().expect("failed to get lock").clear();
+
+            let res = self.tasks.block_on(&self.rt, async {
+                let res = inner(msg);
+                yield_now().await;
+                res
+            });
+
+            self.handles.append(
+                &mut JOIN_THREADS
+                    .lock()
+                    .expect("failed to get lock, this should be impossible"),
+            );
+
+            res
+        }
+    }
+
+    /// Timer Driver
+    #[derive(Debug)]
+    pub struct TimeDriver {
+        driver: Option<Driver>,
+    }
+
+    impl Default for TimeDriver {
+        fn default() -> Self {
+            Self {
+                driver: Some(Driver::new()),
+            }
+        }
+    }
+
+    impl ProcessingElement for TimeDriver {
+        fn process_with(
+            &mut self,
+            msg: Option<Message>,
+            inner: &mut dyn FnMut(Option<Message>) -> Option<Message>,
+        ) -> Option<Message> {
+            use crate::time::{SimTime, TimerSlot};
+
+            let driver = self.driver.take();
+            if let Some(mut driver) = driver {
+                let bumpable = driver.bump();
+                if driver.next_wakeup <= SimTime::now() {
+                    driver.next_wakeup = SimTime::MAX;
+                }
+                bumpable.into_iter().for_each(TimerSlot::wake_all);
+                driver.set();
+            }
+
+            let res = inner(msg);
+
+            let Some(mut driver) = Driver::unset() else {
+                // Somebody stole our driver
+                #[cfg(feature = "tracing")]
+                tracing::error!("IO time driver missing after event execution");
+
+                self.driver = Some(Driver::new());
+                return res;
+            };
+
+            if let Some(next_wakeup) = driver.next()
+                && next_wakeup < driver.next_wakeup
+            {
+                #[cfg(feature = "tracing")]
+                tracing::trace!(
+                    "scheduling new wakeup at {} (prev {})",
+                    next_wakeup,
+                    driver.next_wakeup
+                );
+
+                driver.next_wakeup = next_wakeup;
+
+                schedule_event(
+                    NetEvents::AsyncWakeupEvent(AsyncWakeupEvent {
+                        module: current().me(),
+                    }),
+                    next_wakeup,
+                );
+            }
+
+            self.driver = Some(driver);
+            res
+        }
     }
 }

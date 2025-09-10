@@ -323,7 +323,7 @@ fn access_gate(
     let accessor = &accessors[0];
     if accessors.len() == 1 {
         // Gate access
-        ctx.gate(&accessor.name, accessor.index.unwrap_or(0))
+        ctx.gate((&accessor.name[..], accessor.index.unwrap_or(0)))
     } else {
         // Submodule access
         let child = ctx.child(&accessor.as_name()).expect("child");

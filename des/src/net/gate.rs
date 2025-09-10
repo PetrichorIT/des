@@ -244,8 +244,8 @@ impl Gate {
     /// # use des::prelude::*;
     /// # fn a() -> Option<()>{
     /// # return None;
-    /// let a = current().gate("out", 0)?;
-    /// let b = current().parent().ok()?.gate("in", 0)?;
+    /// let a = current().gate(("out", 0))?;
+    /// let b = current().parent().ok()?.gate(("in", 0))?;
     /// a.connect(b);
     /// # Some(())
     /// # }
@@ -278,8 +278,8 @@ impl Gate {
     /// # use des::prelude::*;
     /// # fn a() -> Option<()>{
     /// # return None;
-    /// let a = current().gate("out", 0)?;
-    /// let b = current().parent().ok()?.gate("in", 0)?;
+    /// let a = current().gate(("out", 0))?;
+    /// let b = current().parent().ok()?.gate(("in", 0))?;
     /// a.connect(b);
     /// # Some(())
     /// # }

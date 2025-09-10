@@ -1,7 +1,7 @@
 #![cfg(feature = "async")]
 
 use des::{
-    net::{ErrorKind, handlers::ModuleFn, module::Module},
+    net::{ErrorKind, globals, handlers::ModuleFn, module::Module},
     prelude::*,
     time::sleep,
 };
@@ -487,4 +487,40 @@ fn shutdown_prevents_accessing_parents() {
     );
 
     let _ = Builder::seeded(123).build(sim.freeze()).run().unwrap();
+}
+
+#[test]
+#[serial]
+fn shutdown_from_foreign_module() -> Result<(), RuntimeError> {
+    des::tracing::init();
+
+    let mut sim = Sim::new(());
+    sim.node(
+        "alice",
+        ModuleFn::new(
+            || {
+                if SimTime::now().is_zero() {
+                    // restart should not trigger again
+                    schedule_in(Message::default().with_id(1), Duration::from_secs(5));
+                    schedule_in(Message::default().with_id(2), Duration::from_secs(10));
+                }
+            },
+            |_, msg| assert_eq!(msg.id, 2), // First message should be skipped, since shutdown
+        ),
+    );
+
+    sim.node(
+        "bob",
+        ModuleFn::new(
+            || schedule_in(Message::default(), Duration::from_secs(2)),
+            |_, _| {
+                globals()
+                    .get(&"alice".into())
+                    .unwrap()
+                    .shutdow_and_restart_at(8.0.into());
+            },
+        ),
+    );
+
+    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
 }

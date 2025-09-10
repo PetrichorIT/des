@@ -67,7 +67,7 @@ pub fn send(msg: impl Into<Message>, gate: impl IntoModuleGate) -> Result<(), Se
 ///         send_in(Message::default().with_kind(42), "out", Duration::from_secs(2));
 ///         assert!(
 ///             !current()
-///                 .gate("out", 0).unwrap()
+///                 .gate("out").unwrap()
 ///                 .path_iter().unwrap() // an iter can NOT be created for transit gates, no direction info provided
 ///                 .next().unwrap() // get next iter element
 ///                 .channel().unwrap() // channels attached to connections are optional

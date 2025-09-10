@@ -2,8 +2,8 @@ use std::{fmt, marker::PhantomData};
 
 use crate::net::{
     ObjectPath,
-    module::{Module, to_processing_chain},
-    processing::{ProcessingStack, Processor},
+    module::Module,
+    processing::{ModuleImpl, ProcessingStack},
 };
 
 /// A type that can be created based on the nodes path and a
@@ -149,7 +149,7 @@ impl<L: Layer> Registry<L> {
         path: &ObjectPath,
         symbol: &str,
         stack: &mut dyn FnMut() -> ProcessingStack,
-    ) -> Option<Processor> {
+    ) -> Option<ModuleImpl> {
         self.layer.resolve(path, symbol, stack)
     }
 
@@ -384,7 +384,7 @@ pub trait Layer {
         _path: &ObjectPath,
         _symbol: &str,
         _stack: &mut dyn FnMut() -> ProcessingStack,
-    ) -> Option<Processor> {
+    ) -> Option<ModuleImpl> {
         None
     }
 }
@@ -402,13 +402,14 @@ where
         path: &ObjectPath,
         symbol: &str,
         stack: &mut dyn FnMut() -> ProcessingStack,
-    ) -> Option<Processor> {
+    ) -> Option<ModuleImpl> {
         self.inner.resolve(path, symbol, stack).or_else(|| {
             if symbol == self.ty {
-                Some(to_processing_chain(
-                    self.factory.create_inner(path, symbol),
-                    stack(),
-                ))
+                Some({
+                    let module = self.factory.create_inner(path, symbol);
+                    let stack = stack();
+                    ModuleImpl::new(module.stack(stack), module)
+                })
             } else {
                 None
             }
@@ -428,12 +429,12 @@ where
         path: &ObjectPath,
         symbol: &str,
         stack: &mut dyn FnMut() -> ProcessingStack,
-    ) -> Option<Processor> {
-        Some(
-            self.inner
-                .resolve(path, symbol, stack)
-                .unwrap_or_else(|| to_processing_chain((self.f)(), stack())),
-        )
+    ) -> Option<ModuleImpl> {
+        Some(self.inner.resolve(path, symbol, stack).unwrap_or_else(|| {
+            let module = (self.f)();
+            let stack = stack();
+            ModuleImpl::new(module.stack(stack), module)
+        }))
     }
 }
 

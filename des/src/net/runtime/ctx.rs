@@ -4,7 +4,7 @@ use super::{Globals, HandleMessageEvent, MessageExitingConnection, Sim};
 use crate::net::channel::SendError;
 use crate::net::gate::Connection;
 use crate::net::module::{MOD_CTX, current, with_mod_ctx};
-use crate::net::runtime::{ModuleRestartEvent, NetEvents};
+use crate::net::runtime::NetEvents;
 use crate::net::{gate::GateRef, message::Message};
 use crate::prelude::{EventLifecycle, ModuleRef, RuntimeError};
 use crate::runtime::{LikeRuntimeError, Runtime};
@@ -12,9 +12,6 @@ use crate::sync::Mutex;
 use crate::time::SimTime;
 use std::iter::once;
 use std::sync::{Arc, Weak};
-
-#[cfg(feature = "async")]
-use crate::net::processing::TokioRuntime;
 
 static BUF_CTX: Mutex<BufferContext> = Mutex::new(BufferContext::new());
 
@@ -121,7 +118,7 @@ pub(crate) fn buf_schedule_event(event: NetEvents, time: SimTime) {
     ctx.events.push((event, time));
 }
 
-pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<Sim<A>>)
+pub(crate) fn buf_process<A>(_module: &ModuleRef, rt: &mut Runtime<Sim<A>>)
 where
     A: EventLifecycle<Sim<A>>,
 {
@@ -132,40 +129,7 @@ where
         rt.add_event(event, time);
     }
 
-    // (2) Handle shutdown if indicated
-    if let Some(restart) = module.shutdown_task.write().take() {
-        // Mark the modules state
-        #[cfg(feature = "tracing")]
-        tracing::debug!("Shuttind down module and restaring at {:?}", restart);
-        module
-            .ctx
-            .active
-            .store(false, std::sync::atomic::Ordering::SeqCst);
-
-        // drop the rt, to prevent all async activity from happening.
-        #[cfg(feature = "async")]
-        module
-            .processing
-            .borrow_mut()
-            .downcast_element_mut::<TokioRuntime>()
-            .map(|rt| rt.shutdown());
-
-        // Reset the internal state
-        // Note that the module is not active, so it must be manually reactivated
-        module.activate();
-        rt.app.error.extend(module.reset().err());
-        module.deactivate(rt);
-
-        // Reschedule wakeup
-        if let Some(restart) = restart {
-            rt.add_event(
-                NetEvents::ModuleRestartEvent(ModuleRestartEvent {
-                    module: module.clone(),
-                }),
-                restart,
-            );
-        }
-    }
+    // FIXME: pull error from BUFCTX
 }
 
 pub(crate) fn buf_fail(e: impl LikeRuntimeError) {

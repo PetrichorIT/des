@@ -1,6 +1,11 @@
 use super::{DummyModule, ModuleId, ModuleRef, ModuleRefWeak, Prop, PropType, Props, RawProp};
 use crate::{
-    net::{Error, ErrorKind},
+    net::{
+        Error, ErrorKind,
+        gate::IntoModuleGate,
+        runtime::{ModuleShutdownEvent, NetEvents},
+        schedule_event,
+    },
     prelude::{GateRef, ObjectPath},
     sync::SwapLock,
     time::SimTime,
@@ -55,10 +60,6 @@ pub struct ModuleContext {
 
     pub(crate) parent: Option<ModuleRefWeak>,
     pub(crate) children: RwLock<FxHashMap<String, ModuleRef>>,
-
-    // RUNTIME VALUES
-    #[allow(clippy::option_option)]
-    pub(crate) shutdown_task: RwLock<Option<Option<SimTime>>>,
 }
 
 impl ModuleContext {
@@ -86,8 +87,6 @@ impl ModuleContext {
 
             parent: None,
             children: RwLock::new(FxHashMap::with_hasher(FxBuildHasher::default())),
-
-            shutdown_task: RwLock::default(),
         }))
     }
 
@@ -117,8 +116,6 @@ impl ModuleContext {
 
             parent: Some(ModuleRefWeak::new(&parent)),
             children: RwLock::new(FxHashMap::with_hasher(FxBuildHasher::default())),
-
-            shutdown_task: RwLock::default(),
         }));
 
         parent
@@ -142,6 +139,11 @@ impl ModuleContext {
         this
     }
 
+    /// Indicates whether the module belonging to this context is currently active.
+    pub fn is_currently_active(&self) -> bool {
+        with_mod_ctx(|ctx| ctx.id == self.id)
+    }
+
     /// Shuts down all activity for the module.
     ///
     /// > *This function requires a node-context within the simulation*
@@ -154,7 +156,13 @@ impl ModuleContext {
     /// This function must be used within a module context
     /// otherwise its effects should be consider UB.
     pub fn shutdown(&self) {
-        *self.shutdown_task.write() = Some(None);
+        schedule_event(
+            NetEvents::ModuleShutdownEvent(ModuleShutdownEvent {
+                module: self.me(),
+                restart_at: None,
+            }),
+            SimTime::now(),
+        );
     }
 
     /// Shuts down all activity for the module.
@@ -211,7 +219,13 @@ impl ModuleContext {
     /// [`Module::reset`]: crate::net::module::Module::reset
     /// [`Module::at_sim_start`]: crate::net::module::Module::at_sim_start
     pub fn shutdow_and_restart_in(&self, dur: Duration) {
-        *self.shutdown_task.write() = Some(Some(SimTime::now() + dur));
+        schedule_event(
+            NetEvents::ModuleShutdownEvent(ModuleShutdownEvent {
+                module: self.me(),
+                restart_at: Some(SimTime::now() + dur),
+            }),
+            SimTime::now(),
+        );
     }
 
     /// Shuts down all activity for the module.
@@ -224,7 +238,13 @@ impl ModuleContext {
     ///
     /// See [`shutdow_and_restart_in`](ModuleContext::shutdow_and_restart_in) for more information.
     pub fn shutdow_and_restart_at(&self, restart_at: SimTime) {
-        *self.shutdown_task.write() = Some(Some(restart_at));
+        schedule_event(
+            NetEvents::ModuleShutdownEvent(ModuleShutdownEvent {
+                module: self.me(),
+                restart_at: Some(restart_at),
+            }),
+            SimTime::now(),
+        );
     }
 
     /// TODO
@@ -353,12 +373,8 @@ impl ModuleContext {
 
     /// Returns a ref to a gate of the current module dependent on its name and cluster position
     /// if possible.
-    pub fn gate(&self, name: &str, pos: usize) -> Option<GateRef> {
-        self.gates
-            .read()
-            .iter()
-            .find(|&g| g.name() == name && g.pos() == pos)
-            .cloned()
+    pub fn gate(&self, desc: impl IntoModuleGate) -> Option<GateRef> {
+        desc.as_gate(self)
     }
 
     /// Returns the unwind behaviour of this module.
@@ -455,6 +471,14 @@ impl ModuleContext {
     }
 }
 
+// FIXME:
+// Since the module ctx is available from all other modules, none of the APIs
+// should assume that self is the currently active module context.
+//
+// Some however do:
+// - spawner
+//
+
 cfg_async! {
     use tokio::task::JoinHandle;
     use crate::net::processing::TokioRuntime;
@@ -464,7 +488,12 @@ cfg_async! {
         ///
         /// This function will **not** block, but rather defer the joining
         /// to the simulation shutdown phase.
+        ///
+        /// # Panics
+        ///
+        /// Panics if the module context is not the currently active module context.
         pub fn join(&self, handle: JoinHandle<()>) {
+            assert!(self.is_currently_active(), "Cannot add join handle to the join group of another module");
             TokioRuntime::join(handle);
         }
 
@@ -472,7 +501,12 @@ cfg_async! {
         ///
         /// This will catch panics that occured within the task, but
         /// if the task is still running, no error will be returned.
+        ///
+        /// # Panics
+        ///
+        /// Panics if the module context is not the currently active module context.
         pub fn try_join(&self, handle: JoinHandle<()>) {
+            assert!(self.is_currently_active(), "Cannot add join handle to the join group of another module");
             TokioRuntime::try_join(handle);
         }
     }

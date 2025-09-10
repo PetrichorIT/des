@@ -1,5 +1,5 @@
 use crate::{
-    net::{module::to_processing_chain, processing::ProcessingStack},
+    net::processing::{ModuleImpl, ProcessingStack},
     prelude::{Gate, Module, ModuleRef},
 };
 
@@ -34,7 +34,7 @@ impl Spawner<'_> {
         let ctx = ModuleContext::child_of(name.as_ref(), sref);
 
         ctx.activate();
-        let pe = to_processing_chain(module, stack);
+        let pe = ModuleImpl::new(module.stack(stack), module);
         ctx.upgrade_dummy(pe);
         ctx.deactivate(&mut vec![]);
 

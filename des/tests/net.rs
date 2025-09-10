@@ -101,3 +101,66 @@ fn select_node_from_globals() -> Result<(), RuntimeError> {
 
     Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
 }
+
+#[test]
+#[serial]
+fn can_access_foreign_module_context() -> Result<(), RuntimeError> {
+    let mut sim = Sim::new(());
+
+    struct Alice;
+    impl Module for Alice {
+        fn at_sim_start(&mut self, _: usize) {
+            current().prop::<String>("key").unwrap().set("value".into());
+        }
+
+        fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+            assert_eq!(
+                current().prop::<String>("key").unwrap().get(),
+                Some("new_value".into())
+            );
+            Ok(())
+        }
+    }
+
+    struct Bob;
+    impl Module for Bob {
+        fn num_sim_start_stages(&self) -> usize {
+            2
+        }
+
+        fn at_sim_start(&mut self, s: usize) {
+            if s == 0 {
+                return;
+            }
+            let gate = current().gate("port").expect("local port must exist");
+            let other = gate.path_end().expect("other module must exist").owner();
+
+            // Gate parsing works just fine with IntoModuleGate
+            let _ = other
+                .gate("other-port")
+                .expect("other port must exist and be resolved with the correct path");
+
+            // simple data acces
+            assert_eq!(other.gates().len(), 2);
+            assert_eq!(other.path(), "alice".into());
+
+            // prop access
+            let mut prop = other.prop::<String>("key").unwrap();
+            assert_eq!(prop.get(), Some("value".into()));
+            prop.set("new_value".into());
+            assert_eq!(prop.get(), Some("new_value".into()));
+
+            // active
+            assert!(!other.is_currently_active());
+            assert!(current().is_currently_active());
+        }
+    }
+
+    sim.node("alice", Alice);
+    sim.node("bob", Bob);
+
+    sim.gate("alice", "port").connect(sim.gate("bob", "port"));
+    let _ = sim.gate("alice", "other-port");
+
+    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
+}

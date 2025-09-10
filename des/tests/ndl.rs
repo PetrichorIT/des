@@ -95,7 +95,7 @@ mod common {
     pub struct Router;
     impl Module for Router {
         fn handle_message(&mut self, msg: Message) {
-            let g = current().gate("out", msg.header.id as usize).unwrap();
+            let g = current().gate(("out", msg.header.id as usize)).unwrap();
             let _ = send(msg, g);
         }
     }

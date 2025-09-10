@@ -94,7 +94,7 @@ fn builder_gate_cluster() {
     impl Module for Alice {
         fn at_sim_start(&mut self, _: usize) {
             for i in 0..4 {
-                assert!(current().gate("cluster", i).is_some());
+                assert!(current().gate(("cluster", i)).is_some());
             }
         }
     }

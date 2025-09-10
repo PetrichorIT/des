@@ -89,7 +89,7 @@ pub(crate) use dummy::*;
 pub use props::*;
 pub use refs::*;
 
-use super::processing::{ProcessingStack, Processor};
+use super::processing::ProcessingStack;
 
 /// A unique identifier for a module.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -216,8 +216,4 @@ pub trait Module: Any {
     fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
         Ok(())
     }
-}
-
-pub(crate) fn to_processing_chain<M: Module>(module: M, stack: ProcessingStack) -> Processor {
-    Processor::new(module.stack(stack), module)
 }
