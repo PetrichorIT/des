@@ -170,14 +170,11 @@ pub struct ModuleImpl {
 }
 
 impl ModuleImpl {
-    pub(super) fn new(stack: ProcessingStack, handler: impl Module) -> Self {
-        ModuleImpl {
-            stack,
-            handler: Box::new(handler),
-        }
+    pub(super) fn new(stack: ProcessingStack, handler: Box<dyn Module>) -> Self {
+        ModuleImpl { stack, handler }
     }
 
-    // FIXME:
+    // FIXME: O(n) lookups
     // This lookup operations scales O(n) with the amount of proc-elements
     // maybe make a lookup using a BTreeMap?
 
@@ -210,9 +207,6 @@ impl ModuleImpl {
     // since by the design of process_with the element is already mutable borrowed. While we could argue
     // that the borrow is lifted for the duration of the inner call, modelling this is rather complicated
     // so better not do it.
-    //
-    // FIXME: Editing the proc-chain at runtime from the active module is fundamentally impossible, since
-    // all elements are already mutable borrowed. Maybe make adding possible by deferring the insertion?
 
     pub(super) fn process_with<R>(
         &mut self,
@@ -425,8 +419,6 @@ cfg_async! {
             let mut error = RuntimeError::empty();
 
             let _guard = self.rt.enter();
-            // self.tasks.block_on(&self.rt, yield_now());
-
             for (handle, must_join) in self.handles.drain(..) {
                 if !handle.is_finished() {
                     if must_join {

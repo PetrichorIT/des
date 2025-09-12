@@ -2,8 +2,8 @@ use serde_yml::{Value, from_str};
 
 use crate::{
     net::{
-        module::{Cfg, DummyModule, MOD_CTX, ModuleContext, try_current},
-        processing::{ModuleImpl, ProcessingStack},
+        module::{Cfg, DummyModule, MOD_CTX, try_current},
+        processing::ProcessingStack,
         topology::Topology,
     },
     prelude::{Application, EventLifecycle, GateRef, Module, ModuleRef, ObjectPath, Runtime},
@@ -36,6 +36,9 @@ pub mod handlers;
 
 mod unwind;
 use self::unwind::Harness;
+
+mod spawner;
+pub use self::spawner::{Spawner, SpawnerKind};
 
 /// A networking simulation.
 ///
@@ -94,53 +97,6 @@ pub struct SimBuilder<A> {
     sim: Sim<A>,
     pub(crate) stack: Box<dyn FnMut() -> ProcessingStack>,
     pub(crate) cfgs: Vec<Cfg>,
-}
-
-/// A helper to manage a scoped part of a networking simulation,
-/// exclusivly used when building the simulation.
-///
-/// This type is helpful in combination with the trait [`IntoModuleTree`]
-/// to create reproducable blocks of modules at different
-/// locations within the simulation.
-///
-/// This builder acts comparable to [`Sim`], but with an automatically
-/// applied path prefix, the `scope`.
-///
-/// # Examples
-///
-/// ```
-/// # use des::prelude::*;
-/// # use des::net::{handlers::{ModuleFn, HandlerFn}, IntoModuleTree};
-/// struct LAN {}
-/// impl IntoModuleTree for LAN {
-///     type Ret = ();
-///     fn build<A>(self, mut sim: SimBuilderScoped<'_, A>) {
-///         sim.root(HandlerFn::new(|_| {}));
-///         let gates = sim.gates("", "port", 5);
-///         for i in 0..5 {
-///             let host = format!("host-{i}");
-///             sim.node(&host, ModuleFn::new(
-///                 /* ... */
-///                 # || 123, |_, _| {}
-///             ));
-///             let gate = sim.gate(&host, "port");
-///             gate.connect(gates[i].clone());
-///         }
-///     }
-/// }
-///
-/// let mut sim = Sim::new(());
-/// sim.node("google", LAN {});
-/// sim.node("microsoft", LAN {});
-/// sim.node("aws", HandlerFn::new(|_| {}));
-/// sim.node("aws.us-east", LAN {});
-///
-/// let _ = Builder::new().build(sim.freeze()).run();
-/// ```
-#[derive(Debug)]
-pub struct SimBuilderScoped<'a, A> {
-    pub(crate) base: &'a mut SimBuilder<A>,
-    pub(crate) scope: ObjectPath,
 }
 
 impl<A> Sim<A> {
@@ -400,9 +356,9 @@ impl<A> SimBuilder<A> {
     /// Custom implementations of `ModuleBlock` can not only create modules based
     /// on config data, but also gates and connections between these modules. Note
     /// that `ModuleBlock::build` is confined to the scope defined by `path`, since
-    /// it uses a [`SimBuilderScoped`] builder.
+    /// it uses a [`Spawner`] builder.
     ///
-    /// See [`SimBuilderScoped`] for more information.
+    /// See [`Spawner`] for more information.
     ///
     /// # Examples
     ///
@@ -427,58 +383,13 @@ impl<A> SimBuilder<A> {
         path: impl Into<ObjectPath>,
         module_block: M,
     ) -> M::Ret {
-        let scoped = SimBuilderScoped::new(self, path.into());
+        let scoped = Spawner::new_at_buildtime(path.into(), self);
         module_block.build(scoped)
     }
 
     /// Returns the contained `Sim`, ending the building phase.
     pub fn freeze(self) -> Sim<A> {
         self.sim
-    }
-
-    pub(super) fn raw(&mut self, path: ObjectPath, module: impl Module) -> ModuleRef {
-        // Check dup
-        assert!(
-            self.get(&path).is_none(),
-            "cannot create node '{path}', node allready exists"
-        );
-
-        // Check node path location
-        let ctx = if let Some(parent) = path.nonzero_parent() {
-            // (a) Check that the parent exists
-            let Some(parent) = self.get(&parent) else {
-                panic!(
-                    "cannot create node '{path}', since parent node '{parent}' is required, but does not exist"
-                );
-            };
-
-            ModuleContext::child_of(path.name(), parent)
-        } else {
-            ModuleContext::standalone(path)
-        };
-
-        // read in Props
-        let path_parts = ctx.path.as_str().split('.').collect::<Vec<_>>();
-        for cfg in &self.cfgs {
-            cfg.capture_for(&path_parts, &mut ctx.props.write());
-        }
-
-        ctx.activate();
-        let pe = {
-            let stack = (self.stack)();
-            ModuleImpl::new(module.stack(stack), module)
-        };
-        ctx.upgrade_dummy(pe);
-
-        let mut sink = Vec::new();
-        ctx.deactivate(&mut sink);
-        assert!(
-            sink.is_empty(),
-            "events cannot be dispatched in constructors"
-        );
-
-        self.with_modules_mut(|mods| mods.add(ctx.clone()));
-        ctx
     }
 }
 
@@ -501,64 +412,6 @@ impl<A> DerefMut for SimBuilder<A> {
     }
 }
 
-impl<'a, A> SimBuilderScoped<'a, A> {
-    pub(crate) fn new(base: &'a mut SimBuilder<A>, scope: ObjectPath) -> Self {
-        Self { base, scope }
-    }
-
-    #[allow(unused)]
-    pub(crate) fn subscope(&mut self, path: impl AsRef<str>) -> SimBuilderScoped<'_, A> {
-        SimBuilderScoped {
-            base: &mut *self.base,
-            scope: self.scope.appended(path),
-        }
-    }
-}
-
-impl<A> SimBuilderScoped<'_, A> {
-    /// The current scope from an absoute prespective.
-    #[must_use]
-    pub fn scope(&self) -> &ObjectPath {
-        &self.scope
-    }
-
-    /// The inner application of the simulation `Sim<A>`.
-    #[must_use]
-    pub fn inner(&self) -> &A {
-        &self.base.inner
-    }
-
-    /// Sets the current scope module.
-    ///
-    /// This call is equivalent to `sim.node(scope, <module_block>)` on [`Sim`].
-    pub fn root(&mut self, module_block: impl Module) {
-        self.base.raw(self.scope.clone(), module_block);
-    }
-
-    /// Creates a module block within the current scope.
-    ///
-    /// See [`SimBuilder::node`] for more information.
-    pub fn node(&mut self, path: impl Into<ObjectPath>, module_block: impl IntoModuleTree) {
-        self.base
-            .node(self.scope.appended(path.into().as_str()), module_block);
-    }
-
-    /// Creates a gate on an existing node within the current scope.
-    ///
-    /// See [`SimBuilder::gate`] for more information.
-    pub fn gate(&mut self, path: impl Into<ObjectPath>, gate: &str) -> GateRef {
-        self.base.gate(self.scope.appended(path.into()), gate)
-    }
-
-    /// Creates a cluster gate on an existing node within the current scope.
-    ///
-    /// See [`SimBuilder::gates`] for more information.
-    pub fn gates(&mut self, path: impl Into<ObjectPath>, gate: &str, size: usize) -> Vec<GateRef> {
-        self.base
-            .gates(self.scope.appended(path.into()), gate, size)
-    }
-}
-
 /// A trait that descibes that an object can be build into a tree of modules
 /// at a given scope within the simulation.
 ///
@@ -571,27 +424,27 @@ impl<A> SimBuilderScoped<'_, A> {
 /// - on module specifically at the position defined by the scope
 /// - on module at the scope position, an more as direct or indirect children of the first module.
 ///
-/// See [`SimBuilderScoped`] for more information.
+/// See [`Spawner`] for more information.
 pub trait IntoModuleTree {
     /// The returns type of the build method. This will be returned by `Sim::node`
     type Ret;
 
     /// Build the described module block within the context of scoped part of
     /// a simulation.
-    fn build<A>(self, sim: SimBuilderScoped<'_, A>) -> Self::Ret;
+    fn build<A>(self, spawner: Spawner<'_, A>) -> Self::Ret;
 }
 
 impl<M: Module> IntoModuleTree for M {
     type Ret = ();
-    fn build<A>(self, sim: SimBuilderScoped<'_, A>) {
-        sim.base.raw(sim.scope, self);
+    fn build<A>(self, mut spawner: Spawner<'_, A>) -> Self::Ret {
+        spawner.root(self);
     }
 }
 
 impl IntoModuleTree for () {
     type Ret = ();
-    fn build<A>(self, sim: SimBuilderScoped<'_, A>) {
-        sim.base.raw(sim.scope, DummyModule);
+    fn build<A>(self, mut spawner: Spawner<'_, A>) -> Self::Ret {
+        spawner.root(DummyModule);
     }
 }
 
@@ -644,13 +497,13 @@ where
             for module in mods {
                 // Use cloned handles to appease the brwchk
                 if stage < module.num_sim_start_stages() {
-                    module.activate();
+                    let _ = module.activate();
 
                     #[cfg(feature = "tracing")]
                     tracing::info!("Calling at_sim_start({}).", stage);
 
                     rt.app.error.extend(module.at_sim_start(stage).err());
-                    module.deactivate(rt);
+                    module.deactivate();
 
                     super::runtime::buf_process(&module, rt);
                 }
@@ -685,9 +538,9 @@ where
 
             #[cfg(feature = "tracing")]
             tracing::info!("Calling 'at_sim_end'");
-            module.activate();
+            let _ = module.activate();
             let _ = module.at_sim_end().map_err(|e| error.merge(e));
-            module.deactivate(rt);
+            module.deactivate();
 
             // NOTE: no buf_process since no furthe events will be processed.
         }
@@ -808,6 +661,7 @@ impl ops::Deref for ModuleTree {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::net::module::ModuleContext;
 
     #[test]
     fn module_tree() {

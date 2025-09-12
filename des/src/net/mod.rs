@@ -6,7 +6,6 @@ mod error;
 mod path;
 pub(crate) mod runtime;
 
-// pub mod channel;
 pub mod channel;
 pub mod gate;
 pub mod message;
@@ -18,7 +17,7 @@ pub mod topology;
 pub use self::error::*;
 pub use self::path::*;
 pub use self::runtime::{
-    Globals, IntoModuleTree, Sim, SimBuilder, SimBuilderScoped, SimLifecycle, fail, globals,
+    Globals, IntoModuleTree, Sim, SimBuilder, SimLifecycle, Spawner, SpawnerKind, fail, globals,
     handlers, schedule_event,
 };
 
@@ -27,6 +26,7 @@ pub mod internals {
     pub use super::runtime::NetEvents;
     pub use super::runtime::{
         ChannelUnbusyNotif, HandleMessageEvent, MessageExitingConnection, ModuleRestartEvent,
+        ModuleShutdownEvent,
     };
 
     cfg_async! {

@@ -1,7 +1,7 @@
 use des::{
     net::{
-        globals,
-        handlers::{AsyncHandler, HandlerFn},
+        fail, globals,
+        handlers::{AsyncHandler, HandlerFn, ModuleFn},
     },
     prelude::*,
 };
@@ -163,4 +163,27 @@ fn can_access_foreign_module_context() -> Result<(), RuntimeError> {
     let _ = sim.gate("alice", "other-port");
 
     Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
+}
+
+#[test]
+#[serial]
+fn custom_fail() {
+    let mut sim = Sim::new(());
+    sim.node(
+        "alice",
+        ModuleFn::new(
+            || schedule_at(Message::default(), 1.0.into()),
+            |_, _| {
+                fail(std::io::Error::other("failed because i like to"));
+            },
+        ),
+    );
+
+    let err = Builder::seeded(123)
+        .build(sim.freeze())
+        .run()
+        .err()
+        .expect("expected an error");
+
+    assert_eq!(err[0].to_string(), "failed because i like to");
 }

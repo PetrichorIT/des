@@ -72,7 +72,7 @@ struct A {
 
 impl IntoModuleTree for Harness<A> {
     type Ret = ();
-    fn build<A>(self, mut sim: des::prelude::SimBuilderScoped<'_, A>) {
+    fn build<A>(self, mut sim: des::prelude::Spawner<'_, A>) {
         let counter = self.counter.clone();
         sim.root(self.0);
         sim.node("b", B { counter });

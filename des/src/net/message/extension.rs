@@ -80,9 +80,13 @@ impl Extensions {
 
     /// Removes an extension of type `T` from the message.
     #[allow(clippy::missing_panics_doc)]
-    pub fn remove<T: Any + Send>(&mut self) {
-        self.extensions.remove(&TypeId::of::<T>());
-        // FIXME: should be return the removed value?
+    pub fn remove<T: Any + Send>(&mut self) -> Option<T> {
+        self.extensions.remove(&TypeId::of::<T>()).map(|v| {
+            #[cfg(not(debug_assertions))]
+            return *v.downcast::<T>().expect("illegal state");
+            #[cfg(debug_assertions)]
+            return *v.0.downcast::<T>().expect("illegal state");
+        })
     }
 
     /// Clears all extensions from the message.
@@ -146,7 +150,8 @@ mod tests {
 
         assert_eq!(extensions.get::<u32>().unwrap(), &10);
 
-        extensions.remove::<u32>();
+        let v = extensions.remove::<u32>();
+        assert_eq!(v, Some(10));
 
         assert!(!extensions.has::<u32>());
         assert!(extensions.has::<u64>());

@@ -11,6 +11,7 @@ use crate::runtime::{LikeRuntimeError, Runtime};
 use crate::sync::Mutex;
 use crate::time::SimTime;
 use std::iter::once;
+use std::mem;
 use std::sync::{Arc, Weak};
 
 static BUF_CTX: Mutex<BufferContext> = Mutex::new(BufferContext::new());
@@ -129,7 +130,10 @@ where
         rt.add_event(event, time);
     }
 
-    // FIXME: pull error from BUFCTX
+    // (1) Pull collected failures from CTX
+    let mut swappable = RuntimeError::empty();
+    mem::swap(&mut swappable, &mut ctx.error);
+    rt.app.error.merge(swappable);
 }
 
 pub(crate) fn buf_fail(e: impl LikeRuntimeError) {

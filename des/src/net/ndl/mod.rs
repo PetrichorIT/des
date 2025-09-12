@@ -46,12 +46,12 @@
 
 use crate::{
     net::{
-        self, Sim, SimBuilder, SimBuilderScoped,
+        self, Sim, SimBuilder,
         channel::ChannelDropBehaviour,
-        module::ModuleContext,
+        module::{DummyModule, ModuleContext},
         ndl::lang::error::{ErrorKind, Result},
     },
-    prelude::{DatarateChannel, DatarateChannelMetrics, ModuleRef, ObjectPath},
+    prelude::{DatarateChannel, DatarateChannelMetrics, ModuleRef, ObjectPath, Spawner},
     time::Duration,
 };
 use std::{
@@ -131,8 +131,9 @@ impl<'a, L: Layer> Ndl<'a, L> {
 
 impl<L: Layer> IntoModuleTree for Ndl<'_, L> {
     type Ret = Result<ModuleRef>;
-    fn build<A>(self, sim: SimBuilderScoped<'_, A>) -> Self::Ret {
-        sim.ndl(&self.node, self.registry)
+
+    fn build<A>(self, spawner: Spawner<'_, A>) -> Self::Ret {
+        spawner.ndl2(&self.node, self.registry)
     }
 }
 
@@ -212,72 +213,23 @@ impl<A> SimBuilder<A> {
     ) -> Result<()> {
         let parsed = lang::transform(def)?;
 
-        let scoped = SimBuilderScoped::new(self, ObjectPath::default());
-        let _ = scoped.ndl(&parsed, registry.as_mut())?;
+        let scoped = Spawner::new_at_buildtime(ObjectPath::default(), self);
+        let _ = scoped.ndl2(&parsed, registry.as_mut())?;
 
         Ok(())
     }
-
-    fn raw_ndl<L: Layer>(
-        &mut self,
-        path: &ObjectPath,
-        ty: &str,
-        registry: &mut Registry<L>,
-    ) -> Result<ModuleRef> {
-        // Check dup
-        assert!(
-            self.get(path).is_none(),
-            "cannot crate module at {path}, already exists"
-        );
-
-        // Check node path location
-        let ctx = if let Some(parent) = path.nonzero_parent() {
-            // (a) Check that the parent exists
-            let parent = self
-                .get(&parent)
-                .expect("cannot create module, parent missing in NDL build");
-
-            ModuleContext::child_of(path.name(), parent)
-        } else if let Some(zero_parent) = self.get(&ObjectPath::from("")) {
-            ModuleContext::child_of(path.name(), zero_parent)
-        } else {
-            ModuleContext::standalone(path.clone())
-        };
-
-        ctx.activate();
-        let path_parts = ctx.path.as_str().split('.').collect::<Vec<_>>();
-        for cfg in &self.cfgs {
-            cfg.capture_for(&path_parts, &mut ctx.props.write());
-        }
-
-        let software = registry.resolve(path, ty, &mut *self.stack).ok_or(
-            lang::error::ErrorKind::MissingRegistrySymbol(path.to_string(), ty.to_string()),
-        )?;
-        ctx.upgrade_dummy(software);
-
-        let mut sink = Vec::new();
-        ctx.deactivate(&mut sink);
-        assert!(
-            sink.is_empty(),
-            "events cannot be dispatched in constructors"
-        );
-
-        self.with_modules_mut(|mods| mods.add(ctx.clone()));
-        Ok(ctx)
-    }
 }
 
-impl<A> SimBuilderScoped<'_, A> {
-    fn ndl<L: Layer>(
+impl<A> Spawner<'_, A> {
+    fn ndl2<L: Layer>(
         mut self,
         node: &lang::tree::Node,
         registry: &mut Registry<L>,
     ) -> Result<ModuleRef> {
         let symbol = node.typ.to_string();
-        let scope = &self.scope;
+        let scope = self.scope().clone();
 
-        let ctx = self.base.raw_ndl(scope, &symbol, registry)?;
-
+        let ctx = self.raw_ndl2(&scope, &symbol, registry)?;
         for gate in &node.gates {
             let _ = ctx.create_gate_cluster(&gate.ident, gate.kardinality.as_size());
         }
@@ -286,13 +238,13 @@ impl<A> SimBuilderScoped<'_, A> {
             match submodule.name.kardinality {
                 lang::def::Kardinality::Atom => {
                     let subscope = self.subscope(&submodule.name.ident);
-                    subscope.ndl(&submodule.typ, registry)?;
+                    subscope.ndl2(&submodule.typ, registry)?;
                 }
                 lang::def::Kardinality::Cluster(n) => {
                     for k in 0..n {
                         let ident = &submodule.name.ident;
                         let subscope = self.subscope(format!("{ident}[{k}]"));
-                        subscope.ndl(&submodule.typ, registry)?;
+                        subscope.ndl2(&submodule.typ, registry)?;
                     }
                 }
             }
@@ -312,6 +264,30 @@ impl<A> SimBuilderScoped<'_, A> {
         }
 
         Ok(ctx)
+    }
+
+    fn raw_ndl2<L: Layer>(
+        &mut self,
+        path: &ObjectPath,
+        ty: &str,
+        registry: &mut Registry<L>,
+    ) -> Result<ModuleRef> {
+        // use the creation fn, but bypass its lack of error handling
+        let mut result = Ok(());
+        let module =
+            self.root_with_context(|| {
+                match registry.resolve(path, ty).ok_or(
+                    lang::error::ErrorKind::MissingRegistrySymbol(path.to_string(), ty.to_string()),
+                ) {
+                    Ok(software) => software,
+                    Err(e) => {
+                        result = Err(e.into());
+                        Box::new(DummyModule)
+                    }
+                }
+            });
+
+        result.map(|()| module)
     }
 }
 

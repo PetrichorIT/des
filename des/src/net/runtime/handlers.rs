@@ -1,10 +1,22 @@
 //! Custom module blocks that simplify the `Module` API.
 
 use crate::{
-    net::{message::Message, module::Module},
+    net::{IntoModuleTree, message::Message, module::Module},
     prelude::current,
 };
 use std::{error::Error, time::Duration};
+
+/// A constructor that allows the creation of the module within the node-context of the
+/// about-to-be-created node.
+#[derive(Debug)]
+pub struct WithContext<F>(pub F);
+
+impl<F: FnOnce() -> M, M: Module> IntoModuleTree for WithContext<F> {
+    type Ret = ();
+    fn build<A>(self, mut spawner: crate::prelude::Spawner<'_, A>) -> Self::Ret {
+        spawner.root_with_context(|| Box::new(self.0()));
+    }
+}
 
 /// The policy that descibes how a module should proceeed, if a
 /// handler function returns an error.

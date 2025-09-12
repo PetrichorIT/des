@@ -11,7 +11,7 @@ use crate::{
     prelude::RuntimeError,
     runtime::{Event, EventLifecycle, EventSink, Runtime},
     time::SimTime,
-    tracing::enter_scope,
+    tracing::{enter_scope, leave_scope},
 };
 use std::{
     any::Any,
@@ -37,6 +37,8 @@ pub enum NetEvents {
     HandleMessageEvent(HandleMessageEvent),
     /// A notification for channels.
     ChannelUnbusyNotif(ChannelUnbusyNotif),
+    /// A delayed `at_sim_start` event for a spawned module.
+    AtSimStartEvent(AtSimStartEvent),
     /// A notification that a module should now be restarted
     ModuleShutdownEvent(ModuleShutdownEvent),
     /// A notification that a module should now be restarted
@@ -55,6 +57,7 @@ where
             Self::MessageExitingConnection(event) => event.handle(rt),
             Self::HandleMessageEvent(event) => event.handle(rt),
             Self::ChannelUnbusyNotif(event) => event.handle(rt),
+            Self::AtSimStartEvent(event) => event.handle(rt),
             Self::ModuleShutdownEvent(event) => event.handle(rt),
             Self::ModuleRestartEvent(event) => event.handle(rt),
             #[cfg(feature = "async")]
@@ -199,11 +202,50 @@ impl HandleMessageEvent {
 
         let module = &self.module;
 
-        module.activate();
+        let _ = module.activate();
         rt.app.error.extend(module.handle_message(message).err());
-        module.deactivate(rt);
+        module.deactivate();
 
         buf_process(module, rt);
+    }
+}
+
+/// A delayed `at_sim_start` event for a spawned module.
+#[derive(Debug)]
+pub struct AtSimStartEvent {
+    /// The module that is being spawned.
+    pub modules: Vec<ModuleRef>,
+}
+
+impl AtSimStartEvent {
+    fn handle<A>(self, rt: &mut Runtime<Sim<A>>)
+    where
+        A: EventLifecycle<Sim<A>>,
+    {
+        let max_stage = self
+            .modules
+            .iter()
+            .fold(1, |acc, module| acc.max(module.num_sim_start_stages()));
+
+        for stage in 0..max_stage {
+            // Direct indexing since rt must be borrowed mutably in handle_buffers.
+            for module in &self.modules {
+                // Use cloned handles to appease the brwchk
+                if stage < module.num_sim_start_stages() {
+                    let _ = module.activate();
+
+                    #[cfg(feature = "tracing")]
+                    tracing::info!("Calling at_sim_start({}).", stage);
+
+                    rt.app.error.extend(module.at_sim_start(stage).err());
+                    module.deactivate();
+
+                    buf_process(module, rt);
+                }
+            }
+        }
+
+        leave_scope();
     }
 }
 
@@ -227,11 +269,11 @@ impl ModuleShutdownEvent {
         tracing::info!("ModuleShutdownEvent");
 
         let module = &self.module;
-        module.activate();
+        let _ = module.activate();
         rt.app
             .error
             .extend(module.module_shutdown(self.restart_at).err());
-        module.deactivate(rt);
+        module.deactivate();
 
         buf_process(module, rt);
     }
@@ -255,9 +297,9 @@ impl ModuleRestartEvent {
         tracing::info!("ModuleRestartEvent");
 
         let module = &self.module;
-        module.activate();
+        let _ = module.activate();
         rt.app.error.extend(module.module_restart().err());
-        module.deactivate(rt);
+        module.deactivate();
 
         buf_process(module, rt);
     }
@@ -283,9 +325,9 @@ impl AsyncWakeupEvent {
         tracing::info!("async wakeup");
 
         let module = &self.module;
-        module.activate();
+        let _ = module.activate();
         rt.app.error.extend(module.async_wakeup().err());
-        module.deactivate(rt);
+        module.deactivate();
 
         buf_process(module, rt);
     }

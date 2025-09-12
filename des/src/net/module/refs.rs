@@ -1,7 +1,5 @@
 use crate::net::processing::{ModuleImpl, ProcessingStack};
-use crate::net::runtime::NetEvents;
 use crate::prelude::{Gate, GateRef};
-use crate::runtime::EventSink;
 use crate::tracing::{enter_scope, leave_scope};
 
 use super::{DummyModule, Module, ModuleContext};
@@ -20,6 +18,13 @@ pub(crate) struct ModuleRefWeak {
 }
 
 impl ModuleRefWeak {
+    pub(crate) fn empty() -> Self {
+        Self {
+            ctx: Weak::new(),
+            handler: Weak::new(),
+        }
+    }
+
     pub(crate) fn new(strong: &ModuleRef) -> Self {
         Self {
             ctx: Arc::downgrade(&strong.ctx),
@@ -60,25 +65,16 @@ impl Deref for ModuleRef {
 }
 
 impl ModuleRef {
-    #[allow(clippy::explicit_deref_methods)]
-    pub(crate) fn new<T: Module>(
-        ctx: Arc<ModuleContext>,
-        module: T,
-        stack: ProcessingStack,
-    ) -> Self {
-        let stack = ModuleImpl::new(module.stack(stack), module);
-        let processing = Arc::new(RefCell::new(stack));
-        let this = Self { ctx, processing };
-
-        *this.ctx.me.write() = Some(ModuleRefWeak::new(&this));
-        this
-    }
-
     #[allow(unused)]
     pub(crate) fn dummy(ctx: Arc<ModuleContext>) -> Self {
         // Create the dummy module explicitly not with ::new since
         // all dyn Module calls would panic
-        Self::new(ctx, DummyModule {}, ProcessingStack::default())
+        let module = Box::new(DummyModule {});
+        let stack = ModuleImpl::new(module.stack(ProcessingStack::default()), module);
+        let processing = Arc::new(RefCell::new(stack));
+        let this = Self { ctx, processing };
+        *this.ctx.me.write() = ModuleRefWeak::new(&this);
+        this
     }
 
     #[allow(unused)]
@@ -178,16 +174,21 @@ impl ModuleRef {
 
     /// INTERNAL
     #[doc(hidden)]
-    #[allow(unused)]
-    pub fn activate(&self) {
+    #[must_use]
+    pub fn activate(&self) -> Option<Arc<ModuleContext>> {
         enter_scope(self.scope_token());
         let prev = ModuleContext::place(Arc::clone(&self.ctx));
+        #[cfg(debug_assertions)]
+        if let Some(prev) = &prev {
+            eprintln!("pushed-off ctx from {}", prev.path());
+        }
+        prev
     }
 
     /// INTERNAL
     #[doc(hidden)]
     #[allow(unused, clippy::unused_self)]
-    pub(crate) fn deactivate(&self, rt: &mut impl EventSink<NetEvents>) {
+    pub(crate) fn deactivate(&self) {
         let _ = ModuleContext::take();
         leave_scope();
     }
@@ -283,7 +284,10 @@ mod tests {
         impl Module for A {}
 
         let module = ModuleContext::standalone("root".into());
-        module.upgrade_dummy(ModuleImpl::new(ProcessingStack::default(), A { inner: 42 }));
+        module.upgrade_dummy(ModuleImpl::new(
+            ProcessingStack::default(),
+            Box::new(A { inner: 42 }),
+        ));
 
         assert!(module.try_as_ref::<i32>().is_none());
         assert!(module.try_as_mut::<i32>().is_none());

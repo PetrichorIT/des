@@ -3,7 +3,8 @@ use crate::{
     net::{
         Error, ErrorKind,
         gate::IntoModuleGate,
-        runtime::{ModuleShutdownEvent, NetEvents},
+        processing::ProcessingStack,
+        runtime::{ModuleShutdownEvent, NetEvents, Spawner},
         schedule_event,
     },
     prelude::{GateRef, ObjectPath},
@@ -13,7 +14,6 @@ use crate::{
 };
 use fxhash::{FxBuildHasher, FxHashMap};
 
-use spawner::Spawner;
 use spin::RwLock;
 use std::{
     cell::Cell,
@@ -29,9 +29,7 @@ pub(crate) fn module_ctx_drop() {
     MOD_CTX.swap(&mut None);
 }
 
-mod spawner;
 mod stereotyp;
-
 pub use stereotyp::Stereotyp;
 
 /// The topological components of a module, not including the attached
@@ -48,7 +46,7 @@ pub struct ModuleContext {
     pub(crate) active: AtomicBool,
     pub(crate) id: ModuleId,
 
-    pub(crate) me: RwLock<Option<ModuleRefWeak>>,
+    pub(crate) me: RwLock<ModuleRefWeak>,
 
     pub(crate) path: ObjectPath,
     pub(crate) gates: RwLock<Vec<GateRef>>,
@@ -73,7 +71,7 @@ impl ModuleContext {
     #[must_use]
     pub fn standalone(path: ObjectPath) -> ModuleRef {
         ModuleRef::dummy(Arc::new(Self {
-            me: RwLock::new(None),
+            me: RwLock::new(ModuleRefWeak::empty()),
             scope_token: new_scope(path.clone()),
 
             props: RwLock::new(Props::default()),
@@ -102,7 +100,7 @@ impl ModuleContext {
     pub fn child_of(name: &str, parent: ModuleRef) -> ModuleRef {
         let path = ObjectPath::appended(&parent.ctx.path, name);
         let this = ModuleRef::dummy(Arc::new(Self {
-            me: RwLock::new(None),
+            me: RwLock::new(ModuleRefWeak::empty()),
             scope_token: new_scope(path.clone()),
 
             props: RwLock::new(Props::default()),
@@ -142,6 +140,11 @@ impl ModuleContext {
     /// Indicates whether the module belonging to this context is currently active.
     pub fn is_currently_active(&self) -> bool {
         with_mod_ctx(|ctx| ctx.id == self.id)
+    }
+
+    /// Indicates whether the module belonging to this context is already initialized.
+    pub fn is_initialized(&self) -> bool {
+        self.me.read().upgrade().is_some()
     }
 
     /// Shuts down all activity for the module.
@@ -247,9 +250,21 @@ impl ModuleContext {
         );
     }
 
-    /// TODO
-    pub fn spawner(&self) -> Spawner<'_> {
-        Spawner { ctx: self }
+    /// Creates a new [`Spawner`] for the module.
+    ///
+    /// > *This function requires a node-context within the simulation*
+    ///
+    /// Must provide a stack, just like in `SimBuilder`
+    ///
+    /// # Panics
+    ///
+    /// Panics if the module is not yet initialized.
+    pub fn spawner<F: Fn() -> ProcessingStack + 'static>(&self, stack: F) -> Spawner<'_, ()> {
+        assert!(
+            self.is_initialized(),
+            "cannot use spawner on a not yet initialized module"
+        );
+        Spawner::new_at_runtime(self, stack)
     }
 
     /// Returns a runtime-unqiue identifier for the currently active module.
@@ -299,12 +314,7 @@ impl ModuleContext {
     ///
     /// Cannot be called during teardown.
     pub fn me(&self) -> ModuleRef {
-        self.me
-            .read()
-            .as_ref()
-            .expect("failed")
-            .upgrade()
-            .expect("cannot upgrade")
+        self.me.read().upgrade().expect("cannot upgrade")
     }
 
     /// Returns a handle to a typed property on this module.
@@ -477,7 +487,6 @@ impl ModuleContext {
 //
 // Some however do:
 // - spawner
-//
 
 cfg_async! {
     use tokio::task::JoinHandle;
