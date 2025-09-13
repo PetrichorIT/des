@@ -2,7 +2,7 @@ use serde_yml::{Value, from_str};
 
 use crate::{
     net::{
-        module::{Cfg, DummyModule, MOD_CTX, try_current},
+        module::{Cfg, DummyModule, MOD_CTX, Props, try_current},
         processing::ProcessingStack,
         topology::Topology,
     },
@@ -96,7 +96,6 @@ pub struct Sim<A> {
 pub struct SimBuilder<A> {
     sim: Sim<A>,
     pub(crate) stack: Box<dyn FnMut() -> ProcessingStack>,
-    pub(crate) cfgs: Vec<Cfg>,
 }
 
 impl<A> Sim<A> {
@@ -131,7 +130,6 @@ impl<A> Sim<A> {
         SimBuilder {
             sim: self,
             stack: Box::new(stack),
-            cfgs: Vec::new(),
         }
     }
 
@@ -245,7 +243,7 @@ impl<A> SimBuilder<A> {
                 }
             });
 
-            self.cfgs.push(cfg);
+            self.globals.add_cfg(cfg);
         }
     }
 
@@ -587,6 +585,7 @@ fn panic_hook(info: &PanicHookInfo) {
 #[derive(Debug, Default)]
 pub struct Globals {
     pub(crate) modules: Arc<Mutex<ModuleTree>>,
+    pub(crate) cfgs: Arc<Mutex<Vec<Cfg>>>,
 }
 
 impl Globals {
@@ -605,6 +604,21 @@ impl Globals {
     #[must_use]
     pub fn get(&self, path: &ObjectPath) -> Option<ModuleRef> {
         self.with(|mods| mods.get(path))
+    }
+
+    pub(crate) fn add_module(&self, module: ModuleRef) {
+        self.modules.lock().expect("failed").add(module);
+    }
+
+    pub(crate) fn add_cfg(&self, cfg: Cfg) {
+        self.cfgs.lock().expect("failed").push(cfg);
+    }
+
+    pub(crate) fn capture_for(&self, path_parts: &[&str], props: &mut Props) {
+        let lock = self.cfgs.lock().expect("failed");
+        for cfg in &*lock {
+            cfg.capture_for(path_parts, props);
+        }
     }
 }
 

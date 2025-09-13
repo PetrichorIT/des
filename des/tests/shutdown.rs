@@ -492,8 +492,6 @@ fn shutdown_prevents_accessing_parents() {
 #[test]
 #[serial]
 fn shutdown_from_foreign_module() -> Result<(), RuntimeError> {
-    des::tracing::init();
-
     let mut sim = Sim::new(());
     sim.node(
         "alice",

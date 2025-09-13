@@ -25,8 +25,8 @@ pub use self::runtime::{
 pub mod internals {
     pub use super::runtime::NetEvents;
     pub use super::runtime::{
-        ChannelUnbusyNotif, HandleMessageEvent, MessageExitingConnection, ModuleRestartEvent,
-        ModuleShutdownEvent,
+        AtSimStartEvent, ChannelUnbusyNotif, HandleMessageEvent, MessageExitingConnection,
+        ModuleRestartEvent, ModuleShutdownEvent,
     };
 
     cfg_async! {

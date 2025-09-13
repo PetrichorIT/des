@@ -16,25 +16,13 @@ impl<'a> Harness<'a> {
         Harness { ctx, unwind: None }
     }
 
-    #[cfg(not(feature = "async"))]
     pub(super) fn exec(mut self, f: impl FnOnce()) -> Self {
         self.unwind = catch_unwind(AssertUnwindSafe(|| f())).err();
         self
     }
 
-    #[cfg(feature = "async")]
-    pub(super) fn exec(mut self, f: impl FnOnce()) -> Self {
-        self.unwind = catch_unwind(AssertUnwindSafe(|| {
-            f();
-        }))
-        .err();
-        self
-    }
-
     pub(super) fn catch(self) -> Result<(), Error> {
         if let Some(unwind) = self.unwind {
-            // display_panic(&unwind);
-
             self.ctx.active.store(false, Ordering::SeqCst);
             if !self.ctx.stereotyp.get().on_panic_catch {
                 return Err(Error::new(self.ctx.path(), ErrorKind::ModulePanic(unwind)));

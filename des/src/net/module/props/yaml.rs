@@ -4,7 +4,7 @@ use super::Props;
 
 /// A collection of configuration parameters, which
 /// can be used to assign properties to a component.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub(crate) struct Cfg {
     value: Value,
 }

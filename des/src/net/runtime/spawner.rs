@@ -30,7 +30,7 @@ use crate::{
 /// - create gates & gate-connections between existing nodes in the subtree
 ///
 /// Note that the usual rules about node creation remain, requiring the existence of a root node before any node under root
-/// might be created.
+/// might be created. At runtime however the root of the subtree is already populated.
 ///
 /// ```
 /// # use des::prelude::*;
@@ -81,7 +81,6 @@ enum InnerSpawner<'a, A> {
         base: &'a mut SimBuilder<A>,
     },
     AtRuntime {
-        ctx: &'a ModuleContext,
         stack: Arc<dyn Fn() -> ProcessingStack>,
     },
 }
@@ -102,7 +101,7 @@ impl<'a, A> InnerSpawner<'a, A> {
     ) -> ModuleRef {
         match self {
             Self::AtBuildtime { base } => crate_node_at_buildtime(path, module, base),
-            Self::AtRuntime { stack, ctx } => create_node_at_runtime(&path, module, &**stack, ctx),
+            Self::AtRuntime { stack, .. } => create_node_at_runtime(&path, module, &**stack),
         }
     }
 
@@ -136,8 +135,7 @@ impl<'a, A> InnerSpawner<'a, A> {
     {
         match self {
             Self::AtBuildtime { base } => InnerSpawner::AtBuildtime { base: *base },
-            Self::AtRuntime { ctx, stack } => InnerSpawner::AtRuntime {
-                ctx,
+            Self::AtRuntime { stack } => InnerSpawner::AtRuntime {
                 stack: stack.clone(),
             },
         }
@@ -178,9 +176,9 @@ fn crate_node_at_buildtime<A>(
     };
     // read in Props
     let path_parts = ctx.path.as_str().split('.').collect::<Vec<_>>();
-    for cfg in &base.cfgs {
-        cfg.capture_for(&path_parts, &mut ctx.props.write());
-    }
+    base.globals
+        .capture_for(&path_parts, &mut ctx.props.write());
+
     let _ = ctx.activate();
     let pe = {
         let module = module();
@@ -197,14 +195,22 @@ fn create_node_at_runtime(
     path: &ObjectPath,
     module_creator: impl FnOnce() -> Box<dyn Module>,
     stack: &dyn Fn() -> ProcessingStack,
-    ctx: &ModuleContext,
 ) -> ModuleRef {
-    let sref = ctx.me();
-    let ctx = ModuleContext::child_of(path.name(), sref);
+    assert!(
+        globals().get(path).is_none(),
+        "cannot create node '{path}' that already exists"
+    );
+
+    let parent_path = path.nonzero_parent().expect("must have a parent");
+    let parent = globals().get(&parent_path).expect("must have a parent");
+    let ctx = ModuleContext::child_of(path.name(), parent);
 
     // TODO: CFGs are missing here
     // A) store in globals & pull
     // B) provide custom CFGs API to local spawners ?
+
+    let path_parts = ctx.path.as_str().split('.').collect::<Vec<_>>();
+    globals().capture_for(&path_parts, &mut ctx.props.write());
 
     let prev = ctx.activate();
     let pe = {
@@ -215,11 +221,7 @@ fn create_node_at_runtime(
     ctx.upgrade_dummy(pe);
     ctx.deactivate();
 
-    globals()
-        .modules
-        .lock()
-        .expect("failed to get globals lock")
-        .add(ctx.clone());
+    globals().add_module(ctx.clone());
 
     if let Some(prev) = prev {
         let _ = prev.me().activate();
@@ -238,13 +240,12 @@ fn create_node_at_runtime(
 impl<'a, A> Spawner<'a, A> {
     // FIXME: the +'static bound may be relaxed to 'a if we are not using a box
     pub(crate) fn new_at_runtime(
-        ctx: &'a ModuleContext,
+        ctx: &ModuleContext,
         stack: impl Fn() -> ProcessingStack + 'static,
     ) -> Self {
         Self {
             scope: ctx.path(),
             inner: InnerSpawner::AtRuntime {
-                ctx,
                 stack: Arc::new(stack),
             },
         }
