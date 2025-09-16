@@ -211,11 +211,13 @@ impl ModuleImpl {
     pub(super) fn process_with<R>(
         &mut self,
         msg: Option<Message>,
-        mut inner: impl FnMut(&mut dyn Module, Option<Message>) -> R,
+        inner: impl FnOnce(&mut dyn Module, Option<Message>) -> R,
     ) -> R {
+        // FIXME: should be FnOnce
+        let mut inner = Some(inner);
         let mut slot = None;
         chain_processing_elements(&mut self.stack.items[..], msg, &mut |msg| {
-            slot = Some(inner(&mut *self.handler, msg));
+            slot = Some(inner.take().expect("should exist")(&mut *self.handler, msg));
         });
         slot.take().expect("failed to execute inner closure")
     }

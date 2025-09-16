@@ -4,7 +4,7 @@ use crate::{
         channel::{ChannelRef, SendContext, SendError},
         gate::Connection,
         message::Message,
-        module::ModuleRef,
+        module::{ModuleRef, Signal},
         runtime::buf_process,
         schedule_event,
     },
@@ -39,6 +39,8 @@ pub enum NetEvents {
     ChannelUnbusyNotif(ChannelUnbusyNotif),
     /// A delayed `at_sim_start` event for a spawned module.
     AtSimStartEvent(AtSimStartEvent),
+    /// A signal that appeared on a module, to be handled by other nodes.
+    SignalEvent(SignalEvent),
     /// A notification that a module should now be restarted
     ModuleShutdownEvent(ModuleShutdownEvent),
     /// A notification that a module should now be restarted
@@ -58,6 +60,7 @@ where
             Self::HandleMessageEvent(event) => event.handle(rt),
             Self::ChannelUnbusyNotif(event) => event.handle(rt),
             Self::AtSimStartEvent(event) => event.handle(rt),
+            Self::SignalEvent(event) => event.handle(rt),
             Self::ModuleShutdownEvent(event) => event.handle(rt),
             Self::ModuleRestartEvent(event) => event.handle(rt),
             #[cfg(feature = "async")]
@@ -249,6 +252,32 @@ impl AtSimStartEvent {
     }
 }
 
+/// A signal event that is emitted when a signal is received.
+#[derive(Debug)]
+pub struct SignalEvent {
+    /// The signal.
+    pub signal: Signal,
+    /// The set of all subscribers to the signal (keeping them as a set reduces event count).
+    pub subscribers: Vec<ModuleRef>,
+}
+
+impl SignalEvent {
+    fn handle<A>(self, rt: &mut Runtime<Sim<A>>)
+    where
+        A: EventLifecycle<Sim<A>>,
+    {
+        for subscriber in &self.subscribers {
+            let _ = subscriber.activate();
+            rt.app
+                .error
+                .extend(subscriber.handle_signal(self.signal.clone()).err());
+            subscriber.deactivate();
+
+            buf_process(subscriber, rt);
+        }
+    }
+}
+
 /// A notification that a module should now be shutdown.
 #[derive(Debug)]
 pub struct ModuleShutdownEvent {
@@ -395,6 +424,17 @@ impl ModuleRef {
             #[cfg(feature = "tracing")]
             tracing::debug!("Ignoring message since module is inactive");
         }
+        Ok(())
+    }
+
+    pub(crate) fn handle_signal(&self, signal: Signal) -> Result<(), Error> {
+        self.processing
+            .borrow_mut()
+            .process_with(None, move |handler, _| {
+                Harness::new(&self.ctx)
+                    .exec(|| handler.handle_signal(signal))
+                    .catch()
+            })?;
         Ok(())
     }
 

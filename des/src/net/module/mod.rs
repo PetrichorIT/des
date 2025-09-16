@@ -78,6 +78,7 @@ mod ctx;
 mod dummy;
 mod props;
 mod refs;
+mod signal;
 
 #[cfg(test)]
 mod tests;
@@ -88,6 +89,7 @@ pub use api::*;
 pub(crate) use dummy::*;
 pub use props::*;
 pub use refs::*;
+pub use signal::*;
 
 use super::processing::ProcessingStack;
 
@@ -162,6 +164,29 @@ pub trait Module: Any {
     /// ```
     ///
     fn handle_message(&mut self, _msg: Message) {}
+
+    /// A signal handler, user defined.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use des::{prelude::*, net::module::{Signal, SIGNAL_MODULE_PANICED}};
+    ///
+    /// struct MyModule {
+    ///     /* ... */
+    /// };
+    ///
+    /// impl Module for MyModule {
+    ///     /* ... */
+    ///     fn handle_signal(&mut self, signal: Signal) {
+    ///         match signal.code {
+    ///             SIGNAL_MODULE_PANICED => println!("another module has panicked"),
+    ///             _ => {}
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    fn handle_signal(&mut self, _signal: Signal) {}
 
     ///
     /// A function that is run at the start of each simulation,

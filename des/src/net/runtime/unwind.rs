@@ -1,4 +1,8 @@
-use crate::net::{Error, ErrorKind, module::ModuleContext};
+use crate::net::{
+    Error, ErrorKind,
+    message::Body,
+    module::{ModuleContext, SIGNAL_MODULE_PANICED, emit},
+};
 use std::{
     any::Any,
     panic::{AssertUnwindSafe, catch_unwind},
@@ -24,6 +28,11 @@ impl<'a> Harness<'a> {
     pub(super) fn catch(self) -> Result<(), Error> {
         if let Some(unwind) = self.unwind {
             self.ctx.active.store(false, Ordering::SeqCst);
+
+            if self.ctx.stereotyp.get().on_panic_inform_parent {
+                emit(SIGNAL_MODULE_PANICED, Body::empty());
+            }
+
             if !self.ctx.stereotyp.get().on_panic_catch {
                 return Err(Error::new(self.ctx.path(), ErrorKind::ModulePanic(unwind)));
             }

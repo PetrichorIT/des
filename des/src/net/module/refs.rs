@@ -82,7 +82,6 @@ impl ModuleRef {
     #[doc(hidden)]
     pub fn upgrade_dummy(&self, module: ModuleImpl) {
         let celled = RefCell::new(module);
-        let celled: RefCell<ModuleImpl> = celled;
         self.processing.swap(&celled);
     }
 

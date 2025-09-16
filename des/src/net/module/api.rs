@@ -8,9 +8,6 @@ use super::{ModuleContext, try_with_mod_ctx};
 ///
 /// > *This function requires a node-context within the simulation*
 ///
-/// **This handle is only fully valid, during the execution of the current event,
-/// thus is should never be stored.**
-///
 /// # Example
 ///
 /// ```

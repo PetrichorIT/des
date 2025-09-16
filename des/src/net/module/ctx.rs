@@ -3,11 +3,12 @@ use crate::{
     net::{
         Error, ErrorKind,
         gate::IntoModuleGate,
+        module::SignalCode,
         processing::ProcessingStack,
         runtime::{ModuleShutdownEvent, NetEvents, Spawner},
         schedule_event,
     },
-    prelude::{GateRef, ObjectPath},
+    prelude::{GateRef, ObjectPath, current},
     sync::SwapLock,
     time::SimTime,
     tracing::{ScopeToken, new_scope},
@@ -55,6 +56,8 @@ pub struct ModuleContext {
 
     pub(crate) parent: Option<ModuleRefWeak>,
     pub(crate) children: RwLock<FxHashMap<String, ModuleRef>>,
+
+    pub(crate) signal_subscribers: RwLock<FxHashMap<SignalCode, Vec<ModuleRefWeak>>>,
 }
 
 impl ModuleContext {
@@ -81,7 +84,9 @@ impl ModuleContext {
             gates: RwLock::new(Vec::new()),
 
             parent: None,
-            children: RwLock::new(FxHashMap::with_hasher(FxBuildHasher::default())),
+            children: RwLock::default(),
+
+            signal_subscribers: RwLock::default(),
         }))
     }
 
@@ -111,6 +116,8 @@ impl ModuleContext {
 
             parent: Some(ModuleRefWeak::new(&parent)),
             children: RwLock::new(FxHashMap::with_hasher(FxBuildHasher::default())),
+
+            signal_subscribers: RwLock::default(),
         }));
 
         parent
@@ -142,6 +149,24 @@ impl ModuleContext {
     /// Indicates whether the module belonging to this context is already initialized.
     pub fn is_initialized(&self) -> bool {
         self.me.read().upgrade().is_some()
+    }
+
+    /// Registers the currently active module as a subscriber to the given signal.
+    pub fn subscribe_to(&self, signal: SignalCode) {
+        self.signal_subscribers
+            .write()
+            .entry(signal)
+            .or_default()
+            .push(ModuleRefWeak::new(&current().me()));
+    }
+
+    /// Unregisters the currently active module as a subscriber to the given signal.
+    pub fn unsubscribe_from(&self, signal: SignalCode) {
+        let id = current().id();
+        self.signal_subscribers
+            .write()
+            .get_mut(&signal)
+            .map(|v| v.retain(|v| v.upgrade().expect("failed to upgrade").id != id));
     }
 
     /// Shuts down all activity for the module.
@@ -594,6 +619,11 @@ impl Default for Stereotyp {
         Self::HOST
     }
 }
+
+// Panic behaviour
+// on_panic -> catch-stop / catch-restart / unwind
+// on_panic submodules -> drop / keep
+// on_panic parent -> inform / NOP
 
 pub(crate) fn with_mod_ctx<R>(f: impl FnOnce(&Arc<ModuleContext>) -> R) -> R {
     let lock = MOD_CTX.read();
