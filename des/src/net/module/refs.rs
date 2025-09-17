@@ -1,3 +1,4 @@
+use crate::net::module::State;
 use crate::net::processing::{ModuleImpl, ProcessingStack};
 use crate::prelude::{Gate, GateRef};
 use crate::tracing::{enter_scope, leave_scope};
@@ -8,7 +9,6 @@ use std::cell::{Ref, RefCell, RefMut};
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::ops::Deref;
-use std::sync::atomic::Ordering;
 use std::sync::{Arc, Weak};
 
 #[derive(Clone)]
@@ -83,6 +83,7 @@ impl ModuleRef {
     pub fn upgrade_dummy(&self, module: ModuleImpl) {
         let celled = RefCell::new(module);
         self.processing.swap(&celled);
+        self.ctx.state.set(State::Initialized);
     }
 
     /// Borrows the referenced module as a readonly reference
@@ -164,7 +165,7 @@ impl ModuleRef {
     /// Whether the module is currently active or shut down.
     #[must_use]
     pub fn is_active(&self) -> bool {
-        self.ctx.active.load(Ordering::SeqCst)
+        self.ctx.state.get() != State::Shutdown
     }
 
     pub(crate) fn scope_token(&self) -> crate::tracing::ScopeToken {
@@ -235,6 +236,7 @@ impl Debug for ModuleRef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ModuleRef")
             .field("name", &self.ctx.path.to_string())
+            .field("state", &self.ctx.state.get())
             .field("handler", &Arc::strong_count(&self.processing))
             .field("ctx", &Arc::strong_count(&self.ctx))
             .finish()
@@ -260,11 +262,11 @@ mod tests {
         assert_eq!(module.path.as_str(), "root.a.b");
         assert_eq!(
             format!("{module:?}"),
-            "ModuleRef { name: \"root.a.b\", handler: 2, ctx: 2 }"
+            "ModuleRef { name: \"root.a.b\", state: Created, handler: 2, ctx: 2 }"
         );
         assert_eq!(
             format!("{weak:?}"),
-            "ModuleRef { name: \"root.a.b\", handler: 3, ctx: 3 }"
+            "ModuleRef { name: \"root.a.b\", state: Created, handler: 3, ctx: 3 }"
         );
 
         assert_eq!(module, m2);

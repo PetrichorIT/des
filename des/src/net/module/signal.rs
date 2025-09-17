@@ -32,6 +32,10 @@ pub fn emit(signal: SignalCode, body: Body) {
 }
 
 /// Emits a signal to all subscribers at a given time.
+///
+/// # Panics
+///
+/// This function panics if `at` is in the past.
 pub fn emit_at(signal: SignalCode, body: Body, at: SimTime) {
     assert!(at >= SimTime::now(), "time travel is forbidden");
 

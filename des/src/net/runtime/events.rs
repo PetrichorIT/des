@@ -4,7 +4,7 @@ use crate::{
         channel::{ChannelRef, SendContext, SendError},
         gate::Connection,
         message::Message,
-        module::{ModuleRef, Signal},
+        module::{ModuleRef, Signal, State},
         runtime::buf_process,
         schedule_event,
     },
@@ -13,11 +13,7 @@ use crate::{
     time::SimTime,
     tracing::{enter_scope, leave_scope},
 };
-use std::{
-    any::Any,
-    fmt::Debug,
-    sync::atomic::Ordering::{self, SeqCst},
-};
+use std::{any::Any, fmt::Debug};
 
 use super::Harness;
 
@@ -416,7 +412,7 @@ impl ModuleRef {
 
     #[cfg(feature = "async")]
     pub(crate) fn async_wakeup(&self) -> Result<(), Error> {
-        if self.ctx.active.load(SeqCst) {
+        if matches!(self.ctx.state.get(), State::Running) {
             self.processing
                 .borrow_mut()
                 .process_with(None, |_, _| Harness::new(&self.ctx).exec(|| {}).catch())?;
@@ -439,14 +435,14 @@ impl ModuleRef {
     }
 
     pub(crate) fn module_shutdown(&self, restart_at: Option<SimTime>) -> Result<(), Error> {
-        if !self.active.load(Ordering::SeqCst) {
+        if matches!(self.ctx.state.get(), State::Shutdown) {
             return Ok(());
         }
 
         // Mark the modules state
         #[cfg(feature = "tracing")]
         tracing::debug!("Shuttind down module and restaring at {:?}", restart_at);
-        self.ctx.active.store(false, SeqCst);
+        self.ctx.state.set(State::Shutdown);
 
         // drop the rt, to prevent all async activity from happening.
         #[cfg(feature = "async")]
@@ -475,7 +471,7 @@ impl ModuleRef {
         #[cfg(feature = "tracing")]
         tracing::debug!("Restarting module");
         // restart the module itself.
-        self.ctx.active.store(true, SeqCst);
+        self.ctx.state.set(State::Initialized);
 
         // Do sim start procedure
         let stages = self.num_sim_start_stages();
@@ -486,7 +482,7 @@ impl ModuleRef {
     }
 
     pub(crate) fn handle_message(&self, msg: Message) -> Result<(), Error> {
-        if self.ctx.active.load(SeqCst) {
+        if matches!(self.ctx.state.get(), State::Running) {
             self.processing
                 .borrow_mut()
                 .process_with(Some(msg), |handler, msg| {
@@ -509,13 +505,22 @@ impl ModuleRef {
     }
 
     pub(crate) fn at_sim_start(&self, stage: usize) -> Result<(), Error> {
+        let mut max = 0;
         self.processing
             .borrow_mut()
             .process_with(None, |handler, _| {
                 Harness::new(&self.ctx)
-                    .exec(|| handler.at_sim_start(stage))
+                    .exec(|| {
+                        max = handler.num_sim_start_stages();
+                        handler.at_sim_start(stage);
+                    })
                     .catch()
             })?;
+
+        if stage + 1 == max {
+            self.ctx.state.set(State::Running);
+        }
+
         Ok(())
     }
 

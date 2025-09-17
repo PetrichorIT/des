@@ -125,6 +125,16 @@ impl Connection {
     pub fn channel(&self) -> Option<ChannelRef> {
         self.channel.clone()
     }
+
+    fn unregister(self) {
+        if let Some(channel) = self.channel {
+            channel
+                .channel
+                .try_write()
+                .expect("failed to get lock")
+                .unregister(self.endpoint);
+        }
+    }
 }
 
 impl Connections {
@@ -146,6 +156,18 @@ impl Connections {
             }
         }
         unreachable!("Connections::put should not be called if no free slots are available")
+    }
+
+    fn remove(&mut self, gate: &GateRef) -> Connection {
+        for i in 0..2 {
+            if self.connections[i]
+                .as_ref()
+                .is_some_and(|c| Arc::ptr_eq(gate, &c.endpoint))
+            {
+                return self.connections[i].take().expect("illegal state");
+            }
+        }
+        unreachable!("Connections::remove should not be called on unconnected elements")
     }
 }
 
@@ -342,6 +364,83 @@ impl Gate {
             endpoint_id: conns_pos,
             channel: bck,
         });
+    }
+
+    /// Disconnects a peer.
+    ///
+    /// After successful execution the two gates will no longer be connnected. If a channel exists
+    /// on thus link, it will be informed via `Channel::unregister`.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the specified peer is not connected to this gate.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use des::prelude::*;
+    /// # use des::net::module::Signal;
+    /// # const SIGNAL_DISCONNECT: u32 = 1231;
+    /// struct MyModule {}
+    ///
+    /// impl Module for MyModule {
+    ///     fn handle_signal(&mut self, signal: Signal) {
+    ///         assert_eq!(signal.code, SIGNAL_DISCONNECT);
+    ///         let gate = current().gate("uplink").expect("failed to get gate");
+    ///         let next = gate.next_gate().expect("failed to get next");
+    ///         gate.disconnect(&next);
+    ///     }
+    /// }
+    /// ```
+    pub fn disconnect(self: &GateRef, other: &GateRef) {
+        assert!(
+            self.is_neighbor_to(other),
+            "cannot disconnect two unconnected gates"
+        );
+
+        let mut conns = self.connections.lock().expect("failed to lock");
+        let mut other_conns = other.connections.try_lock().expect("failed to get lock");
+
+        let local_con = conns.remove(other);
+        let peer_con = other_conns.remove(self);
+
+        local_con.unregister();
+        peer_con.unregister();
+    }
+
+    /// Disconnects all peers. This method cannot fail.
+    #[allow(clippy::missing_panics_doc)]
+    pub fn disconnect_all(self: &GateRef) {
+        let mut conns = self.connections.lock().expect("failed to lock");
+        for i in 0..2 {
+            if let Some(local_con) = conns.connections[i].take() {
+                let mut other_conns = local_con
+                    .endpoint
+                    .connections
+                    .try_lock()
+                    .expect("failed to get lock");
+
+                let peer_con = other_conns.remove(self);
+                peer_con.unregister();
+                drop(other_conns);
+                local_con.unregister();
+            }
+        }
+    }
+
+    /// Checks whether two gates are direct neighbors, works even for transit gates.
+    #[allow(clippy::missing_panics_doc)]
+    pub fn is_neighbor_to(self: &GateRef, other: &GateRef) -> bool {
+        let conns = self.connections.lock().expect("failed to lock");
+        for i in 0..2 {
+            if conns.connections[i]
+                .as_ref()
+                .is_some_and(|c| Arc::ptr_eq(&c.endpoint, other))
+            {
+                return true;
+            }
+        }
+        false
     }
 
     /// Retrives the channel of the first connection on the path.
@@ -566,6 +665,43 @@ mod tests {
 
         gate.clone().connect(gate_b);
         assert_eq!(gate.kind(), GateKind::Endpoint);
+    }
+
+    #[test]
+    fn disconnect() {
+        let owner = ModuleContext::standalone("root".into());
+        let gate_a = owner.create_raw_gate("port-a", 1, 0);
+        assert_eq!(gate_a.kind(), GateKind::Standalone);
+
+        let gate_b = owner.create_raw_gate("port-b", 1, 0);
+        gate_a.clone().connect(gate_b.clone());
+        assert_eq!(gate_a.kind(), GateKind::Endpoint);
+        assert_eq!(gate_b.kind(), GateKind::Endpoint);
+
+        gate_a.disconnect(&gate_b);
+        assert_eq!(gate_a.kind(), GateKind::Standalone);
+        assert_eq!(gate_b.kind(), GateKind::Standalone);
+    }
+
+    #[test]
+    fn disconnect_all() {
+        let owner = ModuleContext::standalone("root".into());
+        let a = owner.create_gate("a");
+        let b = owner.create_gate("b");
+        let c = owner.create_gate("c");
+
+        a.clone().connect(b.clone());
+        a.clone().connect(c.clone());
+
+        assert_eq!(a.kind(), GateKind::Transit);
+        assert_eq!(b.kind(), GateKind::Endpoint);
+        assert_eq!(c.kind(), GateKind::Endpoint);
+
+        a.disconnect_all();
+
+        assert_eq!(a.kind(), GateKind::Standalone);
+        assert_eq!(b.kind(), GateKind::Standalone);
+        assert_eq!(c.kind(), GateKind::Standalone);
     }
 
     #[test]

@@ -1,7 +1,7 @@
 use des::{
     net::{
         handlers::ModuleFn,
-        module::{SIGNAL_MODULE_PANICED, Signal, Stereotyp},
+        module::{SIGNAL_MODULE_PANICED, Signal, UnwindBehaviour},
     },
     prelude::*,
 };
@@ -11,7 +11,7 @@ struct Parent(bool);
 impl Module for Parent {
     fn at_sim_start(&mut self, _stage: usize) {
         let child = current().child("child").unwrap();
-        child.set_stereotyp(Stereotyp::SUBPROCESS);
+        child.set_unwind_behaviour(UnwindBehaviour::SUBPROCESS);
         child.subscribe_to(SIGNAL_MODULE_PANICED);
     }
     fn handle_signal(&mut self, signal: Signal) {

@@ -4,9 +4,6 @@ use des::{net::ndl::Ndl, prelude::*, registry};
 use serial_test::serial;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-#[path = "common/mock.rs"]
-mod mock;
-
 mod common {
     use des::prelude::*;
 
@@ -127,8 +124,6 @@ fn small_network() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 #[serial]
 fn ring_topology() -> Result<(), Box<dyn std::error::Error>> {
-    // Logger::new().set_logger();
-
     let mut app = Sim::new(());
     app.include_cfg(include_str!("ndl/ring_topo/main.par.yml"));
     app.node(

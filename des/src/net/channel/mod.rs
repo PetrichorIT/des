@@ -184,6 +184,11 @@ pub trait Channel: Any {
         let _ = endpoint;
     }
 
+    /// Unregister a gate to be participating in the communication domain.
+    fn unregister(&mut self, endpoint: GateRef) {
+        let _ = endpoint;
+    }
+
     /// A method to send a message through the channel
     ///
     /// # Errors

@@ -84,7 +84,7 @@ mod signal;
 mod tests;
 
 pub(crate) use self::ctx::*;
-pub use self::ctx::{ModuleContext, Stereotyp};
+pub use self::ctx::{ModuleContext, UnwindBehaviour};
 pub use api::*;
 pub(crate) use dummy::*;
 pub use props::*;

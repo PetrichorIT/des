@@ -42,8 +42,6 @@ impl Module for PluginCreation {
 #[test]
 #[serial]
 fn plugin_raw_creation() {
-    // Logger::new().set_logger();
-
     let mut app = Sim::new(());
     app.set_stack(|| IncrementIncomingId);
     app.node("root", PluginCreation::default());
@@ -112,8 +110,6 @@ impl Module for PluginPriorityDefer {
 #[test]
 #[serial]
 fn plugin_priority_defer() {
-    // Logger::new().set_logger();
-
     let mut app = Sim::new(());
     app.node("root", PluginPriorityDefer::default());
 
@@ -184,10 +180,6 @@ impl Module for PluginAtShutdown {
 #[test]
 #[serial]
 fn plugin_shutdown_non_persistent_data() {
-    // Logger::new()
-    //     .interal_max_log_level(log::LevelFilter::Trace)
-    //     .set_logger();
-
     let mut app = Sim::new(());
     app.node("root", PluginAtShutdown::default());
 

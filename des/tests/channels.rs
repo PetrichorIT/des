@@ -1,7 +1,11 @@
 #![cfg(feature = "net")]
 
 use des::{
-    net::{channel::DelayChannel, handlers::AsyncHandler},
+    net::{
+        channel::DelayChannel,
+        handlers::{AsyncHandler, HandlerFn},
+        internals::{MessageExitingConnection, NetEvents},
+    },
     prelude::*,
     time::sleep_until,
 };
@@ -82,10 +86,6 @@ impl Module for BufferChanModule {
 #[test]
 #[serial]
 fn channel_buffering_message() {
-    // Logger::new()
-    //     .interal_max_log_level(log::LevelFilter::Trace)
-    //     .set_logger();
-
     let mut rt = Sim::new(());
     rt.node("root", BufferChanModule::default());
 
@@ -123,10 +123,6 @@ impl Module for SendMessageModule {
 #[test]
 #[serial]
 fn channel_instant_busy() {
-    // Logger::new()
-    //     .interal_max_log_level(log::LevelFilter::Trace)
-    //     .set_logger();
-
     let mut rt = Sim::new(());
     rt.node("root", SendMessageModule);
 
@@ -391,4 +387,97 @@ fn datarate_channel_can_send_at_tft_independent_of_event_order() {
     g2.connect_with(t2, Some(buffer));
 
     let _ = Builder::seeded(123).build(sim.freeze()).run().unwrap();
+}
+
+#[derive(Debug, Clone, Default)]
+struct CustomFwdChannel {
+    peers: Vec<GateRef>,
+}
+
+impl Channel for CustomFwdChannel {
+    fn register(&mut self, endpoint: GateRef) {
+        self.peers.push(endpoint);
+        self.peers.dedup();
+    }
+
+    fn unregister(&mut self, endpoint: GateRef) {
+        self.peers.retain(|v| *v != endpoint);
+    }
+
+    fn send(
+        &mut self,
+        _: GateRef,
+        msg: Message,
+        via: des::net::gate::Connection,
+        ctx: des::net::channel::SendContext<'_>,
+    ) -> Result<(), SendError> {
+        ctx.sink.add(
+            NetEvents::MessageExitingConnection(MessageExitingConnection { con: via, msg }),
+            SimTime::now() + Duration::from_secs(1),
+        );
+        Ok(())
+    }
+
+    fn transmission_finish_time(&self) -> Option<SimTime> {
+        None
+    }
+
+    fn unbusy_notify(
+        &mut self,
+        _: Box<dyn std::any::Any + Send>,
+        _: des::net::channel::SendContext<'_>,
+    ) {
+    }
+}
+
+#[test]
+#[serial]
+fn register_unregister_custom_channel() -> Result<(), RuntimeError> {
+    let mut sim = Sim::new(());
+    sim.node(
+        "alice",
+        AsyncHandler::new(|_| async move {
+            for _ in 0..5 {
+                let _ = send(Message::default(), "a");
+                let _ = send(Message::default(), "a2");
+            }
+
+            let a = current().gate("a").unwrap();
+
+            assert_eq!(
+                a.channel()
+                    .unwrap()
+                    .downcast_ref(|c: &CustomFwdChannel| c.peers.len())
+                    .unwrap_or(0),
+                4
+            );
+
+            let peer = a.next_gate().unwrap();
+            a.clone().disconnect(&peer);
+
+            let a2 = current().gate("a2").unwrap();
+
+            assert_eq!(
+                a2.channel()
+                    .unwrap()
+                    .downcast_ref(|c: &CustomFwdChannel| c.peers.len())
+                    .unwrap_or(0),
+                2
+            );
+        }),
+    );
+    sim.node("bob", HandlerFn::new(|_| ()));
+    sim.node("charlie", HandlerFn::new(|_| ()));
+
+    let a = sim.gate("alice", "a");
+    let a2 = sim.gate("alice", "a2");
+    let b = sim.gate("bob", "b");
+    let c = sim.gate("charlie", "c");
+
+    let chan = ChannelRef::from(CustomFwdChannel::default());
+
+    a.connect_with(b, Some(chan.clone()));
+    a2.connect_with(c, Some(chan));
+
+    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
 }

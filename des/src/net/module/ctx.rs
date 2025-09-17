@@ -16,18 +16,24 @@ use crate::{
 use fxhash::{FxBuildHasher, FxHashMap};
 
 use spin::RwLock;
-use std::{
-    cell::Cell,
-    fmt::Debug,
-    hash::Hash,
-    sync::{Arc, atomic::AtomicBool},
-    time::Duration,
-};
+use std::{cell::Cell, fmt::Debug, hash::Hash, sync::Arc, time::Duration};
 
 pub(crate) static MOD_CTX: SwapLock<Option<Arc<ModuleContext>>> = SwapLock::new(None);
 
 pub(crate) fn module_ctx_drop() {
     MOD_CTX.swap(&mut None);
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum State {
+    /// The context has been created, but no impl is yet attached.
+    Created,
+    /// The module impl has been attached, but `at_sim_start` has not yet been called.
+    Initialized,
+    /// The module impl & ctx are fully ready.
+    Running,
+    /// The module has been shutdown but not dropped.
+    Shutdown,
 }
 
 /// The topological components of a module, not including the attached
@@ -41,7 +47,7 @@ pub(crate) fn module_ctx_drop() {
 /// managing these structures is rather complicated. However the nessecary
 /// constructors are still available, so use them with care.
 pub struct ModuleContext {
-    pub(crate) active: AtomicBool,
+    pub(crate) state: Cell<State>,
     pub(crate) id: ModuleId,
 
     pub(crate) me: RwLock<ModuleRefWeak>,
@@ -51,7 +57,7 @@ pub struct ModuleContext {
 
     pub(crate) props: RwLock<Props>,
 
-    pub(crate) stereotyp: Cell<Stereotyp>,
+    pub(crate) unwind_behaviour: Cell<UnwindBehaviour>,
     pub(crate) scope_token: ScopeToken,
 
     pub(crate) parent: Option<ModuleRefWeak>,
@@ -76,10 +82,10 @@ impl ModuleContext {
 
             props: RwLock::new(Props::default()),
 
-            active: AtomicBool::new(true),
+            state: Cell::new(State::Created),
             id: ModuleId::generate(),
             path,
-            stereotyp: Cell::default(),
+            unwind_behaviour: Cell::default(),
 
             gates: RwLock::new(Vec::new()),
 
@@ -107,10 +113,10 @@ impl ModuleContext {
 
             props: RwLock::new(Props::default()),
 
-            active: AtomicBool::new(true),
+            state: Cell::new(State::Created),
             id: ModuleId::generate(),
             path,
-            stereotyp: Cell::default(),
+            unwind_behaviour: Cell::default(),
 
             gates: RwLock::new(Vec::new()),
 
@@ -163,10 +169,9 @@ impl ModuleContext {
     /// Unregisters the currently active module as a subscriber to the given signal.
     pub fn unsubscribe_from(&self, signal: SignalCode) {
         let id = current().id();
-        self.signal_subscribers
-            .write()
-            .get_mut(&signal)
-            .map(|v| v.retain(|v| v.upgrade().expect("failed to upgrade").id != id));
+        if let Some(v) = self.signal_subscribers.write().get_mut(&signal) {
+            v.retain(|v| v.upgrade().is_some_and(|v| v.id != id));
+        }
     }
 
     /// Shuts down all activity for the module.
@@ -414,8 +419,8 @@ impl ModuleContext {
     /// # Panics
     ///
     /// Panics when concurrently accesed from multiple threads.
-    pub fn stereotyp(&self) -> Stereotyp {
-        self.stereotyp.get()
+    pub fn unwind_behaviour(&self) -> UnwindBehaviour {
+        self.unwind_behaviour.get()
     }
 
     /// Sets the unwind behaviour of this module.
@@ -423,8 +428,8 @@ impl ModuleContext {
     /// # Panics
     ///
     /// Panics when concurrently accesed from multiple threads.
-    pub fn set_stereotyp(&self, new: Stereotyp) {
-        self.stereotyp.set(new);
+    pub fn set_unwind_behaviour(&self, new: UnwindBehaviour) {
+        self.unwind_behaviour.set(new);
     }
 
     /// Returns a reference to a parent module
@@ -567,7 +572,7 @@ impl Drop for ModuleContext {
     }
 }
 
-/// A stereotyp that defines a nodes behaviour on startup, shutdown or panic.
+/// A config that defines a nodes behaviour on startup, shutdown or panic.
 ///
 /// The lifecycle of a node is defined as follows:
 /// 1. A node is created (potentially from non-sim context)
@@ -579,42 +584,42 @@ impl Drop for ModuleContext {
 ///  3. Parent is informed
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(clippy::struct_excessive_bools)]
-pub struct Stereotyp {
-    /// TODO
+pub struct UnwindBehaviour {
+    /// Indicates whether to catch an panic and allow the simulation to continue without error
+    /// or to record the module panic as an error in the runtime result.
     pub on_panic_catch: bool,
-    /// TODO
-    pub on_panic_drop: bool,
-    /// TODO
+    /// Indicates whether a node should be restared if it panicked.
     pub on_panic_restart: bool,
-    /// TODO
+    /// Indicates whether a panic in this module should shut down all submodules.
     pub on_panic_drop_submodules: bool,
-    /// TODO
-    pub on_panic_inform_parent: bool,
 }
 
-impl Stereotyp {
-    /// TODO
-    pub const HOST: Stereotyp = Stereotyp {
+impl UnwindBehaviour {
+    /// The default behaviour of an independent node.
+    ///
+    /// Failures will be recorded & restarts attempted.
+    /// Submodules will be dropped in upon panic.
+    pub const HOST: UnwindBehaviour = UnwindBehaviour {
         on_panic_catch: false,
-        on_panic_drop: false,
         on_panic_restart: true,
-
         on_panic_drop_submodules: true,
-        on_panic_inform_parent: false,
     };
 
-    /// TODO
-    pub const SUBPROCESS: Stereotyp = Stereotyp {
+    /// The default behaviour of a subprocess node.
+    ///
+    /// Failures will not be recorded & restarts not attempted.
+    /// Submodules will be dropped in upon panic.
+    ///
+    /// Handeling the failure is the resposiblity of the managing node
+    /// (aka the 'parent' process).
+    pub const SUBPROCESS: UnwindBehaviour = UnwindBehaviour {
         on_panic_catch: true,
-        on_panic_drop: true,
         on_panic_restart: false,
-
         on_panic_drop_submodules: true,
-        on_panic_inform_parent: true,
     };
 }
 
-impl Default for Stereotyp {
+impl Default for UnwindBehaviour {
     fn default() -> Self {
         Self::HOST
     }

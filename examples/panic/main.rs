@@ -12,7 +12,7 @@ fn main() -> Result<(), RuntimeError> {
 struct B;
 impl Module for B {
     fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
-        current().set_stereotyp(des::net::module::Stereotyp {
+        current().set_unwind_behaviour(des::net::module::UnwindBehaviour {
             on_panic_catch: false,
             ..Default::default()
         });

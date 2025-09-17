@@ -19,6 +19,9 @@ use std::{
     },
 };
 
+mod common;
+pub use common::*;
+
 #[test]
 #[serial]
 fn builder_builds_hierachie() {
@@ -62,9 +65,9 @@ fn builder_builds_hierachie() {
 #[should_panic = "cannot create node 'alice', node allready exists"]
 fn builder_panic_node_duplicate() {
     let mut sim = Sim::new(());
-    sim.node("alice", HandlerFn::new(|_| {}));
-    sim.node("bob", HandlerFn::new(|_| {}));
-    sim.node("alice", HandlerFn::new(|_| {}));
+    sim.node("alice", NopModule);
+    sim.node("bob", NopModule);
+    sim.node("alice", NopModule);
 }
 
 #[test]
@@ -72,9 +75,9 @@ fn builder_panic_node_duplicate() {
 #[should_panic = "cannot create node 'bob.bombardil', since parent node 'bob' is required, but does not exist"]
 fn builder_panic_missing_parent() {
     let mut sim = Sim::new(());
-    sim.node("alice", HandlerFn::new(|_| {}));
-    sim.node("alice.alicent", HandlerFn::new(|_| {}));
-    sim.node("bob.bombardil", HandlerFn::new(|_| {}));
+    sim.node("alice", NopModule);
+    sim.node("alice.alicent", NopModule);
+    sim.node("bob.bombardil", NopModule);
 }
 
 #[test]
@@ -82,7 +85,7 @@ fn builder_panic_missing_parent() {
 #[should_panic = "cannot create gate 'bob.port', because node 'bob' does not exist"]
 fn builder_panic_gate_missing_node() {
     let mut sim = Sim::new(());
-    sim.node("alice", HandlerFn::new(|_| {}));
+    sim.node("alice", NopModule);
     let _ = sim.gate("alice", "port");
 
     let _ = sim.gate("bob", "port");
