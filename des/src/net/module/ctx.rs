@@ -8,7 +8,7 @@ use crate::{
         runtime::{ModuleShutdownEvent, NetEvents, Spawner},
         schedule_event,
     },
-    prelude::{GateRef, ObjectPath, current},
+    prelude::{GateRef, ObjectPath},
     sync::SwapLock,
     time::SimTime,
     tracing::{ScopeToken, new_scope},
@@ -75,7 +75,7 @@ impl ModuleContext {
     /// The sofware attched to the returned reference is a dummy module
     /// that should be replaced before the simulation is started.
     #[must_use]
-    pub fn standalone(path: ObjectPath) -> ModuleRef {
+    pub fn new_standalone(path: ObjectPath) -> ModuleRef {
         ModuleRef::dummy(Arc::new(Self {
             me: RwLock::new(ModuleRefWeak::empty()),
             scope_token: new_scope(path.clone()),
@@ -105,7 +105,7 @@ impl ModuleContext {
     /// that should be replaced before the simulation is started.
     #[allow(clippy::needless_pass_by_value)]
     #[must_use]
-    pub fn child_of(name: &str, parent: ModuleRef) -> ModuleRef {
+    pub fn new_child_of(name: &str, parent: ModuleRef) -> ModuleRef {
         let path = ObjectPath::appended(&parent.ctx.path, name);
         let this = ModuleRef::dummy(Arc::new(Self {
             me: RwLock::new(ModuleRefWeak::empty()),
@@ -123,7 +123,8 @@ impl ModuleContext {
             parent: Some(ModuleRefWeak::new(&parent)),
             children: RwLock::new(FxHashMap::with_hasher(FxBuildHasher::default())),
 
-            signal_subscribers: RwLock::default(),
+            // Copy signal subscriber from parent
+            signal_subscribers: RwLock::new(parent.signal_subscribers.read().clone()),
         }));
 
         parent
@@ -159,19 +160,44 @@ impl ModuleContext {
 
     /// Registers the currently active module as a subscriber to the given signal.
     pub fn subscribe_to(&self, signal: SignalCode) {
+        self.subscribe_to_inner(signal, &self.me.read());
+    }
+
+    fn subscribe_to_inner(&self, signal: SignalCode, subscriber: &ModuleRefWeak) {
         self.signal_subscribers
             .write()
             .entry(signal)
             .or_default()
-            .push(ModuleRefWeak::new(&current().me()));
+            .push(subscriber.clone());
+
+        for child in self.children.read().values() {
+            child.subscribe_to_inner(signal, subscriber);
+        }
     }
 
     /// Unregisters the currently active module as a subscriber to the given signal.
     pub fn unsubscribe_from(&self, signal: SignalCode) {
-        let id = current().id();
+        self.unsubscribe_from_inner(signal, self.id);
+    }
+
+    fn unsubscribe_from_inner(&self, signal: SignalCode, subscriber: ModuleId) {
         if let Some(v) = self.signal_subscribers.write().get_mut(&signal) {
-            v.retain(|v| v.upgrade().is_some_and(|v| v.id != id));
+            v.retain(|v| v.upgrade().is_some_and(|v| v.id != subscriber));
         }
+
+        for child in self.children.read().values() {
+            child.unsubscribe_from_inner(signal, subscriber);
+        }
+    }
+
+    /// Indicates whether a certain signal has subscribers. If the process
+    /// of creating a signal is expensive, check this function before to
+    /// figure out whether a signal must be created.
+    pub fn has_subscribers(&self, signal: SignalCode) -> bool {
+        self.signal_subscribers
+            .read()
+            .get(&signal)
+            .is_some_and(|c| !c.is_empty())
     }
 
     /// Shuts down all activity for the module.

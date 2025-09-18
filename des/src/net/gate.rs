@@ -380,7 +380,7 @@ impl Gate {
     /// ```
     /// # use des::prelude::*;
     /// # use des::net::module::Signal;
-    /// # const SIGNAL_DISCONNECT: u32 = 1231;
+    /// # const SIGNAL_DISCONNECT: usize = 1231;
     /// struct MyModule {}
     ///
     /// impl Module for MyModule {
@@ -621,7 +621,7 @@ mod tests {
 
     #[test]
     fn fmt() {
-        let owner = ModuleContext::standalone("root".into());
+        let owner = ModuleContext::new_standalone("root".into());
         let gate = Gate::new(&owner, "port", 4, 1);
         assert_eq!(format!("{gate:?}"), "Gate { path: \"root.port[1]\" }");
         assert_eq!(gate.str(), "port[1]");
@@ -630,7 +630,7 @@ mod tests {
 
     #[test]
     fn kind_and_iter() {
-        let owner = ModuleContext::standalone("root".into());
+        let owner = ModuleContext::new_standalone("root".into());
         let gate_a = owner.create_raw_gate("port-a", 1, 0);
         assert_eq!(gate_a.kind(), GateKind::Standalone);
 
@@ -655,7 +655,7 @@ mod tests {
 
     #[test]
     fn dedup() {
-        let owner = ModuleContext::standalone("root".into());
+        let owner = ModuleContext::new_standalone("root".into());
         let gate = owner.create_raw_gate("port-a", 1, 0);
         assert_eq!(gate.kind(), GateKind::Standalone);
 
@@ -669,7 +669,7 @@ mod tests {
 
     #[test]
     fn disconnect() {
-        let owner = ModuleContext::standalone("root".into());
+        let owner = ModuleContext::new_standalone("root".into());
         let gate_a = owner.create_raw_gate("port-a", 1, 0);
         assert_eq!(gate_a.kind(), GateKind::Standalone);
 
@@ -685,7 +685,7 @@ mod tests {
 
     #[test]
     fn disconnect_all() {
-        let owner = ModuleContext::standalone("root".into());
+        let owner = ModuleContext::new_standalone("root".into());
         let a = owner.create_gate("a");
         let b = owner.create_gate("b");
         let c = owner.create_gate("c");
@@ -706,7 +706,7 @@ mod tests {
 
     #[test]
     fn into_gate() {
-        let ctx = ModuleContext::standalone("root".into());
+        let ctx = ModuleContext::new_standalone("root".into());
         let gate_a = ctx.create_raw_gate("port-a", 1, 0);
 
         assert_eq!(gate_a.as_gate(&ctx.ctx), Some(gate_a.clone()));

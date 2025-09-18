@@ -168,11 +168,11 @@ fn crate_node_at_buildtime<A>(
             );
         };
 
-        ModuleContext::child_of(path.name(), parent)
+        ModuleContext::new_child_of(path.name(), parent)
     } else if let Some(zero_parent) = base.get(&ObjectPath::from("")) {
-        ModuleContext::child_of(path.name(), zero_parent)
+        ModuleContext::new_child_of(path.name(), zero_parent)
     } else {
-        ModuleContext::standalone(path)
+        ModuleContext::new_standalone(path)
     };
     // read in Props
     let path_parts = ctx.path.as_str().split('.').collect::<Vec<_>>();
@@ -203,7 +203,7 @@ fn create_node_at_runtime(
 
     let parent_path = path.nonzero_parent().expect("must have a parent");
     let parent = globals().get(&parent_path).expect("must have a parent");
-    let ctx = ModuleContext::child_of(path.name(), parent);
+    let ctx = ModuleContext::new_child_of(path.name(), parent);
 
     // TODO: CFGs are missing here
     // A) store in globals & pull

@@ -2,10 +2,10 @@
 use fxhash::{FxBuildHasher, FxHashMap};
 
 use super::{
+    ObjectPath,
     gate::{GateKind, GateRef},
     globals,
     module::ModuleRef,
-    ObjectPath,
 };
 use std::{
     io::{Result, Write},
@@ -418,7 +418,7 @@ impl Topology<(), ()> {
 impl Topology<NodeID, ()> {
     fn raw(edges: &[&[usize]]) -> Self {
         let n = edges.len();
-        let module = super::module::ModuleContext::standalone("raw-topology-holder".into());
+        let module = super::module::ModuleContext::new_standalone("raw-topology-holder".into());
         let start = module.create_gate("start");
         let end = module.create_gate("end");
 

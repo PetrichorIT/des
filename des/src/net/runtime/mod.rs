@@ -681,7 +681,7 @@ mod tests {
     fn module_tree() {
         let mut tree = ModuleTree::default();
         fn module(path: &str) -> ModuleRef {
-            ModuleContext::standalone(path.into())
+            ModuleContext::new_standalone(path.into())
         }
 
         tree.add(module("alice"));

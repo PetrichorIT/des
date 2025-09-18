@@ -1,4 +1,6 @@
-use des::prelude::*;
+#![allow(unused)]
+
+use des::{net::module::SIGNAL_MODULE_PANICED, prelude::*};
 
 pub struct NopModule;
 impl Module for NopModule {}
