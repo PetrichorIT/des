@@ -124,7 +124,6 @@ impl<'a, A> InnerSpawner<'a, A> {
 
     // FIXME: invariants make things annoying, but we could just
     // make a subscope(_, || <do something> bound) that should work without being annoying maybe
-
     fn as_ref_spawner<'b>(&'b mut self) -> InnerSpawner<'b, A>
     where
         'a: 'b,

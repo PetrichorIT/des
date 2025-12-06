@@ -14,7 +14,6 @@ use crate::{
     prelude::RuntimeError,
     runtime::{Event, EventLifecycle, EventSink, Runtime},
     time::SimTime,
-    tracing::{enter_scope, leave_scope},
 };
 use std::{
     any::Any,
@@ -94,8 +93,6 @@ impl MessageExitingConnection {
         // Current packet position: `cur.endpoint`
         let mut cur = self.con;
         while let Some(next) = cur.next_hop() {
-            enter_scope(cur.endpoint.owner().scope_token());
-
             let cur_endpoint = cur.endpoint.clone();
 
             // Since a next gate exists log the current gate as
@@ -147,7 +144,6 @@ impl MessageExitingConnection {
 
         // The loop has ended. This means we are at the end of a gate chain
         // cur has not been checked for anything
-        enter_scope(cur.endpoint.owner().scope_token());
 
         #[cfg(feature = "tracing")]
         tracing::info!(
@@ -196,8 +192,6 @@ impl HandleMessageEvent {
     where
         A: EventLifecycle<Sim<A>>,
     {
-        enter_scope(self.module.scope_token());
-
         let mut message = self.message;
         message.header.receiver_module_id = self.module.ctx.id;
 
@@ -248,8 +242,6 @@ impl AtSimStartEvent {
                 }
             }
         }
-
-        leave_scope();
     }
 }
 
@@ -293,8 +285,6 @@ impl ModuleShutdownEvent {
     where
         A: EventLifecycle<Sim<A>>,
     {
-        enter_scope(self.module.scope_token());
-
         #[cfg(feature = "tracing")]
         tracing::info!("ModuleShutdownEvent");
 
@@ -321,8 +311,6 @@ impl ModuleRestartEvent {
     where
         A: EventLifecycle<Sim<A>>,
     {
-        enter_scope(self.module.scope_token());
-
         #[cfg(feature = "tracing")]
         tracing::info!("ModuleRestartEvent");
 
@@ -349,8 +337,6 @@ impl AsyncWakeupEvent {
     where
         A: EventLifecycle<Sim<A>>,
     {
-        enter_scope(self.module.scope_token());
-
         #[cfg(feature = "tracing")]
         tracing::info!("async wakeup");
 

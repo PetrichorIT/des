@@ -1,7 +1,6 @@
 use crate::net::module::State;
 use crate::net::processing::{ModuleImpl, ProcessingStack};
 use crate::prelude::{Gate, GateRef};
-use crate::tracing::{enter_scope, leave_scope};
 
 use super::{DummyModule, Module, ModuleContext};
 use std::any::Any;
@@ -168,15 +167,10 @@ impl ModuleRef {
         self.ctx.state.get() != State::Shutdown
     }
 
-    pub(crate) fn scope_token(&self) -> crate::tracing::ScopeToken {
-        self.ctx.scope_token
-    }
-
     /// INTERNAL
     #[doc(hidden)]
     #[must_use]
     pub fn activate(&self) -> Option<Arc<ModuleContext>> {
-        enter_scope(self.scope_token());
         let prev = ModuleContext::place(Arc::clone(&self.ctx));
         #[cfg(debug_assertions)]
         if let Some(prev) = &prev {
@@ -190,7 +184,6 @@ impl ModuleRef {
     #[allow(unused, clippy::unused_self)]
     pub(crate) fn deactivate(&self) {
         let _ = ModuleContext::take();
-        leave_scope();
     }
 
     /// Creates a gate on the current module, returning its ID.

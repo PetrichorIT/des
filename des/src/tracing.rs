@@ -1,14 +1,5 @@
 //! Alternative tracing impl
-
-use std::sync::{
-    atomic::{AtomicU64, Ordering},
-    mpsc::Sender,
-};
-
-use crate::{
-    net::module::try_current,
-    prelude::{ObjectPath, SimTime},
-};
+use crate::{net::module::try_current, prelude::SimTime};
 use nu_ansi_term::{Color, Style};
 use tracing::{Level, Subscriber, dispatcher};
 use tracing_error::ErrorLayer;
@@ -19,49 +10,6 @@ use tracing_subscriber::{
     layer::SubscriberExt,
     registry::LookupSpan,
 };
-
-/// A token describing a logger scope.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ScopeToken(u64);
-
-static SCOPE_CURRENT_TOKEN: AtomicU64 = AtomicU64::new(u64::MAX);
-static SCOPE_TOKEN_NEXT: AtomicU64 = AtomicU64::new(0);
-static SCOPES: std::sync::Mutex<Option<Sender<(ScopeToken, ObjectPath)>>> =
-    std::sync::Mutex::new(None);
-
-/// Creates a new scope attached to the tracing subscriber.
-///
-/// This function is intended for internal use, but remains
-/// public, since it may be usefull in rare scenarios
-#[doc(hidden)]
-pub fn new_scope(obj_path: ObjectPath) -> ScopeToken {
-    let token = ScopeToken(SCOPE_TOKEN_NEXT.fetch_add(1, Ordering::SeqCst));
-    let lock = SCOPES.lock().unwrap();
-    if let Some(scopes) = &*lock {
-        scopes.send((token, obj_path)).expect("Failed to send");
-    } else {
-        // WARNING MAYBE
-    }
-    token
-}
-
-/// Indicates that the begin of a scope, that was allread registerd.
-///
-/// This function is intended for internal use, but remains
-/// public, since it may be usefull in rare scenarios
-#[doc(hidden)]
-pub fn enter_scope(token: ScopeToken) {
-    SCOPE_CURRENT_TOKEN.store(token.0, Ordering::SeqCst);
-}
-
-/// Indicates that no scope is currently active.
-///
-/// This function is intended for internal use, but remains
-/// public, since it may be usefull in rare scenarios
-#[doc(hidden)]
-pub fn leave_scope() {
-    SCOPE_CURRENT_TOKEN.store(u64::MAX, Ordering::SeqCst);
-}
 
 /// The log level that will be used if `RUST_LOG` is not defined.
 pub const FALLBACK_LOG_LEVEL: Level = Level::TRACE;
@@ -83,16 +31,6 @@ pub fn init() {
         .with(ErrorLayer::default());
 
     dispatcher::set_global_default(reg.into()).expect("failed to set global default subscriber");
-
-    // let subscriber = tracing_subscriber::fmt();
-    // let subscriber = subscriber.event_format(format());
-    // let subscriber = subscriber.with_env_filter(
-    //     EnvFilter::builder()
-    //         .with_default_directive(Directive::from(FALLBACK_LOG_LEVEL))
-    //         .from_env_lossy(),
-    // );
-
-    // subscriber.finish().init();
 }
 
 /// An instance of a simulation formatter.

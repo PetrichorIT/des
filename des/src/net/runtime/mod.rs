@@ -9,7 +9,6 @@ use crate::{
     prelude::{Application, EventLifecycle, GateRef, Module, ModuleRef, ObjectPath, Runtime},
     runtime::RuntimeError,
     time::SimTime,
-    tracing::{enter_scope, leave_scope},
 };
 use std::{
     fmt::Debug,
@@ -509,8 +508,6 @@ where
             }
         }
 
-        leave_scope();
-
         A::at_sim_start(rt);
     }
 
@@ -533,8 +530,6 @@ where
             .cloned()
             .collect::<Vec<_>>();
         for module in mods {
-            enter_scope(module.scope_token());
-
             #[cfg(feature = "tracing")]
             tracing::info!("Calling 'at_sim_end'");
             let _ = module.activate();
@@ -545,7 +540,6 @@ where
         }
 
         let _ = take_hook();
-        leave_scope();
         if error.is_empty() { Ok(()) } else { Err(error) }
     }
 }

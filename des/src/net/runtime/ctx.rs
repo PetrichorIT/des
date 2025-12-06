@@ -3,7 +3,7 @@
 use super::{Globals, HandleMessageEvent, MessageExitingConnection, Sim};
 use crate::net::channel::SendError;
 use crate::net::gate::Connection;
-use crate::net::module::{MOD_CTX, current, with_mod_ctx};
+use crate::net::module::{MOD_CTX, current};
 use crate::net::runtime::NetEvents;
 use crate::net::{gate::GateRef, message::Message};
 use crate::prelude::{EventLifecycle, ModuleRef, RuntimeError};
@@ -74,8 +74,6 @@ pub(crate) fn buf_send_at(
     let mut ctx = BUF_CTX.lock();
     msg.header.sender_module_id = current().id();
 
-    crate::tracing::enter_scope(gate.owner().scope_token());
-
     // (0) If delayed send is active, dont skip gate_refs
     if send_time > SimTime::now() {
         ctx.events.push((
@@ -94,10 +92,7 @@ pub(crate) fn buf_send_at(
         con: Connection::new(gate),
         msg,
     };
-    let result = event.handle_with_sink(&mut ctx.events);
-
-    crate::tracing::enter_scope(with_mod_ctx(|ctx| ctx.scope_token));
-    result
+    event.handle_with_sink(&mut ctx.events)
 }
 
 pub(crate) fn buf_schedule_at(msg: Message, arrival_time: SimTime) {

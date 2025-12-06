@@ -11,9 +11,8 @@ use crate::{
     prelude::{GateRef, ObjectPath},
     sync::SwapLock,
     time::SimTime,
-    tracing::{ScopeToken, new_scope},
 };
-use fxhash::{FxBuildHasher, FxHashMap};
+use fxhash::FxHashMap;
 
 use spin::RwLock;
 use std::{cell::Cell, fmt::Debug, hash::Hash, sync::Arc, task::Waker, time::Duration};
@@ -58,7 +57,6 @@ pub struct ModuleContext {
     pub(crate) props: RwLock<Props>,
 
     pub(crate) unwind_behaviour: Cell<UnwindBehaviour>,
-    pub(crate) scope_token: ScopeToken,
 
     pub(crate) parent: Option<ModuleRefWeak>,
     pub(crate) children: RwLock<FxHashMap<String, ModuleRef>>,
@@ -79,7 +77,6 @@ impl ModuleContext {
     pub fn new_standalone(path: ObjectPath) -> ModuleRef {
         ModuleRef::dummy(Arc::new(Self {
             me: RwLock::new(ModuleRefWeak::empty()),
-            scope_token: new_scope(path.clone()),
 
             props: RwLock::new(Props::default()),
 
@@ -88,7 +85,7 @@ impl ModuleContext {
             path,
             unwind_behaviour: Cell::default(),
 
-            gates: RwLock::new(Vec::new()),
+            gates: RwLock::default(),
 
             parent: None,
             children: RwLock::default(),
@@ -111,7 +108,6 @@ impl ModuleContext {
         let path = ObjectPath::appended(&parent.ctx.path, name);
         let this = ModuleRef::dummy(Arc::new(Self {
             me: RwLock::new(ModuleRefWeak::empty()),
-            scope_token: new_scope(path.clone()),
 
             props: RwLock::new(Props::default()),
 
@@ -120,10 +116,10 @@ impl ModuleContext {
             path,
             unwind_behaviour: Cell::default(),
 
-            gates: RwLock::new(Vec::new()),
+            gates: RwLock::default(),
 
             parent: Some(ModuleRefWeak::new(&parent)),
-            children: RwLock::new(FxHashMap::with_hasher(FxBuildHasher::default())),
+            children: RwLock::default(),
             state_change_wakers: RwLock::default(),
 
             // Copy signal subscriber from parent
