@@ -20,6 +20,9 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+mod cfg;
+pub(crate) use cfg::SimConfiguration;
+
 mod api;
 pub use self::api::{fail, globals, schedule_event};
 
@@ -33,9 +36,6 @@ mod guard;
 use guard::SimStaticsGuard;
 
 pub mod handlers;
-
-mod unwind;
-use self::unwind::Harness;
 
 mod spawner;
 pub use self::spawner::{Spawner, SpawnerKind};
@@ -95,7 +95,7 @@ pub struct Sim<A> {
 /// ```
 pub struct SimBuilder<A> {
     sim: Sim<A>,
-    pub(crate) stack: Box<dyn FnMut() -> ProcessingStack>,
+    pub(crate) cfg: SimConfiguration,
 }
 
 impl<A> Sim<A> {
@@ -126,10 +126,13 @@ impl<A> Sim<A> {
     }
 
     /// Into Builder
-    pub fn into_builder(self, stack: impl FnMut() -> ProcessingStack + 'static) -> SimBuilder<A> {
+    pub fn into_builder(self, stack: impl Fn() -> ProcessingStack + 'static) -> SimBuilder<A> {
         SimBuilder {
             sim: self,
-            stack: Box::new(stack),
+            cfg: SimConfiguration {
+                stack: Arc::new(stack),
+                default_unwind_behavior: Default::default(),
+            },
         }
     }
 
@@ -181,9 +184,9 @@ impl<A> SimBuilder<A> {
     ///
     /// Note that this will only affect calls of `node` after
     /// this function was called.
-    pub fn set_stack<T: Into<ProcessingStack>>(&mut self, mut stack: impl FnMut() -> T + 'static) {
-        let boxed: Box<dyn FnMut() -> ProcessingStack> = Box::new(move || stack().into());
-        self.stack = boxed;
+    pub fn set_stack<T: Into<ProcessingStack>>(&mut self, stack: impl Fn() -> T + 'static) {
+        let boxed: Arc<dyn Fn() -> ProcessingStack + 'static> = Arc::new(move || stack().into());
+        self.cfg.stack = boxed;
     }
 
     /// Sets the default processing stack for the simulation.
@@ -191,10 +194,7 @@ impl<A> SimBuilder<A> {
     /// Note that this will only affect calls of `node` after
     /// this function was called.
     #[must_use]
-    pub fn with_stack<T: Into<ProcessingStack>>(
-        mut self,
-        stack: impl FnMut() -> T + 'static,
-    ) -> Self {
+    pub fn with_stack<T: Into<ProcessingStack>>(mut self, stack: impl Fn() -> T + 'static) -> Self {
         self.set_stack(stack);
         self
     }

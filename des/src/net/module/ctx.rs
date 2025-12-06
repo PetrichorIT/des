@@ -5,7 +5,7 @@ use crate::{
         gate::IntoModuleGate,
         module::SignalCode,
         processing::ProcessingStack,
-        runtime::{ModuleShutdownEvent, NetEvents, Spawner},
+        runtime::{ModuleShutdownEvent, NetEvents, SimConfiguration, Spawner},
         schedule_event,
     },
     prelude::{GateRef, ObjectPath},
@@ -320,7 +320,13 @@ impl ModuleContext {
             self.is_initialized(),
             "cannot use spawner on a not yet initialized module"
         );
-        Spawner::new_at_runtime(self, stack)
+        Spawner::new_at_runtime(
+            self,
+            SimConfiguration {
+                stack: Arc::new(stack),
+                default_unwind_behavior: UnwindBehaviour::default(),
+            },
+        )
     }
 
     /// Returns a runtime-unqiue identifier for the currently active module.

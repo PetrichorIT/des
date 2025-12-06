@@ -1,10 +1,13 @@
 use crate::{
     net::{
-        Error, Sim,
+        Error, ErrorKind, Sim,
         channel::{ChannelRef, SendContext, SendError},
         gate::Connection,
         message::{Body, Message},
-        module::{ModuleRef, SIGNAL_SIM_START_DONE, Signal, State},
+        module::{
+            ModuleContext, ModuleRef, SIGNAL_MODULE_PANICED, SIGNAL_SIM_START_DONE, Signal, State,
+            emit,
+        },
         runtime::buf_process,
         schedule_event,
     },
@@ -13,9 +16,11 @@ use crate::{
     time::SimTime,
     tracing::{enter_scope, leave_scope},
 };
-use std::{any::Any, fmt::Debug};
-
-use super::Harness;
+use std::{
+    any::Any,
+    fmt::Debug,
+    panic::{AssertUnwindSafe, catch_unwind},
+};
 
 #[cfg(feature = "async")]
 use crate::net::processing::TokioRuntime;
@@ -578,5 +583,57 @@ impl ModuleRef {
         }
 
         result
+    }
+}
+
+#[must_use]
+pub(super) struct Harness<'a> {
+    ctx: &'a ModuleContext,
+    unwind: Option<Box<dyn Any + Send + 'static>>,
+}
+
+impl<'a> Harness<'a> {
+    pub(super) fn new(ctx: &'a ModuleContext) -> Self {
+        Harness { ctx, unwind: None }
+    }
+
+    pub(super) fn exec(mut self, f: impl FnOnce()) -> Self {
+        self.unwind = catch_unwind(AssertUnwindSafe(f)).err();
+        self
+    }
+
+    pub(super) fn catch(self) -> Result<(), Error> {
+        if let Some(unwind) = self.unwind {
+            let bh = self.ctx.unwind_behaviour();
+
+            self.ctx.state.set(State::Shutdown);
+
+            emit(SIGNAL_MODULE_PANICED, Body::empty());
+
+            if !bh.on_panic_catch {
+                return Err(Error::new(self.ctx.path(), ErrorKind::ModulePanic(unwind)));
+            }
+
+            if bh.on_panic_restart {
+                schedule_event(
+                    NetEvents::ModuleRestartEvent(ModuleRestartEvent {
+                        module: self.ctx.me(),
+                    }),
+                    SimTime::now(),
+                );
+            }
+
+            if bh.on_panic_drop_submodules {
+                // TODO: impl drop submodules
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn pass(self) -> Result<(), Error> {
+        if let Some(unwind) = self.unwind {
+            return Err(Error::new(self.ctx.path(), ErrorKind::ModulePanic(unwind)));
+        }
+        Ok(())
     }
 }
