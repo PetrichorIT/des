@@ -24,6 +24,7 @@ pub struct DatarateChannel {
 
 /// Metrics that define a channels capabilitites.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "serde", derive(::serde::Serialize, ::serde::Deserialize))]
 pub struct DatarateChannelMetrics {
     /// The maximum throughput of the channel in bit/s
     pub bitrate: usize,

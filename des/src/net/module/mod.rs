@@ -76,6 +76,7 @@ use std::{
 mod api;
 mod ctx;
 mod dummy;
+mod future;
 mod props;
 mod refs;
 mod signal;

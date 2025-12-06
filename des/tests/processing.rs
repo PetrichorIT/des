@@ -50,7 +50,7 @@ fn plugin_raw_creation() {
     let result = rt.run().unwrap();
 
     assert_eq!(result.1, SimTime::from_duration(Duration::from_secs(99)));
-    assert_eq!(result.2.event_count, 100);
+    assert_eq!(result.2.event_count, 101); // (+1 start signal)
 }
 
 struct ActivitySensor {
@@ -121,7 +121,7 @@ fn plugin_priority_defer() {
     };
 
     assert_eq!(time, 99.0);
-    assert_eq!(profiler.event_count, 100);
+    assert_eq!(profiler.event_count, 101); // (+1 start signal)
 }
 
 struct IncrementArcPlugin {

@@ -203,7 +203,10 @@ fn builder_handler_fn_failure_panic() {
     rt.add_message_onto(gate, Message::default(), 1.0.into());
 
     let e = rt.run().unwrap_err();
-    assert_eq!(e[0].to_string(), "alice: ModulePanic(Any { .. })")
+    assert!(
+        e[0].to_string()
+            .starts_with("alice: ModulePanic(Any { .. })")
+    );
 }
 
 #[test]

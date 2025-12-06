@@ -216,7 +216,28 @@ impl<E> CQueue<E> {
             return (event, time);
         }
 
+        // let mut num_skipped = 0;
         loop {
+            // We skipped alot head
+            // if num_skipped > self.buckets.len() {
+            //     let next_event = self
+            //         .buckets
+            //         .iter()
+            //         .map(|bucket| bucket.front_time())
+            //         .min()
+            //         .expect("must have at least one element");
+
+            //     let delay = next_event - self.t0;
+            //     let n = f64::floor(delay.as_secs_f64() / self.t.as_secs_f64()) as usize - 1;
+            //     let d = self.t.as_secs_f64() * n as f64;
+            //     let d = Duration::from_secs_f64(d);
+
+            //     self.head = (self.head + n) & self.n;
+            //     self.t0 += d;
+            //     self.t1 += d;
+            //     num_skipped = 0;
+            // }
+
             // Move until full bucket is found.
             while self.buckets[self.head].is_empty() {
                 self.head = (self.head + 1) % self.n;
@@ -225,12 +246,12 @@ impl<E> CQueue<E> {
             }
 
             // Bucket with > 0 elements found
-
             let min = self.buckets[self.head].front_time();
             if min > self.t1 {
                 self.head = (self.head + 1) % self.n;
                 self.t0 += self.t;
                 self.t1 += self.t;
+                // num_skipped += 1;
                 continue;
             }
 

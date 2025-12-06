@@ -16,7 +16,7 @@ use crate::{
 use fxhash::{FxBuildHasher, FxHashMap};
 
 use spin::RwLock;
-use std::{cell::Cell, fmt::Debug, hash::Hash, sync::Arc, time::Duration};
+use std::{cell::Cell, fmt::Debug, hash::Hash, sync::Arc, task::Waker, time::Duration};
 
 pub(crate) static MOD_CTX: SwapLock<Option<Arc<ModuleContext>>> = SwapLock::new(None);
 
@@ -63,6 +63,7 @@ pub struct ModuleContext {
     pub(crate) parent: Option<ModuleRefWeak>,
     pub(crate) children: RwLock<FxHashMap<String, ModuleRef>>,
 
+    pub(crate) state_change_wakers: RwLock<Vec<Waker>>,
     pub(crate) signal_subscribers: RwLock<FxHashMap<SignalCode, Vec<ModuleRefWeak>>>,
 }
 
@@ -91,6 +92,7 @@ impl ModuleContext {
 
             parent: None,
             children: RwLock::default(),
+            state_change_wakers: RwLock::default(),
 
             signal_subscribers: RwLock::default(),
         }))
@@ -122,6 +124,7 @@ impl ModuleContext {
 
             parent: Some(ModuleRefWeak::new(&parent)),
             children: RwLock::new(FxHashMap::with_hasher(FxBuildHasher::default())),
+            state_change_wakers: RwLock::default(),
 
             // Copy signal subscriber from parent
             signal_subscribers: RwLock::new(parent.signal_subscribers.read().clone()),

@@ -234,7 +234,7 @@ fn simplex_shared_domain() {
     let rt = Builder::seeded(123).build(sim.freeze()).run().unwrap();
 
     //
-    assert_eq!(rt.2.event_count, 124);
+    assert_eq!(rt.2.event_count, 130);
     assert_eq!(rt.1, 26.0)
 }
 
@@ -286,8 +286,9 @@ fn duplex_shared_domain() {
     // - 50 handle message events
     // - 50 Exiting + 50 handle message events
     // - 48 Channel Notif (only from once two events in queue, thus not for first and not for last message)
+    // - 6 start signals
 
-    assert_eq!(rt.2.event_count, 50 + 50 + 48);
+    assert_eq!(rt.2.event_count, 50 + 50 + 48 + 6);
     assert_eq!(rt.1, 50.0)
 }
 

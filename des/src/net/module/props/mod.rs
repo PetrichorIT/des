@@ -26,7 +26,7 @@ pub(crate) use yaml::Cfg;
 /// This trait is a manual combination of the three traits `Any`, `Serialize` and `Deserialize`.
 /// This allows the implementation of this trait independently of the other traits, even for foreign systems,
 /// evading the orphan rule.
-pub trait PropType: Any {
+pub trait PropType: Any + Send {
     /// Reliably transforms the properties value into a `Value`.
     ///
     /// If no serialization is possible, a placeholder value should be returned.
@@ -42,7 +42,7 @@ pub trait PropType: Any {
         Self: Sized;
 }
 
-impl<T: DeserializeOwned + Serialize + Any> PropType for T {
+impl<T: DeserializeOwned + Serialize + Any + Send> PropType for T {
     fn as_value(&self) -> Value {
         serde_yml::from_str::<Value>(&serde_yml::to_string(&self).unwrap()).unwrap()
     }
@@ -397,6 +397,15 @@ impl<T: PropType, const PRESENT: bool> Prop<T, PRESENT> {
     /// This method consumes that current handle, since the typing guarantee will be lost if the property is cleared.
     pub fn clear(mut self) {
         self.raw.clear();
+    }
+}
+
+impl<T, const PRESENT: bool> Clone for Prop<T, PRESENT> {
+    fn clone(&self) -> Self {
+        Prop {
+            raw: self.raw.clone(),
+            _phantom: PhantomData,
+        }
     }
 }
 

@@ -225,6 +225,7 @@ pub struct SendError {
 
 /// The behaviour a link should follow, if it is oversubscribed
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "serde", derive(::serde::Serialize, ::serde::Deserialize))]
 pub enum ChannelDropBehaviour {
     /// If a link is currently busy, drop packets
     #[default]

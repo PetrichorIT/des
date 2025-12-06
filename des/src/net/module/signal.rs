@@ -14,6 +14,8 @@ pub type SignalCode = usize;
 
 /// An automatic signal that is being send once a module panics.
 pub const SIGNAL_MODULE_PANICED: SignalCode = 0x1;
+/// An automatic signal that sim start has been executed, received in the `Running` state.
+pub const SIGNAL_SIM_START_DONE: SignalCode = 0x2;
 
 /// A signal that is being propagated in a publish-subscribe pattern.
 #[derive(Debug, Clone)]

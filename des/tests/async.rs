@@ -60,7 +60,7 @@ fn quasai_sync_non_blocking() {
     match result {
         Ok((app, time, profiler)) => {
             assert_eq!(time, SimTime::ZERO);
-            assert_eq!(profiler.event_count, 10);
+            assert_eq!(profiler.event_count, 12); // (+2 start signal)
         }
         _ => panic!("Expected runtime to finish"),
     }
@@ -159,8 +159,8 @@ fn mutiple_active_tasks() {
         Ok((app, time, profiler)) => {
             assert_eq!(time, SimTime::ZERO);
 
-            //  3 * (Gate + HandleMessage)
-            assert_eq!(profiler.event_count, 6);
+            //  3 * (Gate + HandleMessage) (+1 start signal)
+            assert_eq!(profiler.event_count, 7);
 
             // let m1 = app
             //     .module(|m| m.module_core().name() == "RootModule")
@@ -231,7 +231,7 @@ fn one_module_timers() {
     match result {
         Ok((app, time, profiler)) => {
             assert_eq!(time, 4.0);
-            assert_eq!(profiler.event_count, 6);
+            assert_eq!(profiler.event_count, 7); // (+1 start signal)
         }
         _ => panic!("Expected runtime to finish"),
     }
@@ -267,13 +267,14 @@ fn one_module_delayed_recv() {
         Ok((app, time, profiler)) => {
             assert_eq!(time, 4.0);
 
+            // (+1 start signal)
             // 1) Gate #1 (0s)
             // 2) HandleMessage #1 (0s)
             // 3) Gate #2 (2s)
             // 4) HandleMessage #2 (2s) (will finish sleep but wakeup was added later)
             // 5) Wakeup aka NOP (2s)
             // 6) Wakeup - sleep reloved - send in '5 (4s)
-            assert_eq!(profiler.event_count, 6);
+            assert_eq!(profiler.event_count, 7);
         }
         _ => panic!("Expected runtime to finish"),
     }
@@ -328,7 +329,7 @@ fn mutiple_module_delayed_recv() {
     match result {
         Ok((app, time, profiler)) => {
             assert_eq!(time, 4.0); // parallel exec is possible
-            assert_eq!(profiler.event_count, 12);
+            assert_eq!(profiler.event_count, 14); // (+2 start signal)
         }
         _ => panic!("Expected runtime to finish"),
     }
@@ -410,7 +411,7 @@ fn semaphore_in_waiting_task() {
     match result {
         Ok((app, time, profiler)) => {
             assert_eq!(time, 3.0);
-            assert_eq!(profiler.event_count, 10);
+            assert_eq!(profiler.event_count, 12); // (+2 start signal)
         }
         _ => panic!("Expected runtime to finish"),
     }
@@ -456,7 +457,7 @@ fn async_time_sleep_select() {
 
     let result = Builder::seeded(123).build(sim.freeze()).run().unwrap();
     assert_eq!(result.1, 5.0);
-    assert_eq!(result.2.event_count, 1); // Just async wakeup for 5s, 10s will never be scheduled
+    assert_eq!(result.2.event_count, 2); // Just async wakeup for 5s, 10s will never be scheduled (+1 start signal)
 }
 
 #[test]
@@ -477,7 +478,7 @@ fn async_time_sleep_reset() {
 
     let result = Builder::seeded(123).build(sim.freeze()).run().unwrap();
     assert_eq!(result.1, 10.0);
-    assert_eq!(result.2.event_count, 1); // Just async wakeup for 10s, 5s was not yet scheduled
+    assert_eq!(result.2.event_count, 2); // Just async wakeup for 10s, 5s was not yet scheduled (+1 start signal)
 }
 
 #[test]
@@ -715,4 +716,47 @@ fn runtime_require_join() {
     sim.node("main", SpawnButNeverJoin);
 
     let _ = Builder::seeded(123).build(sim.freeze()).run();
+}
+
+#[test]
+#[serial]
+fn wait_for_sim_start_fin() -> Result<(), RuntimeError> {
+    let mut sim = Sim::new(());
+    let (tx, rx) = std::sync::mpsc::channel();
+
+    for i in 0..3 {
+        let tx1 = tx.clone();
+        sim.node(
+            format!("alice-{i}"),
+            AsyncHandler::new(move |_| {
+                let tx1 = tx1.clone();
+                async move {
+                    tx1.send((i, "pre")).unwrap();
+                    current().wait_for_start().await;
+                    tx1.send((i, "post")).unwrap();
+                }
+            }),
+        );
+    }
+
+    let _ = Builder::seeded(123).build(sim.freeze()).run()?;
+
+    let mut buf = Vec::new();
+    while let Ok(v) = rx.try_recv() {
+        buf.push(v);
+    }
+
+    assert_eq!(
+        buf,
+        &[
+            (0, "pre"),
+            (1, "pre"),
+            (2, "pre"),
+            (0, "post"),
+            (1, "post"),
+            (2, "post"),
+        ]
+    );
+
+    Ok(())
 }

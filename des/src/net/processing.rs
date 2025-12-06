@@ -165,8 +165,8 @@ pub trait ProcessingElement: Any {
 #[doc(hidden)]
 #[allow(missing_debug_implementations)]
 pub struct ModuleImpl {
-    pub(super) stack: ProcessingStack,
-    pub(super) handler: Box<dyn Module>,
+    pub(crate) stack: ProcessingStack,
+    pub(crate) handler: Box<dyn Module>,
 }
 
 impl ModuleImpl {
@@ -241,7 +241,7 @@ fn chain_processing_elements<R>(
 
 /// A stack of processing elements
 pub struct ProcessingStack {
-    items: Vec<Box<dyn ProcessingElement>>,
+    pub(crate) items: Vec<Box<dyn ProcessingElement>>,
 }
 
 impl ProcessingStack {

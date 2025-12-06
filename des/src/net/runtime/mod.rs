@@ -293,6 +293,7 @@ impl<A> SimBuilder<A> {
     /// # Panics
     ///
     /// This function panic if node modules exists at `path`.
+    #[track_caller]
     pub fn gate(&mut self, path: impl Into<ObjectPath>, gate: &str) -> GateRef {
         let path = path.into();
         let Some(module) = self.get(&path) else {

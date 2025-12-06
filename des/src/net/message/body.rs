@@ -2,6 +2,10 @@ use std::{
     any::{Any, TypeId, type_name},
     fmt::{self, Debug},
     mem,
+    num::{
+        NonZeroI8, NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI128, NonZeroIsize, NonZeroU8,
+        NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU128, NonZeroUsize,
+    },
     ptr::null_mut,
 };
 
@@ -130,6 +134,7 @@ impl Body {
     ///
     /// Panics if the contained type is not `T`.
     #[must_use]
+    #[track_caller]
     pub fn into_content<T: Any>(self) -> T {
         self.try_into_content()
             .expect("could not cast content as type T")
@@ -159,6 +164,7 @@ impl Body {
     ///
     /// This function panics if the contained type is not `T`.
     #[must_use]
+    #[track_caller]
     pub fn content<T: Any>(&self) -> &T {
         self.try_content::<T>()
             .expect("could not cast content as type T")
@@ -178,6 +184,7 @@ impl Body {
     ///
     /// This function panics if the contained type is not `T`.
     #[must_use]
+    #[track_caller]
     pub fn content_mut<T: Any>(&mut self) -> &mut T {
         self.try_content_mut::<T>()
             .expect("could not cast content as type T")
@@ -205,6 +212,7 @@ impl Body {
 }
 
 impl Clone for Body {
+    #[track_caller]
     fn clone(&self) -> Self {
         self.try_clone()
             .expect("expected contained value to be cloneable")
@@ -359,12 +367,24 @@ msg_body_from_mem_size!(
     u64,
     u128,
     usize,
+    NonZeroU8,
+    NonZeroU16,
+    NonZeroU32,
+    NonZeroU64,
+    NonZeroU128,
+    NonZeroUsize,
     i8,
     i16,
     i32,
     i64,
     i128,
     isize,
+    NonZeroI8,
+    NonZeroI16,
+    NonZeroI32,
+    NonZeroI64,
+    NonZeroI128,
+    NonZeroIsize,
     f32,
     f64,
     bool,

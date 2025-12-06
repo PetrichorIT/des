@@ -461,7 +461,7 @@ impl<N, C> Topology<N, C> {
             .edges()
             .map(|edge| {
                 format!(
-                    "\t\"{}\" -> \"{}\" [ headlabel = \"{}\" taillable = \"{}\" ]\n",
+                    "\t\"{}\" -- \"{}\" [ headlabel = \"{}\" taillable = \"{}\" ]\n",
                     edge.from.identifier(),
                     edge.to.identifier(),
                     edge.from.gate.str(),
@@ -470,7 +470,7 @@ impl<N, C> Topology<N, C> {
             })
             .fold(String::new(), |acc, s| acc + &s);
 
-        format!("digraph D {{ \n{nodes} {edges}}}")
+        format!("strict graph D {{ \n{nodes} {edges}}}")
     }
 
     /// Exports the current toplogy object as a SVG.

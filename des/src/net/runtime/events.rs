@@ -3,8 +3,8 @@ use crate::{
         Error, Sim,
         channel::{ChannelRef, SendContext, SendError},
         gate::Connection,
-        message::Message,
-        module::{ModuleRef, Signal, State},
+        message::{Body, Message},
+        module::{ModuleRef, SIGNAL_SIM_START_DONE, Signal, State},
         runtime::buf_process,
         schedule_event,
     },
@@ -424,6 +424,14 @@ impl ModuleRef {
     }
 
     pub(crate) fn handle_signal(&self, signal: Signal) -> Result<(), Error> {
+        // Custom signal handlers
+        if signal.code == SIGNAL_SIM_START_DONE {
+            self.state_change_wakers
+                .write()
+                .drain(..)
+                .for_each(|waker| waker.wake());
+        }
+
         self.processing
             .borrow_mut()
             .process_with(None, move |handler, _| {
@@ -519,6 +527,17 @@ impl ModuleRef {
 
         if stage + 1 == max {
             self.ctx.state.set(State::Running);
+            schedule_event(
+                NetEvents::SignalEvent(SignalEvent {
+                    signal: Signal {
+                        source: self.clone(),
+                        code: SIGNAL_SIM_START_DONE,
+                        body: Body::empty(),
+                    },
+                    subscribers: vec![self.clone()],
+                }),
+                SimTime::now(),
+            );
         }
 
         Ok(())
