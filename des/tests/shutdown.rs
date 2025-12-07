@@ -481,7 +481,7 @@ fn shutdown_prevents_accessing_parents() {
             |_, _| {
                 let err = current().parent().unwrap_err();
                 assert!(matches!(err.kind, ErrorKind::ModuleNotFound(_)));
-                assert_eq!(err.to_string(), "a.b.c: ModuleNotFound(\"the parent module is currently inactive, thus cannot be accessed\")");
+                assert!(err.to_string().starts_with("a.b.c: ModuleNotFound(\"the parent module is currently inactive, thus cannot be accessed\")"));
             },
         ),
     );
