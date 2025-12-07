@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use fxhash::FxHashMap;
-use serde_yml::Value;
+use serde_norway::Value;
 
 use crate::{net::Error, sync::Mutex};
 
@@ -85,7 +85,7 @@ impl Props {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_yml::Number;
+    use serde_norway::Number;
 
     #[test]
     fn get_yaml_number() -> Result<(), Error> {

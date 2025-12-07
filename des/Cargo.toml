@@ -24,7 +24,7 @@ serde = ["dep:serde"]
 macros = ["dep:des-macros", "dep:futures"]
 async = ["net", "dep:tokio"]
 cqueue = ["dep:des-cqueue"]
-net = ["dep:des-macros", "dep:des-sync-utils", "serde", "dep:serde_yml"]
+net = ["dep:des-macros", "dep:des-sync-utils", "serde", "dep:serde_norway"]
 tracing = ["net"]
 
 miri = []
@@ -40,14 +40,14 @@ rand = { version = "*", features = ["std_rng"] }
 # due to issues like #8
 spin = { version = "*" }
 tracing = { version = "*" }
-tracing-subscriber = { version = "*", features = ["env-filter"] }
+tracing-subscriber = { version = "^0.3.20", features = ["env-filter"] }
 nu-ansi-term = "*"
 fxhash = "0.2"
 pin-project-lite = "0.2"
 
 # All other dependencies are optional
 serde = { version = "*", optional = true, features = ["derive"] }
-serde_yml = { version = "*", optional = true }
+serde_norway = { version = "*", optional = true }
 tokio = { version = "*", features = [
     "rt",
     "sync",
@@ -60,6 +60,7 @@ des-cqueue = { path = "../des-cqueue", optional = true }
 des-macros = { path = "../des-macros", optional = true }
 des-sync-utils = { path = "../des-sync-utils", optional = true }
 tracing-error = "0.2.1"
+
 
 [dev-dependencies]
 futures = "0.3"

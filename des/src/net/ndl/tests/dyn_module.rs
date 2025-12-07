@@ -8,7 +8,7 @@ type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 #[test]
 fn comptime() -> Result<()> {
-    let def: Def = serde_yml::from_str(
+    let def: Def = serde_norway::from_str(
         r#"
         entry: A
         modules:
@@ -30,13 +30,13 @@ fn comptime() -> Result<()> {
 
     let net = transform(&def)?;
     println!("================");
-    println!("{}", serde_yml::to_string(&net)?);
+    println!("{}", serde_norway::to_string(&net)?);
     Ok(())
 }
 
 #[test]
 fn typ_arguments_not_provided() -> Result<()> {
-    let def: Def = serde_yml::from_str(
+    let def: Def = serde_norway::from_str(
         r#"
         entry: A
         modules:
@@ -75,7 +75,7 @@ fn typ_arguments_not_provided() -> Result<()> {
 
 #[test]
 fn typ_arguments_wrong_count_provided() -> Result<()> {
-    let def: Def = serde_yml::from_str(
+    let def: Def = serde_norway::from_str(
         r#"
         entry: A
         modules:
@@ -114,7 +114,7 @@ fn typ_arguments_wrong_count_provided() -> Result<()> {
 
 #[test]
 fn typ_arguments_no_interface_compliance() -> Result<()> {
-    let def: Def = serde_yml::from_str(
+    let def: Def = serde_norway::from_str(
         r#"
         entry: A
         modules:
@@ -146,7 +146,7 @@ fn typ_arguments_no_interface_compliance() -> Result<()> {
 
 #[test]
 fn typ_arguments_interface_compliance_without_inherit() -> Result<()> {
-    let def: Def = serde_yml::from_str(
+    let def: Def = serde_norway::from_str(
         r#"
         entry: A
         modules:
@@ -172,7 +172,7 @@ fn typ_arguments_interface_compliance_without_inherit() -> Result<()> {
 
 #[test]
 fn typ_arguments_interface_compliance_through_inherit() -> Result<()> {
-    let def: Def = serde_yml::from_str(
+    let def: Def = serde_norway::from_str(
         r#"
         entry: A
         modules:
@@ -197,7 +197,7 @@ fn typ_arguments_interface_compliance_through_inherit() -> Result<()> {
 
 #[test]
 fn typ_definiton_generics_already_defined() -> Result<()> {
-    let def: Def = serde_yml::from_str(
+    let def: Def = serde_norway::from_str(
         r#"
         entry: A
         modules:
@@ -219,7 +219,7 @@ fn typ_definiton_generics_already_defined() -> Result<()> {
 
 #[test]
 fn typ_definition_disallow_generic_interface_by_other_generic() -> Result<()> {
-    let def: Def = serde_yml::from_str(
+    let def: Def = serde_norway::from_str(
         r#"
         entry: A
         modules:
@@ -241,7 +241,7 @@ fn typ_definition_disallow_generic_interface_by_other_generic() -> Result<()> {
 
 #[test]
 fn typ_definition_can_override_external_module() -> Result<()> {
-    let def: Def = serde_yml::from_str(
+    let def: Def = serde_norway::from_str(
         r#"
         entry: A
         modules:
@@ -258,7 +258,7 @@ fn typ_definition_can_override_external_module() -> Result<()> {
     let net = transform(&def)?;
     assert_eq!(&*net.submodules[0].typ.submodules[0].typ.typ, "C");
 
-    let def: Def = serde_yml::from_str(
+    let def: Def = serde_norway::from_str(
         r#"
         entry: A
         modules:

@@ -113,7 +113,7 @@ impl<'a, L: Layer> Ndl<'a, L> {
     /// This function may return an error, if the provided NDL topology is
     /// invalid or if the registry fails to provide an implementation for a module.
     pub fn from_str(registry: &'a mut Registry<L>, str: &str) -> Result<Self> {
-        let def = serde_yml::from_str(str).map_err(|e| ErrorKind::Io(e.to_string()))?;
+        let def = serde_norway::from_str(str).map_err(|e| ErrorKind::Io(e.to_string()))?;
         Self::new(registry, &def)
     }
 
@@ -192,7 +192,7 @@ impl<A> SimBuilder<A> {
     ) -> Result<Self> {
         let f = File::open(path).map_err(|e| lang::error::ErrorKind::Io(e.to_string()))?;
         let def =
-            serde_yml::from_reader(f).map_err(|e| lang::error::ErrorKind::Io(e.to_string()))?;
+            serde_norway::from_reader(f).map_err(|e| lang::error::ErrorKind::Io(e.to_string()))?;
         self.nodes_from_ndl(&def, registry)?;
         Ok(self)
     }

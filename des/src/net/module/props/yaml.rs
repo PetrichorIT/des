@@ -1,4 +1,4 @@
-use serde_yml::{Mapping, Value};
+use serde_norway::{Mapping, Value};
 
 use super::Props;
 
@@ -125,7 +125,7 @@ impl Props {
 
 #[cfg(test)]
 mod tests {
-    use serde_yml::from_str;
+    use serde_norway::from_str;
 
     use super::*;
 
@@ -139,7 +139,7 @@ mod tests {
     }
 
     #[test]
-    fn compartmentalized() -> serde_yml::Result<()> {
+    fn compartmentalized() -> serde_norway::Result<()> {
         const RAW: &str = "\
         lx.alice.tcp.sack: true\n\
         lx.<any>.log: trace\n\
@@ -160,7 +160,7 @@ mod tests {
     }
 
     #[test]
-    fn compartmentalized_multi_any() -> serde_yml::Result<()> {
+    fn compartmentalized_multi_any() -> serde_norway::Result<()> {
         const RAW: &str = "\
         lx.alice.tcp.sack: true\n\
         lx.<any>.node.<any>.log: trace\n\
@@ -179,7 +179,7 @@ mod tests {
     }
 
     #[test]
-    fn compartmentalized_preexisting_mapping() -> serde_yml::Result<()> {
+    fn compartmentalized_preexisting_mapping() -> serde_norway::Result<()> {
         const RAW: &str = "\
         lx: { alice.tcp.sack: true }\n\
         lx.<any>.node.<any>.log: trace\n\
@@ -197,7 +197,7 @@ mod tests {
     }
 
     #[test]
-    fn capture_parameter_set() -> serde_yml::Result<()> {
+    fn capture_parameter_set() -> serde_norway::Result<()> {
         let cfg = Cfg::new(from_str::<Value>(
             "\
             alice.addr: 1.1.1.1\n\
@@ -223,7 +223,7 @@ mod tests {
     }
 
     #[test]
-    fn capture_parameter_set_does_not_contain_any() -> serde_yml::Result<()> {
+    fn capture_parameter_set_does_not_contain_any() -> serde_norway::Result<()> {
         let cfg = Cfg::new(from_str::<Value>(
             "\
             alice.addr: 1.1.1.1\n\

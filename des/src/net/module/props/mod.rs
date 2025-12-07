@@ -15,7 +15,7 @@ mod store;
 mod yaml;
 
 use serde::{Serialize, de::DeserializeOwned};
-use serde_yml::Value;
+use serde_norway::Value;
 
 use store::Entry;
 pub(crate) use store::Props;
@@ -44,14 +44,14 @@ pub trait PropType: Any + Send {
 
 impl<T: DeserializeOwned + Serialize + Any + Send> PropType for T {
     fn as_value(&self) -> Value {
-        serde_yml::from_str::<Value>(&serde_yml::to_string(&self).unwrap()).unwrap()
+        serde_norway::from_str::<Value>(&serde_norway::to_string(&self).unwrap()).unwrap()
     }
 
     fn from_value(value: Value) -> Result<Self, Error>
     where
         Self: Sized,
     {
-        serde_yml::from_value(value)
+        serde_norway::from_value(value)
             .map_err(|e| Error::new_current(ErrorKind::PropParsingError(Box::new(e))))
     }
 }

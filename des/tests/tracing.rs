@@ -231,11 +231,6 @@ fn multi_span_regognition() {
 #[test]
 #[serial_test::serial]
 fn with_ansi() {
-    #[tracing::instrument]
-    async fn say_hello() {
-        tracing::info!("hello")
-    }
-
     let writer = MakeMockWriter::new();
     let subscriber = tracing_subscriber::fmt()
         .with_ansi(true)

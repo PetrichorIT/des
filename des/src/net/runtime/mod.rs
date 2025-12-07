@@ -1,5 +1,3 @@
-use serde_yml::{Value, from_str};
-
 use crate::{
     net::{
         module::{Cfg, DummyModule, MOD_CTX, Props, try_current},
@@ -10,6 +8,7 @@ use crate::{
     runtime::RuntimeError,
     time::SimTime,
 };
+use serde_norway::{Value, from_str};
 use std::{
     fmt::Debug,
     fs, io, mem,
