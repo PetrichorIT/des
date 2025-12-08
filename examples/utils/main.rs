@@ -1,5 +1,3 @@
-use std::io::Write;
-
 use des::{prelude::*, registry};
 
 #[derive(Debug, Default)]
@@ -58,10 +56,10 @@ fn main() -> std::io::Result<()> {
 
     let topo = app.globals().topology();
 
-    assert_eq!(topo.nodes().len(), 5);
-    assert_eq!(topo.edges().count(), 4);
+    assert_eq!(topo.node_count(), 5);
+    assert_eq!(topo.edge_count(), 4);
 
-    std::fs::File::create("examples/utils/graph.svg")?.write_all(topo.as_svg()?.as_bytes())?;
+    // std::fs::File::create("examples/utils/graph.svg")?.write_all(topo.as_svg()?.as_bytes())?;
 
     // Chain 0: iterations [0, 1, 2, ..., 10] a [ExitingConn, HandleMessage] + 3
     // Chain 1: iterations [0, 1, 2] a 2 events + one 3th event

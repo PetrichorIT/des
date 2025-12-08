@@ -19,6 +19,7 @@ use std::{
     any::Any,
     fmt::Debug,
     panic::{AssertUnwindSafe, catch_unwind},
+    task::Waker,
 };
 
 #[cfg(feature = "async")]
@@ -420,7 +421,7 @@ impl ModuleRef {
             self.state_change_wakers
                 .write()
                 .drain(..)
-                .for_each(|waker| waker.wake());
+                .for_each(Waker::wake);
         }
 
         self.processing

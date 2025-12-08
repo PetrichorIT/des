@@ -1,8 +1,7 @@
 use crate::{
     net::{
-        module::{Cfg, DummyModule, MOD_CTX, Props, try_current},
+        module::{Cfg, DummyModule, MOD_CTX, Props, UnwindBehaviour, try_current},
         processing::ProcessingStack,
-        topology::Topology,
     },
     prelude::{Application, EventLifecycle, GateRef, Module, ModuleRef, ObjectPath, Runtime},
     runtime::RuntimeError,
@@ -129,7 +128,7 @@ impl<A> Sim<A> {
             sim: self,
             cfg: SimConfiguration {
                 stack: Arc::new(stack),
-                default_unwind_behavior: Default::default(),
+                default_unwind_behavior: UnwindBehaviour::default(),
             },
         }
     }
@@ -585,12 +584,6 @@ pub struct Globals {
 impl Globals {
     pub(crate) fn with<R>(&self, f: impl FnOnce(&ModuleTree) -> R) -> R {
         f(&self.modules.lock().expect("failed"))
-    }
-
-    /// Extracts topology information from the runtime
-    #[must_use]
-    pub fn topology(&self) -> Topology<(), ()> {
-        self.with(|mods| Topology::from_modules(mods))
     }
 
     /// Returns a handle to a module from the global scope.

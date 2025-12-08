@@ -37,6 +37,6 @@ impl ModuleContext {
             desired: State::Running,
             handle: self,
         }
-        .await
+        .await;
     }
 }
