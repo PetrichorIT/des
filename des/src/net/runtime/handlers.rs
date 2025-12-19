@@ -297,6 +297,31 @@ cfg_async! {
             self
         }
 
+        /// Does things once
+        pub fn once<Once, Fut>(once: Once) -> Self
+        where
+            Once: FnOnce(Receiver<Message>) -> Fut,
+            Once: Send + 'static,
+            Fut: Future<Output = ()>,
+            Fut: Send + 'static,
+        {
+            let (tx, rx) = mpsc::channel(8);
+            let mut once = Some(once);
+            Self {
+                generator: Box::new(move |rx| {
+                    if let Some(once) = once.take() {
+                        Box::pin(once(rx))
+                    } else {
+                        panic!("called more than once")
+                    }
+                }),
+                tx,
+                rx: Some(rx),
+                require_join: false,
+                require_recv: false
+            }
+        }
+
         /// Creates a new instance using the generator function.
         pub fn new<Gen, Fut>(mut generator: Gen) -> Self
         where

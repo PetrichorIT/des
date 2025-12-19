@@ -481,6 +481,10 @@ where
             return true;
         }
 
+        if A::Lifecycle::sim_should_stop(self) {
+            return true;
+        }
+
         self.itr += 1;
 
         // Let this be the only position where SimTime is changed

@@ -412,33 +412,54 @@ cfg_async! {
             *self = Self::default();
         }
 
-        /// a custom handler for sim-end szenarios, only supported by this proc-element.
-        ///
-        /// # Errors
-        ///
-        /// Erorors that occured in handles about to be joined.
-        pub fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+        /// Check for panics in the runtime.
+        pub fn check_for_panics(&mut self) -> Result<(), RuntimeError> {
+            if self.handles.is_empty() {
+                return Ok(());
+            }
             let mut error = RuntimeError::empty();
 
+            // NOTE: calling this requires RNG to be set, to seed the runtime;
+            // we want to do that only after the lazy cell has been inited but no such API exists.
+            // -> check handles.len(), since they can only reaonsably be set after the first real activation of the node
             let _guard = self.rt.enter();
+
+            let mut remaining_handles = Vec::new();
             for (handle, must_join) in self.handles.drain(..) {
                 if !handle.is_finished() {
-                    if must_join {
-                        error.extend(once(Error::new_current(ErrorKind::JoinError(
-                            JoinErrorKind::NotFinished,
-                        ))));
-                    }
+                    remaining_handles.push((handle, must_join));
                     continue;
                 }
 
                 match self.rt.block_on(handle) {
-                    Ok(()) => {}
+                    Ok(()) => {
+                    }
                     Err(e) if e.is_panic() => error.extend(once(Error::new_current(
                         ErrorKind::JoinError(JoinErrorKind::Paniced(e.into_panic())),
                     ))),
                     Err(e) => error.extend(once(Error::new_current(ErrorKind::JoinError(
                         JoinErrorKind::Tokio(e),
                     )))),
+                }
+            }
+
+            self.handles = remaining_handles;
+
+            if error.is_empty() { Ok(()) } else { Err(error) }
+        }
+
+        /// a custom handler for sim-end szenarios, only supported by this proc-element.
+        ///
+        /// # Errors
+        ///
+        /// Erorors that occured in handles about to be joined.
+        pub fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+            let mut error = self.check_for_panics().err().unwrap_or(RuntimeError::empty());
+            for (_, must_join) in self.handles.drain(..) {
+                if must_join {
+                    error.extend(once(Error::new_current(ErrorKind::JoinError(
+                        JoinErrorKind::NotFinished,
+                    ))));
                 }
             }
 

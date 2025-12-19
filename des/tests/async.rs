@@ -2,7 +2,11 @@
 #![allow(unused_variables)]
 
 use des::{
-    net::{Error, ErrorKind, handlers::AsyncHandler, module::Module},
+    net::{
+        Error, ErrorKind,
+        handlers::AsyncHandler,
+        module::{Module, UnwindBehaviour},
+    },
     prelude::*,
     runtime::RuntimeError,
     time::{self, MissedTickBehavior, sleep, timeout, timeout_at},
@@ -757,6 +761,49 @@ fn wait_for_sim_start_fin() -> Result<(), RuntimeError> {
             (2, "post"),
         ]
     );
+
+    Ok(())
+}
+
+#[test]
+#[serial]
+fn panic_stops_sim_immediately() -> Result<(), RuntimeError> {
+    let mut sim = Sim::new(());
+    let cfg = UnwindBehaviour {
+        on_panic_catch: false,
+        ..Default::default()
+    };
+    sim.set_default_unwind_behavior(cfg);
+    sim.node(
+        "alice",
+        AsyncHandler::once(move |_| async move {
+            assert_eq!(current().unwind_behaviour(), cfg);
+            sleep(Duration::from_secs(1)).await;
+            panic!("Huh something went wrong");
+        })
+        .require_join(),
+    );
+
+    let counter = Arc::new(AtomicUsize::new(0));
+    let counter2 = counter.clone();
+    sim.node(
+        "bob",
+        AsyncHandler::once(move |_| async move {
+            loop {
+                sleep(Duration::from_secs_f64(0.4)).await;
+                counter.fetch_add(1, Ordering::SeqCst);
+                schedule_in(Message::default(), Duration::from_secs(1));
+            }
+        }),
+    );
+
+    let _err = Builder::seeded(123)
+        .max_time(10.0.into())
+        .build(sim.freeze())
+        .run()
+        .unwrap_err();
+
+    assert_eq!(counter2.load(Ordering::SeqCst), 2); // at 0.4, 0.8
 
     Ok(())
 }

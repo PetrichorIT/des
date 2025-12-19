@@ -196,6 +196,24 @@ impl<A> SimBuilder<A> {
         self
     }
 
+    /// Sets the default unwind behavior for the simulation.
+    ///
+    /// Note that this will only affect calls of `node` after
+    /// this function was called.
+    #[must_use]
+    pub fn with_default_unwind_behavior(mut self, behavior: UnwindBehaviour) -> Self {
+        self.set_default_unwind_behavior(behavior);
+        self
+    }
+
+    /// Sets the default processing stack for the simulation.
+    ///
+    /// Note that this will only affect calls of `node` after
+    /// this function was called.
+    pub fn set_default_unwind_behavior(&mut self, behavior: UnwindBehaviour) {
+        self.cfg.default_unwind_behavior = behavior;
+    }
+
     /// Includes raw parameter defintions in the simulation.
     ///
     /// If a parsing error is encountered, it will be silently
@@ -539,6 +557,14 @@ where
 
         let _ = take_hook();
         if error.is_empty() { Ok(()) } else { Err(error) }
+    }
+
+    #[inline]
+    fn sim_should_stop(runtime: &Runtime<Sim<A>>) -> bool
+    where
+        Sim<A>: Application,
+    {
+        !runtime.app.error.is_empty()
     }
 }
 

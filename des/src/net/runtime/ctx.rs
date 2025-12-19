@@ -135,3 +135,8 @@ pub(crate) fn buf_fail(e: impl LikeRuntimeError) {
     let mut ctx = BUF_CTX.lock();
     ctx.error.extend(once(Box::new(e)));
 }
+
+pub(crate) fn buf_fail_internal(e: RuntimeError) {
+    let mut ctx = BUF_CTX.lock();
+    ctx.error.merge(e);
+}

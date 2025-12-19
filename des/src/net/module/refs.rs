@@ -183,7 +183,24 @@ impl ModuleRef {
     #[doc(hidden)]
     #[allow(unused, clippy::unused_self)]
     pub(crate) fn deactivate(&self) {
-        let _ = ModuleContext::take();
+        #[cfg(feature = "async")]
+        if !self.ctx.unwind_behaviour.get().on_panic_catch {
+            // Check for the join threads in the tokio runtime, to abort at an appropriate moment
+
+            use crate::net::{processing::TokioRuntime, runtime::buf_fail_internal};
+            let mut processing = self.processing.try_borrow_mut().expect("failed to borrow");
+
+            let err = processing
+                .downcast_element_mut::<TokioRuntime>()
+                .and_then(|tokio| tokio.check_for_panics().err());
+
+            let _ = ModuleContext::take();
+            if let Some(err) = err {
+                buf_fail_internal(err);
+            }
+        } else {
+            let _ = ModuleContext::take();
+        }
     }
 
     /// Creates a gate on the current module, returning its ID.
