@@ -1,9 +1,10 @@
 use des::{
     net::{
-        module::{Module, Stereotyp},
-        ObjectPath, PanicError, Sim,
+        Error, ErrorKind, Sim, globals,
+        handlers::ModuleFn,
+        module::{Module, UnwindBehaviour},
     },
-    prelude::{current, Message},
+    prelude::{Message, current, schedule_at},
     runtime::{Builder, RuntimeError},
 };
 use serial_test::serial;
@@ -68,12 +69,10 @@ fn catch_panic_at_sim_end() {
 struct SimPanicAtHandle;
 impl Module for SimPanicAtHandle {
     fn handle_message(&mut self, _msg: Message) {
-        current().set_stereotyp(Stereotyp {
+        current().set_unwind_behaviour(UnwindBehaviour {
             on_panic_catch: false,
-            on_panic_drop: true,
             on_panic_restart: false,
             on_panic_drop_submodules: true,
-            on_panic_inform_parent: false,
         });
         panic!("Oh no");
     }
@@ -89,16 +88,16 @@ fn unwind_sim_panic_at_handle_message() {
     let mut rt = Builder::seeded(123).build(sim.freeze());
     rt.add_message_onto(gate, Message::default(), 5.0.into());
     let err = rt.run().unwrap_err();
-    assert_eq!(
-        err[0].as_any().downcast_ref::<PanicError>().unwrap().path,
-        ObjectPath::from("alice")
-    );
+    assert!(matches!(
+        err[0].as_any().downcast_ref::<Error>().unwrap().kind,
+        ErrorKind::ModulePanic(_)
+    ));
 }
 
 struct SimPanicAtSimStart;
 impl Module for SimPanicAtSimStart {
     fn at_sim_start(&mut self, _stage: usize) {
-        current().set_stereotyp(Stereotyp {
+        current().set_unwind_behaviour(UnwindBehaviour {
             on_panic_catch: false,
             ..Default::default()
         });
@@ -116,16 +115,16 @@ fn unwind_sim_panic_at_sim_start() {
     let mut rt = Builder::seeded(123).build(sim.freeze());
     rt.add_message_onto(gate, Message::default(), 5.0.into());
     let err = rt.run().unwrap_err();
-    assert_eq!(
-        err[0].as_any().downcast_ref::<PanicError>().unwrap().path,
-        ObjectPath::from("alice")
-    );
+    assert!(matches!(
+        err[0].as_any().downcast_ref::<Error>().unwrap().kind,
+        ErrorKind::ModulePanic(_)
+    ));
 }
 
 struct SimPanicAtSimEnd;
 impl Module for SimPanicAtSimEnd {
     fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
-        current().set_stereotyp(Stereotyp {
+        current().set_unwind_behaviour(UnwindBehaviour {
             on_panic_catch: false,
             ..Default::default()
         });
@@ -143,18 +142,19 @@ fn unwind_sim_panic_at_sim_end() {
     let mut rt = Builder::seeded(123).build(sim.freeze());
     rt.add_message_onto(gate, Message::default(), 5.0.into());
     let err = rt.run().unwrap_err();
-    assert_eq!(
-        err[0].as_any().downcast_ref::<PanicError>().unwrap().path,
-        ObjectPath::from("alice")
-    );
+
+    assert!(matches!(
+        err[0].as_any().downcast_ref::<Error>().unwrap().kind,
+        ErrorKind::ModulePanic(_)
+    ));
 }
 
 struct PanicWithUnwindAllways;
 impl Module for PanicWithUnwindAllways {
     fn at_sim_start(&mut self, _stage: usize) {
-        current().set_stereotyp(Stereotyp {
+        current().set_unwind_behaviour(UnwindBehaviour {
             on_panic_catch: false,
-            ..Stereotyp::HOST
+            ..UnwindBehaviour::HOST
         });
     }
     fn handle_message(&mut self, _msg: Message) {
@@ -172,8 +172,45 @@ fn unwind_behaviour_unwind_allways_panics() {
     let mut rt = Builder::seeded(123).build(sim.freeze());
     rt.add_message_onto(gate, Message::default(), 5.0.into());
     let err = rt.run().unwrap_err();
-    assert_eq!(
-        err[0].as_any().downcast_ref::<PanicError>().unwrap().path,
-        ObjectPath::from("alice")
+    assert!(matches!(
+        err[0].as_any().downcast_ref::<Error>().unwrap().kind,
+        ErrorKind::ModulePanic(_)
+    ));
+}
+
+struct PanicAtRecvWithRestart;
+impl Module for PanicAtRecvWithRestart {
+    fn at_sim_start(&mut self, _stage: usize) {
+        current().set_unwind_behaviour(UnwindBehaviour {
+            on_panic_catch: true,
+            on_panic_restart: true,
+            on_panic_drop_submodules: false,
+        });
+    }
+
+    fn handle_message(&mut self, _msg: Message) {
+        panic!();
+    }
+}
+
+#[serial]
+#[test]
+fn unwind_and_restart() -> Result<(), RuntimeError> {
+    let mut sim = Sim::new(());
+    sim.node("alice", PanicAtRecvWithRestart);
+    sim.node(
+        "bob",
+        ModuleFn::new(
+            || schedule_at(Message::default(), 10.0.into()),
+            |_, _| {
+                let alice = globals().get(&"alice".into()).unwrap();
+                assert!(alice.is_active());
+            },
+        ),
     );
+    let gate = sim.gate("alice", "port");
+
+    let mut rt = Builder::seeded(123).build(sim.freeze());
+    rt.add_message_onto(gate, Message::default(), 5.0.into());
+    rt.run().map(|_| ())
 }

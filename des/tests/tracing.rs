@@ -1,17 +1,61 @@
 use des::{
-    net::{blocks::AsyncFn, Sim},
+    net::{Sim, handlers::AsyncHandler},
     runtime::Builder,
     tracing::format,
 };
-use tracing::{level_filters::LevelFilter, span, subscriber::with_default, Instrument, Level};
+use tracing::{Instrument, Level, level_filters::LevelFilter, span, subscriber::with_default};
 
-#[path = "common/mock.rs"]
-mod mock;
+use spin::Mutex;
+use std::{io, sync::Arc};
+use tracing_subscriber::fmt::MakeWriter;
+
+#[derive(Debug, Clone)]
+pub struct MakeMockWriter {
+    lines: Arc<Mutex<String>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct MockWriter {
+    lines: Arc<Mutex<String>>,
+}
+
+impl io::Write for MockWriter {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let mut lines = self.lines.lock();
+        lines.push_str(&String::from_utf8_lossy(buf));
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+impl MakeMockWriter {
+    pub fn new() -> Self {
+        MakeMockWriter {
+            lines: Arc::new(Mutex::new(String::new())),
+        }
+    }
+
+    pub fn content(&self) -> String {
+        self.lines.lock().clone()
+    }
+}
+
+impl<'a> MakeWriter<'a> for MakeMockWriter {
+    type Writer = MockWriter;
+    fn make_writer(&'a self) -> Self::Writer {
+        MockWriter {
+            lines: self.lines.clone(),
+        }
+    }
+}
 
 #[test]
 #[serial_test::serial]
 fn test_mock_output() {
-    let writer = mock::MakeMockWriter::new();
+    let writer = MakeMockWriter::new();
     let subscriber = tracing_subscriber::fmt()
         .with_ansi(false)
         .with_max_level(LevelFilter::TRACE)
@@ -34,7 +78,7 @@ fn test_mock_output() {
 #[test]
 #[serial_test::serial]
 fn scope_regognition() {
-    let writer = mock::MakeMockWriter::new();
+    let writer = MakeMockWriter::new();
     let subscriber = tracing_subscriber::fmt()
         .with_ansi(false)
         .with_max_level(LevelFilter::TRACE)
@@ -46,14 +90,14 @@ fn scope_regognition() {
         let mut sim = Sim::new(());
         sim.node(
             "a",
-            AsyncFn::new(|_| async {
+            AsyncHandler::new(|_| async {
                 tracing::info!("node(a) says(1) at(0s)");
                 tracing::error!("node(a) says(2) at(0s)");
             }),
         );
         sim.node(
             "a.b",
-            AsyncFn::new(|_| async {
+            AsyncHandler::new(|_| async {
                 tracing::trace!("node(b) says(1) at(0s)");
             }),
         );
@@ -69,7 +113,7 @@ fn scope_regognition() {
 #[test]
 #[serial_test::serial]
 fn time_regognition() {
-    let writer = mock::MakeMockWriter::new();
+    let writer = MakeMockWriter::new();
     let subscriber = tracing_subscriber::fmt()
         .with_ansi(false)
         .with_max_level(LevelFilter::TRACE)
@@ -81,7 +125,7 @@ fn time_regognition() {
         let mut sim = Sim::new(());
         sim.node(
             "a",
-            AsyncFn::new(|_| async {
+            AsyncHandler::new(|_| async {
                 tracing::info!("node(a) says(1) at(0s)");
                 des::time::sleep(std::time::Duration::from_secs(5)).await;
                 tracing::error!("node(a) says(2) at(5s)");
@@ -89,7 +133,7 @@ fn time_regognition() {
         );
         sim.node(
             "a.b",
-            AsyncFn::new(|_| async {
+            AsyncHandler::new(|_| async {
                 tracing::trace!("node(b) says(1) at(0s)");
             }),
         );
@@ -105,7 +149,7 @@ fn time_regognition() {
 #[test]
 #[serial_test::serial]
 fn span_regognition() {
-    let writer = mock::MakeMockWriter::new();
+    let writer = MakeMockWriter::new();
     let subscriber = tracing_subscriber::fmt()
         .with_ansi(false)
         .with_max_level(LevelFilter::TRACE)
@@ -117,7 +161,7 @@ fn span_regognition() {
         let mut sim = Sim::new(());
         sim.node(
             "a",
-            AsyncFn::new(|_| {
+            AsyncHandler::new(|_| {
                 async {
                     tracing::info!("node(a) says(1) at(0s)");
                 }
@@ -126,7 +170,7 @@ fn span_regognition() {
         );
         sim.node(
             "a.b",
-            AsyncFn::new(|_| async {
+            AsyncHandler::new(|_| async {
                 tracing::trace!("node(b) says(1) at(0s)");
             }),
         );
@@ -147,7 +191,7 @@ fn multi_span_regognition() {
         tracing::info!("hello")
     }
 
-    let writer = mock::MakeMockWriter::new();
+    let writer = MakeMockWriter::new();
     let subscriber = tracing_subscriber::fmt()
         .with_ansi(false)
         .with_max_level(LevelFilter::TRACE)
@@ -159,7 +203,7 @@ fn multi_span_regognition() {
         let mut sim = Sim::new(());
         sim.node(
             "a",
-            AsyncFn::new(|_| {
+            AsyncHandler::new(|_| {
                 async {
                     say_hello().await;
                 }
@@ -168,7 +212,7 @@ fn multi_span_regognition() {
         );
         sim.node(
             "a.b",
-            AsyncFn::new(|_| {
+            AsyncHandler::new(|_| {
                 async {
                     tracing::trace!("node(b) says(1) at(0s)");
                 }
@@ -187,12 +231,7 @@ fn multi_span_regognition() {
 #[test]
 #[serial_test::serial]
 fn with_ansi() {
-    #[tracing::instrument]
-    async fn say_hello() {
-        tracing::info!("hello")
-    }
-
-    let writer = mock::MakeMockWriter::new();
+    let writer = MakeMockWriter::new();
     let subscriber = tracing_subscriber::fmt()
         .with_ansi(true)
         .with_max_level(LevelFilter::TRACE)
@@ -204,7 +243,7 @@ fn with_ansi() {
         let mut sim = Sim::new(());
         sim.node(
             "a",
-            AsyncFn::new(|_| async { tracing::info!("Hello World!") }),
+            AsyncHandler::new(|_| async { tracing::info!("Hello World!") }),
         );
 
         let _ = Builder::seeded(123).build(sim.freeze()).run();

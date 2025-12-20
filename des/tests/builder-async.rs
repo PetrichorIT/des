@@ -3,12 +3,16 @@
 use std::{
     io,
     sync::{
-        atomic::{AtomicBool, AtomicU16, AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicBool, AtomicU16, AtomicUsize, Ordering},
     },
 };
 
-use des::{net::blocks::AsyncFn, prelude::*, time::sleep};
+use des::{
+    net::{Error, ErrorKind, handlers::AsyncHandler},
+    prelude::*,
+    time::sleep,
+};
 use serial_test::serial;
 
 #[test]
@@ -20,7 +24,7 @@ fn builder_async_fn_quasai_sync() {
     let mut sim = Sim::new(());
     sim.node(
         "alice",
-        AsyncFn::new(move |_| {
+        AsyncHandler::new(move |_| {
             let d2 = d2.clone();
             async move {
                 d2.store(true, Ordering::SeqCst);
@@ -42,7 +46,7 @@ fn builder_async_fn_sleep() {
     let mut sim = Sim::new(());
     sim.node(
         "alice",
-        AsyncFn::new(move |_| {
+        AsyncHandler::new(move |_| {
             let t2 = t2.clone();
             async move {
                 sleep(Duration::from_secs(10)).await;
@@ -65,11 +69,11 @@ fn builder_async_fn_message_recv() {
     let mut sim = Sim::new(());
     sim.node(
         "alice",
-        AsyncFn::new(move |mut rx| {
+        AsyncHandler::new(move |mut rx| {
             let c2 = c2.clone();
             async move {
                 while let Some(msg) = rx.recv().await {
-                    c2.fetch_add(msg.header().id, Ordering::SeqCst);
+                    c2.fetch_add(msg.header.id, Ordering::SeqCst);
                 }
             }
         }),
@@ -77,9 +81,9 @@ fn builder_async_fn_message_recv() {
     let gate = sim.gate("alice", "port");
 
     let mut rt = Builder::seeded(123).build(sim.freeze());
-    rt.add_message_onto(gate.clone(), Message::default().id(1), 1.0.into());
-    rt.add_message_onto(gate.clone(), Message::default().id(2), 2.0.into());
-    rt.add_message_onto(gate.clone(), Message::default().id(3), 3.0.into());
+    rt.add_message_onto(gate.clone(), Message::default().with_id(1), 1.0.into());
+    rt.add_message_onto(gate.clone(), Message::default().with_id(2), 2.0.into());
+    rt.add_message_onto(gate.clone(), Message::default().with_id(3), 3.0.into());
 
     let _ = rt.run();
     assert_eq!(counter.load(Ordering::SeqCst), 6);
@@ -94,20 +98,20 @@ fn builder_async_fn_channeled() {
     let mut sim = Sim::new(());
     sim.node(
         "tx",
-        AsyncFn::new(|_| async move {
+        AsyncHandler::new(|_| async move {
             for i in 0..16 {
                 sleep(Duration::from_secs(i)).await;
-                send(Message::default().id(i as u16), "port");
+                let _ = send(Message::default().with_id(i as u16), "port");
             }
         }),
     );
     sim.node(
         "rx",
-        AsyncFn::new(move |mut rx| {
+        AsyncHandler::new(move |mut rx| {
             let c2 = c2.clone();
             async move {
                 while let Some(msg) = rx.recv().await {
-                    c2.fetch_add(msg.header().id, Ordering::SeqCst);
+                    c2.fetch_add(msg.header.id, Ordering::SeqCst);
                 }
             }
         }),
@@ -116,9 +120,9 @@ fn builder_async_fn_channeled() {
     let txg = sim.gate("tx", "port");
     let rxg = sim.gate("rx", "port");
 
-    txg.connect(
+    txg.connect_with(
         rxg,
-        Some(Channel::new(ChannelMetrics {
+        Some(DatarateChannel::new(DatarateChannelMetrics {
             bitrate: 10000,
             latency: Duration::from_millis(20),
             jitter: Duration::ZERO,
@@ -136,7 +140,7 @@ fn builder_async_failable() {
     let mut sim = Sim::new(());
     sim.node(
         "alice",
-        AsyncFn::failable(|_| async move {
+        AsyncHandler::failable(|_| async move {
             if false {
                 return Err(io::Error::new(io::ErrorKind::Other, "other"));
             }
@@ -153,7 +157,7 @@ fn builder_async_failable_with_fail() {
     let mut sim = Sim::new(());
     sim.node(
         "alice",
-        AsyncFn::failable(|_| async move {
+        AsyncHandler::failable(|_| async move {
             if true {
                 return Err(io::Error::new(io::ErrorKind::Other, "other"));
             }
@@ -162,10 +166,12 @@ fn builder_async_failable_with_fail() {
         }),
     );
     let v = Builder::new().build(sim.freeze()).run();
-    assert!(v.unwrap_err()[0]
-        .as_any()
-        .downcast_ref::<JoinError>()
-        .is_some())
+    assert!(
+        v.unwrap_err()[0]
+            .as_any()
+            .downcast_ref::<Error>()
+            .map_or(false, |e| matches!(e.kind, ErrorKind::JoinError(_)))
+    );
 }
 
 #[test]
@@ -174,7 +180,7 @@ fn builder_async_no_join() {
     let mut sim = Sim::new(());
     sim.node(
         "alice",
-        AsyncFn::new(|_| async move { std::future::pending().await }),
+        AsyncHandler::new(|_| async move { std::future::pending().await }),
     );
 
     let _ = Builder::seeded(123).build(sim.freeze()).run();
@@ -186,14 +192,16 @@ fn builder_async_require_join() {
     let mut sim = Sim::new(());
     sim.node(
         "alice",
-        AsyncFn::io(|_| async move { std::future::pending().await }).require_join(),
+        AsyncHandler::io(|_| async move { std::future::pending().await }).require_join(),
     );
 
     let v = Builder::seeded(123).build(sim.freeze()).run();
-    assert!(v.unwrap_err()[0]
-        .as_any()
-        .downcast_ref::<JoinError>()
-        .is_some());
+    assert!(
+        v.unwrap_err()[0]
+            .as_any()
+            .downcast_ref::<Error>()
+            .map_or(false, |e| matches!(e.kind, ErrorKind::JoinError(_)))
+    );
 }
 
 #[test]
@@ -202,7 +210,7 @@ fn builder_async_restart() {
     static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
     let mut sim = Sim::new(());
-    let software = AsyncFn::io(|_| async move {
+    let software = AsyncHandler::io(|_| async move {
         COUNTER.fetch_add(1, Ordering::SeqCst);
 
         des::time::sleep(Duration::from_secs(10)).await;

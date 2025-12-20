@@ -88,7 +88,7 @@ fn alloc_single_page_alloc_exceeds_page_size() {
     assert!(alloc
         .handle()
         .allocate(Layout::new::<[u8; 8000]>())
-        .is_err())
+        .is_err());
     // let _ = Box::new_in([42u8; 8000], alloc.handle());
 }
 
@@ -97,7 +97,7 @@ fn alloc_single_page_list_alloc() {
     let mut alloc = CQueueLLAllocatorInner::with_page_size(4096);
     let mut boxes = Vec::new();
     for i in 0..10 {
-        boxes.push(LocalBox::new_in([i as u8; 400], alloc.handle()))
+        boxes.push(LocalBox::new_in([i as u8; 400], alloc.handle()));
     }
 
     // 4000 byte
@@ -145,7 +145,7 @@ fn alloc_multiple_pages_same_size_allocation() {
         "alloc: {} expected: {} * 100",
         alloc.dbg_alloc_total(),
         size_of::<A>()
-    )
+    );
 }
 
 #[test]
@@ -189,7 +189,7 @@ fn alloc_16_byteboxes() {
     let mut list = Vec::new();
     for _ in 1..10 {
         let b = LocalBox::new_in(Word::new(), alloc.handle());
-        list.push(b)
+        list.push(b);
     }
     alloc.info();
 
@@ -221,7 +221,7 @@ fn cqueue_simple_event_order_nonoverlapping() {
 
     let mut c = 0;
     while !cqueue.is_empty() {
-        println!("Itr: {}", c);
+        println!("Itr: {c}");
         let (event, time) = cqueue.fetch_next();
         assert_eq!(c, event);
         assert_eq!(time.as_secs(), c);
@@ -268,7 +268,7 @@ fn cqueue_simple_event_out_of_order_nonoverlapping() {
 
     let mut c = 0;
     while !cqueue.is_empty() {
-        println!("Itr: {}", c);
+        println!("Itr: {c}");
         let (event, time) = cqueue.fetch_next();
         assert_eq!(c, event);
         assert_eq!(time.as_secs(), c);
@@ -519,8 +519,7 @@ fn cqueue_out_of_order_boxes_overlapping() {
     event_boxes.shuffle(&mut rng);
     let _ = event_boxes
         .into_iter()
-        .map(|(t, from, n)| (from..(from + n)).map(move |i| (i, t)))
-        .flatten()
+        .flat_map(|(t, from, n)| (from..(from + n)).map(move |i| (i, t)))
         .map(|(e, t)| cqueue.add(t, e))
         .collect::<Vec<_>>();
 
@@ -556,8 +555,7 @@ fn cqueue_out_of_order_boxes_with_cancel() {
     event_boxes.shuffle(&mut rng);
     let handles = event_boxes
         .into_iter()
-        .map(|(t, from, n)| (from..(from + n)).map(move |i| (i, t)))
-        .flatten()
+        .flat_map(|(t, from, n)| (from..(from + n)).map(move |i| (i, t)))
         .map(|(e, t)| {
             (
                 cqueue.add(t, e),
@@ -634,7 +632,7 @@ fn cqueue_cancel_validity() {
         c += 1;
     }
 
-    assert_eq!(c, 4)
+    assert_eq!(c, 4);
 }
 
 #[test]
@@ -676,5 +674,5 @@ fn cqueue_cancel_validity_2() {
         c += 1;
     }
 
-    assert_eq!(c, 4)
+    assert_eq!(c, 4);
 }

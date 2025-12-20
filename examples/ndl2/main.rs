@@ -5,12 +5,12 @@ struct Sub;
 impl Module for Sub {
     fn at_sim_start(&mut self, _stage: usize) {
         if current().name() == "a" {
-            send(Message::default(), "out");
+            let _ = send(Message::default(), "out");
         }
     }
 
     fn handle_message(&mut self, msg: Message) {
-        send(msg, "out");
+        let _ = send(msg, "out");
         tracing::info!("EY");
     }
 }

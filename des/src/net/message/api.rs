@@ -1,5 +1,6 @@
 use crate::{
     net::{
+        channel::SendError,
         gate::IntoModuleGate,
         message::Message,
         module::with_mod_ctx,
@@ -14,6 +15,10 @@ use crate::{
 ///
 /// > *This function requires a node-context within the simulation*
 ///
+/// # Errors
+///
+/// Returns an error if the attached channel cannot currently send the message.
+///
 /// # Examples
 ///
 /// ```
@@ -22,8 +27,8 @@ use crate::{
 ///
 /// impl Module for MyModule {
 ///     fn handle_message(&mut self, _msg: Message) {
-///         send(
-///             Message::default().id(123).with_content("Hello world"),
+///         let _ = send(
+///             Message::default().with_id(123).with_content("Hello world"),
 ///             "out"
 ///         );
 ///     }
@@ -37,14 +42,17 @@ use crate::{
 /// let _ = Builder::new().build(sim.freeze()).run();
 /// ```
 #[allow(clippy::needless_pass_by_value)]
-pub fn send(msg: impl Into<Message>, gate: impl IntoModuleGate) {
-    self::send_at(msg, gate, SimTime::now());
+pub fn send(msg: impl Into<Message>, gate: impl IntoModuleGate) -> Result<(), SendError> {
+    self::send_at(msg, gate, SimTime::now())
 }
 
 /// Sends a message onto a given gate with a delay. If the delay is nonzero
 /// the effects will only be observable later on.
 ///
 /// > *This function requires a node-context within the simulation*
+/// # Errors
+///
+/// Returns an error if the attached channel cannot currently send the message.
 ///
 /// # Examples
 ///
@@ -56,10 +64,10 @@ pub fn send(msg: impl Into<Message>, gate: impl IntoModuleGate) {
 ///
 /// impl Module for MyModule {
 ///     fn at_sim_start(&mut self, _: usize) {
-///         send_in(Message::default().kind(42), "out", Duration::from_secs(2));
+///         send_in(Message::default().with_kind(42), "out", Duration::from_secs(2));
 ///         assert!(
 ///             !current()
-///                 .gate("out", 0).unwrap()
+///                 .gate("out").unwrap()
 ///                 .path_iter().unwrap() // an iter can NOT be created for transit gates, no direction info provided
 ///                 .next().unwrap() // get next iter element
 ///                 .channel().unwrap() // channels attached to connections are optional
@@ -75,29 +83,41 @@ pub fn send(msg: impl Into<Message>, gate: impl IntoModuleGate) {
 /// sim.node("bob", SomeOtherModule);
 /// let in_gate = sim.gate("bob", "in");
 ///
-/// out_gate.connect(in_gate, Some(
+/// out_gate.connect_with(in_gate, Some(
 ///     /* Channel definition */
-///     # Channel::new(ChannelMetrics { bitrate: 10000, jitter: Duration::ZERO, latency: Duration::from_millis(10), drop_behaviour: ChannelDropBehaviour::Drop })
+///     # DatarateChannel::new(DatarateChannelMetrics { bitrate: 10000, jitter: Duration::ZERO, latency: Duration::from_millis(10), drop_behaviour: ChannelDropBehaviour::Drop })
 /// ));
 ///
 /// let _ = Builder::new().build(sim.freeze()).run();
 ///
 /// ```
 #[allow(clippy::needless_pass_by_value)]
-pub fn send_in(msg: impl Into<Message>, gate: impl IntoModuleGate, dur: Duration) {
+pub fn send_in(
+    msg: impl Into<Message>,
+    gate: impl IntoModuleGate,
+    dur: Duration,
+) -> Result<(), SendError> {
     let deadline = SimTime::now() + dur;
-    self::send_at(msg, gate, deadline);
+    self::send_at(msg, gate, deadline)
 }
 /// Sends a message onto a given gate at the specific time. This operation is
 /// equivalent to [`send_in`].
 ///
 /// > *This function requires a node-context within the simulation*
 ///
+/// # Errors
+///
+/// Returns an error if the attached channel cannot currently send the message.
+///
 /// # Panics
 ///
 /// Panics if the send time is in the past.
 #[allow(clippy::needless_pass_by_value)]
-pub fn send_at(msg: impl Into<Message>, gate: impl IntoModuleGate, send_time: SimTime) {
+pub fn send_at(
+    msg: impl Into<Message>,
+    gate: impl IntoModuleGate,
+    send_time: SimTime,
+) -> Result<(), SendError> {
     assert!(
         send_time >= SimTime::now(),
         "cannot send a message with a send_time {send_time:?}, less than the current simulation time {:?}",
@@ -113,10 +133,14 @@ pub fn send_at(msg: impl Into<Message>, gate: impl IntoModuleGate, send_time: Si
     });
 
     if let Some(gate) = gate {
-        buf_send_at(msg, gate, send_time);
+        buf_send_at(msg, gate, send_time)
     } else {
         #[cfg(feature = "tracing")]
         tracing::error!("Error: Could not find gate in current module");
+        Err(SendError {
+            msg,
+            reason: "Gate not found".into(),
+        })
     }
 }
 
@@ -137,7 +161,7 @@ pub fn send_at(msg: impl Into<Message>, gate: impl IntoModuleGate, send_time: Si
 ///     }
 ///
 ///     fn handle_message(&mut self, msg: Message) {
-///         assert_eq!(msg.try_content::<&str>(), Some(&"wakeup"));
+///         assert_eq!(msg.body.try_content::<&str>(), Some(&"wakeup"));
 ///         /* Do something periodicly */
 ///         schedule_in(msg, self.period);
 ///     }

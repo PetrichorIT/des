@@ -65,8 +65,7 @@
 
 use std::{any::Any, fmt::Debug, ops::Deref};
 
-use super::module::Module;
-use crate::prelude::Message;
+use crate::{net::module::Module, prelude::Message};
 
 /// A subprogramm between the module application and the network layer.
 ///
@@ -78,78 +77,17 @@ use crate::prelude::Message;
 ///   debug output.
 /// - **Scope-Provider**: This element provides some kind of scope to all items further
 ///   from the network layer than itself. A scope can be defined using a static variable
-///   or just consist of a time meassurement between [`event_start`] / [`event_end`].
+///   or just consist of a time meassurement between start & end of the inner computation.
 /// - **Capture**: This kind of processing element captures parts of the input stream and redirects
 ///   it in some abitraty way, using other APIs. This pattern can be used to implement buffering
 ///   or mergeing of frameneted IP packets.
 /// - **Meta-Provider**: This kind of processing element attaches / modifies part of the incoming or
 ///   outgoing message stream to provide some new level of abstraction e.g. a VPN
 ///   or simulated network Interfaces.
-///
-/// [`event_start`]: ProcessingElement::event_start
-/// [`event_end`]: ProcessingElement::event_end
 pub trait ProcessingElement: Any {
-    /// A handler for when an the event processing of a message starts.
+    /// A simplifed capture clause that can modify an incoming message.
     ///
-    /// This function is called only once per event. If this function is called
-    /// this means all plugins closer to the network layer have allready been called
-    /// while all plugins further from the network layer are not yet called.
-    ///
-    /// Use this function to set up actions, required at the start of
-    /// a generic event.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// # use des::prelude::*;
-    /// struct LoggerPlugin {
-    ///     counter: usize,
-    /// }
-    ///
-    /// impl ProcessingElement for LoggerPlugin {
-    ///     fn event_start(&mut self) {
-    ///         tracing::trace!("receiving {}th message", self.counter);
-    ///         self.counter += 1;
-    ///     }
-    /// }
-    /// ```
-    fn event_start(&mut self) {}
-
-    /// A handler for when an the event processing of a message ends.
-    ///
-    /// This function is called only once per event. The call order
-    /// is the reverse to the call order of [`event_start`].
-    ///
-    /// Use this function to set up actions, associated
-    /// with the end of an event
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// # use des::prelude::*;
-    /// # use des::time::*;
-    /// struct Timer {
-    ///     started: SimTime,
-    /// }
-    ///
-    /// impl ProcessingElement for Timer {
-    ///     fn event_start(&mut self) {
-    ///        self.started = SimTime::now();
-    ///     }
-    ///     fn event_end(&mut self) {
-    ///        let t = SimTime::now().duration_since(self.started);
-    ///        tracing::trace!("took {:?}", t);
-    ///     }
-    /// }
-    /// ```
-    ///
-    /// [`event_start`]: ProcessingElement::event_start
-    fn event_end(&mut self) {}
-
-    /// A capture clause that can modify an incoming message.
-    ///
-    /// This function is called at most once per event, after all
-    /// plugins have called [`event_start`],
+    /// This function is called at most once per event,
     /// but before all the main application has processed its message.
     ///
     /// This function receives an incoming message, and can
@@ -164,7 +102,7 @@ pub trait ProcessingElement: Any {
     /// }
     ///
     /// impl ProcessingElement for Filter {
-    ///     fn incoming(&mut self, msg: Message) -> Option<Message> {
+    ///     fn process(&mut self, msg: Message) -> Option<Message> {
     ///        let f = &self.filter;
     ///        if f(&msg) {
     ///            Some(msg)
@@ -174,88 +112,136 @@ pub trait ProcessingElement: Any {
     ///     }
     /// }
     /// ```
-    ///
-    /// [`event_start`]: ProcessingElement::event_start
-    fn incoming(&mut self, msg: Message) -> Option<Message> {
+    fn process(&mut self, msg: Message) -> Option<Message> {
         Some(msg)
     }
-}
 
-impl<T: Module> ProcessingElement for T {
-    fn incoming(&mut self, msg: Message) -> Option<Message> {
-        self.handle_message(msg);
-        None
+    /// A general capture clause that reacts to abitrary node activations and encapsulates
+    /// further processing elements. Use this function to perform work on more than just
+    /// `HandleMessage` events and to set scope variables.
+    ///
+    /// This function is called for a variety of node activations:
+    /// - an arriving message
+    /// - a sim-start or sim-end stage
+    /// - an async wakeup event
+    ///
+    /// An event is than passed through a chain of processing elements. The `i-th` processing elements
+    /// will receive the output from the `(i-1)-th` processing element and a closure that will execute the
+    /// `(i+1)-th` processing element. The last processing element will be the module.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use des::prelude::*;
+    /// struct MeassureTimer {
+    ///     meassurements: Vec<f64>,
+    /// }
+    ///
+    /// impl ProcessingElement for MeassureTimer {
+    ///     fn process_with(
+    ///         &mut self,
+    ///         msg: Option<Message>,
+    ///         inner: &mut dyn FnMut(Option<Message>) -> Option<Message>,
+    ///     ) -> Option<Message> {
+    ///         let t0 = std::time::Instant::now();
+    ///         let res = inner(msg);
+    ///         self.meassurements.push(t0.elapsed().as_millis() as f64);
+    ///         res
+    ///     }
+    /// }
+    ///
+    /// ```
+    fn process_with(
+        &mut self,
+        msg: Option<Message>,
+        inner: &mut dyn FnMut(Option<Message>) -> Option<Message>,
+    ) -> Option<Message> {
+        let res = msg.and_then(|msg| self.process(msg));
+        inner(res)
     }
 }
 
 /// A untyped set of processing elements, effectivly a processing stack.
 #[doc(hidden)]
 #[allow(missing_debug_implementations)]
-pub struct Processor {
-    // last element is module
-    pub(super) state: ProcessingState,
-    stack: ProcessingStack,
-    pub(super) handler: Box<dyn Module>,
+pub struct ModuleImpl {
+    pub(crate) stack: ProcessingStack,
+    pub(crate) handler: Box<dyn Module>,
 }
 
-impl Processor {
-    pub(super) fn new(stack: ProcessingStack, handler: impl Module) -> Self {
-        Processor {
-            state: ProcessingState::Upstream(0),
-            stack,
-            handler: Box::new(handler),
-        }
+impl ModuleImpl {
+    pub(super) fn new(stack: ProcessingStack, handler: Box<dyn Module>) -> Self {
+        ModuleImpl { stack, handler }
     }
 
-    pub(super) fn incoming_upstream(&mut self, msg: Option<Message>) -> Option<Message> {
-        self.state = ProcessingState::Upstream(0);
+    // FIXME: O(n) lookups
+    // This lookup operations scales O(n) with the amount of proc-elements
+    // maybe make a lookup using a BTreeMap?
 
-        let mut msg = msg;
-        for i in 0..self.stack.items.len() {
-            self.stack.items[i].event_start();
-            if let Some(existing_msg) = msg {
-                msg = self.stack.items[i].incoming(existing_msg);
+    pub(super) fn downcast_element_ref<T: Any>(&self) -> Option<&T> {
+        for element in &self.stack.items {
+            let as_any: &dyn Any = &**element;
+            if let Some(element) = as_any.downcast_ref::<T>() {
+                return Some(element);
             }
-            self.state.bump_upstream();
         }
-        msg
+
+        let as_any: &dyn Any = &*self.handler;
+        as_any.downcast_ref::<T>()
     }
 
-    pub(super) fn incoming_downstream(&mut self) {
-        self.state = ProcessingState::Downstream(self.stack.items.len());
-        for i in (0..self.stack.items.len()).rev() {
-            self.stack.items[i].event_end();
-            self.state.bump_downstream();
+    pub(super) fn downcast_element_mut<T: Any>(&mut self) -> Option<&mut T> {
+        for element in &mut self.stack.items {
+            let as_any: &mut dyn Any = &mut **element;
+            if let Some(element) = as_any.downcast_mut::<T>() {
+                return Some(element);
+            }
         }
+
+        let as_any: &mut dyn Any = &mut *self.handler;
+        as_any.downcast_mut::<T>()
+    }
+
+    // NOTE:
+    // it is fundamentally impossible to access proc-elements from within the active module,
+    // since by the design of process_with the element is already mutable borrowed. While we could argue
+    // that the borrow is lifted for the duration of the inner call, modelling this is rather complicated
+    // so better not do it.
+
+    pub(super) fn process_with<R>(
+        &mut self,
+        msg: Option<Message>,
+        inner: impl FnOnce(&mut dyn Module, Option<Message>) -> R,
+    ) -> R {
+        // FIXME: should be FnOnce
+        let mut inner = Some(inner);
+        let mut slot = None;
+        chain_processing_elements(&mut self.stack.items[..], msg, &mut |msg| {
+            slot = Some(inner.take().expect("should exist")(&mut *self.handler, msg));
+        });
+        slot.take().expect("failed to execute inner closure")
     }
 }
 
-pub(super) enum ProcessingState {
-    Upstream(usize), // next processing index
-    Peek,
-    Downstream(usize), // last processing index
-}
-
-impl ProcessingState {
-    fn bump_upstream(&mut self) {
-        match self {
-            ProcessingState::Upstream(ref mut idx) => *idx += 1,
-            _ => unreachable!(),
-        }
-    }
-
-    fn bump_downstream(&mut self) {
-        match self {
-            ProcessingState::Downstream(ref mut idx) => *idx -= 1,
-            _ => unreachable!(),
-        }
+// This recursive function may be horribly inefficient
+// TODO: check asm output / actual performance
+fn chain_processing_elements<R>(
+    elements: &mut [Box<dyn ProcessingElement>],
+    msg: Option<Message>,
+    inner: &mut impl FnMut(Option<Message>) -> R,
+) -> Option<Message> {
+    if elements.is_empty() {
+        (inner)(msg);
+        None
+    } else {
+        let (first, rest) = elements.split_at_mut(1);
+        first[0].process_with(msg, &mut |msg| chain_processing_elements(rest, msg, inner))
     }
 }
 
 /// A stack of processing elements
-#[derive(Default)]
 pub struct ProcessingStack {
-    items: Vec<Box<dyn ProcessingElement>>,
+    pub(crate) items: Vec<Box<dyn ProcessingElement>>,
 }
 
 impl ProcessingStack {
@@ -284,10 +270,26 @@ impl From<()> for ProcessingStack {
     }
 }
 
+impl Default for ProcessingStack {
+    fn default() -> Self {
+        #[cfg(feature = "async")]
+        return ProcessingStack {
+            items: vec![
+                Box::new(TimeDriver::default()),
+                Box::new(TokioRuntime::default()),
+            ],
+        };
+
+        #[cfg(not(feature = "async"))]
+        return ProcessingStack { items: Vec::new() };
+    }
+}
+
 impl<P: ProcessingElement> From<P> for ProcessingStack {
     fn from(value: P) -> Self {
-        let boxed: Box<dyn ProcessingElement> = Box::new(value);
-        ProcessingStack { items: vec![boxed] }
+        ProcessingStack {
+            items: vec![Box::new(value)],
+        }
     }
 }
 
@@ -298,7 +300,7 @@ macro_rules! for_tuples {
         impl<$($i: ProcessingElement + 'static),*> From<($($i),*)> for ProcessingStack {
             #[allow(non_snake_case)]
             fn from(value: ($($i),*)) -> Self {
-                let mut stack = ProcessingStack::default();
+                let mut stack = ProcessingStack { items: Vec::new()};
                 let ($($i),*) = value;
                 $(
                     stack.append(ProcessingStack::from($i));
@@ -318,3 +320,242 @@ for_tuples!(A, B, C, D, E, F, G);
 for_tuples!(A, B, C, D, E, F, G, H);
 for_tuples!(A, B, C, D, E, F, G, H, I);
 for_tuples!(A, B, C, D, E, F, G, H, I, J);
+
+cfg_async! {
+    use std::{
+        cell::LazyCell,
+        iter::once,
+        rc::Rc,
+        sync::{Arc, LazyLock, Mutex},
+    };
+
+    use tokio::{
+        runtime::{Builder, RngSeed, Runtime},
+        task::{JoinHandle, LocalSet, yield_now},
+    };
+
+    use crate::{
+        net::{
+            Error, ErrorKind, JoinErrorKind,
+            runtime::{NetEvents, AsyncWakeupEvent},
+            schedule_event,
+        },
+        prelude::{RuntimeError, current, random},
+        time::Driver,
+    };
+
+    /// A processing element that provides a tokio runtime in the entered state.
+    #[derive(Debug)]
+    pub struct TokioRuntime {
+        pub(super) tasks: Rc<LocalSet>,
+        pub(super) rt: LazyCell<Arc<Runtime>>,
+        pub(super) handles: Vec<(JoinHandle<()>, bool)>,
+    }
+
+    #[allow(clippy::type_complexity)]
+    static JOIN_THREADS: LazyLock<Mutex<Vec<(JoinHandle<()>, bool)>>> =
+        LazyLock::new(Mutex::default);
+
+    impl Default for TokioRuntime {
+     fn default() -> Self {
+            let tasks = Rc::new(LocalSet::new());
+            Self {
+                tasks,
+                rt: LazyCell::new(|| {
+                    #[allow(unused_mut)]
+                    let mut builder = Builder::new_current_thread();
+                    #[cfg(feature = "unstable-tokio-enable-time")]
+                    builder.enable_time();
+
+                    Arc::new(
+                        builder
+                            .rng_seed(RngSeed::from_bytes(&random::<u64>().to_le_bytes()))
+                            .build()
+                            .expect("Failed to build tokio runtime"),
+                    )
+                }),
+                handles: Vec::new(),
+            }
+        }
+    }
+
+    impl TokioRuntime {
+        /// Join a handle.
+        #[allow(clippy::missing_panics_doc)]
+        pub fn join(handle: JoinHandle<()>) {
+            let mut join_threads = JOIN_THREADS.lock().expect("failed to get lock");
+            join_threads.push((handle, true));
+        }
+
+        /// Try to join a handle.
+        #[allow(clippy::missing_panics_doc)]
+        pub fn try_join(handle: JoinHandle<()>) {
+            let mut join_threads = JOIN_THREADS.lock().expect("failed to get lock");
+            join_threads.push((handle, false));
+        }
+
+        /// Reset the join handles.
+        #[allow(clippy::missing_panics_doc)]
+        pub fn reset_join_handles(&mut self) {
+            let mut join_threads = JOIN_THREADS.lock().expect("failed to get lock");
+            join_threads.clear();
+            self.handles.clear();
+        }
+
+        /// Reset the runtime.
+        pub fn reset(&mut self) {
+            *self = Self::default();
+        }
+
+        /// Shutdown the runtime.
+        pub fn shutdown(&mut self) {
+            *self = Self::default();
+        }
+
+        /// Check for panics in the runtime.
+        pub fn check_for_panics(&mut self) -> Result<(), RuntimeError> {
+            if self.handles.is_empty() {
+                return Ok(());
+            }
+            let mut error = RuntimeError::empty();
+
+            // NOTE: calling this requires RNG to be set, to seed the runtime;
+            // we want to do that only after the lazy cell has been inited but no such API exists.
+            // -> check handles.len(), since they can only reaonsably be set after the first real activation of the node
+            let _guard = self.rt.enter();
+
+            let mut remaining_handles = Vec::new();
+            for (handle, must_join) in self.handles.drain(..) {
+                if !handle.is_finished() {
+                    remaining_handles.push((handle, must_join));
+                    continue;
+                }
+
+                match self.rt.block_on(handle) {
+                    Ok(()) => {
+                    }
+                    Err(e) if e.is_panic() => error.extend(once(Error::new_current(
+                        ErrorKind::JoinError(JoinErrorKind::Paniced(e.into_panic())),
+                    ))),
+                    Err(e) => error.extend(once(Error::new_current(ErrorKind::JoinError(
+                        JoinErrorKind::Tokio(e),
+                    )))),
+                }
+            }
+
+            self.handles = remaining_handles;
+
+            if error.is_empty() { Ok(()) } else { Err(error) }
+        }
+
+        /// a custom handler for sim-end szenarios, only supported by this proc-element.
+        ///
+        /// # Errors
+        ///
+        /// Erorors that occured in handles about to be joined.
+        pub fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+            let mut error = self.check_for_panics().err().unwrap_or(RuntimeError::empty());
+            for (_, must_join) in self.handles.drain(..) {
+                if must_join {
+                    error.extend(once(Error::new_current(ErrorKind::JoinError(
+                        JoinErrorKind::NotFinished,
+                    ))));
+                }
+            }
+
+            if error.is_empty() { Ok(()) } else { Err(error) }
+        }
+    }
+
+    impl ProcessingElement for TokioRuntime {
+        fn process_with(
+            &mut self,
+            msg: Option<Message>,
+            inner: &mut dyn FnMut(Option<Message>) -> Option<Message>,
+        ) -> Option<Message> {
+            JOIN_THREADS.lock().expect("failed to get lock").clear();
+
+            let res = self.tasks.block_on(&self.rt, async {
+                let res = inner(msg);
+                yield_now().await;
+                res
+            });
+
+            self.handles.append(
+                &mut JOIN_THREADS
+                    .lock()
+                    .expect("failed to get lock, this should be impossible"),
+            );
+
+            res
+        }
+    }
+
+    /// Timer Driver
+    #[derive(Debug)]
+    pub struct TimeDriver {
+        driver: Option<Driver>,
+    }
+
+    impl Default for TimeDriver {
+        fn default() -> Self {
+            Self {
+                driver: Some(Driver::new()),
+            }
+        }
+    }
+
+    impl ProcessingElement for TimeDriver {
+        fn process_with(
+            &mut self,
+            msg: Option<Message>,
+            inner: &mut dyn FnMut(Option<Message>) -> Option<Message>,
+        ) -> Option<Message> {
+            use crate::time::{SimTime, TimerSlot};
+
+            let driver = self.driver.take();
+            if let Some(mut driver) = driver {
+                let bumpable = driver.bump();
+                if driver.next_wakeup <= SimTime::now() {
+                    driver.next_wakeup = SimTime::MAX;
+                }
+                bumpable.into_iter().for_each(TimerSlot::wake_all);
+                driver.set();
+            }
+
+            let res = inner(msg);
+
+            let Some(mut driver) = Driver::unset() else {
+                // Somebody stole our driver
+                #[cfg(feature = "tracing")]
+                tracing::error!("IO time driver missing after event execution");
+
+                self.driver = Some(Driver::new());
+                return res;
+            };
+
+            if let Some(next_wakeup) = driver.next()
+                && next_wakeup < driver.next_wakeup
+            {
+                #[cfg(feature = "tracing")]
+                tracing::trace!(
+                    "scheduling new wakeup at {} (prev {})",
+                    next_wakeup,
+                    driver.next_wakeup
+                );
+
+                driver.next_wakeup = next_wakeup;
+
+                schedule_event(
+                    NetEvents::AsyncWakeupEvent(AsyncWakeupEvent {
+                        module: current().me(),
+                    }),
+                    next_wakeup,
+                );
+            }
+
+            self.driver = Some(driver);
+            res
+        }
+    }
+}

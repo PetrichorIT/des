@@ -115,6 +115,16 @@ pub trait EventLifecycle<A = Self> {
     {
         Ok(())
     }
+
+    /// Indicates whether a runtime should stop prematurely.
+    #[allow(unused_variables)]
+    #[inline]
+    fn sim_should_stop(runtime: &Runtime<A>) -> bool
+    where
+        A: Application,
+    {
+        false
+    }
 }
 
 impl<A: Application> Event<A> for () {

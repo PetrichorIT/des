@@ -55,11 +55,14 @@ impl CQueueLLAllocatorInner {
     pub(crate) fn info(&self) {}
 
     unsafe fn add_page(&mut self) {
-        let block = alloc::alloc_zeroed(
-            Layout::from_size_align(self.page_size, self.page_size).expect("page layout invalid"),
-        );
-        self.pages.push(block);
-        self.add_free_region(block as usize, self.page_size);
+        unsafe {
+            let block = alloc::alloc_zeroed(
+                Layout::from_size_align(self.page_size, self.page_size)
+                    .expect("page layout invalid"),
+            );
+            self.pages.push(block);
+            self.add_free_region(block as usize, self.page_size);
+        }
     }
 
     pub fn handle(&mut self) -> CQueueLLAllocator {
@@ -90,11 +93,14 @@ impl CQueueLLAllocatorInner {
         assert!(size >= size_of::<ListNode>());
 
         // create a new list node and append it at the start of the list
-        let mut node = ListNode::new(size);
-        node.next = self.head.next.take();
-        let node_ptr = addr as *mut ListNode;
-        node_ptr.write(node);
-        self.head.next = Some(&mut *node_ptr);
+
+        unsafe {
+            let mut node = ListNode::new(size);
+            node.next = self.head.next.take();
+            let node_ptr = addr as *mut ListNode;
+            node_ptr.write(node);
+            self.head.next = Some(&mut *node_ptr);
+        }
     }
 
     /// Looks for a free region with the given size and alignment and removes
@@ -212,6 +218,8 @@ impl CQueueLLAllocator {
         let (size, _) = CQueueLLAllocatorInner::size_align(layout);
         let allocator = unsafe { &mut *self.inner };
         allocator.allocated_mem -= size;
-        allocator.add_free_region(ptr.as_ptr() as usize, size);
+        unsafe {
+            allocator.add_free_region(ptr.as_ptr() as usize, size);
+        }
     }
 }

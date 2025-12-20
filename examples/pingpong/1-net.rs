@@ -58,13 +58,13 @@ fn build_network() -> Sim<()> {
     let ping_gate = sim.gate("pinger", "port");
     let pong_gate = sim.gate("ponger", "port");
 
-    let metrics = ChannelMetrics::new(
+    let metrics = DatarateChannelMetrics::new(
         8_000_000,
         Duration::from_millis(80),
         Duration::ZERO,
         ChannelDropBehaviour::Drop,
     );
-    ping_gate.connect(pong_gate, Some(Channel::new(metrics)));
+    ping_gate.connect_with(pong_gate, Some(DatarateChannel::new(metrics)));
 
     sim.freeze()
 }
@@ -104,14 +104,17 @@ const PONG: MessageKind = 2;
 impl Module for Pinger {
     fn at_sim_start(&mut self, _stage: usize) {
         for i in 0..30 {
-            schedule_in(Message::default().kind(INTERVAL), Duration::from_secs(i));
+            schedule_in(
+                Message::default().with_kind(INTERVAL),
+                Duration::from_secs(i),
+            );
         }
     }
 
     fn handle_message(&mut self, msg: Message) {
-        match msg.header().kind {
+        match msg.header.kind {
             INTERVAL => {
-                send(Message::default().kind(PING), "port");
+                let _ = send(Message::default().with_kind(PING), "port");
             }
             PONG => {
                 self.pongs_received += 1;
@@ -134,10 +137,10 @@ impl Module for Pinger {
 
 impl Module for Ponger {
     fn handle_message(&mut self, msg: Message) {
-        match msg.header().kind {
+        match msg.header.kind {
             PING => {
                 self.pings_received += 1;
-                send(Message::default().kind(PONG), "port");
+                let _ = send(Message::default().with_kind(PONG), "port");
             }
             _ => panic!("unexpeced"),
         }

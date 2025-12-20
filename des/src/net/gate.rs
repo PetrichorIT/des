@@ -1,12 +1,12 @@
 //! Module-specific network ports.
 
-use crate::net::channel::ChannelRef;
+use crate::net::channel::{ChannelRef, IntoDuplexChannel};
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::sync::{Arc, Mutex, Weak};
 
-use super::module::{ModuleContext, ModuleRef, ModuleRefWeak};
 use super::ObjectPath;
+use super::module::{ModuleContext, ModuleRef, ModuleRefWeak};
 
 /// A  reference to a gate.
 pub type GateRef = Arc<Gate>;
@@ -125,6 +125,16 @@ impl Connection {
     pub fn channel(&self) -> Option<ChannelRef> {
         self.channel.clone()
     }
+
+    fn unregister(self) {
+        if let Some(channel) = self.channel {
+            channel
+                .channel
+                .try_write()
+                .expect("failed to get lock")
+                .unregister(self.endpoint);
+        }
+    }
 }
 
 impl Connections {
@@ -146,6 +156,18 @@ impl Connections {
             }
         }
         unreachable!("Connections::put should not be called if no free slots are available")
+    }
+
+    fn remove(&mut self, gate: &GateRef) -> Connection {
+        for i in 0..2 {
+            if self.connections[i]
+                .as_ref()
+                .is_some_and(|c| Arc::ptr_eq(gate, &c.endpoint))
+            {
+                return self.connections[i].take().expect("illegal state");
+            }
+        }
+        unreachable!("Connections::remove should not be called on unconnected elements")
     }
 }
 
@@ -244,9 +266,9 @@ impl Gate {
     /// # use des::prelude::*;
     /// # fn a() -> Option<()>{
     /// # return None;
-    /// let a = current().gate("out", 0)?;
-    /// let b = current().parent().ok()?.gate("in", 0)?;
-    /// a.connect(b, None);
+    /// let a = current().gate(("out", 0))?;
+    /// let b = current().parent().ok()?.gate(("in", 0))?;
+    /// a.connect(b);
     /// # Some(())
     /// # }
     /// ```
@@ -256,7 +278,41 @@ impl Gate {
     /// This function panic if either of the two gates is allready fully connected in a chain.
     /// This function also panics if only one gate is provided
     #[allow(clippy::needless_pass_by_value)]
-    pub fn connect(self: GateRef, other: GateRef, channel: Option<ChannelRef>) {
+    pub fn connect(self: GateRef, other: GateRef) {
+        self.connect_with::<(ChannelRef, ChannelRef)>(other, None);
+    }
+
+    /// Connects two gates into a gate chain element.
+    ///
+    /// Gates can be organized into a bidirectional gate chain, that
+    /// forwards messages two the other end. Using this function two gates
+    /// are connected and both gates save their connection state. A gate
+    /// can have up to two other gates connected to it, forming a full gate
+    /// chain in response.
+    ///
+    /// If a channel was provided to enable message delaying on this chain element
+    /// both direction will have unique instances of the channel, with identical
+    /// configuration.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use des::prelude::*;
+    /// # fn a() -> Option<()>{
+    /// # return None;
+    /// let a = current().gate(("out", 0))?;
+    /// let b = current().parent().ok()?.gate(("in", 0))?;
+    /// a.connect(b);
+    /// # Some(())
+    /// # }
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// This function panic if either of the two gates is allready fully connected in a chain.
+    /// This function also panics if only one gate is provided
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn connect_with<C: IntoDuplexChannel>(self: GateRef, other: GateRef, channel: Option<C>) {
         assert!(
             !Arc::ptr_eq(&self, &other),
             "Cannot connect gate to itself."
@@ -265,10 +321,10 @@ impl Gate {
         // Check whether the target is allready connected
         let mut conns = self.connections.try_lock().expect("failed lock");
         for i in 0..2 {
-            if let Some(ref con) = conns.connections[i] {
-                if Arc::ptr_eq(&con.endpoint, &other) {
-                    return;
-                }
+            if let Some(ref con) = conns.connections[i]
+                && Arc::ptr_eq(&con.endpoint, &other)
+            {
+                return;
             }
         }
 
@@ -281,19 +337,110 @@ impl Gate {
             "Cannot add connection, gates allready connected to multiple points"
         );
 
-        let ch1 = channel.as_ref().map(|c| Arc::new(c.dup()));
-        let ch2 = channel;
+        let (fwd, bck) = match channel {
+            Some(channel) => {
+                let (a, b) = channel.into_duplex();
+                a.channel
+                    .try_write()
+                    .expect("failed to get lock")
+                    .register(self.clone());
+                b.channel
+                    .try_write()
+                    .expect("failed to get lock")
+                    .register(other.clone());
+
+                (Some(a), Some(b))
+            }
+            None => (None, None),
+        };
 
         conns.put(Connection {
             endpoint: other.clone(),
             endpoint_id: other_conns_pos,
-            channel: ch1,
+            channel: fwd,
         });
         other_conns.put(Connection {
             endpoint: self.clone(),
             endpoint_id: conns_pos,
-            channel: ch2,
+            channel: bck,
         });
+    }
+
+    /// Disconnects a peer.
+    ///
+    /// After successful execution the two gates will no longer be connnected. If a channel exists
+    /// on thus link, it will be informed via `Channel::unregister`.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the specified peer is not connected to this gate.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use des::prelude::*;
+    /// # use des::net::module::Signal;
+    /// # const SIGNAL_DISCONNECT: usize = 1231;
+    /// struct MyModule {}
+    ///
+    /// impl Module for MyModule {
+    ///     fn handle_signal(&mut self, signal: Signal) {
+    ///         assert_eq!(signal.code, SIGNAL_DISCONNECT);
+    ///         let gate = current().gate("uplink").expect("failed to get gate");
+    ///         let next = gate.next_gate().expect("failed to get next");
+    ///         gate.disconnect(&next);
+    ///     }
+    /// }
+    /// ```
+    pub fn disconnect(self: &GateRef, other: &GateRef) {
+        assert!(
+            self.is_neighbor_to(other),
+            "cannot disconnect two unconnected gates"
+        );
+
+        let mut conns = self.connections.lock().expect("failed to lock");
+        let mut other_conns = other.connections.try_lock().expect("failed to get lock");
+
+        let local_con = conns.remove(other);
+        let peer_con = other_conns.remove(self);
+
+        local_con.unregister();
+        peer_con.unregister();
+    }
+
+    /// Disconnects all peers. This method cannot fail.
+    #[allow(clippy::missing_panics_doc)]
+    pub fn disconnect_all(self: &GateRef) {
+        let mut conns = self.connections.lock().expect("failed to lock");
+        for i in 0..2 {
+            if let Some(local_con) = conns.connections[i].take() {
+                let mut other_conns = local_con
+                    .endpoint
+                    .connections
+                    .try_lock()
+                    .expect("failed to get lock");
+
+                let peer_con = other_conns.remove(self);
+                peer_con.unregister();
+                drop(other_conns);
+                local_con.unregister();
+            }
+        }
+    }
+
+    /// Checks whether two gates are direct neighbors, works even for transit gates.
+    #[allow(clippy::missing_panics_doc)]
+    pub fn is_neighbor_to(self: &GateRef, other: &GateRef) -> bool {
+        let conns = self.connections.lock().expect("failed to lock");
+        for i in 0..2 {
+            if conns.connections[i]
+                .as_ref()
+                .is_some_and(|c| Arc::ptr_eq(&c.endpoint, other))
+            {
+                return true;
+            }
+        }
+        false
     }
 
     /// Retrives the channel of the first connection on the path.
@@ -301,10 +448,15 @@ impl Gate {
         self.path_iter()?.nth(0).and_then(|con| con.channel)
     }
 
+    /// Retrieves the next channel on the path.
+    pub fn next_channel(self: &GateRef) -> Option<ChannelRef> {
+        self.path_iter()?.find_map(|con| con.channel)
+    }
+
     /// Returns an iterator over the connections on a gate path.
     /// If the current gate is a transit gate, no iterator will be returned,
     /// since the direction of the iterator cannot be determined.
-    pub fn path_iter(self: &GateRef) -> Option<impl Iterator<Item = Connection>> {
+    pub fn path_iter(self: &GateRef) -> Option<impl Iterator<Item = Connection> + use<>> {
         if self.kind() == GateKind::Transit {
             None
         } else {
@@ -350,15 +502,13 @@ impl Gate {
     pub fn new(owner: &ModuleRef, name: impl AsRef<str>, size: usize, pos: usize) -> GateRef {
         assert!(size >= 1, "Cannot create with a non-postive size");
 
-        let this = GateRef::new(Self {
+        GateRef::new(Self {
             owner: ModuleRefWeak::new(owner),
             name: name.as_ref().to_string(),
             size,
             pos,
             connections: Mutex::new(Connections::new()),
-        });
-
-        this
+        })
     }
 
     pub(crate) fn dissolve_paths(&self) {
@@ -471,7 +621,7 @@ mod tests {
 
     #[test]
     fn fmt() {
-        let owner = ModuleContext::standalone("root".into());
+        let owner = ModuleContext::new_standalone("root".into());
         let gate = Gate::new(&owner, "port", 4, 1);
         assert_eq!(format!("{gate:?}"), "Gate { path: \"root.port[1]\" }");
         assert_eq!(gate.str(), "port[1]");
@@ -480,16 +630,16 @@ mod tests {
 
     #[test]
     fn kind_and_iter() {
-        let owner = ModuleContext::standalone("root".into());
+        let owner = ModuleContext::new_standalone("root".into());
         let gate_a = owner.create_raw_gate("port-a", 1, 0);
         assert_eq!(gate_a.kind(), GateKind::Standalone);
 
         let gate_b = owner.create_raw_gate("port-b", 1, 0);
-        gate_a.clone().connect(gate_b.clone(), None);
+        gate_a.clone().connect(gate_b.clone());
         assert_eq!(gate_a.kind(), GateKind::Endpoint);
 
         let gate_c = owner.create_raw_gate("port-c", 1, 0);
-        gate_a.clone().connect(gate_c.clone(), None);
+        gate_a.clone().connect(gate_c.clone());
         assert_eq!(gate_a.kind(), GateKind::Transit);
 
         // Chain chould be c -- a -- b
@@ -505,24 +655,61 @@ mod tests {
 
     #[test]
     fn dedup() {
-        let owner = ModuleContext::standalone("root".into());
+        let owner = ModuleContext::new_standalone("root".into());
         let gate = owner.create_raw_gate("port-a", 1, 0);
         assert_eq!(gate.kind(), GateKind::Standalone);
 
         let gate_b = owner.create_raw_gate("port-b", 1, 0);
-        gate.clone().connect(gate_b.clone(), None);
+        gate.clone().connect(gate_b.clone());
         assert_eq!(gate.kind(), GateKind::Endpoint);
 
-        gate.clone().connect(gate_b, None);
+        gate.clone().connect(gate_b);
         assert_eq!(gate.kind(), GateKind::Endpoint);
     }
 
     #[test]
+    fn disconnect() {
+        let owner = ModuleContext::new_standalone("root".into());
+        let gate_a = owner.create_raw_gate("port-a", 1, 0);
+        assert_eq!(gate_a.kind(), GateKind::Standalone);
+
+        let gate_b = owner.create_raw_gate("port-b", 1, 0);
+        gate_a.clone().connect(gate_b.clone());
+        assert_eq!(gate_a.kind(), GateKind::Endpoint);
+        assert_eq!(gate_b.kind(), GateKind::Endpoint);
+
+        gate_a.disconnect(&gate_b);
+        assert_eq!(gate_a.kind(), GateKind::Standalone);
+        assert_eq!(gate_b.kind(), GateKind::Standalone);
+    }
+
+    #[test]
+    fn disconnect_all() {
+        let owner = ModuleContext::new_standalone("root".into());
+        let a = owner.create_gate("a");
+        let b = owner.create_gate("b");
+        let c = owner.create_gate("c");
+
+        a.clone().connect(b.clone());
+        a.clone().connect(c.clone());
+
+        assert_eq!(a.kind(), GateKind::Transit);
+        assert_eq!(b.kind(), GateKind::Endpoint);
+        assert_eq!(c.kind(), GateKind::Endpoint);
+
+        a.disconnect_all();
+
+        assert_eq!(a.kind(), GateKind::Standalone);
+        assert_eq!(b.kind(), GateKind::Standalone);
+        assert_eq!(c.kind(), GateKind::Standalone);
+    }
+
+    #[test]
     fn into_gate() {
-        let ctx = ModuleContext::standalone("root".into());
+        let ctx = ModuleContext::new_standalone("root".into());
         let gate_a = ctx.create_raw_gate("port-a", 1, 0);
 
-        assert_eq!((&gate_a).as_gate(&ctx.ctx), Some(gate_a.clone()));
+        assert_eq!(gate_a.as_gate(&ctx.ctx), Some(gate_a.clone()));
         assert_eq!(
             Arc::downgrade(&gate_a).as_gate(&ctx.ctx),
             Some(gate_a.clone())

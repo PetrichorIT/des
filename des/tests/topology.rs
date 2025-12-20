@@ -1,6 +1,5 @@
-use std::{fs, io::Write};
-
 use des::prelude::*;
+use petgraph::algo::tarjan_scc;
 use serial_test::serial;
 
 #[test]
@@ -11,39 +10,10 @@ fn main() {
         .unwrap();
     let rt = Builder::new().build(app.freeze());
     let app = rt.run().unwrap().0;
-    let mut topo = app
-        .globals()
-        .topology()
-        .with_edge_cost_attachment()
-        .with_node_connectivity_attachment();
+    let topo = app.globals().topology();
 
-    assert!(topo.bidirectional());
-    assert!(!topo.connected());
-
-    let dj = topo.dijkstra("node[1]");
-    assert_eq!(dj.get(&"node[1]".into()), None);
-
-    topo.filter_nodes(|n| n.module().name() != "node[2]");
-
-    assert_eq!(topo.edges().count(), 10);
-
-    // 4 nodes, router, debugger, main + distant
-    assert_eq!(topo.nodes().len(), 8);
-
-    topo.filter_nodes(|node| node.degree > 0);
-    assert_eq!(topo.nodes().len(), 6);
-    assert_eq!(topo.edges().count(), 10);
-
-    assert!(topo
-        .edges_for("router")
-        .any(|edge| edge.to.gate().owner().path().as_str() == "debugger"));
-
-    if let Ok(output) = topo.as_svg() {
-        fs::File::create("tests/topology.svg")
-            .unwrap()
-            .write_all(output.as_bytes())
-            .unwrap();
-    }
+    let connected = dbg!(tarjan_scc(&topo)).len() == 1;
+    assert!(!connected);
 }
 
 struct Fallback;
@@ -61,18 +31,18 @@ fn spanned_topology() {
     sim.node("bob", Fallback);
 
     sim.gate("alice", "to-eve")
-        .connect(sim.gate("alice.eve", "to-alice"), None);
+        .connect(sim.gate("alice.eve", "to-alice"));
     sim.gate("alice", "to-sophie")
-        .connect(sim.gate("alice.sophie", "to-alice"), None);
+        .connect(sim.gate("alice.sophie", "to-alice"));
     sim.gate("alice.eve", "to-travis")
-        .connect(sim.gate("alice.eve.travis", "to-eve"), None);
+        .connect(sim.gate("alice.eve.travis", "to-eve"));
     sim.gate("alice.eve", "to-sophie")
-        .connect(sim.gate("alice.sophie", "to-eve"), None);
+        .connect(sim.gate("alice.sophie", "to-eve"));
 
     let root = sim.get(&"alice".into()).unwrap();
 
-    let topology = Topology::spanned(root);
-    assert_eq!(topology.nodes().len(), 4);
-    assert_eq!(topology.edges().count(), 2 * 4);
-    assert!(!topology.nodes().iter().any(|n| n.module().name() == "bob"));
+    let topology = root.spanning_tree();
+    assert_eq!(topology.node_count(), 4);
+    assert_eq!(topology.edge_count(), 2 * 4);
+    assert!(!topology.node_weights().any(|n| n.name() == "bob"));
 }

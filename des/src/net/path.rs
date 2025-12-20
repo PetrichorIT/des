@@ -94,11 +94,7 @@ impl ObjectPath {
     #[must_use]
     pub fn nonzero_parent(&self) -> Option<ObjectPath> {
         let parent = self.parent()?;
-        if parent.is_root() {
-            None
-        } else {
-            Some(parent)
-        }
+        if parent.is_root() { None } else { Some(parent) }
     }
 
     /// Returns a new instance with another module appended to the path.
@@ -261,7 +257,7 @@ mod tests {
         assert_eq!(
             path,
             ObjectPath {
-                data: "".to_string().into(),
+                data: String::new().into(),
                 len: 0,
                 last_element_offset: 0,
                 is_gate: false,
@@ -305,7 +301,7 @@ mod tests {
         assert_eq!(
             parent,
             Some(ObjectPath {
-                data: "".to_string().into(),
+                data: String::new().into(),
                 len: 0,
                 last_element_offset: 0,
                 is_gate: false,
@@ -353,7 +349,7 @@ mod tests {
         assert_eq!(
             ObjectPath::from(""),
             ObjectPath {
-                data: "".to_string().into(),
+                data: String::new().into(),
                 len: 0,
                 last_element_offset: 0,
                 is_gate: false,

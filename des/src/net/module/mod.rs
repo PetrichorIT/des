@@ -24,8 +24,8 @@
 //! will still respecting the global plugin stack. See [`processing` module](crate::net::processing) for
 //! more information on plugins and other advanced processing features.
 //!
-//! > Note that APIs like [`SimBuilder::node`](crate::net::runtime::SimBuilder::node) require a object of [trait `ModuleBlock`](crate::net::blocks::ModuleBlock). However
-//! > all implementors of [`Module`] also implement [`ModuleBlock`](crate::net::blocks::ModuleBlock).
+//! > Note that APIs like [`SimBuilder::node`](crate::net::runtime::SimBuilder::node) require a object of [trait `IntoModuleTree`](crate::net::IntoModuleTree). However
+//! > all implementors of [`Module`] also implement [`IntoModuleTree`](crate::net::IntoModuleTree).
 //!
 //! # Common features via the `ModuleContext`
 //!
@@ -76,21 +76,23 @@ use std::{
 mod api;
 mod ctx;
 mod dummy;
-mod error;
+mod future;
+mod props;
 mod refs;
+mod signal;
 
 #[cfg(test)]
 mod tests;
 
 pub(crate) use self::ctx::*;
-pub use self::ctx::{ModuleContext, Stereotyp};
+pub use self::ctx::{ModuleContext, UnwindBehaviour};
 pub use api::*;
 pub(crate) use dummy::*;
-pub use error::*;
+pub use props::*;
 pub use refs::*;
+pub use signal::*;
 
-use super::processing::{ProcessingStack, Processor};
-pub use des_net_utils::props::{Prop, PropType, RawProp};
+use super::processing::ProcessingStack;
 
 /// A unique identifier for a module.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -104,7 +106,7 @@ impl ModuleId {
     pub const NULL: ModuleId = ModuleId(0);
 
     /// Generates a unique module ID.
-    pub fn gen() -> Self {
+    pub fn generate() -> Self {
         Self(MODULE_ID.fetch_add(1, Ordering::SeqCst))
     }
 }
@@ -125,7 +127,9 @@ pub trait Module: Any {
     /// Resets the custom state when a module is restarted.
     fn reset(&mut self) {
         #[cfg(feature = "tracing")]
-        tracing::warn!("Module has been shutdown and restarted, but reset() was not defined. This may lead to invalid custom state.");
+        tracing::warn!(
+            "Module has been shutdown and restarted, but reset() was not defined. This may lead to invalid custom state."
+        );
     }
 
     ///
@@ -161,6 +165,29 @@ pub trait Module: Any {
     /// ```
     ///
     fn handle_message(&mut self, _msg: Message) {}
+
+    /// A signal handler, user defined.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use des::{prelude::*, net::module::{Signal, SIGNAL_MODULE_PANICED}};
+    ///
+    /// struct MyModule {
+    ///     /* ... */
+    /// };
+    ///
+    /// impl Module for MyModule {
+    ///     /* ... */
+    ///     fn handle_signal(&mut self, signal: Signal) {
+    ///         match signal.code {
+    ///             SIGNAL_MODULE_PANICED => println!("another module has panicked"),
+    ///             _ => {}
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    fn handle_signal(&mut self, _signal: Signal) {}
 
     ///
     /// A function that is run at the start of each simulation,
@@ -216,15 +243,3 @@ pub trait Module: Any {
         Ok(())
     }
 }
-
-pub(crate) trait ModuleExt: Module {
-    /// BUILD TODO: Remove
-    fn to_processing_chain(self, stack: ProcessingStack) -> Processor
-    where
-        Self: Sized + 'static,
-    {
-        Processor::new(self.stack(stack), self)
-    }
-}
-
-impl<T: Module> ModuleExt for T {}

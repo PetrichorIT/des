@@ -26,6 +26,9 @@ pub use body::*;
 mod header;
 pub use header::*;
 
+mod extension;
+pub use extension::*;
+
 ///
 /// A network message holding a arbitrary payload.
 ///
@@ -35,21 +38,26 @@ pub use header::*;
 ///
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-#[derive(Debug, Default)]
+#[derive(Debug)]
 #[must_use]
 pub struct Message {
-    pub(crate) header: Box<Header>,
-    pub(crate) content: Option<Body>,
+    /// The header contained in the message.
+    pub header: Box<Header>,
+    /// The body contained in the message. Default is ().
+    pub body: Body,
+    /// The extensions attached to the message.
+    pub extensions: Extensions,
 }
 
 impl Message {
     /// Constructs a message from its raw parts.
     ///
     /// The header is boxed for improved internal layout.
-    pub fn from_raw_parts(header: Box<Header>, body: Option<Body>) -> Self {
+    pub fn from_raw_parts(header: Box<Header>, body: Option<Body>, extensions: Extensions) -> Self {
         Self {
             header,
-            content: body,
+            body: body.unwrap_or(Body::empty()),
+            extensions,
         }
     }
 
@@ -58,7 +66,7 @@ impl Message {
         header: Header,
         body: Option<T>,
     ) -> Self {
-        Self::from_raw_parts(Box::new(header), body.map(Body::new))
+        Self::from_raw_parts(Box::new(header), body.map(Body::new), Extensions::default())
     }
 
     /// Returns the length of the complete message.
@@ -66,21 +74,17 @@ impl Message {
     /// The length is the sum of the bodys length and a fixed header length.
     #[must_use]
     pub fn length(&self) -> usize {
-        self.content.as_ref().map_or(0, Body::length) + self.header.byte_len()
+        self.body.length() + self.header.byte_len()
     }
+}
 
-    /// The metadata attached to the message.
-    #[inline]
-    #[must_use]
-    pub fn header(&self) -> &Header {
-        &self.header
-    }
-
-    /// The metadata attached to the message.
-    #[inline]
-    #[must_use]
-    pub fn header_mut(&mut self) -> &mut Header {
-        &mut self.header
+impl Default for Message {
+    fn default() -> Self {
+        Self {
+            header: Box::new(Header::default()),
+            body: Body::empty(),
+            extensions: Extensions::default(),
+        }
     }
 }
 
@@ -103,55 +107,55 @@ impl DerefMut for Message {
 
 impl Message {
     /// **Builder** that sets the messsage ID field.
-    pub fn id(mut self, id: MessageId) -> Self {
+    pub fn with_id(mut self, id: MessageId) -> Self {
         self.header.id = id;
         self
     }
 
     /// **Builder** that sets the messsage kind field.
-    pub fn kind(mut self, kind: MessageKind) -> Self {
+    pub fn with_kind(mut self, kind: MessageKind) -> Self {
         self.header.kind = kind;
         self
     }
 
     /// **Builder** that sets the creation time field.
-    pub fn creation_time(mut self, time: SimTime) -> Self {
+    pub fn with_creation_time(mut self, time: SimTime) -> Self {
         self.header.creation_time = time;
         self
     }
 
     /// **Builder** that sets the send time field.
-    pub fn send_time(mut self, time: SimTime) -> Self {
+    pub fn with_send_time(mut self, time: SimTime) -> Self {
         self.header.send_time = time;
         self
     }
 
     /// **Builder** that sets the sender module ID field.
-    pub fn sender_module_id(mut self, id: ModuleId) -> Self {
+    pub fn with_sender_module_id(mut self, id: ModuleId) -> Self {
         self.header.sender_module_id = id;
         self
     }
 
     /// **Builder** that sets the receiver module ID field.
-    pub fn receiver_module_id(mut self, id: ModuleId) -> Self {
+    pub fn with_receiver_module_id(mut self, id: ModuleId) -> Self {
         self.header.receiver_module_id = id;
         self
     }
 
     /// **Builder** that sets the last gate field.
-    pub fn last_gate(mut self, gate: GateRef) -> Self {
+    pub fn with_last_gate(mut self, gate: GateRef) -> Self {
         self.header.last_gate = Some(gate);
         self
     }
 
     /// **Builder** that sets the source MAC address field.
-    pub fn src(mut self, src: [u8; 6]) -> Self {
+    pub fn with_src(mut self, src: [u8; 6]) -> Self {
         self.header.src = src;
         self
     }
 
     /// **Builder** that sets the destination MAC address field.
-    pub fn dst(mut self, dest: [u8; 6]) -> Self {
+    pub fn with_dst(mut self, dest: [u8; 6]) -> Self {
         self.header.dst = dest;
         self
     }
@@ -162,31 +166,16 @@ impl Message {
 impl Message {
     /// Sets the content of the message.
     pub fn set_body(&mut self, body: Body) {
-        self.content = Some(body);
+        self.body = body;
     }
 
     /// Sets the content of the message.
+    #[inline]
     pub fn set_content<T>(&mut self, value: T)
     where
         T: MessageBody + Clone + Debug + Any,
     {
-        self.content = Some(Body::new(value));
-    }
-
-    /// Sets the content of the message.
-    pub fn set_content_non_clonable<T>(&mut self, value: T)
-    where
-        T: MessageBody + Debug + Any,
-    {
-        self.content = Some(Body::new_non_clonable(value));
-    }
-
-    /// Sets the content of the message.
-    pub fn set_content_non_debugable<T>(&mut self, value: T)
-    where
-        T: Clone + Any,
-    {
-        self.content = Some(Body::new_non_debugable(value));
+        self.set_body(Body::new(value));
     }
 
     /// **Builder** that sets the content of the message.
@@ -204,68 +193,14 @@ impl Message {
         self
     }
 
-    /// Trys to return the content by reference casted to the given type T.
-    /// Returns [None] if the no content exists or the content is not of type T.
-    #[must_use]
-    pub fn try_content<T: 'static + MessageBody>(&self) -> Option<&T> {
-        self.content.as_ref().and_then(Body::try_content::<T>)
-    }
-
-    /// Trys to return the content by reference casted to the given type T.
-    /// Panics if the no content exists or the content is not of type T.
+    /// Performs a [`try_into_content`](Message::try_into_content) unwraping the result.
     ///
     /// # Panics
     ///
     /// Panics if he cast fails.
     #[must_use]
-    pub fn content<T: 'static + MessageBody>(&self) -> &T {
-        self.try_content().expect("Failed to unwrap")
-    }
-
-    /// Trys to return the content by mutable ref casted to the given type T.
-    /// Returns [None] if the no content exists or the content is not of type T.
-    pub fn try_content_mut<T: 'static + MessageBody>(&mut self) -> Option<&mut T> {
-        self.content.as_mut().and_then(Body::try_content_mut::<T>)
-    }
-
-    /// Trys to return the content by mutable ref casted to the given type T.
-    /// Panics if the no content exists or the content is not of type T.
-    ///
-    /// # Panics
-    ///
-    /// Panics if he cast fails.
-    pub fn content_mut<T: 'static + MessageBody>(&mut self) -> &mut T {
-        self.try_content_mut().expect("Failed to unwrap")
-    }
-
-    /// Indicates wheter a cast to a instance of type T ca
-    /// succeed.
-    ///
-    /// ## Safty
-    ///
-    /// Note that this only gurantees that a cast will result in UB
-    /// if it returns 'false'. Should this function return 'true' it indicates
-    /// that the underlying value was created as a instance of type 'T',
-    /// which does not gurantee that this is a internally valid instance
-    /// of 'T'.
-    ///
-    /// # Panics
-    ///
-    /// Panics if he cast fails.
-    #[inline]
-    #[must_use]
-    pub fn can_cast<T: 'static + MessageBody>(&self) -> bool {
-        self.content.as_ref().map_or(false, Body::is::<T>)
-    }
-
-    /// Performs a [`try_cast`](Message::try_cast)unwraping the result.
-    ///
-    /// # Panics
-    ///
-    /// Panics if he cast fails.
-    #[must_use]
-    pub fn cast<T: 'static + MessageBody + Send>(self) -> (T, Header) {
-        self.try_cast().expect("Could not cast to type T")
+    pub fn into_content<T: 'static + MessageBody + Send>(self) -> (T, Header, Extensions) {
+        self.try_into_content().expect("could not cast to type T")
     }
 
     /// Consumes the message casting the stored ptr
@@ -282,14 +217,17 @@ impl Message {
     ///
     /// Returns an error if either there is no content, or
     /// the content is not of type T.
-    pub fn try_cast<T: 'static + MessageBody + Send>(self) -> Result<(T, Header), Self> {
-        let Message { header, content } = self;
-        match content {
-            Some(body) => match body.try_cast() {
-                Ok(value) => Ok((value, *header)),
-                Err(body) => Err(Self::from_raw_parts(header, Some(body))),
-            },
-            None => Err(Self::from_raw_parts(header, None)),
+    pub fn try_into_content<T: 'static + MessageBody + Send>(
+        self,
+    ) -> Result<(T, Header, Extensions), Self> {
+        let Message {
+            header,
+            body,
+            extensions,
+        } = self;
+        match body.try_into_content() {
+            Ok(value) => Ok((value, *header, extensions)),
+            Err(body) => Err(Self::from_raw_parts(header, Some(body), extensions)),
         }
     }
 
@@ -298,11 +236,27 @@ impl Message {
     pub fn try_clone(&self) -> Option<Self> {
         Some(Self {
             header: self.header.clone(),
-            content: match &self.content {
-                Some(body) => Some(body.try_clone()?),
-                None => None,
-            },
+            body: self.body.try_clone()?,
+            extensions: Extensions::default(),
         })
+    }
+}
+
+//
+// # Extensions
+//
+
+impl Message {
+    /// Overrides the extension set of the message.
+    pub fn with_extensions(mut self, extensions: Extensions) -> Self {
+        self.extensions = extensions;
+        self
+    }
+
+    /// Adds an extension to the message.
+    pub fn with_extension<T: Any + Send>(mut self, extension: T) -> Self {
+        self.extensions.set(extension);
+        self
     }
 }
 
@@ -317,12 +271,12 @@ impl Clone for Message {
 
 impl Display for Message {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Message {{ {} bytes {:?}  }}",
-            self.length(),
-            self.content
-        )
+        write!(f, "Message {{ {} bytes {:?}  ", self.length(), self.body)?;
+        if !self.extensions.is_empty() {
+            write!(f, "+ {:?} ", self.extensions)?;
+        }
+
+        write!(f, "}}")
     }
 }
 
@@ -335,32 +289,100 @@ impl UnwindSafe for Message {}
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
-    use std::any::type_name;
+
+    macro_rules! test_primive {
+        ($ident:ident { $($e:expr => $s:expr),+ }) => {
+            #[test]
+            #[allow(unused_allocation)]
+            fn $ident() {
+                $(
+                    assert_eq!(($e).byte_len(), $s);
+                )+
+            }
+        };
+    }
+
+    test_primive!(body_size_int {
+        32u8 => 1,
+        32u16 => 2,
+        32u32 => 4,
+        32u64 => 8,
+        32u128 => 16,
+        -32i8 => 1,
+        -32i16 => 2,
+        -32i32 => 4,
+        -32i64 => 8,
+        -32i128 => 16
+    });
+
+    test_primive!(body_size_float {
+        0.1f32 => 4,
+        0.45f64 => 8
+    });
+
+    test_primive!(body_size_other_primitives {
+        () => 0,
+        true => 1,
+        'b' => 4
+    });
+
+    test_primive!(body_size_string {
+        String::new() => 0,
+        "Hello World".to_string() => 11,
+        "Hello World😀".to_string() => 15
+    });
+
+    test_primive!(body_size_boxed {
+        Box::new(0u8) => 1,
+        Box::new(0i128) => 16,
+        Box::new(String::from("Hello World")) => 11,
+        Box::new(()) => 0
+    });
+
+    test_primive!(body_size_option {
+        Some(0u8) => 1,
+        Option::<u8>::None => 0,
+        Some("Hello World".to_string()) => 11,
+        Option::<String>::None => 0
+    });
+
+    test_primive!(body_size_result {
+       Result::<_, u8>::Ok("Hello World".to_string()) => 11,
+       Result::<_, u8>::Ok(String::new()) => 0,
+       Result::<String, _>::Err(0u8) => 1,
+       Result::<String, _>::Err(16u8) => 1
+    });
+
+    test_primive!(body_size_collection {
+        vec![1, 2, 3u8] => 3,
+        vec![String::new(), "Hello World".to_string(), "ABC".to_string()] => 11 + 3
+    });
 
     #[test]
-    fn message_fmt() {
+    fn display() {
         let msg = Message::default()
-            .id(123)
-            .src([1; 6])
-            .dst([2; 6])
+            .with_id(123)
+            .with_src([1; 6])
+            .with_dst([2; 6])
             .with_content(String::from("Hello world!"));
 
         #[cfg(debug_assertions)]
         assert_eq!(
             msg.to_string(),
             format!(
-                "Message {{ 76 bytes Some(Body {{ length: 12, type: {:?}, value: \"Hello world!\" }})  }}",
-                type_name::<String>()
+                "Message {{ 76 bytes Body {{ length: 12, type: {:?}, value: \"Hello world!\" }}  }}",
+                std::any::type_name::<String>()
             )
         );
 
-        assert!(msg.can_cast::<String>());
-        assert_eq!(msg.content::<String>(), "Hello world!");
+        assert!(msg.body.is::<String>());
+        assert_eq!(msg.body.content::<String>(), "Hello world!");
     }
 
     #[test]
-    fn message_cast() {
+    fn cast() {
         #[derive(Debug, Clone)]
         struct A(i32);
         impl MessageBody for A {
@@ -370,12 +392,65 @@ mod tests {
         }
 
         let msg = Message::default()
-            .id(123)
-            .receiver_module_id(ModuleId(1))
-            .sender_module_id(ModuleId(2))
+            .with_id(123)
+            .with_receiver_module_id(ModuleId(1))
+            .with_sender_module_id(ModuleId(2))
             .with_content(A(42));
-        let (value, header) = msg.cast::<A>();
+
+        let (value, header, _) = msg.into_content::<A>();
         assert_eq!(header.id, 123);
         assert_eq!(value.0, 42);
+    }
+
+    #[derive(Debug, PartialEq, Eq)]
+    struct PrivateType;
+
+    #[test]
+    fn extensions() {
+        let mut msg = Message::default();
+
+        msg.extensions.set(String::from("hello world"));
+        msg.extensions.set(PrivateType);
+
+        assert_eq!(msg.extensions.get::<String>(), Some(&"hello world".into()));
+        assert_eq!(msg.extensions.get::<PrivateType>(), Some(&PrivateType));
+    }
+
+    #[test]
+    fn extensions_display() {
+        let mut msg = Message::default();
+
+        msg.extensions.set(String::from("hello world"));
+        msg.extensions.set(PrivateType);
+
+        #[cfg(not(debug_assertions))]
+        assert!(
+            msg.to_string()
+                .contains(&format!("{:?}", std::any::TypeId::of::<String>())),
+        );
+        #[cfg(not(debug_assertions))]
+        assert!(
+            msg.to_string()
+                .contains(&format!("{:?}", std::any::TypeId::of::<PrivateType>()))
+        );
+
+        #[cfg(debug_assertions)]
+        assert!(msg.to_string().contains(std::any::type_name::<String>()));
+        #[cfg(debug_assertions)]
+        assert!(
+            msg.to_string()
+                .contains(std::any::type_name::<PrivateType>())
+        );
+    }
+
+    #[test]
+    fn extensions_clone() {
+        let mut msg = Message::default();
+
+        msg.extensions.set(String::from("hello world"));
+        msg.extensions.set(PrivateType);
+
+        let cloned_msg = msg.clone();
+        assert!(cloned_msg.extensions.is_empty());
     }
 }

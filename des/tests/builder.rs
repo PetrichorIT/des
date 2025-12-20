@@ -1,7 +1,11 @@
 #![cfg(feature = "net")]
 
 use des::{
-    net::blocks::{FailabilityPolicy, HandlerFn, ModuleBlock, ModuleFn},
+    net::{
+        IntoModuleTree,
+        handlers::{FailabilityPolicy, HandlerFn, ModuleFn, WithContext},
+        module::Prop,
+    },
     prelude::*,
 };
 use serial_test::serial;
@@ -10,10 +14,13 @@ use std::{
     hint::black_box,
     io,
     sync::{
-        atomic::{AtomicU16, Ordering},
         Arc,
+        atomic::{AtomicU16, Ordering},
     },
 };
+
+mod common;
+pub use common::*;
 
 #[test]
 #[serial]
@@ -58,9 +65,9 @@ fn builder_builds_hierachie() {
 #[should_panic = "cannot create node 'alice', node allready exists"]
 fn builder_panic_node_duplicate() {
     let mut sim = Sim::new(());
-    sim.node("alice", HandlerFn::new(|_| {}));
-    sim.node("bob", HandlerFn::new(|_| {}));
-    sim.node("alice", HandlerFn::new(|_| {}));
+    sim.node("alice", NopModule);
+    sim.node("bob", NopModule);
+    sim.node("alice", NopModule);
 }
 
 #[test]
@@ -68,9 +75,9 @@ fn builder_panic_node_duplicate() {
 #[should_panic = "cannot create node 'bob.bombardil', since parent node 'bob' is required, but does not exist"]
 fn builder_panic_missing_parent() {
     let mut sim = Sim::new(());
-    sim.node("alice", HandlerFn::new(|_| {}));
-    sim.node("alice.alicent", HandlerFn::new(|_| {}));
-    sim.node("bob.bombardil", HandlerFn::new(|_| {}));
+    sim.node("alice", NopModule);
+    sim.node("alice.alicent", NopModule);
+    sim.node("bob.bombardil", NopModule);
 }
 
 #[test]
@@ -78,7 +85,7 @@ fn builder_panic_missing_parent() {
 #[should_panic = "cannot create gate 'bob.port', because node 'bob' does not exist"]
 fn builder_panic_gate_missing_node() {
     let mut sim = Sim::new(());
-    sim.node("alice", HandlerFn::new(|_| {}));
+    sim.node("alice", NopModule);
     let _ = sim.gate("alice", "port");
 
     let _ = sim.gate("bob", "port");
@@ -91,7 +98,7 @@ fn builder_gate_cluster() {
     impl Module for Alice {
         fn at_sim_start(&mut self, _: usize) {
             for i in 0..4 {
-                assert!(current().gate("cluster", i).is_some());
+                assert!(current().gate(("cluster", i)).is_some());
             }
         }
     }
@@ -109,16 +116,15 @@ fn builder_module_block() {
     struct Def;
     struct Block;
     impl Module for Def {}
-    impl ModuleBlock for Block {
+    impl IntoModuleTree for Block {
         type Ret = ();
-        fn build<A>(self, mut sim: SimBuilderScoped<'_, A>) {
+
+        fn build<A>(self, mut sim: Spawner<'_, A>) {
             sim.root(Def);
             let _ = sim.gate("", &format!("port-{}", sim.scope()));
 
             sim.node("sub", Def);
             let _ = sim.gates("sub", "cluster", 123);
-
-            let _ = sim.inner();
         }
     }
 
@@ -137,7 +143,7 @@ fn builder_handler_fn() {
     sim.node(
         "alice",
         HandlerFn::new(move |msg| {
-            c2.fetch_add(msg.header().id, Ordering::SeqCst);
+            c2.fetch_add(msg.header.id, Ordering::SeqCst);
         }),
     );
     let gate = sim.gate("alice", "port");
@@ -145,9 +151,9 @@ fn builder_handler_fn() {
     assert!(Arc::ptr_eq(&gate, &other));
 
     let mut rt = Builder::seeded(123).build(sim.freeze());
-    rt.add_message_onto(gate.clone(), Message::default().id(1), 1.0.into());
-    rt.add_message_onto(gate.clone(), Message::default().id(2), 2.0.into());
-    rt.add_message_onto(gate.clone(), Message::default().id(3), 3.0.into());
+    rt.add_message_onto(gate.clone(), Message::default().with_id(1), 1.0.into());
+    rt.add_message_onto(gate.clone(), Message::default().with_id(2), 2.0.into());
+    rt.add_message_onto(gate.clone(), Message::default().with_id(3), 3.0.into());
 
     let _ = rt.run();
     assert_eq!(counter.load(Ordering::SeqCst), 6);
@@ -174,31 +180,34 @@ fn builder_handler_fn_with_err() {
     let _ = Builder::seeded(123).build(sim.freeze()).run();
 }
 
-// #[test]
-// #[serial]
-// #[should_panic = "node 'alice' failed to process message, handler fn failed with: other"]
-// fn builder_handler_fn_failure_panic() {
-//     let mut sim = Sim::new(());
-//     sim.node(
-//         "alice",
-//         HandlerFn::failable(
-//             |_| {
-//                 if black_box(true) {
-//                     return Err(io::Error::new(io::ErrorKind::Other, "other"));
-//                 }
+#[test]
+#[serial]
+fn builder_handler_fn_failure_panic() {
+    let mut sim = Sim::new(());
+    sim.node(
+        "alice",
+        HandlerFn::failable(
+            |_| {
+                if black_box(true) {
+                    return Err(io::Error::new(io::ErrorKind::Other, "other"));
+                }
 
-//                 Ok(())
-//             },
-//             FailabilityPolicy::Panic,
-//         ),
-//     );
-//     let gate = sim.gate("alice", "port");
+                Ok(())
+            },
+            FailabilityPolicy::Panic,
+        ),
+    );
+    let gate = sim.gate("alice", "port");
 
-//     let mut rt = Builder::seeded(123).build(sim.freeze());
-//     rt.add_message_onto(gate, Message::default(), 1.0.into());
+    let mut rt = Builder::seeded(123).build(sim.freeze());
+    rt.add_message_onto(gate, Message::default(), 1.0.into());
 
-//     let _ = rt.run();
-// }
+    let e = rt.run().unwrap_err();
+    assert!(
+        e[0].to_string()
+            .starts_with("alice: ModulePanic(Any { .. })")
+    );
+}
 
 #[test]
 #[serial]
@@ -248,7 +257,11 @@ fn builder_module_fn() {
 
     let mut rt = Builder::seeded(123).build(sim.freeze());
     for i in 0..10 {
-        rt.add_message_onto(gate.clone(), Message::default().id(i), (i as f64).into());
+        rt.add_message_onto(
+            gate.clone(),
+            Message::default().with_id(i),
+            (i as f64).into(),
+        );
     }
 
     let _ = rt.run();
@@ -270,7 +283,7 @@ fn builder_module_fn_restart_at_failure() {
                 0
             },
             |_, msg| {
-                if msg.header().id == 1 {
+                if msg.header.id == 1 {
                     Err(io::Error::new(io::ErrorKind::Other, "other"))
                 } else {
                     Ok(())
@@ -282,9 +295,9 @@ fn builder_module_fn_restart_at_failure() {
     let gate = sim.gate("alice", "port");
 
     let mut rt = Builder::seeded(123).build(sim.freeze());
-    rt.add_message_onto(gate.clone(), Message::default().id(1), 1.0.into());
-    rt.add_message_onto(gate.clone(), Message::default().id(1), 2.0.into());
-    rt.add_message_onto(gate.clone(), Message::default().id(2), 3.0.into());
+    rt.add_message_onto(gate.clone(), Message::default().with_id(1), 1.0.into());
+    rt.add_message_onto(gate.clone(), Message::default().with_id(1), 2.0.into());
+    rt.add_message_onto(gate.clone(), Message::default().with_id(2), 3.0.into());
 
     let _ = rt.run();
     assert_eq!(starts.load(Ordering::SeqCst), 3);
@@ -313,4 +326,26 @@ fn builder_module_fn_gen_in_module_scope() {
     assert_eq!(stage.load(Ordering::SeqCst), 0);
     let _ = Builder::seeded(123).build(sim.freeze()).run();
     assert_eq!(stage.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+#[serial]
+fn builder_with_context_can_access_props() -> Result<(), RuntimeError> {
+    struct WithProp {
+        #[allow(dead_code)]
+        prop: Prop<u32, true>,
+    }
+    impl Module for WithProp {}
+
+    let mut sim = Sim::new(()).with_cfg("alice.key: 123");
+    sim.node(
+        "alice",
+        WithContext(|| {
+            let prop = current().prop("key").unwrap().expect("must exist");
+            assert_eq!(prop.get(), 123);
+            WithProp { prop }
+        }),
+    );
+
+    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
 }

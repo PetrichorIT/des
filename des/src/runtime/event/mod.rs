@@ -3,8 +3,10 @@ use crate::time::SimTime;
 mod event_set;
 pub(crate) use event_set::*;
 
+/// A trait describing a sink for events, usually the future event set of the runtime.
 #[allow(unused)]
-pub(crate) trait EventSink<E> {
+pub trait EventSink<E> {
+    /// Adds an event to the sink.
     fn add(&mut self, event: E, time: SimTime);
 }
 

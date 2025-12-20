@@ -2,19 +2,23 @@
 #![allow(unused_variables)]
 
 use des::{
-    net::{blocks::AsyncFn, module::Module, JoinError},
+    net::{
+        Error, ErrorKind,
+        handlers::AsyncHandler,
+        module::{Module, UnwindBehaviour},
+    },
     prelude::*,
     runtime::RuntimeError,
-    time::{self, sleep, timeout, timeout_at, MissedTickBehavior},
+    time::{self, MissedTickBehavior, sleep, timeout, timeout_at},
 };
 use std::sync::{
-    atomic::{AtomicBool, AtomicUsize, Ordering},
     Arc,
+    atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 use tokio::{
     sync::{
-        mpsc::{self, channel, Sender},
         Semaphore,
+        mpsc::{self, Sender, channel},
     },
     task::{JoinHandle, JoinSet},
 };
@@ -32,8 +36,8 @@ struct QuasaiSyncModule {
 
 impl Module for QuasaiSyncModule {
     fn handle_message(&mut self, msg: Message) {
-        println!("[{}] Received msg: {}", current().name(), msg.header().id);
-        self.counter += msg.header().id as usize;
+        println!("[{}] Received msg: {}", current().name(), msg.header.id);
+        self.counter += msg.header.id as usize;
     }
 }
 
@@ -49,18 +53,18 @@ fn quasai_sync_non_blocking() {
 
     let mut rt = Builder::seeded(123).build(rt.freeze());
 
-    rt.add_message_onto(gate_a.clone(), Message::default().id(1), SimTime::ZERO);
-    rt.add_message_onto(gate_a, Message::default().id(2), SimTime::ZERO);
+    rt.add_message_onto(gate_a.clone(), Message::default().with_id(1), SimTime::ZERO);
+    rt.add_message_onto(gate_a, Message::default().with_id(2), SimTime::ZERO);
 
-    rt.add_message_onto(gate_b.clone(), Message::default().id(1), SimTime::ZERO);
-    rt.add_message_onto(gate_b.clone(), Message::default().id(2), SimTime::ZERO);
-    rt.add_message_onto(gate_b, Message::default().id(3), SimTime::ZERO);
+    rt.add_message_onto(gate_b.clone(), Message::default().with_id(1), SimTime::ZERO);
+    rt.add_message_onto(gate_b.clone(), Message::default().with_id(2), SimTime::ZERO);
+    rt.add_message_onto(gate_b, Message::default().with_id(3), SimTime::ZERO);
 
     let result = rt.run();
     match result {
         Ok((app, time, profiler)) => {
             assert_eq!(time, SimTime::ZERO);
-            assert_eq!(profiler.event_count, 10);
+            assert_eq!(profiler.event_count, 12); // (+2 start signal)
         }
         _ => panic!("Expected runtime to finish"),
     }
@@ -89,7 +93,7 @@ impl Module for MutipleTasksModule {
 
         self.handles.spawn(async move {
             while let Some(v) = rxa.recv().await {
-                let k = v.header().kind;
+                let k = v.header.kind;
                 txb.send(v).await.unwrap();
 
                 if k == 42 {
@@ -101,7 +105,7 @@ impl Module for MutipleTasksModule {
 
         self.handles.spawn(async move {
             while let Some(v) = rxb.recv().await {
-                let k = v.header().kind;
+                let k = v.header.kind;
                 txc.send(v).await.unwrap();
 
                 if k == 42 {
@@ -113,8 +117,8 @@ impl Module for MutipleTasksModule {
 
         self.handles.spawn(async move {
             while let Some(v) = rxc.recv().await {
-                let k = v.header().kind;
-                result.fetch_add(v.header().id as usize, std::sync::atomic::Ordering::SeqCst);
+                let k = v.header.kind;
+                result.fetch_add(v.header.id as usize, std::sync::atomic::Ordering::SeqCst);
 
                 if k == 42 {
                     rxc.close();
@@ -150,17 +154,17 @@ fn mutiple_active_tasks() {
 
     let mut rt = Builder::seeded(123).build(rt.freeze());
 
-    rt.add_message_onto(gate_a.clone(), Message::default().id(1), SimTime::ZERO);
-    rt.add_message_onto(gate_a.clone(), Message::default().id(2), SimTime::ZERO);
-    rt.add_message_onto(gate_a, Message::default().kind(42), SimTime::ZERO);
+    rt.add_message_onto(gate_a.clone(), Message::default().with_id(1), SimTime::ZERO);
+    rt.add_message_onto(gate_a.clone(), Message::default().with_id(2), SimTime::ZERO);
+    rt.add_message_onto(gate_a, Message::default().with_kind(42), SimTime::ZERO);
 
     let result = rt.run();
     match result {
         Ok((app, time, profiler)) => {
             assert_eq!(time, SimTime::ZERO);
 
-            //  3 * (Gate + HandleMessage)
-            assert_eq!(profiler.event_count, 6);
+            //  3 * (Gate + HandleMessage) (+1 start signal)
+            assert_eq!(profiler.event_count, 7);
 
             // let m1 = app
             //     .module(|m| m.module_core().name() == "RootModule")
@@ -185,7 +189,7 @@ impl Module for TimeSleepModule {
     fn handle_message(&mut self, msg: Message) {
         tokio::spawn(async move {
             tracing::debug!("recv msg: {msg}");
-            let wait_time = msg.header().kind as u64;
+            let wait_time = msg.header.kind as u64;
             tracing::info!(
                 "<{}> [{}] Waiting for timer",
                 current().name(),
@@ -196,7 +200,7 @@ impl Module for TimeSleepModule {
                 "<{}> [{}] Done waiting for id: {}",
                 current().name(),
                 SimTime::now(),
-                msg.header().id
+                msg.header.id
             );
         });
     }
@@ -218,12 +222,12 @@ fn one_module_timers() {
 
     rt.add_message_onto(
         gate_a.clone(),
-        Message::default().id(1).kind(1),
+        Message::default().with_id(1).with_kind(1),
         SimTime::ZERO,
     );
     rt.add_message_onto(
         gate_a,
-        Message::default().id(2).kind(2),
+        Message::default().with_id(2).with_kind(2),
         SimTime::from_duration(Duration::new(2, 0)),
     );
 
@@ -231,7 +235,7 @@ fn one_module_timers() {
     match result {
         Ok((app, time, profiler)) => {
             assert_eq!(time, 4.0);
-            assert_eq!(profiler.event_count, 6);
+            assert_eq!(profiler.event_count, 7); // (+1 start signal)
         }
         _ => panic!("Expected runtime to finish"),
     }
@@ -253,12 +257,12 @@ fn one_module_delayed_recv() {
 
     rt.add_message_onto(
         gate_a.clone(),
-        Message::default().id(1).kind(2),
+        Message::default().with_id(1).with_kind(2),
         SimTime::ZERO,
     );
     rt.add_message_onto(
         gate_a,
-        Message::default().id(2).kind(2),
+        Message::default().with_id(2).with_kind(2),
         SimTime::from_duration(Duration::new(2, 0)),
     );
 
@@ -267,13 +271,14 @@ fn one_module_delayed_recv() {
         Ok((app, time, profiler)) => {
             assert_eq!(time, 4.0);
 
+            // (+1 start signal)
             // 1) Gate #1 (0s)
             // 2) HandleMessage #1 (0s)
             // 3) Gate #2 (2s)
             // 4) HandleMessage #2 (2s) (will finish sleep but wakeup was added later)
             // 5) Wakeup aka NOP (2s)
             // 6) Wakeup - sleep reloved - send in '5 (4s)
-            assert_eq!(profiler.event_count, 6);
+            assert_eq!(profiler.event_count, 7);
         }
         _ => panic!("Expected runtime to finish"),
     }
@@ -300,12 +305,12 @@ fn mutiple_module_delayed_recv() {
     //          ....<ID=2_>
     rt.add_message_onto(
         gate_a.clone(),
-        Message::default().id(1).kind(2),
+        Message::default().with_id(1).with_kind(2),
         SimTime::from_duration(Duration::new(1, 0)),
     );
     rt.add_message_onto(
         gate_a,
-        Message::default().id(2).kind(2),
+        Message::default().with_id(2).with_kind(2),
         SimTime::from_duration(Duration::new(2, 0)),
     );
 
@@ -315,12 +320,12 @@ fn mutiple_module_delayed_recv() {
     //          <ID=20>
     rt.add_message_onto(
         gate_b.clone(),
-        Message::default().id(10).kind(1),
+        Message::default().with_id(10).with_kind(1),
         SimTime::from_duration(Duration::new(1, 0)),
     );
     rt.add_message_onto(
         gate_b,
-        Message::default().id(20).kind(2),
+        Message::default().with_id(20).with_kind(2),
         SimTime::from_duration(Duration::new(2, 0)),
     );
 
@@ -328,7 +333,7 @@ fn mutiple_module_delayed_recv() {
     match result {
         Ok((app, time, profiler)) => {
             assert_eq!(time, 4.0); // parallel exec is possible
-            assert_eq!(profiler.event_count, 12);
+            assert_eq!(profiler.event_count, 14); // (+2 start signal)
         }
         _ => panic!("Expected runtime to finish"),
     }
@@ -363,7 +368,7 @@ impl Module for SemaphoreModule {
     }
 
     fn handle_message(&mut self, msg: Message) {
-        self.semaphore.add_permits(msg.header().kind as usize);
+        self.semaphore.add_permits(msg.header.kind as usize);
     }
 }
 
@@ -381,28 +386,28 @@ fn semaphore_in_waiting_task() {
 
     rt.add_message_onto(
         gate_a.clone(),
-        Message::default().id(1).kind(2),
+        Message::default().with_id(1).with_kind(2),
         SimTime::from_duration(Duration::new(1, 0)),
     );
     rt.add_message_onto(
         gate_a,
-        Message::default().id(2).kind(3),
+        Message::default().with_id(2).with_kind(3),
         SimTime::from_duration(Duration::new(2, 0)),
     );
 
     rt.add_message_onto(
         gate_b.clone(),
-        Message::default().id(10).kind(2),
+        Message::default().with_id(10).with_kind(2),
         SimTime::from_duration(Duration::new(1, 0)),
     );
     rt.add_message_onto(
         gate_b.clone(),
-        Message::default().id(20).kind(2),
+        Message::default().with_id(20).with_kind(2),
         SimTime::from_duration(Duration::new(2, 0)),
     );
     rt.add_message_onto(
         gate_b,
-        Message::default().id(20).kind(1),
+        Message::default().with_id(20).with_kind(1),
         SimTime::from_duration(Duration::new(3, 0)),
     );
 
@@ -410,7 +415,7 @@ fn semaphore_in_waiting_task() {
     match result {
         Ok((app, time, profiler)) => {
             assert_eq!(time, 3.0);
-            assert_eq!(profiler.event_count, 10);
+            assert_eq!(profiler.event_count, 12); // (+2 start signal)
         }
         _ => panic!("Expected runtime to finish"),
     }
@@ -422,7 +427,7 @@ fn async_time_sleep_far_future() {
     let mut sim = Sim::new(());
     sim.node(
         "alice",
-        AsyncFn::new(|rx| async move {
+        AsyncHandler::new(|rx| async move {
             assert_eq!(SimTime::now(), 0.0);
             time::sleep_until(10.0.into()).await;
             assert_eq!(SimTime::now(), 10.0);
@@ -445,7 +450,7 @@ fn async_time_sleep_select() {
     let mut sim = Sim::new(());
     sim.node(
         "alice",
-        AsyncFn::new(|rx| async move {
+        AsyncHandler::new(|rx| async move {
             tokio::select! {
                 _ = time::sleep(Duration::from_secs(10)) => unreachable!(),
                 _ = time::sleep(Duration::from_secs(5)) => println!("resolved"),
@@ -456,7 +461,7 @@ fn async_time_sleep_select() {
 
     let result = Builder::seeded(123).build(sim.freeze()).run().unwrap();
     assert_eq!(result.1, 5.0);
-    assert_eq!(result.2.event_count, 1); // Just async wakeup for 5s, 10s will never be scheduled
+    assert_eq!(result.2.event_count, 2); // Just async wakeup for 5s, 10s will never be scheduled (+1 start signal)
 }
 
 #[test]
@@ -465,7 +470,7 @@ fn async_time_sleep_reset() {
     let mut sim = Sim::new(());
     sim.node(
         "alice",
-        AsyncFn::new(|rx| async move {
+        AsyncHandler::new(|rx| async move {
             let sleep = time::sleep(Duration::from_secs(5));
             tokio::pin!(sleep);
 
@@ -477,7 +482,7 @@ fn async_time_sleep_reset() {
 
     let result = Builder::seeded(123).build(sim.freeze()).run().unwrap();
     assert_eq!(result.1, 10.0);
-    assert_eq!(result.2.event_count, 1); // Just async wakeup for 10s, 5s was not yet scheduled
+    assert_eq!(result.2.event_count, 2); // Just async wakeup for 10s, 5s was not yet scheduled (+1 start signal)
 }
 
 #[test]
@@ -486,7 +491,7 @@ fn async_time_timeout() {
     let mut sim = Sim::new(());
     sim.node(
         "alice",
-        AsyncFn::new(|rx| async move {
+        AsyncHandler::new(|rx| async move {
             let result: Result<i32, time::error::Elapsed> =
                 timeout(Duration::from_secs(10), std::future::pending()).await;
             assert!(result.is_err());
@@ -525,7 +530,7 @@ fn async_time_timeout_far_future() {
     let mut sim = Sim::new(());
     sim.node(
         "alice",
-        AsyncFn::new(|rx| async move {
+        AsyncHandler::new(|rx| async move {
             // add a sleep to get a nonempty sim
             time::sleep(Duration::from_secs(42)).await;
 
@@ -548,7 +553,7 @@ fn async_time_interval() {
     let mut sim = Sim::new(());
     sim.node(
         "alice",
-        AsyncFn::new(|rx| async move {
+        AsyncHandler::new(|rx| async move {
             // (0) No missed ticks
             let counter = Arc::new(AtomicUsize::new(0));
 
@@ -584,7 +589,7 @@ fn async_time_interval_missed_tick_behaviour() {
     let mut sim = Sim::new(());
     sim.node(
         "burst",
-        AsyncFn::new(|rx| async move {
+        AsyncHandler::new(|rx| async move {
             // (0) No missed ticks
             let mut interval = time::interval(Duration::from_secs(1));
             interval.set_missed_tick_behavior(MissedTickBehavior::Burst);
@@ -602,7 +607,7 @@ fn async_time_interval_missed_tick_behaviour() {
 
     sim.node(
         "delay",
-        AsyncFn::new(|rx| async move {
+        AsyncHandler::new(|rx| async move {
             // (0) No missed ticks
             let mut interval = time::interval(Duration::from_secs(1));
             interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
@@ -626,7 +631,7 @@ fn async_time_interval_missed_tick_behaviour() {
 
     sim.node(
         "skip",
-        AsyncFn::new(|rx| async move {
+        AsyncHandler::new(|rx| async move {
             // (0) No missed ticks
             let mut interval = time::interval_at(0.0.into(), Duration::from_secs(1));
             interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
@@ -669,10 +674,12 @@ fn async_join_on_module_fail() {
     sim.node("main", JoinOnModule);
 
     let v = Builder::seeded(123).build(sim.freeze()).run();
-    assert!(v.unwrap_err()[0]
-        .as_any()
-        .downcast_ref::<JoinError>()
-        .is_some())
+    assert!(
+        v.unwrap_err()[0]
+            .as_any()
+            .downcast_ref::<Error>()
+            .map_or(false, |e| matches!(e.kind, ErrorKind::JoinError(_)))
+    )
 }
 
 struct PanicIsJoinable;
@@ -689,10 +696,12 @@ fn async_join_paniced_will_join_but_fail() {
     sim.node("main", PanicIsJoinable);
 
     let v = Builder::seeded(123).build(sim.freeze()).run();
-    assert!(v.unwrap_err()[0]
-        .as_any()
-        .downcast_ref::<JoinError>()
-        .is_some())
+    assert!(
+        v.unwrap_err()[0]
+            .as_any()
+            .downcast_ref::<Error>()
+            .map_or(false, |e| matches!(e.kind, ErrorKind::JoinError(_)))
+    );
 }
 
 struct SpawnButNeverJoin;
@@ -711,4 +720,90 @@ fn runtime_require_join() {
     sim.node("main", SpawnButNeverJoin);
 
     let _ = Builder::seeded(123).build(sim.freeze()).run();
+}
+
+#[test]
+#[serial]
+fn wait_for_sim_start_fin() -> Result<(), RuntimeError> {
+    let mut sim = Sim::new(());
+    let (tx, rx) = std::sync::mpsc::channel();
+
+    for i in 0..3 {
+        let tx1 = tx.clone();
+        sim.node(
+            format!("alice-{i}"),
+            AsyncHandler::new(move |_| {
+                let tx1 = tx1.clone();
+                async move {
+                    tx1.send((i, "pre")).unwrap();
+                    current().wait_for_start().await;
+                    tx1.send((i, "post")).unwrap();
+                }
+            }),
+        );
+    }
+
+    let _ = Builder::seeded(123).build(sim.freeze()).run()?;
+
+    let mut buf = Vec::new();
+    while let Ok(v) = rx.try_recv() {
+        buf.push(v);
+    }
+
+    assert_eq!(
+        buf,
+        &[
+            (0, "pre"),
+            (1, "pre"),
+            (2, "pre"),
+            (0, "post"),
+            (1, "post"),
+            (2, "post"),
+        ]
+    );
+
+    Ok(())
+}
+
+#[test]
+#[serial]
+fn panic_stops_sim_immediately() -> Result<(), RuntimeError> {
+    let mut sim = Sim::new(());
+    let cfg = UnwindBehaviour {
+        on_panic_catch: false,
+        ..Default::default()
+    };
+    sim.set_default_unwind_behavior(cfg);
+    sim.node(
+        "alice",
+        AsyncHandler::once(move |_| async move {
+            assert_eq!(current().unwind_behaviour(), cfg);
+            sleep(Duration::from_secs(1)).await;
+            panic!("Huh something went wrong");
+        })
+        .require_join(),
+    );
+
+    let counter = Arc::new(AtomicUsize::new(0));
+    let counter2 = counter.clone();
+    sim.node(
+        "bob",
+        AsyncHandler::once(move |_| async move {
+            loop {
+                sleep(Duration::from_secs_f64(0.4)).await;
+                counter.fetch_add(1, Ordering::SeqCst);
+                schedule_in(Message::default(), Duration::from_secs(1));
+            }
+        }),
+    );
+
+    let _err = Builder::seeded(123)
+        .max_time(10.0.into())
+        .build(sim.freeze())
+        .run()
+        .unwrap_err();
+
+    assert_eq!(counter2.load(Ordering::SeqCst), 2); // at 0.4, 0.8
+
+    Ok(())
 }

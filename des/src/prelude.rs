@@ -34,13 +34,15 @@ cfg_net! {
     pub use crate::net::message::{send, send_in, send_at, schedule_in, schedule_at};
 
     pub use crate::net::Sim;
-    pub use crate::net::SimBuilderScoped;
     pub use crate::net::Globals;
+    pub use crate::net::Spawner;
 
     pub use crate::net::channel::Channel;
-    pub use crate::net::channel::ChannelMetrics;
+    pub use crate::net::channel::DatarateChannel;
+    pub use crate::net::channel::DatarateChannelMetrics;
     pub use crate::net::channel::ChannelRef;
     pub use crate::net::channel::ChannelDropBehaviour;
+    pub use crate::net::channel::SendError;
 
     pub use crate::net::gate::Gate;
     pub use crate::net::gate::GateRef;
@@ -50,13 +52,11 @@ cfg_net! {
     pub use crate::net::module::Module;
     pub use crate::net::module::ModuleId;
     pub use crate::net::module::ModuleRef;
-    pub use crate::net::module::ModuleReferencingError;
+
 
     pub use crate::net::module::{current, try_current};
 
-
     pub use crate::net::ObjectPath;
-    pub use crate::net::JoinError;
     pub use crate::net::processing::ProcessingElement;
 
     pub use crate::net::ndl::Registry;

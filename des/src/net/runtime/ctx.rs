@@ -1,14 +1,17 @@
 #![allow(missing_docs)]
 
 use super::{Globals, HandleMessageEvent, MessageExitingConnection, Sim};
+use crate::net::channel::SendError;
 use crate::net::gate::Connection;
-use crate::net::module::{current, with_mod_ctx, MOD_CTX};
-use crate::net::ModuleRestartEvent;
-use crate::net::{gate::GateRef, message::Message, NetEvents};
-use crate::prelude::{EventLifecycle, ModuleRef};
-use crate::runtime::Runtime;
+use crate::net::module::{MOD_CTX, current};
+use crate::net::runtime::NetEvents;
+use crate::net::{gate::GateRef, message::Message};
+use crate::prelude::{EventLifecycle, ModuleRef, RuntimeError};
+use crate::runtime::{LikeRuntimeError, Runtime};
 use crate::sync::Mutex;
 use crate::time::SimTime;
+use std::iter::once;
+use std::mem;
 use std::sync::{Arc, Weak};
 
 static BUF_CTX: Mutex<BufferContext> = Mutex::new(BufferContext::new());
@@ -18,6 +21,8 @@ struct BufferContext {
     events: Vec<(NetEvents, SimTime)>,
     // globals
     globals: Option<Weak<Globals>>,
+    // errors
+    error: RuntimeError,
 }
 
 impl BufferContext {
@@ -25,6 +30,7 @@ impl BufferContext {
         Self {
             events: Vec::new(),
             globals: None,
+            error: RuntimeError::empty(),
         }
     }
 }
@@ -60,11 +66,13 @@ pub(crate) fn buf_drop() {
     *ctx = BufferContext::new();
 }
 
-pub(crate) fn buf_send_at(mut msg: Message, gate: GateRef, send_time: SimTime) {
+pub(crate) fn buf_send_at(
+    mut msg: Message,
+    gate: GateRef,
+    send_time: SimTime,
+) -> Result<(), SendError> {
     let mut ctx = BUF_CTX.lock();
     msg.header.sender_module_id = current().id();
-
-    crate::tracing::enter_scope(gate.owner().scope_token());
 
     // (0) If delayed send is active, dont skip gate_refs
     if send_time > SimTime::now() {
@@ -75,7 +83,7 @@ pub(crate) fn buf_send_at(mut msg: Message, gate: GateRef, send_time: SimTime) {
             }),
             send_time,
         ));
-        return;
+        return Ok(());
     }
 
     // (0) Else handle the event inlined, for instant effects on the associated
@@ -84,9 +92,7 @@ pub(crate) fn buf_send_at(mut msg: Message, gate: GateRef, send_time: SimTime) {
         con: Connection::new(gate),
         msg,
     };
-    event.handle_with_sink(&mut ctx.events);
-
-    crate::tracing::enter_scope(with_mod_ctx(|ctx| ctx.scope_token));
+    event.handle_with_sink(&mut ctx.events)
 }
 
 pub(crate) fn buf_schedule_at(msg: Message, arrival_time: SimTime) {
@@ -103,7 +109,12 @@ pub(crate) fn buf_schedule_at(msg: Message, arrival_time: SimTime) {
     ));
 }
 
-pub(crate) fn buf_process<A>(module: &ModuleRef, rt: &mut Runtime<Sim<A>>)
+pub(crate) fn buf_schedule_event(event: NetEvents, time: SimTime) {
+    let mut ctx = BUF_CTX.lock();
+    ctx.events.push((event, time));
+}
+
+pub(crate) fn buf_process<A>(_module: &ModuleRef, rt: &mut Runtime<Sim<A>>)
 where
     A: EventLifecycle<Sim<A>>,
 {
@@ -114,34 +125,18 @@ where
         rt.add_event(event, time);
     }
 
-    // (2) Handle shutdown if indicated
-    if let Some(restart) = module.shutdown_task.write().take() {
-        // Mark the modules state
-        #[cfg(feature = "tracing")]
-        tracing::debug!("Shuttind down module and restaring at {:?}", restart);
-        module
-            .ctx
-            .active
-            .store(false, std::sync::atomic::Ordering::SeqCst);
+    // (1) Pull collected failures from CTX
+    let mut swappable = RuntimeError::empty();
+    mem::swap(&mut swappable, &mut ctx.error);
+    rt.app.error.merge(swappable);
+}
 
-        // drop the rt, to prevent all async activity from happening.
-        #[cfg(feature = "async")]
-        module.ctx.async_ext.write().rt.shutdown();
+pub(crate) fn buf_fail(e: impl LikeRuntimeError) {
+    let mut ctx = BUF_CTX.lock();
+    ctx.error.extend(once(Box::new(e)));
+}
 
-        // Reset the internal state
-        // Note that the module is not active, so it must be manually reactivated
-        module.activate();
-        rt.app.error.extend(module.reset().err());
-        module.deactivate(rt);
-
-        // Reschedule wakeup
-        if let Some(restart) = restart {
-            rt.add_event(
-                NetEvents::ModuleRestartEvent(ModuleRestartEvent {
-                    module: module.clone(),
-                }),
-                restart,
-            );
-        }
-    }
+pub(crate) fn buf_fail_internal(e: RuntimeError) {
+    let mut ctx = BUF_CTX.lock();
+    ctx.error.merge(e);
 }

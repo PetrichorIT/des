@@ -1,25 +1,29 @@
-use crate::net::processing::{ProcessingStack, Processor};
-use crate::net::NetEvents;
+use crate::net::module::State;
+use crate::net::processing::{ModuleImpl, ProcessingStack};
 use crate::prelude::{Gate, GateRef};
-use crate::runtime::EventSink;
-use crate::tracing::{enter_scope, leave_scope};
 
-use super::{DummyModule, Module, ModuleContext, ModuleExt};
-use std::any::{Any, TypeId};
+use super::{DummyModule, Module, ModuleContext};
+use std::any::Any;
 use std::cell::{Ref, RefCell, RefMut};
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::ops::Deref;
-use std::sync::atomic::Ordering;
 use std::sync::{Arc, Weak};
 
 #[derive(Clone)]
 pub(crate) struct ModuleRefWeak {
     ctx: Weak<ModuleContext>,
-    handler: Weak<RefCell<Processor>>,
+    handler: Weak<RefCell<ModuleImpl>>,
 }
 
 impl ModuleRefWeak {
+    pub(crate) fn empty() -> Self {
+        Self {
+            ctx: Weak::new(),
+            handler: Weak::new(),
+        }
+    }
+
     pub(crate) fn new(strong: &ModuleRef) -> Self {
         Self {
             ctx: Arc::downgrade(&strong.ctx),
@@ -37,7 +41,11 @@ impl ModuleRefWeak {
 
 impl Debug for ModuleRefWeak {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ModuleRefWeak").finish()
+        if let Some(mref) = self.upgrade() {
+            mref.fmt(f)
+        } else {
+            f.debug_struct("Weak").finish_non_exhaustive()
+        }
     }
 }
 
@@ -45,7 +53,7 @@ impl Debug for ModuleRefWeak {
 #[derive(Clone)]
 pub struct ModuleRef {
     pub(crate) ctx: Arc<ModuleContext>,
-    pub(crate) processing: Arc<RefCell<Processor>>,
+    pub(crate) processing: Arc<RefCell<ModuleImpl>>,
 }
 
 impl Deref for ModuleRef {
@@ -56,43 +64,26 @@ impl Deref for ModuleRef {
 }
 
 impl ModuleRef {
-    #[allow(clippy::explicit_deref_methods)]
-    pub(crate) fn new<T: Module>(
-        ctx: Arc<ModuleContext>,
-        module: T,
-        stack: ProcessingStack,
-    ) -> Self {
-        let procesing = module.to_processing_chain(stack);
-        let handler = Arc::new(RefCell::new(procesing));
-        let this = Self {
-            ctx,
-            processing: handler,
-        };
-
-        *this.ctx.me.write() = Some(ModuleRefWeak::new(&this));
-        this
-    }
-
     #[allow(unused)]
     pub(crate) fn dummy(ctx: Arc<ModuleContext>) -> Self {
         // Create the dummy module explicitly not with ::new since
         // all dyn Module calls would panic
-        Self::new(ctx, DummyModule {}, ProcessingStack::default())
+        let module = Box::new(DummyModule {});
+        let stack = ModuleImpl::new(module.stack(ProcessingStack::default()), module);
+        let processing = Arc::new(RefCell::new(stack));
+        let this = Self { ctx, processing };
+        *this.ctx.me.write() = ModuleRefWeak::new(&this);
+        this
     }
 
     #[allow(unused)]
     // Caller must ensure that handler is indeed a dummy
     #[doc(hidden)]
-    pub fn upgrade_dummy(&self, module: Processor) {
+    pub fn upgrade_dummy(&self, module: ModuleImpl) {
         let celled = RefCell::new(module);
-        let celled: RefCell<Processor> = celled;
         self.processing.swap(&celled);
+        self.ctx.state.set(State::Initialized);
     }
-
-    // NOTE / TODO
-    // Once feature(trait_upcasting) is stabalized, use traitupcasting for
-    // safe interactions with the v-table.
-    // For now us raw pointer casts.
 
     /// Borrows the referenced module as a readonly reference
     /// to the provided type T.
@@ -102,7 +93,7 @@ impl ModuleRef {
     /// Panics if either the module is not of type T,
     /// or the module is allready borrowed mutably.
     #[must_use]
-    pub fn as_ref<T: Any>(&self) -> Ref<T> {
+    pub fn as_ref<T: Any>(&self) -> Ref<'_, T> {
         self.try_as_ref::<T>()
             .expect("Failed to cast ModuleRef to readonly reference to type T")
     }
@@ -121,18 +112,14 @@ impl ModuleRef {
     /// or the reference module is `self` and a module-specific function is called.
     ///
     #[must_use]
-    pub fn try_as_ref<T: Any>(&self) -> Option<Ref<T>> {
-        let brw = self.processing.borrow();
-        let rf = &*brw.handler;
-        let ty = rf.type_id();
-        if ty == TypeId::of::<T>() {
-            Some(Ref::map(brw, |brw| {
-                let v: &dyn Any = &*brw.handler;
-                v.downcast_ref::<T>().expect("unreachable")
-            }))
-        } else {
-            None
-        }
+    pub fn try_as_ref<T: Any>(&self) -> Option<Ref<'_, T>> {
+        Ref::filter_map(
+            self.processing.try_borrow()
+                .expect("could not aquire handle to node implementation, since the implementation is currently active"),
+            |processor| {
+                processor.downcast_element_ref::<T>()
+            }
+        ).ok()
     }
 
     /// Borrows the referenced module as a mutable reference
@@ -143,7 +130,7 @@ impl ModuleRef {
     /// Panics if either the module is not of type T,
     /// or the module is allready borrowed on any way.
     #[must_use]
-    pub fn as_mut<T: Any>(&self) -> RefMut<T> {
+    pub fn as_mut<T: Any>(&self) -> RefMut<'_, T> {
         self.try_as_mut()
             .expect("Failed to cast ModuleRef to mutable reference to type T")
     }
@@ -162,18 +149,14 @@ impl ModuleRef {
     /// or the reference module is `self` and a module-specific function is called.
     ///
     #[must_use]
-    pub fn try_as_mut<T: Any>(&self) -> Option<RefMut<T>> {
-        let brw = self.processing.borrow_mut();
-        let rf = &*brw.handler;
-        let ty = rf.type_id();
-        if ty == TypeId::of::<T>() {
-            Some(RefMut::map(brw, |brw| {
-                let v: &mut dyn Any = &mut *brw.handler;
-                v.downcast_mut::<T>().expect("unreachable")
-            }))
-        } else {
-            None
-        }
+    pub fn try_as_mut<T: Any>(&self) -> Option<RefMut<'_, T>> {
+        RefMut::filter_map(
+            self.processing.try_borrow_mut()
+                .expect("could not aquire handle to node implementation, since the implementation is currently active"),
+            |processor| {
+                processor.downcast_element_mut::<T>()
+            }
+        ).ok()
     }
 }
 
@@ -181,81 +164,43 @@ impl ModuleRef {
     /// Whether the module is currently active or shut down.
     #[must_use]
     pub fn is_active(&self) -> bool {
-        self.ctx.active.load(Ordering::SeqCst)
-    }
-
-    pub(crate) fn scope_token(&self) -> crate::tracing::ScopeToken {
-        self.ctx.scope_token
+        self.ctx.state.get() != State::Shutdown
     }
 
     /// INTERNAL
     #[doc(hidden)]
-    #[allow(unused)]
-    pub fn activate(&self) {
-        enter_scope(self.scope_token());
+    #[must_use]
+    pub fn activate(&self) -> Option<Arc<ModuleContext>> {
         let prev = ModuleContext::place(Arc::clone(&self.ctx));
-
-        #[cfg(feature = "async")]
-        {
-            use crate::time::{Driver, SimTime, TimerSlot};
-
-            if let Some(prev) = prev {
-                prev.async_ext.write().driver = Driver::unset();
-            }
-
-            let driver = self.ctx.async_ext.write().driver.take();
-            if let Some(mut d) = driver {
-                let bumpable = d.bump();
-                if d.next_wakeup <= SimTime::now() {
-                    d.next_wakeup = SimTime::MAX;
-                }
-                bumpable.into_iter().for_each(TimerSlot::wake_all);
-                d.set();
-            }
+        #[cfg(debug_assertions)]
+        if let Some(prev) = &prev {
+            eprintln!("pushed-off ctx from {}", prev.path());
         }
+        prev
     }
 
     /// INTERNAL
     #[doc(hidden)]
-    #[allow(unused)]
-    pub(crate) fn deactivate(&self, rt: &mut impl EventSink<NetEvents>) {
+    #[allow(unused, clippy::unused_self)]
+    pub(crate) fn deactivate(&self) {
         #[cfg(feature = "async")]
-        {
-            use crate::net::AsyncWakeupEvent;
-            use crate::time::Driver;
+        if !self.ctx.unwind_behaviour.get().on_panic_catch {
+            // Check for the join threads in the tokio runtime, to abort at an appropriate moment
 
-            let mut ext = self.ctx.async_ext.write();
-            let Some(mut driver) = Driver::unset() else {
-                // Somebody stole our driver
-                #[cfg(feature = "tracing")]
-                tracing::error!("IO time driver missing after event execution");
+            use crate::net::{processing::TokioRuntime, runtime::buf_fail_internal};
+            let mut processing = self.processing.try_borrow_mut().expect("failed to borrow");
 
-                ext.driver = Some(Driver::new());
-                return;
-            };
-            if let Some(next_wakeup) = driver.next() {
-                if next_wakeup < driver.next_wakeup {
-                    #[cfg(feature = "tracing")]
-                    tracing::trace!(
-                        "scheduling new wakeup at {} (prev {})",
-                        next_wakeup,
-                        driver.next_wakeup
-                    );
+            let err = processing
+                .downcast_element_mut::<TokioRuntime>()
+                .and_then(|tokio| tokio.check_for_panics().err());
 
-                    driver.next_wakeup = next_wakeup;
-                    rt.add(
-                        NetEvents::AsyncWakeupEvent(AsyncWakeupEvent {
-                            module: self.clone(),
-                        }),
-                        next_wakeup,
-                    );
-                }
+            let _ = ModuleContext::take();
+            if let Some(err) = err {
+                buf_fail_internal(err);
             }
-            ext.driver = Some(driver);
+        } else {
+            let _ = ModuleContext::take();
         }
-
-        let _ = ModuleContext::take();
-        leave_scope();
     }
 
     /// Creates a gate on the current module, returning its ID.
@@ -299,13 +244,12 @@ impl Hash for ModuleRef {
 
 impl Debug for ModuleRef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct(&format!(
-            "ModuleRef {{ name: {}, handler: {}, ctx: {} }}",
-            self.ctx.path,
-            Arc::strong_count(&self.processing),
-            Arc::strong_count(&self.ctx),
-        ))
-        .finish()
+        f.debug_struct("ModuleRef")
+            .field("name", &self.ctx.path.to_string())
+            .field("state", &self.ctx.state.get())
+            .field("handler", &Arc::strong_count(&self.processing))
+            .field("ctx", &Arc::strong_count(&self.ctx))
+            .finish()
     }
 }
 
@@ -321,18 +265,25 @@ mod tests {
 
     #[test]
     fn fmt() {
-        let module = ModuleContext::standalone("root.a.b".into());
+        let module = ModuleContext::new_standalone("root.a.b".into());
         let m2 = module.clone();
         let weak = ModuleRefWeak::new(&module);
 
         assert_eq!(module.path.as_str(), "root.a.b");
         assert_eq!(
             format!("{module:?}"),
-            "ModuleRef { name: root.a.b, handler: 2, ctx: 2 }"
+            "ModuleRef { name: \"root.a.b\", state: Created, handler: 2, ctx: 2 }"
         );
-        assert_eq!(format!("{weak:?}"), "ModuleRefWeak");
+        assert_eq!(
+            format!("{weak:?}"),
+            "ModuleRef { name: \"root.a.b\", state: Created, handler: 3, ctx: 3 }"
+        );
 
         assert_eq!(module, m2);
+
+        drop((m2, module));
+
+        assert_eq!(format!("{weak:?}"), "Weak { .. }");
     }
 
     #[test]
@@ -343,8 +294,11 @@ mod tests {
         }
         impl Module for A {}
 
-        let module = ModuleContext::standalone("root".into());
-        module.upgrade_dummy(Processor::new(ProcessingStack::default(), A { inner: 42 }));
+        let module = ModuleContext::new_standalone("root".into());
+        module.upgrade_dummy(ModuleImpl::new(
+            ProcessingStack::default(),
+            Box::new(A { inner: 42 }),
+        ));
 
         assert!(module.try_as_ref::<i32>().is_none());
         assert!(module.try_as_mut::<i32>().is_none());

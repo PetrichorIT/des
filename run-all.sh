@@ -7,3 +7,4 @@ cargo run --release --example waiter
 cargo run --release --example multisim
 cargo run --release --example plugin
 cargo run --release --example ndl2
+cargo run --release --example time-division-multiplexing

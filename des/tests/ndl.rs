@@ -1,11 +1,8 @@
 use common::*;
+use des::net::ndl::lang::error;
 use des::{net::ndl::Ndl, prelude::*, registry};
-use des_net_utils::ndl::error;
 use serial_test::serial;
 use std::sync::atomic::{AtomicUsize, Ordering};
-
-#[path = "common/mock.rs"]
-mod mock;
 
 mod common {
     use des::prelude::*;
@@ -41,30 +38,33 @@ mod common {
                 self.delay.as_secs_f64()
             );
             if self.rem > 0 {
-                schedule_in(Message::default().kind(1), self.delay)
+                schedule_in(Message::default().with_kind(1), self.delay)
             }
         }
 
         fn handle_message(&mut self, msg: Message) {
-            match msg.header().kind {
+            match msg.header.kind {
                 1 => {
                     self.rem -= 1;
-                    send(Message::default().kind(2).id(self.dst as u16), "out");
+                    let _ = send(
+                        Message::default().with_kind(2).with_id(self.dst as u16),
+                        "out",
+                    );
 
                     if self.rem > 0 {
-                        schedule_in(Message::default().kind(1), self.delay)
+                        schedule_in(Message::default().with_kind(1), self.delay)
                     }
                 }
                 2 => {
                     if current().name().starts_with("node") {
-                        assert_eq!(format!("node[{}]", msg.header().id), current().name());
+                        assert_eq!(format!("node[{}]", msg.header.id), current().name());
                         self.rcv += 1;
                     }
                     if current().name().starts_with("ring") {
-                        if format!("ring[{}]", msg.header().id) == current().name() {
+                        if format!("ring[{}]", msg.header.id) == current().name() {
                             self.rcv += 1;
                         } else {
-                            send(msg, "out")
+                            let _ = send(msg, "out");
                         }
                     }
                 }
@@ -92,8 +92,8 @@ mod common {
     pub struct Router;
     impl Module for Router {
         fn handle_message(&mut self, msg: Message) {
-            let g = current().gate("out", msg.header().id as usize).unwrap();
-            send(msg, g);
+            let g = current().gate(("out", msg.header.id as usize)).unwrap();
+            let _ = send(msg, g);
         }
     }
 }
@@ -124,8 +124,6 @@ fn small_network() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 #[serial]
 fn ring_topology() -> Result<(), Box<dyn std::error::Error>> {
-    // Logger::new().set_logger();
-
     let mut app = Sim::new(());
     app.include_cfg(include_str!("ndl/ring_topo/main.par.yml"));
     app.node(
@@ -150,11 +148,13 @@ struct Single;
 
 impl RegistryCreatable for Single {
     fn create(_path: &ObjectPath, _: &str) -> Self {
-        assert!(current()
-            .prop::<Option<IpAddr>>("addr")
-            .unwrap()
-            .get()
-            .is_some());
+        assert!(
+            current()
+                .prop::<Option<IpAddr>>("addr")
+                .unwrap()
+                .get()
+                .is_some()
+        );
         Self
     }
 }
@@ -253,7 +253,7 @@ fn registry_custom_resolver() -> Result<(), Box<dyn std::error::Error>> {
 struct Sender;
 impl Module for Sender {
     fn at_sim_start(&mut self, _stage: usize) {
-        send(Message::default(), "port")
+        let _ = send(Message::default(), "port");
     }
 }
 

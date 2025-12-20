@@ -1,4 +1,8 @@
-use crate::net::{buf_drop, buf_init, module::module_ctx_drop, Globals};
+use crate::net::{
+    Globals,
+    module::module_ctx_drop,
+    runtime::{buf_drop, buf_init},
+};
 use std::sync::{Mutex, MutexGuard, TryLockError, Weak};
 
 static GUARD: Mutex<()> = Mutex::new(());

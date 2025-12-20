@@ -13,7 +13,7 @@
 //! include `tokio` as a dependency.
 
 use des::{
-    net::blocks::{self, ModuleBlock},
+    net::{IntoModuleTree, handlers},
     prelude::*,
     time,
 };
@@ -42,13 +42,13 @@ const PONG: MessageKind = 2;
 // APIs like `tokio::time` or `tokio::net` cannot be used, because these types are working with real OS sockets or clocks
 // not simulated ones in the simulation fabric.
 
-fn ponger() -> impl ModuleBlock {
-    blocks::AsyncFn::new(|mut rx| async move {
+fn ponger() -> impl IntoModuleTree {
+    handlers::AsyncHandler::new(|mut rx| async move {
         let mut pongs_received = 0;
         while let Some(msg) = rx.recv().await {
-            assert_eq!(msg.header().kind, PING);
+            assert_eq!(msg.header.kind, PING);
             pongs_received += 1;
-            send(Message::default().kind(PONG), "port");
+            let _ = send(Message::default().with_kind(PONG), "port");
         }
 
         assert_eq!(pongs_received, 30);
@@ -66,13 +66,13 @@ fn build_network() -> Sim<()> {
     let ping_gate = sim.gate("pinger", "port");
     let pong_gate = sim.gate("ponger", "port");
 
-    let metrics = ChannelMetrics::new(
+    let metrics = DatarateChannelMetrics::new(
         8_000_000,
         Duration::from_millis(80),
         Duration::ZERO,
         ChannelDropBehaviour::Drop,
     );
-    ping_gate.connect(pong_gate, Some(Channel::new(metrics)));
+    ping_gate.connect_with(pong_gate, Some(DatarateChannel::new(metrics)));
 
     sim.freeze()
 }
@@ -97,7 +97,7 @@ impl Module for Pinger {
     fn at_sim_start(&mut self, _stage: usize) {
         let handle = tokio::spawn(async move {
             for _ in 0..30 {
-                send(Message::default().kind(PING), "port");
+                let _ = send(Message::default().with_kind(PING), "port");
                 time::sleep(Duration::from_secs(1)).await;
             }
         });
@@ -105,7 +105,7 @@ impl Module for Pinger {
     }
 
     fn handle_message(&mut self, msg: Message) {
-        assert_eq!(msg.header().kind, PONG);
+        assert_eq!(msg.header.kind, PONG);
         self.pongs_received += 1;
     }
 

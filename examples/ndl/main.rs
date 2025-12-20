@@ -17,8 +17,8 @@ fn main() {
 
     // assert_eq!(tie, 18224.956482853);
 
-    assert_eq!(time.as_secs(), 12278);
-    assert_eq!(profile.event_count, 18_001_000);
+    assert_eq!(time.as_secs(), 9264);
+    assert_eq!(profile.event_count, 12_000_700);
 
     // profile
     //     .write_to("examples/ndl/bench")

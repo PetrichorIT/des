@@ -1,35 +1,30 @@
-use blocks::ModuleBlock;
-use des_net_utils::props::Cfg;
-use serde_yml::{from_str, Value};
-
 use crate::{
     net::{
-        module::{try_current, ModuleContext, ModuleExt, MOD_CTX},
+        module::{Cfg, DummyModule, MOD_CTX, Props, UnwindBehaviour, try_current},
         processing::ProcessingStack,
-        topology::Topology,
     },
     prelude::{Application, EventLifecycle, GateRef, Module, ModuleRef, ObjectPath, Runtime},
     runtime::RuntimeError,
     time::SimTime,
-    tracing::{enter_scope, leave_scope},
 };
+use serde_norway::{Value, from_str};
 use std::{
     fmt::Debug,
     fs, io, mem,
     ops::{self, Deref, DerefMut},
-    panic::{set_hook, take_hook, PanicHookInfo},
+    panic::{PanicHookInfo, set_hook, take_hook},
     path::Path,
     sync::{Arc, Mutex},
 };
 
+mod cfg;
+pub(crate) use cfg::SimConfiguration;
+
 mod api;
-pub use self::api::*;
+pub use self::api::{fail, globals, schedule_event};
 
 mod events;
-pub(crate) use self::events::*;
-
-#[cfg(feature = "async")]
-pub use self::events::JoinError;
+pub use self::events::*;
 
 mod ctx;
 pub(crate) use self::ctx::*;
@@ -37,11 +32,10 @@ pub(crate) use self::ctx::*;
 mod guard;
 use guard::SimStaticsGuard;
 
-pub mod blocks;
+pub mod handlers;
 
-mod unwind;
-use self::unwind::Harness;
-pub use self::unwind::PanicError;
+mod spawner;
+pub use self::spawner::{Spawner, SpawnerKind};
 
 /// A networking simulation.
 ///
@@ -61,7 +55,7 @@ pub use self::unwind::PanicError;
 ///
 /// ```
 /// # use des::prelude::*;
-/// # use des::net::blocks::HandlerFn;
+/// # use des::net::handlers::HandlerFn;
 /// struct Inner;
 /// impl EventLifecycle<Sim<Inner>> for Inner {
 ///     fn at_sim_start(rt: &mut Runtime<Sim<Inner>>) {
@@ -98,55 +92,7 @@ pub struct Sim<A> {
 /// ```
 pub struct SimBuilder<A> {
     sim: Sim<A>,
-    pub(crate) stack: Box<dyn FnMut() -> ProcessingStack>,
-    pub(crate) cfgs: Vec<Cfg>,
-}
-
-/// A helper to manage a scoped part of a networking simulation,
-/// exclusivly used when building the simulation.
-///
-/// This type is helpful in combination with the trait [`ModuleBlock`]
-/// to create reproducable blocks of modules at different
-/// locations within the simulation.
-///
-/// This builder acts comparable to [`Sim`], but with an automatically
-/// applied path prefix, the `scope`.
-///
-/// # Examples
-///
-/// ```
-/// # use des::prelude::*;
-/// # use des::net::blocks::{ModuleBlock, ModuleFn, HandlerFn};
-/// struct LAN {}
-/// impl ModuleBlock for LAN {
-///     type Ret = ();
-///     fn build<A>(self, mut sim: SimBuilderScoped<'_, A>) {
-///         sim.root(HandlerFn::new(|_| {}));
-///         let gates = sim.gates("", "port", 5);
-///         for i in 0..5 {
-///             let host = format!("host-{i}");
-///             sim.node(&host, ModuleFn::new(
-///                 /* ... */
-///                 # || 123, |_, _| {}
-///             ));
-///             let gate = sim.gate(&host, "port");
-///             gate.connect(gates[i].clone(), None);
-///         }
-///     }
-/// }
-///
-/// let mut sim = Sim::new(());
-/// sim.node("google", LAN {});
-/// sim.node("microsoft", LAN {});
-/// sim.node("aws", HandlerFn::new(|_| {}));
-/// sim.node("aws.us-east", LAN {});
-///
-/// let _ = Builder::new().build(sim.freeze()).run();
-/// ```
-#[derive(Debug)]
-pub struct SimBuilderScoped<'a, A> {
-    pub(crate) base: &'a mut SimBuilder<A>,
-    pub(crate) scope: ObjectPath,
+    pub(crate) cfg: SimConfiguration,
 }
 
 impl<A> Sim<A> {
@@ -177,11 +123,13 @@ impl<A> Sim<A> {
     }
 
     /// Into Builder
-    pub fn into_builder(self, stack: impl FnMut() -> ProcessingStack + 'static) -> SimBuilder<A> {
+    pub fn into_builder(self, stack: impl Fn() -> ProcessingStack + 'static) -> SimBuilder<A> {
         SimBuilder {
             sim: self,
-            stack: Box::new(stack),
-            cfgs: Vec::new(),
+            cfg: SimConfiguration {
+                stack: Arc::new(stack),
+                default_unwind_behavior: UnwindBehaviour::default(),
+            },
         }
     }
 
@@ -233,9 +181,9 @@ impl<A> SimBuilder<A> {
     ///
     /// Note that this will only affect calls of `node` after
     /// this function was called.
-    pub fn set_stack<T: Into<ProcessingStack>>(&mut self, mut stack: impl FnMut() -> T + 'static) {
-        let boxed: Box<dyn FnMut() -> ProcessingStack> = Box::new(move || stack().into());
-        self.stack = boxed;
+    pub fn set_stack<T: Into<ProcessingStack>>(&mut self, stack: impl Fn() -> T + 'static) {
+        let boxed: Arc<dyn Fn() -> ProcessingStack + 'static> = Arc::new(move || stack().into());
+        self.cfg.stack = boxed;
     }
 
     /// Sets the default processing stack for the simulation.
@@ -243,12 +191,27 @@ impl<A> SimBuilder<A> {
     /// Note that this will only affect calls of `node` after
     /// this function was called.
     #[must_use]
-    pub fn with_stack<T: Into<ProcessingStack>>(
-        mut self,
-        stack: impl FnMut() -> T + 'static,
-    ) -> Self {
+    pub fn with_stack<T: Into<ProcessingStack>>(mut self, stack: impl Fn() -> T + 'static) -> Self {
         self.set_stack(stack);
         self
+    }
+
+    /// Sets the default unwind behavior for the simulation.
+    ///
+    /// Note that this will only affect calls of `node` after
+    /// this function was called.
+    #[must_use]
+    pub fn with_default_unwind_behavior(mut self, behavior: UnwindBehaviour) -> Self {
+        self.set_default_unwind_behavior(behavior);
+        self
+    }
+
+    /// Sets the default processing stack for the simulation.
+    ///
+    /// Note that this will only affect calls of `node` after
+    /// this function was called.
+    pub fn set_default_unwind_behavior(&mut self, behavior: UnwindBehaviour) {
+        self.cfg.default_unwind_behavior = behavior;
     }
 
     /// Includes raw parameter defintions in the simulation.
@@ -261,7 +224,7 @@ impl<A> SimBuilder<A> {
     ///
     /// ```
     /// # use des::prelude::*;
-    /// # use des::net::blocks::ModuleFn;
+    /// # use des::net::handlers::ModuleFn;
     /// use std::net::IpAddr;
     ///
     /// let mut sim = Sim::new(());
@@ -295,7 +258,7 @@ impl<A> SimBuilder<A> {
                 }
             });
 
-            self.cfgs.push(cfg);
+            self.globals.add_cfg(cfg);
         }
     }
 
@@ -337,7 +300,7 @@ impl<A> SimBuilder<A> {
     /// let a = sim.gate("alice", "in");
     /// let b = sim.gate("bob", "out");
     ///
-    /// b.connect(a, None);
+    /// b.connect(a);
     ///
     /// let _ = Builder::new().build(sim.freeze()).run();
     /// ```
@@ -345,12 +308,13 @@ impl<A> SimBuilder<A> {
     /// # Panics
     ///
     /// This function panic if node modules exists at `path`.
+    #[track_caller]
     pub fn gate(&mut self, path: impl Into<ObjectPath>, gate: &str) -> GateRef {
         let path = path.into();
         let Some(module) = self.get(&path) else {
             panic!("cannot create gate '{path}.{gate}', because node '{path}' does not exist")
         };
-        if let Some(gate) = module.gate(gate, 0) {
+        if let Some(gate) = module.gate((gate, 0)) {
             gate
         } else {
             module.create_gate(gate)
@@ -374,7 +338,7 @@ impl<A> SimBuilder<A> {
         };
         let mut gates = Vec::new();
         for k in 0..size {
-            if let Some(gate) = module.gate(gate, k) {
+            if let Some(gate) = module.gate((gate, k)) {
                 gates.push(gate);
             } else {
                 break;
@@ -406,9 +370,9 @@ impl<A> SimBuilder<A> {
     /// Custom implementations of `ModuleBlock` can not only create modules based
     /// on config data, but also gates and connections between these modules. Note
     /// that `ModuleBlock::build` is confined to the scope defined by `path`, since
-    /// it uses a [`SimBuilderScoped`] builder.
+    /// it uses a [`Spawner`] builder.
     ///
-    /// See [`SimBuilderScoped`] for more information.
+    /// See [`Spawner`] for more information.
     ///
     /// # Examples
     ///
@@ -428,54 +392,18 @@ impl<A> SimBuilder<A> {
     ///
     /// let _ = Builder::new().build(sim.freeze()).run();
     /// ```
-    pub fn node<M: ModuleBlock>(&mut self, path: impl Into<ObjectPath>, module_block: M) -> M::Ret {
-        let scoped = SimBuilderScoped::new(self, path.into());
+    pub fn node<M: IntoModuleTree>(
+        &mut self,
+        path: impl Into<ObjectPath>,
+        module_block: M,
+    ) -> M::Ret {
+        let scoped = Spawner::new_at_buildtime(path.into(), self);
         module_block.build(scoped)
     }
 
     /// Returns the contained `Sim`, ending the building phase.
     pub fn freeze(self) -> Sim<A> {
         self.sim
-    }
-
-    pub(super) fn raw(&mut self, path: ObjectPath, module: impl Module) -> ModuleRef {
-        // Check dup
-        assert!(
-            self.get(&path).is_none(),
-            "cannot create node '{path}', node allready exists"
-        );
-
-        // Check node path location
-        let ctx = if let Some(parent) = path.nonzero_parent() {
-            // (a) Check that the parent exists
-            let Some(parent) = self.get(&parent) else {
-                panic!("cannot create node '{path}', since parent node '{parent}' is required, but does not exist");
-            };
-
-            ModuleContext::child_of(path.name(), parent)
-        } else {
-            ModuleContext::standalone(path)
-        };
-
-        // read in Props
-        let path_parts = ctx.path.as_str().split('.').collect::<Vec<_>>();
-        for cfg in &self.cfgs {
-            cfg.capture_for(&path_parts, &mut ctx.props.write());
-        }
-
-        ctx.activate();
-        let pe = module.to_processing_chain((self.stack)());
-        ctx.upgrade_dummy(pe);
-
-        let mut sink = Vec::new();
-        ctx.deactivate(&mut sink);
-        assert!(
-            sink.is_empty(),
-            "events cannot be dispatched in constructors"
-        );
-
-        self.with_modules_mut(|mods| mods.add(ctx.clone()));
-        ctx
     }
 }
 
@@ -498,61 +426,39 @@ impl<A> DerefMut for SimBuilder<A> {
     }
 }
 
-impl<'a, A> SimBuilderScoped<'a, A> {
-    pub(crate) fn new(base: &'a mut SimBuilder<A>, scope: ObjectPath) -> Self {
-        Self { base, scope }
-    }
+/// A trait that descibes that an object can be build into a tree of modules
+/// at a given scope within the simulation.
+///
+/// Types that implement `ModuleBlock` should be treated as builders for the actual
+/// block of modules. They can contain abitrary information that may be relevent to the
+/// build process of the actual modules within the block.
+///
+/// A module block can consist of either:
+/// - no module at all
+/// - on module specifically at the position defined by the scope
+/// - on module at the scope position, an more as direct or indirect children of the first module.
+///
+/// See [`Spawner`] for more information.
+pub trait IntoModuleTree {
+    /// The returns type of the build method. This will be returned by `Sim::node`
+    type Ret;
 
-    #[allow(unused)]
-    pub(crate) fn subscope(&mut self, path: impl AsRef<str>) -> SimBuilderScoped<'_, A> {
-        SimBuilderScoped {
-            base: &mut *self.base,
-            scope: self.scope.appended(path),
-        }
+    /// Build the described module block within the context of scoped part of
+    /// a simulation.
+    fn build<A>(self, spawner: Spawner<'_, A>) -> Self::Ret;
+}
+
+impl<M: Module> IntoModuleTree for M {
+    type Ret = ();
+    fn build<A>(self, mut spawner: Spawner<'_, A>) -> Self::Ret {
+        spawner.root(self);
     }
 }
 
-impl<A> SimBuilderScoped<'_, A> {
-    /// The current scope from an absoute prespective.
-    #[must_use]
-    pub fn scope(&self) -> &ObjectPath {
-        &self.scope
-    }
-
-    /// The inner application of the simulation `Sim<A>`.
-    #[must_use]
-    pub fn inner(&self) -> &A {
-        &self.base.inner
-    }
-
-    /// Sets the current scope module.
-    ///
-    /// This call is equivalent to `sim.node(scope, <module_block>)` on [`Sim`].
-    pub fn root(&mut self, module_block: impl Module) {
-        self.base.raw(self.scope.clone(), module_block);
-    }
-
-    /// Creates a module block within the current scope.
-    ///
-    /// See [`SimBuilder::node`] for more information.
-    pub fn node(&mut self, path: impl Into<ObjectPath>, module_block: impl ModuleBlock) {
-        self.base
-            .node(self.scope.appended(path.into().as_str()), module_block);
-    }
-
-    /// Creates a gate on an existing node within the current scope.
-    ///
-    /// See [`SimBuilder::gate`] for more information.
-    pub fn gate(&mut self, path: impl Into<ObjectPath>, gate: &str) -> GateRef {
-        self.base.gate(self.scope.appended(path.into()), gate)
-    }
-
-    /// Creates a cluster gate on an existing node within the current scope.
-    ///
-    /// See [`SimBuilder::gates`] for more information.
-    pub fn gates(&mut self, path: impl Into<ObjectPath>, gate: &str, size: usize) -> Vec<GateRef> {
-        self.base
-            .gates(self.scope.appended(path.into()), gate, size)
+impl IntoModuleTree for () {
+    type Ret = ();
+    fn build<A>(self, mut spawner: Spawner<'_, A>) -> Self::Ret {
+        spawner.root(DummyModule);
     }
 }
 
@@ -605,20 +511,18 @@ where
             for module in mods {
                 // Use cloned handles to appease the brwchk
                 if stage < module.num_sim_start_stages() {
-                    module.activate();
+                    let _ = module.activate();
 
                     #[cfg(feature = "tracing")]
                     tracing::info!("Calling at_sim_start({}).", stage);
 
                     rt.app.error.extend(module.at_sim_start(stage).err());
-                    module.deactivate(rt);
+                    module.deactivate();
 
-                    super::buf_process(&module, rt);
+                    super::runtime::buf_process(&module, rt);
                 }
             }
         }
-
-        leave_scope();
 
         A::at_sim_start(rt);
     }
@@ -642,24 +546,25 @@ where
             .cloned()
             .collect::<Vec<_>>();
         for module in mods {
-            enter_scope(module.scope_token());
-
             #[cfg(feature = "tracing")]
             tracing::info!("Calling 'at_sim_end'");
-            module.activate();
+            let _ = module.activate();
             let _ = module.at_sim_end().map_err(|e| error.merge(e));
-            module.deactivate(rt);
+            module.deactivate();
 
             // NOTE: no buf_process since no furthe events will be processed.
         }
 
         let _ = take_hook();
-        leave_scope();
-        if error.is_empty() {
-            Ok(())
-        } else {
-            Err(error)
-        }
+        if error.is_empty() { Ok(()) } else { Err(error) }
+    }
+
+    #[inline]
+    fn sim_should_stop(runtime: &Runtime<Sim<A>>) -> bool
+    where
+        Sim<A>: Application,
+    {
+        !runtime.app.error.is_empty()
     }
 }
 
@@ -699,6 +604,7 @@ fn panic_hook(info: &PanicHookInfo) {
 #[derive(Debug, Default)]
 pub struct Globals {
     pub(crate) modules: Arc<Mutex<ModuleTree>>,
+    pub(crate) cfgs: Arc<Mutex<Vec<Cfg>>>,
 }
 
 impl Globals {
@@ -706,17 +612,26 @@ impl Globals {
         f(&self.modules.lock().expect("failed"))
     }
 
-    /// Extracts topology information from the runtime
-    #[must_use]
-    pub fn topology(&self) -> Topology<(), ()> {
-        self.with(|mods| Topology::from_modules(mods))
-    }
-
     /// Returns a handle to a module from the global scope.
     /// This can be used to access arbitrary modules, independent of the current execution context.
     #[must_use]
     pub fn get(&self, path: &ObjectPath) -> Option<ModuleRef> {
         self.with(|mods| mods.get(path))
+    }
+
+    pub(crate) fn add_module(&self, module: ModuleRef) {
+        self.modules.lock().expect("failed").add(module);
+    }
+
+    pub(crate) fn add_cfg(&self, cfg: Cfg) {
+        self.cfgs.lock().expect("failed").push(cfg);
+    }
+
+    pub(crate) fn capture_for(&self, path_parts: &[&str], props: &mut Props) {
+        let lock = self.cfgs.lock().expect("failed");
+        for cfg in &*lock {
+            cfg.capture_for(path_parts, props);
+        }
     }
 }
 
@@ -743,7 +658,10 @@ impl ModuleTree {
 
                 // search for parent insert at last possible position
                 let Some(mut pos) = self.modules.iter().rposition(|m| m.path == parent) else {
-                    panic!("cannot create node '{}', since parent node '{parent}' is required, but does not exist", module.path)
+                    panic!(
+                        "cannot create node '{}', since parent node '{parent}' is required, but does not exist",
+                        module.path
+                    )
                 };
                 pos += 1;
 
@@ -770,12 +688,13 @@ impl ops::Deref for ModuleTree {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::net::module::ModuleContext;
 
     #[test]
     fn module_tree() {
         let mut tree = ModuleTree::default();
         fn module(path: &str) -> ModuleRef {
-            ModuleContext::standalone(path.into())
+            ModuleContext::new_standalone(path.into())
         }
 
         tree.add(module("alice"));

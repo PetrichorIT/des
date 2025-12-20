@@ -1,27 +1,14 @@
 use des::{
     net::{
-        blocks::{AsyncFn, HandlerFn},
-        globals,
+        fail, globals,
+        handlers::{AsyncHandler, ModuleFn},
     },
     prelude::*,
 };
 use serial_test::serial;
 
-#[derive(Default)]
-struct Receiver {
-    counter: usize,
-}
-
-impl Module for Receiver {
-    fn handle_message(&mut self, _msg: Message) {
-        self.counter += 1;
-    }
-
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
-        assert_eq!(self.counter, 10);
-        Ok(())
-    }
-}
+mod common;
+pub use common::*;
 
 #[derive(Default)]
 struct Sender;
@@ -29,8 +16,8 @@ struct Sender;
 impl Module for Sender {
     fn at_sim_start(&mut self, _stage: usize) {
         for i in 0..10 {
-            send_in(
-                Message::default().id(i as u16),
+            let _ = send_in(
+                Message::default().with_id(i as u16),
                 ("port", 0),
                 Duration::from_secs(i),
             );
@@ -43,15 +30,15 @@ impl Module for Sender {
 fn connectivity() {
     let mut app = Sim::new(());
 
-    app.node("rx", Receiver::default());
+    app.node("rx", ExpectNMessage(10));
     app.node("tx", Sender::default());
 
     let rx = app.gate("rx", "port");
     let tx = app.gate("tx", "port");
 
-    rx.connect(
+    rx.connect_with(
         tx,
-        Some(Channel::new(ChannelMetrics {
+        Some(DatarateChannel::new(DatarateChannelMetrics {
             bitrate: 10000,
             latency: Duration::from_millis(100),
             jitter: Duration::ZERO,
@@ -68,14 +55,14 @@ fn connectivity() {
 fn select_node_from_globals() -> Result<(), RuntimeError> {
     let mut sim = Sim::new(());
 
-    sim.node("alice", HandlerFn::new(|_| {}));
-    sim.node("alice.submodule", HandlerFn::new(|_| {}));
-    sim.node("alice.submodule.child", HandlerFn::new(|_| {}));
-    sim.node("bob", HandlerFn::new(|_| {}));
+    sim.node("alice", NopModule);
+    sim.node("alice.submodule", NopModule);
+    sim.node("alice.submodule.child", NopModule);
+    sim.node("bob", NopModule);
 
     sim.node(
         "tester",
-        AsyncFn::io(|_| async move {
+        AsyncHandler::io(|_| async move {
             assert_eq!(
                 globals().get(&"alice".into()).unwrap().path(),
                 "alice".into()
@@ -100,4 +87,140 @@ fn select_node_from_globals() -> Result<(), RuntimeError> {
     );
 
     Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
+}
+
+#[test]
+#[serial]
+fn can_access_foreign_module_context() -> Result<(), RuntimeError> {
+    let mut sim = Sim::new(());
+
+    struct Alice;
+    impl Module for Alice {
+        fn at_sim_start(&mut self, _: usize) {
+            current().prop::<String>("key").unwrap().set("value".into());
+        }
+
+        fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+            assert_eq!(
+                current().prop::<String>("key").unwrap().get(),
+                Some("new_value".into())
+            );
+            Ok(())
+        }
+    }
+
+    struct Bob;
+    impl Module for Bob {
+        fn num_sim_start_stages(&self) -> usize {
+            2
+        }
+
+        fn at_sim_start(&mut self, s: usize) {
+            if s == 0 {
+                return;
+            }
+            let gate = current().gate("port").expect("local port must exist");
+            let other = gate.path_end().expect("other module must exist").owner();
+
+            // Gate parsing works just fine with IntoModuleGate
+            let _ = other
+                .gate("other-port")
+                .expect("other port must exist and be resolved with the correct path");
+
+            // simple data acces
+            assert_eq!(other.gates().len(), 2);
+            assert_eq!(other.path(), "alice".into());
+
+            // prop access
+            let mut prop = other.prop::<String>("key").unwrap();
+            assert_eq!(prop.get(), Some("value".into()));
+            prop.set("new_value".into());
+            assert_eq!(prop.get(), Some("new_value".into()));
+
+            // active
+            assert!(!other.is_currently_active());
+            assert!(current().is_currently_active());
+        }
+    }
+
+    sim.node("alice", Alice);
+    sim.node("bob", Bob);
+
+    sim.gate("alice", "port").connect(sim.gate("bob", "port"));
+    let _ = sim.gate("alice", "other-port");
+
+    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
+}
+
+#[test]
+#[serial]
+fn custom_fail() {
+    let mut sim = Sim::new(());
+    sim.node(
+        "alice",
+        ModuleFn::new(
+            || schedule_at(Message::default(), 1.0.into()),
+            |_, _| {
+                fail(std::io::Error::other("failed because i like to"));
+            },
+        ),
+    );
+
+    let err = Builder::seeded(123)
+        .build(sim.freeze())
+        .run()
+        .err()
+        .expect("expected an error");
+
+    assert_eq!(err[0].to_string(), "failed because i like to");
+}
+
+#[test]
+#[serial]
+fn gate_disconnect() -> Result<(), RuntimeError> {
+    let mut sim = Sim::new(());
+    sim.node(
+        "alice",
+        AsyncHandler::new(|_| async move {
+            for _ in 0..5 {
+                let _ = send(Message::default(), "a");
+            }
+
+            let gate = current().gate("a").unwrap();
+
+            let peer = gate.next_gate().unwrap();
+            gate.clone().disconnect(&peer);
+
+            let _ = send(Message::default(), "a");
+
+            let other = globals().get(&"charlie".into()).unwrap().gate("c").unwrap();
+            gate.connect(other);
+
+            for _ in 0..7 {
+                let _ = send(Message::default(), "a");
+            }
+        }),
+    );
+    sim.node("bob", ExpectNMessage(5));
+    sim.node("charlie", ExpectNMessage(7));
+
+    let a = sim.gate("alice", "a");
+    let b = sim.gate("bob", "b");
+    let _c = sim.gate("charlie", "c");
+
+    a.connect(b);
+
+    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
+}
+
+#[test]
+#[serial]
+#[should_panic = "cannot disconnect two unconnected gates"]
+fn gate_disconnect_panic_at_unconnected() {
+    let mut sim = Sim::new(());
+    sim.node("alice", NopModule);
+    let a = sim.gate("alice", "a");
+    let b = sim.gate("alice", "b");
+
+    a.disconnect(&b);
 }

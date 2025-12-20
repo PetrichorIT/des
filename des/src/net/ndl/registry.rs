@@ -1,10 +1,6 @@
 use std::{fmt, marker::PhantomData};
 
-use crate::net::{
-    module::{Module, ModuleExt},
-    processing::{ProcessingStack, Processor},
-    ObjectPath,
-};
+use crate::net::{ObjectPath, module::Module};
 
 /// A type that can be created based on the nodes path and a
 /// NDL symbol.
@@ -144,13 +140,8 @@ impl Registry<EmptyLayer> {
 }
 
 impl<L: Layer> Registry<L> {
-    pub(super) fn resolve(
-        &mut self,
-        path: &ObjectPath,
-        symbol: &str,
-        stack: &mut dyn FnMut() -> ProcessingStack,
-    ) -> Option<Processor> {
-        self.layer.resolve(path, symbol, stack)
+    pub(super) fn resolve(&mut self, path: &ObjectPath, symbol: &str) -> Option<Box<dyn Module>> {
+        self.layer.resolve(path, symbol)
     }
 
     /// Adds a symbol mapping to the registry.
@@ -379,12 +370,7 @@ impl<L: Layer> fmt::Debug for Registry<L> {
 pub trait Layer {
     const FINAL: bool = false;
     #[doc(hidden)]
-    fn resolve(
-        &mut self,
-        _path: &ObjectPath,
-        _symbol: &str,
-        _stack: &mut dyn FnMut() -> ProcessingStack,
-    ) -> Option<Processor> {
+    fn resolve(&mut self, _path: &ObjectPath, _symbol: &str) -> Option<Box<dyn Module>> {
         None
     }
 }
@@ -397,19 +383,10 @@ where
     M::Target: Module,
     L: Layer,
 {
-    fn resolve(
-        &mut self,
-        path: &ObjectPath,
-        symbol: &str,
-        stack: &mut dyn FnMut() -> ProcessingStack,
-    ) -> Option<Processor> {
-        self.inner.resolve(path, symbol, stack).or_else(|| {
+    fn resolve(&mut self, path: &ObjectPath, symbol: &str) -> Option<Box<dyn Module>> {
+        self.inner.resolve(path, symbol).or_else(|| {
             if symbol == self.ty {
-                Some(
-                    self.factory
-                        .create_inner(path, symbol)
-                        .to_processing_chain(stack()),
-                )
+                Some(Box::new(self.factory.create_inner(path, symbol)))
             } else {
                 None
             }
@@ -424,16 +401,11 @@ where
     L: Layer,
 {
     const FINAL: bool = true;
-    fn resolve(
-        &mut self,
-        path: &ObjectPath,
-        symbol: &str,
-        stack: &mut dyn FnMut() -> ProcessingStack,
-    ) -> Option<Processor> {
+    fn resolve(&mut self, path: &ObjectPath, symbol: &str) -> Option<Box<dyn Module>> {
         Some(
             self.inner
-                .resolve(path, symbol, stack)
-                .unwrap_or_else(|| (self.f)().to_processing_chain(stack())),
+                .resolve(path, symbol)
+                .unwrap_or_else(|| Box::new((self.f)())),
         )
     }
 }

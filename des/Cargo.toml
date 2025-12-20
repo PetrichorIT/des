@@ -5,13 +5,13 @@ description = """
 A simulation backend for discrete event simulations, supporting
 simulation of asynchronous systems via tokio.
 """
-edition = "2021"
+edition = "2024"
 keywords = ["async", "simulation", "tokio", "net"]
 license = "MIT"
 name = "des"
 readme = "../README.md"
 repository = "https://github.com/PetrichorIT/des"
-version = "0.6.0"
+version = "0.6.2"
 
 [features]
 # Include nothing by default
@@ -24,8 +24,7 @@ serde = ["dep:serde"]
 macros = ["dep:des-macros", "dep:futures"]
 async = ["net", "dep:tokio"]
 cqueue = ["dep:des-cqueue"]
-multi-threaded = []
-net = ["dep:des-macros", "dep:des-net-utils", "serde", "dep:serde_yml"]
+net = ["dep:des-macros", "dep:des-sync-utils", "serde", "dep:serde_norway"]
 tracing = ["net"]
 
 miri = []
@@ -41,14 +40,14 @@ rand = { version = "*", features = ["std_rng"] }
 # due to issues like #8
 spin = { version = "*" }
 tracing = { version = "*" }
-tracing-subscriber = { version = "*", features = ["env-filter"] }
+tracing-subscriber = { version = "^0.3.20", features = ["env-filter"] }
 nu-ansi-term = "*"
 fxhash = "0.2"
 pin-project-lite = "0.2"
 
 # All other dependencies are optional
 serde = { version = "*", optional = true, features = ["derive"] }
-serde_yml = { version = "*", optional = true }
+serde_norway = { version = "*", optional = true }
 tokio = { version = "*", features = [
     "rt",
     "sync",
@@ -59,11 +58,16 @@ futures = { version = "*", optional = true }
 
 des-cqueue = { path = "../des-cqueue", optional = true }
 des-macros = { path = "../des-macros", optional = true }
-des-net-utils = { path = "../des-net-utils", optional = true }
+des-sync-utils = { path = "../des-sync-utils", optional = true }
+tracing-error = "0.2.1"
+petgraph = "0.8.3"
+
 
 [dev-dependencies]
 futures = "0.3"
 serial_test = "3.1.1"
+serde_json = "1.0"
+serde_test = "1.0"
 
 [package.metadata.docs.rs]
 all-features = true

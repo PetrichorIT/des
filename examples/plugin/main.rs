@@ -1,18 +1,36 @@
-use des::{prelude::*, registry};
+use des::{net::Error, prelude::*, registry};
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct A {}
+
+impl A {
+    #[tracing::instrument]
+    fn method_one(&mut self, value: i32) -> Result<(), Error> {
+        self.method_two()?;
+        Ok(())
+    }
+
+    #[tracing::instrument]
+    fn method_two(&mut self) -> Result<(), Error> {
+        Err(Error::new(current().path(), des::net::ErrorKind::Other))
+    }
+}
 
 impl Module for A {
     fn at_sim_start(&mut self, _stage: usize) {
-        send(Message::default().with_content(42), "out");
-        send(Message::default().with_content(69), "out");
+        let _ = send(Message::default().with_content(42), "out");
+        let _ = send(Message::default().with_content(69), "out");
     }
 
     fn handle_message(&mut self, msg: Message) {
         let span = ::tracing::span!(::tracing::Level::INFO, "a-recv", age = 2, size = 3);
         let _g = span.enter();
-        tracing::info!("recv: {} {}", msg, msg.content::<i32>())
+        tracing::info!("recv: {} {}", msg, msg.body.content::<i32>());
+    }
+
+    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+        self.method_one(123)?;
+        Ok(())
     }
 }
 
@@ -21,7 +39,7 @@ struct B {}
 
 impl Module for B {
     fn handle_message(&mut self, msg: Message) {
-        send(msg, "out")
+        let _ = send(msg, "out");
     }
 }
 
@@ -29,7 +47,7 @@ impl Module for B {
 struct Main;
 impl Module for Main {}
 
-fn main() {
+fn main() -> Result<(), RuntimeError> {
     // Logger::new().set_logger();
     // tracing_subscriber::fmt()
     //     .with_max_level(LevelFilter::TRACE)
@@ -41,5 +59,5 @@ fn main() {
 
     let app = Sim::ndl("examples/plugin/main.yml", registry![A, B, Main]).unwrap();
     let rt = Builder::new().build(app.freeze());
-    let _res = rt.run();
+    rt.run().map(|_| ())
 }
