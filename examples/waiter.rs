@@ -164,6 +164,6 @@ fn main() {
     let dur = Duration::from_secs_f64(expdist(&mut rt, l));
     rt.add_event_in(Events::CustomerArrival(CustomerArrival { idx: 0 }), dur);
 
-    let r = rt.run().unwrap_no_err();
+    let r = rt.run().assert_no_err();
     r.app.eval(r.time);
 }

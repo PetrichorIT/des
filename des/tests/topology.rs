@@ -9,7 +9,7 @@ fn main() {
         .map_err(|e| println!("{e}"))
         .unwrap();
     let rt = Builder::new().build(app.freeze());
-    let app = rt.run().unwrap_no_err().app;
+    let app = rt.run().assert_no_err().app;
     let topo = app.globals().topology();
 
     let connected = dbg!(tarjan_scc(&topo)).len() == 1;

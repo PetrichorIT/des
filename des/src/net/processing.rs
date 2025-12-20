@@ -413,6 +413,10 @@ cfg_async! {
         }
 
         /// Check for panics in the runtime.
+        ///
+        /// # Errors
+        ///
+        /// Returns an error if any of the join handles panicked or a must-join failed to join.
         pub fn check_for_panics(&mut self) -> Result<(), RuntimeError> {
             if self.handles.is_empty() {
                 return Ok(());

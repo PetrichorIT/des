@@ -196,14 +196,14 @@ impl ModuleRef {
 
             let _ = ModuleContext::take();
 
-            match err {
+            return match err {
                 Some(err) => Err(err),
                 None => Ok(()),
-            }
-        } else {
-            let _ = ModuleContext::take();
-            Ok(())
+            };
         }
+
+        let _ = ModuleContext::take();
+        Ok(())
     }
 
     /// Creates a gate on the current module, returning its ID.

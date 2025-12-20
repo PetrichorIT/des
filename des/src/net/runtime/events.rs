@@ -168,6 +168,7 @@ impl MessageExitingConnection {
 }
 
 impl MessageExitingConnection {
+    #[allow(clippy::unnecessary_wraps)]
     fn handle<A>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError>
     where
         A: EventLifecycle<Sim<A>>,
@@ -366,6 +367,7 @@ pub struct ChannelUnbusyNotif {
 }
 
 impl ChannelUnbusyNotif {
+    #[allow(clippy::unnecessary_wraps)]
     fn handle<A>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError>
     where
         A: EventLifecycle<Sim<A>>,

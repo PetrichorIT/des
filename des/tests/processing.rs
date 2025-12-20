@@ -47,7 +47,7 @@ fn plugin_raw_creation() {
     app.node("root", PluginCreation::default());
 
     let rt = Builder::seeded(123).build(app.freeze());
-    let result = rt.run().unwrap_no_err();
+    let result = rt.run().assert_no_err();
 
     assert_eq!(result.time, SimTime::from_duration(Duration::from_secs(99)));
     assert_eq!(result.profiler.event_count, 101); // (+1 start signal)
@@ -114,7 +114,7 @@ fn plugin_priority_defer() {
     app.node("root", PluginPriorityDefer::default());
 
     let rt = Builder::seeded(123).build(app.freeze());
-    let result = rt.run().unwrap_no_err();
+    let result = rt.run().assert_no_err();
 
     assert_eq!(result.time, 99.0);
     assert_eq!(result.profiler.event_count, 101); // (+1 start signal)
@@ -182,7 +182,7 @@ fn plugin_shutdown_non_persistent_data() {
     let rt = Builder::seeded(123).build(app.freeze());
 
     let res = rt.run();
-    let _res = res.unwrap_no_err();
+    let _res = res.assert_no_err();
 }
 
 #[test]

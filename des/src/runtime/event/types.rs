@@ -38,6 +38,9 @@ where
     /// but could lead to unexpected behaviour if not done properly in custom
     /// event set implementations.
     ///
+    /// # Errors
+    ///
+    /// This function may return an error that will in turn stop the simulation.
     fn handle(self, runtime: &mut Runtime<App>) -> Result<(), RuntimeError>;
 }
 
@@ -71,6 +74,9 @@ pub trait EventLifecycle<A = Self> {
     /// }
     /// ```
     ///
+    /// # Errors
+    ///
+    /// This function may return an error that will in turn stop the simulation startup.
     #[allow(unused_variables)]
     fn at_sim_start(runtime: &mut Runtime<A>) -> Result<(), RuntimeError>
     where

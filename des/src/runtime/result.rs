@@ -26,10 +26,16 @@ impl<A: Application> RuntimeResult<A> {
         }
     }
 
+    /// Asserts that no errors occurred during simulation.
     ///
-    pub fn unwrap_no_err(self) -> Self {
+    /// # Panics
+    ///
+    /// Panics if any errors occurred during simulation.
+    #[track_caller]
+    #[must_use]
+    pub fn assert_no_err(self) -> Self {
         if let Some(error) = self.error {
-            panic!("unwraped with errors: {}", error);
+            panic!("unwraped with errors: {error}");
         }
         self
     }
@@ -37,6 +43,10 @@ impl<A: Application> RuntimeResult<A> {
 
 impl<A: Application> RuntimeResult<A> {
     /// Returns an Err variant if some error occurred during simulation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any errors occurred during simulation.
     pub fn as_result(mut self) -> Result<RuntimeResult<A>, RuntimeError> {
         match self.error.take() {
             None => Ok(self),

@@ -13,7 +13,7 @@ fn main() {
 
     let rt = Builder::seeded(0x123).build(app.freeze());
 
-    let r = rt.run().unwrap_no_err();
+    let r = rt.run().assert_no_err();
 
     // assert_eq!(tie, 18224.956482853);
 

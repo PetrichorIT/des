@@ -234,7 +234,7 @@ fn simplex_shared_domain() {
     let rt = Builder::seeded(123)
         .build(sim.freeze())
         .run()
-        .unwrap_no_err();
+        .assert_no_err();
 
     //
     assert_eq!(rt.profiler.event_count, 130);
@@ -286,7 +286,7 @@ fn duplex_shared_domain() {
     let rt = Builder::seeded(123)
         .build(sim.freeze())
         .run()
-        .unwrap_no_err();
+        .assert_no_err();
 
     // 50 messages over datarate channel with infinite buffer
     // - 50 handle message events
@@ -396,7 +396,7 @@ fn datarate_channel_can_send_at_tft_independent_of_event_order() {
     let _ = Builder::seeded(123)
         .build(sim.freeze())
         .run()
-        .unwrap_no_err();
+        .assert_no_err();
 }
 
 #[derive(Debug, Clone, Default)]

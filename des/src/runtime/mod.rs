@@ -287,6 +287,10 @@ where
     /// of start, tick and finish to complete a full execution cycle.
     ///
     /// `start` must be called before any calls to the main loop.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any errors occurred during simulation startup.
     pub fn start(&mut self) -> Result<(), RuntimeError> {
         macro_rules! symbol {
             ($i:ident) => {
@@ -324,6 +328,10 @@ where
 
     /// Executes the next n events in the runtime queue.
     ///
+    /// # Errors
+    ///
+    /// Returns an error if any errors occurred during event execution.
+    ///
     /// # Panics
     ///
     /// This function panics if the simulation has not been started.
@@ -343,6 +351,11 @@ where
     }
 
     /// Executes runtime events until the runtime reaches the designated time
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any errors occurred during event
+    ///
     /// # Panics
     ///
     /// This function panics if the simulation has not been started.
@@ -362,6 +375,10 @@ where
     }
 
     /// Executes runtime events until the runtime reaches the designated time
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any errors occurred during event
     ///
     /// # Panics
     ///

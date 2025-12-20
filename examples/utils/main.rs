@@ -52,7 +52,7 @@ fn main() -> std::io::Result<()> {
     app.include_cfg(CFG);
 
     let rt = Builder::seeded(0x123).quiet().build(app.freeze());
-    let r = rt.run().unwrap_no_err();
+    let r = rt.run().assert_no_err();
 
     let topo = r.app.globals().topology();
 

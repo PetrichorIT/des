@@ -297,7 +297,8 @@ cfg_async! {
             self
         }
 
-        /// Does things once
+        /// Does things once.
+        #[allow(clippy::missing_panics_doc)]
         pub fn once<Once, Fut>(once: Once) -> Self
         where
             Once: FnOnce(Receiver<Message>) -> Fut,

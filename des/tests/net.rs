@@ -48,7 +48,7 @@ fn connectivity() {
     );
 
     let app = Builder::seeded(123).build(app.freeze());
-    let _ = app.run().unwrap_no_err();
+    let _ = app.run().assert_no_err();
 }
 
 #[test]

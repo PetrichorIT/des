@@ -77,7 +77,7 @@ fn stateless_module_shudown() {
         SimTime::from_duration(Duration::from_secs(10)),
     );
 
-    let _ = rt.run().unwrap_no_err();
+    let _ = rt.run().assert_no_err();
     assert_eq!(DROPPED_STATELESS_SHUTDOWN.load(Ordering::SeqCst), 1)
 }
 
@@ -126,7 +126,7 @@ fn stateless_module_restart() {
         SimTime::from_duration(Duration::from_secs(30)),
     );
 
-    let _ = rt.run().unwrap_no_err();
+    let _ = rt.run().assert_no_err();
     assert_eq!(DROPPED_STATLESS_RESTART.load(Ordering::SeqCst), 2)
 }
 
@@ -189,7 +189,7 @@ fn statefull_module_restart() {
         SimTime::from_duration(Duration::from_secs(30)),
     );
 
-    let _ = rt.run().unwrap_no_err();
+    let _ = rt.run().assert_no_err();
     assert_eq!(DROPPED_STATFULL_RESTART.load(Ordering::SeqCst), 2);
 }
 
@@ -221,7 +221,7 @@ fn shutdown_via_async_handle() {
 
     let rt = Builder::seeded(123).build(rt.freeze());
 
-    let _ = rt.run().unwrap_no_err();
+    let _ = rt.run().assert_no_err();
     assert_eq!(DROPPED_SHUTDOWN_VIA_HANDLE.load(Ordering::SeqCst), 1)
 }
 
@@ -261,7 +261,7 @@ fn restart_via_async_handle() {
 
     let rt = Builder::seeded(123).build(rt.freeze());
 
-    let _ = rt.run().unwrap_no_err();
+    let _ = rt.run().assert_no_err();
     assert_eq!(DROPPED_RESTART_VIA_HANDLE.load(Ordering::SeqCst), 2)
 }
 
@@ -327,7 +327,7 @@ fn shutdown_will_ignore_incoming() {
 
     let rt = Builder::seeded(123).build(rt.freeze());
 
-    let _ = rt.run().unwrap_no_err();
+    let _ = rt.run().assert_no_err();
 }
 
 #[derive(Default)]
@@ -410,7 +410,7 @@ fn shutdown_will_drop_transiting() {
     con.connect(pong);
 
     let rt = Builder::seeded(123).max_itr(500).build(app.freeze());
-    let _ = rt.run().unwrap_no_err();
+    let _ = rt.run().assert_no_err();
 }
 
 #[test]
@@ -447,7 +447,7 @@ fn shutdown_will_drop_transiting_delayed_channels() {
     );
 
     let rt = Builder::seeded(123).max_itr(500).build(app.freeze());
-    let _ = rt.run().unwrap_no_err();
+    let _ = rt.run().assert_no_err();
 }
 
 #[test]
@@ -489,7 +489,7 @@ fn shutdown_prevents_accessing_parents() {
     let _ = Builder::seeded(123)
         .build(sim.freeze())
         .run()
-        .unwrap_no_err();
+        .assert_no_err();
 }
 
 #[test]
