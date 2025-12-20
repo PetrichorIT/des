@@ -202,7 +202,7 @@ fn builder_handler_fn_failure_panic() {
     let mut rt = Builder::seeded(123).build(sim.freeze());
     rt.add_message_onto(gate, Message::default(), 1.0.into());
 
-    let e = rt.run().unwrap_err();
+    let e = rt.run().error.unwrap();
     assert!(
         e[0].to_string()
             .starts_with("alice: ModulePanic(Any { .. })")
@@ -347,5 +347,9 @@ fn builder_with_context_can_access_props() -> Result<(), RuntimeError> {
         }),
     );
 
-    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
+    Builder::seeded(123)
+        .build(sim.freeze())
+        .run()
+        .as_result()
+        .map(|_| ())
 }

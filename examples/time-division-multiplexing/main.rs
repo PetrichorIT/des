@@ -265,5 +265,5 @@ fn main() {
         .max_time(10.0.into())
         .build(sim.freeze())
         .run()
-        .unwrap();
+        .unwrap_no_err();
 }

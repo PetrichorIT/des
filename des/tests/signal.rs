@@ -51,7 +51,11 @@ fn signal_subscription_in_direct_parent() -> Result<(), RuntimeError> {
     sim.node("parent", Parent(false));
     sim.node("parent.child", panicing_subprocess_at(2.0));
 
-    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
+    Builder::seeded(123)
+        .build(sim.freeze())
+        .run()
+        .as_result()
+        .map(|_| ())
 }
 
 #[test]
@@ -66,7 +70,11 @@ fn signal_subscription_in_indirect_ancestor() -> Result<(), RuntimeError> {
         panicing_subprocess_at(2.0),
     );
 
-    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
+    Builder::seeded(123)
+        .build(sim.freeze())
+        .run()
+        .as_result()
+        .map(|_| ())
 }
 
 #[test]
@@ -88,7 +96,11 @@ fn signal_subscription_passed_to_created_child() -> Result<(), RuntimeError> {
         ),
     );
 
-    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
+    Builder::seeded(123)
+        .build(sim.freeze())
+        .run()
+        .as_result()
+        .map(|_| ())
 }
 
 struct ExpectNSignal<const SIGNAL: usize>(i32);
@@ -133,7 +145,11 @@ fn signal_subscription_from_multiple_children() -> Result<(), RuntimeError> {
     sim.node("parent.child", EmitSignal::<SIGNAL>(3));
     sim.node("parent.child.grandchild", EmitSignal::<SIGNAL>(7));
 
-    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
+    Builder::seeded(123)
+        .build(sim.freeze())
+        .run()
+        .as_result()
+        .map(|_| ())
 }
 
 struct ExpectNSignalThenUnsubscribe<const SIGNAL: usize>(i32);
@@ -180,5 +196,9 @@ fn signal_unsubscribe() -> Result<(), RuntimeError> {
         ),
     );
 
-    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
+    Builder::seeded(123)
+        .build(sim.freeze())
+        .run()
+        .as_result()
+        .map(|_| ())
 }

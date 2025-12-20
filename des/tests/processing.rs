@@ -47,10 +47,10 @@ fn plugin_raw_creation() {
     app.node("root", PluginCreation::default());
 
     let rt = Builder::seeded(123).build(app.freeze());
-    let result = rt.run().unwrap();
+    let result = rt.run().unwrap_no_err();
 
-    assert_eq!(result.1, SimTime::from_duration(Duration::from_secs(99)));
-    assert_eq!(result.2.event_count, 101); // (+1 start signal)
+    assert_eq!(result.time, SimTime::from_duration(Duration::from_secs(99)));
+    assert_eq!(result.profiler.event_count, 101); // (+1 start signal)
 }
 
 struct ActivitySensor {
@@ -114,14 +114,10 @@ fn plugin_priority_defer() {
     app.node("root", PluginPriorityDefer::default());
 
     let rt = Builder::seeded(123).build(app.freeze());
-    let result = rt.run();
+    let result = rt.run().unwrap_no_err();
 
-    let Ok((_, time, profiler)) = result else {
-        panic!("Unexpected runtime result")
-    };
-
-    assert_eq!(time, 99.0);
-    assert_eq!(profiler.event_count, 101); // (+1 start signal)
+    assert_eq!(result.time, 99.0);
+    assert_eq!(result.profiler.event_count, 101); // (+1 start signal)
 }
 
 struct IncrementArcPlugin {
@@ -186,7 +182,7 @@ fn plugin_shutdown_non_persistent_data() {
     let rt = Builder::seeded(123).build(app.freeze());
 
     let res = rt.run();
-    let _res = res.unwrap();
+    let _res = res.unwrap_no_err();
 }
 
 #[test]
@@ -259,7 +255,7 @@ fn add_extension_in_plugin() -> Result<(), RuntimeError> {
     let mut rt = Builder::seeded(123).build(sim.freeze());
     rt.add_message_onto(gate, Message::default(), 1.0.into());
 
-    rt.run().map(|_| ())
+    rt.run().as_result().map(|_| ())
 }
 
 struct PEWithValue {
@@ -296,5 +292,5 @@ fn downcast_proc_elements_from_other_node() -> Result<(), RuntimeError> {
     sim.node("alice.observer", NodeReadingPE);
 
     let rt = Builder::seeded(123).build(sim.freeze());
-    rt.run().map(|_| ())
+    rt.run().as_result().map(|_| ())
 }

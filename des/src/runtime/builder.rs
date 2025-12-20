@@ -7,13 +7,13 @@ use std::{
 use std::time::Duration;
 
 use rand::{
-    rngs::{StdRng, ThreadRng},
     RngCore, SeedableRng,
+    rngs::{StdRng, ThreadRng},
 };
 
 use crate::prelude::SimTime;
 
-use super::{Application, FutureEventSet, Profiler, Runtime, RuntimeLimit, State, RNG};
+use super::{Application, FutureEventSet, Profiler, RNG, Runtime, RuntimeLimit, State};
 
 /// A lock the ensures only one runtime exits at a time.
 static SIMULATION_LOCK: Mutex<()> = Mutex::new(());
@@ -142,7 +142,7 @@ impl Builder {
     /// # }
     /// # enum Events {}
     /// # impl Event<App> for Events {
-    /// #   fn handle(self, rt: &mut Runtime<App>) {}
+    /// #   fn handle(self, rt: &mut Runtime<App>)  -> Result<(), RuntimeError> { Ok(()) }
     /// # }
     ///
     /// let app = App(42, String::from("Hello there!"));
@@ -153,27 +153,31 @@ impl Builder {
             let lock = SIMULATION_LOCK.try_lock();
             match lock {
                 Ok(permit) => permit,
-                Err(err) => {
-                    match err {
-                        TryLockError::WouldBlock => {
-                            eprintln!("des::warning ** another runtime allready exists ... waiting for simlock");
-                            let lock = SIMULATION_LOCK.lock();
-                            match lock {
-                                Ok(lock) => lock,
-                                Err(p) => {
-                                    eprintln!("des::error ** another runtime poisoned the simlock ... cleaning up");
-                                    Runtime::<A>::poison_cleanup();
-                                    p.into_inner()
-                                }
+                Err(err) => match err {
+                    TryLockError::WouldBlock => {
+                        eprintln!(
+                            "des::warning ** another runtime allready exists ... waiting for simlock"
+                        );
+                        let lock = SIMULATION_LOCK.lock();
+                        match lock {
+                            Ok(lock) => lock,
+                            Err(p) => {
+                                eprintln!(
+                                    "des::error ** another runtime poisoned the simlock ... cleaning up"
+                                );
+                                Runtime::<A>::poison_cleanup();
+                                p.into_inner()
                             }
                         }
-                        TryLockError::Poisoned(p) => {
-                            eprintln!("des::error ** another runtime poisoned the simlock ... cleaning up");
-                            Runtime::<A>::poison_cleanup();
-                            p.into_inner()
-                        }
                     }
-                }
+                    TryLockError::Poisoned(p) => {
+                        eprintln!(
+                            "des::error ** another runtime poisoned the simlock ... cleaning up"
+                        );
+                        Runtime::<A>::poison_cleanup();
+                        p.into_inner()
+                    }
+                },
             }
         };
 
@@ -181,7 +185,9 @@ impl Builder {
         // StandardLogger::setup().expect("Failed to create logger");
         #[cfg(feature = "cqueue")]
         if std::mem::size_of::<A::EventSet>() > 128 {
-            eprintln!("des::warning ** creating runtime with event-set bigger that 128 bytes * this may lead to performance losses");
+            eprintln!(
+                "des::warning ** creating runtime with event-set bigger that 128 bytes * this may lead to performance losses"
+            );
         }
 
         let future_event_set = FutureEventSet::new_with(&self);

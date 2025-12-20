@@ -1,7 +1,8 @@
 use des::{
     net::{
-        fail, globals,
+        globals,
         handlers::{AsyncHandler, ModuleFn},
+        report,
     },
     prelude::*,
 };
@@ -47,7 +48,7 @@ fn connectivity() {
     );
 
     let app = Builder::seeded(123).build(app.freeze());
-    let _ = app.run().unwrap();
+    let _ = app.run().unwrap_no_err();
 }
 
 #[test]
@@ -86,7 +87,11 @@ fn select_node_from_globals() -> Result<(), RuntimeError> {
         }),
     );
 
-    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
+    Builder::seeded(123)
+        .build(sim.freeze())
+        .run()
+        .as_result()
+        .map(|_| ())
 }
 
 #[test]
@@ -149,7 +154,11 @@ fn can_access_foreign_module_context() -> Result<(), RuntimeError> {
     sim.gate("alice", "port").connect(sim.gate("bob", "port"));
     let _ = sim.gate("alice", "other-port");
 
-    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
+    Builder::seeded(123)
+        .build(sim.freeze())
+        .run()
+        .as_result()
+        .map(|_| ())
 }
 
 #[test]
@@ -161,7 +170,7 @@ fn custom_fail() {
         ModuleFn::new(
             || schedule_at(Message::default(), 1.0.into()),
             |_, _| {
-                fail(std::io::Error::other("failed because i like to"));
+                report(std::io::Error::other("failed because i like to"));
             },
         ),
     );
@@ -169,7 +178,7 @@ fn custom_fail() {
     let err = Builder::seeded(123)
         .build(sim.freeze())
         .run()
-        .err()
+        .error
         .expect("expected an error");
 
     assert_eq!(err[0].to_string(), "failed because i like to");
@@ -210,7 +219,11 @@ fn gate_disconnect() -> Result<(), RuntimeError> {
 
     a.connect(b);
 
-    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
+    Builder::seeded(123)
+        .build(sim.freeze())
+        .run()
+        .as_result()
+        .map(|_| ())
 }
 
 #[test]

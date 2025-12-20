@@ -231,11 +231,14 @@ fn simplex_shared_domain() {
         );
     }
 
-    let rt = Builder::seeded(123).build(sim.freeze()).run().unwrap();
+    let rt = Builder::seeded(123)
+        .build(sim.freeze())
+        .run()
+        .unwrap_no_err();
 
     //
-    assert_eq!(rt.2.event_count, 130);
-    assert_eq!(rt.1, 26.0)
+    assert_eq!(rt.profiler.event_count, 130);
+    assert_eq!(rt.time, 26.0)
 }
 
 #[test]
@@ -280,7 +283,10 @@ fn duplex_shared_domain() {
             .connect_with(switch[i].clone(), Some(chan.clone()));
     }
 
-    let rt = Builder::seeded(123).build(sim.freeze()).run().unwrap();
+    let rt = Builder::seeded(123)
+        .build(sim.freeze())
+        .run()
+        .unwrap_no_err();
 
     // 50 messages over datarate channel with infinite buffer
     // - 50 handle message events
@@ -288,8 +294,8 @@ fn duplex_shared_domain() {
     // - 48 Channel Notif (only from once two events in queue, thus not for first and not for last message)
     // - 6 start signals
 
-    assert_eq!(rt.2.event_count, 50 + 50 + 48 + 6);
-    assert_eq!(rt.1, 50.0)
+    assert_eq!(rt.profiler.event_count, 50 + 50 + 48 + 6);
+    assert_eq!(rt.time, 50.0)
 }
 
 #[test]
@@ -387,7 +393,10 @@ fn datarate_channel_can_send_at_tft_independent_of_event_order() {
     g1.connect_with(t1, Some(no_buffer));
     g2.connect_with(t2, Some(buffer));
 
-    let _ = Builder::seeded(123).build(sim.freeze()).run().unwrap();
+    let _ = Builder::seeded(123)
+        .build(sim.freeze())
+        .run()
+        .unwrap_no_err();
 }
 
 #[derive(Debug, Clone, Default)]
@@ -480,5 +489,9 @@ fn register_unregister_custom_channel() -> Result<(), RuntimeError> {
     a.connect_with(b, Some(chan.clone()));
     a2.connect_with(c, Some(chan));
 
-    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
+    Builder::seeded(123)
+        .build(sim.freeze())
+        .run()
+        .as_result()
+        .map(|_| ())
 }

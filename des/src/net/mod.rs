@@ -18,7 +18,7 @@ pub use self::error::*;
 pub use self::path::*;
 pub use self::runtime::{
     Globals, IntoModuleTree, Sim, SimBuilder, SimLifecycle, Spawner, SpawnerKind, fail, globals,
-    handlers, schedule_event,
+    handlers, report, schedule_event,
 };
 
 /// Internal details only sometimes needed to e.g. implement a custom channel.

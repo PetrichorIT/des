@@ -55,7 +55,7 @@ impl<A> Event<Sim<A>> for NetEvents
 where
     A: EventLifecycle<Sim<A>>,
 {
-    fn handle(self, rt: &mut Runtime<Sim<A>>) {
+    fn handle(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError> {
         match self {
             Self::MessageExitingConnection(event) => event.handle(rt),
             Self::HandleMessageEvent(event) => event.handle(rt),
@@ -168,7 +168,7 @@ impl MessageExitingConnection {
 }
 
 impl MessageExitingConnection {
-    fn handle<A>(self, rt: &mut Runtime<Sim<A>>)
+    fn handle<A>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError>
     where
         A: EventLifecycle<Sim<A>>,
     {
@@ -176,6 +176,7 @@ impl MessageExitingConnection {
         if let Err(err) = result {
             tracing::error!("message {} failed to be send: {}", err.msg, err.reason);
         }
+        Ok(())
     }
 }
 
@@ -189,7 +190,7 @@ pub struct HandleMessageEvent {
 }
 
 impl HandleMessageEvent {
-    fn handle<A>(self, rt: &mut Runtime<Sim<A>>)
+    fn handle<A>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError>
     where
         A: EventLifecycle<Sim<A>>,
     {
@@ -203,9 +204,9 @@ impl HandleMessageEvent {
 
         let _ = module.activate();
         rt.app.error.extend(module.handle_message(message).err());
-        module.deactivate();
+        module.deactivate()?;
 
-        buf_process(module, rt);
+        buf_process(module, rt)
     }
 }
 
@@ -217,7 +218,7 @@ pub struct AtSimStartEvent {
 }
 
 impl AtSimStartEvent {
-    fn handle<A>(self, rt: &mut Runtime<Sim<A>>)
+    fn handle<A>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError>
     where
         A: EventLifecycle<Sim<A>>,
     {
@@ -237,12 +238,14 @@ impl AtSimStartEvent {
                     tracing::info!("Calling at_sim_start({}).", stage);
 
                     rt.app.error.extend(module.at_sim_start(stage).err());
-                    module.deactivate();
+                    module.deactivate()?;
 
-                    buf_process(module, rt);
+                    buf_process(module, rt)?;
                 }
             }
         }
+
+        Ok(())
     }
 }
 
@@ -256,7 +259,7 @@ pub struct SignalEvent {
 }
 
 impl SignalEvent {
-    fn handle<A>(self, rt: &mut Runtime<Sim<A>>)
+    fn handle<A>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError>
     where
         A: EventLifecycle<Sim<A>>,
     {
@@ -265,10 +268,12 @@ impl SignalEvent {
             rt.app
                 .error
                 .extend(subscriber.handle_signal(self.signal.clone()).err());
-            subscriber.deactivate();
+            subscriber.deactivate()?;
 
-            buf_process(subscriber, rt);
+            buf_process(subscriber, rt)?;
         }
+
+        Ok(())
     }
 }
 
@@ -282,7 +287,7 @@ pub struct ModuleShutdownEvent {
 }
 
 impl ModuleShutdownEvent {
-    fn handle<A>(self, rt: &mut Runtime<Sim<A>>)
+    fn handle<A>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError>
     where
         A: EventLifecycle<Sim<A>>,
     {
@@ -294,9 +299,9 @@ impl ModuleShutdownEvent {
         rt.app
             .error
             .extend(module.module_shutdown(self.restart_at).err());
-        module.deactivate();
+        module.deactivate()?;
 
-        buf_process(module, rt);
+        buf_process(module, rt)
     }
 }
 
@@ -308,7 +313,7 @@ pub struct ModuleRestartEvent {
 }
 
 impl ModuleRestartEvent {
-    fn handle<A>(self, rt: &mut Runtime<Sim<A>>)
+    fn handle<A>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError>
     where
         A: EventLifecycle<Sim<A>>,
     {
@@ -318,9 +323,9 @@ impl ModuleRestartEvent {
         let module = &self.module;
         let _ = module.activate();
         rt.app.error.extend(module.module_restart().err());
-        module.deactivate();
+        module.deactivate()?;
 
-        buf_process(module, rt);
+        buf_process(module, rt)
     }
 }
 
@@ -334,7 +339,7 @@ pub struct AsyncWakeupEvent {
 
 #[cfg(feature = "async")]
 impl AsyncWakeupEvent {
-    fn handle<A>(self, rt: &mut Runtime<Sim<A>>)
+    fn handle<A>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError>
     where
         A: EventLifecycle<Sim<A>>,
     {
@@ -344,9 +349,9 @@ impl AsyncWakeupEvent {
         let module = &self.module;
         let _ = module.activate();
         rt.app.error.extend(module.async_wakeup().err());
-        module.deactivate();
+        module.deactivate()?;
 
-        buf_process(module, rt);
+        buf_process(module, rt)
     }
 }
 
@@ -361,7 +366,7 @@ pub struct ChannelUnbusyNotif {
 }
 
 impl ChannelUnbusyNotif {
-    fn handle<A>(self, rt: &mut Runtime<Sim<A>>)
+    fn handle<A>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError>
     where
         A: EventLifecycle<Sim<A>>,
     {
@@ -371,6 +376,8 @@ impl ChannelUnbusyNotif {
             .try_write()
             .expect("failed to get lock")
             .unbusy_notify(self.info, SendContext { sink: rt, handle });
+
+        Ok(())
     }
 }
 

@@ -32,8 +32,9 @@
 //! }
 //!
 //! impl Event<MyApp> for MyEventSet {
-//!     fn handle(self, _rt: &mut Runtime<MyApp>) {
+//!     fn handle(self, _rt: &mut Runtime<MyApp>) -> Result<(), RuntimeError> {
 //!         // Do something
+//!         Ok(())
 //!     }
 //! }
 //!

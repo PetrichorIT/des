@@ -37,11 +37,12 @@ struct Pong;
 // and then reschedule the `Interval` event itself, as long as the contained counter is greater than 0.
 
 impl Event<PingPongApp> for Interval {
-    fn handle(self, runtime: &mut Runtime<PingPongApp>) {
+    fn handle(self, runtime: &mut Runtime<PingPongApp>) -> Result<(), RuntimeError> {
         runtime.add_event_in(Ping, Duration::from_secs_f64(1.5));
         if self.0 != 0 {
             runtime.add_event_in(Interval(self.0 - 1), Duration::from_secs(1));
         }
+        Ok(())
     }
 }
 
@@ -52,15 +53,17 @@ impl Event<PingPongApp> for Interval {
 // Since the state is mutably accesable, events can modify the global state.
 
 impl Event<PingPongApp> for Ping {
-    fn handle(self, runtime: &mut Runtime<PingPongApp>) {
+    fn handle(self, runtime: &mut Runtime<PingPongApp>) -> Result<(), RuntimeError> {
         runtime.app.pings_received += 1;
         runtime.add_event_in(Pong, Duration::from_secs(1));
+        Ok(())
     }
 }
 
 impl Event<PingPongApp> for Pong {
-    fn handle(self, runtime: &mut Runtime<PingPongApp>) {
+    fn handle(self, runtime: &mut Runtime<PingPongApp>) -> Result<(), RuntimeError> {
         runtime.app.pongs_received += 1;
+        Ok(())
     }
 }
 
@@ -109,11 +112,12 @@ impl Application for PingPongApp {
 // so that the `Interval` repeats 30 times, thus sending 30 pings.
 
 impl EventLifecycle for PingPongApp {
-    fn at_sim_start(runtime: &mut Runtime<Self>)
+    fn at_sim_start(runtime: &mut Runtime<Self>) -> Result<(), RuntimeError>
     where
         Self: Application,
     {
         runtime.add_event_in(Interval(29), Duration::ZERO);
+        Ok(())
     }
 }
 
@@ -134,12 +138,12 @@ fn main() -> Result<(), RuntimeError> {
         pongs_received: 0,
     };
     let rt = Builder::new().build(app);
-    let (app, _, profile) = rt.run()?;
+    let r = rt.run().as_result()?;
 
-    assert_eq!(app.pings_received, 30);
-    assert_eq!(app.pongs_received, 30);
+    assert_eq!(r.app.pings_received, 30);
+    assert_eq!(r.app.pongs_received, 30);
 
-    assert_eq!(profile.event_count, 90);
+    assert_eq!(r.profiler.event_count, 90);
 
     Ok(())
 }

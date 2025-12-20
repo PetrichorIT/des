@@ -58,11 +58,12 @@ enum Events {
 }
 
 impl Event<Application> for Events {
-    fn handle(self, rt: &mut Runtime<Application>) {
+    fn handle(self, rt: &mut Runtime<Application>) -> Result<(), RuntimeError> {
         match self {
             Self::ServerDone(event) => event.handle(rt),
             Self::CustomerArrival(event) => event.handle(rt),
         }
+        Ok(())
     }
 }
 
@@ -163,6 +164,6 @@ fn main() {
     let dur = Duration::from_secs_f64(expdist(&mut rt, l));
     rt.add_event_in(Events::CustomerArrival(CustomerArrival { idx: 0 }), dur);
 
-    let (app, t_max, _) = rt.run().unwrap();
-    app.eval(t_max);
+    let r = rt.run().unwrap_no_err();
+    r.app.eval(r.time);
 }

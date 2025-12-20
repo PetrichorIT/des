@@ -2,7 +2,7 @@ use des::{
     prelude::*,
     runtime::{RuntimeError, RuntimeLimit},
 };
-use rand::{distr::StandardUniform, prelude::SliceRandom, Rng};
+use rand::{Rng, distr::StandardUniform, prelude::SliceRandom};
 use serial_test::serial;
 
 /// The Event ste
@@ -14,12 +14,13 @@ enum MyEventSet {
 }
 
 impl Event<App> for MyEventSet {
-    fn handle(self, rt: &mut Runtime<App>) {
+    fn handle(self, rt: &mut Runtime<App>) -> Result<(), RuntimeError> {
         match self {
             Self::RegisterToRtWithTime(a) => a.handle(rt),
             Self::B(b) => b.handle(rt),
             Self::RepeatWithDelay(rwd) => rwd.handle(rt),
         }
+        Ok(())
     }
 }
 
@@ -67,7 +68,8 @@ fn zero_event_runtime() {
     });
 
     let res = rt.run();
-    assert!(matches!(res.unwrap().2.event_count, 0))
+    assert!(res.error.is_none());
+    assert_eq!(res.profiler.event_count, 0);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -106,19 +108,15 @@ fn one_event_runtime() {
     // this means 17 events
 
     let res = rt.run();
-    match res {
-        Ok((_, time, profiler)) => {
-            assert_eq!(time, SimTime::from_duration(Duration::new(16, 0)));
-            assert_eq!(profiler.event_count, 17);
-        }
-        _ => panic!("Runtime should have finished"),
-    }
+    assert!(res.error.is_none());
+    assert_eq!(res.time, 16.0);
+    assert_eq!(res.profiler.event_count, 17);
 }
 
 #[test]
 #[serial]
 fn ensure_event_order() {
-    use rand::{rngs::StdRng, SeedableRng};
+    use rand::{SeedableRng, rngs::StdRng};
 
     let mut id = 0;
     let mut events = Vec::with_capacity(128);
@@ -146,23 +144,20 @@ fn ensure_event_order() {
         rt.add_event(event, time);
     }
 
-    match rt.run() {
-        Ok((app, rt_fin_time, profiler)) => {
-            assert_eq!(rt_fin_time, time);
-            assert_eq!(profiler.event_count, 128);
+    let result = rt.run();
+    assert!(result.error.is_none());
+    assert_eq!(result.time, time);
+    assert_eq!(result.profiler.event_count, 128);
 
-            let mut last_id = 0;
-            for (_, event) in app.event_list {
-                match event {
-                    MyEventSet::RegisterToRtWithTime(a) => {
-                        assert_eq!(last_id + 1, a.id);
-                        last_id += 1;
-                    }
-                    _ => panic!("Unexpected event"),
-                }
+    let mut last_id = 0;
+    for (_, event) in result.app.event_list {
+        match event {
+            MyEventSet::RegisterToRtWithTime(a) => {
+                assert_eq!(last_id + 1, a.id);
+                last_id += 1;
             }
+            _ => panic!("Unexpected event"),
         }
-        _ => panic!("Expected runtime to finish after fininte non-replicating event set"),
     }
 }
 
@@ -284,7 +279,7 @@ fn full_test_n_100_000() {
 
     println!("c := {}", c);
 
-    let (App { event_list }, _, _) = rt.run().unwrap();
+    let App { event_list } = rt.run().as_result().unwrap().app;
     let mut boxed_list = Vec::with_capacity(N);
 
     let mut current_box = EventBox {
@@ -335,8 +330,9 @@ struct DeferredApplication {
     ended: bool,
 }
 impl EventLifecycle for DeferredApplication {
-    fn at_sim_start(rt: &mut Runtime<Self>) {
+    fn at_sim_start(rt: &mut Runtime<Self>) -> Result<(), RuntimeError> {
         rt.app.started = true;
+        Ok(())
     }
     fn at_sim_end(rt: &mut Runtime<Self>) -> Result<(), RuntimeError> {
         rt.app.ended = true;
@@ -350,7 +346,9 @@ impl Application for DeferredApplication {
 
 struct DeferredES;
 impl Event<DeferredApplication> for DeferredES {
-    fn handle(self, _rt: &mut Runtime<DeferredApplication>) {}
+    fn handle(self, _rt: &mut Runtime<DeferredApplication>) -> Result<(), RuntimeError> {
+        Ok(())
+    }
 }
 
 #[test]
@@ -365,10 +363,7 @@ fn deferred_sim_start() {
     assert_eq!(rt.app.started, false);
     assert_eq!(rt.app.ended, false);
 
-    let app = match rt.run() {
-        Ok((app, _, _)) => app,
-        _ => panic!("Which events?"),
-    };
+    let app = rt.run().as_result().unwrap().app;
 
     assert_eq!(app.started, true);
     assert_eq!(app.ended, true);
@@ -382,12 +377,15 @@ impl Application for CustomStartApp {
 
 struct CustomStartEvent;
 impl Event<CustomStartApp> for CustomStartEvent {
-    fn handle(self, _: &mut Runtime<CustomStartApp>) {}
+    fn handle(self, _: &mut Runtime<CustomStartApp>) -> Result<(), RuntimeError> {
+        Ok(())
+    }
 }
 
 impl EventLifecycle for CustomStartApp {
-    fn at_sim_start(_: &mut Runtime<Self>) {
+    fn at_sim_start(_: &mut Runtime<Self>) -> Result<(), RuntimeError> {
         assert_eq!(SimTime::now(), 42.0);
+        Ok(())
     }
 }
 
@@ -409,41 +407,45 @@ impl Application for PausableApp {
 }
 
 impl EventLifecycle for PausableApp {
-    fn at_sim_start(runtime: &mut Runtime<Self>)
+    fn at_sim_start(runtime: &mut Runtime<Self>) -> Result<(), RuntimeError>
     where
         Self: Application,
     {
         runtime.add_event(PausableAppEvent(0), SimTime::ZERO);
+        Ok(())
     }
 }
 
 struct PausableAppEvent(usize);
 impl Event<PausableApp> for PausableAppEvent {
-    fn handle(mut self, runtime: &mut Runtime<PausableApp>) {
+    fn handle(mut self, runtime: &mut Runtime<PausableApp>) -> Result<(), RuntimeError> {
         self.0 += 1;
-        runtime.add_event_in(self, Duration::from_secs(1))
+        runtime.add_event_in(self, Duration::from_secs(1));
+        Ok(())
     }
 }
 
 #[test]
 #[serial]
-fn pausable_app() {
+fn pausable_app() -> Result<(), RuntimeError> {
     let mut sim = Builder::new()
         .quiet()
         .limit(RuntimeLimit::EventCount(1000))
         .build(PausableApp);
 
-    sim.start();
+    sim.start()?;
 
     assert_eq!(sim.num_events_dispatched(), 0);
 
-    sim.dispatch_n_events(10);
+    sim.dispatch_n_events(10)?;
     assert_eq!(sim.num_events_dispatched(), 10);
 
-    sim.dispatch_events_until(42.0.into());
+    sim.dispatch_events_until(42.0.into())?;
     assert_eq!(sim.num_events_dispatched(), 43); // 0...42 ??
 
-    sim.dispatch_all();
+    sim.dispatch_all()?;
     assert_eq!(sim.num_events_dispatched() + 1, sim.num_events_scheduled());
     assert_eq!(sim.num_events_dispatched(), 1000);
+
+    Ok(())
 }

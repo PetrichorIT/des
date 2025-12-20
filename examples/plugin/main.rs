@@ -59,5 +59,5 @@ fn main() -> Result<(), RuntimeError> {
 
     let app = Sim::ndl("examples/plugin/main.yml", registry![A, B, Main]).unwrap();
     let rt = Builder::new().build(app.freeze());
-    rt.run().map(|_| ())
+    rt.run().as_result().map(|_| ())
 }

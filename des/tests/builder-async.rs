@@ -167,7 +167,7 @@ fn builder_async_failable_with_fail() {
     );
     let v = Builder::new().build(sim.freeze()).run();
     assert!(
-        v.unwrap_err()[0]
+        v.error.unwrap()[0]
             .as_any()
             .downcast_ref::<Error>()
             .map_or(false, |e| matches!(e.kind, ErrorKind::JoinError(_)))
@@ -197,7 +197,7 @@ fn builder_async_require_join() {
 
     let v = Builder::seeded(123).build(sim.freeze()).run();
     assert!(
-        v.unwrap_err()[0]
+        v.error.unwrap()[0]
             .as_any()
             .downcast_ref::<Error>()
             .map_or(false, |e| matches!(e.kind, ErrorKind::JoinError(_)))

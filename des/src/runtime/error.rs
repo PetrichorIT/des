@@ -31,17 +31,20 @@ impl RuntimeError {
     pub fn merge(&mut self, other: Self) {
         self.inner.extend(other.inner);
     }
+}
 
-    /// Extend
-    pub fn extend<T, I>(&mut self, iter: I)
-    where
-        I: IntoIterator<Item = T>,
-        T: LikeRuntimeError + 'static,
-    {
+impl<I: LikeRuntimeError + 'static> Extend<I> for RuntimeError {
+    fn extend<T: IntoIterator<Item = I>>(&mut self, iter: T) {
         self.inner.extend(
             iter.into_iter()
                 .map(|e| Box::new(e) as Box<dyn LikeRuntimeError>),
         );
+    }
+}
+
+impl Extend<Box<dyn LikeRuntimeError>> for RuntimeError {
+    fn extend<T: IntoIterator<Item = Box<dyn LikeRuntimeError>>>(&mut self, iter: T) {
+        self.inner.extend(iter);
     }
 }
 

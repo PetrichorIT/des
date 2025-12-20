@@ -10,20 +10,22 @@ impl Application for App {
 }
 
 impl EventLifecycle<App> for App {
-    fn at_sim_start(rt: &mut Runtime<Self>) {
+    fn at_sim_start(rt: &mut Runtime<Self>) -> Result<(), RuntimeError> {
         let mut delay = Duration::ZERO;
         for _ in 0..rt.app.num_events {
             rt.add_event_in(EvSet {}, delay);
             let offset = random::<f64>() * 2.0 * rt.app.event_delay.as_secs_f64();
             delay += Duration::from_secs_f64(offset);
         }
+        Ok(())
     }
 }
 
 struct EvSet {}
 impl Event<App> for EvSet {
-    fn handle(self, rt: &mut Runtime<App>) {
+    fn handle(self, rt: &mut Runtime<App>) -> Result<(), RuntimeError> {
         rt.add_event_in(EvSet {}, rt.app.event_delay);
+        Ok(())
         // NOP
     }
 }

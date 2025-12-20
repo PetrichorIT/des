@@ -52,9 +52,9 @@ fn main() -> std::io::Result<()> {
     app.include_cfg(CFG);
 
     let rt = Builder::seeded(0x123).quiet().build(app.freeze());
-    let (app, time, p) = rt.run().unwrap();
+    let r = rt.run().unwrap_no_err();
 
-    let topo = app.globals().topology();
+    let topo = r.app.globals().topology();
 
     assert_eq!(topo.node_count(), 5);
     assert_eq!(topo.edge_count(), 2);
@@ -65,12 +65,12 @@ fn main() -> std::io::Result<()> {
     // Chain 1: iterations [0, 1, 2] a 2 events + one 3th event
     // + 5 sim_start_done events
     // + 5 sim_start_done events
-    assert_eq!(p.event_count, ((4 * 11 + 2) + (6 * 2 + 2) + 5));
+    assert_eq!(r.profiler.event_count, ((4 * 11 + 2) + (6 * 2 + 2) + 5));
 
     // Chain 0 longest:
     // - start at 1
     // - 11 round trips
-    assert_eq!(time.as_secs(), 2);
+    assert_eq!(r.time.as_secs(), 2);
 
     Ok(())
 }

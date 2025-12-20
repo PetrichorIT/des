@@ -38,7 +38,7 @@ where
     /// but could lead to unexpected behaviour if not done properly in custom
     /// event set implementations.
     ///
-    fn handle(self, runtime: &mut Runtime<App>);
+    fn handle(self, runtime: &mut Runtime<App>) -> Result<(), RuntimeError>;
 }
 
 ///
@@ -56,7 +56,7 @@ pub trait EventLifecycle<A = Self> {
     /// # impl Worker { fn initalize(&mut self) {}}
     /// # enum MyEventSet { EventA, EventB }
     /// # impl Event<MyApp> for MyEventSet {
-    /// #   fn handle(self, rt: &mut Runtime<MyApp>) {}
+    /// #   fn handle(self, rt: &mut Runtime<MyApp>)  -> Result<(), RuntimeError> { Ok(()) }
     /// # }
     /// struct MyApp { workers: Vec<Worker> };
     /// impl Application for MyApp {
@@ -64,17 +64,19 @@ pub trait EventLifecycle<A = Self> {
     ///     type Lifecycle = Self;
     /// }
     /// impl EventLifecycle for MyApp {
-    ///     fn at_sim_start(runtime: &mut Runtime<Self>) {
+    ///     fn at_sim_start(runtime: &mut Runtime<Self>) -> Result<(), RuntimeError> {
     ///         runtime.app.workers.iter_mut().for_each(|w| w.initalize());
+    ///         Ok(())
     ///     }
     /// }
     /// ```
     ///
     #[allow(unused_variables)]
-    fn at_sim_start(runtime: &mut Runtime<A>)
+    fn at_sim_start(runtime: &mut Runtime<A>) -> Result<(), RuntimeError>
     where
         A: Application,
     {
+        Ok(())
     }
 
     ///
@@ -88,7 +90,7 @@ pub trait EventLifecycle<A = Self> {
     /// # impl Worker { fn finish(&mut self) {}}
     /// # enum MyEventSet { EventA, EventB }
     /// # impl Event<MyApp> for MyEventSet {
-    /// #   fn handle(self, rt: &mut Runtime<MyApp>) {}
+    /// #   fn handle(self, rt: &mut Runtime<MyApp>)  -> Result<(), RuntimeError> { Ok(()) }
     /// # }
     /// struct MyApp { workers: Vec<Worker> };
     /// impl Application for MyApp {
@@ -115,20 +117,12 @@ pub trait EventLifecycle<A = Self> {
     {
         Ok(())
     }
-
-    /// Indicates whether a runtime should stop prematurely.
-    #[allow(unused_variables)]
-    #[inline]
-    fn sim_should_stop(runtime: &Runtime<A>) -> bool
-    where
-        A: Application,
-    {
-        false
-    }
 }
 
 impl<A: Application> Event<A> for () {
-    fn handle(self, _: &mut Runtime<A>) {}
+    fn handle(self, _: &mut Runtime<A>) -> Result<(), RuntimeError> {
+        Ok(())
+    }
 }
 
 impl<A> EventLifecycle<A> for () {}
@@ -138,16 +132,16 @@ impl<A> EventLifecycle<A> for () {}
 ///
 pub(crate) type EventId = usize;
 
-impl<F: FnMut() -> R, R> Application for F {
+impl<F: FnMut() -> R, R: Into<Result<(), RuntimeError>>> Application for F {
     type EventSet = ();
     type Lifecycle = Self;
 }
 
-impl<F: FnMut() -> R, R> EventLifecycle<F> for F {
-    fn at_sim_start(runtime: &mut Runtime<F>)
+impl<F: FnMut() -> R, R: Into<Result<(), RuntimeError>>> EventLifecycle<F> for F {
+    fn at_sim_start(runtime: &mut Runtime<F>) -> Result<(), RuntimeError>
     where
         F: Application,
     {
-        (runtime.app)();
+        (runtime.app)().into()
     }
 }

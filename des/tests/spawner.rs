@@ -51,7 +51,11 @@ fn runtime_spawner_calls_sim_start() -> Result<(), RuntimeError> {
         ),
     );
 
-    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
+    Builder::seeded(123)
+        .build(sim.freeze())
+        .run()
+        .as_result()
+        .map(|_| ())
 }
 
 #[test]
@@ -92,7 +96,11 @@ fn runtime_spawner_with_mod_ctx() -> Result<(), RuntimeError> {
         ),
     );
 
-    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
+    Builder::seeded(123)
+        .build(sim.freeze())
+        .run()
+        .as_result()
+        .map(|_| ())
 }
 
 #[test]
@@ -125,7 +133,8 @@ fn runtime_spawner_cannot_use_root() -> Result<(), RuntimeError> {
     let _ = Builder::seeded(123)
         .build(sim.freeze())
         .run()
-        .expect_err("must have failed");
+        .error
+        .expect("must have failed");
     Ok(())
 }
 
@@ -158,7 +167,11 @@ fn runtime_spawner_reads_cfgs() -> Result<(), RuntimeError> {
         ),
     );
 
-    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
+    Builder::seeded(123)
+        .build(sim.freeze())
+        .run()
+        .as_result()
+        .map(|_| ())
 }
 
 struct ProcElementWithSubmodule {
@@ -219,5 +232,9 @@ fn runtime_spawner_from_proc_element() -> Result<(), RuntimeError> {
     sim.include_cfg("alice.bob.key: 123");
     sim.node("alice", MyProcElementModule { c: 0 });
 
-    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
+    Builder::seeded(123)
+        .build(sim.freeze())
+        .run()
+        .as_result()
+        .map(|_| ())
 }

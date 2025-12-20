@@ -86,6 +86,7 @@ fn parse_props() -> Result<(), RuntimeError> {
         .max_time(100.0.into())
         .build(sim.freeze())
         .run()
+        .as_result()
         .map(|_| ())
 }
 
@@ -111,5 +112,6 @@ fn disallow_casting() -> Result<(), RuntimeError> {
         .max_time(100.0.into())
         .build(sim.freeze())
         .run()
+        .as_result()
         .map(|_| ())
 }

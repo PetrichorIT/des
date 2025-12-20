@@ -5,7 +5,7 @@ use crate::{
         IntoModuleTree, ObjectPath, SimBuilder, globals,
         module::ModuleContext,
         processing::ModuleImpl,
-        runtime::{AtSimStartEvent, NetEvents, cfg::SimConfiguration},
+        runtime::{AtSimStartEvent, NetEvents, buf_fail, cfg::SimConfiguration},
         schedule_event,
     },
     prelude::{GateRef, Module, ModuleRef},
@@ -181,7 +181,7 @@ fn crate_node_at_buildtime<A>(
         ModuleImpl::new(module.stack(stack), module)
     };
     ctx.upgrade_dummy(pe);
-    ctx.deactivate();
+    ctx.deactivate().expect("failed at internal");
     base.with_modules_mut(|mods| mods.add(ctx.clone()));
     ctx
 }
@@ -215,7 +215,9 @@ fn create_node_at_runtime(
         ModuleImpl::new(module.stack(stack), module)
     };
     ctx.upgrade_dummy(pe);
-    ctx.deactivate();
+    if let Err(e) = ctx.deactivate() {
+        buf_fail(e);
+    }
 
     globals().add_module(ctx.clone());
 

@@ -120,6 +120,6 @@ impl Module for Pinger {
 fn main() -> Result<(), RuntimeError> {
     let sim = build_network();
     let rt = Builder::new().build(sim);
-    let (_, _, _) = rt.run()?;
+    let _ = rt.run().as_result()?;
     Ok(())
 }

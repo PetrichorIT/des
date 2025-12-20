@@ -10,8 +10,8 @@ fn main() {
 
     let rt = Builder::seeded(0x123).build(app.freeze());
 
-    let (_, time, p) = rt.run().unwrap();
+    let r = rt.run().unwrap_no_err();
 
-    assert_eq!(p.event_count, 7);
-    assert_eq!(time.as_millis(), 315)
+    assert_eq!(r.profiler.event_count, 7);
+    assert_eq!(r.time.as_millis(), 315)
 }

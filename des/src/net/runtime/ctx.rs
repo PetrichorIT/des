@@ -1,16 +1,19 @@
 #![allow(missing_docs)]
 
 use super::{Globals, HandleMessageEvent, MessageExitingConnection, Sim};
-use crate::net::channel::SendError;
-use crate::net::gate::Connection;
-use crate::net::module::{MOD_CTX, current};
-use crate::net::runtime::NetEvents;
-use crate::net::{gate::GateRef, message::Message};
-use crate::prelude::{EventLifecycle, ModuleRef, RuntimeError};
-use crate::runtime::{LikeRuntimeError, Runtime};
-use crate::sync::Mutex;
-use crate::time::SimTime;
-use std::iter::once;
+use crate::{
+    net::{
+        channel::SendError,
+        gate::{Connection, GateRef},
+        message::Message,
+        module::{MOD_CTX, current},
+        runtime::NetEvents,
+    },
+    prelude::{EventLifecycle, ModuleRef, RuntimeError},
+    runtime::{LikeRuntimeError, Runtime},
+    sync::Mutex,
+    time::SimTime,
+};
 use std::mem;
 use std::sync::{Arc, Weak};
 
@@ -22,7 +25,9 @@ struct BufferContext {
     // globals
     globals: Option<Weak<Globals>>,
     // errors
-    error: RuntimeError,
+    error: Vec<Box<dyn LikeRuntimeError>>,
+    // failure
+    failure: Result<(), RuntimeError>,
 }
 
 impl BufferContext {
@@ -30,7 +35,8 @@ impl BufferContext {
         Self {
             events: Vec::new(),
             globals: None,
-            error: RuntimeError::empty(),
+            error: Vec::new(),
+            failure: Ok(()),
         }
     }
 }
@@ -114,7 +120,10 @@ pub(crate) fn buf_schedule_event(event: NetEvents, time: SimTime) {
     ctx.events.push((event, time));
 }
 
-pub(crate) fn buf_process<A>(_module: &ModuleRef, rt: &mut Runtime<Sim<A>>)
+pub(crate) fn buf_process<A>(
+    _module: &ModuleRef,
+    rt: &mut Runtime<Sim<A>>,
+) -> Result<(), RuntimeError>
 where
     A: EventLifecycle<Sim<A>>,
 {
@@ -126,17 +135,22 @@ where
     }
 
     // (1) Pull collected failures from CTX
-    let mut swappable = RuntimeError::empty();
-    mem::swap(&mut swappable, &mut ctx.error);
-    rt.app.error.merge(swappable);
+    rt.app.error.extend(ctx.error.drain(..));
+
+    let mut swaped_out = Ok(());
+    mem::swap(&mut swaped_out, &mut ctx.failure);
+    swaped_out
 }
 
-pub(crate) fn buf_fail(e: impl LikeRuntimeError) {
+pub(crate) fn buf_report(e: impl LikeRuntimeError) {
     let mut ctx = BUF_CTX.lock();
-    ctx.error.extend(once(Box::new(e)));
+    ctx.error.push(Box::new(e));
 }
 
-pub(crate) fn buf_fail_internal(e: RuntimeError) {
+pub(crate) fn buf_fail(e: RuntimeError) {
     let mut ctx = BUF_CTX.lock();
-    ctx.error.merge(e);
+    match &mut ctx.failure {
+        Ok(()) => ctx.failure = Err(e),
+        Err(err) => err.merge(e),
+    }
 }

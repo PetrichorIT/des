@@ -13,12 +13,12 @@ fn main() {
 
     let rt = Builder::seeded(0x123).build(app.freeze());
 
-    let (_, time, profile) = rt.run().unwrap();
+    let r = rt.run().unwrap_no_err();
 
     // assert_eq!(tie, 18224.956482853);
 
-    assert_eq!(time.as_secs(), 9264);
-    assert_eq!(profile.event_count, 12_000_901);
+    assert_eq!(r.time.as_secs(), 9264);
+    assert_eq!(r.profiler.event_count, 12_000_901);
 
     // profile
     //     .write_to("examples/ndl/bench")

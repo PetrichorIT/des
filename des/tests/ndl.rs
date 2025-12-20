@@ -115,9 +115,9 @@ fn small_network() -> Result<(), Box<dyn std::error::Error>> {
         .max_time(1000.0.into())
         .build(app.freeze())
         .run()
-        .unwrap();
+        .unwrap_no_err();
 
-    assert_eq!(r.1.as_secs(), 200);
+    assert_eq!(r.time.as_secs(), 200);
     Ok(())
 }
 
@@ -138,9 +138,9 @@ fn ring_topology() -> Result<(), Box<dyn std::error::Error>> {
         .max_time(1000.0.into())
         .build(app.freeze())
         .run()
-        .unwrap();
+        .unwrap_no_err();
 
-    assert_eq!(r.1.as_secs(), 200);
+    assert_eq!(r.time.as_secs(), 200);
     Ok(())
 }
 

@@ -21,7 +21,7 @@ mod cfg;
 pub(crate) use cfg::SimConfiguration;
 
 mod api;
-pub use self::api::{fail, globals, schedule_event};
+pub use self::api::{fail, globals, report, schedule_event};
 
 mod events;
 pub use self::events::*;
@@ -58,9 +58,10 @@ pub use self::spawner::{Spawner, SpawnerKind};
 /// # use des::net::handlers::HandlerFn;
 /// struct Inner;
 /// impl EventLifecycle<Sim<Inner>> for Inner {
-///     fn at_sim_start(rt: &mut Runtime<Sim<Inner>>) {
+///     fn at_sim_start(rt: &mut Runtime<Sim<Inner>>)  -> Result<(), RuntimeError> {
 ///         println!("Hello simulation");
 ///         /* Do something */
+///         Ok(())
 ///     }
 /// }
 ///
@@ -477,7 +478,7 @@ impl<A> EventLifecycle<Sim<A>> for SimLifecycle
 where
     A: EventLifecycle<Sim<A>>,
 {
-    fn at_sim_start(rt: &mut Runtime<Sim<A>>) {
+    fn at_sim_start(rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError> {
         set_hook(Box::new(panic_hook));
 
         let mods = rt.app.modules.lock().expect("failed");
@@ -517,14 +518,16 @@ where
                     tracing::info!("Calling at_sim_start({}).", stage);
 
                     rt.app.error.extend(module.at_sim_start(stage).err());
-                    module.deactivate();
+                    module.deactivate()?;
 
-                    super::runtime::buf_process(&module, rt);
+                    super::runtime::buf_process(&module, rt)?;
                 }
             }
         }
 
-        A::at_sim_start(rt);
+        A::at_sim_start(rt)?;
+
+        Ok(())
     }
 
     fn at_sim_end(rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError> {
@@ -550,21 +553,13 @@ where
             tracing::info!("Calling 'at_sim_end'");
             let _ = module.activate();
             let _ = module.at_sim_end().map_err(|e| error.merge(e));
-            module.deactivate();
+            module.deactivate()?;
 
             // NOTE: no buf_process since no furthe events will be processed.
         }
 
         let _ = take_hook();
         if error.is_empty() { Ok(()) } else { Err(error) }
-    }
-
-    #[inline]
-    fn sim_should_stop(runtime: &Runtime<Sim<A>>) -> bool
-    where
-        Sim<A>: Application,
-    {
-        !runtime.app.error.is_empty()
     }
 }
 

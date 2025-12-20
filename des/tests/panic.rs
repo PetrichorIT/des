@@ -87,7 +87,7 @@ fn unwind_sim_panic_at_handle_message() {
 
     let mut rt = Builder::seeded(123).build(sim.freeze());
     rt.add_message_onto(gate, Message::default(), 5.0.into());
-    let err = rt.run().unwrap_err();
+    let err = rt.run().error.unwrap();
     assert!(matches!(
         err[0].as_any().downcast_ref::<Error>().unwrap().kind,
         ErrorKind::ModulePanic(_)
@@ -114,7 +114,7 @@ fn unwind_sim_panic_at_sim_start() {
 
     let mut rt = Builder::seeded(123).build(sim.freeze());
     rt.add_message_onto(gate, Message::default(), 5.0.into());
-    let err = rt.run().unwrap_err();
+    let err = rt.run().error.unwrap();
     assert!(matches!(
         err[0].as_any().downcast_ref::<Error>().unwrap().kind,
         ErrorKind::ModulePanic(_)
@@ -141,7 +141,7 @@ fn unwind_sim_panic_at_sim_end() {
 
     let mut rt = Builder::seeded(123).build(sim.freeze());
     rt.add_message_onto(gate, Message::default(), 5.0.into());
-    let err = rt.run().unwrap_err();
+    let err = rt.run().error.unwrap();
 
     assert!(matches!(
         err[0].as_any().downcast_ref::<Error>().unwrap().kind,
@@ -171,7 +171,7 @@ fn unwind_behaviour_unwind_allways_panics() {
 
     let mut rt = Builder::seeded(123).build(sim.freeze());
     rt.add_message_onto(gate, Message::default(), 5.0.into());
-    let err = rt.run().unwrap_err();
+    let err = rt.run().error.unwrap();
     assert!(matches!(
         err[0].as_any().downcast_ref::<Error>().unwrap().kind,
         ErrorKind::ModulePanic(_)
@@ -212,5 +212,5 @@ fn unwind_and_restart() -> Result<(), RuntimeError> {
 
     let mut rt = Builder::seeded(123).build(sim.freeze());
     rt.add_message_onto(gate, Message::default(), 5.0.into());
-    rt.run().map(|_| ())
+    rt.run().as_result().map(|_| ())
 }

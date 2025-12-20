@@ -15,22 +15,20 @@ use std::{
     sync::MutexGuard,
 };
 
-mod event;
-pub use self::event::*;
-
-mod limit;
-pub use self::limit::*;
-
 mod bench;
-pub use bench::*;
-
 mod builder;
-pub use builder::*;
-
 mod error;
-pub use error::*;
-
+mod event;
+mod limit;
 mod metrics;
+mod result;
+
+pub use self::bench::*;
+pub use self::builder::*;
+pub use self::error::*;
+pub use self::event::*;
+pub use self::limit::*;
+pub use self::result::*;
 
 pub(crate) const FT_NET: bool = cfg!(feature = "net");
 pub(crate) const FT_CQUEUE: bool = cfg!(feature = "cqueue");
@@ -144,20 +142,6 @@ impl<A> Runtime<A>
 where
     A: Application,
 {
-    // ///
-    // /// Returns the current number of events on enqueud.
-    // ///
-    // pub(crate) fn num_non_zero_events_queued(&self) -> usize {
-    //     self.future_event_set.len_nonzero()
-    // }
-
-    // ///
-    // /// Returns the current number of events on enqueud.
-    // ///
-    // pub(crate) fn num_zero_events_queued(&self) -> usize {
-    //     self.future_event_set.len_zero()
-    // }
-
     ///
     /// Returns the number of events that were dispatched on this [`Runtime`] instance.
     ///
@@ -243,10 +227,11 @@ where
     ///     type Lifecycle = Self;
     /// }
     /// impl EventLifecycle for MyApp {
-    ///     fn at_sim_start(rt: &mut Runtime<Self>) {
+    ///     fn at_sim_start(rt: &mut Runtime<Self>) -> Result<(), RuntimeError> {
     ///         rt.add_event(MyEventSet::EventA, SimTime::from(1.0));
     ///         rt.add_event(MyEventSet::EventB, SimTime::from(2.0));
     ///         rt.add_event(MyEventSet::EventA, SimTime::from(3.0));
+    ///         Ok(())
     ///     }
     /// }
     ///
@@ -256,22 +241,17 @@ where
     ///     EventB
     /// }
     /// impl Event<MyApp> for MyEventSet {
-    ///     fn handle(self, rt: &mut Runtime<MyApp>) {
+    ///     fn handle(self, rt: &mut Runtime<MyApp>) -> Result<(), RuntimeError> {
     ///         dbg!(self, SimTime::now());
+    ///         Ok(())
     ///     }
     /// }
     ///
     ///
     /// let runtime = Builder::new().build(MyApp());
-    /// let result = runtime.run();
-    ///
-    /// match result {
-    ///     Ok((_, time, profiler))  => {
-    ///         assert_eq!(time, SimTime::from(3.0));
-    ///         assert_eq!(profiler.event_count, 3);
-    ///     },
-    ///     _ => panic!("They can't do that! Shoot them or something!")
-    /// }
+    /// let result = runtime.run().unwrap_no_err();
+    /// assert_eq!(result.time, SimTime::from(3.0));
+    /// assert_eq!(result.profiler.event_count, 3);
     ///
     /// ```
     ///
@@ -283,17 +263,21 @@ where
     /// # Panics
     ///
     /// This function panics if the simulation has not been started.
-    pub fn run(mut self) -> Result<(A, SimTime, Profiler<A::EventSet>), RuntimeError> {
+    pub fn run(mut self) -> RuntimeResult<A> {
         assert_eq!(
             self.state,
             State::Ready,
             "Sim::run can only be used for simulations in the ready state"
         );
         // (0) Start sim-start
-        self.start();
+        if let Err(e) = self.start() {
+            return RuntimeResult::new(self, Some(e));
+        }
 
         // (1) Event main loop
-        self.dispatch_all();
+        if let Err(e) = self.dispatch_all() {
+            return RuntimeResult::new(self, Some(e));
+        }
 
         // (2) Finish sim-end
         self.finish()
@@ -303,7 +287,7 @@ where
     /// of start, tick and finish to complete a full execution cycle.
     ///
     /// `start` must be called before any calls to the main loop.
-    pub fn start(&mut self) {
+    pub fn start(&mut self) -> Result<(), RuntimeError> {
         macro_rules! symbol {
             ($i:ident) => {
                 if $i { SYM_CHECKMARK } else { SYM_CROSSMARK }
@@ -332,9 +316,10 @@ where
         self.profiler.start();
 
         // (2) sim-starting on application object
-        A::Lifecycle::at_sim_start(self);
+        A::Lifecycle::at_sim_start(self)?;
 
         self.state = State::Running;
+        Ok(())
     }
 
     /// Executes the next n events in the runtime queue.
@@ -342,7 +327,7 @@ where
     /// # Panics
     ///
     /// This function panics if the simulation has not been started.
-    pub fn dispatch_n_events(&mut self, n: usize) -> bool {
+    pub fn dispatch_n_events(&mut self, n: usize) -> Result<(), RuntimeError> {
         assert_eq!(
             self.state,
             State::Running,
@@ -351,17 +336,17 @@ where
 
         let mut limit = RuntimeLimit::EventCount(self.num_events_dispatched() + n);
         mem::swap(&mut self.limit, &mut limit);
-        self.dispatch_all();
+        self.dispatch_all()?;
         self.limit = limit;
 
-        false
+        Ok(())
     }
 
     /// Executes runtime events until the runtime reaches the designated time
     /// # Panics
     ///
     /// This function panics if the simulation has not been started.
-    pub fn dispatch_events_until(&mut self, t: SimTime) -> bool {
+    pub fn dispatch_events_until(&mut self, t: SimTime) -> Result<(), RuntimeError> {
         assert_eq!(
             self.state,
             State::Running,
@@ -370,10 +355,10 @@ where
 
         let mut limit = RuntimeLimit::SimTime(t);
         mem::swap(&mut self.limit, &mut limit);
-        self.dispatch_all();
+        self.dispatch_all()?;
         self.limit = limit;
 
-        false
+        Ok(())
     }
 
     /// Executes runtime events until the runtime reaches the designated time
@@ -381,13 +366,14 @@ where
     /// # Panics
     ///
     /// This function panics if the simulation has not been started.
-    pub fn dispatch_all(&mut self) {
+    pub fn dispatch_all(&mut self) -> Result<(), RuntimeError> {
         assert_eq!(
             self.state,
             State::Running,
             "dispatching is only allowed for running simulations"
         );
-        while !self.dispatch_event() {}
+        while !(self.dispatch_event()?) {}
+        Ok(())
     }
 
     /// Decontructs the runtime and returns the application and the final `sim_time`.
@@ -404,7 +390,7 @@ where
     ///
     /// This function panics if the runtime is has not yet been started.
     #[allow(unused_mut)]
-    pub fn finish(mut self) -> Result<(A, SimTime, Profiler<A::EventSet>), RuntimeError> {
+    pub fn finish(mut self) -> RuntimeResult<A> {
         assert_eq!(
             self.state,
             State::Running,
@@ -412,8 +398,15 @@ where
         );
 
         // Call the fin-handler on the allocated application
-        A::Lifecycle::at_sim_end(&mut self)?;
-        self.profiler.finish(self.itr);
+        let error = A::Lifecycle::at_sim_end(&mut self).err();
+
+        let mut result = RuntimeResult {
+            time: self.sim_time(),
+            app: self.app,
+            profiler: self.profiler,
+            error,
+        };
+        result.profiler.finish(self.itr);
 
         if self.future_event_set.is_empty() && self.itr == 0 {
             if !self.quiet {
@@ -423,43 +416,44 @@ where
                 println!("\u{23A3}");
             }
 
-            let time = self.sim_time();
-            return Ok((self.app, time, self.profiler));
+            return result;
         }
 
         if self.future_event_set.is_empty() {
-            let time = self.sim_time();
-
             if !self.quiet {
                 println!("\u{23A1}");
                 println!("\u{23A2} Simulation ended");
-                println!("\u{23A2}  Ended at event #{} after {}", self.itr, time);
-                println!("\u{23A3}");
-            }
-
-            Ok((self.app, time, self.profiler))
-        } else {
-            let time = self.sim_time();
-
-            if !self.quiet {
-                println!("\u{23A1}");
-                println!("\u{23A2} Simulation ended prematurly");
                 println!(
-                    "\u{23A2}  Ended at event #{} with {} active events after {}",
-                    self.itr,
-                    self.future_event_set.len(),
-                    time
+                    "\u{23A2}  Ended at event #{} after {}",
+                    self.itr, result.time
                 );
                 println!("\u{23A3}");
             }
 
-            self.profiler.remaining.reserve(self.future_event_set.len());
-            while !self.future_event_set.is_empty() {
-                let event_frame = self.future_event_set.fetch_next();
-                self.profiler.remaining.push(event_frame);
+            result
+        } else {
+            if !self.quiet {
+                println!("\u{23A1}");
+                println!("\u{23A2} Simulation stopped");
+                println!(
+                    "\u{23A2}  Ended at event #{} with {} active events after {}",
+                    self.itr,
+                    self.future_event_set.len(),
+                    result.time
+                );
+                println!("\u{23A3}");
             }
 
-            Ok((self.app, time, self.profiler))
+            result
+                .profiler
+                .remaining
+                .reserve(self.future_event_set.len());
+            while !self.future_event_set.is_empty() {
+                let event_frame = self.future_event_set.fetch_next();
+                result.profiler.remaining.push(event_frame);
+            }
+
+            result
         }
     }
 
@@ -469,30 +463,25 @@ where
     /// This function requires the caller to guarantee that at least one
     /// event exists in the future event set.
     #[allow(clippy::should_implement_trait)]
-    fn dispatch_event(&mut self) -> bool {
+    fn dispatch_event(&mut self) -> Result<bool, RuntimeError> {
         if self.future_event_set.is_empty() {
-            return true;
+            return Ok(true);
         }
 
         let (event, time) = self.future_event_set.fetch_next();
 
         if self.limit.applies(self.itr + 1, time) {
             self.future_event_set.add(time, event);
-            return true;
-        }
-
-        if A::Lifecycle::sim_should_stop(self) {
-            return true;
+            return Ok(true);
         }
 
         self.itr += 1;
 
         // Let this be the only position where SimTime is changed
         SimTime::set_now(time);
+        event.handle(self)?;
 
-        event.handle(self);
-
-        false
+        Ok(false)
     }
 
     ///
@@ -515,7 +504,7 @@ where
     /// #     EventB
     /// # }
     /// # impl Event<MyApp> for MyEventSet {
-    /// #     fn handle(self, rt: &mut Runtime<MyApp>) {}
+    /// #     fn handle(self, rt: &mut Runtime<MyApp>) -> Result<(), RuntimeError> { Ok(()) }
     /// # }
     /// #
     /// fn main() {
@@ -524,13 +513,9 @@ where
     ///         .build(MyApp());
     ///     runtime.add_event_in(MyEventSet::EventA, Duration::new(12, 0));
     ///
-    ///     match runtime.run() {
-    ///         Ok((_, time, profiler)) => {
-    ///             assert_eq!(time, SimTime::from(22.0));
-    ///             assert_eq!(profiler.event_count, 1);
-    ///         },
-    ///         _ => panic!("They can't do that! Shoot them or something!")
-    ///     }
+    ///     let result = runtime.run().unwrap_no_err();
+    ///     assert_eq!(result.time, SimTime::from(22.0));
+    ///     assert_eq!(result.profiler.event_count, 1);
     /// }
     /// ```
     ///
@@ -559,7 +544,7 @@ where
     /// #     EventB
     /// # }
     /// # impl Event<MyApp> for MyEventSet {
-    /// #     fn handle(self, rt: &mut Runtime<MyApp>) {}
+    /// #     fn handle(self, rt: &mut Runtime<MyApp>) -> Result<(), RuntimeError> { Ok(()) }
     /// # }
     /// #
     /// fn main() {
@@ -568,13 +553,10 @@ where
     ///         .build(MyApp());
     ///     runtime.add_event(MyEventSet::EventA, SimTime::from(12.0));
     ///
-    ///     match runtime.run() {
-    ///         Ok((_, time, profiler)) => {
-    ///             assert_eq!(time, SimTime::from(12.0)); // 12 not 10+12 = 22
-    ///             assert_eq!(profiler.event_count, 1);
-    ///         },
-    ///         _ => panic!("They can't do that! Shoot them or something!")
-    ///     }
+    ///     let result = runtime.run().unwrap_no_err();
+    ///     assert_eq!(result.time, SimTime::from(12.0)); // 12 not 10+12 = 22
+    ///     assert_eq!(result.profiler.event_count, 1);
+    ///
     /// }
     /// ```
     ///
