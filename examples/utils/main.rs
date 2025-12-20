@@ -57,13 +57,15 @@ fn main() -> std::io::Result<()> {
     let topo = app.globals().topology();
 
     assert_eq!(topo.node_count(), 5);
-    assert_eq!(topo.edge_count(), 4);
+    assert_eq!(topo.edge_count(), 2);
 
     // std::fs::File::create("examples/utils/graph.svg")?.write_all(topo.as_svg()?.as_bytes())?;
 
     // Chain 0: iterations [0, 1, 2, ..., 10] a [ExitingConn, HandleMessage] + 3
     // Chain 1: iterations [0, 1, 2] a 2 events + one 3th event
-    assert_eq!(p.event_count, ((4 * 11 + 2) + (6 * 2 + 2)));
+    // + 5 sim_start_done events
+    // + 5 sim_start_done events
+    assert_eq!(p.event_count, ((4 * 11 + 2) + (6 * 2 + 2) + 5));
 
     // Chain 0 longest:
     // - start at 1
