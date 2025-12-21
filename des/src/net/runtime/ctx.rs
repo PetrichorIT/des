@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use super::{Globals, HandleMessageEvent, MessageExitingConnection, Sim};
+use super::{HandleMessageEvent, MessageExitingConnection, Sim};
 use crate::{
     net::{
         channel::SendError,
@@ -14,20 +14,17 @@ use crate::{
     sync::Mutex,
     time::SimTime,
 };
-use std::sync::{Arc, Weak};
 
 static EXEC_CTX: Mutex<EventExecutionContext> = Mutex::new(EventExecutionContext::new());
 
 struct EventExecutionContext {
     // All new events that will be scheduled
     events: Vec<(NetEvents, SimTime)>,
-    // globals
-    globals: Option<Weak<Globals>>,
     // errors
     error: Vec<Box<dyn LikeRuntimeError>>,
     // failure
     failure: Option<RuntimeError>,
-    /// Indicates whether any call to the panic_hook has been observed. This should trigger a try-join to fast-find crashing tokio tasks.
+    /// Indicates whether any call to the panic-hook has been observed. This should trigger a try-join to fast-find crashing tokio tasks.
     observed_panics: bool,
 }
 
@@ -35,7 +32,6 @@ impl EventExecutionContext {
     const fn new() -> Self {
         Self {
             events: Vec::new(),
-            globals: None,
             error: Vec::new(),
             failure: None,
             observed_panics: false,
@@ -46,18 +42,11 @@ impl EventExecutionContext {
 unsafe impl Send for EventExecutionContext {}
 unsafe impl Sync for EventExecutionContext {}
 
-impl Globals {
-    pub(crate) fn current() -> Arc<Self> {
-        let ctx = EXEC_CTX.lock();
-        ctx.globals
-            .as_ref()
-            .expect("no globals attached to this event")
-            .upgrade()
-            .expect("globals allready dropped: simulation shutting down")
-    }
-}
-
 impl ModuleRef {
+    /// INTERNAL
+    /// # Errors
+    /// May occur
+    #[allow(clippy::missing_panics_doc)]
     pub fn deactivate<A>(&self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError>
     where
         A: EventLifecycle<Sim<A>>,
@@ -95,9 +84,12 @@ impl ModuleRef {
     }
 }
 
-pub(crate) fn buf_init(globals: Weak<Globals>) {
+pub(crate) fn buf_init() {
     let mut ctx = EXEC_CTX.lock();
-    ctx.globals = Some(globals);
+    ctx.events.clear();
+    ctx.events.clear();
+    ctx.observed_panics = false;
+    ctx.failure = None;
 
     // TODO: remove ?
     // SAFTEY:

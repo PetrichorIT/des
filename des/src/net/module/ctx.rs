@@ -1,7 +1,7 @@
 use super::{DummyModule, ModuleRef, ModuleRefWeak, Prop, PropType, Props, RawProp};
 use crate::{
     net::{
-        Error, ErrorKind,
+        Error, ErrorKind, Globals,
         gate::IntoModuleGate,
         module::SignalCode,
         processing::ProcessingStack,
@@ -15,7 +15,14 @@ use crate::{
 use fxhash::FxHashMap;
 
 use spin::RwLock;
-use std::{cell::Cell, fmt::Debug, hash::Hash, sync::Arc, task::Waker, time::Duration};
+use std::{
+    cell::Cell,
+    fmt::Debug,
+    hash::Hash,
+    sync::{Arc, Weak},
+    task::Waker,
+    time::Duration,
+};
 
 pub(crate) static MOD_CTX: SwapLock<Option<Arc<ModuleContext>>> = SwapLock::new(None);
 
@@ -46,16 +53,15 @@ pub(crate) enum State {
 /// managing these structures is rather complicated. However the nessecary
 /// constructors are still available, so use them with care.
 pub struct ModuleContext {
-    pub(crate) state: Cell<State>,
     pub(crate) me: RwLock<ModuleRefWeak>,
 
     pub(crate) path: ObjectPath,
+    pub(crate) state: Cell<State>,
     pub(crate) gates: RwLock<Vec<GateRef>>,
-
     pub(crate) props: RwLock<Props>,
-
     pub(crate) unwind_behaviour: Cell<UnwindBehaviour>,
 
+    pub(crate) globals: Weak<Globals>,
     pub(crate) parent: Option<ModuleRefWeak>,
     pub(crate) children: RwLock<FxHashMap<String, ModuleRef>>,
 
@@ -72,9 +78,10 @@ impl ModuleContext {
     /// The sofware attched to the returned reference is a dummy module
     /// that should be replaced before the simulation is started.
     #[must_use]
-    pub fn new_standalone(path: ObjectPath) -> ModuleRef {
+    pub fn new_root(path: ObjectPath, globals: Weak<Globals>) -> ModuleRef {
         ModuleRef::dummy(Arc::new(Self {
             me: RwLock::new(ModuleRefWeak::empty()),
+            globals,
 
             props: RwLock::new(Props::default()),
 
@@ -105,6 +112,7 @@ impl ModuleContext {
         let path = ObjectPath::appended(&parent.ctx.path, name);
         let this = ModuleRef::dummy(Arc::new(Self {
             me: RwLock::new(ModuleRefWeak::empty()),
+            globals: parent.globals.clone(),
 
             props: RwLock::new(Props::default()),
 
@@ -149,6 +157,15 @@ impl ModuleContext {
             let as_arc = self.me().ctx;
             Arc::ptr_eq(&as_arc, ctx)
         })
+    }
+
+    /// Provides the global context this node is connected to.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the globals were dropped aka. we are in the drop chain.
+    pub fn globals(&self) -> Arc<Globals> {
+        self.globals.upgrade().expect("failed to upgrade")
     }
 
     /// Indicates whether the module belonging to this context is already initialized.

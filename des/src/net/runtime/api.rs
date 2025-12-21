@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     net::runtime::{NetEvents, buf_fail, buf_report, buf_schedule_event},
-    prelude::RuntimeError,
+    prelude::{RuntimeError, current},
     runtime::LikeRuntimeError,
     time::SimTime,
 };
@@ -20,7 +20,7 @@ use super::Globals;
 ///
 #[must_use]
 pub fn globals() -> Arc<Globals> {
-    Globals::current()
+    current().globals()
 }
 
 /// Reports an error that will fail the current simulation. This will

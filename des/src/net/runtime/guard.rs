@@ -1,9 +1,8 @@
 use crate::net::{
-    Globals,
     module::module_ctx_drop,
     runtime::{buf_drop, buf_init},
 };
-use std::sync::{Mutex, MutexGuard, TryLockError, Weak};
+use std::sync::{Mutex, MutexGuard, TryLockError};
 
 static GUARD: Mutex<()> = Mutex::new(());
 
@@ -14,7 +13,7 @@ pub(super) struct SimStaticsGuard {
 }
 
 impl SimStaticsGuard {
-    pub(super) fn new(globals: Weak<Globals>) -> Self {
+    pub(super) fn new() -> Self {
         let guard = GUARD.try_lock();
         let guard = match guard {
             Ok(guard) => guard,
@@ -30,7 +29,7 @@ impl SimStaticsGuard {
             },
         };
 
-        buf_init(globals);
+        buf_init();
         Self { guard }
     }
 }

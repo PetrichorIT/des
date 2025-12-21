@@ -229,7 +229,7 @@ mod tests {
 
     #[test]
     fn fmt() {
-        let module = ModuleContext::new_standalone("root.a.b".into());
+        let module = ModuleContext::new_root("root.a.b".into(), Weak::new());
         let m2 = module.clone();
         let weak = ModuleRefWeak::new(&module);
 
@@ -258,7 +258,7 @@ mod tests {
         }
         impl Module for A {}
 
-        let module = ModuleContext::new_standalone("root".into());
+        let module = ModuleContext::new_root("root".into(), Weak::new());
         module.upgrade_dummy(ModuleImpl::new(
             ProcessingStack::default(),
             Box::new(A { inner: 42 }),

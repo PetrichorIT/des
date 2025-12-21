@@ -56,3 +56,5 @@ Equivalence to current features:
   - 1:n calling APIs
   - n:1 useless, thats just multiple events for the same node
 - ExecutionContext as part of current()
+
+# Runtime spawner could just store current() to have it as an arg for ModuleContext::new_child_of

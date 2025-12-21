@@ -410,7 +410,7 @@ impl ModuleRef {
     //     Ok(())
     // }
 
-    /// Lets the current module leave the scope of current()
+    /// Lets the current module leave the scope of `current()`
     pub fn leave_scope(&self) {
         let _ = ModuleContext::take();
     }

@@ -111,7 +111,7 @@ impl<A> Sim<A> {
     #[allow(clippy::new_ret_no_self)]
     pub fn new(inner: A) -> SimBuilder<A> {
         let globals = Arc::new(Globals::default());
-        let guard = SimStaticsGuard::new(Arc::downgrade(&globals));
+        let guard = SimStaticsGuard::new();
 
         Sim {
             error: RuntimeError::empty(),
@@ -679,6 +679,8 @@ impl ops::Deref for ModuleTree {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Weak;
+
     use super::*;
     use crate::net::module::ModuleContext;
 
@@ -686,7 +688,7 @@ mod tests {
     fn module_tree() {
         let mut tree = ModuleTree::default();
         fn module(path: &str) -> ModuleRef {
-            ModuleContext::new_standalone(path.into())
+            ModuleContext::new_root(path.into(), Weak::new())
         }
 
         tree.add(module("alice"));

@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc};
 
 use crate::{
     net::{
@@ -77,8 +77,13 @@ pub enum SpawnerKind {
 }
 
 enum InnerSpawner<'a, A> {
-    AtBuildtime { base: &'a mut SimBuilder<A> },
-    AtRuntime { cfg: SimConfiguration },
+    AtBuildtime {
+        base: &'a mut SimBuilder<A>,
+    },
+    AtRuntime {
+        cfg: SimConfiguration,
+        caller: &'a ModuleContext,
+    },
 }
 
 impl<'a, A> InnerSpawner<'a, A> {
@@ -97,7 +102,7 @@ impl<'a, A> InnerSpawner<'a, A> {
     ) -> ModuleRef {
         match self {
             Self::AtBuildtime { base } => crate_node_at_buildtime(path, module, base),
-            Self::AtRuntime { cfg, .. } => create_node_at_runtime(&path, module, &*cfg),
+            Self::AtRuntime { cfg, caller } => create_node_at_runtime(&path, module, &*cfg, caller),
         }
     }
 
@@ -130,7 +135,10 @@ impl<'a, A> InnerSpawner<'a, A> {
     {
         match self {
             Self::AtBuildtime { base } => InnerSpawner::AtBuildtime { base: *base },
-            Self::AtRuntime { cfg } => InnerSpawner::AtRuntime { cfg: cfg.clone() },
+            Self::AtRuntime { cfg, caller } => InnerSpawner::AtRuntime {
+                cfg: cfg.clone(),
+                caller,
+            },
         }
     }
 
@@ -165,7 +173,7 @@ fn crate_node_at_buildtime<A>(
     } else if let Some(zero_parent) = base.get(&ObjectPath::from("")) {
         ModuleContext::new_child_of(path.name(), zero_parent)
     } else {
-        ModuleContext::new_standalone(path)
+        ModuleContext::new_root(path, Arc::downgrade(&base.globals))
     };
     ctx.set_unwind_behaviour(base.cfg.default_unwind_behavior);
 
@@ -190,15 +198,15 @@ fn create_node_at_runtime(
     path: &ObjectPath,
     module_creator: impl FnOnce() -> Box<dyn Module>,
     cfg: &SimConfiguration,
+    caller: &ModuleContext,
 ) -> ModuleRef {
+    let globals = caller.globals();
     assert!(
-        globals().get(path).is_none(),
+        globals.get(path).is_none(),
         "cannot create node '{path}' that already exists"
     );
 
-    let parent_path = path.nonzero_parent().expect("must have a parent");
-    let parent = globals().get(&parent_path).expect("must have a parent");
-    let ctx = ModuleContext::new_child_of(path.name(), parent);
+    let ctx = ModuleContext::new_child_of(path.name(), caller.me());
     ctx.set_unwind_behaviour(cfg.default_unwind_behavior);
 
     // TODO: CFGs are missing here
@@ -206,7 +214,7 @@ fn create_node_at_runtime(
     // B) provide custom CFGs API to local spawners ?
 
     let path_parts = ctx.path.as_str().split('.').collect::<Vec<_>>();
-    globals().capture_for(&path_parts, &mut ctx.props.write());
+    globals.capture_for(&path_parts, &mut ctx.props.write());
 
     let prev = ctx.activate();
     let pe = {
@@ -217,7 +225,7 @@ fn create_node_at_runtime(
     ctx.upgrade_dummy(pe);
     ctx.leave_scope(); // Do not deactivate, since nothing should have been written to EXEC_CTX
 
-    globals().add_module(ctx.clone());
+    globals.add_module(ctx.clone());
 
     if let Some(prev) = prev {
         let _ = prev.me().activate();
@@ -235,10 +243,10 @@ fn create_node_at_runtime(
 
 impl<'a, A> Spawner<'a, A> {
     // FIXME: the +'static bound may be relaxed to 'a if we are not using a box
-    pub(crate) fn new_at_runtime(ctx: &ModuleContext, cfg: SimConfiguration) -> Self {
+    pub(crate) fn new_at_runtime(ctx: &'a ModuleContext, cfg: SimConfiguration) -> Self {
         Self {
             scope: ctx.path(),
-            inner: InnerSpawner::AtRuntime { cfg },
+            inner: InnerSpawner::AtRuntime { cfg, caller: ctx },
         }
     }
 

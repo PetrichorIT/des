@@ -87,11 +87,16 @@ fn signal_subscription_passed_to_created_child() -> Result<(), RuntimeError> {
         ModuleFn::new(
             || schedule_at(Message::default(), 2.0.into()),
             |_, _| {
-                globals()
-                    .get(&"parent".into())
-                    .unwrap()
-                    .spawner(ProcessingStack::default)
-                    .node("child", panicing_subprocess_at(4.0))
+                println!("[{}] 1 {}", SimTime::now(), current().path());
+
+                let g = globals();
+                println!("2");
+                let p = g.get(&"parent".into()).unwrap();
+                println!("3");
+                p.spawner(ProcessingStack::default)
+                    .node("child", panicing_subprocess_at(4.0));
+
+                println!("[{}] 2 {}", SimTime::now(), current().path());
             },
         ),
     );
