@@ -352,12 +352,18 @@ cfg_async! {
         pub(super) handles: Vec<(JoinHandle<()>, bool)>,
     }
 
+    #[derive(Debug, Default)]
+    struct TokioRuntimeStatics {
+        threads: Vec<(JoinHandle<()>, bool)>,
+        has_observed_panics: bool,
+    }
+
     #[allow(clippy::type_complexity)]
-    static JOIN_THREADS: LazyLock<Mutex<Vec<(JoinHandle<()>, bool)>>> =
+    static TOKIO_SHARED: LazyLock<Mutex<TokioRuntimeStatics>> =
         LazyLock::new(Mutex::default);
 
     impl Default for TokioRuntime {
-     fn default() -> Self {
+        fn default() -> Self {
             let tasks = Rc::new(LocalSet::new());
             Self {
                 tasks,
@@ -380,25 +386,32 @@ cfg_async! {
     }
 
     impl TokioRuntime {
+        /// Report a call to the panic hook
+        #[allow(clippy::missing_panics_doc)]
+        pub fn report_panic()  {
+            let mut shared = TOKIO_SHARED.lock().expect("failed to get lock");
+            shared.has_observed_panics = true;
+        }
+
         /// Join a handle.
         #[allow(clippy::missing_panics_doc)]
         pub fn join(handle: JoinHandle<()>) {
-            let mut join_threads = JOIN_THREADS.lock().expect("failed to get lock");
-            join_threads.push((handle, true));
+            let mut shared = TOKIO_SHARED.lock().expect("failed to get lock");
+            shared.threads.push((handle, true));
         }
 
         /// Try to join a handle.
         #[allow(clippy::missing_panics_doc)]
         pub fn try_join(handle: JoinHandle<()>) {
-            let mut join_threads = JOIN_THREADS.lock().expect("failed to get lock");
-            join_threads.push((handle, false));
+            let mut shared = TOKIO_SHARED.lock().expect("failed to get lock");
+             shared.threads.push((handle, false));
         }
 
         /// Reset the join handles.
         #[allow(clippy::missing_panics_doc)]
         pub fn reset_join_handles(&mut self) {
-            let mut join_threads = JOIN_THREADS.lock().expect("failed to get lock");
-            join_threads.clear();
+            let mut shared = TOKIO_SHARED.lock().expect("failed to get lock");
+            shared.threads.clear();
             self.handles.clear();
         }
 
@@ -477,7 +490,10 @@ cfg_async! {
             msg: Option<Message>,
             inner: &mut dyn FnMut(Option<Message>) -> Option<Message>,
         ) -> Option<Message> {
-            JOIN_THREADS.lock().expect("failed to get lock").clear();
+            let mut shared = TOKIO_SHARED.lock().expect("failed to get lock");
+            shared.threads.clear();
+            shared.has_observed_panics = false;
+            drop(shared);
 
             let res = self.tasks.block_on(&self.rt, async {
                 let res = inner(msg);
@@ -485,17 +501,13 @@ cfg_async! {
                 res
             });
 
-            self.handles.append(
-                &mut JOIN_THREADS
-                    .lock()
-                    .expect("failed to get lock, this should be impossible"),
-            );
+            let mut shared = TOKIO_SHARED.lock().expect("failed to get lock");
+            self.handles.append(&mut shared.threads);
 
-            if let Some(exec) = &*current().execution_context.read()  && exec.has_observed_panics() {
+            if shared.has_observed_panics {
                 if let Err(err) = self.check_for_panics() {
-                    exec.report_failure(err); // TODO: < not really correct
+                    current().exec().report_failure(err);
                 }
-                exec.clear_observed_panics();
             }
 
             res

@@ -26,23 +26,9 @@ struct EventExecutionContextInner {
     error: Vec<Box<dyn LikeRuntimeError>>,
     // failure
     failure: Option<RuntimeError>,
-    /// Indicates whether any call to the panic-hook has been observed. This should trigger a try-join to fast-find crashing tokio tasks.
-    observed_panics: bool,
 }
 
 impl EventExecutionContext {
-    pub(crate) fn report_panic(&self) {
-        self.inner.lock().observed_panics = true;
-    }
-
-    pub(crate) fn has_observed_panics(&self) -> bool {
-        self.inner.lock().observed_panics
-    }
-
-    pub(crate) fn clear_observed_panics(&self) {
-        self.inner.lock().observed_panics = false;
-    }
-
     pub(crate) fn report_error(&self, error: Box<dyn LikeRuntimeError>) {
         self.inner.lock().error.push(error);
     }

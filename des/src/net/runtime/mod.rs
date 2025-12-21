@@ -1,7 +1,7 @@
 use crate::{
     net::{
         module::{Cfg, DummyModule, MOD_CTX, Props, UnwindBehaviour, try_current},
-        processing::ProcessingStack,
+        processing::{ProcessingStack, TokioRuntime},
     },
     prelude::{Application, EventLifecycle, GateRef, Module, ModuleRef, ObjectPath, Runtime},
     runtime::RuntimeError,
@@ -585,8 +585,7 @@ fn panic_hook(info: &PanicHookInfo) {
             );
         }
 
-        current.exec().report_panic();
-        // buf_report_panic();
+        TokioRuntime::report_panic();
     } else {
         eprintln!("thread 'main' panicked:");
     }
