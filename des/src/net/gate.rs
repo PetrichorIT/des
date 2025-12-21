@@ -542,7 +542,7 @@ unsafe impl Send for Gate {}
 impl PartialEq for Gate {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name
-            && self.owner().ctx.id == other.owner().ctx.id
+            && Arc::ptr_eq(&self.owner().ctx, &other.owner().ctx)
             && self.size == other.size
             && self.pos == other.pos
     }

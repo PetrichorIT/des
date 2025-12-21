@@ -249,7 +249,7 @@ where
     ///
     ///
     /// let runtime = Builder::new().build(MyApp());
-    /// let result = runtime.run().unwrap_no_err();
+    /// let result = runtime.run().assert_no_err();
     /// assert_eq!(result.time, SimTime::from(3.0));
     /// assert_eq!(result.profiler.event_count, 3);
     ///
@@ -530,7 +530,7 @@ where
     ///         .build(MyApp());
     ///     runtime.add_event_in(MyEventSet::EventA, Duration::new(12, 0));
     ///
-    ///     let result = runtime.run().unwrap_no_err();
+    ///     let result = runtime.run().assert_no_err();
     ///     assert_eq!(result.time, SimTime::from(22.0));
     ///     assert_eq!(result.profiler.event_count, 1);
     /// }
@@ -570,7 +570,7 @@ where
     ///         .build(MyApp());
     ///     runtime.add_event(MyEventSet::EventA, SimTime::from(12.0));
     ///
-    ///     let result = runtime.run().unwrap_no_err();
+    ///     let result = runtime.run().assert_no_err();
     ///     assert_eq!(result.time, SimTime::from(12.0)); // 12 not 10+12 = 22
     ///     assert_eq!(result.profiler.event_count, 1);
     ///

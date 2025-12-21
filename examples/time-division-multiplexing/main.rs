@@ -245,7 +245,7 @@ fn main() {
     let mut sim = Sim::new(());
     sim.node(
         "tower",
-        HandlerFn::new(|msg| tracing::info!("#{} from {}", msg.id, msg.header.sender_module_id)),
+        HandlerFn::new(|msg| tracing::info!("#{} from", msg.id)),
     );
 
     // Create a channel, that will be shared by casting it to a ChannelRef

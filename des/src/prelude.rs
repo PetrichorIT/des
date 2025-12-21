@@ -50,7 +50,6 @@ cfg_net! {
     pub use crate::net::topology::Topology;
 
     pub use crate::net::module::Module;
-    pub use crate::net::module::ModuleId;
     pub use crate::net::module::ModuleRef;
 
 

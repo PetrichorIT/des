@@ -1,6 +1,6 @@
 use crate::net::module::State;
 use crate::net::processing::{ModuleImpl, ProcessingStack};
-use crate::prelude::{Gate, GateRef, RuntimeError};
+use crate::prelude::{Gate, GateRef};
 
 use super::{DummyModule, Module, ModuleContext};
 use std::any::Any;
@@ -165,45 +165,6 @@ impl ModuleRef {
     #[must_use]
     pub fn is_active(&self) -> bool {
         self.ctx.state.get() != State::Shutdown
-    }
-
-    /// INTERNAL
-    #[doc(hidden)]
-    #[must_use]
-    pub fn activate(&self) -> Option<Arc<ModuleContext>> {
-        let prev = ModuleContext::place(Arc::clone(&self.ctx));
-        #[cfg(debug_assertions)]
-        if let Some(prev) = &prev {
-            eprintln!("pushed-off ctx from {}", prev.path());
-        }
-        prev
-    }
-
-    /// INTERNAL
-    #[doc(hidden)]
-    #[allow(unused, clippy::unused_self)]
-    pub(crate) fn deactivate(&self) -> Result<(), RuntimeError> {
-        #[cfg(feature = "async")]
-        if !self.ctx.unwind_behaviour.get().on_panic_catch {
-            // Check for the join threads in the tokio runtime, to abort at an appropriate moment
-
-            use crate::net::{processing::TokioRuntime, runtime::buf_fail};
-            let mut processing = self.processing.try_borrow_mut().expect("failed to borrow");
-
-            let err = processing
-                .downcast_element_mut::<TokioRuntime>()
-                .and_then(|tokio| tokio.check_for_panics().err());
-
-            let _ = ModuleContext::take();
-
-            return match err {
-                Some(err) => Err(err),
-                None => Ok(()),
-            };
-        }
-
-        let _ = ModuleContext::take();
-        Ok(())
     }
 
     /// Creates a gate on the current module, returning its ID.

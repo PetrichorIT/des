@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use super::MessageBody;
-use crate::net::{gate::GateRef, module::ModuleId};
+use crate::net::gate::GateRef;
 use crate::time::SimTime;
 
 use std::fmt::Debug;
@@ -32,10 +32,7 @@ pub struct Header {
     pub kind: MessageKind, // Ethertype
     pub creation_time: SimTime,
     pub send_time: SimTime,
-
-    pub sender_module_id: ModuleId,   // MAC src
-    pub receiver_module_id: ModuleId, // MAC dest
-    pub last_gate: Option<GateRef>,   // Path info
+    pub last_gate: Option<GateRef>, // Path info
 
     pub src: [u8; 6],
     pub dst: [u8; 6],
@@ -48,9 +45,6 @@ impl Clone for Header {
             kind: self.kind,
             creation_time: SimTime::now(),
             send_time: self.send_time,
-
-            sender_module_id: self.sender_module_id,
-            receiver_module_id: self.receiver_module_id,
             last_gate: self.last_gate.clone(),
 
             src: self.src,
@@ -66,9 +60,6 @@ impl Default for Header {
             kind: 0,
             creation_time: SimTime::now(),
             send_time: SimTime::MIN,
-
-            sender_module_id: ModuleId::NULL,
-            receiver_module_id: ModuleId::NULL,
             last_gate: None,
 
             src: [0; 6],

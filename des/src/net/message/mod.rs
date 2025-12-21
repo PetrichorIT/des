@@ -10,7 +10,7 @@
 //! gate chains, to communicate with other modules. Schedule messages directed at yourself
 //! using [`schedule_at`] and [`schedule_in`].
 
-use crate::net::{gate::GateRef, module::ModuleId};
+use crate::net::gate::GateRef;
 use crate::time::SimTime;
 use std::any::Any;
 use std::fmt::{Debug, Display};
@@ -127,18 +127,6 @@ impl Message {
     /// **Builder** that sets the send time field.
     pub fn with_send_time(mut self, time: SimTime) -> Self {
         self.header.send_time = time;
-        self
-    }
-
-    /// **Builder** that sets the sender module ID field.
-    pub fn with_sender_module_id(mut self, id: ModuleId) -> Self {
-        self.header.sender_module_id = id;
-        self
-    }
-
-    /// **Builder** that sets the receiver module ID field.
-    pub fn with_receiver_module_id(mut self, id: ModuleId) -> Self {
-        self.header.receiver_module_id = id;
         self
     }
 
@@ -391,11 +379,7 @@ mod tests {
             }
         }
 
-        let msg = Message::default()
-            .with_id(123)
-            .with_receiver_module_id(ModuleId(1))
-            .with_sender_module_id(ModuleId(2))
-            .with_content(A(42));
+        let msg = Message::default().with_id(123).with_content(A(42));
 
         let (value, header, _) = msg.into_content::<A>();
         assert_eq!(header.id, 123);

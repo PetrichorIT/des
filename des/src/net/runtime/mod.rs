@@ -518,9 +518,7 @@ where
                     tracing::info!("Calling at_sim_start({}).", stage);
 
                     rt.app.error.extend(module.at_sim_start(stage).err());
-                    module.deactivate()?;
-
-                    super::runtime::buf_process(&module, rt)?;
+                    module.deactivate(rt)?;
                 }
             }
         }
@@ -553,9 +551,7 @@ where
             tracing::info!("Calling 'at_sim_end'");
             let _ = module.activate();
             let _ = module.at_sim_end().map_err(|e| error.merge(e));
-            module.deactivate()?;
-
-            // NOTE: no buf_process since no furthe events will be processed.
+            module.deactivate(rt)?; // provide the rt nonetheless, to record errors
         }
 
         let _ = take_hook();
@@ -575,6 +571,7 @@ fn panic_hook(info: &PanicHookInfo) {
                 SimTime::now()
             );
         }
+        buf_report_panic();
     } else {
         eprintln!("thread 'main' panicked:");
     }

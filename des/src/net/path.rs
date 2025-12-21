@@ -189,6 +189,18 @@ impl From<String> for ObjectPath {
     }
 }
 
+impl PartialOrd for ObjectPath {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for ObjectPath {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.data.cmp(&other.data)
+    }
+}
+
 impl Default for ObjectPath {
     fn default() -> Self {
         Self {

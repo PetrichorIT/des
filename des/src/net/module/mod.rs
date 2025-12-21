@@ -66,12 +66,15 @@
 //! Using the [`join`](ModuleContext::join) function, you can schedule a tokio task to be joined once the simulation ends.
 //! If that is not possible, an error will be returned from the simulation run.
 
+// A node is a set of processes
+// -> each invocation of a `trait Module` API  from Sim is a process
+// -> each tokio task is a process
+//
+// -> if a process fails, check whether its observed (sync = yes, async = sometimes)
+// -> unwind behaviour
+
 use crate::{net::message::Message, prelude::RuntimeError};
-use std::{
-    any::Any,
-    fmt,
-    sync::atomic::{AtomicU16, Ordering},
-};
+use std::any::Any;
 
 mod api;
 mod ctx;
@@ -93,29 +96,6 @@ pub use refs::*;
 pub use signal::*;
 
 use super::processing::ProcessingStack;
-
-/// A unique identifier for a module.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[repr(transparent)]
-pub struct ModuleId(pub u16);
-
-static MODULE_ID: AtomicU16 = AtomicU16::new(0xff);
-
-impl ModuleId {
-    /// A general purpose ID indicating None.
-    pub const NULL: ModuleId = ModuleId(0);
-
-    /// Generates a unique module ID.
-    pub fn generate() -> Self {
-        Self(MODULE_ID.fetch_add(1, Ordering::SeqCst))
-    }
-}
-
-impl fmt::Display for ModuleId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
 
 ///
 /// A set of user defined functions for customizing the
@@ -202,7 +182,7 @@ pub trait Module: Any {
     /// use des::prelude::*;
     /// # type Config = ();
     /// # type Record = u8;
-    /// # fn fetch_config(s: &str, id: ModuleId) -> Config {}
+    /// # fn fetch_config(s: &str, id: ObjectPath) -> Config {}
     ///
     /// struct SomeModule {
     ///     config: Config,
@@ -213,7 +193,7 @@ pub trait Module: Any {
     ///     /* ... */
     ///
     ///     fn at_sim_start(&mut self, _stage: usize) {
-    ///         self.config = fetch_config("https://mysimconfig.com/simrun1", current().id());
+    ///         self.config = fetch_config("https://mysimconfig.com/simrun1", current().path());
     ///         self.records.clear();
     ///     }
     ///

@@ -1,4 +1,4 @@
-use super::{DummyModule, ModuleId, ModuleRef, ModuleRefWeak, Prop, PropType, Props, RawProp};
+use super::{DummyModule, ModuleRef, ModuleRefWeak, Prop, PropType, Props, RawProp};
 use crate::{
     net::{
         Error, ErrorKind,
@@ -47,8 +47,6 @@ pub(crate) enum State {
 /// constructors are still available, so use them with care.
 pub struct ModuleContext {
     pub(crate) state: Cell<State>,
-    pub(crate) id: ModuleId,
-
     pub(crate) me: RwLock<ModuleRefWeak>,
 
     pub(crate) path: ObjectPath,
@@ -81,7 +79,6 @@ impl ModuleContext {
             props: RwLock::new(Props::default()),
 
             state: Cell::new(State::Created),
-            id: ModuleId::generate(),
             path,
             unwind_behaviour: Cell::default(),
 
@@ -112,7 +109,6 @@ impl ModuleContext {
             props: RwLock::new(Props::default()),
 
             state: Cell::new(State::Created),
-            id: ModuleId::generate(),
             path,
             unwind_behaviour: Cell::default(),
 
@@ -149,7 +145,10 @@ impl ModuleContext {
 
     /// Indicates whether the module belonging to this context is currently active.
     pub fn is_currently_active(&self) -> bool {
-        with_mod_ctx(|ctx| ctx.id == self.id)
+        with_mod_ctx(|ctx| {
+            let as_arc = self.me().ctx;
+            Arc::ptr_eq(&as_arc, ctx)
+        })
     }
 
     /// Indicates whether the module belonging to this context is already initialized.
@@ -176,12 +175,15 @@ impl ModuleContext {
 
     /// Unregisters the currently active module as a subscriber to the given signal.
     pub fn unsubscribe_from(&self, signal: SignalCode) {
-        self.unsubscribe_from_inner(signal, self.id);
+        self.unsubscribe_from_inner(signal, &self.me().ctx);
     }
 
-    fn unsubscribe_from_inner(&self, signal: SignalCode, subscriber: ModuleId) {
+    fn unsubscribe_from_inner(&self, signal: SignalCode, subscriber: &Arc<ModuleContext>) {
         if let Some(v) = self.signal_subscribers.write().get_mut(&signal) {
-            v.retain(|v| v.upgrade().is_some_and(|v| v.id != subscriber));
+            v.retain(|v| {
+                v.upgrade()
+                    .is_some_and(|v| !Arc::ptr_eq(&v.ctx, subscriber))
+            });
         }
 
         for child in self.children.read().values() {
@@ -323,27 +325,6 @@ impl ModuleContext {
                 default_unwind_behavior: UnwindBehaviour::default(),
             },
         )
-    }
-
-    /// Returns a runtime-unqiue identifier for the currently active module.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use des::prelude::*;
-    ///
-    /// struct MyModule;
-    /// impl Module for MyModule {
-    ///     fn handle_message(&mut self, msg: Message) {
-    ///         let id = current().id();
-    ///         assert_eq!(id, msg.header.receiver_module_id);
-    ///     }
-    /// }
-    /// ```
-    ///
-    /// [`Module`]: crate::net::module::Module
-    pub fn id(&self) -> ModuleId {
-        self.id
     }
 
     /// Returns a runtime-unqiue identifier for the currently active module,
@@ -587,7 +568,6 @@ impl Debug for ModuleContext {
 
 impl Hash for ModuleContext {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.id.hash(state);
         self.path.hash(state);
     }
 }
