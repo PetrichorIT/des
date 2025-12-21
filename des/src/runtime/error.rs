@@ -28,8 +28,8 @@ impl RuntimeError {
     }
 
     /// Merge
-    pub fn merge(&mut self, other: Self) {
-        self.inner.extend(other.inner);
+    pub fn merge(&mut self, mut other: Self) {
+        self.inner.append(&mut other.inner);
     }
 }
 

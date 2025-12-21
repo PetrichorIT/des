@@ -1,11 +1,6 @@
 use crate::{
-    net::{
-        channel::SendError,
-        gate::IntoModuleGate,
-        message::Message,
-        module::with_mod_ctx,
-        runtime::{buf_schedule_at, buf_send_at},
-    },
+    net::{channel::SendError, gate::IntoModuleGate, message::Message},
+    prelude::current,
     time::{Duration, SimTime},
 };
 
@@ -125,15 +120,14 @@ pub fn send_at(
     );
     // (0) Cast the message.
     let msg: Message = msg.into();
+    let ctx = current();
 
-    let gate = with_mod_ctx(|ctx| {
-        // (1) Cast the gate
-        #[allow(clippy::explicit_auto_deref)] // IS RIGHT ?
-        gate.as_gate(ctx)
-    });
+    // (1) Cast gate using local position
+    let gate = gate.as_gate(&ctx);
 
+    // (2) Send message using corresponding exec
     if let Some(gate) = gate {
-        buf_send_at(msg, gate, send_time)
+        ctx.exec().send_in(msg, gate, send_time)
     } else {
         #[cfg(feature = "tracing")]
         tracing::error!("Error: Could not find gate in current module");
@@ -193,5 +187,5 @@ pub fn schedule_at(msg: impl Into<Message>, arrival_time: SimTime) {
         SimTime::now()
     );
     let msg: Message = msg.into();
-    buf_schedule_at(msg, arrival_time);
+    current().exec().schedule(msg, arrival_time);
 }

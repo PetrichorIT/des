@@ -491,6 +491,13 @@ cfg_async! {
                     .expect("failed to get lock, this should be impossible"),
             );
 
+            if let Some(exec) = &*current().execution_context.read()  && exec.has_observed_panics() {
+                if let Err(err) = self.check_for_panics() {
+                    exec.report_failure(err); // TODO: < not really correct
+                }
+                exec.clear_observed_panics();
+            }
+
             res
         }
     }

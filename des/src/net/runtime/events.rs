@@ -8,6 +8,7 @@ use crate::{
             ModuleContext, ModuleRef, SIGNAL_MODULE_PANICED, SIGNAL_SIM_START_DONE, Signal, State,
             emit,
         },
+        runtime::EventExecutionContext,
         schedule_event,
     },
     prelude::RuntimeError,
@@ -196,15 +197,18 @@ impl HandleMessageEvent {
         A: EventLifecycle<Sim<A>>,
     {
         let message = self.message;
+        let module = &self.module;
 
         #[cfg(feature = "tracing")]
         tracing::info!("Handling message {:?}", message);
 
-        let module = &self.module;
+        let ctx = EventExecutionContext::default();
 
-        let _ = module.activate();
+        module.activate_with(Some(ctx.clone()));
         rt.app.error.extend(module.handle_message(message).err());
-        module.deactivate(rt)
+        module.deactivate();
+
+        ctx.finish(rt)
     }
 }
 
@@ -230,13 +234,15 @@ impl AtSimStartEvent {
             for module in &self.modules {
                 // Use cloned handles to appease the brwchk
                 if stage < module.num_sim_start_stages() {
-                    let _ = module.activate();
+                    let ctx = EventExecutionContext::default();
 
+                    module.activate_with(Some(ctx.clone()));
                     #[cfg(feature = "tracing")]
                     tracing::info!("Calling at_sim_start({}).", stage);
-
                     rt.app.error.extend(module.at_sim_start(stage).err());
-                    module.deactivate(rt)?;
+                    module.deactivate();
+
+                    ctx.finish(rt)?;
                 }
             }
         }
@@ -260,11 +266,15 @@ impl SignalEvent {
         A: EventLifecycle<Sim<A>>,
     {
         for subscriber in &self.subscribers {
-            let _ = subscriber.activate();
+            let ctx = EventExecutionContext::default();
+
+            subscriber.activate_with(Some(ctx.clone()));
             rt.app
                 .error
                 .extend(subscriber.handle_signal(self.signal.clone()).err());
-            subscriber.deactivate(rt)?;
+            subscriber.deactivate();
+
+            ctx.finish(rt)?;
         }
 
         Ok(())
@@ -289,11 +299,15 @@ impl ModuleShutdownEvent {
         tracing::info!("ModuleShutdownEvent");
 
         let module = &self.module;
-        let _ = module.activate();
+        let ctx = EventExecutionContext::default();
+
+        module.activate_with(Some(ctx.clone()));
         rt.app
             .error
             .extend(module.module_shutdown(self.restart_at).err());
-        module.deactivate(rt)
+        module.deactivate();
+
+        ctx.finish(rt)
     }
 }
 
@@ -313,9 +327,13 @@ impl ModuleRestartEvent {
         tracing::info!("ModuleRestartEvent");
 
         let module = &self.module;
-        let _ = module.activate();
+        let ctx = EventExecutionContext::default();
+
+        module.activate_with(Some(ctx.clone()));
         rt.app.error.extend(module.module_restart().err());
-        module.deactivate(rt)
+        module.deactivate();
+
+        ctx.finish(rt)
     }
 }
 
@@ -337,9 +355,13 @@ impl AsyncWakeupEvent {
         tracing::info!("async wakeup");
 
         let module = &self.module;
-        let _ = module.activate();
+        let ctx = EventExecutionContext::default();
+
+        module.activate_with(Some(ctx.clone()));
         rt.app.error.extend(module.async_wakeup().err());
-        module.deactivate(rt)
+        module.deactivate();
+
+        ctx.finish(rt)
     }
 }
 
@@ -371,10 +393,11 @@ impl ChannelUnbusyNotif {
 }
 
 impl ModuleRef {
-    /// INTERNAL
-    #[doc(hidden)]
-    #[must_use]
-    pub fn activate(&self) -> Option<Arc<ModuleContext>> {
+    pub(crate) fn activate_with(
+        &self,
+        exec: Option<EventExecutionContext>,
+    ) -> Option<Arc<ModuleContext>> {
+        self.ctx.set_execution_context(exec);
         let prev = ModuleContext::place(Arc::clone(&self.ctx));
         #[cfg(debug_assertions)]
         if let Some(prev) = &prev {
@@ -383,36 +406,9 @@ impl ModuleRef {
         prev
     }
 
-    // /// INTERNAL
-    // #[doc(hidden)]
-    // #[allow(unused, clippy::unused_self)]
-    // pub(crate) fn deactivate(&self) -> Result<(), RuntimeError> {
-    //     #[cfg(feature = "async")]
-    //     if !self.ctx.unwind_behaviour.get().on_panic_catch {
-    //         // Check for the join threads in the tokio runtime, to abort at an appropriate moment
-
-    //         use crate::net::{processing::TokioRuntime, runtime::buf_fail};
-    //         let mut processing = self.processing.try_borrow_mut().expect("failed to borrow");
-
-    //         let err = processing
-    //             .downcast_element_mut::<TokioRuntime>()
-    //             .and_then(|tokio| tokio.check_for_panics().err());
-
-    //         self.leave_scope();
-
-    //         return match err {
-    //             Some(err) => Err(err),
-    //             None => Ok(()),
-    //         };
-    //     }
-
-    //     self.leave_scope();
-    //     Ok(())
-    // }
-
-    /// Lets the current module leave the scope of `current()`
-    pub fn leave_scope(&self) {
+    pub(crate) fn deactivate(&self) {
         let _ = ModuleContext::take();
+        self.ctx.set_execution_context(None);
     }
 
     /// Resetting a module state as port of a reboot or shutdown sequence

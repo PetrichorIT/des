@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    net::runtime::{NetEvents, buf_fail, buf_report, buf_schedule_event},
+    net::runtime::NetEvents,
     prelude::{RuntimeError, current},
     runtime::LikeRuntimeError,
     time::SimTime,
@@ -35,7 +35,7 @@ pub fn globals() -> Arc<Globals> {
 /// Note that a runtime is active if a instance of [`Sim`](super::Sim) exists.
 ///
 pub fn report(e: impl LikeRuntimeError) {
-    buf_report(e);
+    current().exec().report_error(Box::new(e));
 }
 
 /// Fail the current simulation with the given error. This will terminate
@@ -49,7 +49,7 @@ pub fn report(e: impl LikeRuntimeError) {
 /// Note that a runtime is active if a instance of [`Sim`](super::Sim) exists.
 ///
 pub fn fail(e: impl LikeRuntimeError) {
-    buf_fail(RuntimeError::new(vec![e]));
+    current().exec().report_failure(RuntimeError::new(vec![e]));
 }
 
 /// Schedule an event to be executed at the given time.
@@ -65,5 +65,5 @@ pub fn fail(e: impl LikeRuntimeError) {
 /// Note that a runtime is active if a instance of [`Sim`](super::Sim) exists.
 ///
 pub fn schedule_event(event: NetEvents, time: SimTime) {
-    buf_schedule_event(event, time);
+    current().exec().schedule_event(event, time);
 }

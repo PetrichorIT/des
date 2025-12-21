@@ -1,7 +1,4 @@
-use crate::net::{
-    module::module_ctx_drop,
-    runtime::{buf_drop, buf_init},
-};
+use crate::net::module::module_ctx_drop;
 use std::sync::{Mutex, MutexGuard, TryLockError};
 
 static GUARD: Mutex<()> = Mutex::new(());
@@ -29,14 +26,14 @@ impl SimStaticsGuard {
             },
         };
 
-        buf_init();
+        // buf_init();
         Self { guard }
     }
 }
 
 impl Drop for SimStaticsGuard {
     fn drop(&mut self) {
-        buf_drop();
+        // buf_drop();
         module_ctx_drop();
     }
 }

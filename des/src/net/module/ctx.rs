@@ -5,7 +5,9 @@ use crate::{
         gate::IntoModuleGate,
         module::SignalCode,
         processing::ProcessingStack,
-        runtime::{ModuleShutdownEvent, NetEvents, SimConfiguration, Spawner},
+        runtime::{
+            EventExecutionContext, ModuleShutdownEvent, NetEvents, SimConfiguration, Spawner,
+        },
         schedule_event,
     },
     prelude::{GateRef, ObjectPath},
@@ -67,6 +69,9 @@ pub struct ModuleContext {
 
     pub(crate) state_change_wakers: RwLock<Vec<Waker>>,
     pub(crate) signal_subscribers: RwLock<FxHashMap<SignalCode, Vec<ModuleRefWeak>>>,
+
+    // AtExecutionTime
+    pub(crate) execution_context: RwLock<Option<EventExecutionContext>>,
 }
 
 impl ModuleContext {
@@ -96,6 +101,8 @@ impl ModuleContext {
             state_change_wakers: RwLock::default(),
 
             signal_subscribers: RwLock::default(),
+
+            execution_context: RwLock::default(),
         }))
     }
 
@@ -128,6 +135,7 @@ impl ModuleContext {
 
             // Copy signal subscriber from parent
             signal_subscribers: RwLock::new(parent.signal_subscribers.read().clone()),
+            execution_context: RwLock::default(),
         }));
 
         parent
@@ -157,6 +165,19 @@ impl ModuleContext {
             let as_arc = self.me().ctx;
             Arc::ptr_eq(&as_arc, ctx)
         })
+    }
+
+    #[track_caller]
+    pub(crate) fn exec(&self) -> EventExecutionContext {
+        self.execution_context
+            .read()
+            .clone()
+            .expect("the following operations is invalid in the current state")
+    }
+
+    #[track_caller]
+    pub(crate) fn set_execution_context(&self, exec: Option<EventExecutionContext>) {
+        *self.execution_context.write() = exec;
     }
 
     /// Provides the global context this node is connected to.

@@ -4,7 +4,7 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Mutex<T> {
     value: UnsafeCell<T>,
     locked: AtomicBool,

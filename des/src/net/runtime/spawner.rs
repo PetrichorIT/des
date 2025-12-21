@@ -182,14 +182,14 @@ fn crate_node_at_buildtime<A>(
     base.globals
         .capture_for(&path_parts, &mut ctx.props.write());
 
-    let _ = ctx.activate();
+    let _ = ctx.activate_with(None);
     let pe = {
         let module = module();
         let stack = (base.cfg.stack)();
         ModuleImpl::new(module.stack(stack), module)
     };
     ctx.upgrade_dummy(pe);
-    ctx.leave_scope(); // Do not deactivate, since nothing should have been written to EXEC_CTX
+    ctx.deactivate(); // Do not deactivate, since nothing should have been written to EXEC_CTX
     base.with_modules_mut(|mods| mods.add(ctx.clone()));
     ctx
 }
@@ -216,19 +216,21 @@ fn create_node_at_runtime(
     let path_parts = ctx.path.as_str().split('.').collect::<Vec<_>>();
     globals.capture_for(&path_parts, &mut ctx.props.write());
 
-    let prev = ctx.activate();
+    let prev = ctx.activate_with(None); // < no code execution allowed in ::new()
     let pe = {
         let module = module_creator();
         let stack = (cfg.stack)();
         ModuleImpl::new(module.stack(stack), module)
     };
     ctx.upgrade_dummy(pe);
-    ctx.leave_scope(); // Do not deactivate, since nothing should have been written to EXEC_CTX
+    ctx.deactivate(); // Do not deactivate, since nothing should have been written to EXEC_CTX
 
     globals.add_module(ctx.clone());
 
     if let Some(prev) = prev {
-        let _ = prev.me().activate();
+        let exec = prev.execution_context.read().clone();
+        // drop the lock before activating
+        let _ = prev.me().activate_with(exec);
     }
 
     schedule_event(

@@ -17,6 +17,9 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+mod exec;
+pub(crate) use exec::*;
+
 mod cfg;
 pub(crate) use cfg::SimConfiguration;
 
@@ -25,9 +28,6 @@ pub use self::api::{fail, globals, report, schedule_event};
 
 mod events;
 pub use self::events::*;
-
-mod ctx;
-pub(crate) use self::ctx::*;
 
 mod guard;
 use guard::SimStaticsGuard;
@@ -512,13 +512,16 @@ where
             for module in mods {
                 // Use cloned handles to appease the brwchk
                 if stage < module.num_sim_start_stages() {
-                    let _ = module.activate();
+                    let ctx = EventExecutionContext::default();
+
+                    module.activate_with(Some(ctx.clone()));
 
                     #[cfg(feature = "tracing")]
                     tracing::info!("Calling at_sim_start({}).", stage);
-
                     rt.app.error.extend(module.at_sim_start(stage).err());
-                    module.deactivate(rt)?;
+                    module.deactivate();
+
+                    ctx.finish(rt)?;
                 }
             }
         }
@@ -547,11 +550,21 @@ where
             .cloned()
             .collect::<Vec<_>>();
         for module in mods {
+            let ctx = EventExecutionContext::default();
+
+            module.activate_with(Some(ctx.clone()));
+
             #[cfg(feature = "tracing")]
             tracing::info!("Calling 'at_sim_end'");
-            let _ = module.activate();
-            let _ = module.at_sim_end().map_err(|e| error.merge(e));
-            module.deactivate(rt)?; // provide the rt nonetheless, to record errors
+            error.merge(
+                module
+                    .at_sim_end()
+                    .err()
+                    .unwrap_or_else(RuntimeError::empty),
+            );
+            module.deactivate();
+
+            ctx.finish(rt)?;
         }
 
         let _ = take_hook();
@@ -571,7 +584,9 @@ fn panic_hook(info: &PanicHookInfo) {
                 SimTime::now()
             );
         }
-        buf_report_panic();
+
+        current.exec().report_panic();
+        // buf_report_panic();
     } else {
         eprintln!("thread 'main' panicked:");
     }
