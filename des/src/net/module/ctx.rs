@@ -636,6 +636,14 @@ impl Drop for ModuleContext {
 pub struct UnwindBehaviour {
     /// Indicates whether to catch an panic and allow the simulation to continue without error
     /// or to record the module panic as an error in the runtime result.
+    ///
+    /// `true`:
+    /// - Panics in sync code will be caught and the module will shut down.
+    /// - Panics in observed tokio tasks will be reported, but will not terminate the module nor the simulation.
+    ///
+    /// `false`
+    /// - Panics in sync code will crash the entire simulation with an error.
+    /// - Panics in observed tokio tasks will crash the entire simulation with an error.
     pub on_panic_catch: bool,
     /// Indicates whether a node should be restared if it panicked.
     pub on_panic_restart: bool,

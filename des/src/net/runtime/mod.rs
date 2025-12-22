@@ -11,7 +11,7 @@ use serde_norway::{Value, from_str};
 use std::{
     fmt::Debug,
     fs, io, mem,
-    ops::{self, Deref, DerefMut},
+    ops::{Deref, DerefMut},
     panic::{PanicHookInfo, set_hook, take_hook},
     path::Path,
     sync::{Arc, Mutex},
@@ -74,8 +74,6 @@ pub use self::spawner::{Spawner, SpawnerKind};
 /// ```
 pub struct Sim<A> {
     pub(crate) error: RuntimeError,
-
-    modules: Arc<Mutex<ModuleTree>>,
     globals: Arc<Globals>,
     /// A inner field of a network simulation that can be used to attach
     /// custom lifetime handlers to a simulation
@@ -97,12 +95,8 @@ pub struct SimBuilder<A> {
 }
 
 impl<A> Sim<A> {
-    pub(crate) fn with_modules<R>(&self, f: impl FnOnce(&ModuleTree) -> R) -> R {
-        f(&self.modules.lock().expect("failed to lock"))
-    }
-
-    pub(crate) fn with_modules_mut<R>(&mut self, f: impl FnOnce(&mut ModuleTree) -> R) -> R {
-        f(&mut self.modules.lock().expect("failed to lock"))
+    pub(crate) fn with_roots<R>(&self, f: impl FnOnce(&ModuleRoots) -> R) -> R {
+        f(&self.roots.lock().expect("failed to lock"))
     }
 
     /// Creates a new network simulation, with an inner application `A`.
@@ -115,7 +109,6 @@ impl<A> Sim<A> {
 
         Sim {
             error: RuntimeError::empty(),
-            modules: globals.modules.clone(),
             guard,
             inner,
             globals,
@@ -136,8 +129,8 @@ impl<A> Sim<A> {
 
     /// Returns an iterator over all nodes in the simulation.
     pub fn nodes(&self) -> impl Iterator<Item = ObjectPath> + '_ {
-        self.with_modules(|mods| {
-            mods.iter()
+        self.with_roots(|mods| {
+            mods.nodes()
                 .map(|v| v.path())
                 .collect::<Vec<_>>()
                 .into_iter()
@@ -162,7 +155,7 @@ impl<A: Debug> Debug for Sim<A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Sim")
             .field("inner", &self.inner)
-            .field("modules", &self.modules)
+            .field("modules", &self.roots)
             .finish()
     }
 }
@@ -250,8 +243,8 @@ impl<A> SimBuilder<A> {
             let cfg = Cfg::new(value);
 
             // update config of already existing modules
-            self.with_modules(|mods| {
-                for module in mods.iter() {
+            self.with_roots(|mods| {
+                for module in mods.nodes() {
                     cfg.capture_for(
                         &module.path.as_str().split('.').collect::<Vec<_>>(),
                         &mut module.props.write(),
@@ -312,7 +305,7 @@ impl<A> SimBuilder<A> {
     #[track_caller]
     pub fn gate(&mut self, path: impl Into<ObjectPath>, gate: &str) -> GateRef {
         let path = path.into();
-        let Some(module) = self.get(&path) else {
+        let Some(module) = self.get(path.as_ref()) else {
             panic!("cannot create gate '{path}.{gate}', because node '{path}' does not exist")
         };
         if let Some(gate) = module.gate((gate, 0)) {
@@ -334,7 +327,7 @@ impl<A> SimBuilder<A> {
     /// some parts of the gate cluster allready exist, but others do not.
     pub fn gates(&mut self, path: impl Into<ObjectPath>, gate: &str, size: usize) -> Vec<GateRef> {
         let path = path.into();
-        let Some(module) = self.get(&path) else {
+        let Some(module) = self.get(path.as_ref()) else {
             panic!("cannot create gate '{path}.{gate}', because node '{path}' does not exist")
         };
         let mut gates = Vec::new();
@@ -481,7 +474,7 @@ where
     fn at_sim_start(rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError> {
         set_hook(Box::new(panic_hook));
 
-        let mods = rt.app.modules.lock().expect("failed");
+        let mods = rt.app.roots.lock().expect("failed");
 
         // (1) Get Topology
         // REMOVED: has this side effects?
@@ -493,7 +486,7 @@ where
         // allowing preemtive dropping of 'module' so that rt can be used in
         // 'module_handle_jobs'.
         let max_stage = mods
-            .iter()
+            .nodes()
             .fold(1, |acc, module| acc.max(module.num_sim_start_stages()));
 
         drop(mods);
@@ -503,11 +496,10 @@ where
             // Direct indexing since rt must be borrowed mutably in handle_buffers.
             let mods = rt
                 .app
-                .modules
+                .roots
                 .lock()
                 .expect("failed")
-                .iter()
-                .cloned()
+                .nodes()
                 .collect::<Vec<_>>();
             for module in mods {
                 // Use cloned handles to appease the brwchk
@@ -543,11 +535,10 @@ where
 
         let mods = rt
             .app
-            .modules
+            .roots
             .lock()
             .expect("failed")
-            .iter()
-            .cloned()
+            .nodes()
             .collect::<Vec<_>>();
         for module in mods {
             let ctx = EventExecutionContext::default();
@@ -609,24 +600,24 @@ fn panic_hook(info: &PanicHookInfo) {
 ///
 #[derive(Debug, Default)]
 pub struct Globals {
-    pub(crate) modules: Arc<Mutex<ModuleTree>>,
+    pub(crate) roots: Arc<Mutex<ModuleRoots>>,
     pub(crate) cfgs: Arc<Mutex<Vec<Cfg>>>,
 }
 
 impl Globals {
-    pub(crate) fn with<R>(&self, f: impl FnOnce(&ModuleTree) -> R) -> R {
-        f(&self.modules.lock().expect("failed"))
+    pub(crate) fn with<R>(&self, f: impl FnOnce(&ModuleRoots) -> R) -> R {
+        f(&self.roots.lock().expect("failed"))
     }
 
     /// Returns a handle to a module from the global scope.
     /// This can be used to access arbitrary modules, independent of the current execution context.
     #[must_use]
-    pub fn get(&self, path: &ObjectPath) -> Option<ModuleRef> {
-        self.with(|mods| mods.get(path))
+    pub fn get(&self, path: impl AsRef<str>) -> Option<ModuleRef> {
+        self.with(|mods| mods.get(path.as_ref()))
     }
 
     pub(crate) fn add_module(&self, module: ModuleRef) {
-        self.modules.lock().expect("failed").add(module);
+        self.roots.lock().expect("failed").add(module);
     }
 
     pub(crate) fn add_cfg(&self, cfg: Cfg) {
@@ -642,52 +633,86 @@ impl Globals {
 }
 
 #[derive(Debug, Default)]
-pub(crate) struct ModuleTree {
+pub(crate) struct ModuleRoots {
     modules: Vec<ModuleRef>,
 }
 
-impl ModuleTree {
-    pub(crate) fn get(&self, path: &ObjectPath) -> Option<ModuleRef> {
-        self.modules
-            .iter()
-            .find(|module| module.path == *path)
-            .cloned()
-    }
+/// The all nodes iterator.
+struct AllNodesIter<'a> {
+    stack: Vec<(ModuleRef, Vec<String>)>,
+    remaining: &'a [ModuleRef],
+}
 
-    pub(crate) fn add(&mut self, module: ModuleRef) {
-        if let Some(parent) = module.path.parent() {
-            if parent.is_root() {
-                // root either non existen or at index 0
-                self.modules.push(module);
-            } else {
-                let parent_depth = parent.len();
+impl<'a> Iterator for AllNodesIter<'a> {
+    type Item = ModuleRef;
 
-                // search for parent insert at last possible position
-                let Some(mut pos) = self.modules.iter().rposition(|m| m.path == parent) else {
-                    panic!(
-                        "cannot create node '{}', since parent node '{parent}' is required, but does not exist",
-                        module.path
-                    )
-                };
-                pos += 1;
-
-                // (iter as long as we stay at path lengths > parent)
-                while pos < self.modules.len() && self.modules[pos].path.len() > parent_depth {
-                    pos += 1;
-                }
-                self.modules.insert(pos, module);
-            }
-        } else {
-            // No parent
-            self.modules.push(module);
-        }
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next_along_stack().or_else(|| {
+            assert!(self.stack.is_empty());
+            let next_root = self.remaining.first()?.clone();
+            self.remaining = &self.remaining[1..];
+            self.stack.push((
+                next_root.clone(),
+                next_root.children.read().keys().cloned().collect(),
+            ));
+            Some(next_root)
+        })
     }
 }
 
-impl ops::Deref for ModuleTree {
-    type Target = [ModuleRef];
-    fn deref(&self) -> &Self::Target {
-        &self.modules
+impl<'a> AllNodesIter<'a> {
+    fn next_along_stack(&mut self) -> Option<ModuleRef> {
+        let (node, keys) = self.stack.last_mut()?;
+        let Some(key) = keys.pop() else {
+            self.stack.pop();
+            return self.next_along_stack();
+        };
+
+        let child = node.children.read()[&key].clone();
+        self.stack.push((
+            child.clone(),
+            child.children.read().keys().cloned().collect(),
+        ));
+        Some(child)
+    }
+}
+
+impl ModuleRoots {
+    pub(crate) fn nodes(&self) -> impl Iterator<Item = ModuleRef> + '_ {
+        AllNodesIter {
+            stack: Vec::new(),
+            remaining: &self.modules,
+        }
+    }
+
+    pub(crate) fn get(&self, path: &str) -> Option<ModuleRef> {
+        let (first, mut rem) = if self.modules.first()?.path.is_root() {
+            ("", path)
+        } else {
+            path.split_once('.').unwrap_or((path, ""))
+        };
+        let mut current = self.modules.iter().find(|m| m.path == first)?.clone();
+
+        while !rem.is_empty() {
+            let (next, rest) = rem.split_once('.').unwrap_or((rem, ""));
+            rem = rest;
+            current = current.child(next).ok()?;
+        }
+
+        Some(current)
+    }
+
+    pub(crate) fn add(&mut self, module: ModuleRef) {
+        assert!(
+            module.parent.is_none(), // && dbg!(module.path.parent()).is_none(),
+            "cannot register non-root module as root"
+        );
+        match self
+            .modules
+            .binary_search_by_key(&&module.path, |m| &m.path)
+        {
+            Ok(i) | Err(i) => self.modules.insert(i, module),
+        }
     }
 }
 
@@ -700,34 +725,18 @@ mod tests {
 
     #[test]
     fn module_tree() {
-        let mut tree = ModuleTree::default();
+        let mut tree = ModuleRoots::default();
         fn module(path: &str) -> ModuleRef {
             ModuleContext::new_root(path.into(), Weak::new())
         }
 
         tree.add(module("alice"));
-        tree.add(module("alice.alicent"));
-        tree.add(module("alice.john"));
-        tree.add(module("alice.john.previous"));
         tree.add(module("bob"));
         tree.add(module("eve"));
-        tree.add(module("eve.trevor"));
-        tree.add(module("eve.trevor.list"));
-        tree.add(module("eve.mark"));
 
         assert_eq!(
-            tree.iter().map(|v| v.path.as_str()).collect::<Vec<_>>(),
-            [
-                "alice",
-                "alice.alicent",
-                "alice.john",
-                "alice.john.previous",
-                "bob",
-                "eve",
-                "eve.trevor",
-                "eve.trevor.list",
-                "eve.mark"
-            ]
+            tree.nodes().map(|v| v.path.to_string()).collect::<Vec<_>>(),
+            ["alice", "bob", "eve",]
         );
     }
 }

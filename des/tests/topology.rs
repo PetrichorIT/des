@@ -39,7 +39,7 @@ fn spanned_topology() {
     sim.gate("alice.eve", "to-sophie")
         .connect(sim.gate("alice.sophie", "to-eve"));
 
-    let root = sim.get(&"alice".into()).unwrap();
+    let root = sim.get(&"alice").unwrap();
 
     let topology = root.spanning_tree();
     assert_eq!(topology.node_count(), 4);

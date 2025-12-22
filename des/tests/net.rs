@@ -64,24 +64,18 @@ fn select_node_from_globals() -> Result<(), RuntimeError> {
     sim.node(
         "tester",
         AsyncHandler::io(|_| async move {
+            assert_eq!(globals().get(&"alice").unwrap().path(), "alice");
             assert_eq!(
-                globals().get(&"alice".into()).unwrap().path(),
-                "alice".into()
+                globals().get(&"alice.submodule").unwrap().path(),
+                "alice.submodule"
             );
             assert_eq!(
-                globals().get(&"alice.submodule".into()).unwrap().path(),
-                "alice.submodule".into()
+                globals().get(&"alice.submodule.child").unwrap().path(),
+                "alice.submodule.child"
             );
-            assert_eq!(
-                globals()
-                    .get(&"alice.submodule.child".into())
-                    .unwrap()
-                    .path(),
-                "alice.submodule.child".into()
-            );
-            assert_eq!(globals().get(&"bob".into()).unwrap().path(), "bob".into());
+            assert_eq!(globals().get(&"bob").unwrap().path(), "bob");
 
-            assert!(globals().get(&"steve".into()).is_none());
+            assert!(globals().get(&"steve").is_none());
 
             Ok(())
         }),
@@ -134,7 +128,7 @@ fn can_access_foreign_module_context() -> Result<(), RuntimeError> {
 
             // simple data acces
             assert_eq!(other.gates().len(), 2);
-            assert_eq!(other.path(), "alice".into());
+            assert_eq!(other.path(), "alice");
 
             // prop access
             let mut prop = other.prop::<String>("key").unwrap();
@@ -202,7 +196,7 @@ fn gate_disconnect() -> Result<(), RuntimeError> {
 
             let _ = send(Message::default(), "a");
 
-            let other = globals().get(&"charlie".into()).unwrap().gate("c").unwrap();
+            let other = globals().get(&"charlie").unwrap().gate("c").unwrap();
             gate.connect(other);
 
             for _ in 0..7 {

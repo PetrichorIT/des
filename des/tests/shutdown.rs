@@ -516,7 +516,7 @@ fn shutdown_from_foreign_module() -> Result<(), RuntimeError> {
             || schedule_in(Message::default(), Duration::from_secs(2)),
             |_, _| {
                 globals()
-                    .get(&"alice".into())
+                    .get(&"alice")
                     .unwrap()
                     .shutdow_and_restart_at(8.0.into());
             },

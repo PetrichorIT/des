@@ -130,7 +130,7 @@ fn builder_module_block() {
 
     let mut sim = Sim::new(());
     sim.node("alice", Block);
-    assert!(sim.get(&"alice.sub".into()).is_some());
+    assert!(sim.get(&"alice.sub").is_some());
 }
 
 #[test]

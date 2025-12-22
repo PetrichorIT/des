@@ -189,6 +189,12 @@ impl From<String> for ObjectPath {
     }
 }
 
+impl PartialEq<&str> for ObjectPath {
+    fn eq(&self, other: &&str) -> bool {
+        self.as_str() == *other
+    }
+}
+
 impl PartialOrd for ObjectPath {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))

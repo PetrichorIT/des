@@ -101,6 +101,8 @@ mod common {
 #[test]
 #[serial]
 fn small_network() -> Result<(), Box<dyn std::error::Error>> {
+    // des::tracing::init();
+
     let mut app = Sim::new(());
     app.include_cfg(include_str!("ndl/small_network/main.par.yml"));
     app.node(

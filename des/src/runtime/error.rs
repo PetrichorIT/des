@@ -31,6 +31,10 @@ impl RuntimeError {
     pub fn merge(&mut self, mut other: Self) {
         self.inner.append(&mut other.inner);
     }
+
+    pub(crate) fn into_inner(self) -> Vec<Box<dyn LikeRuntimeError>> {
+        self.inner
+    }
 }
 
 impl<I: LikeRuntimeError + 'static> Extend<I> for RuntimeError {

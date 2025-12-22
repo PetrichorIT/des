@@ -91,7 +91,7 @@ fn signal_subscription_passed_to_created_child() -> Result<(), RuntimeError> {
 
                 let g = globals();
                 println!("2");
-                let p = g.get(&"parent".into()).unwrap();
+                let p = g.get(&"parent").unwrap();
                 println!("3");
                 p.spawner(ProcessingStack::default)
                     .node("child", panicing_subprocess_at(4.0));

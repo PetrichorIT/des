@@ -47,7 +47,7 @@ impl Globals {
         self.with(|modules| {
             let mut graph = UnGraph::new_undirected();
 
-            for module in modules.iter().cloned() {
+            for module in modules.nodes() {
                 graph.add_node(module);
             }
 

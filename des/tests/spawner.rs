@@ -44,7 +44,7 @@ fn runtime_spawner_calls_sim_start() -> Result<(), RuntimeError> {
                     assert!(child.as_ref::<WithSimStartRequired>().0);
 
                     // check global access
-                    assert!(globals().get(&"alice.bob".into()).is_some())
+                    assert!(globals().get(&"alice.bob").is_some())
                 }
                 _ => {}
             },
@@ -89,7 +89,7 @@ fn runtime_spawner_with_mod_ctx() -> Result<(), RuntimeError> {
                     assert!(child.as_ref::<WithSimStartRequired>().0);
 
                     // check global access
-                    assert!(globals().get(&"alice.bob".into()).is_some())
+                    assert!(globals().get(&"alice.bob").is_some())
                 }
                 _ => {}
             },

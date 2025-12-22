@@ -87,7 +87,7 @@ enum InnerSpawner<'a, A> {
 }
 
 impl<'a, A> InnerSpawner<'a, A> {
-    fn get(&self, path: &ObjectPath) -> Option<ModuleRef> {
+    fn get(&self, path: &str) -> Option<ModuleRef> {
         match self {
             Self::AtBuildtime { base } => base.get(path),
             Self::AtRuntime { .. } => globals().get(path),
@@ -107,7 +107,7 @@ impl<'a, A> InnerSpawner<'a, A> {
     }
 
     fn create_gates(&mut self, path: &ObjectPath, gate: &str, size: usize) -> Vec<GateRef> {
-        let Some(module) = self.get(path) else {
+        let Some(module) = self.get(path.as_ref()) else {
             panic!("cannot create gate '{path}.{gate}', because node '{path}' does not exist")
         };
 
@@ -157,20 +157,20 @@ fn crate_node_at_buildtime<A>(
 ) -> ModuleRef {
     // Check dup
     assert!(
-        base.get(&path).is_none(),
+        base.get(path.as_ref()).is_none(),
         "cannot create node '{path}', node allready exists"
     );
     // Check node path location
     let ctx = if let Some(parent) = path.nonzero_parent() {
         // (a) Check that the parent exists
-        let Some(parent) = base.get(&parent) else {
+        let Some(parent) = base.get(parent.as_ref()) else {
             panic!(
                 "cannot create node '{path}', since parent node '{parent}' is required, but does not exist"
             );
         };
 
         ModuleContext::new_child_of(path.name(), parent)
-    } else if let Some(zero_parent) = base.get(&ObjectPath::from("")) {
+    } else if let Some(zero_parent) = base.get("") {
         ModuleContext::new_child_of(path.name(), zero_parent)
     } else {
         ModuleContext::new_root(path, Arc::downgrade(&base.globals))
@@ -190,7 +190,11 @@ fn crate_node_at_buildtime<A>(
     };
     ctx.upgrade_dummy(pe);
     ctx.deactivate(); // Do not deactivate, since nothing should have been written to EXEC_CTX
-    base.with_modules_mut(|mods| mods.add(ctx.clone()));
+
+    if ctx.parent.is_none() {
+        base.globals.add_module(ctx.clone());
+    }
+
     ctx
 }
 
@@ -202,7 +206,7 @@ fn create_node_at_runtime(
 ) -> ModuleRef {
     let globals = caller.globals();
     assert!(
-        globals.get(path).is_none(),
+        globals.get(path.as_ref()).is_none(),
         "cannot create node '{path}' that already exists"
     );
 
@@ -224,8 +228,6 @@ fn create_node_at_runtime(
     };
     ctx.upgrade_dummy(pe);
     ctx.deactivate(); // Do not deactivate, since nothing should have been written to EXEC_CTX
-
-    globals.add_module(ctx.clone());
 
     if let Some(prev) = prev {
         let exec = prev.execution_context.read().clone();
@@ -291,7 +293,7 @@ impl<'a, A> Spawner<'a, A> {
     /// Nodes outside the spawners scope are not accessible, to reduce the
     /// risk of unintended interactions.
     pub fn get(&self, path: impl AsRef<str>) -> Option<ModuleRef> {
-        self.inner.get(&self.scope.appended(path))
+        self.inner.get(self.scope.appended(path).as_ref())
     }
 
     /// Creates or retrieves a gate at the specified module.

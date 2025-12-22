@@ -506,7 +506,14 @@ cfg_async! {
 
             if shared.has_observed_panics {
                 if let Err(err) = self.check_for_panics() {
-                    current().exec().report_failure(err);
+                    let current = current();
+                    if current.unwind_behaviour().on_panic_catch {
+                        for e in err.into_inner() {
+                            current.exec().report_error(e);
+                        }
+                    } else {
+                        current.exec().report_failure(err);
+                    }
                 }
             }
 
