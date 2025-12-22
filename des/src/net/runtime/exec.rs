@@ -1,15 +1,14 @@
-use std::sync::Arc;
+use std::{iter::once, sync::Arc};
 
 use des_sync_utils::Mutex;
 
 use crate::{
     net::{
-        Sim,
+        Error, Sim,
         gate::Connection,
         runtime::{HandleMessageEvent, MessageExitingConnection, NetEvents},
     },
     prelude::{EventLifecycle, GateRef, Message, Runtime, RuntimeError, SendError, current},
-    runtime::LikeRuntimeError,
     time::SimTime,
 };
 
@@ -23,22 +22,22 @@ struct EventExecutionContextInner {
     // All new events that will be scheduled
     events: Vec<(NetEvents, SimTime)>,
     // errors
-    errors: Vec<Box<dyn LikeRuntimeError>>,
+    errors: Vec<Error>,
     // failure
     failure: Option<RuntimeError>,
 }
 
 impl EventExecutionContext {
-    pub(crate) fn report_error(&self, error: Box<dyn LikeRuntimeError>) {
+    pub(crate) fn report_error(&self, error: Error) {
         self.inner.lock().errors.push(error);
     }
 
-    pub(crate) fn report_failure(&self, failure: RuntimeError) {
+    pub(crate) fn report_failure(&self, failure: Error) {
         let mut lock = self.inner.lock();
         match lock.failure {
-            None => lock.failure = Some(failure),
+            None => lock.failure = Some(RuntimeError::from(failure)),
             Some(ref mut existing_failure) => {
-                existing_failure.merge(failure);
+                existing_failure.extend(once(failure));
             }
         }
     }

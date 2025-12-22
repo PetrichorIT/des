@@ -9,7 +9,7 @@ use std::{
 
 use tracing_error::{SpanTrace, SpanTraceStatus};
 
-use crate::{net::ObjectPath, prelude::try_current};
+use crate::{net::ObjectPath, prelude::try_current, runtime::LikeRuntimeError};
 
 /// An simulation error produced by the `net` feature.
 #[derive(Debug)]
@@ -59,6 +59,26 @@ impl Error {
             }),
         }
     }
+
+    /// Creates a new other error.
+    #[inline]
+    #[must_use]
+    pub fn other(error: impl LikeRuntimeError) -> Self {
+        if error.as_any().is::<Self>() {
+            // Dirty runtime casting hack, to make a generic check 'T == Error'
+            let boxed: Box<dyn Any> = Box::new(error);
+            return *boxed.downcast().expect("illegal state");
+        }
+
+        Self {
+            repr: Box::new(Repr {
+                origin: try_current().map(|v| v.path()).unwrap_or_default(),
+                kind: ErrorKind::Other(Box::new(error)),
+                backtrace: Backtrace::capture(),
+                context: SpanTrace::capture(),
+            }),
+        }
+    }
 }
 
 /// The kind of error.
@@ -66,7 +86,7 @@ impl Error {
 #[non_exhaustive]
 pub enum ErrorKind {
     /// Uncategoried
-    Other,
+    Other(Box<dyn LikeRuntimeError>),
     /// An error that occured at the end of the simulation, when joining the remaining tasks
     #[cfg(feature = "async")]
     JoinError(JoinErrorKind),
@@ -89,7 +109,8 @@ impl Deref for Error {
 
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {:?}", self.origin, self.kind)?;
+        write!(f, "{}: ", self.origin)?;
+        self.kind.display(f)?;
         if self.backtrace.status() == BacktraceStatus::Captured {
             write!(f, "\nin:\n{}", self.backtrace)?;
         }
@@ -97,6 +118,15 @@ impl Display for Error {
             write!(f, "\nin:\n{}", self.context)?;
         }
         Ok(())
+    }
+}
+
+impl ErrorKind {
+    fn display(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Other(e) => write!(f, "{e}"),
+            _ => write!(f, "{self:?}"),
+        }
     }
 }
 

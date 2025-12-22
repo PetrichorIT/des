@@ -403,7 +403,7 @@ cfg_async! {
             if self.require_join {
                 current().join(tokio::spawn(fut));
             } else {
-                current().try_join(tokio::spawn(fut));
+                current().observe(tokio::spawn(fut));
             }
         }
 
@@ -416,7 +416,6 @@ cfg_async! {
          fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
             Ok(())
          }
-
     }
 
     impl std::fmt::Debug for AsyncHandler {

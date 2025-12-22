@@ -175,7 +175,10 @@ fn custom_fail() {
         .error
         .expect("expected an error");
 
-    assert_eq!(err[0].to_string(), "failed because i like to");
+    assert_eq!(
+        err[0].to_string(),
+        std::io::Error::other("alice: failed because i like to").to_string()
+    );
 }
 
 #[test]

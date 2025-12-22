@@ -518,7 +518,7 @@ impl ModuleRef {
     }
 
     pub(crate) fn handle_message(&self, msg: Message) -> Result<(), Error> {
-        if matches!(self.ctx.state.get(), State::Running) {
+        if let State::Running = self.ctx.state.get() {
             self.processing
                 .borrow_mut()
                 .process_with(Some(msg), |handler, msg| {
@@ -596,14 +596,11 @@ impl ModuleRef {
         processing.process_with(None, |_, _| {});
 
         #[cfg(feature = "async")]
-        let Some(tokio) = processing.downcast_element_mut::<TokioRuntime>() else {
-            return result;
+        if let Some(tokio) = processing.downcast_element_mut::<TokioRuntime>() {
+            if let Err(other) = tokio.at_sim_end() {
+                result = Err(RuntimeError::new(other));
+            }
         };
-
-        #[cfg(feature = "async")]
-        if let Err(other) = tokio.at_sim_end() {
-            result = Err(other);
-        }
 
         result
     }

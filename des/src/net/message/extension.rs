@@ -12,9 +12,6 @@ use std::{
 /// Upon cloning extensions will be lost.
 #[derive(Default)]
 pub struct Extensions {
-    #[cfg(not(debug_assertions))]
-    extensions: BTreeMap<TypeId, Box<dyn Any + Send>>,
-    #[cfg(debug_assertions)]
     extensions: BTreeMap<TypeId, (Box<dyn Any + Send>, &'static str)>,
 }
 
@@ -39,10 +36,6 @@ impl Extensions {
 
     /// Adds an extension of type `T` to the message.
     pub fn set<T: Any + Send>(&mut self, extension: T) {
-        #[cfg(not(debug_assertions))]
-        self.extensions
-            .insert(TypeId::of::<T>(), Box::new(extension));
-        #[cfg(debug_assertions)]
         self.extensions.insert(
             TypeId::of::<T>(),
             (Box::new(extension), std::any::type_name::<T>()),
@@ -60,9 +53,6 @@ impl Extensions {
     #[must_use]
     pub fn get<T: Any + Send>(&self) -> Option<&T> {
         self.extensions.get(&TypeId::of::<T>()).and_then(|e| {
-            #[cfg(not(debug_assertions))]
-            return e.downcast_ref();
-            #[cfg(debug_assertions)]
             return e.0.downcast_ref();
         })
     }
@@ -71,9 +61,6 @@ impl Extensions {
     #[must_use]
     pub fn get_mut<T: Any + Send>(&mut self) -> Option<&mut T> {
         self.extensions.get_mut(&TypeId::of::<T>()).and_then(|e| {
-            #[cfg(not(debug_assertions))]
-            return e.downcast_mut();
-            #[cfg(debug_assertions)]
             return e.0.downcast_mut();
         })
     }
@@ -82,9 +69,6 @@ impl Extensions {
     #[allow(clippy::missing_panics_doc)]
     pub fn remove<T: Any + Send>(&mut self) -> Option<T> {
         self.extensions.remove(&TypeId::of::<T>()).map(|v| {
-            #[cfg(not(debug_assertions))]
-            return *v.downcast::<T>().expect("illegal state");
-            #[cfg(debug_assertions)]
             return *v.0.downcast::<T>().expect("illegal state");
         })
     }
@@ -97,9 +81,6 @@ impl Extensions {
 
 impl Debug for Extensions {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        #[cfg(not(debug_assertions))]
-        return self.extensions.keys().collect::<BTreeSet<_>>().fmt(f);
-        #[cfg(debug_assertions)]
         return self
             .extensions
             .values()

@@ -558,13 +558,6 @@ impl ModuleContext {
     }
 }
 
-// FIXME:
-// Since the module ctx is available from all other modules, none of the APIs
-// should assume that self is the currently active module context.
-//
-// Some however do:
-// - spawner
-
 cfg_async! {
     use tokio::task::JoinHandle;
     use crate::net::processing::TokioRuntime;
@@ -591,9 +584,9 @@ cfg_async! {
         /// # Panics
         ///
         /// Panics if the module context is not the currently active module context.
-        pub fn try_join(&self, handle: JoinHandle<()>) {
+        pub fn observe(&self, handle: JoinHandle<()>) {
             assert!(self.is_currently_active(), "Cannot add join handle to the join group of another module");
-            TokioRuntime::try_join(handle);
+            TokioRuntime::observe(handle);
         }
     }
 }

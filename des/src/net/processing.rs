@@ -324,7 +324,6 @@ for_tuples!(A, B, C, D, E, F, G, H, I, J);
 cfg_async! {
     use std::{
         cell::LazyCell,
-        iter::once,
         rc::Rc,
         sync::{Arc, LazyLock, Mutex},
     };
@@ -340,7 +339,7 @@ cfg_async! {
             runtime::{NetEvents, AsyncWakeupEvent},
             schedule_event,
         },
-        prelude::{RuntimeError, current, random},
+        prelude::{current, random},
         time::Driver,
     };
 
@@ -402,7 +401,7 @@ cfg_async! {
 
         /// Try to join a handle.
         #[allow(clippy::missing_panics_doc)]
-        pub fn try_join(handle: JoinHandle<()>) {
+        pub fn observe(handle: JoinHandle<()>) {
             let mut shared = TOKIO_SHARED.lock().expect("failed to get lock");
              shared.threads.push((handle, false));
         }
@@ -430,11 +429,11 @@ cfg_async! {
         /// # Errors
         ///
         /// Returns an error if any of the join handles panicked or a must-join failed to join.
-        pub fn check_for_panics(&mut self) -> Result<(), RuntimeError> {
+        pub fn check_for_panics(&mut self) -> Result<(), Vec<Error>> {
             if self.handles.is_empty() {
                 return Ok(());
             }
-            let mut error = RuntimeError::empty();
+            let mut error = Vec::new();
 
             // NOTE: calling this requires RNG to be set, to seed the runtime;
             // we want to do that only after the lazy cell has been inited but no such API exists.
@@ -449,14 +448,13 @@ cfg_async! {
                 }
 
                 match self.rt.block_on(handle) {
-                    Ok(()) => {
-                    }
-                    Err(e) if e.is_panic() => error.extend(once(Error::new_current(
+                    Ok(()) => {}
+                    Err(e) if e.is_panic() => error.push(Error::new_current(
                         ErrorKind::JoinError(JoinErrorKind::Paniced(e.into_panic())),
-                    ))),
-                    Err(e) => error.extend(once(Error::new_current(ErrorKind::JoinError(
+                    )),
+                    Err(e) => error.push(Error::new_current(ErrorKind::JoinError(
                         JoinErrorKind::Tokio(e),
-                    )))),
+                    ))),
                 }
             }
 
@@ -470,13 +468,13 @@ cfg_async! {
         /// # Errors
         ///
         /// Erorors that occured in handles about to be joined.
-        pub fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
-            let mut error = self.check_for_panics().err().unwrap_or(RuntimeError::empty());
+        pub fn at_sim_end(&mut self) -> Result<(), Vec<Error>> {
+            let mut error = self.check_for_panics().err().unwrap_or(Vec::new());
             for (_, must_join) in self.handles.drain(..) {
                 if must_join {
-                    error.extend(once(Error::new_current(ErrorKind::JoinError(
+                    error.push(Error::new_current(ErrorKind::JoinError(
                         JoinErrorKind::NotFinished,
-                    ))));
+                    )));
                 }
             }
 
@@ -507,12 +505,12 @@ cfg_async! {
             if shared.has_observed_panics {
                 if let Err(err) = self.check_for_panics() {
                     let current = current();
+                    let exec = current.exec();
+
                     if current.unwind_behaviour().on_panic_catch {
-                        for e in err.into_inner() {
-                            current.exec().report_error(e);
-                        }
+                        err.into_iter().for_each(|e| exec.report_error(e));
                     } else {
-                        current.exec().report_failure(err);
+                        err.into_iter().for_each(|e| exec.report_failure(e));
                     }
                 }
             }

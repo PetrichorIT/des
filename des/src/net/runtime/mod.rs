@@ -475,10 +475,6 @@ where
         set_hook(Box::new(panic_hook));
 
         let mods = rt.app.roots.lock().expect("failed");
-
-        // (1) Get Topology
-        // REMOVED: has this side effects?
-
         // (2) Run network-node sim_starting stages
         // - inline this to ensure this is run before any possible events
 
@@ -576,6 +572,7 @@ fn panic_hook(info: &PanicHookInfo) {
             );
         }
 
+        #[cfg(feature = "async")]
         TokioRuntime::report_panic();
     } else {
         eprintln!("thread 'main' panicked:");

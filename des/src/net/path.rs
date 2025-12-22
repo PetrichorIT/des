@@ -7,8 +7,6 @@ use std::sync::Arc;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ObjectPath {
     data: Arc<str>,
-    last_element_offset: usize,
-    len: usize,
     is_gate: bool,
 }
 
@@ -16,7 +14,7 @@ impl ObjectPath {
     /// Indicates whether the path points to the simulation root.
     #[must_use]
     pub fn is_root(&self) -> bool {
-        self.len == 0
+        self.data.len() == 0
     }
 
     /// Indicates whether the path points to a module.
@@ -25,19 +23,11 @@ impl ObjectPath {
         !self.is_gate
     }
 
-    /// Returns the depth of the referenced object.
-    ///
-    /// Note that depth 0 indicates the root of the simulation.
-    #[must_use]
-    #[allow(clippy::len_without_is_empty)]
-    pub fn len(&self) -> usize {
-        self.len
-    }
-
     /// Returns the last path component, the name of the current module.
     #[must_use]
     pub fn name(&self) -> &str {
-        &self.data[self.last_element_offset..]
+        let last = self.data.rfind('.').map(|i| i + 1).unwrap_or(0);
+        &self.data[last..]
     }
 
     /// Returns the entrie path as a &str.
@@ -59,35 +49,22 @@ impl ObjectPath {
     /// Returns the entrie path as a &str.
     #[must_use]
     pub fn as_parent_str(&self) -> &str {
-        &self.data[..self.last_element_offset.saturating_sub(1)]
+        let last = self.data.rfind('.').unwrap_or(0);
+        &self.data[..last]
     }
 
     /// Constructs the path to the parent element, if there is any.
     #[must_use]
     pub fn parent(&self) -> Option<ObjectPath> {
-        if self.len == 0 {
-            return None;
-        }
-
-        let mut data = self.data.to_string();
-        let mut last_element_offset = self.last_element_offset;
-        let mut len = self.len;
-
-        data.truncate(last_element_offset.saturating_sub(1));
-
-        if let Some(i) = data.rfind('.') {
-            last_element_offset = i + 1;
+        let path = self.as_parent_str();
+        if path.is_empty() {
+            None
         } else {
-            last_element_offset = 0;
+            Some(ObjectPath {
+                data: path.into(),
+                is_gate: false,
+            })
         }
-        len -= 1;
-
-        Some(Self {
-            data: data.into(),
-            last_element_offset,
-            len,
-            is_gate: false,
-        })
     }
 
     /// Returns a parent that is not root.
@@ -104,29 +81,22 @@ impl ObjectPath {
     /// This function panics if the current path points to a gate.
     #[must_use]
     pub fn appended(&self, module: impl AsRef<str>) -> Self {
-        let mut data = self.data.to_string();
-        let mut last_element_offset = self.last_element_offset;
-        let mut len = self.len;
-
         assert!(
             !self.is_gate,
             "cannot append to a path that points to a gate"
         );
 
+        let mut data = self.data.to_string();
         let suffix = module.as_ref();
         if !suffix.is_empty() {
-            if self.len != 0 {
-                last_element_offset = data.len() + 1;
+            if !data.is_empty() {
                 data.push('.');
             }
             data.push_str(suffix);
-            len += 1;
         }
 
         Self {
             data: data.into(),
-            last_element_offset,
-            len,
             is_gate: false,
         }
     }
@@ -154,26 +124,14 @@ impl AsRef<str> for ObjectPath {
 
 impl From<&str> for ObjectPath {
     fn from(s: &str) -> Self {
-        let mut o = 0;
-        let mut last_element_offset = 0;
-        let mut len = 0;
-        for c in s.chars() {
-            if c == '.' {
-                last_element_offset = o + c.len_utf8();
-                len += 1;
-            }
-            o += c.len_utf8();
-        }
-        if o != last_element_offset {
-            len += 1;
-        }
-
-        Self {
-            data: s.to_string().into(),
-            last_element_offset,
-            len,
+        let mut this = Self {
+            data: s.into(),
             is_gate: false,
+        };
+        if this.name().contains('#') {
+            this.is_gate = true;
         }
+        this
     }
 }
 
@@ -211,8 +169,6 @@ impl Default for ObjectPath {
     fn default() -> Self {
         Self {
             data: String::new().into(),
-            last_element_offset: 0,
-            len: 0,
             is_gate: false,
         }
     }
@@ -232,8 +188,6 @@ mod tests {
             path,
             ObjectPath {
                 data: "top.mid".to_string().into(),
-                len: 2,
-                last_element_offset: 4,
                 is_gate: false,
             }
         );
@@ -249,8 +203,6 @@ mod tests {
             path,
             ObjectPath {
                 data: "top.mid.low".to_string().into(),
-                len: 3,
-                last_element_offset: 8,
                 is_gate: false,
             }
         );
@@ -262,8 +214,6 @@ mod tests {
             path,
             ObjectPath {
                 data: "top".to_string().into(),
-                len: 1,
-                last_element_offset: 0,
                 is_gate: false,
             }
         );
@@ -276,8 +226,6 @@ mod tests {
             path,
             ObjectPath {
                 data: String::new().into(),
-                len: 0,
-                last_element_offset: 0,
                 is_gate: false,
             }
         );
@@ -291,8 +239,6 @@ mod tests {
             parent,
             Some(ObjectPath {
                 data: "top".to_string().into(),
-                len: 1,
-                last_element_offset: 0,
                 is_gate: false,
             })
         );
@@ -307,27 +253,11 @@ mod tests {
             parent,
             Some(ObjectPath {
                 data: "top.mid".to_string().into(),
-                len: 2,
-                last_element_offset: 4,
-                is_gate: false,
-            })
-        );
-
-        let path = ObjectPath::default().appended("top");
-
-        let parent = path.parent();
-        assert_eq!(
-            parent,
-            Some(ObjectPath {
-                data: String::new().into(),
-                len: 0,
-                last_element_offset: 0,
                 is_gate: false,
             })
         );
 
         let path = ObjectPath::default();
-
         let parent = path.parent();
         assert_eq!(parent, None);
     }
@@ -338,8 +268,6 @@ mod tests {
             ObjectPath::from("top.mid"),
             ObjectPath {
                 data: "top.mid".to_string().into(),
-                len: 2,
-                last_element_offset: 4,
                 is_gate: false,
             }
         );
@@ -348,8 +276,6 @@ mod tests {
             ObjectPath::from("top.mid.low"),
             ObjectPath {
                 data: "top.mid.low".to_string().into(),
-                len: 3,
-                last_element_offset: 8,
                 is_gate: false,
             }
         );
@@ -358,8 +284,6 @@ mod tests {
             ObjectPath::from("top"),
             ObjectPath {
                 data: "top".to_string().into(),
-                len: 1,
-                last_element_offset: 0,
                 is_gate: false,
             }
         );
@@ -368,8 +292,6 @@ mod tests {
             ObjectPath::from(""),
             ObjectPath {
                 data: String::new().into(),
-                len: 0,
-                last_element_offset: 0,
                 is_gate: false,
             }
         );
@@ -379,8 +301,6 @@ mod tests {
             ObjectPath::from("top.a😀b.low"),
             ObjectPath {
                 data: "top.a😀b.low".to_string().into(),
-                len: 3,
-                last_element_offset: 11,
                 is_gate: false,
             }
         );

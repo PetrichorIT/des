@@ -1,3 +1,5 @@
+use std::io;
+
 use des::{net::Error, prelude::*, registry};
 
 #[derive(Debug, Default)]
@@ -12,7 +14,10 @@ impl A {
 
     #[tracing::instrument]
     fn method_two(&mut self) -> Result<(), Error> {
-        Err(Error::new(current().path(), des::net::ErrorKind::Other))
+        Err(Error::new(
+            current().path(),
+            des::net::ErrorKind::Other(Box::new(io::Error::other("a"))),
+        ))
     }
 }
 
