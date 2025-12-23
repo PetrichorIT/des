@@ -1,9 +1,10 @@
 use crate::{
     net::{
+        gate::Connection,
         module::{Cfg, DummyModule, MOD_CTX, Props, UnwindBehaviour, try_current},
         processing::{ProcessingStack, TokioRuntime},
     },
-    prelude::{Application, EventLifecycle, GateRef, Module, ModuleRef, ObjectPath, Runtime},
+    prelude::{Application, GateRef, Message, Module, ModuleRef, ObjectPath, Runtime},
     runtime::RuntimeError,
     time::SimTime,
 };
@@ -22,6 +23,7 @@ pub(crate) use exec::*;
 
 mod cfg;
 pub(crate) use cfg::SimConfiguration;
+pub use cfg::SimLifecycle;
 
 mod api;
 pub use self::api::{fail, globals, report, schedule_event};
@@ -56,8 +58,9 @@ pub use self::spawner::{Spawner, SpawnerKind};
 /// ```
 /// # use des::prelude::*;
 /// # use des::net::handlers::HandlerFn;
+/// # use des::net::SimLifecycle;
 /// struct Inner;
-/// impl EventLifecycle<Sim<Inner>> for Inner {
+/// impl SimLifecycle for Inner {
 ///     fn at_sim_start(rt: &mut Runtime<Sim<Inner>>)  -> Result<(), RuntimeError> {
 ///         println!("Hello simulation");
 ///         /* Do something */
@@ -456,21 +459,10 @@ impl IntoModuleTree for () {
     }
 }
 
-impl<A> Application for Sim<A>
-where
-    A: EventLifecycle<Sim<A>>,
-{
+impl<A: SimLifecycle> Application for Sim<A> {
+    type Error = RuntimeError;
     type EventSet = NetEvents;
-    type Lifecycle = SimLifecycle;
-}
 
-#[doc(hidden)]
-#[derive(Debug)]
-pub struct SimLifecycle;
-impl<A> EventLifecycle<Sim<A>> for SimLifecycle
-where
-    A: EventLifecycle<Sim<A>>,
-{
     fn at_sim_start(rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError> {
         set_hook(Box::new(panic_hook));
 
@@ -556,6 +548,37 @@ where
 
         let _ = take_hook();
         if error.is_empty() { Ok(()) } else { Err(error) }
+    }
+}
+
+impl<A: SimLifecycle> Runtime<Sim<A>> {
+    ///
+    /// Adds a message event into a [`Runtime<NetworkApplication<A>>`] onto a gate.
+    ///
+    pub fn add_message_onto(&mut self, gate: GateRef, message: impl Into<Message>, time: SimTime) {
+        let event = MessageExitingConnection {
+            con: Connection::new(gate),
+            msg: message.into(),
+        };
+
+        self.add_event(NetEvents::MessageExitingConnection(event), time);
+    }
+
+    ///
+    /// Adds a message event into a [`Runtime<NetworkApplication<A>>`] onto a module.
+    ///
+    pub fn handle_message_on(
+        &mut self,
+        module: impl Into<ModuleRef>,
+        message: impl Into<Message>,
+        time: SimTime,
+    ) {
+        let event = HandleMessageEvent {
+            module: module.into(),
+            message: message.into(),
+        };
+
+        self.add_event(NetEvents::HandleMessageEvent(event), time);
     }
 }
 

@@ -6,9 +6,9 @@ use crate::{
     net::{
         Error, Sim,
         gate::Connection,
-        runtime::{HandleMessageEvent, MessageExitingConnection, NetEvents},
+        runtime::{HandleMessageEvent, MessageExitingConnection, NetEvents, cfg::SimLifecycle},
     },
-    prelude::{EventLifecycle, GateRef, Message, Runtime, RuntimeError, SendError, current},
+    prelude::{GateRef, Message, Runtime, RuntimeError, SendError, current},
     time::SimTime,
 };
 
@@ -86,10 +86,10 @@ impl EventExecutionContext {
 }
 
 impl EventExecutionContext {
-    pub(crate) fn finish<A>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError>
-    where
-        A: EventLifecycle<Sim<A>>,
-    {
+    pub(crate) fn finish<A: SimLifecycle>(
+        self,
+        rt: &mut Runtime<Sim<A>>,
+    ) -> Result<(), RuntimeError> {
         let mut ctx = Arc::into_inner(self.inner)
             .expect("could not retrieve Arc")
             .into_inner();

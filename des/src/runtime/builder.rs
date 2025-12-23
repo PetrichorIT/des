@@ -136,13 +136,14 @@ impl Builder {
     /// // Assumme Application is implemented for App.
     /// #[derive(Debug)]
     /// struct App(usize,  String);
+    /// # use std::convert::Infallible;
     /// # impl Application for App {
+    /// #   type Error = Infallible;
     /// #   type EventSet = Events;
-    /// #   type Lifecycle = ();
     /// # }
     /// # enum Events {}
     /// # impl Event<App> for Events {
-    /// #   fn handle(self, rt: &mut Runtime<App>)  -> Result<(), RuntimeError> { Ok(()) }
+    /// #   fn handle(self, rt: &mut Runtime<App>)  -> Result<(), Infallible> { Ok(()) }
     /// # }
     ///
     /// let app = App(42, String::from("Hello there!"));

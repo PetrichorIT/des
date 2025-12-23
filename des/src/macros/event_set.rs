@@ -10,14 +10,14 @@
 /// struct PingEvent;
 /// struct PongEvent;
 /// /* ... */
-/// # impl Event<App> for PingEvent { fn handle(self, rt: &mut Runtime<App>)  -> Result<(), RuntimeError> { Ok(()) } }
-/// # impl Event<App> for PongEvent { fn handle(self, rt: &mut Runtime<App>)  -> Result<(), RuntimeError> { Ok(()) } }
+/// # impl Event<App> for PingEvent { fn handle(self, rt: &mut Runtime<App>)  -> Result<(), ()> { Ok(()) } }
+/// # impl Event<App> for PongEvent { fn handle(self, rt: &mut Runtime<App>)  -> Result<(), ()> { Ok(()) } }
 ///
 /// struct App;
 /// impl Application for App {
 ///     /* ... */
 /// #   type EventSet = Events;
-/// #   type Lifecycle = ();
+/// #   type Error = ();
 /// }
 ///
 /// event_set! {
@@ -51,7 +51,8 @@ macro_rules! event_set {
         }
 
         impl< $( $N $(: $b0 $(+$b)* )? ),* > ::des::runtime::Event<$ty< $( $N ),* >> for $ident {
-            fn handle(self, rt: &mut ::des::runtime::Runtime<$ty< $( $N ),* >>) -> ::std::result::Result<(), ::des::runtime::RuntimeError> {
+            fn handle(self, rt: &mut ::des::runtime::Runtime<$ty< $( $N ),* >>)
+            -> ::std::result::Result<(), <$ty< $( $N ),* > as ::des::runtime::Application>::Error> {
                 match self {
                     $(
                         Self::$variant(event) => event.handle(rt),

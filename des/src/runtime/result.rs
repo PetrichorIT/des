@@ -1,5 +1,5 @@
 use crate::{
-    runtime::{Application, Profiler, Runtime, RuntimeError},
+    runtime::{Application, Profiler, Runtime},
     time::SimTime,
 };
 
@@ -13,11 +13,11 @@ pub struct RuntimeResult<A: Application> {
     /// The profiler instance.
     pub profiler: Profiler<A::EventSet>,
     /// Errors which may occur during simulation.
-    pub error: Option<RuntimeError>,
+    pub error: Option<A::Error>,
 }
 
 impl<A: Application> RuntimeResult<A> {
-    pub(super) fn new(runtime: Runtime<A>, error: Option<RuntimeError>) -> Self {
+    pub(super) fn new(runtime: Runtime<A>, error: Option<A::Error>) -> Self {
         Self {
             time: runtime.sim_time(),
             app: runtime.app,
@@ -35,7 +35,7 @@ impl<A: Application> RuntimeResult<A> {
     #[must_use]
     pub fn assert_no_err(self) -> Self {
         if let Some(error) = self.error {
-            panic!("unwraped with errors: {error}");
+            panic!("unwraped with errors: {error:?}");
         }
         self
     }
@@ -47,7 +47,7 @@ impl<A: Application> RuntimeResult<A> {
     /// # Errors
     ///
     /// Returns an error if any errors occurred during simulation.
-    pub fn as_result(mut self) -> Result<RuntimeResult<A>, RuntimeError> {
+    pub fn as_result(mut self) -> Result<RuntimeResult<A>, A::Error> {
         match self.error.take() {
             None => Ok(self),
             Some(error) => Err(error),

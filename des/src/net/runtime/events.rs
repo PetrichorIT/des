@@ -8,11 +8,11 @@ use crate::{
             ModuleContext, ModuleRef, SIGNAL_MODULE_PANICED, SIGNAL_SIM_START_DONE, Signal, State,
             emit,
         },
-        runtime::EventExecutionContext,
+        runtime::{EventExecutionContext, cfg::SimLifecycle},
         schedule_event,
     },
     prelude::RuntimeError,
-    runtime::{Event, EventLifecycle, EventSink, Runtime},
+    runtime::{Event, EventSink, Runtime},
     time::SimTime,
 };
 use std::{
@@ -52,10 +52,7 @@ pub enum NetEvents {
     AsyncWakeupEvent(AsyncWakeupEvent),
 }
 
-impl<A> Event<Sim<A>> for NetEvents
-where
-    A: EventLifecycle<Sim<A>>,
-{
+impl<A: SimLifecycle> Event<Sim<A>> for NetEvents {
     fn handle(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError> {
         match self {
             Self::MessageExitingConnection(event) => event.handle(rt),
@@ -170,10 +167,7 @@ impl MessageExitingConnection {
 
 impl MessageExitingConnection {
     #[allow(clippy::unnecessary_wraps)]
-    fn handle<A>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError>
-    where
-        A: EventLifecycle<Sim<A>>,
-    {
+    fn handle<A: SimLifecycle>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError> {
         let result = self.handle_with_sink(rt);
         if let Err(err) = result {
             tracing::error!("message {} failed to be send: {}", err.msg, err.reason);
@@ -192,10 +186,7 @@ pub struct HandleMessageEvent {
 }
 
 impl HandleMessageEvent {
-    fn handle<A>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError>
-    where
-        A: EventLifecycle<Sim<A>>,
-    {
+    fn handle<A: SimLifecycle>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError> {
         let message = self.message;
         let module = &self.module;
 
@@ -220,10 +211,7 @@ pub struct AtSimStartEvent {
 }
 
 impl AtSimStartEvent {
-    fn handle<A>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError>
-    where
-        A: EventLifecycle<Sim<A>>,
-    {
+    fn handle<A: SimLifecycle>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError> {
         let max_stage = self
             .modules
             .iter()
@@ -261,10 +249,7 @@ pub struct SignalEvent {
 }
 
 impl SignalEvent {
-    fn handle<A>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError>
-    where
-        A: EventLifecycle<Sim<A>>,
-    {
+    fn handle<A: SimLifecycle>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError> {
         for subscriber in &self.subscribers {
             let ctx = EventExecutionContext::default();
 
@@ -291,10 +276,7 @@ pub struct ModuleShutdownEvent {
 }
 
 impl ModuleShutdownEvent {
-    fn handle<A>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError>
-    where
-        A: EventLifecycle<Sim<A>>,
-    {
+    fn handle<A: SimLifecycle>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError> {
         #[cfg(feature = "tracing")]
         tracing::info!("ModuleShutdownEvent");
 
@@ -319,10 +301,7 @@ pub struct ModuleRestartEvent {
 }
 
 impl ModuleRestartEvent {
-    fn handle<A>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError>
-    where
-        A: EventLifecycle<Sim<A>>,
-    {
+    fn handle<A: SimLifecycle>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError> {
         #[cfg(feature = "tracing")]
         tracing::info!("ModuleRestartEvent");
 
@@ -347,10 +326,7 @@ pub struct AsyncWakeupEvent {
 
 #[cfg(feature = "async")]
 impl AsyncWakeupEvent {
-    fn handle<A>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError>
-    where
-        A: EventLifecycle<Sim<A>>,
-    {
+    fn handle<A: SimLifecycle>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError> {
         #[cfg(feature = "tracing")]
         tracing::info!("async wakeup");
 
@@ -377,10 +353,7 @@ pub struct ChannelUnbusyNotif {
 
 impl ChannelUnbusyNotif {
     #[allow(clippy::unnecessary_wraps)]
-    fn handle<A>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError>
-    where
-        A: EventLifecycle<Sim<A>>,
-    {
+    fn handle<A: SimLifecycle>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError> {
         let handle = self.channel.clone();
         self.channel
             .channel

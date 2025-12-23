@@ -98,20 +98,17 @@ struct PingPongApp {
 }
 
 impl Application for PingPongApp {
+    type Error = RuntimeError;
     type EventSet = PingPongEvent;
-    type Lifecycle = Self;
-}
+    // The most imporant definition of the `EventLifecycle` trait that must be implemented
+    // for any proxy in the `Application::Lifecylce` position, is `at_sim_start`.
+    //
+    // This function is called once the simulation has been started and has access to all
+    // internal APIs and globals. Think of it like the 0th event.
+    //
+    // In this case we simply create the inital `Interval` event with a counter set to 29
+    // so that the `Interval` repeats 30 times, thus sending 30 pings.
 
-// The most imporant definition of the `EventLifecycle` trait that must be implemented
-// for any proxy in the `Application::Lifecylce` position, is `at_sim_start`.
-//
-// This function is called once the simulation has been started and has access to all
-// internal APIs and globals. Think of it like the 0th event.
-//
-// In this case we simply create the inital `Interval` event with a counter set to 29
-// so that the `Interval` repeats 30 times, thus sending 30 pings.
-
-impl EventLifecycle for PingPongApp {
     fn at_sim_start(runtime: &mut Runtime<Self>) -> Result<(), RuntimeError>
     where
         Self: Application,

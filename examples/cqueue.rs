@@ -1,3 +1,5 @@
+use std::convert::Infallible;
+
 use des::prelude::*;
 
 struct App {
@@ -5,12 +7,9 @@ struct App {
     num_events: usize,
 }
 impl Application for App {
+    type Error = Infallible;
     type EventSet = EvSet;
-    type Lifecycle = App;
-}
-
-impl EventLifecycle<App> for App {
-    fn at_sim_start(rt: &mut Runtime<Self>) -> Result<(), RuntimeError> {
+    fn at_sim_start(rt: &mut Runtime<Self>) -> Result<(), Infallible> {
         let mut delay = Duration::ZERO;
         for _ in 0..rt.app.num_events {
             rt.add_event_in(EvSet {}, delay);
@@ -23,10 +22,9 @@ impl EventLifecycle<App> for App {
 
 struct EvSet {}
 impl Event<App> for EvSet {
-    fn handle(self, rt: &mut Runtime<App>) -> Result<(), RuntimeError> {
+    fn handle(self, rt: &mut Runtime<App>) -> Result<(), Infallible> {
         rt.add_event_in(EvSet {}, rt.app.event_delay);
         Ok(())
-        // NOP
     }
 }
 

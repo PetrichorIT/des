@@ -220,14 +220,13 @@ where
     ///
     /// ```
     /// use des::prelude::*;
+    /// use std::convert::Infallible;
     ///
     /// struct MyApp();
     /// impl Application for MyApp {
+    ///     type Error = Infallible;
     ///     type EventSet = MyEventSet;
-    ///     type Lifecycle = Self;
-    /// }
-    /// impl EventLifecycle for MyApp {
-    ///     fn at_sim_start(rt: &mut Runtime<Self>) -> Result<(), RuntimeError> {
+    ///     fn at_sim_start(rt: &mut Runtime<Self>) -> Result<(), Infallible> {
     ///         rt.add_event(MyEventSet::EventA, SimTime::from(1.0));
     ///         rt.add_event(MyEventSet::EventB, SimTime::from(2.0));
     ///         rt.add_event(MyEventSet::EventA, SimTime::from(3.0));
@@ -241,7 +240,7 @@ where
     ///     EventB
     /// }
     /// impl Event<MyApp> for MyEventSet {
-    ///     fn handle(self, rt: &mut Runtime<MyApp>) -> Result<(), RuntimeError> {
+    ///     fn handle(self, rt: &mut Runtime<MyApp>) -> Result<(), Infallible> {
     ///         dbg!(self, SimTime::now());
     ///         Ok(())
     ///     }
@@ -291,7 +290,7 @@ where
     /// # Errors
     ///
     /// Returns an error if any errors occurred during simulation startup.
-    pub fn start(&mut self) -> Result<(), RuntimeError> {
+    pub fn start(&mut self) -> Result<(), A::Error> {
         macro_rules! symbol {
             ($i:ident) => {
                 if $i { SYM_CHECKMARK } else { SYM_CROSSMARK }
@@ -320,7 +319,7 @@ where
         self.profiler.start();
 
         // (2) sim-starting on application object
-        A::Lifecycle::at_sim_start(self)?;
+        A::at_sim_start(self)?;
 
         self.state = State::Running;
         Ok(())
@@ -335,7 +334,7 @@ where
     /// # Panics
     ///
     /// This function panics if the simulation has not been started.
-    pub fn dispatch_n_events(&mut self, n: usize) -> Result<(), RuntimeError> {
+    pub fn dispatch_n_events(&mut self, n: usize) -> Result<(), A::Error> {
         assert_eq!(
             self.state,
             State::Running,
@@ -359,7 +358,7 @@ where
     /// # Panics
     ///
     /// This function panics if the simulation has not been started.
-    pub fn dispatch_events_until(&mut self, t: SimTime) -> Result<(), RuntimeError> {
+    pub fn dispatch_events_until(&mut self, t: SimTime) -> Result<(), A::Error> {
         assert_eq!(
             self.state,
             State::Running,
@@ -383,7 +382,7 @@ where
     /// # Panics
     ///
     /// This function panics if the simulation has not been started.
-    pub fn dispatch_all(&mut self) -> Result<(), RuntimeError> {
+    pub fn dispatch_all(&mut self) -> Result<(), A::Error> {
         assert_eq!(
             self.state,
             State::Running,
@@ -415,7 +414,7 @@ where
         );
 
         // Call the fin-handler on the allocated application
-        let error = A::Lifecycle::at_sim_end(&mut self).err();
+        let error = A::at_sim_end(&mut self).err();
 
         let mut result = RuntimeResult {
             time: self.sim_time(),
@@ -480,7 +479,7 @@ where
     /// This function requires the caller to guarantee that at least one
     /// event exists in the future event set.
     #[allow(clippy::should_implement_trait)]
-    fn dispatch_event(&mut self) -> Result<bool, RuntimeError> {
+    fn dispatch_event(&mut self) -> Result<bool, A::Error> {
         if self.future_event_set.is_empty() {
             return Ok(true);
         }
@@ -509,11 +508,11 @@ where
     ///
     /// ```
     /// use des::prelude::*;
-    ///
+    /// use std::convert::Infallible;
     /// # struct MyApp();
     /// # impl Application for MyApp {
+    /// #     type Error = Infallible;
     /// #     type EventSet = MyEventSet;
-    /// #     type Lifecycle = ();
     /// # }
     /// #
     /// # enum MyEventSet {
@@ -521,7 +520,7 @@ where
     /// #     EventB
     /// # }
     /// # impl Event<MyApp> for MyEventSet {
-    /// #     fn handle(self, rt: &mut Runtime<MyApp>) -> Result<(), RuntimeError> { Ok(()) }
+    /// #     fn handle(self, rt: &mut Runtime<MyApp>) -> Result<(), Infallible> { Ok(()) }
     /// # }
     /// #
     /// fn main() {
@@ -549,11 +548,11 @@ where
     ///
     /// ```
     /// use des::prelude::*;
-    ///
+    /// use std::convert::Infallible;
     /// # struct MyApp();
     /// # impl Application for MyApp {
     /// #     type EventSet = MyEventSet;
-    /// #     type Lifecycle = ();
+    /// #     type Error = Infallible;
     /// # }
     /// #
     /// # enum MyEventSet {
@@ -561,7 +560,7 @@ where
     /// #     EventB
     /// # }
     /// # impl Event<MyApp> for MyEventSet {
-    /// #     fn handle(self, rt: &mut Runtime<MyApp>) -> Result<(), RuntimeError> { Ok(()) }
+    /// #     fn handle(self, rt: &mut Runtime<MyApp>) -> Result<(), Infallible> { Ok(()) }
     /// # }
     /// #
     /// fn main() {
@@ -580,47 +579,6 @@ where
     pub fn add_event(&mut self, event: impl Into<A::EventSet>, time: SimTime) {
         self.future_event_set.add(time, event);
         self.event_id += 1;
-    }
-}
-
-cfg_net! {
-    use crate::net::{gate::{GateRef, Connection},   message::Message,  module::ModuleRef,  Sim, runtime::{MessageExitingConnection, NetEvents, HandleMessageEvent}};
-
-    impl<A> Runtime<Sim<A>> where
-        A: EventLifecycle<Sim<A>>,{
-        ///
-        /// Adds a message event into a [`Runtime<NetworkApplication<A>>`] onto a gate.
-        ///
-        pub fn add_message_onto(
-            &mut self,
-            gate: GateRef,
-            message: impl Into<Message>,
-            time: SimTime,
-        ) {
-            let event = MessageExitingConnection {
-                con: Connection::new(gate),
-                msg: message.into(),
-            };
-
-            self.add_event(NetEvents::MessageExitingConnection(event), time);
-        }
-
-        ///
-        /// Adds a message event into a [`Runtime<NetworkApplication<A>>`] onto a module.
-        ///
-        pub fn handle_message_on(
-            &mut self,
-            module: impl Into<ModuleRef>,
-            message: impl Into<Message>,
-            time: SimTime,
-        ) {
-            let event = HandleMessageEvent {
-                module: module.into(),
-                message: message.into(),
-            };
-
-            self.add_event(NetEvents::HandleMessageEvent(event), time);
-        }
     }
 }
 

@@ -38,3 +38,6 @@ Equivalence to current features:
 - shutdown / startup (can be represented)
 - spawner -> no reason not to (model as part of dispatcher?)
 - props -> Part of state (conditional) or Props (custom extractor)
+
+# Application::Error to model a concrete error type for Runtime
+# Is EventSet / EventLifecycle Distinction required ?

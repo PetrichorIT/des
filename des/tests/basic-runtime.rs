@@ -1,3 +1,5 @@
+use std::convert::Infallible;
+
 use des::{
     prelude::*,
     runtime::{RuntimeError, RuntimeLimit},
@@ -14,7 +16,7 @@ enum MyEventSet {
 }
 
 impl Event<App> for MyEventSet {
-    fn handle(self, rt: &mut Runtime<App>) -> Result<(), RuntimeError> {
+    fn handle(self, rt: &mut Runtime<App>) -> Result<(), Infallible> {
         match self {
             Self::RegisterToRtWithTime(a) => a.handle(rt),
             Self::B(b) => b.handle(rt),
@@ -56,8 +58,8 @@ struct App {
 }
 
 impl Application for App {
+    type Error = Infallible;
     type EventSet = MyEventSet;
-    type Lifecycle = ();
 }
 
 #[test]
@@ -329,24 +331,23 @@ struct DeferredApplication {
     started: bool,
     ended: bool,
 }
-impl EventLifecycle for DeferredApplication {
-    fn at_sim_start(rt: &mut Runtime<Self>) -> Result<(), RuntimeError> {
+
+impl Application for DeferredApplication {
+    type Error = Infallible;
+    type EventSet = DeferredES;
+    fn at_sim_start(rt: &mut Runtime<Self>) -> Result<(), Infallible> {
         rt.app.started = true;
         Ok(())
     }
-    fn at_sim_end(rt: &mut Runtime<Self>) -> Result<(), RuntimeError> {
+    fn at_sim_end(rt: &mut Runtime<Self>) -> Result<(), Infallible> {
         rt.app.ended = true;
         Ok(())
     }
 }
-impl Application for DeferredApplication {
-    type Lifecycle = Self;
-    type EventSet = DeferredES;
-}
 
 struct DeferredES;
 impl Event<DeferredApplication> for DeferredES {
-    fn handle(self, _rt: &mut Runtime<DeferredApplication>) -> Result<(), RuntimeError> {
+    fn handle(self, _rt: &mut Runtime<DeferredApplication>) -> Result<(), Infallible> {
         Ok(())
     }
 }
@@ -371,20 +372,17 @@ fn deferred_sim_start() {
 
 struct CustomStartApp;
 impl Application for CustomStartApp {
+    type Error = Infallible;
     type EventSet = CustomStartEvent;
-    type Lifecycle = Self;
-}
-
-struct CustomStartEvent;
-impl Event<CustomStartApp> for CustomStartEvent {
-    fn handle(self, _: &mut Runtime<CustomStartApp>) -> Result<(), RuntimeError> {
+    fn at_sim_start(_: &mut Runtime<Self>) -> Result<(), Infallible> {
+        assert_eq!(SimTime::now(), 42.0);
         Ok(())
     }
 }
 
-impl EventLifecycle for CustomStartApp {
-    fn at_sim_start(_: &mut Runtime<Self>) -> Result<(), RuntimeError> {
-        assert_eq!(SimTime::now(), 42.0);
+struct CustomStartEvent;
+impl Event<CustomStartApp> for CustomStartEvent {
+    fn handle(self, _: &mut Runtime<CustomStartApp>) -> Result<(), Infallible> {
         Ok(())
     }
 }
@@ -402,12 +400,9 @@ fn custom_start_time() {
 
 struct PausableApp;
 impl Application for PausableApp {
+    type Error = Infallible;
     type EventSet = PausableAppEvent;
-    type Lifecycle = PausableApp;
-}
-
-impl EventLifecycle for PausableApp {
-    fn at_sim_start(runtime: &mut Runtime<Self>) -> Result<(), RuntimeError>
+    fn at_sim_start(runtime: &mut Runtime<Self>) -> Result<(), Infallible>
     where
         Self: Application,
     {
@@ -418,7 +413,7 @@ impl EventLifecycle for PausableApp {
 
 struct PausableAppEvent(usize);
 impl Event<PausableApp> for PausableAppEvent {
-    fn handle(mut self, runtime: &mut Runtime<PausableApp>) -> Result<(), RuntimeError> {
+    fn handle(mut self, runtime: &mut Runtime<PausableApp>) -> Result<(), Infallible> {
         self.0 += 1;
         runtime.add_event_in(self, Duration::from_secs(1));
         Ok(())

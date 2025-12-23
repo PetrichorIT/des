@@ -1,5 +1,5 @@
 use rand::distr::StandardUniform;
-use std::{collections::VecDeque, fmt::Debug};
+use std::{collections::VecDeque, convert::Infallible, fmt::Debug};
 
 use des::prelude::*;
 
@@ -47,7 +47,7 @@ impl Application {
 
 impl des::runtime::Application for Application {
     type EventSet = Events;
-    type Lifecycle = ();
+    type Error = Infallible;
 }
 
 #[derive(Debug)]
@@ -58,7 +58,7 @@ enum Events {
 }
 
 impl Event<Application> for Events {
-    fn handle(self, rt: &mut Runtime<Application>) -> Result<(), RuntimeError> {
+    fn handle(self, rt: &mut Runtime<Application>) -> Result<(), Infallible> {
         match self {
             Self::ServerDone(event) => event.handle(rt),
             Self::CustomerArrival(event) => event.handle(rt),

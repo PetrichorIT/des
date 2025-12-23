@@ -25,6 +25,7 @@
 //!
 //! ```
 //! use des::prelude::*;
+//! use std::convert::Infallible;
 //!
 //! enum MyEventSet {
 //!     EventA { what_happend: String },
@@ -32,7 +33,7 @@
 //! }
 //!
 //! impl Event<MyApp> for MyEventSet {
-//!     fn handle(self, _rt: &mut Runtime<MyApp>) -> Result<(), RuntimeError> {
+//!     fn handle(self, _rt: &mut Runtime<MyApp>) -> Result<(), Infallible> {
 //!         // Do something
 //!         Ok(())
 //!     }
@@ -45,8 +46,8 @@
 //! }
 //!
 //! impl Application for MyApp {
+//!     type Error = Infallible;
 //!     type EventSet = MyEventSet;
-//!     type Lifecycle = ();
 //! }
 //!
 //! fn main() {
