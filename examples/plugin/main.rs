@@ -1,6 +1,10 @@
 use std::io;
 
-use des::{net::Error, prelude::*, registry};
+use des::{
+    net::{Error, Failure},
+    prelude::*,
+    registry,
+};
 
 #[derive(Debug, Default)]
 struct A {}
@@ -52,7 +56,7 @@ impl Module for B {
 struct Main;
 impl Module for Main {}
 
-fn main() -> Result<(), Error> {
+fn main() -> Result<(), Failure> {
     // Logger::new().set_logger();
     // tracing_subscriber::fmt()
     //     .with_max_level(LevelFilter::TRACE)

@@ -1,10 +1,10 @@
-use std::sync::Arc;
+use std::{iter::once, sync::Arc};
 
 use des_sync_utils::Mutex;
 
 use crate::{
     net::{
-        Error, Sim,
+        Error, Failure, Sim,
         gate::Connection,
         runtime::{HandleMessageEvent, MessageExitingConnection, NetEvents, cfg::SimLifecycle},
     },
@@ -24,7 +24,7 @@ struct EventExecutionContextInner {
     // errors
     errors: Vec<Error>,
     // failure
-    failure: Option<Error>,
+    failure: Option<Failure>,
 }
 
 impl EventExecutionContext {
@@ -35,9 +35,9 @@ impl EventExecutionContext {
     pub(crate) fn report_failure(&self, failure: Error) {
         let mut lock = self.inner.lock();
         match lock.failure {
-            None => lock.failure = Some(Error::from(failure)),
+            None => lock.failure = Some(Failure::from(failure)),
             Some(ref mut existing_failure) => {
-                existing_failure.append(failure);
+                existing_failure.extend(once(failure));
             }
         }
     }
@@ -86,7 +86,7 @@ impl EventExecutionContext {
 }
 
 impl EventExecutionContext {
-    pub(crate) fn finish<A: SimLifecycle>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), Error> {
+    pub(crate) fn finish<A: SimLifecycle>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), Failure> {
         let mut ctx = Arc::into_inner(self.inner)
             .expect("could not retrieve Arc")
             .into_inner();
@@ -97,7 +97,7 @@ impl EventExecutionContext {
         }
 
         // (2) Collect reported errors
-        rt.app.error.extend(ctx.errors.drain(..));
+        rt.app.error.append(&mut ctx.errors);
 
         // (3) Check for a critical failure
         match ctx.failure.take() {

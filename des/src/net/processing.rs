@@ -469,7 +469,7 @@ cfg_async! {
         ///
         /// Erorors that occured in handles about to be joined.
         pub fn at_sim_end(&mut self) -> Result<(), Vec<Error>> {
-            let mut error = self.check_for_panics().err().unwrap_or(Vec::new());
+            let mut error = self.check_for_panics().err().unwrap_or_default();
             for (_, must_join) in self.handles.drain(..) {
                 if must_join {
                     error.push(Error::new_current(ErrorKind::JoinError(
@@ -483,6 +483,7 @@ cfg_async! {
     }
 
     impl ProcessingElement for TokioRuntime {
+        #[allow(clippy::needless_for_each)]
         fn process_with(
             &mut self,
             msg: Option<Message>,
@@ -502,16 +503,14 @@ cfg_async! {
             let mut shared = TOKIO_SHARED.lock().expect("failed to get lock");
             self.handles.append(&mut shared.threads);
 
-            if shared.has_observed_panics {
-                if let Err(err) = self.check_for_panics() {
-                    let current = current();
-                    let exec = current.exec();
+            if shared.has_observed_panics && let Err(err) = self.check_for_panics() {
+                let current = current();
+                let exec = current.exec();
 
-                    if current.unwind_behaviour().on_panic_catch {
-                        err.into_iter().for_each(|e| exec.report_error(e));
-                    } else {
-                        err.into_iter().for_each(|e| exec.report_failure(e));
-                    }
+                if current.unwind_behaviour().on_panic_catch {
+                    err.into_iter().for_each(|e| exec.report_error(e));
+                } else {
+                    err.into_iter().for_each(|e| exec.report_failure(e));
                 }
             }
 

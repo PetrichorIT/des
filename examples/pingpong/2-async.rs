@@ -13,7 +13,7 @@
 //! include `tokio` as a dependency.
 
 use des::{
-    net::{Error, IntoModuleTree, handlers},
+    net::{Error, Failure, IntoModuleTree, handlers},
     prelude::*,
     time,
 };
@@ -117,7 +117,7 @@ impl Module for Pinger {
 
 // At last the runtime is created and run using the `Builder`.
 
-fn main() -> Result<(), Error> {
+fn main() -> Result<(), Failure> {
     let sim = build_network();
     let rt = Builder::new().build(sim);
     let _ = rt.run().as_result()?;

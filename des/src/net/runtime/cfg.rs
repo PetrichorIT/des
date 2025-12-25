@@ -21,11 +21,19 @@ impl Debug for SimConfiguration {
 pub trait SimLifecycle: Sized {
     /// See [`Application::at_sim_start`]
     ///
+    /// # Errors
+    ///
+    /// Errors that may occur during the simulation start event.
+    ///
     /// [`Application::at_sim_start`]: crate::runtime::Application::at_sim_start
     fn at_sim_start(_rt: &mut Runtime<Sim<Self>>) -> Result<(), Error> {
         Ok(())
     }
     /// See [`Application::at_sim_end`]
+    ///
+    /// # Errors
+    ///
+    /// Errors that may occur during the simulation end event.
     ///
     /// [`Application::at_sim_end`]: crate::runtime::Application::at_sim_end
     fn at_sim_end(_rt: &mut Runtime<Sim<Self>>) -> Result<(), Error> {

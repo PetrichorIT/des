@@ -1,6 +1,6 @@
 use des::{
     net::{
-        Error, globals,
+        Error, Failure, globals,
         handlers::{ModuleFn, WithContext},
         processing::ProcessingStack,
     },
@@ -21,7 +21,7 @@ impl Module for WithSimStartRequired {
 
 #[test]
 #[serial]
-fn runtime_spawner_calls_sim_start() -> Result<(), Error> {
+fn runtime_spawner_calls_sim_start() -> Result<(), Failure> {
     let mut sim = Sim::new(());
     sim.node(
         "alice",
@@ -60,7 +60,7 @@ fn runtime_spawner_calls_sim_start() -> Result<(), Error> {
 
 #[test]
 #[serial]
-fn runtime_spawner_with_mod_ctx() -> Result<(), Error> {
+fn runtime_spawner_with_mod_ctx() -> Result<(), Failure> {
     let mut sim = Sim::new(());
     sim.node(
         "alice",
@@ -105,7 +105,7 @@ fn runtime_spawner_with_mod_ctx() -> Result<(), Error> {
 
 #[test]
 #[serial]
-fn runtime_spawner_cannot_use_root() -> Result<(), Error> {
+fn runtime_spawner_cannot_use_root() -> Result<(), Failure> {
     let mut sim = Sim::new(());
     sim.node(
         "alice",
@@ -140,7 +140,7 @@ fn runtime_spawner_cannot_use_root() -> Result<(), Error> {
 
 #[test]
 #[serial]
-fn runtime_spawner_reads_cfgs() -> Result<(), Error> {
+fn runtime_spawner_reads_cfgs() -> Result<(), Failure> {
     let mut sim = Sim::new(());
     sim.include_cfg("alice.bob.key: 123");
     sim.node(
@@ -227,7 +227,7 @@ impl Module for MyProcElementModule {
 
 #[test]
 #[serial]
-fn runtime_spawner_from_proc_element() -> Result<(), Error> {
+fn runtime_spawner_from_proc_element() -> Result<(), Failure> {
     let mut sim = Sim::new(());
     sim.include_cfg("alice.bob.key: 123");
     sim.node("alice", MyProcElementModule { c: 0 });

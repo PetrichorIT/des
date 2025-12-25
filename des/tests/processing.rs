@@ -1,5 +1,5 @@
 #![cfg(feature = "net")]
-use des::net::{Error, processing::*};
+use des::net::{Error, Failure, processing::*};
 use des::prelude::*;
 use serial_test::serial;
 use std::sync::Arc;
@@ -247,7 +247,7 @@ impl Module for M {
 
 #[test]
 #[serial]
-fn add_extension_in_plugin() -> Result<(), Error> {
+fn add_extension_in_plugin() -> Result<(), Failure> {
     let mut sim = Sim::new(());
     sim.node("m", M { c: 0 });
     let gate = sim.gate("m", "port");
@@ -286,7 +286,7 @@ impl Module for NodeReadingPE {
 
 #[test]
 #[serial]
-fn downcast_proc_elements_from_other_node() -> Result<(), Error> {
+fn downcast_proc_elements_from_other_node() -> Result<(), Failure> {
     let mut sim = Sim::new(());
     sim.node("alice", NodeWithPE);
     sim.node("alice.observer", NodeReadingPE);

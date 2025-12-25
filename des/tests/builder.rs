@@ -2,7 +2,7 @@
 
 use des::{
     net::{
-        Error, IntoModuleTree,
+        Failure, IntoModuleTree,
         handlers::{FailabilityPolicy, HandlerFn, ModuleFn, WithContext},
         module::Prop,
     },
@@ -330,7 +330,7 @@ fn builder_module_fn_gen_in_module_scope() {
 
 #[test]
 #[serial]
-fn builder_with_context_can_access_props() -> Result<(), Error> {
+fn builder_with_context_can_access_props() -> Result<(), Failure> {
     struct WithProp {
         #[allow(dead_code)]
         prop: Prop<u32, true>,

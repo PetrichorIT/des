@@ -1,6 +1,6 @@
 use des::{
     net::{
-        Error, globals,
+        Error, Failure, globals,
         handlers::{AsyncHandler, ModuleFn},
         report,
     },
@@ -53,7 +53,7 @@ fn connectivity() {
 
 #[test]
 #[serial]
-fn select_node_from_globals() -> Result<(), Error> {
+fn select_node_from_globals() -> Result<(), Failure> {
     let mut sim = Sim::new(());
 
     sim.node("alice", NopModule);
@@ -90,7 +90,7 @@ fn select_node_from_globals() -> Result<(), Error> {
 
 #[test]
 #[serial]
-fn can_access_foreign_module_context() -> Result<(), Error> {
+fn can_access_foreign_module_context() -> Result<(), Failure> {
     let mut sim = Sim::new(());
 
     struct Alice;
@@ -183,7 +183,7 @@ fn custom_fail() {
 
 #[test]
 #[serial]
-fn gate_disconnect() -> Result<(), Error> {
+fn gate_disconnect() -> Result<(), Failure> {
     let mut sim = Sim::new(());
     sim.node(
         "alice",

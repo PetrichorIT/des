@@ -52,25 +52,25 @@ impl Extensions {
     /// Retrieves an extension of type `T` from the message.
     #[must_use]
     pub fn get<T: Any + Send>(&self) -> Option<&T> {
-        self.extensions.get(&TypeId::of::<T>()).and_then(|e| {
-            return e.0.downcast_ref();
-        })
+        self.extensions
+            .get(&TypeId::of::<T>())
+            .and_then(|e| e.0.downcast_ref())
     }
 
     /// Retrieves a mutable reference to an extension of type `T` from the message.
     #[must_use]
     pub fn get_mut<T: Any + Send>(&mut self) -> Option<&mut T> {
-        self.extensions.get_mut(&TypeId::of::<T>()).and_then(|e| {
-            return e.0.downcast_mut();
-        })
+        self.extensions
+            .get_mut(&TypeId::of::<T>())
+            .and_then(|e| e.0.downcast_mut())
     }
 
     /// Removes an extension of type `T` from the message.
     #[allow(clippy::missing_panics_doc)]
     pub fn remove<T: Any + Send>(&mut self) -> Option<T> {
-        self.extensions.remove(&TypeId::of::<T>()).map(|v| {
-            return *v.0.downcast::<T>().expect("illegal state");
-        })
+        self.extensions
+            .remove(&TypeId::of::<T>())
+            .map(|v| *v.0.downcast::<T>().expect("illegal state"))
     }
 
     /// Clears all extensions from the message.
@@ -81,12 +81,11 @@ impl Extensions {
 
 impl Debug for Extensions {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        return self
-            .extensions
+        self.extensions
             .values()
             .map(|v| v.1)
             .collect::<BTreeSet<_>>()
-            .fmt(f);
+            .fmt(f)
     }
 }
 

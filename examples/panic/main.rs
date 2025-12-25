@@ -1,9 +1,9 @@
 use des::{
-    net::{Error, handlers::AsyncHandler},
+    net::{Error, Failure, handlers::AsyncHandler},
     prelude::*,
 };
 
-fn main() -> Result<(), Error> {
+fn main() -> Result<(), Failure> {
     let mut sim = Sim::new(());
     sim.node("alice", AsyncHandler::io(|_| async { Ok(()) }));
     sim.node("bob", B);

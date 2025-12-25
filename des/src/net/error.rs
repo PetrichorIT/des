@@ -5,7 +5,7 @@ use std::{
     error::Error as StdError,
     fmt::{Debug, Display},
     io,
-    ops::{Deref, Index},
+    ops::Deref,
     panic::UnwindSafe,
 };
 
@@ -18,7 +18,6 @@ use crate::{net::ObjectPath, prelude::try_current};
 pub struct Error {
     /// Boxed internal representation, otherwise the error struct would be too large.
     pub repr: Box<Repr>,
-    next: Option<Box<Error>>,
 }
 
 /// The internal representation of an error.
@@ -35,19 +34,6 @@ pub struct Repr {
 }
 
 impl Error {
-    /// Gets the current error as a list.
-    pub fn as_list(&self) -> ErrorList<'_> {
-        ErrorList { error: self }
-    }
-
-    /// Appends an error to the current error as a list.
-    pub fn append(&mut self, error: Error) {
-        match self.next {
-            None => self.next = Some(Box::new(error)),
-            Some(ref mut next) => next.append(error),
-        }
-    }
-
     /// Creates a new error.
     #[inline]
     #[must_use]
@@ -59,7 +45,6 @@ impl Error {
                 backtrace: Backtrace::capture(),
                 context: SpanTrace::capture(),
             }),
-            next: None,
         }
     }
 
@@ -74,7 +59,6 @@ impl Error {
                 backtrace: Backtrace::capture(),
                 context: SpanTrace::capture(),
             }),
-            next: None,
         }
     }
 
@@ -93,7 +77,6 @@ impl Error {
                 backtrace: Backtrace::capture(),
                 context: SpanTrace::capture(),
             }),
-            next: None,
         }
     }
 }
@@ -126,13 +109,7 @@ impl Deref for Error {
 
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(&self.repr, f)?;
-        if let Some(next) = &self.next {
-            writeln!(f)?;
-            Display::fmt(next, f)
-        } else {
-            Ok(())
-        }
+        Display::fmt(&self.repr, f)
     }
 }
 
@@ -189,39 +166,37 @@ cfg_async! {
     }
 }
 
-impl From<Vec<Error>> for Error {
-    fn from(value: Vec<Error>) -> Self {
-        assert!(!value.is_empty());
-        value
-            .into_iter()
-            .rev()
-            .reduce(|a, mut b| {
-                b.append(a);
-                b
-            })
-            .expect("iter cannot be empty")
-    }
-}
-
 impl From<Infallible> for Error {
     fn from(value: Infallible) -> Self {
         match value {}
     }
 }
 
-impl Extend<Error> for Error {
-    fn extend<T: IntoIterator<Item = Error>>(&mut self, iter: T) {
-        // TODO: inefficient
-        for val in iter {
-            self.append(val);
-        }
-    }
-}
-
 impl UnwindSafe for Error {}
 
 /// A set of failures
-pub struct Failure(pub Vec<Error>);
+pub struct Failure(Vec<Error>);
+
+impl Failure {
+    /// As a vec.
+    #[must_use]
+    pub fn into_inner(self) -> Vec<Error> {
+        self.0
+    }
+}
+
+impl Deref for Failure {
+    type Target = [Error];
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl Debug for Failure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self, f)
+    }
+}
 
 impl Display for Failure {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -233,70 +208,23 @@ impl Display for Failure {
     }
 }
 
+impl Extend<Error> for Failure {
+    fn extend<T: IntoIterator<Item = Error>>(&mut self, iter: T) {
+        self.0.extend(iter);
+    }
+}
+
+impl StdError for Failure {}
+
 impl From<Vec<Error>> for Failure {
     fn from(value: Vec<Error>) -> Self {
+        assert!(!value.is_empty(), "Failure must contain at least one error");
         Failure(value)
     }
 }
 
-impl From<Error> for Failure {
-    fn from(value: Error) -> Self {
-        Failure(vec![value])
-    }
-}
-
-/// A list of errors.
-#[derive(Debug)]
-pub struct ErrorList<'a> {
-    error: &'a Error,
-}
-
-impl<'a> ErrorList<'a> {
-    /// Gets the i-th error in the list.
-    pub fn get(&self, index: usize) -> Option<&'a Error> {
-        self.error.get_index(index)
-    }
-}
-
-impl Index<usize> for Error {
-    type Output = Error;
-    fn index(&self, index: usize) -> &Self::Output {
-        self.as_list().get(index).expect("index out of bounds")
-    }
-}
-
-impl Error {
-    fn get_index(&self, offset: usize) -> Option<&Error> {
-        if offset == 0 {
-            Some(self)
-        } else {
-            self.next.as_ref().and_then(|e| e.get_index(offset - 1))
-        }
-    }
-}
-
-/// An iterator over the errors in a list.
-#[derive(Debug)]
-pub struct ErrorListIter<'a> {
-    error: Option<&'a Error>,
-}
-
-impl<'a> Iterator for ErrorListIter<'a> {
-    type Item = &'a Error;
-    fn next(&mut self) -> Option<Self::Item> {
-        let error = self.error?;
-        self.error = error.next.as_ref().map(|v| &**v);
-        Some(error)
-    }
-}
-
-impl<'a> IntoIterator for ErrorList<'a> {
-    type Item = &'a Error;
-    type IntoIter = ErrorListIter<'a>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        ErrorListIter {
-            error: Some(self.error),
-        }
+impl<E: Into<Error>> From<E> for Failure {
+    fn from(value: E) -> Self {
+        Failure(vec![value.into()])
     }
 }

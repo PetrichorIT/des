@@ -1,6 +1,6 @@
 use des::{
     net::{
-        Error, globals,
+        Error, Failure, globals,
         handlers::ModuleFn,
         message::Body,
         module::{SIGNAL_MODULE_PANICED, Signal, UnwindBehaviour, emit},
@@ -46,7 +46,7 @@ fn panicing_subprocess_at(t: impl Into<SimTime>) -> impl Module {
 
 #[test]
 #[serial]
-fn signal_subscription_in_direct_parent() -> Result<(), Error> {
+fn signal_subscription_in_direct_parent() -> Result<(), Failure> {
     let mut sim = Sim::new(());
     sim.node("parent", Parent(false));
     sim.node("parent.child", panicing_subprocess_at(2.0));
@@ -60,7 +60,7 @@ fn signal_subscription_in_direct_parent() -> Result<(), Error> {
 
 #[test]
 #[serial]
-fn signal_subscription_in_indirect_ancestor() -> Result<(), Error> {
+fn signal_subscription_in_indirect_ancestor() -> Result<(), Failure> {
     let mut sim = Sim::new(());
     sim.node("parent", Parent(false));
     sim.node("parent.child", NopModule);
@@ -79,7 +79,7 @@ fn signal_subscription_in_indirect_ancestor() -> Result<(), Error> {
 
 #[test]
 #[serial]
-fn signal_subscription_passed_to_created_child() -> Result<(), Error> {
+fn signal_subscription_passed_to_created_child() -> Result<(), Failure> {
     let mut sim = Sim::new(());
     sim.node("parent", Parent(false));
     sim.node(
@@ -142,7 +142,7 @@ impl<const SIGNAL: usize> Module for EmitSignal<SIGNAL> {
 
 #[test]
 #[serial]
-fn signal_subscription_from_multiple_children() -> Result<(), Error> {
+fn signal_subscription_from_multiple_children() -> Result<(), Failure> {
     const SIGNAL: usize = 32;
 
     let mut sim = Sim::new(());
@@ -178,7 +178,7 @@ impl<const SIGNAL: usize> Module for ExpectNSignalThenUnsubscribe<SIGNAL> {
 
 #[test]
 #[serial]
-fn signal_unsubscribe() -> Result<(), Error> {
+fn signal_unsubscribe() -> Result<(), Failure> {
     const SIGNAL: usize = 32;
 
     let mut sim = Sim::new(());

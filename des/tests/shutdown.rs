@@ -1,7 +1,7 @@
 #![cfg(feature = "async")]
 
 use des::{
-    net::{Error, ErrorKind, globals, handlers::ModuleFn, module::Module},
+    net::{Error, ErrorKind, Failure, globals, handlers::ModuleFn, module::Module},
     prelude::*,
     time::sleep,
 };
@@ -494,7 +494,7 @@ fn shutdown_prevents_accessing_parents() {
 
 #[test]
 #[serial]
-fn shutdown_from_foreign_module() -> Result<(), Error> {
+fn shutdown_from_foreign_module() -> Result<(), Failure> {
     let mut sim = Sim::new(());
     sim.node(
         "alice",

@@ -14,7 +14,7 @@ impl ObjectPath {
     /// Indicates whether the path points to the simulation root.
     #[must_use]
     pub fn is_root(&self) -> bool {
-        self.data.len() == 0
+        self.data.is_empty()
     }
 
     /// Indicates whether the path points to a module.
@@ -26,7 +26,7 @@ impl ObjectPath {
     /// Returns the last path component, the name of the current module.
     #[must_use]
     pub fn name(&self) -> &str {
-        let last = self.data.rfind('.').map(|i| i + 1).unwrap_or(0);
+        let last = self.data.rfind('.').map_or(0, |i| i + 1);
         &self.data[last..]
     }
 

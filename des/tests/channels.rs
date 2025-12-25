@@ -2,7 +2,7 @@
 
 use des::{
     net::{
-        Error,
+        Error, Failure,
         channel::DelayChannel,
         handlers::{AsyncHandler, HandlerFn},
         internals::{MessageExitingConnection, NetEvents},
@@ -443,7 +443,7 @@ impl Channel for CustomFwdChannel {
 
 #[test]
 #[serial]
-fn register_unregister_custom_channel() -> Result<(), Error> {
+fn register_unregister_custom_channel() -> Result<(), Failure> {
     let mut sim = Sim::new(());
     sim.node(
         "alice",

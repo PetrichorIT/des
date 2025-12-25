@@ -1,6 +1,6 @@
 use crate::{
     net::{
-        Error,
+        Error, Failure,
         gate::Connection,
         module::{Cfg, DummyModule, MOD_CTX, Props, UnwindBehaviour, try_current},
         processing::{ProcessingStack, TokioRuntime},
@@ -461,10 +461,10 @@ impl IntoModuleTree for () {
 }
 
 impl<A: SimLifecycle> Application for Sim<A> {
-    type Error = Error;
+    type Error = Failure;
     type EventSet = NetEvents;
 
-    fn at_sim_start(rt: &mut Runtime<Sim<A>>) -> Result<(), Error> {
+    fn at_sim_start(rt: &mut Runtime<Sim<A>>) -> Result<(), Failure> {
         set_hook(Box::new(panic_hook));
 
         let mods = rt.app.roots.lock().expect("failed");
@@ -512,7 +512,7 @@ impl<A: SimLifecycle> Application for Sim<A> {
         Ok(())
     }
 
-    fn at_sim_end(rt: &mut Runtime<Sim<A>>) -> Result<(), Error> {
+    fn at_sim_end(rt: &mut Runtime<Sim<A>>) -> Result<(), Failure> {
         A::at_sim_end(rt)?;
 
         let mut error = Vec::new();
@@ -536,7 +536,13 @@ impl<A: SimLifecycle> Application for Sim<A> {
 
             #[cfg(feature = "tracing")]
             tracing::info!("Calling 'at_sim_end'");
-            error.extend(module.at_sim_end().err());
+            error.extend(
+                module
+                    .at_sim_end()
+                    .map_err(Failure::into_inner)
+                    .err()
+                    .unwrap_or(Vec::new()),
+            );
             module.deactivate();
 
             ctx.finish(rt)?;
@@ -663,7 +669,7 @@ struct AllNodesIter<'a> {
     remaining: &'a [ModuleRef],
 }
 
-impl<'a> Iterator for AllNodesIter<'a> {
+impl Iterator for AllNodesIter<'_> {
     type Item = ModuleRef;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -680,7 +686,7 @@ impl<'a> Iterator for AllNodesIter<'a> {
     }
 }
 
-impl<'a> AllNodesIter<'a> {
+impl AllNodesIter<'_> {
     fn next_along_stack(&mut self) -> Option<ModuleRef> {
         let (node, keys) = self.stack.last_mut()?;
         let Some(key) = keys.pop() else {

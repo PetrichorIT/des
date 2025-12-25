@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use des::{
     net::{
-        Error, ErrorKind, Sim, globals,
+        Error, ErrorKind, Failure, Sim, globals,
         handlers::{AsyncHandler, ModuleFn},
         module::{Module, UnwindBehaviour},
     },
@@ -186,7 +186,7 @@ impl Module for PanicAtRecvWithRestart {
 
 #[serial]
 #[test]
-fn unwind_and_restart() -> Result<(), Error> {
+fn unwind_and_restart() -> Result<(), Failure> {
     let mut sim = Sim::new(());
     sim.node("alice", PanicAtRecvWithRestart);
     sim.node(
@@ -208,7 +208,7 @@ fn unwind_and_restart() -> Result<(), Error> {
 
 #[serial]
 #[test]
-fn task_panic_unobserved() -> Result<(), Error> {
+fn task_panic_unobserved() -> Result<(), Failure> {
     let mut sim = Sim::new(());
     sim.node(
         "alice",
@@ -239,7 +239,7 @@ fn task_panic_unobserved() -> Result<(), Error> {
 
 #[serial]
 #[test]
-fn task_panic_will_only_report() -> Result<(), Error> {
+fn task_panic_will_only_report() -> Result<(), Failure> {
     let mut sim = Sim::new(());
     sim.node(
         "alice",
@@ -270,7 +270,7 @@ fn task_panic_will_only_report() -> Result<(), Error> {
 
 #[serial]
 #[test]
-fn task_panic_will_fail() -> Result<(), Error> {
+fn task_panic_will_fail() -> Result<(), Failure> {
     let mut sim = Sim::new(());
     sim.node(
         "alice",

@@ -12,7 +12,10 @@
 //! abstractions, macros and serialization implementations. By default this feature does NOT
 //! include `tokio`.
 
-use des::{net::Error, prelude::*};
+use des::{
+    net::{Error, Failure},
+    prelude::*,
+};
 use std::io;
 
 // ## The hosts
@@ -154,7 +157,7 @@ impl Module for Ponger {
 
 // At last the runtime is created and run using the `Builder`.
 
-fn main() -> Result<(), Error> {
+fn main() -> Result<(), Failure> {
     let sim = build_network();
     let rt = Builder::new().build(sim);
     let _ = rt.run().as_result()?;

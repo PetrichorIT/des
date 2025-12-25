@@ -3,7 +3,7 @@
 
 use des::{
     net::{
-        Error, ErrorKind,
+        Error, ErrorKind, Failure,
         handlers::AsyncHandler,
         module::{Module, UnwindBehaviour},
     },
@@ -678,7 +678,7 @@ fn runtime_require_join() {
 
 #[test]
 #[serial]
-fn wait_for_sim_start_fin() -> Result<(), Error> {
+fn wait_for_sim_start_fin() -> Result<(), Failure> {
     let mut sim = Sim::new(());
     let (tx, rx) = std::sync::mpsc::channel();
 
