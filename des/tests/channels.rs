@@ -2,6 +2,7 @@
 
 use des::{
     net::{
+        Error,
         channel::DelayChannel,
         handlers::{AsyncHandler, HandlerFn},
         internals::{MessageExitingConnection, NetEvents},
@@ -30,7 +31,7 @@ impl Module for DropChanModule {
         self.received += 1;
     }
 
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+    fn at_sim_end(&mut self) -> Result<(), Error> {
         assert_ne!(self.send, self.received);
         Ok(())
     }
@@ -76,7 +77,7 @@ impl Module for BufferChanModule {
         self.received += 1;
     }
 
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+    fn at_sim_end(&mut self) -> Result<(), Error> {
         assert_eq!(self.send, 3);
         assert_eq!(self.received, 2);
         Ok(())
@@ -155,7 +156,7 @@ impl Module for LatencyOnly {
         self.0 += 1;
     }
 
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+    fn at_sim_end(&mut self) -> Result<(), Error> {
         assert_eq!(self.0, 10);
         Ok(())
     }
@@ -442,7 +443,7 @@ impl Channel for CustomFwdChannel {
 
 #[test]
 #[serial]
-fn register_unregister_custom_channel() -> Result<(), RuntimeError> {
+fn register_unregister_custom_channel() -> Result<(), Error> {
     let mut sim = Sim::new(());
     sim.node(
         "alice",

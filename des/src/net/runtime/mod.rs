@@ -1,11 +1,11 @@
 use crate::{
     net::{
+        Error,
         gate::Connection,
         module::{Cfg, DummyModule, MOD_CTX, Props, UnwindBehaviour, try_current},
         processing::{ProcessingStack, TokioRuntime},
     },
     prelude::{Application, GateRef, Message, Module, ModuleRef, ObjectPath, Runtime},
-    runtime::RuntimeError,
     time::SimTime,
 };
 use serde_norway::{Value, from_str};
@@ -45,7 +45,7 @@ pub use self::spawner::{Spawner, SpawnerKind};
 /// used in the [`Runtime`].
 ///
 /// A networking simulation can internally contain an application `A`,
-/// that implements [`EventLifecycle`]. This type can be used attach
+/// that implements [`SimLifecycle`]. This type can be used attach
 /// custom global behaviour at the simulation launch and shutdown. The
 /// lifetime events will be applied after the simulation has started itself
 /// and before the simulation itself will shut down.
@@ -59,9 +59,10 @@ pub use self::spawner::{Spawner, SpawnerKind};
 /// # use des::prelude::*;
 /// # use des::net::handlers::HandlerFn;
 /// # use des::net::SimLifecycle;
+/// # use des::net::Error;
 /// struct Inner;
 /// impl SimLifecycle for Inner {
-///     fn at_sim_start(rt: &mut Runtime<Sim<Inner>>)  -> Result<(), RuntimeError> {
+///     fn at_sim_start(rt: &mut Runtime<Sim<Inner>>)  -> Result<(), Error> {
 ///         println!("Hello simulation");
 ///         /* Do something */
 ///         Ok(())
@@ -76,7 +77,7 @@ pub use self::spawner::{Spawner, SpawnerKind};
 /// let _ = Builder::new().build(sim.freeze()).run(); // prints 'Hello simulation'
 /// ```
 pub struct Sim<A> {
-    pub(crate) error: RuntimeError,
+    pub(crate) error: Vec<Error>,
     globals: Arc<Globals>,
     /// A inner field of a network simulation that can be used to attach
     /// custom lifetime handlers to a simulation
@@ -111,7 +112,7 @@ impl<A> Sim<A> {
         let guard = SimStaticsGuard::new();
 
         Sim {
-            error: RuntimeError::empty(),
+            error: Vec::new(),
             guard,
             inner,
             globals,
@@ -460,10 +461,10 @@ impl IntoModuleTree for () {
 }
 
 impl<A: SimLifecycle> Application for Sim<A> {
-    type Error = RuntimeError;
+    type Error = Error;
     type EventSet = NetEvents;
 
-    fn at_sim_start(rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError> {
+    fn at_sim_start(rt: &mut Runtime<Sim<A>>) -> Result<(), Error> {
         set_hook(Box::new(panic_hook));
 
         let mods = rt.app.roots.lock().expect("failed");
@@ -511,14 +512,14 @@ impl<A: SimLifecycle> Application for Sim<A> {
         Ok(())
     }
 
-    fn at_sim_end(rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError> {
+    fn at_sim_end(rt: &mut Runtime<Sim<A>>) -> Result<(), Error> {
         A::at_sim_end(rt)?;
 
-        let mut error = RuntimeError::empty();
+        let mut error = Vec::new();
         mem::swap(&mut error, &mut rt.app.error);
 
         if !rt.app.error.is_empty() {
-            return Err(error);
+            return Err(error.into());
         }
 
         let mods = rt
@@ -535,19 +536,18 @@ impl<A: SimLifecycle> Application for Sim<A> {
 
             #[cfg(feature = "tracing")]
             tracing::info!("Calling 'at_sim_end'");
-            error.merge(
-                module
-                    .at_sim_end()
-                    .err()
-                    .unwrap_or_else(RuntimeError::empty),
-            );
+            error.extend(module.at_sim_end().err());
             module.deactivate();
 
             ctx.finish(rt)?;
         }
 
         let _ = take_hook();
-        if error.is_empty() { Ok(()) } else { Err(error) }
+        if error.is_empty() {
+            Ok(())
+        } else {
+            Err(error.into())
+        }
     }
 }
 

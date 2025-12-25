@@ -1,8 +1,8 @@
 use std::{fmt::Debug, sync::Arc};
 
 use crate::{
-    net::{Sim, module::UnwindBehaviour, processing::ProcessingStack},
-    prelude::{Runtime, RuntimeError},
+    net::{Error, Sim, module::UnwindBehaviour, processing::ProcessingStack},
+    prelude::Runtime,
 };
 
 #[derive(Clone)]
@@ -20,11 +20,15 @@ impl Debug for SimConfiguration {
 /// A trait for sim events
 pub trait SimLifecycle: Sized {
     /// See [`Application::at_sim_start`]
-    fn at_sim_start(_rt: &mut Runtime<Sim<Self>>) -> Result<(), RuntimeError> {
+    ///
+    /// [`Application::at_sim_start`]: crate::runtime::Application::at_sim_start
+    fn at_sim_start(_rt: &mut Runtime<Sim<Self>>) -> Result<(), Error> {
         Ok(())
     }
     /// See [`Application::at_sim_end`]
-    fn at_sim_end(_rt: &mut Runtime<Sim<Self>>) -> Result<(), RuntimeError> {
+    ///
+    /// [`Application::at_sim_end`]: crate::runtime::Application::at_sim_end
+    fn at_sim_end(_rt: &mut Runtime<Sim<Self>>) -> Result<(), Error> {
         Ok(())
     }
 }

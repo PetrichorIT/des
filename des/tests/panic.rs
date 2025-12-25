@@ -7,7 +7,7 @@ use des::{
         module::{Module, UnwindBehaviour},
     },
     prelude::{Message, current, schedule_at},
-    runtime::{Builder, RuntimeError},
+    runtime::Builder,
     time::sleep,
 };
 use serial_test::serial;
@@ -52,7 +52,7 @@ fn catch_panic_at_sim_start() {
 
 struct PanicAtSimEnd;
 impl Module for PanicAtSimEnd {
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+    fn at_sim_end(&mut self) -> Result<(), Error> {
         panic!("Oh no");
     }
 }
@@ -91,10 +91,7 @@ fn unwind_sim_panic_at_handle_message() {
     let mut rt = Builder::seeded(123).build(sim.freeze());
     rt.add_message_onto(gate, Message::default(), 5.0.into());
     let err = rt.run().error.unwrap();
-    assert!(matches!(
-        err[0].as_any().downcast_ref::<Error>().unwrap().kind,
-        ErrorKind::ModulePanic(_)
-    ));
+    assert!(matches!(err[0].kind, ErrorKind::ModulePanic(_)));
 }
 
 struct SimPanicAtSimStart;
@@ -118,15 +115,12 @@ fn unwind_sim_panic_at_sim_start() {
     let mut rt = Builder::seeded(123).build(sim.freeze());
     rt.add_message_onto(gate, Message::default(), 5.0.into());
     let err = rt.run().error.unwrap();
-    assert!(matches!(
-        err[0].as_any().downcast_ref::<Error>().unwrap().kind,
-        ErrorKind::ModulePanic(_)
-    ));
+    assert!(matches!(err[0].kind, ErrorKind::ModulePanic(_)));
 }
 
 struct SimPanicAtSimEnd;
 impl Module for SimPanicAtSimEnd {
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+    fn at_sim_end(&mut self) -> Result<(), Error> {
         current().set_unwind_behaviour(UnwindBehaviour {
             on_panic_catch: false,
             ..Default::default()
@@ -146,10 +140,7 @@ fn unwind_sim_panic_at_sim_end() {
     rt.add_message_onto(gate, Message::default(), 5.0.into());
     let err = rt.run().error.unwrap();
 
-    assert!(matches!(
-        err[0].as_any().downcast_ref::<Error>().unwrap().kind,
-        ErrorKind::ModulePanic(_)
-    ));
+    assert!(matches!(err[0].kind, ErrorKind::ModulePanic(_)));
 }
 
 struct PanicWithUnwindAllways;
@@ -175,10 +166,7 @@ fn unwind_behaviour_unwind_allways_panics() {
     let mut rt = Builder::seeded(123).build(sim.freeze());
     rt.add_message_onto(gate, Message::default(), 5.0.into());
     let err = rt.run().error.unwrap();
-    assert!(matches!(
-        err[0].as_any().downcast_ref::<Error>().unwrap().kind,
-        ErrorKind::ModulePanic(_)
-    ));
+    assert!(matches!(err[0].kind, ErrorKind::ModulePanic(_)));
 }
 
 struct PanicAtRecvWithRestart;
@@ -198,7 +186,7 @@ impl Module for PanicAtRecvWithRestart {
 
 #[serial]
 #[test]
-fn unwind_and_restart() -> Result<(), RuntimeError> {
+fn unwind_and_restart() -> Result<(), Error> {
     let mut sim = Sim::new(());
     sim.node("alice", PanicAtRecvWithRestart);
     sim.node(
@@ -220,7 +208,7 @@ fn unwind_and_restart() -> Result<(), RuntimeError> {
 
 #[serial]
 #[test]
-fn task_panic_unobserved() -> Result<(), RuntimeError> {
+fn task_panic_unobserved() -> Result<(), Error> {
     let mut sim = Sim::new(());
     sim.node(
         "alice",
@@ -251,7 +239,7 @@ fn task_panic_unobserved() -> Result<(), RuntimeError> {
 
 #[serial]
 #[test]
-fn task_panic_will_only_report() -> Result<(), RuntimeError> {
+fn task_panic_will_only_report() -> Result<(), Error> {
     let mut sim = Sim::new(());
     sim.node(
         "alice",
@@ -282,7 +270,7 @@ fn task_panic_will_only_report() -> Result<(), RuntimeError> {
 
 #[serial]
 #[test]
-fn task_panic_will_fail() -> Result<(), RuntimeError> {
+fn task_panic_will_fail() -> Result<(), Error> {
     let mut sim = Sim::new(());
     sim.node(
         "alice",

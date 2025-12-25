@@ -73,7 +73,7 @@
 // -> if a process fails, check whether its observed (sync = yes, async = sometimes)
 // -> unwind behaviour
 
-use crate::{net::message::Message, prelude::RuntimeError};
+use crate::net::{Error, message::Message};
 use std::any::Any;
 
 mod api;
@@ -219,7 +219,7 @@ pub trait Module: Any {
     /// # Errors
     ///
     /// May return an error if the module deems the simulation has failed.
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+    fn at_sim_end(&mut self) -> Result<(), Error> {
         Ok(())
     }
 }

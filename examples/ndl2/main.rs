@@ -1,4 +1,4 @@
-use des::{prelude::*, registry};
+use des::{net::Error, prelude::*, registry};
 
 #[derive(Default)]
 struct Sub;
@@ -18,7 +18,7 @@ impl Module for Sub {
 #[derive(Default)]
 struct Main;
 impl Module for Main {
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+    fn at_sim_end(&mut self) -> Result<(), Error> {
         tracing::info!(target: "custom", "at sim end");
         Ok(())
     }

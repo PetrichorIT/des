@@ -1,9 +1,8 @@
-use std::sync::Arc;
+use std::{error::Error as StdError, sync::Arc};
 
 use crate::{
     net::{Error, runtime::NetEvents},
     prelude::current,
-    runtime::LikeRuntimeError,
     time::SimTime,
 };
 
@@ -34,7 +33,7 @@ pub fn globals() -> Arc<Globals> {
 /// This function panics if the no runtime is currently active.
 /// Note that a runtime is active if a instance of [`Sim`](super::Sim) exists.
 ///
-pub fn report(e: impl LikeRuntimeError) {
+pub fn report<E: Into<Box<dyn StdError + Send + Sync>>>(e: E) {
     current().exec().report_error(Error::other(e));
 }
 
@@ -48,7 +47,7 @@ pub fn report(e: impl LikeRuntimeError) {
 /// This function panics if the no runtime is currently active.
 /// Note that a runtime is active if a instance of [`Sim`](super::Sim) exists.
 ///
-pub fn fail(e: impl LikeRuntimeError) {
+pub fn fail<E: Into<Box<dyn StdError + Send + Sync>>>(e: E) {
     current().exec().report_failure(Error::other(e));
 }
 

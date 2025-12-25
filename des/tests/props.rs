@@ -1,11 +1,14 @@
 #![cfg(feature = "net")]
 
-use des::{net::handlers::AsyncHandler, prelude::*};
+use des::{
+    net::{Error, handlers::AsyncHandler},
+    prelude::*,
+};
 use serial_test::serial;
 
 #[test]
 #[serial]
-fn parse_props() -> Result<(), RuntimeError> {
+fn parse_props() -> Result<(), Error> {
     let mut sim = Sim::new(());
 
     sim.include_cfg(
@@ -91,7 +94,7 @@ fn parse_props() -> Result<(), RuntimeError> {
 }
 
 #[test]
-fn disallow_casting() -> Result<(), RuntimeError> {
+fn disallow_casting() -> Result<(), Error> {
     let mut sim = Sim::new(());
 
     sim.node(

@@ -1,4 +1,7 @@
-use crate::prelude::{Message, Module, RuntimeError};
+use crate::{
+    net::Error,
+    prelude::{Message, Module},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(crate) struct DummyModule;
@@ -28,7 +31,7 @@ impl Module for DummyModule {
         )
     }
 
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+    fn at_sim_end(&mut self) -> Result<(), Error> {
         panic!(
             "A dummy module is only a placeholder in the load process. No `dyn Module` functions should be called."
         )

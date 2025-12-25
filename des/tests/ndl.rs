@@ -72,7 +72,7 @@ mod common {
             }
         }
 
-        fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+        fn at_sim_end(&mut self) -> Result<(), des::net::Error> {
             let v = current()
                 .prop::<usize>("expected")
                 .unwrap()

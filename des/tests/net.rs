@@ -1,6 +1,6 @@
 use des::{
     net::{
-        globals,
+        Error, globals,
         handlers::{AsyncHandler, ModuleFn},
         report,
     },
@@ -53,7 +53,7 @@ fn connectivity() {
 
 #[test]
 #[serial]
-fn select_node_from_globals() -> Result<(), RuntimeError> {
+fn select_node_from_globals() -> Result<(), Error> {
     let mut sim = Sim::new(());
 
     sim.node("alice", NopModule);
@@ -90,7 +90,7 @@ fn select_node_from_globals() -> Result<(), RuntimeError> {
 
 #[test]
 #[serial]
-fn can_access_foreign_module_context() -> Result<(), RuntimeError> {
+fn can_access_foreign_module_context() -> Result<(), Error> {
     let mut sim = Sim::new(());
 
     struct Alice;
@@ -99,7 +99,7 @@ fn can_access_foreign_module_context() -> Result<(), RuntimeError> {
             current().prop::<String>("key").unwrap().set("value".into());
         }
 
-        fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+        fn at_sim_end(&mut self) -> Result<(), Error> {
             assert_eq!(
                 current().prop::<String>("key").unwrap().get(),
                 Some("new_value".into())
@@ -183,7 +183,7 @@ fn custom_fail() {
 
 #[test]
 #[serial]
-fn gate_disconnect() -> Result<(), RuntimeError> {
+fn gate_disconnect() -> Result<(), Error> {
     let mut sim = Sim::new(());
     sim.node(
         "alice",

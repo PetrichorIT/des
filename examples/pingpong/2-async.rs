@@ -13,7 +13,7 @@
 //! include `tokio` as a dependency.
 
 use des::{
-    net::{IntoModuleTree, handlers},
+    net::{Error, IntoModuleTree, handlers},
     prelude::*,
     time,
 };
@@ -109,7 +109,7 @@ impl Module for Pinger {
         self.pongs_received += 1;
     }
 
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+    fn at_sim_end(&mut self) -> Result<(), Error> {
         assert_eq!(self.pongs_received, 30);
         Ok(())
     }
@@ -117,7 +117,7 @@ impl Module for Pinger {
 
 // At last the runtime is created and run using the `Builder`.
 
-fn main() -> Result<(), RuntimeError> {
+fn main() -> Result<(), Error> {
     let sim = build_network();
     let rt = Builder::new().build(sim);
     let _ = rt.run().as_result()?;

@@ -9,7 +9,7 @@
 //! # Requirements
 //!
 //! This implementation only uses the base implementation of `des` and does not require any features or dependencies.
-use des::{event_set, prelude::*};
+use des::{event_set, net::Error, prelude::*};
 
 // ## Defining Events
 //
@@ -37,7 +37,7 @@ struct Pong;
 // and then reschedule the `Interval` event itself, as long as the contained counter is greater than 0.
 
 impl Event<PingPongApp> for Interval {
-    fn handle(self, runtime: &mut Runtime<PingPongApp>) -> Result<(), RuntimeError> {
+    fn handle(self, runtime: &mut Runtime<PingPongApp>) -> Result<(), Error> {
         runtime.add_event_in(Ping, Duration::from_secs_f64(1.5));
         if self.0 != 0 {
             runtime.add_event_in(Interval(self.0 - 1), Duration::from_secs(1));
@@ -53,7 +53,7 @@ impl Event<PingPongApp> for Interval {
 // Since the state is mutably accesable, events can modify the global state.
 
 impl Event<PingPongApp> for Ping {
-    fn handle(self, runtime: &mut Runtime<PingPongApp>) -> Result<(), RuntimeError> {
+    fn handle(self, runtime: &mut Runtime<PingPongApp>) -> Result<(), Error> {
         runtime.app.pings_received += 1;
         runtime.add_event_in(Pong, Duration::from_secs(1));
         Ok(())
@@ -61,7 +61,7 @@ impl Event<PingPongApp> for Ping {
 }
 
 impl Event<PingPongApp> for Pong {
-    fn handle(self, runtime: &mut Runtime<PingPongApp>) -> Result<(), RuntimeError> {
+    fn handle(self, runtime: &mut Runtime<PingPongApp>) -> Result<(), Error> {
         runtime.app.pongs_received += 1;
         Ok(())
     }
@@ -98,7 +98,7 @@ struct PingPongApp {
 }
 
 impl Application for PingPongApp {
-    type Error = RuntimeError;
+    type Error = Error;
     type EventSet = PingPongEvent;
     // The most imporant definition of the `EventLifecycle` trait that must be implemented
     // for any proxy in the `Application::Lifecylce` position, is `at_sim_start`.
@@ -109,7 +109,7 @@ impl Application for PingPongApp {
     // In this case we simply create the inital `Interval` event with a counter set to 29
     // so that the `Interval` repeats 30 times, thus sending 30 pings.
 
-    fn at_sim_start(runtime: &mut Runtime<Self>) -> Result<(), RuntimeError>
+    fn at_sim_start(runtime: &mut Runtime<Self>) -> Result<(), Error>
     where
         Self: Application,
     {
@@ -123,13 +123,13 @@ impl Application for PingPongApp {
 // The last thing to do is to create an application, and put it into a runtime, using the `Builder` API
 // to build a runtime. The resulting `rt` object can either be run, one event at a time using the `dispatch_*`
 // methods, or all at once using `run`. All dispatch calls are failable, since the simulation may emit
-// `RuntimeError`s that cause the simulation run to fail. This can be used to e.g. search for failures
+// `Error`s that cause the simulation run to fail. This can be used to e.g. search for failures
 // of algorithms under specific seeds.
 //
 // Once the simulation is finished, results from the global scope as well as metadata can be
 // inspeced.
 
-fn main() -> Result<(), RuntimeError> {
+fn main() -> Result<(), Error> {
     let app = PingPongApp {
         pings_received: 0,
         pongs_received: 0,

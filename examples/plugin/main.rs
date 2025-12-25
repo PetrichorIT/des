@@ -33,7 +33,7 @@ impl Module for A {
         tracing::info!("recv: {} {}", msg, msg.body.content::<i32>());
     }
 
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+    fn at_sim_end(&mut self) -> Result<(), Error> {
         self.method_one(123)?;
         Ok(())
     }
@@ -52,7 +52,7 @@ impl Module for B {
 struct Main;
 impl Module for Main {}
 
-fn main() -> Result<(), RuntimeError> {
+fn main() -> Result<(), Error> {
     // Logger::new().set_logger();
     // tracing_subscriber::fmt()
     //     .with_max_level(LevelFilter::TRACE)

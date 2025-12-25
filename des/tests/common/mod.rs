@@ -1,6 +1,9 @@
 #![allow(unused)]
 
-use des::{net::module::SIGNAL_MODULE_PANICED, prelude::*};
+use des::{
+    net::{Error, module::SIGNAL_MODULE_PANICED},
+    prelude::*,
+};
 
 pub struct NopModule;
 impl Module for NopModule {}
@@ -12,7 +15,7 @@ impl Module for ExpectNMessage {
         self.0 -= 1;
     }
 
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+    fn at_sim_end(&mut self) -> Result<(), Error> {
         assert_eq!(self.0, 0, "expected {} more messages", self.0);
         Ok(())
     }

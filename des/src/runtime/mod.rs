@@ -17,7 +17,6 @@ use std::{
 
 mod bench;
 mod builder;
-mod error;
 mod event;
 mod limit;
 mod metrics;
@@ -25,7 +24,6 @@ mod result;
 
 pub use self::bench::*;
 pub use self::builder::*;
-pub use self::error::*;
 pub use self::event::*;
 pub use self::limit::*;
 pub use self::result::*;
@@ -101,12 +99,13 @@ where
 /// # Usage with module system
 ///
 /// If you want to use the module system for network-like simulations
-/// than you must create a [`Sim<A>`] as app parameter for the core [`Runtime`].
+/// than you must create a [`Sim`] as app parameter for the core [`Runtime`].
 /// This network runtime comes preconfigured with an event set and all managment
 /// event nessecary for the simulation. All you have to do is to pass the app into [`Builder::build`]
 /// to create a runnable instance and the run it.
 ///
 /// [`Event`]: crate::runtime::Event
+/// [`Sim`]: crate::net::Sim
 pub struct Runtime<App>
 where
     App: Application,

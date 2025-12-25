@@ -9,7 +9,7 @@ use std::{
 };
 
 use des::{
-    net::{Error, ErrorKind, handlers::AsyncHandler},
+    net::{ErrorKind, handlers::AsyncHandler},
     prelude::*,
     time::sleep,
 };
@@ -166,12 +166,7 @@ fn builder_async_failable_with_fail() {
         }),
     );
     let v = Builder::new().build(sim.freeze()).run();
-    assert!(
-        v.error.unwrap()[0]
-            .as_any()
-            .downcast_ref::<Error>()
-            .map_or(false, |e| matches!(e.kind, ErrorKind::JoinError(_)))
-    );
+    assert!(matches!(v.error.unwrap()[0].kind, ErrorKind::JoinError(_)));
 }
 
 #[test]
@@ -196,12 +191,7 @@ fn builder_async_require_join() {
     );
 
     let v = Builder::seeded(123).build(sim.freeze()).run();
-    assert!(
-        v.error.unwrap()[0]
-            .as_any()
-            .downcast_ref::<Error>()
-            .map_or(false, |e| matches!(e.kind, ErrorKind::JoinError(_)))
-    );
+    assert!(matches!(v.error.unwrap()[0].kind, ErrorKind::JoinError(_)));
 }
 
 #[test]

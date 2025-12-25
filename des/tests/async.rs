@@ -8,7 +8,6 @@ use des::{
         module::{Module, UnwindBehaviour},
     },
     prelude::*,
-    runtime::RuntimeError,
     time::{self, MissedTickBehavior, sleep, timeout, timeout_at},
 };
 use std::sync::{
@@ -125,7 +124,7 @@ impl Module for MutipleTasksModule {
         self.sender = Some(txa);
     }
 
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+    fn at_sim_end(&mut self) -> Result<(), Error> {
         for i in 0..self.handles.len() {
             assert!(
                 self.handles.try_join_next().is_some(),
@@ -639,12 +638,7 @@ fn async_join_on_module_fail() {
     sim.node("main", JoinOnModule);
 
     let v = Builder::seeded(123).build(sim.freeze()).run();
-    assert!(
-        v.error.unwrap()[0]
-            .as_any()
-            .downcast_ref::<Error>()
-            .map_or(false, |e| matches!(e.kind, ErrorKind::JoinError(_)))
-    )
+    assert!(matches!(v.error.unwrap()[0].kind, ErrorKind::JoinError(_)));
 }
 
 struct PanicIsJoinable;
@@ -661,12 +655,7 @@ fn async_join_paniced_will_join_but_fail() {
     sim.node("main", PanicIsJoinable);
 
     let v = Builder::seeded(123).build(sim.freeze()).run();
-    assert!(
-        v.error.unwrap()[0]
-            .as_any()
-            .downcast_ref::<Error>()
-            .map_or(false, |e| matches!(e.kind, ErrorKind::JoinError(_)))
-    );
+    assert!(matches!(v.error.unwrap()[0].kind, ErrorKind::JoinError(_)));
 }
 
 struct SpawnButNeverJoin;
@@ -689,7 +678,7 @@ fn runtime_require_join() {
 
 #[test]
 #[serial]
-fn wait_for_sim_start_fin() -> Result<(), RuntimeError> {
+fn wait_for_sim_start_fin() -> Result<(), Error> {
     let mut sim = Sim::new(());
     let (tx, rx) = std::sync::mpsc::channel();
 
@@ -732,7 +721,7 @@ fn wait_for_sim_start_fin() -> Result<(), RuntimeError> {
 
 #[test]
 #[serial]
-fn panic_stops_sim_immediately() -> Result<(), RuntimeError> {
+fn panic_stops_sim_immediately() -> Result<(), Error> {
     let mut sim = Sim::new(());
     let cfg = UnwindBehaviour {
         on_panic_catch: false,

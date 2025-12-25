@@ -1,5 +1,5 @@
 #![cfg(feature = "net")]
-use des::net::processing::*;
+use des::net::{Error, processing::*};
 use des::prelude::*;
 use serial_test::serial;
 use std::sync::Arc;
@@ -33,7 +33,7 @@ impl Module for PluginCreation {
         self.sum += msg.header.id as usize;
     }
 
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+    fn at_sim_end(&mut self) -> Result<(), Error> {
         assert_eq!(self.sum, (0..100).sum::<usize>() + 100);
         Ok(())
     }
@@ -167,7 +167,7 @@ impl Module for PluginAtShutdown {
         }
     }
 
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+    fn at_sim_end(&mut self) -> Result<(), Error> {
         assert_eq!(self.arc.load(SeqCst), 20);
         Ok(())
     }
@@ -239,7 +239,7 @@ impl Module for M {
         self.c += 1;
     }
 
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+    fn at_sim_end(&mut self) -> Result<(), Error> {
         assert_eq!(self.c, 1);
         Ok(())
     }
@@ -247,7 +247,7 @@ impl Module for M {
 
 #[test]
 #[serial]
-fn add_extension_in_plugin() -> Result<(), RuntimeError> {
+fn add_extension_in_plugin() -> Result<(), Error> {
     let mut sim = Sim::new(());
     sim.node("m", M { c: 0 });
     let gate = sim.gate("m", "port");
@@ -273,7 +273,7 @@ impl Module for NodeWithPE {
 
 struct NodeReadingPE;
 impl Module for NodeReadingPE {
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+    fn at_sim_end(&mut self) -> Result<(), Error> {
         let parent = current().parent().expect("parent must exist");
 
         assert!(parent.try_as_ref::<NodeWithPE>().is_some());
@@ -286,7 +286,7 @@ impl Module for NodeReadingPE {
 
 #[test]
 #[serial]
-fn downcast_proc_elements_from_other_node() -> Result<(), RuntimeError> {
+fn downcast_proc_elements_from_other_node() -> Result<(), Error> {
     let mut sim = Sim::new(());
     sim.node("alice", NodeWithPE);
     sim.node("alice.observer", NodeReadingPE);

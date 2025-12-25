@@ -234,7 +234,6 @@ cfg_async! {
         sync::mpsc::{self, Receiver, Sender},
     };
     use std::{future::Future, fmt::Formatter, pin::Pin};
-    use crate::{runtime::RuntimeError};
 
 
     /// A helper that enables user to treat a module as a async stream of messages,
@@ -413,7 +412,7 @@ cfg_async! {
             }
         }
 
-         fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+         fn at_sim_end(&mut self) -> Result<(), crate::net::Error> {
             Ok(())
          }
     }

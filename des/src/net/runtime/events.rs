@@ -11,7 +11,6 @@ use crate::{
         runtime::{EventExecutionContext, cfg::SimLifecycle},
         schedule_event,
     },
-    prelude::RuntimeError,
     runtime::{Event, EventSink, Runtime},
     time::SimTime,
 };
@@ -53,7 +52,7 @@ pub enum NetEvents {
 }
 
 impl<A: SimLifecycle> Event<Sim<A>> for NetEvents {
-    fn handle(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError> {
+    fn handle(self, rt: &mut Runtime<Sim<A>>) -> Result<(), Error> {
         match self {
             Self::MessageExitingConnection(event) => event.handle(rt),
             Self::HandleMessageEvent(event) => event.handle(rt),
@@ -167,7 +166,7 @@ impl MessageExitingConnection {
 
 impl MessageExitingConnection {
     #[allow(clippy::unnecessary_wraps)]
-    fn handle<A: SimLifecycle>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError> {
+    fn handle<A: SimLifecycle>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), Error> {
         let result = self.handle_with_sink(rt);
         if let Err(err) = result {
             tracing::error!("message {} failed to be send: {}", err.msg, err.reason);
@@ -186,7 +185,7 @@ pub struct HandleMessageEvent {
 }
 
 impl HandleMessageEvent {
-    fn handle<A: SimLifecycle>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError> {
+    fn handle<A: SimLifecycle>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), Error> {
         let message = self.message;
         let module = &self.module;
 
@@ -211,7 +210,7 @@ pub struct AtSimStartEvent {
 }
 
 impl AtSimStartEvent {
-    fn handle<A: SimLifecycle>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError> {
+    fn handle<A: SimLifecycle>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), Error> {
         let max_stage = self
             .modules
             .iter()
@@ -249,7 +248,7 @@ pub struct SignalEvent {
 }
 
 impl SignalEvent {
-    fn handle<A: SimLifecycle>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError> {
+    fn handle<A: SimLifecycle>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), Error> {
         for subscriber in &self.subscribers {
             let ctx = EventExecutionContext::default();
 
@@ -276,7 +275,7 @@ pub struct ModuleShutdownEvent {
 }
 
 impl ModuleShutdownEvent {
-    fn handle<A: SimLifecycle>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError> {
+    fn handle<A: SimLifecycle>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), Error> {
         #[cfg(feature = "tracing")]
         tracing::info!("ModuleShutdownEvent");
 
@@ -301,7 +300,7 @@ pub struct ModuleRestartEvent {
 }
 
 impl ModuleRestartEvent {
-    fn handle<A: SimLifecycle>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError> {
+    fn handle<A: SimLifecycle>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), Error> {
         #[cfg(feature = "tracing")]
         tracing::info!("ModuleRestartEvent");
 
@@ -326,7 +325,7 @@ pub struct AsyncWakeupEvent {
 
 #[cfg(feature = "async")]
 impl AsyncWakeupEvent {
-    fn handle<A: SimLifecycle>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError> {
+    fn handle<A: SimLifecycle>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), Error> {
         #[cfg(feature = "tracing")]
         tracing::info!("async wakeup");
 
@@ -353,7 +352,7 @@ pub struct ChannelUnbusyNotif {
 
 impl ChannelUnbusyNotif {
     #[allow(clippy::unnecessary_wraps)]
-    fn handle<A: SimLifecycle>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), RuntimeError> {
+    fn handle<A: SimLifecycle>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), Error> {
         let handle = self.channel.clone();
         self.channel
             .channel
@@ -550,7 +549,7 @@ impl ModuleRef {
         self.processing.borrow().handler.num_sim_start_stages()
     }
 
-    pub(crate) fn at_sim_end(&self) -> Result<(), RuntimeError> {
+    pub(crate) fn at_sim_end(&self) -> Result<(), Error> {
         #[allow(unused_mut)]
         let mut result = self
             .processing
@@ -563,7 +562,8 @@ impl ModuleRef {
                     .catch()?;
 
                 result
-            });
+            })
+            .map_err(Error::from);
 
         let mut processing = self.processing.borrow_mut();
         processing.process_with(None, |_, _| {});
@@ -571,7 +571,10 @@ impl ModuleRef {
         #[cfg(feature = "async")]
         if let Some(tokio) = processing.downcast_element_mut::<TokioRuntime>() {
             if let Err(other) = tokio.at_sim_end() {
-                result = Err(RuntimeError::new(other));
+                match &mut result {
+                    Ok(()) => result = Err(Error::from(other)),
+                    Err(e) => e.extend(other),
+                }
             }
         };
 

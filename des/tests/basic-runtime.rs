@@ -1,9 +1,6 @@
 use std::convert::Infallible;
 
-use des::{
-    prelude::*,
-    runtime::{RuntimeError, RuntimeLimit},
-};
+use des::{net::Error, prelude::*, runtime::RuntimeLimit};
 use rand::{Rng, distr::StandardUniform, prelude::SliceRandom};
 use serial_test::serial;
 
@@ -422,7 +419,7 @@ impl Event<PausableApp> for PausableAppEvent {
 
 #[test]
 #[serial]
-fn pausable_app() -> Result<(), RuntimeError> {
+fn pausable_app() -> Result<(), Error> {
     let mut sim = Builder::new()
         .quiet()
         .limit(RuntimeLimit::EventCount(1000))

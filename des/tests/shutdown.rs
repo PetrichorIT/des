@@ -1,7 +1,7 @@
 #![cfg(feature = "async")]
 
 use des::{
-    net::{ErrorKind, globals, handlers::ModuleFn, module::Module},
+    net::{Error, ErrorKind, globals, handlers::ModuleFn, module::Module},
     prelude::*,
     time::sleep,
 };
@@ -160,7 +160,7 @@ impl Module for StatefullModule {
         }
     }
 
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+    fn at_sim_end(&mut self) -> Result<(), Error> {
         assert_eq!(self.state, 5);
         Ok(())
     }
@@ -312,7 +312,7 @@ impl Module for WillIgnoreInncomingInDowntime {
         msg.body.content_mut::<CountDropsMessage>().counter = Arc::new(AtomicUsize::new(0));
     }
 
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+    fn at_sim_end(&mut self) -> Result<(), Error> {
         assert_eq!(self.received.load(Ordering::SeqCst), 8);
         assert_eq!(self.drops.load(Ordering::SeqCst), 2);
         Ok(())
@@ -370,7 +370,7 @@ impl Module for EndNode {
         }
     }
 
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+    fn at_sim_end(&mut self) -> Result<(), Error> {
         assert_eq!(self.sent, 10);
         assert_eq!(self.recv, 7);
         assert_eq!(self.drops.load(Ordering::SeqCst), 3);
@@ -494,7 +494,7 @@ fn shutdown_prevents_accessing_parents() {
 
 #[test]
 #[serial]
-fn shutdown_from_foreign_module() -> Result<(), RuntimeError> {
+fn shutdown_from_foreign_module() -> Result<(), Error> {
     let mut sim = Sim::new(());
     sim.node(
         "alice",

@@ -1,6 +1,6 @@
 use des::{
     net::{
-        globals,
+        Error, globals,
         handlers::ModuleFn,
         message::Body,
         module::{SIGNAL_MODULE_PANICED, Signal, UnwindBehaviour, emit},
@@ -27,7 +27,7 @@ impl Module for Parent {
             _ => {}
         }
     }
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+    fn at_sim_end(&mut self) -> Result<(), Error> {
         assert!(self.0, "Must have observed child's panic");
         Ok(())
     }
@@ -46,7 +46,7 @@ fn panicing_subprocess_at(t: impl Into<SimTime>) -> impl Module {
 
 #[test]
 #[serial]
-fn signal_subscription_in_direct_parent() -> Result<(), RuntimeError> {
+fn signal_subscription_in_direct_parent() -> Result<(), Error> {
     let mut sim = Sim::new(());
     sim.node("parent", Parent(false));
     sim.node("parent.child", panicing_subprocess_at(2.0));
@@ -60,7 +60,7 @@ fn signal_subscription_in_direct_parent() -> Result<(), RuntimeError> {
 
 #[test]
 #[serial]
-fn signal_subscription_in_indirect_ancestor() -> Result<(), RuntimeError> {
+fn signal_subscription_in_indirect_ancestor() -> Result<(), Error> {
     let mut sim = Sim::new(());
     sim.node("parent", Parent(false));
     sim.node("parent.child", NopModule);
@@ -79,7 +79,7 @@ fn signal_subscription_in_indirect_ancestor() -> Result<(), RuntimeError> {
 
 #[test]
 #[serial]
-fn signal_subscription_passed_to_created_child() -> Result<(), RuntimeError> {
+fn signal_subscription_passed_to_created_child() -> Result<(), Error> {
     let mut sim = Sim::new(());
     sim.node("parent", Parent(false));
     sim.node(
@@ -118,7 +118,7 @@ impl<const SIGNAL: usize> Module for ExpectNSignal<SIGNAL> {
             self.0 -= 1;
         }
     }
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+    fn at_sim_end(&mut self) -> Result<(), Error> {
         assert_eq!(self.0, 0, "expected {} more messages", self.0);
         Ok(())
     }
@@ -142,7 +142,7 @@ impl<const SIGNAL: usize> Module for EmitSignal<SIGNAL> {
 
 #[test]
 #[serial]
-fn signal_subscription_from_multiple_children() -> Result<(), RuntimeError> {
+fn signal_subscription_from_multiple_children() -> Result<(), Error> {
     const SIGNAL: usize = 32;
 
     let mut sim = Sim::new(());
@@ -170,7 +170,7 @@ impl<const SIGNAL: usize> Module for ExpectNSignalThenUnsubscribe<SIGNAL> {
             }
         }
     }
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+    fn at_sim_end(&mut self) -> Result<(), Error> {
         assert_eq!(self.0, 0, "expected {} more messages", self.0);
         Ok(())
     }
@@ -178,7 +178,7 @@ impl<const SIGNAL: usize> Module for ExpectNSignalThenUnsubscribe<SIGNAL> {
 
 #[test]
 #[serial]
-fn signal_unsubscribe() -> Result<(), RuntimeError> {
+fn signal_unsubscribe() -> Result<(), Error> {
     const SIGNAL: usize = 32;
 
     let mut sim = Sim::new(());
