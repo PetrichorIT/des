@@ -9,7 +9,7 @@
 //! # Requirements
 //!
 //! This implementation only uses the base implementation of `des` and does not require any features or dependencies.
-use des::{event_set, net::Error, prelude::*};
+use des::{net::Error, prelude::*};
 
 // ## Defining Events
 //
@@ -38,9 +38,12 @@ struct Pong;
 
 impl Event<PingPongApp> for Interval {
     fn handle(self, runtime: &mut Runtime<PingPongApp>) -> Result<(), Error> {
-        runtime.add_event_in(Ping, Duration::from_secs_f64(1.5));
+        runtime.add_event_in(PingPongEvent::Ping(Ping), Duration::from_secs_f64(1.5));
         if self.0 != 0 {
-            runtime.add_event_in(Interval(self.0 - 1), Duration::from_secs(1));
+            runtime.add_event_in(
+                PingPongEvent::Interval(Interval(self.0 - 1)),
+                Duration::from_secs(1),
+            );
         }
         Ok(())
     }
@@ -55,7 +58,7 @@ impl Event<PingPongApp> for Interval {
 impl Event<PingPongApp> for Ping {
     fn handle(self, runtime: &mut Runtime<PingPongApp>) -> Result<(), Error> {
         runtime.app.pings_received += 1;
-        runtime.add_event_in(Pong, Duration::from_secs(1));
+        runtime.add_event_in(PingPongEvent::Pong(Pong), Duration::from_secs(1));
         Ok(())
     }
 }
@@ -71,16 +74,22 @@ impl Event<PingPongApp> for Pong {
 //
 // Since this simulation uses more than one event type, these types need to be combined to form a
 // singular event set. An event set is just another type that implements the `Event` trait, and multiplexes
-// between its variants. The `event_set!` macro implements such a multimplexing type easily.
+// between its variants.
 
-event_set! {
-    enum PingPongEvent {
-        type App = PingPongApp;
+enum PingPongEvent {
+    Ping(Ping),
+    Pong(Pong),
+    Interval(Interval),
+}
 
-        Ping(Ping),
-        Pong(Pong),
-        Interval(Interval),
-    };
+impl Event<PingPongApp> for PingPongEvent {
+    fn handle(self, runtime: &mut Runtime<PingPongApp>) -> Result<(), Error> {
+        match self {
+            PingPongEvent::Ping(event) => event.handle(runtime),
+            PingPongEvent::Pong(event) => event.handle(runtime),
+            PingPongEvent::Interval(event) => event.handle(runtime),
+        }
+    }
 }
 
 // ## Applications
@@ -113,7 +122,7 @@ impl Application for PingPongApp {
     where
         Self: Application,
     {
-        runtime.add_event_in(Interval(29), Duration::ZERO);
+        runtime.add_event_in(PingPongEvent::Interval(Interval(29)), Duration::ZERO);
         Ok(())
     }
 }

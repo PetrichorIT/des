@@ -88,11 +88,6 @@ pub trait Application: Sized {
 /// A type that can handle an event, specific to the given aplication,
 /// and associated event set.
 ///
-/// Note that events in an event set dont need to implement this trait,
-/// unless the event set is derived using the [`event_set`](crate::event_set)
-/// macros. Nonetheless is it advised to use this trait to better isolate different events
-/// and their associated data.
-///
 pub trait Event<App>
 where
     App: Application,
