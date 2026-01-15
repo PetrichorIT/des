@@ -3,7 +3,10 @@
 use des::{
     net::{Failure, handlers::AsyncHandler},
     prelude::*,
+    time::sleep_until,
 };
+use serde::{Deserialize, Serialize};
+use serde_norway::{Number, Value};
 use serial_test::serial;
 
 #[test]
@@ -94,6 +97,7 @@ fn parse_props() -> Result<(), Failure> {
 }
 
 #[test]
+#[serial]
 fn disallow_casting() -> Result<(), Failure> {
     let mut sim = Sim::new(());
 
@@ -109,6 +113,130 @@ fn disallow_casting() -> Result<(), Failure> {
             // ); TODO make errors more expresive
             Ok(())
         }),
+    );
+
+    Builder::seeded(132)
+        .max_time(100.0.into())
+        .build(sim.freeze())
+        .run()
+        .as_result()
+        .map(|_| ())
+}
+
+#[test]
+#[serial]
+fn prop_tracer() -> Result<(), Failure> {
+    let mut sim = Sim::new(());
+
+    sim.node(
+        "alice",
+        AsyncHandler::io(|_| async move {
+            let mut prop = current().prop::<usize>("usize")?.or_default();
+            prop.set(0);
+            prop.add_tracer("");
+
+            sleep_until(1.0.into()).await;
+            prop.set(1);
+
+            sleep_until(2.0.into()).await;
+            prop.set(2);
+
+            sleep_until(3.0.into()).await;
+            prop.set(2);
+
+            sleep_until(4.0.into()).await;
+            prop.update(|v| {
+                *v = 3;
+                *v = 4;
+            });
+
+            let tracers = prop.tracers().remove(0);
+            assert_eq!(
+                tracers.history,
+                [
+                    (0.0.into(), Value::Number(Number::from(0))),
+                    (1.0.into(), Value::Number(Number::from(1))),
+                    (2.0.into(), Value::Number(Number::from(2))),
+                    (4.0.into(), Value::Number(Number::from(4)))
+                ]
+            );
+
+            Ok(())
+        })
+        .require_join(),
+    );
+
+    Builder::seeded(132)
+        .max_time(100.0.into())
+        .build(sim.freeze())
+        .run()
+        .as_result()
+        .map(|_| ())
+}
+
+#[test]
+#[serial]
+fn prop_tracer_subvalue() -> Result<(), Failure> {
+    let mut sim = Sim::new(());
+
+    #[derive(Debug, Default, Serialize, Deserialize)]
+    struct SuperValue {
+        number: usize,
+        list: Vec<usize>,
+    }
+
+    sim.node(
+        "alice",
+        AsyncHandler::io(|_| async move {
+            let mut prop = current().prop::<SuperValue>("usize")?.or_default();
+            prop.add_tracer("number");
+
+            prop.set(SuperValue {
+                number: 1,
+                list: vec![1, 2, 3],
+            });
+            prop.add_tracer("list.0");
+
+            sleep_until(1.0.into()).await;
+            prop.update(|v| v.number = 1);
+
+            sleep_until(2.0.into()).await;
+            prop.update(|v| v.list[0] = 11);
+
+            sleep_until(3.0.into()).await;
+            prop.update(|v| {
+                v.number = 3;
+                v.list[0] = 111;
+            });
+
+            sleep_until(4.0.into()).await;
+            prop.update(|v| v.number = 4);
+
+            let tracers = prop.tracers();
+            assert_eq!(tracers[0].selector, "number");
+            assert_eq!(
+                tracers[0].history,
+                [
+                    (0.0.into(), Value::Number(Number::from(0))),
+                    (0.0.into(), Value::Number(Number::from(1))),
+                    (3.0.into(), Value::Number(Number::from(3))),
+                    (4.0.into(), Value::Number(Number::from(4))),
+                ]
+            );
+
+            assert_eq!(tracers[1].selector, "list.0");
+            assert_eq!(
+                tracers[1].history,
+                [
+                    (0.0.into(), Value::Number(Number::from(1))),
+                    (2.0.into(), Value::Number(Number::from(11))),
+                    (3.0.into(), Value::Number(Number::from(111))),
+                ]
+            );
+
+            Ok(())
+        })
+        .require_join(),
     );
 
     Builder::seeded(132)

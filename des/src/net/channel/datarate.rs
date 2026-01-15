@@ -53,6 +53,16 @@ impl DatarateChannel {
             scheduled: None,
         }
     }
+
+    /// Buffer queue length in bytes.
+    pub fn queue_length(&self) -> usize {
+        self.buffer.acc_bytes
+    }
+
+    /// Buffer queue length in packets.
+    pub fn queue_length_packets(&self) -> usize {
+        self.buffer.packets.len()
+    }
 }
 
 impl Buffer {

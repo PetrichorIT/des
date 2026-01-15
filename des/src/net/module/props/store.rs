@@ -3,7 +3,7 @@ use std::sync::Arc;
 use fxhash::FxHashMap;
 use serde_norway::Value;
 
-use crate::{net::Error, sync::Mutex};
+use crate::{net::Error, sync::Mutex, time::SimTime};
 
 use super::{Prop, PropType, RawProp};
 
@@ -14,38 +14,128 @@ pub(crate) struct Props {
 }
 
 pub(super) enum Entry {
-    None,
-    Yaml(Value),
-    Some(Box<dyn PropType>),
+    None,        // Not set
+    Yaml(Value), // Loaded from YAML
+    Some {
+        value: Box<dyn PropType>,
+        tracers: Vec<PropTracer>,
+    }, // actual Value
+}
+
+/// A property tracer that tracks a subvalue at the given key.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PropTracer {
+    /// The selector for the subvalue.
+    pub selector: String,
+    /// The history of the subvalue, only recording when a change occurs.
+    pub history: Vec<(SimTime, Value)>,
 }
 
 impl Entry {
+    pub(super) fn set(&mut self, new: Box<dyn PropType>) {
+        match self {
+            Entry::Some { value, .. } => *value = new,
+            _ => {
+                *self = Entry::Some {
+                    value: new,
+                    tracers: Vec::new(),
+                }
+            }
+        }
+    }
+
+    pub(super) fn add_tracer(&mut self, key: &str) {
+        let Entry::Some { tracers, .. } = self else {
+            panic!("Cannot add tracer to unset property");
+        };
+        tracers.push(PropTracer {
+            selector: key.to_string(),
+            history: Vec::new(),
+        });
+    }
+
+    pub(super) fn tracers(&self) -> &[PropTracer] {
+        match self {
+            Entry::Some { tracers, .. } => tracers,
+            _ => &[],
+        }
+    }
+
     pub(super) fn is_some(&self) -> bool {
         match self {
             Entry::None | Entry::Yaml(_) => false,
-            Entry::Some(_) => true,
+            Entry::Some { .. } => true,
         }
     }
 
     pub(super) fn is_none(&self) -> bool {
         match self {
             Entry::None => true,
-            Entry::Yaml(_) | Entry::Some(_) => false,
+            Entry::Yaml(_) | Entry::Some { .. } => false,
         }
     }
 
     pub(super) fn as_option(&self) -> Option<&dyn PropType> {
         match self {
             Entry::None | Entry::Yaml(_) => None,
-            Entry::Some(val) => Some(&**val),
+            Entry::Some { value, .. } => Some(&**value),
         }
     }
 
     pub(super) fn as_option_mut(&mut self) -> Option<&mut dyn PropType> {
         match self {
             Entry::None | Entry::Yaml(_) => None,
-            Entry::Some(val) => Some(&mut **val),
+            Entry::Some { value, .. } => Some(&mut **value),
         }
+    }
+
+    pub(super) fn record(&mut self) {
+        let Entry::Some { value, tracers } = self else {
+            return;
+        };
+
+        let encoded = value.as_value();
+        for tracer in tracers {
+            let Some(selected) = access(&encoded, &tracer.selector) else {
+                continue;
+            };
+            let is_eq = tracer.history.last().is_some_and(|(_, v)| v == &selected);
+            if !is_eq {
+                tracer.history.push((SimTime::now(), selected));
+            }
+        }
+    }
+}
+
+fn access(value: &Value, key: &str) -> Option<Value> {
+    match value {
+        other if key.is_empty() => Some(other.clone()),
+        Value::Mapping(map) => {
+            let mut include = key.len();
+            while include > 0 {
+                // TODO: This shit is still buggy
+                let pos = key[..include].rfind('.').unwrap_or(include);
+                let subkey = &key[..pos];
+                if let Some(val) = map.get(subkey) {
+                    return access(val, &key[(pos + 1).min(key.len())..]);
+                }
+                include = pos - 1;
+            }
+
+            // try full key
+            if let Some(val) = map.get(key) {
+                return access(val, "");
+            }
+
+            None
+        }
+        Value::Sequence(seq) => {
+            let (index, rem) = key.split_once('.').unwrap_or((key, ""));
+            let index = index.parse::<usize>().ok()?;
+            let element = seq.get(index)?;
+            access(element, rem)
+        }
+        _ => None,
     }
 }
 

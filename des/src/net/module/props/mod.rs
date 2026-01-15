@@ -21,6 +21,8 @@ use store::Entry;
 pub(crate) use store::Props;
 pub(crate) use yaml::Cfg;
 
+pub use store::PropTracer;
+
 /// A composite trait that needs to be implemented by all property types.
 ///
 /// This trait is a manual combination of the three traits `Any`, `Serialize` and `Deserialize`.
@@ -77,7 +79,9 @@ impl RawProp {
 
     fn access_mut<R>(&mut self, f: impl FnOnce(&mut Entry) -> R) -> R {
         let mut slot = self.slot.lock();
-        f(&mut slot)
+        let result = f(&mut slot);
+        slot.record();
+        result
     }
 
     /// Clears the property, moving it into the `Absent` state.
@@ -96,7 +100,7 @@ impl RawProp {
         self.access(|entry| match entry {
             Entry::None => None,
             Entry::Yaml(value) => Some(value.clone()),
-            Entry::Some(value) => Some(value.as_value()),
+            Entry::Some { value, .. } => Some(value.as_value()),
         })
     }
 
@@ -108,7 +112,7 @@ impl RawProp {
     pub fn is<T: PropType>(&self) -> bool {
         self.access(|entry| match entry {
             Entry::None | Entry::Yaml(_) => true,
-            Entry::Some(value) => as_any(&**value).is::<T>(),
+            Entry::Some { value, .. } => as_any(&**value).is::<T>(),
         })
     }
 
@@ -123,7 +127,10 @@ impl RawProp {
         if self.is::<T>() {
             let mut lock = self.slot.lock();
             if let Entry::Yaml(value) = &*lock {
-                *lock = Entry::Some(Box::new(T::from_value(value.clone())?));
+                *lock = Entry::Some {
+                    value: Box::new(T::from_value(value.clone())?),
+                    tracers: Vec::new(),
+                };
             }
             drop(lock);
 
@@ -275,7 +282,10 @@ impl<T: PropType> Prop<T, false> {
     {
         self.raw.access_mut(|v| {
             if v.is_none() {
-                *v = Entry::Some(Box::new(f()));
+                *v = Entry::Some {
+                    value: Box::new(f()),
+                    tracers: Vec::new(),
+                };
             }
         });
         Prop {
@@ -382,8 +392,22 @@ impl<T: PropType, const PRESENT: bool> Prop<T, PRESENT> {
                     .is_none_or(|prev_value| as_any(prev_value).is::<T>()),
                 "cannot use this prop, since other instance has changed the type"
             );
-            *slot = Entry::Some(Box::new(value));
+            slot.set(Box::new(value));
         });
+    }
+
+    /// Adds a tracer to the property that tracks a subvalue at the given key.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the property is not yet set.
+    pub fn add_tracer(&mut self, key: &str) {
+        self.raw.access_mut(|slot| slot.add_tracer(key))
+    }
+
+    /// Returns the current tracers of the property.
+    pub fn tracers(&self) -> Vec<PropTracer> {
+        self.raw.access(|slot| slot.tracers().to_vec())
     }
 
     /// See [`RawProp::as_value`],
