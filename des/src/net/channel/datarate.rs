@@ -54,6 +54,11 @@ impl DatarateChannel {
         }
     }
 
+    /// The metrics of this channel.
+    pub fn metrics(&self) -> &DatarateChannelMetrics {
+        &self.metrics
+    }
+
     /// Buffer queue length in bytes.
     pub fn queue_length(&self) -> usize {
         self.buffer.acc_bytes
