@@ -12,6 +12,7 @@ pub mod message;
 pub mod module;
 pub mod ndl;
 pub mod processing;
+pub mod statistics;
 pub mod topology;
 
 pub use self::error::*;

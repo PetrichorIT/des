@@ -147,9 +147,18 @@ impl From<String> for ObjectPath {
     }
 }
 
-impl PartialEq<&str> for ObjectPath {
-    fn eq(&self, other: &&str) -> bool {
-        self.as_str() == *other
+impl<T: ?Sized> PartialEq<&T> for ObjectPath
+where
+    ObjectPath: PartialEq<T>,
+{
+    fn eq(&self, other: &&T) -> bool {
+        <ObjectPath as PartialEq<T>>::eq(self, other)
+    }
+}
+
+impl PartialEq<str> for ObjectPath {
+    fn eq(&self, other: &str) -> bool {
+        self.as_str() == other
     }
 }
 

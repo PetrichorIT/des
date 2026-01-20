@@ -25,6 +25,7 @@ use super::{ModuleContext, try_with_mod_ctx};
 ///
 /// This function will panic if not called within a modules context.
 #[must_use]
+#[track_caller]
 pub fn current() -> Arc<ModuleContext> {
     try_with_mod_ctx(Arc::clone)
         .expect("cannot retrieve current module context, no module currently in scope")
