@@ -1,11 +1,14 @@
 use common::*;
-use des::net::ndl::lang::error;
-use des::{net::ndl::Ndl, prelude::*, registry};
+use des::{
+    ndl::{Ndl, lang::error},
+    prelude::*,
+    registry,
+};
 use serial_test::serial;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 mod common {
-    use des::prelude::*;
+    use des::{Error, prelude::*};
 
     #[derive(Default)]
     pub struct Main;
@@ -72,7 +75,7 @@ mod common {
             }
         }
 
-        fn at_sim_end(&mut self) -> Result<(), des::net::Error> {
+        fn at_sim_end(&mut self) -> Result<(), Error> {
             let v = current()
                 .prop::<usize>("expected")
                 .unwrap()
@@ -113,9 +116,10 @@ fn small_network() -> Result<(), Box<dyn std::error::Error>> {
         )?,
     )?;
 
-    let r = Builder::seeded(123)
+    let r = app
+        .seeded(123)
         .max_time(1000.0.into())
-        .build(app.freeze())
+        .build()
         .run()
         .assert_no_err();
 
@@ -136,9 +140,10 @@ fn ring_topology() -> Result<(), Box<dyn std::error::Error>> {
         )?,
     )?;
 
-    let r = Builder::seeded(123)
+    let r = app
+        .seeded(123)
         .max_time(1000.0.into())
-        .build(app.freeze())
+        .build()
         .run()
         .assert_no_err();
 
@@ -176,7 +181,7 @@ fn build_with_preexisting_sim() -> Result<(), Box<dyn std::error::Error>> {
         )?,
     )?;
 
-    let _ = Builder::seeded(123).build(sim.freeze()).run();
+    let _ = sim.seeded(123).build().run();
     Ok(())
 }
 
@@ -192,7 +197,7 @@ fn non_std_gate_connections() -> Result<(), Box<dyn std::error::Error>> {
         )?,
     )?;
 
-    let _ = Builder::seeded(123).build(sim.freeze()).run();
+    let _ = sim.seeded(123).build().run();
     Ok(())
 }
 
@@ -244,7 +249,7 @@ fn registry_custom_resolver() -> Result<(), Box<dyn std::error::Error>> {
         Ndl::from_str(&mut registry, include_str!("ndl/ab.yml"))?,
     )?;
 
-    let _ = Builder::seeded(123).build(sim.freeze()).run();
+    let _ = sim.seeded(123).build().run();
 
     assert_eq!(COUNTER.load(Ordering::SeqCst), 1);
 
@@ -271,7 +276,7 @@ fn registry_default_fallback_does_not_panic() -> Result<(), Box<dyn std::error::
         "",
         Ndl::from_str(&mut registry, include_str!("ndl/ab.yml"))?,
     )?;
-    let _ = Builder::seeded(123).build(sim.freeze()).run();
+    let _ = sim.seeded(123).build().run();
 
     Ok(())
 }

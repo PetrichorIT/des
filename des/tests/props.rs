@@ -1,10 +1,4 @@
-#![cfg(feature = "net")]
-
-use des::{
-    net::{Failure, handlers::AsyncHandler},
-    prelude::*,
-    time::sleep_until,
-};
+use des::{Failure, handlers::AsyncHandler, prelude::*, time::sleep_until};
 use serde::{Deserialize, Serialize};
 use serde_norway::{Number, Value};
 use serial_test::serial;
@@ -88,11 +82,11 @@ fn parse_props() -> Result<(), Failure> {
         }),
     );
 
-    Builder::seeded(132)
+    sim.seeded(132)
         .max_time(100.0.into())
-        .build(sim.freeze())
+        .build()
         .run()
-        .as_result()
+        .into_result()
         .map(|_| ())
 }
 
@@ -115,11 +109,11 @@ fn disallow_casting() -> Result<(), Failure> {
         }),
     );
 
-    Builder::seeded(132)
+    sim.seeded(132)
         .max_time(100.0.into())
-        .build(sim.freeze())
+        .build()
         .run()
-        .as_result()
+        .into_result()
         .map(|_| ())
 }
 
@@ -166,11 +160,11 @@ fn prop_tracer() -> Result<(), Failure> {
         .require_join(),
     );
 
-    Builder::seeded(132)
+    sim.seeded(132)
         .max_time(100.0.into())
-        .build(sim.freeze())
+        .build()
         .run()
-        .as_result()
+        .into_result()
         .map(|_| ())
 }
 
@@ -239,10 +233,10 @@ fn prop_tracer_subvalue() -> Result<(), Failure> {
         .require_join(),
     );
 
-    Builder::seeded(132)
+    sim.seeded(132)
         .max_time(100.0.into())
-        .build(sim.freeze())
+        .build()
         .run()
-        .as_result()
+        .into_result()
         .map(|_| ())
 }

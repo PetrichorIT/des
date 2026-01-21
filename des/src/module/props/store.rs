@@ -1,0 +1,242 @@
+use std::sync::Arc;
+
+use fxhash::FxHashMap;
+use serde_norway::Value;
+
+use crate::{Error, sync::Mutex, time::SimTime};
+
+use super::{Prop, PropType, RawProp};
+
+/// The properties associated with a component.
+#[derive(Default)]
+pub(crate) struct Props {
+    mapping: FxHashMap<String, Arc<Mutex<Entry>>>,
+}
+
+pub(super) enum Entry {
+    None,        // Not set
+    Yaml(Value), // Loaded from YAML
+    Some {
+        value: Box<dyn PropType>,
+        tracers: Vec<PropTracer>,
+    }, // actual Value
+}
+
+/// A property tracer that tracks a subvalue at the given key.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PropTracer {
+    /// The selector for the subvalue.
+    pub selector: String,
+    /// The history of the subvalue, only recording when a change occurs.
+    pub history: Vec<(SimTime, Value)>,
+}
+
+impl Entry {
+    pub(super) fn set(&mut self, new: Box<dyn PropType>) {
+        match self {
+            Entry::Some { value, .. } => *value = new,
+            _ => {
+                *self = Entry::Some {
+                    value: new,
+                    tracers: Vec::new(),
+                }
+            }
+        }
+    }
+
+    pub(super) fn add_tracer(&mut self, key: &str) {
+        let Entry::Some { tracers, .. } = self else {
+            panic!("Cannot add tracer to unset property");
+        };
+        tracers.push(PropTracer {
+            selector: key.to_string(),
+            history: Vec::new(),
+        });
+    }
+
+    pub(super) fn tracers(&self) -> &[PropTracer] {
+        match self {
+            Entry::Some { tracers, .. } => tracers,
+            _ => &[],
+        }
+    }
+
+    pub(super) fn is_some(&self) -> bool {
+        match self {
+            Entry::None | Entry::Yaml(_) => false,
+            Entry::Some { .. } => true,
+        }
+    }
+
+    pub(super) fn is_none(&self) -> bool {
+        match self {
+            Entry::None => true,
+            Entry::Yaml(_) | Entry::Some { .. } => false,
+        }
+    }
+
+    pub(super) fn as_option(&self) -> Option<&dyn PropType> {
+        match self {
+            Entry::None | Entry::Yaml(_) => None,
+            Entry::Some { value, .. } => Some(&**value),
+        }
+    }
+
+    pub(super) fn as_option_mut(&mut self) -> Option<&mut dyn PropType> {
+        match self {
+            Entry::None | Entry::Yaml(_) => None,
+            Entry::Some { value, .. } => Some(&mut **value),
+        }
+    }
+
+    pub(super) fn record(&mut self) {
+        let Entry::Some { value, tracers } = self else {
+            return;
+        };
+
+        let encoded = value.as_value();
+        for tracer in tracers {
+            let Some(selected) = access(&encoded, &tracer.selector) else {
+                continue;
+            };
+            let is_eq = tracer.history.last().is_some_and(|(_, v)| v == &selected);
+            if !is_eq {
+                tracer.history.push((SimTime::now(), selected));
+            }
+        }
+    }
+}
+
+fn access(value: &Value, key: &str) -> Option<Value> {
+    match value {
+        other if key.is_empty() => Some(other.clone()),
+        Value::Mapping(map) => {
+            let mut include = key.len();
+            while include > 0 {
+                // TODO: This shit is still buggy
+                let pos = key[..include].rfind('.').unwrap_or(include);
+                let subkey = &key[..pos];
+                if let Some(val) = map.get(subkey) {
+                    return access(val, &key[(pos + 1).min(key.len())..]);
+                }
+                include = pos - 1;
+            }
+
+            // try full key
+            if let Some(val) = map.get(key) {
+                return access(val, "");
+            }
+
+            None
+        }
+        Value::Sequence(seq) => {
+            let (index, rem) = key.split_once('.').unwrap_or((key, ""));
+            let index = index.parse::<usize>().ok()?;
+            let element = seq.get(index)?;
+            access(element, rem)
+        }
+        _ => None,
+    }
+}
+
+impl Props {
+    /// Sets a YAML value for a property. This will be used as the preinitialized
+    /// value and will be decoded once the property is accessed.
+    pub(crate) fn set(&mut self, key: String, val: Value) {
+        self.mapping
+            .entry(key)
+            .or_insert(Arc::new(Mutex::new(Entry::Yaml(val))));
+    }
+
+    /// The keys of all properties.
+    #[must_use]
+    pub(crate) fn keys(&self) -> Vec<String> {
+        self.mapping.keys().cloned().collect()
+    }
+
+    pub(crate) fn get_raw(&mut self, key: &str) -> RawProp {
+        let entry = self
+            .mapping
+            .entry(key.to_string())
+            .or_insert_with(|| Arc::new(Mutex::new(Entry::None)));
+
+        RawProp {
+            slot: entry.clone(),
+        }
+    }
+
+    /// # Errors
+    /// Returns an error if the typing of the property fails.
+    pub(crate) fn get<T: PropType>(&mut self, key: &str) -> Result<Prop<T, false>, Error> {
+        self.get_raw(key).typed::<T>()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_norway::Number;
+
+    #[test]
+    fn get_yaml_number() -> Result<(), Error> {
+        let mut props = Props::default();
+
+        props.set("u8".to_string(), Value::Number(Number::from(32u8)));
+        assert_eq!(props.get::<u8>("u8")?.or_default().get(), 32);
+
+        props.set(
+            "u8_but_usize".to_string(),
+            Value::Number(Number::from(32u8)),
+        );
+        assert_eq!(props.get::<usize>("u8_but_usize")?.or_default().get(), 32);
+
+        props.set(
+            "u8_but_isize".to_string(),
+            Value::Number(Number::from(32u8)),
+        );
+        assert_eq!(props.get::<isize>("u8_but_isize")?.or_default().get(), 32);
+
+        Ok(())
+    }
+
+    #[test]
+    fn get_yaml_string() -> Result<(), Error> {
+        let mut props = Props::default();
+
+        props.set("string".to_string(), Value::String("hello".to_string()));
+        assert_eq!(props.get::<String>("string")?.or_default().get(), "hello");
+
+        Ok(())
+    }
+
+    #[test]
+    fn get_yaml_bool() -> Result<(), Error> {
+        let mut props = Props::default();
+
+        props.set("bool".to_string(), Value::Bool(true));
+        assert!(props.get::<bool>("bool")?.or_default().get());
+
+        Ok(())
+    }
+
+    #[test]
+    fn get_yaml_failure() -> Result<(), Error> {
+        let mut props = Props::default();
+
+        props.set("string".to_string(), Value::String("hello".to_string()));
+        assert!(props.get::<u8>("string").is_err());
+
+        // value remains unchanged
+        assert_eq!(props.get::<String>("string")?.or_default().get(), "hello");
+
+        Ok(())
+    }
+
+    #[test]
+    fn get_default_no_yaml() -> Result<(), Error> {
+        let mut props = Props::default();
+        assert_eq!(props.get::<String>("string")?.or_default().get(), "");
+
+        Ok(())
+    }
+}

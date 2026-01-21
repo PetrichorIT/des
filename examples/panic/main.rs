@@ -1,7 +1,4 @@
-use des::{
-    net::{Error, Failure, handlers::AsyncHandler},
-    prelude::*,
-};
+use des::{Error, Failure, handlers::AsyncHandler, module::UnwindBehaviour, prelude::*};
 
 fn main() -> Result<(), Failure> {
     let mut sim = Sim::new(());
@@ -9,17 +6,13 @@ fn main() -> Result<(), Failure> {
     sim.node("bob", B);
     sim.node("eve", B);
 
-    Builder::seeded(123)
-        .build(sim.freeze())
-        .run()
-        .as_result()
-        .map(|_| ())
+    sim.seeded(123).build().run().into_result().map(|_| ())
 }
 
 struct B;
 impl Module for B {
     fn at_sim_end(&mut self) -> Result<(), Error> {
-        current().set_unwind_behaviour(des::net::module::UnwindBehaviour {
+        current().set_unwind_behaviour(UnwindBehaviour {
             on_panic_catch: false,
             ..Default::default()
         });

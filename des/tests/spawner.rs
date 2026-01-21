@@ -1,10 +1,8 @@
 use des::{
-    net::{
-        Error, Failure, globals,
-        handlers::{ModuleFn, WithContext},
-        processing::ProcessingStack,
-    },
+    Error, Failure, globals,
+    handlers::{ModuleFn, WithContext},
     prelude::*,
+    processing::ProcessingStack,
 };
 use serial_test::serial;
 
@@ -51,11 +49,7 @@ fn runtime_spawner_calls_sim_start() -> Result<(), Failure> {
         ),
     );
 
-    Builder::seeded(123)
-        .build(sim.freeze())
-        .run()
-        .as_result()
-        .map(|_| ())
+    sim.seeded(123).build().run().into_result().map(|_| ())
 }
 
 #[test]
@@ -96,11 +90,7 @@ fn runtime_spawner_with_mod_ctx() -> Result<(), Failure> {
         ),
     );
 
-    Builder::seeded(123)
-        .build(sim.freeze())
-        .run()
-        .as_result()
-        .map(|_| ())
+    sim.seeded(123).build().run().into_result().map(|_| ())
 }
 
 #[test]
@@ -130,8 +120,9 @@ fn runtime_spawner_cannot_use_root() -> Result<(), Failure> {
         ),
     );
 
-    let _ = Builder::seeded(123)
-        .build(sim.freeze())
+    let _ = sim
+        .seeded(123)
+        .build()
         .run()
         .error
         .expect("must have failed");
@@ -167,11 +158,7 @@ fn runtime_spawner_reads_cfgs() -> Result<(), Failure> {
         ),
     );
 
-    Builder::seeded(123)
-        .build(sim.freeze())
-        .run()
-        .as_result()
-        .map(|_| ())
+    sim.seeded(123).build().run().into_result().map(|_| ())
 }
 
 struct ProcElementWithSubmodule {
@@ -232,9 +219,5 @@ fn runtime_spawner_from_proc_element() -> Result<(), Failure> {
     sim.include_cfg("alice.bob.key: 123");
     sim.node("alice", MyProcElementModule { c: 0 });
 
-    Builder::seeded(123)
-        .build(sim.freeze())
-        .run()
-        .as_result()
-        .map(|_| ())
+    sim.seeded(123).build().run().into_result().map(|_| ())
 }

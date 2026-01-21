@@ -1,6 +1,4 @@
-#![cfg(feature = "net")]
-
-use des::net::handlers::ModuleFn;
+use des::handlers::ModuleFn;
 use des::prelude::*;
 use std::sync::{Arc, atomic::AtomicU16};
 
@@ -34,5 +32,5 @@ fn load_order() {
         ModuleFn::new(move || stage!(s2 == 2), |_, _| {}),
     );
 
-    let _ = Builder::seeded(123).build(sim.freeze()).run();
+    let _ = sim.seeded(123).build().run();
 }

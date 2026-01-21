@@ -72,9 +72,9 @@
 //!
 //! # Using a module oriented system
 //!
-//! DES is able to provide tools for simulating network-like structures with [Modules](crate::net::module::Module).
-//! These modules are self contained units with their own state, connected via [Channels](crate::net::channel::Channel)
-//! (network links) that are attached to [Gates](crate::net::gate::Gate) (physical ports) on modules.
+//! DES is able to provide tools for simulating network-like structures with [Modules](crate::module::Module).
+//! These modules are self contained units with their own state, connected via [Channels](crate::channel::Channel)
+//! (network links) that are attached to [Gates](crate::gate::Gate) (physical ports) on modules.
 //! Modules can send messages (packtes) through these gates / channels to communicated
 //! with other modules. Additionally modules can be created in a tree like structure,
 //! providing links like [`parent`] or [`child`].
@@ -119,24 +119,56 @@
 //! Look for the `pingpong-*` examples for more detailed explanations.
 //!
 //! [`time`]: crate::time
-//! [`net`]: crate::net
+//! [`net`]: crate
 //! [`runtime`]: crate::runtime
-//! [`parent`]: crate::net::module::ModuleContext::parent
-//! [`child`]: crate::net::module::ModuleContext::child
+//! [`parent`]: crate::module::ModuleContext::parent
+//! [`child`]: crate::module::ModuleContext::child
 
 #[macro_use]
 #[doc(hidden)]
 pub mod macros;
 pub mod prelude;
-pub mod runtime;
+// pub mod runtime;
 pub mod time;
 
-cfg_net! {
-    pub mod net;
-    pub mod tracing;
-    pub(crate) use des_sync_utils as sync;
-}
+pub mod tracing;
+pub(crate) use des_sync_utils as sync;
 
 cfg_macros! {
     pub use des_macros::*;
+}
+
+mod error;
+mod path;
+
+/// The simulation runtime.
+pub mod runtime;
+
+pub mod channel;
+pub mod gate;
+pub mod message;
+pub mod module;
+pub mod ndl;
+pub mod processing;
+pub mod statistics;
+pub mod topology;
+
+pub use self::error::*;
+pub use self::path::*;
+pub use self::runtime::{
+    Globals, IntoModuleTree, Sim, SimBuilder, SimLifecycle, Spawner, SpawnerKind, fail, globals,
+    handlers, random, report, rng, sample, schedule_event,
+};
+
+/// Internal details only sometimes needed to e.g. implement a custom channel.
+pub mod internals {
+    pub use super::runtime::NetEvents;
+    pub use super::runtime::{
+        AtSimStartEvent, ChannelUnbusyNotif, HandleMessageEvent, MessageExitingConnection,
+        ModuleRestartEvent, ModuleShutdownEvent, SignalEvent,
+    };
+
+    cfg_async! {
+        pub use super::runtime::AsyncWakeupEvent;
+    }
 }

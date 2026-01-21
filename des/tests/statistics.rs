@@ -1,7 +1,7 @@
 use des::{
-    net::{Failure, Sim, statistics::time_series::TimeSeries},
+    Failure, Sim,
     prelude::{Message, Module},
-    runtime::Builder,
+    statistics::time_series::TimeSeries,
 };
 use serial_test::serial;
 
@@ -27,7 +27,7 @@ fn statistics_object_from_non_node_ctx() -> Result<(), Failure> {
     );
     let gate = sim.gate("alice", "gate");
 
-    let mut builder = Builder::seeded(123).build(sim.freeze());
+    let mut builder = sim.seeded(123).build();
     builder.add_message_onto(gate.clone(), Message::default().with_id(1), 1.0.into());
     builder.add_message_onto(gate.clone(), Message::default().with_id(2), 2.0.into());
     builder.add_message_onto(gate.clone(), Message::default().with_id(3), 3.0.into());

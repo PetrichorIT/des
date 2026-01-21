@@ -5,7 +5,5 @@ mod cfg;
 pub mod support;
 
 cfg_macros! {
-    cfg_net! {
-        mod registry;
-    }
+    mod registry;
 }

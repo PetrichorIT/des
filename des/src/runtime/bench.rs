@@ -5,7 +5,7 @@ use std::{
 
 use crate::time::SimTime;
 
-use super::{FT_ASYNC, FT_CQUEUE, FT_NET};
+use super::{FT_ASYNC, FT_CQUEUE};
 
 /// A run profiler
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -81,9 +81,6 @@ impl<E> Default for Profiler<E> {
         let mut features = Vec::with_capacity(5);
         if FT_CQUEUE {
             features.push("cqueue".into());
-        }
-        if FT_NET {
-            features.push("net".into());
         }
         if FT_ASYNC {
             features.push("async".into());

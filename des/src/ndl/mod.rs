@@ -1,0 +1,323 @@
+//! Integration of the Network-Description-Language (NDL).
+//!
+//! # What is NDL ?
+//!
+//! NDL is a decriptory language for defining network topologies.
+//! Refer to [`ndl`](crate::ndl) for more information.
+//!
+//! # How to use it ?
+//!
+//! This submodule provides an [`Sim::ndl`] that can create a simulation
+//! that builsd a network based on a given topology.
+//! Users can create such an application by providing the path to the
+//! root file of the NDL description, and by providing a registry of modules.
+//! This registry is used to link names of network nodes in NDL to associated
+//! structs that implmenent [`Module`](crate::module::Module).
+//! By proving both parameters, the application will load the topology and check
+//! whether the network can be build. If not an descriptive error will be returned.
+//!
+//! ```
+//! # use des::prelude::*;
+//! # use des::net::ndl::*;
+//! # use des::registry;
+//! #[derive(Default)]
+//! struct ModuleA;
+//! /* ... */
+//!
+//! #[derive(Default)]
+//! struct ModuleB;
+//! /* ... */
+//!
+//! # impl Module for ModuleA {}
+//! # impl Module for ModuleB {}
+//! fn main() {
+//!     # return;
+//!     let app = match Sim::ndl("path/to/ndl.ndl", registry![ModuleA, ModuleB]) {
+//!         Ok(v) => v,
+//!         Err(e) => {
+//!             println!("{e}");
+//!             return;
+//!         },
+//!     };
+//!     let rt = Builder::new().build(app.freeze());
+//!     let _ = rt.run();
+//! }
+//! ```
+
+use crate::{
+    ObjectPath, Sim, SimBuilder, Spawner,
+    channel::{ChannelDropBehaviour, DatarateChannel, DatarateChannelMetrics},
+    gate::GateRef,
+    module::{DummyModule, ModuleContext, ModuleRef},
+    ndl::lang::error::{ErrorKind, Result},
+    time::Duration,
+};
+use std::{
+    fs::{self, File},
+    path::Path,
+};
+
+pub mod lang;
+mod registry;
+
+#[cfg(test)]
+mod tests;
+
+pub use self::registry::*;
+
+use super::IntoModuleTree;
+
+/// Inject modules described using the Node Description Language (NDL).
+///
+/// A NDL topology describes a module tree, that can be dynamically created
+/// using modules provided in a [`Registry`]. This module tree can either be
+/// attached at a specific location in the simulation module tree using
+/// [`SimBuilder::node`] with [`Ndl`] as the provided module block, or as a global
+/// tree using constructors like [`Sim::ndl`].
+///
+/// The tree is initalized depth first. This means for each module:
+/// - First the gate of the current module are created
+/// - Then all children are created, including gates **and** connections
+/// - Then all connections are resolved, since connections statements may depend
+///   on the existence of gates in child nodes
+///
+/// To initalize a node, the parameter `registry` is used to provide
+/// an implementation of the [`Module`](crate::module::Module) trait. Should the registry
+/// fail to provide an implementation, the node creation will fail.
+#[derive(Debug)]
+pub struct Ndl<'a, L: Layer> {
+    registry: &'a mut Registry<L>,
+    node: lang::tree::Node,
+}
+
+impl<'a, L: Layer> Ndl<'a, L> {
+    /// Loads a NDL topology description from a raw `Def` and a provided registry.
+    ///
+    /// # Errors
+    ///
+    /// This function may return an error, if the provided NDL topology is
+    /// invalid or if the registry fails to provide an implementation for a module.
+    pub fn new(registry: &'a mut Registry<L>, def: &lang::def::Def) -> Result<Self> {
+        Ok(Self {
+            registry,
+            node: lang::transform(def)?,
+        })
+    }
+
+    /// Loads a NDL topology description from a file and a provided registry.
+    ///
+    /// # Errors
+    ///
+    /// This function may return an error, if the provided NDL topology is
+    /// invalid or if the registry fails to provide an implementation for a module.
+    pub fn from_str(registry: &'a mut Registry<L>, str: &str) -> Result<Self> {
+        let def = serde_norway::from_str(str).map_err(|e| ErrorKind::Io(e.to_string()))?;
+        Self::new(registry, &def)
+    }
+
+    /// Loads a NDL topology description from a file and a provided registry.
+    ///
+    /// # Errors
+    ///
+    /// This function may return an error, if the provided NDL topology is
+    /// invalid or if the registry fails to provide an implementation for a module.
+    pub fn from_file(registry: &'a mut Registry<L>, path: impl AsRef<Path>) -> Result<Self> {
+        let str = fs::read_to_string(path).map_err(|e| ErrorKind::Io(e.to_string()))?;
+        Self::from_str(registry, &str)
+    }
+}
+
+impl<L: Layer> IntoModuleTree for Ndl<'_, L> {
+    type Ret = Result<ModuleRef>;
+
+    fn build<A>(self, spawner: Spawner<'_, A>) -> Self::Ret {
+        spawner.ndl2(&self.node, self.registry)
+    }
+}
+
+//
+
+impl Sim<()> {
+    /// Creates a NDL application with the inner application `()`.
+    ///
+    /// See [`SimBuilder::with_ndl`] for more information.
+    ///
+    /// # Errors
+    ///
+    /// This function may return an error, if the provided NDL topology is
+    /// erronous, or the software requirements cannot be fulfilled by the registry.
+    pub fn ndl<L: Layer>(
+        path: impl AsRef<Path>,
+        registry: impl AsMut<Registry<L>>,
+    ) -> Result<SimBuilder<()>> {
+        Sim::new(()).with_ndl(path, registry)
+    }
+}
+
+impl<A> SimBuilder<A> {
+    /// Creates an NDL application from a topology description at `path`, with
+    /// software defined by `registry` and an inner application `inner`.
+    ///
+    /// The NDL topology desciption found at `path` describes a module tree
+    /// including a root module at the path `""`. Each node in this tree
+    /// is derived from a NDL Module. The name of this module prototype
+    /// is the symbol used in accessed to the registry. The NDL topology
+    /// additionally includes gate and gate-chain definitions.
+    ///
+    /// The tree is initalized depth first. This means for each module:
+    /// - First the gate of the current module are created
+    /// - Then all children are created, including gates **and** connections
+    /// - Then all connections are resolved, since connections statements may depend
+    ///   on the existence of gates in child nodes
+    ///
+    /// The provided parameter `registry` is resposible for attaching software
+    /// to the nodes defined by the topology description. Should the registry
+    /// fail to provide software for a node, this function will fail.
+    ///
+    /// The inner application `inner` is equivalent the inner application
+    /// object of a network simulation, which can be used to define custom
+    /// actions at sim start / end.
+    ///
+    /// **NOTE** that the nodes will be created with a call to this function.
+    ///
+    /// # Errors
+    ///
+    /// Some Errors
+    pub fn with_ndl<L: Layer>(
+        mut self,
+        path: impl AsRef<Path>,
+        registry: impl AsMut<Registry<L>>,
+    ) -> Result<Self> {
+        let f = File::open(path).map_err(|e| lang::error::ErrorKind::Io(e.to_string()))?;
+        let def =
+            serde_norway::from_reader(f).map_err(|e| lang::error::ErrorKind::Io(e.to_string()))?;
+        self.nodes_from_ndl(&def, registry)?;
+        Ok(self)
+    }
+
+    /// Builds a NDL based application with onto an allready existing [`Sim`] object.
+    ///
+    /// See [`Sim::with_ndl`](Sim) for more infomation.
+    ///
+    /// # Errors
+    ///
+    /// This function will fail if either:
+    /// a) some NDL error occures when parsing the NDL tree defined at `path`,
+    /// b) or the registry fails to provide software for some NDL-defined module.
+    pub fn nodes_from_ndl<L: Layer>(
+        &mut self,
+        def: &lang::def::Def,
+        mut registry: impl AsMut<Registry<L>>,
+    ) -> Result<()> {
+        let parsed = lang::transform(def)?;
+
+        let scoped = Spawner::new_at_buildtime(ObjectPath::default(), self);
+        let _ = scoped.ndl2(&parsed, registry.as_mut())?;
+
+        Ok(())
+    }
+}
+
+impl<A> Spawner<'_, A> {
+    fn ndl2<L: Layer>(
+        mut self,
+        node: &lang::tree::Node,
+        registry: &mut Registry<L>,
+    ) -> Result<ModuleRef> {
+        let symbol = node.typ.to_string();
+        let scope = self.scope().clone();
+
+        let ctx = self.raw_ndl2(&scope, &symbol, registry)?;
+        for gate in &node.gates {
+            let _ = ctx.create_gate_cluster(&gate.ident, gate.kardinality.as_size());
+        }
+
+        for submodule in &node.submodules {
+            match submodule.name.kardinality {
+                lang::def::Kardinality::Atom => {
+                    let subscope = self.subscope(&submodule.name.ident);
+                    subscope.ndl2(&submodule.typ, registry)?;
+                }
+                lang::def::Kardinality::Cluster(n) => {
+                    for k in 0..n {
+                        let ident = &submodule.name.ident;
+                        let subscope = self.subscope(format!("{ident}[{k}]"));
+                        subscope.ndl2(&submodule.typ, registry)?;
+                    }
+                }
+            }
+        }
+
+        for connection in &node.connections {
+            let from = access_gate(&ctx.ctx, &connection.peers[0].accessors).expect("gate");
+            let to = access_gate(&ctx.ctx, &connection.peers[1].accessors).expect("gate");
+
+            from.connect_with(
+                to,
+                connection
+                    .link
+                    .as_ref()
+                    .map(|link| DatarateChannel::new(DatarateChannelMetrics::from(link))),
+            );
+        }
+
+        Ok(ctx)
+    }
+
+    fn raw_ndl2<L: Layer>(
+        &mut self,
+        path: &ObjectPath,
+        ty: &str,
+        registry: &mut Registry<L>,
+    ) -> Result<ModuleRef> {
+        // use the creation fn, but bypass its lack of error handling
+        let mut result = Ok(());
+        let module =
+            self.root_with_context(|| {
+                match registry.resolve(path, ty).ok_or(
+                    lang::error::ErrorKind::MissingRegistrySymbol(path.to_string(), ty.to_string()),
+                ) {
+                    Ok(software) => software,
+                    Err(e) => {
+                        result = Err(e.into());
+                        Box::new(DummyModule)
+                    }
+                }
+            });
+
+        result.map(|()| module)
+    }
+}
+
+fn access_gate(
+    ctx: &ModuleContext,
+    accessors: &[lang::tree::ConnectionEndpointAccessor],
+) -> Option<GateRef> {
+    assert!(!accessors.is_empty(), "accessors must be non-empty");
+    let accessor = &accessors[0];
+    if accessors.len() == 1 {
+        // Gate access
+        ctx.gate((&accessor.name[..], accessor.index.unwrap_or(0)))
+    } else {
+        // Submodule access
+        let child = ctx.child(&accessor.as_name()).expect("child");
+        access_gate(&child.ctx, &accessors[1..])
+    }
+}
+
+impl From<&lang::tree::Link> for DatarateChannelMetrics {
+    #[allow(clippy::cast_sign_loss)]
+    fn from(value: &lang::tree::Link) -> Self {
+        DatarateChannelMetrics {
+            bitrate: value.bitrate as usize,
+            jitter: Duration::from_secs_f64(value.jitter),
+            latency: Duration::from_secs_f64(value.latency),
+            drop_behaviour: ChannelDropBehaviour::Queue(Some(
+                value
+                    .other
+                    .get("queuesize")
+                    .map_or(0, |v| v.parse().expect("number")) as usize,
+            )),
+        }
+    }
+}

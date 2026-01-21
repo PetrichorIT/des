@@ -1,16 +1,10 @@
-#![cfg(feature = "net")]
-
 use std::{
     error::Error,
     ops::Deref,
     sync::{Arc, atomic::AtomicUsize},
 };
 
-use des::{
-    net::ndl::Registry,
-    net::{IntoModuleTree, Sim, module::Module},
-    runtime::Builder,
-};
+use des::{IntoModuleTree, Sim, module::Module, ndl::Registry};
 use serial_test::serial;
 
 struct Harness<A>(pub A);
@@ -39,7 +33,7 @@ fn drop_check_modules_net_from_sim_builder() {
         }),
     );
 
-    let rtr = Builder::seeded(123).build(sim.freeze()).run();
+    let rtr = sim.seeded(123).build().run();
     drop(rtr);
 
     assert_eq!(drop_counter.load(std::sync::atomic::Ordering::SeqCst), 3);
@@ -59,7 +53,7 @@ fn drop_check_modules_net_from_ndl() -> Result<(), Box<dyn Error>> {
         .with_default_fallback();
 
     let sim = Sim::ndl("tests/ndl/drop-test.yml", registry)?;
-    let rtr = Builder::seeded(123).build(sim.freeze()).run();
+    let rtr = sim.seeded(123).build().run();
     drop(rtr);
 
     assert_eq!(drop_counter.load(std::sync::atomic::Ordering::SeqCst), 2);

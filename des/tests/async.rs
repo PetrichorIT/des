@@ -2,11 +2,9 @@
 #![allow(unused_variables)]
 
 use des::{
-    net::{
-        Error, ErrorKind, Failure,
-        handlers::AsyncHandler,
-        module::{Module, UnwindBehaviour},
-    },
+    Error, ErrorKind, Failure,
+    handlers::AsyncHandler,
+    module::{Module, UnwindBehaviour},
     prelude::*,
     time::{self, MissedTickBehavior, sleep, timeout, timeout_at},
 };
@@ -50,7 +48,7 @@ fn quasai_sync_non_blocking() {
     let gate_a = rt.gate("root", "a");
     let gate_b = rt.gate("other", "b");
 
-    let mut rt = Builder::seeded(123).build(rt.freeze());
+    let mut rt = rt.seeded(123).build();
 
     rt.add_message_onto(gate_a.clone(), Message::default().with_id(1), SimTime::ZERO);
     rt.add_message_onto(gate_a, Message::default().with_id(2), SimTime::ZERO);
@@ -62,7 +60,7 @@ fn quasai_sync_non_blocking() {
     let result = rt.run();
     assert!(result.error.is_none());
     assert_eq!(result.time, SimTime::ZERO);
-    assert_eq!(result.profiler.event_count, 12); // (+2 start signal)
+    assert_eq!(result.app.profiler.event_count, 12); // (+2 start signal)
 }
 
 // # Test case
@@ -147,7 +145,7 @@ fn mutiple_active_tasks() {
 
     let gate_a = rt.gate("root", "in");
 
-    let mut rt = Builder::seeded(123).build(rt.freeze());
+    let mut rt = rt.seeded(123).build();
 
     rt.add_message_onto(gate_a.clone(), Message::default().with_id(1), SimTime::ZERO);
     rt.add_message_onto(gate_a.clone(), Message::default().with_id(2), SimTime::ZERO);
@@ -157,7 +155,7 @@ fn mutiple_active_tasks() {
     assert!(result.error.is_none());
     assert_eq!(result.time, SimTime::ZERO);
     //  3 * (Gate + HandleMessage) (+1 start signal)
-    assert_eq!(result.profiler.event_count, 7);
+    assert_eq!(result.app.profiler.event_count, 7);
 }
 
 // # Test case
@@ -200,7 +198,7 @@ fn one_module_timers() {
 
     let gate_a = rt.gate("root", "a");
 
-    let mut rt = Builder::seeded(123).build(rt.freeze());
+    let mut rt = rt.seeded(123).build();
 
     rt.add_message_onto(
         gate_a.clone(),
@@ -217,7 +215,7 @@ fn one_module_timers() {
 
     assert!(result.error.is_none());
     assert_eq!(result.time, 4.0);
-    assert_eq!(result.profiler.event_count, 7); // (+1 start signal)
+    assert_eq!(result.app.profiler.event_count, 7); // (+1 start signal)
 }
 
 // # Test case
@@ -232,7 +230,7 @@ fn one_module_delayed_recv() {
 
     let gate_a = rt.gate("root", "in");
 
-    let mut rt = Builder::seeded(123).build(rt.freeze());
+    let mut rt = rt.seeded(123).build();
 
     rt.add_message_onto(
         gate_a.clone(),
@@ -248,7 +246,7 @@ fn one_module_delayed_recv() {
     let result = rt.run();
     assert!(result.error.is_none());
     assert_eq!(result.time, 4.0);
-    assert_eq!(result.profiler.event_count, 7); // (+2 start signal)
+    assert_eq!(result.app.profiler.event_count, 7); // (+2 start signal)
 }
 
 // # Test case
@@ -264,7 +262,7 @@ fn mutiple_module_delayed_recv() {
     let gate_a = rt.gate("a", "in");
     let gate_b = rt.gate("b", "in");
 
-    let mut rt = Builder::seeded(123).build(rt.freeze());
+    let mut rt = rt.seeded(123).build();
 
     // # Module 1
     //  |0  |1  |2  |3  |4  |5  |6
@@ -299,7 +297,7 @@ fn mutiple_module_delayed_recv() {
     let result = rt.run();
     assert!(result.error.is_none());
     assert_eq!(result.time, 4.0);
-    assert_eq!(result.profiler.event_count, 14); // (+2 start signal)
+    assert_eq!(result.app.profiler.event_count, 14); // (+2 start signal)
 }
 
 struct SemaphoreModule {
@@ -345,7 +343,7 @@ fn semaphore_in_waiting_task() {
     let gate_a = rt.gate("a", "in");
     let gate_b = rt.gate("b", "in");
 
-    let mut rt = Builder::seeded(123).build(rt.freeze());
+    let mut rt = rt.seeded(123).build();
 
     rt.add_message_onto(
         gate_a.clone(),
@@ -377,7 +375,7 @@ fn semaphore_in_waiting_task() {
     let result = rt.run();
     assert!(result.error.is_none());
     assert_eq!(result.time, 3.0);
-    assert_eq!(result.profiler.event_count, 12); // (+2 start signal)
+    assert_eq!(result.app.profiler.event_count, 12); // (+2 start signal)
 }
 
 #[test]
@@ -399,7 +397,7 @@ fn async_time_sleep_far_future() {
         }),
     );
 
-    let result = Builder::seeded(123).build(sim.freeze()).run();
+    let result = sim.seeded(123).build().run();
     assert!(result.error.is_none());
     assert_eq!(result.time, 10.0);
 }
@@ -419,10 +417,10 @@ fn async_time_sleep_select() {
         .require_join(),
     );
 
-    let result = Builder::seeded(123).build(sim.freeze()).run();
+    let result = sim.seeded(123).build().run();
     assert!(result.error.is_none());
     assert_eq!(result.time, 5.0);
-    assert_eq!(result.profiler.event_count, 2); // Just async wakeup for 5s, 10s will never be scheduled (+1 start signal)
+    assert_eq!(result.app.profiler.event_count, 2); // Just async wakeup for 5s, 10s will never be scheduled (+1 start signal)
 }
 
 #[test]
@@ -441,10 +439,10 @@ fn async_time_sleep_reset() {
         .require_join(),
     );
 
-    let result = Builder::seeded(123).build(sim.freeze()).run();
+    let result = sim.seeded(123).build().run();
     assert!(result.error.is_none());
     assert_eq!(result.time, 10.0);
-    assert_eq!(result.profiler.event_count, 2); // Just async wakeup for 10s, 5s was not yet scheduled (+1 start signal)
+    assert_eq!(result.app.profiler.event_count, 2); // Just async wakeup for 10s, 5s was not yet scheduled (+1 start signal)
 }
 
 #[test]
@@ -478,7 +476,7 @@ fn async_time_timeout() {
         .require_join(),
     );
 
-    let result = Builder::seeded(123).build(sim.freeze()).run();
+    let result = sim.seeded(123).build().run();
     assert!(result.error.is_none());
     assert_eq!(result.time, 15.0);
     // why 15s?
@@ -506,7 +504,7 @@ fn async_time_timeout_far_future() {
         }),
     );
 
-    let result = Builder::seeded(123).build(sim.freeze()).run();
+    let result = sim.seeded(123).build().run();
     assert!(result.error.is_none());
     assert_eq!(result.time, 42.0);
 }
@@ -541,10 +539,7 @@ fn async_time_interval() {
         }),
     );
 
-    let _ = Builder::seeded(123)
-        .max_time(100.0.into())
-        .build(sim.freeze())
-        .run();
+    let _ = sim.seeded(123).max_time(100.0.into()).build().run();
 }
 
 #[test]
@@ -616,10 +611,7 @@ fn async_time_interval_missed_tick_behaviour() {
         }),
     );
 
-    let _ = Builder::seeded(123)
-        .max_time(100.0.into())
-        .build(sim.freeze())
-        .run();
+    let _ = sim.seeded(123).max_time(100.0.into()).build().run();
 }
 
 struct JoinOnModule;
@@ -637,7 +629,7 @@ fn async_join_on_module_fail() {
     let mut sim = Sim::new(());
     sim.node("main", JoinOnModule);
 
-    let v = Builder::seeded(123).build(sim.freeze()).run();
+    let v = sim.seeded(123).build().run();
     assert!(matches!(v.error.unwrap()[0].kind, ErrorKind::JoinError(_)));
 }
 
@@ -654,7 +646,7 @@ fn async_join_paniced_will_join_but_fail() {
     let mut sim = Sim::new(());
     sim.node("main", PanicIsJoinable);
 
-    let v = Builder::seeded(123).build(sim.freeze()).run();
+    let v = sim.seeded(123).build().run();
     assert!(matches!(v.error.unwrap()[0].kind, ErrorKind::JoinError(_)));
 }
 
@@ -673,7 +665,7 @@ fn runtime_require_join() {
     let mut sim = Sim::new(());
     sim.node("main", SpawnButNeverJoin);
 
-    let _ = Builder::seeded(123).build(sim.freeze()).run();
+    let _ = sim.seeded(123).build().run();
 }
 
 #[test]
@@ -697,7 +689,7 @@ fn wait_for_sim_start_fin() -> Result<(), Failure> {
         );
     }
 
-    let _ = Builder::seeded(123).build(sim.freeze()).run().as_result()?;
+    let _ = sim.seeded(123).build().run().into_result()?;
 
     let mut buf = Vec::new();
     while let Ok(v) = rx.try_recv() {
@@ -751,9 +743,10 @@ fn panic_stops_sim_immediately() -> Result<(), Error> {
         }),
     );
 
-    let _err = Builder::seeded(123)
+    let _err = sim
+        .seeded(123)
         .max_time(10.0.into())
-        .build(sim.freeze())
+        .build()
         .run()
         .error
         .unwrap();

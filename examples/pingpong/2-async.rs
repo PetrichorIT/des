@@ -12,11 +12,7 @@
 //! abstractions, macros and serialization implementations. By default this feature does
 //! include `tokio` as a dependency.
 
-use des::{
-    net::{Error, Failure, IntoModuleTree, handlers},
-    prelude::*,
-    time,
-};
+use des::{Error, Failure, IntoModuleTree, handlers, prelude::*, time};
 
 // ## Why async?
 //
@@ -118,8 +114,7 @@ impl Module for Pinger {
 // At last the runtime is created and run using the `Builder`.
 
 fn main() -> Result<(), Failure> {
-    let sim = build_network();
-    let rt = Builder::new().build(sim);
-    let _ = rt.run().as_result()?;
+    let rt = build_network();
+    let _ = rt.run().into_result()?;
     Ok(())
 }

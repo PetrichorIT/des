@@ -1,4 +1,4 @@
-use des::{net::Error, prelude::*, registry};
+use des::{Error, prelude::*, registry};
 
 #[derive(Default)]
 struct Sub;
@@ -36,6 +36,6 @@ fn main() {
             panic!("exiting due to previouis error")
         }
     };
-    let rt = Builder::seeded(123).max_itr(10).build(app.freeze());
+    let rt = app.seeded(123).max_itr(10).build();
     let _ = rt.run();
 }

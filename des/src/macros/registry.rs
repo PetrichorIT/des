@@ -1,9 +1,9 @@
-/// Creates a registry of types that implement [`Module`](crate::net::module::Module),
+/// Creates a registry of types that implement [`Module`](crate::module::Module),
 /// to link rust structs to NDL modules.
 ///
 /// The listing of types can be optionally suffixed with
 /// `else <some_type>`  to declare a fallback module
-/// in the [`Registry`](crate::net::ndl::Registry). The suffix `else _`
+/// in the [`Registry`](crate::ndl::Registry). The suffix `else _`
 /// declarse the default fallback module.
 ///
 /// # Example
@@ -35,7 +35,7 @@
 #[macro_export]
 macro_rules! registry {
     ($($t:ty),*) => {{
-        let registry = $crate::net::ndl::Registry::new();
+        let registry = $crate::ndl::Registry::new();
         $(
             let registry = registry.symbol::<$t>(stringify!($t));
         )*
@@ -44,7 +44,7 @@ macro_rules! registry {
     }};
 
     ($($t:ty),*, else _) => {{
-        let registry = $crate::net::ndl::Registry::new();
+        let registry = $crate::ndl::Registry::new();
         $(
             let registry = registry.symbol::<$t>(stringify!($t));
         )*
@@ -53,7 +53,7 @@ macro_rules! registry {
     }};
 
     ($($t:ty),*, else $f:ty) => {{
-        let registry = $crate::net::ndl::Registry::new();
+        let registry = $crate::ndl::Registry::new();
         $(
             let registry = registry.symbol::<$t>(stringify!($t));
         )*

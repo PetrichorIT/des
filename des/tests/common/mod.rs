@@ -1,9 +1,6 @@
 #![allow(unused)]
 
-use des::{
-    net::{Error, module::SIGNAL_MODULE_PANICED},
-    prelude::*,
-};
+use des::{Error, module::SIGNAL_MODULE_PANICED, prelude::*};
 
 pub struct NopModule;
 impl Module for NopModule {}

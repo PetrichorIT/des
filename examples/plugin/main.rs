@@ -1,10 +1,6 @@
 use std::io;
 
-use des::{
-    net::{Error, Failure},
-    prelude::*,
-    registry,
-};
+use des::{Error, ErrorKind, Failure, prelude::*, registry};
 
 #[derive(Debug, Default)]
 struct A {}
@@ -20,7 +16,7 @@ impl A {
     fn method_two(&mut self) -> Result<(), Error> {
         Err(Error::new(
             current().path(),
-            des::net::ErrorKind::Other(Box::new(io::Error::other("a"))),
+            ErrorKind::Other(Box::new(io::Error::other("a"))),
         ))
     }
 }
@@ -67,6 +63,6 @@ fn main() -> Result<(), Failure> {
     // Subscriber::default().init().unwrap();
 
     let app = Sim::ndl("examples/plugin/main.yml", registry![A, B, Main]).unwrap();
-    let rt = Builder::new().build(app.freeze());
-    rt.run().as_result().map(|_| ())
+    let rt = app.build();
+    rt.run().into_result().map(|_| ())
 }
