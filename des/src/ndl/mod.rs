@@ -18,7 +18,7 @@
 //!
 //! ```
 //! # use des::prelude::*;
-//! # use des::net::ndl::*;
+//! # use des::ndl::*;
 //! # use des::registry;
 //! #[derive(Default)]
 //! struct ModuleA;
@@ -39,17 +39,18 @@
 //!             return;
 //!         },
 //!     };
-//!     let rt = Builder::new().build(app.freeze());
+//!     let rt = app.build();
 //!     let _ = rt.run();
 //! }
 //! ```
 
 use crate::{
-    ObjectPath, Sim, SimBuilder, Spawner,
+    ObjectPath, Sim, SimBuilder,
     channel::{ChannelDropBehaviour, DatarateChannel, DatarateChannelMetrics},
     gate::GateRef,
     module::{DummyModule, ModuleContext, ModuleRef},
     ndl::lang::error::{ErrorKind, Result},
+    runtime::Spawner,
     time::Duration,
 };
 use std::{
@@ -65,7 +66,7 @@ mod tests;
 
 pub use self::registry::*;
 
-use super::IntoModuleTree;
+use crate::runtime::IntoModuleTree;
 
 /// Inject modules described using the Node Description Language (NDL).
 ///

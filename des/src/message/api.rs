@@ -36,7 +36,7 @@ use crate::{
 /// sim.gate("alice", "out");
 /// /* ... */
 ///
-/// let _ = Builder::new().build(sim.freeze()).run();
+/// let _ = sim.build().run();
 /// ```
 #[allow(clippy::needless_pass_by_value)]
 pub fn send(msg: impl Into<Message>, gate: impl IntoModuleGate) -> Result<(), SendError> {
@@ -85,7 +85,7 @@ pub fn send(msg: impl Into<Message>, gate: impl IntoModuleGate) -> Result<(), Se
 ///     # DatarateChannel::new(DatarateChannelMetrics { bitrate: 10000, jitter: Duration::ZERO, latency: Duration::from_millis(10), drop_behaviour: ChannelDropBehaviour::Drop })
 /// ));
 ///
-/// let _ = Builder::new().build(sim.freeze()).run();
+/// let _ = sim.build().run();
 ///
 /// ```
 #[allow(clippy::needless_pass_by_value)]
@@ -167,7 +167,7 @@ pub fn send_at(
 /// sim.node("timer", Timer { period: Duration::from_secs(5) });
 /// /* ... */
 ///
-/// let _ = Builder::new().max_time(100.0.into()).build(sim.freeze()).run();
+/// let _ = sim.max_time(100.0.into()).build().run();
 /// ```
 pub fn schedule_in(msg: impl Into<Message>, dur: Duration) {
     self::schedule_at(msg, SimTime::now() + dur);

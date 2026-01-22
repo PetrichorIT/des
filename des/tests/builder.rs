@@ -1,8 +1,9 @@
 use des::{
-    Failure, IntoModuleTree,
-    handlers::{FailabilityPolicy, HandlerFn, ModuleFn, WithContext},
+    Failure,
     module::Prop,
     prelude::*,
+    runtime::IntoModuleTree,
+    runtime::handlers::{FailabilityPolicy, HandlerFn, ModuleFn, WithContext},
 };
 use serial_test::serial;
 use spin::Mutex;

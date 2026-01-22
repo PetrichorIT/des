@@ -8,7 +8,7 @@ use std::{
     },
 };
 
-use des::{ErrorKind, handlers::AsyncHandler, prelude::*, time::sleep};
+use des::{ErrorKind, prelude::*, runtime::handlers::AsyncHandler, time::sleep};
 use serial_test::serial;
 
 #[test]

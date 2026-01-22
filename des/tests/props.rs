@@ -1,4 +1,4 @@
-use des::{Failure, handlers::AsyncHandler, prelude::*, time::sleep_until};
+use des::{Failure, prelude::*, runtime::handlers::AsyncHandler, time::sleep_until};
 use serde::{Deserialize, Serialize};
 use serde_norway::{Number, Value};
 use serial_test::serial;

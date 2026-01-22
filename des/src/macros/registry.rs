@@ -23,12 +23,12 @@
 /// struct Server;
 /// # impl Module for Server {}
 /// /* ... */
-/// # use des::net::ndl::lang::error::Result;
+/// # use des::ndl::lang::error::Result;
 /// fn main() -> Result<()> {
 ///     let registry = registry![DnsServer, Client, Server, else _];
 ///     # return Ok(());
 ///     let app = Sim::ndl("path/to/ndl", registry)?;
-///     let rt = Builder::new().build(app.freeze());
+///     let rt = app.build();
 ///     let r = rt.run();
 /// }
 /// ```

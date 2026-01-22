@@ -23,39 +23,7 @@
 //! but usually only optimization features like `cqueue` or montioring tools like `metrics`
 //! are used in this context.
 //!
-//! ```
-//! use des::prelude::*;
-//! use std::convert::Infallible;
-//!
-//! enum MyEventSet {
-//!     EventA { what_happend: String },
-//!     EventB { ack: bool },
-//! }
-//!
-//! impl Event<MyApp> for MyEventSet {
-//!     fn handle(self, _rt: &mut Runtime<MyApp>) -> Result<(), Infallible> {
-//!         // Do something
-//!         Ok(())
-//!     }
-//! }
-//!
-//! #[derive(Default)]
-//! struct MyApp {
-//!     global_value: usize,
-//!     logs: Vec<String>,
-//! }
-//!
-//! impl Application for MyApp {
-//!     type Error = Infallible;
-//!     type EventSet = MyEventSet;
-//! }
-//!
-//! fn main() {
-//!     let app = MyApp::default();
-//!     let rt = Builder::new().build(app);
-//!     let result = rt.run();
-//! }
-//! ```
+//! TODO: Example
 //!
 //! This simulation will now provide a [`runtime`] with
 //! [`time`] managment and a future event set to execute events.
@@ -156,19 +124,5 @@ pub mod topology;
 pub use self::error::*;
 pub use self::path::*;
 pub use self::runtime::{
-    Globals, IntoModuleTree, Sim, SimBuilder, SimLifecycle, Spawner, SpawnerKind, fail, globals,
-    handlers, random, report, rng, sample, schedule_event,
+    Sim, SimBuilder, fail, globals, random, report, rng, sample, schedule_event,
 };
-
-/// Internal details only sometimes needed to e.g. implement a custom channel.
-pub mod internals {
-    pub use super::runtime::NetEvents;
-    pub use super::runtime::{
-        AtSimStartEvent, ChannelUnbusyNotif, HandleMessageEvent, MessageExitingConnection,
-        ModuleRestartEvent, ModuleShutdownEvent, SignalEvent,
-    };
-
-    cfg_async! {
-        pub use super::runtime::AsyncWakeupEvent;
-    }
-}

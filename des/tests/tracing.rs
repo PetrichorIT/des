@@ -1,4 +1,4 @@
-use des::{Sim, handlers::AsyncHandler, tracing::format};
+use des::{Sim, runtime::handlers::AsyncHandler, tracing::format};
 use tracing::{Instrument, Level, level_filters::LevelFilter, span, subscriber::with_default};
 
 use spin::Mutex;

@@ -379,7 +379,7 @@ impl Gate {
     ///
     /// ```
     /// # use des::prelude::*;
-    /// # use des::net::module::Signal;
+    /// # use des::module::Signal;
     /// # const SIGNAL_DISCONNECT: usize = 1231;
     /// struct MyModule {}
     ///

@@ -4,7 +4,7 @@ use std::{
     sync::{Arc, atomic::AtomicUsize},
 };
 
-use des::{IntoModuleTree, Sim, module::Module, ndl::Registry};
+use des::{Sim, module::Module, ndl::Registry, runtime::IntoModuleTree};
 use serial_test::serial;
 
 struct Harness<A>(pub A);

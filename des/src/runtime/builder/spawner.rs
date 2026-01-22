@@ -1,11 +1,12 @@
 use std::{fmt::Debug, sync::Arc};
 
 use crate::{
-    IntoModuleTree, ObjectPath, SimBuilder, globals,
+    ObjectPath, SimBuilder, globals,
     module::ModuleContext,
     prelude::{GateRef, Module, ModuleRef},
     processing::ModuleImpl,
-    runtime::{AtSimStartEvent, NetEvents, cfg::SimConfiguration},
+    runtime::IntoModuleTree,
+    runtime::{AtSimStartEvent, NetEvents, builder::cfg::SimConfiguration},
     schedule_event,
     time::SimTime,
 };
@@ -32,7 +33,7 @@ use crate::{
 ///
 /// ```
 /// # use des::prelude::*;
-/// # use des::net::{handlers::{ModuleFn, HandlerFn}, IntoModuleTree};
+/// # use des::runtime::{handlers::{ModuleFn, HandlerFn}, IntoModuleTree};
 /// struct LAN {}
 /// impl IntoModuleTree for LAN {
 ///     type Ret = ();
@@ -57,7 +58,7 @@ use crate::{
 /// sim.node("aws", HandlerFn::new(|_| {}));
 /// sim.node("aws.us-east", LAN {});
 ///
-/// let _ = Builder::new().build(sim.freeze()).run();
+/// let _ = sim.build().run();
 /// ```
 pub struct Spawner<'a, A> {
     scope: ObjectPath,
@@ -330,7 +331,7 @@ impl<'a, A> Spawner<'a, A> {
     /// # Examples
     ///
     /// ```
-    /// # use des::{prelude::*, net::{IntoModuleTree, module::Prop}};
+    /// # use des::{prelude::*, IntoModuleTree, module::Prop};
     /// struct PropInStruct {
     ///     prop: Prop<String>, // cannot be initialized outside of node-context, since it contains a prop
     /// }

@@ -3,9 +3,9 @@
 
 use des::{
     Error, ErrorKind, Failure,
-    handlers::AsyncHandler,
     module::{Module, UnwindBehaviour},
     prelude::*,
+    runtime::handlers::AsyncHandler,
     time::{self, MissedTickBehavior, sleep, timeout, timeout_at},
 };
 use std::sync::{

@@ -4,12 +4,12 @@ use std::sync::{Mutex, MutexGuard, TryLockError};
 static GUARD: Mutex<()> = Mutex::new(());
 
 #[derive(Debug)]
-pub(super) struct SimStaticsGuard {
+pub(crate) struct SimGuard {
     #[allow(unused)]
     guard: MutexGuard<'static, ()>,
 }
 
-impl SimStaticsGuard {
+impl SimGuard {
     pub(super) fn new() -> Self {
         let guard = GUARD.try_lock();
         let guard = match guard {
@@ -26,12 +26,11 @@ impl SimStaticsGuard {
             },
         };
 
-        // buf_init();
         Self { guard }
     }
 }
 
-impl Drop for SimStaticsGuard {
+impl Drop for SimGuard {
     fn drop(&mut self) {
         // buf_drop();
         module_ctx_drop();

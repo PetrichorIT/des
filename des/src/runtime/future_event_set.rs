@@ -1,4 +1,4 @@
-use crate::{Sim, SimLifecycle, runtime::NetEvents, time::SimTime};
+use crate::{Sim, runtime::NetEvents, runtime::SimLifecycle, time::SimTime};
 
 /// A trait describing a sink for events, usually the future event set of the runtime.
 #[allow(unused)]

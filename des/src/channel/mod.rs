@@ -105,10 +105,10 @@
 //! # let tower_port_2 = sim.gate("tower", "port-2");
 //! # let port_alice = sim.gate("alice", "port");
 //! # let port_bob = sim.gate("bob", "port");
-//! # use des::{runtime::EventSink, net::{internals::NetEvents, gate::Connection}};
+//! # use des::{runtime::EventSink, internals::NetEvents, gate::Connection};
 //! # use std::sync::Arc;
 //! # use std::any::Any;
-//! # use des::net::channel::SendContext;
+//! # use des::channel::SendContext;
 //! struct CustomChannel {
 //!     // Define your custom channel fields here
 //! }

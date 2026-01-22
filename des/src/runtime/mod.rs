@@ -1,9 +1,9 @@
 use crate::{
     Error, Failure,
     gate::Connection,
-    module::{Cfg, DummyModule, MOD_CTX, Props, UnwindBehaviour, try_current},
+    module::{DummyModule, MOD_CTX, try_current},
     prelude::{GateRef, Message, Module, ModuleRef, ObjectPath},
-    processing::{ProcessingStack, TokioRuntime},
+    processing::TokioRuntime,
     runtime::{
         bench::Profiler, future_event_set::FutureEventSet, limit::RuntimeLimit,
         result::RuntimeResult, rng::set_rng,
@@ -11,44 +11,36 @@ use crate::{
     statistics::Statistics,
     time::SimTime,
 };
-use rand::{RngCore, SeedableRng};
-use serde_norway::{Value, from_str};
 #[cfg(feature = "cqueue")]
 use std::time::Duration;
 use std::{
     fmt::Debug,
-    fs, io, mem,
+    mem,
     ops::Deref,
     panic::{PanicHookInfo, set_hook, take_hook},
-    path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    path::PathBuf,
+    sync::Arc,
 };
 
 mod api;
 mod bench;
-mod cfg;
+mod builder;
 mod events;
 mod exec;
 mod future_event_set;
-mod guard;
 mod limit;
 mod result;
 mod rng;
-mod spawner;
 
 pub mod handlers;
 
-use guard::SimStaticsGuard;
-
-pub(crate) use cfg::SimConfiguration;
 pub(crate) use exec::*;
 
 pub use self::api::{fail, globals, report, schedule_event};
-pub use self::cfg::SimLifecycle;
+pub use self::builder::*;
 pub use self::events::*;
 pub use self::future_event_set::EventSink;
 pub use self::rng::{random, rng, sample};
-pub use self::spawner::{Spawner, SpawnerKind};
 
 pub(crate) const FT_CQUEUE: bool = cfg!(feature = "cqueue");
 pub(crate) const FT_ASYNC: bool = cfg!(feature = "async");
@@ -59,7 +51,7 @@ pub(crate) const SYM_CROSSMARK: char = '\u{02df}';
 /// A networking simulation.
 ///
 /// This type acts as both a builder for simulations, as well as the application object
-/// used in the [`Runtime`].
+/// used in the [`Sim`].
 ///
 /// A networking simulation can internally contain an application `A`,
 /// that implements [`SimLifecycle`]. This type can be used attach
@@ -74,12 +66,12 @@ pub(crate) const SYM_CROSSMARK: char = '\u{02df}';
 ///
 /// ```
 /// # use des::prelude::*;
-/// # use des::net::handlers::HandlerFn;
-/// # use des::net::SimLifecycle;
-/// # use des::net::Error;
+/// # use des::runtime::handlers::HandlerFn;
+/// # use des::SimLifecycle;
+/// # use des::Failure;
 /// struct Inner;
 /// impl SimLifecycle for Inner {
-///     fn at_sim_start(rt: &mut Runtime<Sim<Inner>>)  -> Result<(), Error> {
+///     fn at_sim_start(rt: &mut Sim<Inner>)  -> Result<(), Failure> {
 ///         println!("Hello simulation");
 ///         /* Do something */
 ///         Ok(())
@@ -91,11 +83,9 @@ pub(crate) const SYM_CROSSMARK: char = '\u{02df}';
 ///     /* Message processing */
 /// }));
 ///
-/// let _ = Builder::new().build(sim.freeze()).run(); // prints 'Hello simulation'
+/// let _ = sim.build().run(); // prints 'Hello simulation'
 /// ```
 pub struct Sim<A> {
-    pub(crate) error: Vec<Error>,
-    globals: Arc<Globals>,
     /// A inner field of a network simulation that can be used to attach
     /// custom lifetime handlers to a simulation
     pub inner: A,
@@ -103,23 +93,24 @@ pub struct Sim<A> {
     /// This value is only set after the simulation has finished.
     pub statistics: Statistics,
 
-    state: State,
-
-    limit: RuntimeLimit,
-
-    event_id: EventId,
-    itr: usize,
-
-    quiet: bool,
     /// The profiler for the simulation.
     pub profiler: Profiler<NetEvents>,
-    future_event_set: FutureEventSet<NetEvents>,
 
-    #[allow(unused)]
-    guard: SimStaticsGuard,
+    pub(crate) error: Vec<Error>,
+
+    globals: Arc<Globals>,
+    future_event_set: FutureEventSet<NetEvents>,
+    param: RunParameters,
 }
 
-type EventId = usize;
+struct RunParameters {
+    state: State,
+    limit: RuntimeLimit,
+    event_id: usize,
+    itr: usize,
+    quiet: bool,
+    _guard: SimGuard,
+}
 
 #[derive(Debug, PartialEq, Eq)]
 enum State {
@@ -127,48 +118,24 @@ enum State {
     Running,
 }
 
-/// A builder wrapping a `Sim` object.
-///
-/// This builder essential implements a construction function as follows:
-/// ```ignore
-/// fn build_node(ctx: ModuleContext, module_impl: impl Module) -> ModuleRef;
-/// ```
-#[must_use]
-pub struct SimBuilder<A> {
-    quiet: bool,
-    rng: Box<dyn RngCore>,
-    limit: RuntimeLimit,
-    start_time: SimTime,
-
-    #[cfg(feature = "cqueue")]
-    cqueue_num_buckets: usize,
-    #[cfg(feature = "cqueue")]
-    cqueue_bucket_timespan: Duration,
-
-    app: A,
-    cfg: SimConfiguration,
-
-    globals: Arc<Globals>,
-}
-
 impl<A: SimLifecycle> Sim<A> {
     ///
-    /// Returns the number of events that were dispatched on this [`Runtime`] instance.
+    /// Returns the number of events that were dispatched on this [`Sim`] instance.
     ///
     #[inline]
     pub fn num_events_scheduled(&self) -> usize {
-        self.event_id
+        self.param.event_id
     }
 
     ///
-    /// Returns the number of events that were recieved & handled on this [`Runtime`] instance.
+    /// Returns the number of events that were recieved & handled on this [`Sim`] instance.
     ///
     pub fn num_events_dispatched(&self) -> usize {
-        self.itr
+        self.param.itr
     }
 
     ///
-    /// Returns the number of events that are remaining to be dispatched on this [`Runtime`] instance.
+    /// Returns the number of events that are remaining to be dispatched on this [`Sim`] instance.
     ///
     pub fn num_events_remaining(&self) -> usize {
         self.future_event_set.len()
@@ -184,12 +151,14 @@ impl<A: SimLifecycle> Sim<A> {
 
     /// Indicates whether the simulation was already started.
     pub fn was_started(&self) -> bool {
-        matches!(self.state, State::Running)
+        matches!(self.param.state, State::Running)
     }
 
     /// Indicates whether the simulation has reached its limit.
     pub fn has_reached_limit(&self) -> bool {
-        self.limit.applies(self.itr + 1, self.sim_time())
+        self.param
+            .limit
+            .applies(self.param.itr + 1, self.sim_time())
     }
 
     /// Runs the application until it terminates or a breaking condition
@@ -199,37 +168,13 @@ impl<A: SimLifecycle> Sim<A> {
     ///
     /// ```
     /// use des::prelude::*;
-    /// use std::convert::Infallible;
+    /// let sim = Sim::new(());
+    /// /* ... */
     ///
-    /// struct MyApp();
-    /// impl Application for MyApp {
-    ///     type Error = Infallible;
-    ///     type EventSet = MyEventSet;
-    ///     fn at_sim_start(rt: &mut Runtime<Self>) -> Result<(), Infallible> {
-    ///         rt.add_event(MyEventSet::EventA, SimTime::from(1.0));
-    ///         rt.add_event(MyEventSet::EventB, SimTime::from(2.0));
-    ///         rt.add_event(MyEventSet::EventA, SimTime::from(3.0));
-    ///         Ok(())
-    ///     }
-    /// }
-    ///
-    /// #[derive(Debug)]
-    /// enum MyEventSet {
-    ///     EventA,
-    ///     EventB
-    /// }
-    /// impl Event<MyApp> for MyEventSet {
-    ///     fn handle(self, rt: &mut Runtime<MyApp>) -> Result<(), Infallible> {
-    ///         dbg!(self, SimTime::now());
-    ///         Ok(())
-    ///     }
-    /// }
-    ///
-    ///
-    /// let runtime = Builder::new().build(MyApp());
-    /// let result = runtime.run().assert_no_err();
+    /// let result = sim.build().run().assert_no_err();
+    /// # return;
     /// assert_eq!(result.time, SimTime::from(3.0));
-    /// assert_eq!(result.profiler.event_count, 3);
+    /// assert_eq!(result.app.profiler.event_count, 3);
     ///
     /// ```
     ///
@@ -243,7 +188,7 @@ impl<A: SimLifecycle> Sim<A> {
     /// This function panics if the simulation has not been started.
     pub fn run(mut self) -> RuntimeResult<A> {
         assert_eq!(
-            self.state,
+            self.param.state,
             State::Ready,
             "Sim::run can only be used for simulations in the ready state"
         );
@@ -277,7 +222,7 @@ impl<A: SimLifecycle> Sim<A> {
         }
 
         // (0) Publish sim-start message
-        if !self.quiet {
+        if !self.param.quiet {
             println!("\u{23A1}");
             println!("\u{23A2} Simulation starting");
             println!(
@@ -289,7 +234,7 @@ impl<A: SimLifecycle> Sim<A> {
                 "\u{23A2}  Executor := {}",
                 self.future_event_set.descriptor()
             );
-            println!("\u{23A2}  Event limit := {}", self.limit);
+            println!("\u{23A2}  Event limit := {}", self.param.limit);
             println!("\u{23A3}");
         }
 
@@ -299,7 +244,7 @@ impl<A: SimLifecycle> Sim<A> {
         // (2) sim-starting on application object
         self.at_sim_start()?;
 
-        self.state = State::Running;
+        self.param.state = State::Running;
         Ok(())
     }
 
@@ -314,15 +259,15 @@ impl<A: SimLifecycle> Sim<A> {
     /// This function panics if the simulation has not been started.
     pub fn dispatch_n_events(&mut self, n: usize) -> Result<(), Failure> {
         assert_eq!(
-            self.state,
+            self.param.state,
             State::Running,
             "dispatching is only allowed for running simulations"
         );
 
         let mut limit = RuntimeLimit::EventCount(self.num_events_dispatched() + n);
-        mem::swap(&mut self.limit, &mut limit);
+        mem::swap(&mut self.param.limit, &mut limit);
         self.dispatch_all()?;
-        self.limit = limit;
+        self.param.limit = limit;
 
         Ok(())
     }
@@ -338,15 +283,15 @@ impl<A: SimLifecycle> Sim<A> {
     /// This function panics if the simulation has not been started.
     pub fn dispatch_events_until(&mut self, t: SimTime) -> Result<(), Failure> {
         assert_eq!(
-            self.state,
+            self.param.state,
             State::Running,
             "dispatching is only allowed for running simulations"
         );
 
         let mut limit = RuntimeLimit::SimTime(t);
-        mem::swap(&mut self.limit, &mut limit);
+        mem::swap(&mut self.param.limit, &mut limit);
         self.dispatch_all()?;
-        self.limit = limit;
+        self.param.limit = limit;
 
         Ok(())
     }
@@ -362,7 +307,7 @@ impl<A: SimLifecycle> Sim<A> {
     /// This function panics if the simulation has not been started.
     pub fn dispatch_all(&mut self) -> Result<(), Failure> {
         assert_eq!(
-            self.state,
+            self.param.state,
             State::Running,
             "dispatching is only allowed for running simulations"
         );
@@ -386,7 +331,7 @@ impl<A: SimLifecycle> Sim<A> {
     #[allow(unused_mut)]
     pub fn finish(mut self) -> RuntimeResult<A> {
         assert_eq!(
-            self.state,
+            self.param.state,
             State::Running,
             "only a running simulation can be finished"
         );
@@ -399,10 +344,10 @@ impl<A: SimLifecycle> Sim<A> {
             app: self,
             error,
         };
-        result.app.profiler.finish(result.app.itr);
+        result.app.profiler.finish(result.app.param.itr);
 
-        if result.app.future_event_set.is_empty() && result.app.itr == 0 {
-            if !result.app.quiet {
+        if result.app.future_event_set.is_empty() && result.app.param.itr == 0 {
+            if !result.app.param.quiet {
                 println!("\u{23A1}");
                 println!("\u{23A2} Empty simulation");
                 println!("\u{23A2}  Ended at event #0 after 0s");
@@ -413,24 +358,24 @@ impl<A: SimLifecycle> Sim<A> {
         }
 
         if result.app.future_event_set.is_empty() {
-            if !result.app.quiet {
+            if !result.app.param.quiet {
                 println!("\u{23A1}");
                 println!("\u{23A2} Simulation ended");
                 println!(
                     "\u{23A2}  Ended at event #{} after {}",
-                    result.app.itr, result.time
+                    result.app.param.itr, result.time
                 );
                 println!("\u{23A3}");
             }
 
             result
         } else {
-            if !result.app.quiet {
+            if !result.app.param.quiet {
                 println!("\u{23A1}");
                 println!("\u{23A2} Simulation stopped");
                 println!(
                     "\u{23A2}  Ended at event #{} with {} active events after {}",
-                    result.app.itr,
+                    result.app.param.itr,
                     result.app.future_event_set.len(),
                     result.time
                 );
@@ -464,12 +409,12 @@ impl<A: SimLifecycle> Sim<A> {
 
         let (event, time) = self.future_event_set.fetch_next();
 
-        if self.limit.applies(self.itr + 1, time) {
+        if self.param.limit.applies(self.param.itr + 1, time) {
             self.future_event_set.add(time, event);
             return Ok(true);
         }
 
-        self.itr += 1;
+        self.param.itr += 1;
 
         // Let this be the only position where SimTime is changed
         SimTime::set_now(time);
@@ -482,37 +427,6 @@ impl<A: SimLifecycle> Sim<A> {
     /// Adds and event to the future event heap, that will be handled in 'duration'
     /// time units.
     ///
-    /// # Examples
-    ///
-    /// ```
-    /// use des::prelude::*;
-    /// use std::convert::Infallible;
-    /// # struct MyApp();
-    /// # impl Application for MyApp {
-    /// #     type Error = Infallible;
-    /// #     type EventSet = MyEventSet;
-    /// # }
-    /// #
-    /// # enum MyEventSet {
-    /// #     EventA,
-    /// #     EventB
-    /// # }
-    /// # impl Event<MyApp> for MyEventSet {
-    /// #     fn handle(self, rt: &mut Runtime<MyApp>) -> Result<(), Infallible> { Ok(()) }
-    /// # }
-    /// #
-    /// fn main() {
-    ///     let mut runtime = Builder::seeded(1)
-    ///         .start_time(10.0.into())
-    ///         .build(MyApp());
-    ///     runtime.add_event_in(MyEventSet::EventA, Duration::new(12, 0));
-    ///
-    ///     let result = runtime.run().assert_no_err();
-    ///     assert_eq!(result.time, SimTime::from(22.0));
-    ///     assert_eq!(result.profiler.event_count, 1);
-    /// }
-    /// ```
-    ///
     pub fn add_event_in(&mut self, event: impl Into<NetEvents>, duration: impl Into<Duration>) {
         self.add_event(event, self.sim_time() + duration.into());
     }
@@ -522,153 +436,9 @@ impl<A: SimLifecycle> Sim<A> {
     /// Note that this time must be in the future i.e. greated that `sim_time`, or this
     /// function will panic.
     ///
-    /// # Examples
-    ///
-    /// ```
-    /// use des::prelude::*;
-    /// use std::convert::Infallible;
-    /// # struct MyApp();
-    /// # impl Application for MyApp {
-    /// #     type EventSet = MyEventSet;
-    /// #     type Error = Infallible;
-    /// # }
-    /// #
-    /// # enum MyEventSet {
-    /// #     EventA,
-    /// #     EventB
-    /// # }
-    /// # impl Event<MyApp> for MyEventSet {
-    /// #     fn handle(self, rt: &mut Runtime<MyApp>) -> Result<(), Infallible> { Ok(()) }
-    /// # }
-    /// #
-    /// fn main() {
-    ///     let mut runtime = Builder::seeded(1)
-    ///         .start_time(10.0.into())
-    ///         .build(MyApp());
-    ///     runtime.add_event(MyEventSet::EventA, SimTime::from(12.0));
-    ///
-    ///     let result = runtime.run().assert_no_err();
-    ///     assert_eq!(result.time, SimTime::from(12.0)); // 12 not 10+12 = 22
-    ///     assert_eq!(result.profiler.event_count, 1);
-    ///
-    /// }
-    /// ```
-    ///
     pub fn add_event(&mut self, event: impl Into<NetEvents>, time: SimTime) {
         self.future_event_set.add(time, event);
-        self.event_id += 1;
-    }
-}
-
-impl<A> SimBuilder<A> {
-    /// Creates a new simulation builder with the given application.
-    pub fn new(app: A) -> Self {
-        SimBuilder {
-            quiet: false,
-            rng: Box::new(rand::rngs::StdRng::from_rng(
-                &mut rand::rngs::ThreadRng::default(),
-            )),
-            limit: RuntimeLimit::None,
-            start_time: SimTime::ZERO,
-
-            #[cfg(feature = "cqueue")]
-            cqueue_num_buckets: 1028,
-            #[cfg(feature = "cqueue")]
-            cqueue_bucket_timespan: Duration::from_secs_f64(0.0025),
-
-            app,
-            cfg: SimConfiguration {
-                stack: Arc::new(ProcessingStack::default),
-                default_unwind_behavior: UnwindBehaviour::default(),
-            },
-
-            globals: Arc::default(),
-        }
-    }
-
-    /// Sets the seed for the random number generator.
-    pub fn seeded(mut self, seed: u64) -> Self {
-        self.rng = Box::new(rand::rngs::StdRng::seed_from_u64(seed));
-        self
-    }
-
-    ///
-    /// Sets the cqueue options if this runtime uses a cqueue.
-    /// NOP otherwise.
-    ///
-    #[cfg(feature = "cqueue")]
-    pub fn cqueue_options(mut self, n: usize, t: Duration) -> Self {
-        self.cqueue_num_buckets = n;
-        self.cqueue_bucket_timespan = t;
-
-        self
-    }
-
-    ///
-    /// Suppressed runtime messages from the simulation framework.
-    ///
-    pub fn quiet(mut self) -> Self {
-        self.quiet = true;
-        self
-    }
-
-    ///
-    /// Changes the maximum iteration number of a runtime.
-    ///
-    pub fn start_time(mut self, time: SimTime) -> Self {
-        self.start_time = time;
-        self
-    }
-
-    ///
-    /// Changes the maximum iteration number of a runtime.
-    ///
-    pub fn max_itr(mut self, max_itr: usize) -> Self {
-        self.limit.add(RuntimeLimit::EventCount(max_itr));
-        self
-    }
-
-    ///
-    /// Changes the maximum time of the runtime (default: inf).
-    ///
-    pub fn max_time(mut self, max_time: SimTime) -> Self {
-        self.limit.add(RuntimeLimit::SimTime(max_time));
-        self
-    }
-
-    ///
-    /// Sets a custom limit to the end of the runtime, overwriting
-    /// all `max_itr` and `max_time` options.
-    ///
-    pub fn limit(mut self, limit: RuntimeLimit) -> Self {
-        self.limit.add(limit);
-        self
-    }
-
-    ///
-    /// Builds the simulation with the given application.
-    ///
-    pub fn build(self) -> Sim<A> {
-        let guard = SimStaticsGuard::new();
-        let future_event_set = FutureEventSet::new_with(&self);
-
-        SimTime::set_now(self.start_time);
-        set_rng(self.rng);
-
-        Sim {
-            error: Vec::new(),
-            globals: self.globals,
-            inner: self.app,
-            statistics: Statistics::default(),
-            state: State::Ready,
-            limit: self.limit,
-            event_id: 0,
-            itr: 0,
-            quiet: self.quiet,
-            profiler: Profiler::default(),
-            future_event_set,
-            guard,
-        }
+        self.param.event_id += 1;
     }
 }
 
@@ -731,245 +501,6 @@ impl<A> Drop for Sim<A> {
         unsafe {
             MOD_CTX.reset(None);
         }
-    }
-}
-
-impl<A> SimBuilder<A> {
-    /// Retrieves a node.
-    pub fn get(&self, path: impl AsRef<str>) -> Option<ModuleRef> {
-        self.globals.get(path)
-    }
-
-    /// Sets the default processing stack for the simulation.
-    ///
-    /// Note that this will only affect calls of `node` after
-    /// this function was called.
-    pub fn set_stack<T: Into<ProcessingStack>>(&mut self, stack: impl Fn() -> T + 'static) {
-        let boxed: Arc<dyn Fn() -> ProcessingStack + 'static> = Arc::new(move || stack().into());
-        self.cfg.stack = boxed;
-    }
-
-    /// Sets the default processing stack for the simulation.
-    ///
-    /// Note that this will only affect calls of `node` after
-    /// this function was called.
-    pub fn with_stack<T: Into<ProcessingStack>>(mut self, stack: impl Fn() -> T + 'static) -> Self {
-        self.set_stack(stack);
-        self
-    }
-
-    /// Sets the default unwind behavior for the simulation.
-    ///
-    /// Note that this will only affect calls of `node` after
-    /// this function was called.
-    pub fn with_default_unwind_behavior(mut self, behavior: UnwindBehaviour) -> Self {
-        self.set_default_unwind_behavior(behavior);
-        self
-    }
-
-    /// Sets the default processing stack for the simulation.
-    ///
-    /// Note that this will only affect calls of `node` after
-    /// this function was called.
-    pub fn set_default_unwind_behavior(&mut self, behavior: UnwindBehaviour) {
-        self.cfg.default_unwind_behavior = behavior;
-    }
-
-    /// Includes raw parameter defintions in the simulation.
-    ///
-    /// If a parsing error is encountered, it will be silently
-    /// ignored. Only successful parses will be applied to the
-    /// module parameters.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use des::prelude::*;
-    /// # use des::net::handlers::ModuleFn;
-    /// use std::net::IpAddr;
-    ///
-    /// let mut sim = Sim::new(());
-    /// sim.include_cfg("alice.addr: 198.2.1.45\nalice.role: host");
-    /// sim.node("alice", ModuleFn::new(
-    ///     || {
-    ///         let addr = current().prop::<Option<Ipv4Addr>>("addr").unwrap().get().unwrap();
-    ///         let role = current().prop::<String>("role").unwrap().get();
-    ///     },
-    ///     |_, _| {}
-    /// ));
-    /// /*
-    ///     Note that the order of the previous operations does not matter,
-    ///     since the setup code will only be executed when the simulation
-    ///     is startin, so on `Runtime::run`.
-    /// */
-    ///
-    /// let _ = Builder::new().build(sim.freeze()).run();
-    /// ```
-    pub fn include_cfg(&mut self, raw: &str) {
-        if let Ok(value) = from_str::<Value>(raw) {
-            let cfg = Cfg::new(value);
-
-            // update config of already existing modules
-            self.globals.with(|mods| {
-                for module in mods.nodes() {
-                    cfg.capture_for(
-                        &module.path.as_str().split('.').collect::<Vec<_>>(),
-                        &mut module.props.write(),
-                    );
-                }
-            });
-
-            self.globals.add_cfg(cfg);
-        }
-    }
-
-    /// See [`SimBuilder::include_cfg`]
-    pub fn with_cfg(mut self, raw: &str) -> Self {
-        self.include_cfg(raw);
-        self
-    }
-
-    /// Tries to read and include parameters from a file into the simulation.
-    ///
-    /// See [`SimBuilder::include_cfg`] for more infomation.
-    ///
-    /// # Errors
-    ///
-    /// This function may fail if the reading from a file fails.
-    pub fn include_cfg_file(&mut self, path: impl AsRef<Path>) -> io::Result<()> {
-        self.include_cfg(&fs::read_to_string(path)?);
-        Ok(())
-    }
-
-    /// Creates a gate on a allready created module.
-    ///
-    /// The module will be defined `path` and the gate will be named `gate`.
-    /// Should such a gate allready exist, the allready existing gate will be
-    /// returned.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use des::prelude::*;
-    /// # struct SomeModule;
-    /// # impl Module for SomeModule {}
-    /// let mut sim = Sim::new(());
-    /// sim.node("alice", SomeModule);
-    /// sim.node("bob", SomeModule);
-    ///
-    /// let a = sim.gate("alice", "in");
-    /// let b = sim.gate("bob", "out");
-    ///
-    /// b.connect(a);
-    ///
-    /// let _ = Builder::new().build(sim.freeze()).run();
-    /// ```
-    ///
-    /// # Panics
-    ///
-    /// This function panic if node modules exists at `path`.
-    #[track_caller]
-    pub fn gate(&mut self, path: impl Into<ObjectPath>, gate: &str) -> GateRef {
-        let path = path.into();
-        let Some(module) = self.get(path.as_ref()) else {
-            panic!("cannot create gate '{path}.{gate}', because node '{path}' does not exist")
-        };
-        if let Some(gate) = module.gate((gate, 0)) {
-            gate
-        } else {
-            module.create_gate(gate)
-        }
-    }
-
-    /// Creates a clust of gate gate on a allready created module.
-    ///
-    /// The module will be defined `path` and the gate cluster will be named `gate`.
-    /// Should such a gate cluster allready exist, the allready existing gate will be
-    /// returned.
-    ///
-    /// # Panics
-    ///
-    /// This function panics if either, not module exists at `path`, or
-    /// some parts of the gate cluster allready exist, but others do not.
-    pub fn gates(&mut self, path: impl Into<ObjectPath>, gate: &str, size: usize) -> Vec<GateRef> {
-        let path = path.into();
-        let Some(module) = self.get(path.as_ref()) else {
-            panic!("cannot create gate '{path}.{gate}', because node '{path}' does not exist")
-        };
-        let mut gates = Vec::new();
-        for k in 0..size {
-            if let Some(gate) = module.gate((gate, k)) {
-                gates.push(gate);
-            } else {
-                break;
-            }
-        }
-        if gates.len() == size {
-            gates
-        } else {
-            assert!(
-                gates.is_empty(),
-                "cannot create gate cluster from partial gate cluster"
-            );
-            module.create_gate_cluster(gate, size)
-        }
-    }
-
-    /// Creates a new module block within the simulation.
-    ///
-    /// A "node" is a block of modules at a given `path`. This may include:
-    /// - no modules at all
-    /// - just one module exactly at the given `path`
-    /// - multiple modules, one at `path`, the others as direct or indirect children of this root module.
-    ///
-    /// The provided parameter `module_block` must be some type that implements the trait `ModuleBlock`.
-    /// This trait can be used to create all components of the required block, within the local scope
-    /// defined by `path`. Modules themself also implement `ModuleBlock` so modules themselfs can be
-    /// build into a block of size 1.
-    ///
-    /// Custom implementations of `ModuleBlock` can not only create modules based
-    /// on config data, but also gates and connections between these modules. Note
-    /// that `ModuleBlock::build` is confined to the scope defined by `path`, since
-    /// it uses a [`Spawner`] builder.
-    ///
-    /// See [`Spawner`] for more information.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use des::prelude::*;
-    /// struct MyModule {
-    ///     state: i32,
-    /// }
-    /// impl Module for MyModule {
-    ///     fn handle_message(&mut self, msg: Message) {
-    ///         /* Do something */
-    ///     }
-    /// }
-    ///
-    /// let mut sim = Sim::new(());
-    /// sim.node("alice", MyModule { state: 42 });
-    ///
-    /// let _ = Builder::new().build(sim.freeze()).run();
-    /// ```
-    pub fn node<M: IntoModuleTree>(
-        &mut self,
-        path: impl Into<ObjectPath>,
-        module_block: M,
-    ) -> M::Ret {
-        let scoped = Spawner::new_at_buildtime(path.into(), self);
-        module_block.build(scoped)
-    }
-
-    /// Returns the contained `Sim`, ending the building phase.
-    pub fn freeze(self) -> Sim<A> {
-        self.build()
-    }
-}
-
-impl<A> Debug for SimBuilder<A> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SimBuilder").finish()
     }
 }
 
@@ -1106,7 +637,7 @@ impl<A: SimLifecycle> Sim<A> {
 
 impl<A: SimLifecycle> Sim<A> {
     ///
-    /// Adds a message event into a [`Runtime<NetworkApplication<A>>`] onto a gate.
+    /// Adds a message event into a [`Sim<A>`] onto a gate.
     ///
     pub fn add_message_onto(&mut self, gate: GateRef, message: impl Into<Message>, time: SimTime) {
         let event = MessageExitingConnection {
@@ -1118,7 +649,7 @@ impl<A: SimLifecycle> Sim<A> {
     }
 
     ///
-    /// Adds a message event into a [`Runtime<NetworkApplication<A>>`] onto a module.
+    /// Adds a message event into a [`Sim<A>`] onto a module.
     ///
     pub fn handle_message_on(
         &mut self,
@@ -1165,161 +696,4 @@ fn panic_hook(info: &PanicHookInfo) {
     }
 
     eprintln!("Box<dyn Any>");
-}
-
-///
-/// The global parameters about a [`Sim`] that are publicly
-/// exposed.
-///
-#[derive(Debug, Default)]
-pub struct Globals {
-    pub(crate) roots: Arc<Mutex<ModuleRoots>>,
-    pub(crate) cfgs: Arc<Mutex<Vec<Cfg>>>,
-    pub(crate) dir: Arc<Mutex<PathBuf>>,
-    pub(crate) statistics: Mutex<Statistics>,
-}
-
-impl Globals {
-    pub(crate) fn with<R>(&self, f: impl FnOnce(&ModuleRoots) -> R) -> R {
-        f(&self.roots.lock().expect("failed"))
-    }
-
-    /// Returns a handle to a module from the global scope.
-    /// This can be used to access arbitrary modules, independent of the current execution context.
-    #[must_use]
-    pub fn get(&self, path: impl AsRef<str>) -> Option<ModuleRef> {
-        self.with(|mods| mods.get(path.as_ref()))
-    }
-
-    /// Returns the directory path of the
-    /// out directory for this simulation.
-    #[must_use]
-    #[allow(clippy::missing_panics_doc)]
-    pub fn dir(&self) -> PathBuf {
-        self.dir.lock().expect("failed").clone()
-    }
-
-    pub(crate) fn add_module(&self, module: ModuleRef) {
-        self.roots.lock().expect("failed").add(module);
-    }
-
-    pub(crate) fn add_cfg(&self, cfg: Cfg) {
-        self.cfgs.lock().expect("failed").push(cfg);
-    }
-
-    pub(crate) fn capture_for(&self, path_parts: &[&str], props: &mut Props) {
-        let lock = self.cfgs.lock().expect("failed");
-        for cfg in &*lock {
-            cfg.capture_for(path_parts, props);
-        }
-    }
-}
-
-#[derive(Debug, Default)]
-pub(crate) struct ModuleRoots {
-    modules: Vec<ModuleRef>,
-}
-
-/// The all nodes iterator.
-struct AllNodesIter<'a> {
-    stack: Vec<(ModuleRef, Vec<String>)>,
-    remaining: &'a [ModuleRef],
-}
-
-impl Iterator for AllNodesIter<'_> {
-    type Item = ModuleRef;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.next_along_stack().or_else(|| {
-            assert!(self.stack.is_empty());
-            let next_root = self.remaining.first()?.clone();
-            self.remaining = &self.remaining[1..];
-            self.stack.push((
-                next_root.clone(),
-                next_root.children.read().keys().cloned().collect(),
-            ));
-            Some(next_root)
-        })
-    }
-}
-
-impl AllNodesIter<'_> {
-    fn next_along_stack(&mut self) -> Option<ModuleRef> {
-        let (node, keys) = self.stack.last_mut()?;
-        let Some(key) = keys.pop() else {
-            self.stack.pop();
-            return self.next_along_stack();
-        };
-
-        let child = node.children.read()[&key].clone();
-        self.stack.push((
-            child.clone(),
-            child.children.read().keys().cloned().collect(),
-        ));
-        Some(child)
-    }
-}
-
-impl ModuleRoots {
-    pub(crate) fn nodes(&self) -> impl Iterator<Item = ModuleRef> + '_ {
-        AllNodesIter {
-            stack: Vec::new(),
-            remaining: &self.modules,
-        }
-    }
-
-    pub(crate) fn get(&self, path: &str) -> Option<ModuleRef> {
-        let (first, mut rem) = if self.modules.first()?.path.is_root() {
-            ("", path)
-        } else {
-            path.split_once('.').unwrap_or((path, ""))
-        };
-        let mut current = self.modules.iter().find(|m| m.path == first)?.clone();
-
-        while !rem.is_empty() {
-            let (next, rest) = rem.split_once('.').unwrap_or((rem, ""));
-            rem = rest;
-            current = current.child(next).ok()?;
-        }
-
-        Some(current)
-    }
-
-    pub(crate) fn add(&mut self, module: ModuleRef) {
-        assert!(
-            module.parent.is_none(), // && dbg!(module.path.parent()).is_none(),
-            "cannot register non-root module as root"
-        );
-        match self
-            .modules
-            .binary_search_by_key(&&module.path, |m| &m.path)
-        {
-            Ok(i) | Err(i) => self.modules.insert(i, module),
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::sync::Weak;
-
-    use super::*;
-    use crate::module::ModuleContext;
-
-    #[test]
-    fn module_tree() {
-        let mut tree = ModuleRoots::default();
-        fn module(path: &str) -> ModuleRef {
-            ModuleContext::new_root(path.into(), Weak::new())
-        }
-
-        tree.add(module("alice"));
-        tree.add(module("bob"));
-        tree.add(module("eve"));
-
-        assert_eq!(
-            tree.nodes().map(|v| v.path.to_string()).collect::<Vec<_>>(),
-            ["alice", "bob", "eve",]
-        );
-    }
 }

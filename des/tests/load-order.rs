@@ -1,5 +1,5 @@
-use des::handlers::ModuleFn;
 use des::prelude::*;
+use des::runtime::handlers::ModuleFn;
 use std::sync::{Arc, atomic::AtomicU16};
 
 #[test]

@@ -1,6 +1,6 @@
 //! Custom module blocks that simplify the `Module` API.
 
-use crate::{IntoModuleTree, message::Message, module::Module, prelude::current};
+use crate::{message::Message, module::Module, prelude::current, runtime::IntoModuleTree};
 use std::{error::Error, time::Duration};
 
 /// A constructor that allows the creation of the module within the node-context of the
@@ -49,13 +49,13 @@ pub enum FailabilityPolicy {
 ///
 /// ```
 /// # use des::prelude::*;
-/// # use des::net::handlers::HandlerFn;
+/// # use des::runtime::handlers::HandlerFn;
 /// let mut sim = Sim::new(());
 /// sim.node("alice", HandlerFn::new(|msg| {
 ///     /* Do something stateless (e.g. random routing) */
 /// }));
 ///
-/// let _ = Builder::new().build(sim.freeze()).run();
+/// let _ = sim.build().run();
 /// ```
 #[derive(Debug)]
 pub struct HandlerFn<Handler> {
@@ -124,7 +124,7 @@ where
 ///
 /// ```
 /// # use des::prelude::*;
-/// # use des::net::handlers::ModuleFn;
+/// # use des::runtime::handlers::ModuleFn;
 /// struct State {
 ///     /* ...data */
 /// }
@@ -140,7 +140,7 @@ where
 ///     }
 /// ));
 ///
-/// let _ = Builder::new().build(sim.freeze()).run();
+/// let _ = sim.build().run();
 /// ```
 #[derive(Debug)]
 pub struct ModuleFn<Gen, State, Handler> {
@@ -249,7 +249,7 @@ cfg_async! {
     ///
     /// ```
     /// # use des::prelude::*;
-    /// # use des::net::handlers::AsyncHandler;
+    /// # use des::runtime::handlers::AsyncHandler;
     /// let mut sim = Sim::new(());
     /// sim.node("alice", AsyncHandler::new(|mut rx| {
     ///     /* Do some setup / sim_start_stuff here */
@@ -261,7 +261,7 @@ cfg_async! {
     /// }));
     /// /* ... */
     ///
-    /// let _ = Builder::new().build(sim.freeze()).run();
+    /// let _ = sim.build().run();
     /// ```
     pub struct AsyncHandler
     {

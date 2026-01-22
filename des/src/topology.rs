@@ -1,8 +1,8 @@
 //! Graph-based tooling for exploring simulation topology.
 use crate::{
-    Globals,
     gate::GateKind,
     prelude::{GateRef, ModuleRef},
+    runtime::Globals,
 };
 use petgraph::{
     Graph, Undirected,

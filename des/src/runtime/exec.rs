@@ -6,7 +6,7 @@ use crate::{
     Error, Failure, Sim,
     gate::Connection,
     prelude::{GateRef, Message, SendError, current},
-    runtime::{HandleMessageEvent, MessageExitingConnection, NetEvents, cfg::SimLifecycle},
+    runtime::{HandleMessageEvent, MessageExitingConnection, NetEvents, SimLifecycle},
     time::SimTime,
 };
 

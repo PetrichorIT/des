@@ -1,9 +1,10 @@
 use super::{DummyModule, ModuleRef, ModuleRefWeak, Prop, PropType, Props, RawProp};
 use crate::{
-    Error, ErrorKind, Globals, ObjectPath,
+    Error, ErrorKind, ObjectPath,
     gate::{GateRef, IntoModuleGate},
     module::SignalCode,
     processing::ProcessingStack,
+    runtime::Globals,
     runtime::{EventExecutionContext, ModuleShutdownEvent, NetEvents, SimConfiguration, Spawner},
     schedule_event,
     sync::SwapLock,
@@ -298,9 +299,9 @@ impl ModuleContext {
     /// }
     ///
     /// fn main() {
-    ///     let app = /* ... */
+    ///     let sim = /* ... */
     /// #    Sim::new(());
-    ///     let rt = Builder::new().build(app.freeze()).run();
+    ///     let rt = sim.build().run();
     ///     // outputs 'Start at 0s with volatile := 0 and persistent := 0'
     ///     // outputs 'Start at 10s with volatile := 0 and persistent := 1024'
     /// }

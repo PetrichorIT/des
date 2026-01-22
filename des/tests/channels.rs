@@ -1,9 +1,9 @@
 use des::{
     Error, Failure,
     channel::DelayChannel,
-    handlers::{AsyncHandler, HandlerFn},
-    internals::{MessageExitingConnection, NetEvents},
     prelude::*,
+    runtime::handlers::{AsyncHandler, HandlerFn},
+    runtime::{MessageExitingConnection, NetEvents},
     time::sleep_until,
 };
 use serial_test::serial;

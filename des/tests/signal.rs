@@ -1,10 +1,10 @@
 use des::{
     Error, Failure, globals,
-    handlers::ModuleFn,
     message::Body,
     module::{SIGNAL_MODULE_PANICED, Signal, UnwindBehaviour, emit},
     prelude::*,
     processing::ProcessingStack,
+    runtime::handlers::ModuleFn,
 };
 use serial_test::serial;
 

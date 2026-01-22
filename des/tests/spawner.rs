@@ -1,8 +1,8 @@
 use des::{
     Error, Failure, globals,
-    handlers::{ModuleFn, WithContext},
     prelude::*,
     processing::ProcessingStack,
+    runtime::handlers::{ModuleFn, WithContext},
 };
 use serial_test::serial;
 

@@ -2,9 +2,9 @@ use std::time::Duration;
 
 use des::{
     Error, ErrorKind, Failure, Sim, globals,
-    handlers::{AsyncHandler, ModuleFn},
     module::{Module, UnwindBehaviour},
     prelude::{Message, current, schedule_at},
+    runtime::handlers::{AsyncHandler, ModuleFn},
     time::sleep,
 };
 use serial_test::serial;

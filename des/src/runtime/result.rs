@@ -1,4 +1,4 @@
-use crate::{Failure, Sim, SimLifecycle, time::SimTime};
+use crate::{Failure, Sim, runtime::SimLifecycle, time::SimTime};
 
 /// The result of a simulation run.
 #[derive(Debug)]

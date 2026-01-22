@@ -1,7 +1,8 @@
 #![cfg(feature = "async")]
 
 use des::{
-    Error, ErrorKind, Failure, globals, handlers::ModuleFn, module::Module, prelude::*, time::sleep,
+    Error, ErrorKind, Failure, globals, module::Module, prelude::*, runtime::handlers::ModuleFn,
+    time::sleep,
 };
 use serial_test::serial;
 use std::sync::{

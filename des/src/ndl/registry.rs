@@ -18,7 +18,7 @@ pub trait RegistryCreatable {
     ///
     /// ```
     /// # use des::prelude::*;
-    /// # use des::net::ndl::*;
+    /// # use des::ndl::*;
     /// # use des::registry;
     /// # fn extract_dns_from_oid(path: &ObjectPath) {}
     /// struct Server { /* ... */ }
@@ -106,7 +106,7 @@ impl Registry<EmptyLayer> {
     ///
     /// ```
     /// # use des::prelude::*;
-    /// # use des::net::ndl::*;
+    /// # use des::ndl::*;
     /// # #[derive(Default)]
     /// # struct HostModule;
     /// # impl Module for HostModule {}
@@ -125,7 +125,7 @@ impl Registry<EmptyLayer> {
     ///
     /// ```
     /// # use des::prelude::*;
-    /// # use des::net::ndl::*;
+    /// # use des::ndl::*;
     /// # use des::registry;
     /// # #[derive(Default)]
     /// # struct HostModule;
@@ -155,7 +155,7 @@ impl<L: Layer> Registry<L> {
     /// # Examples
     ///
     /// ```
-    /// # use des::net::ndl::*;
+    /// # use des::ndl::*;
     /// # use des::prelude::*;
     /// # #[derive(Default)]
     /// struct Host { /* ... */ }
@@ -215,7 +215,7 @@ impl<L: Layer> Registry<L> {
     ///
     /// ```
     /// # use des::prelude::*;
-    /// # use des::net::ndl::*;
+    /// # use des::ndl::*;
     /// # struct GoogleGeneralHost;
     /// # impl GoogleGeneralHost { fn new(_: &ObjectPath) -> Self { Self }}
     /// # impl Module for GoogleGeneralHost {}
@@ -280,7 +280,7 @@ impl<L: Layer> Registry<L> {
     /// # Examples
     ///
     /// ```
-    /// # use des::net::ndl::*;
+    /// # use des::ndl::*;
     /// # use des::prelude::*;
     /// # #[derive(Default)]
     /// # struct HostModule;

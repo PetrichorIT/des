@@ -1,8 +1,8 @@
 use des::{
     Error, Failure, globals,
-    handlers::{AsyncHandler, ModuleFn},
     prelude::*,
     report,
+    runtime::handlers::{AsyncHandler, ModuleFn},
 };
 use serial_test::serial;
 

@@ -6,7 +6,7 @@ use crate::{
     module::{
         ModuleContext, ModuleRef, SIGNAL_MODULE_PANICED, SIGNAL_SIM_START_DONE, Signal, State, emit,
     },
-    runtime::{EventExecutionContext, cfg::SimLifecycle, future_event_set::EventSink},
+    runtime::{EventExecutionContext, SimLifecycle, future_event_set::EventSink},
     schedule_event,
     time::SimTime,
 };

@@ -24,8 +24,8 @@
 //! will still respecting the global plugin stack. See [`processing` module](crate::processing) for
 //! more information on plugins and other advanced processing features.
 //!
-//! > Note that APIs like [`SimBuilder::node`](crate::runtime::SimBuilder::node) require a object of [trait `IntoModuleTree`](crate::IntoModuleTree). However
-//! > all implementors of [`Module`] also implement [`IntoModuleTree`](crate::IntoModuleTree).
+//! > Note that APIs like [`SimBuilder::node`](crate::runtime::SimBuilder::node) require a object of [trait `IntoModuleTree`](crate::runtime::IntoModuleTree). However
+//! > all implementors of [`Module`] also implement [`IntoModuleTree`](crate::runtime::IntoModuleTree).
 //!
 //! # Common features via the `ModuleContext`
 //!
@@ -151,7 +151,7 @@ pub trait Module: Any {
     /// # Example
     ///
     /// ```
-    /// use des::{prelude::*, net::module::{Signal, SIGNAL_MODULE_PANICED}};
+    /// use des::{prelude::*, module::{Signal, SIGNAL_MODULE_PANICED}};
     ///
     /// struct MyModule {
     ///     /* ... */
