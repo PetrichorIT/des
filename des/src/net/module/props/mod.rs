@@ -105,7 +105,11 @@ impl RawProp {
     ///
     /// This method works independently of the property's type or state.
     pub fn clear(&mut self) {
-        self.access_mut(|entry| *entry = Entry::None);
+        self.access_mut(|entry| {
+            *entry = Entry::None {
+                is_statistic: false,
+            }
+        });
     }
 
     /// Converts the property into a YAML `Value`.
@@ -115,7 +119,7 @@ impl RawProp {
     #[must_use]
     pub fn as_value(&self) -> Option<Value> {
         self.access(|entry| match entry {
-            Entry::None => None,
+            Entry::None { .. } => None,
             Entry::Yaml(value) => Some(value.clone()),
             Entry::Some { value, .. } => Some(value.as_value()),
         })
@@ -124,7 +128,7 @@ impl RawProp {
     /// Marks this prop as a statistic, that should be included in the statistics report.
     pub fn make_statistic(&mut self) {
         self.access_mut(|entry| {
-            if let Entry::Some { is_statistic, .. } = entry {
+            if let Entry::Some { is_statistic, .. } | Entry::None { is_statistic } = entry {
                 *is_statistic = true;
             }
         });
@@ -134,7 +138,7 @@ impl RawProp {
     #[must_use]
     pub fn is_statistic(&self) -> bool {
         self.access(|entry| match entry {
-            Entry::Some { is_statistic, .. } => *is_statistic,
+            Entry::None { is_statistic } | Entry::Some { is_statistic, .. } => *is_statistic,
             _ => false,
         })
     }
@@ -146,7 +150,7 @@ impl RawProp {
     #[must_use]
     pub fn is<T: PropType>(&self) -> bool {
         self.access(|entry| match entry {
-            Entry::None | Entry::Yaml(_) => true,
+            Entry::None { .. } | Entry::Yaml(_) => true,
             Entry::Some { value, .. } => as_any(&**value).is::<T>(),
         })
     }
@@ -434,7 +438,7 @@ impl<T: PropType, const PRESENT: bool> Prop<T, PRESENT> {
     }
 
     /// Marks this prop as a statistic, that should be included in the statistics report.
-    pub fn make_statistic(&mut self) -> &mut Self {
+    pub fn make_statistic(mut self) -> Self {
         self.raw.make_statistic();
         self
     }

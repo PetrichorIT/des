@@ -81,8 +81,8 @@ fn statistics_report_generated() -> Result<(), Failure> {
             current()
                 .prop::<f64>("scalar")
                 .unwrap()
-                .set(42.0)
-                .make_statistic();
+                .make_statistic()
+                .set(42.0);
         }),
     );
 
