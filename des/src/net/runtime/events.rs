@@ -583,6 +583,8 @@ impl ModuleRef {
             }
         }
 
+        self.export_statistics_report()?;
+
         result.map_err(Failure::from)
     }
 }

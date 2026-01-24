@@ -2,12 +2,13 @@
 
 use std::f64;
 
-use crate::{net::statistics::Statistic, prelude::current};
+use serde::Serialize;
+
+use crate::net::module::PropType;
 
 /// Standard deviation
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct StdDev {
-    name: String,
     min: f64,
     max: f64,
     sum: f64,
@@ -18,7 +19,6 @@ pub struct StdDev {
 impl Default for StdDev {
     fn default() -> Self {
         StdDev {
-            name: String::new(),
             min: f64::INFINITY,
             max: f64::NEG_INFINITY,
             sum: 0.0,
@@ -30,25 +30,8 @@ impl Default for StdDev {
 
 #[allow(missing_docs)]
 impl StdDev {
-    /// Create a new standard deviation statistic with the given name.
-    #[must_use]
-    pub fn new(name: &str) -> Self {
-        StdDev {
-            name: name.to_string(),
-            ..Default::default()
-        }
-    }
-
     /// Record a new value for this standard deviation statistic.
     pub fn record(&mut self, value: f64) {
-        let current = current();
-        let globals = current.globals();
-        let mut stats = globals.statistics.lock().expect("failed lock");
-        let collector = stats.get_collector::<StdDev>(current.path.clone(), self.name.clone());
-        collector.record_inner(value);
-    }
-
-    fn record_inner(&mut self, value: f64) {
         self.min = self.min.min(value);
         self.max = self.max.max(value);
         self.sum += value;
@@ -56,18 +39,24 @@ impl StdDev {
         self.count += 1;
     }
 
+    #[must_use]
     pub fn min(&self) -> f64 {
-        (self.count > 0).then_some(self.min).unwrap_or(f64::NAN)
+        if self.count > 0 { self.min } else { f64::NAN }
     }
 
+    #[must_use]
     pub fn max(&self) -> f64 {
-        (self.count > 0).then_some(self.max).unwrap_or(f64::NAN)
+        if self.count > 0 { self.max } else { f64::NAN }
     }
 
+    #[must_use]
+    #[allow(clippy::cast_precision_loss)]
     pub fn mean(&self) -> f64 {
         self.sum / self.count as f64
     }
 
+    #[must_use]
+    #[allow(clippy::cast_precision_loss, clippy::float_cmp)]
     pub fn variance(&self) -> f64 {
         if self.count == 0 {
             f64::NAN
@@ -80,11 +69,25 @@ impl StdDev {
         }
     }
 
+    #[must_use]
     pub fn std_dev(&self) -> f64 {
         self.variance().sqrt()
     }
 }
 
-impl Statistic for StdDev {
-    type Result = Self;
+impl PropType for StdDev {
+    fn is_statistic(&self) -> bool {
+        true
+    }
+
+    fn as_value(&self) -> serde_norway::Value {
+        serde_norway::to_value(self).expect("failed encoding")
+    }
+
+    fn from_value(_: serde_norway::Value) -> Result<Self, crate::net::Error>
+    where
+        Self: Sized,
+    {
+        todo!()
+    }
 }

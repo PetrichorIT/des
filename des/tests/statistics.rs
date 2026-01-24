@@ -1,17 +1,25 @@
+use std::fs::File;
+
 use des::{
-    net::{Failure, Sim, statistics::time_series::TimeSeries},
-    prelude::{Message, Module},
+    net::{
+        Failure, Sim,
+        handlers::{AsyncHandler, WithContext},
+        module::Prop,
+        statistics::time_series::TimeSeries,
+    },
+    prelude::{Message, Module, current},
     runtime::Builder,
 };
+use serde_norway::Value;
 use serial_test::serial;
 
 struct StatisticsAsField {
-    series: TimeSeries,
+    series: Prop<TimeSeries<f64>, true>,
 }
 
 impl Module for StatisticsAsField {
     fn handle_message(&mut self, msg: des::prelude::Message) {
-        self.series.record(msg.id as f64);
+        self.series.update(|s| s.record(msg.id as f64));
     }
 }
 
@@ -21,9 +29,9 @@ fn statistics_object_from_non_node_ctx() -> Result<(), Failure> {
     let mut sim = Sim::new(());
     sim.node(
         "alice",
-        StatisticsAsField {
-            series: TimeSeries::new("id"),
-        },
+        WithContext(|| StatisticsAsField {
+            series: current().prop("id").unwrap().or_default(),
+        }),
     );
     let gate = sim.gate("alice", "gate");
 
@@ -35,14 +43,14 @@ fn statistics_object_from_non_node_ctx() -> Result<(), Failure> {
     builder.add_message_onto(gate.clone(), Message::default().with_id(1), 5.0.into());
 
     let result = builder.run().assert_no_err();
-    let ((path, key), col) = result
+    let col = result
         .app
-        .statistics
-        .collectors::<TimeSeries>()
-        .next()
+        .get("alice")
+        .unwrap()
+        .prop::<TimeSeries<f64>>("id")
+        .unwrap()
+        .get()
         .unwrap();
-    assert_eq!(path, "alice");
-    assert_eq!(key, "id");
     assert_eq!(
         col.values,
         [
@@ -53,6 +61,48 @@ fn statistics_object_from_non_node_ctx() -> Result<(), Failure> {
             (5.0.into(), 1.0)
         ]
     );
+
+    Ok(())
+}
+
+#[test]
+#[serial]
+fn statistics_report_generated() -> Result<(), Failure> {
+    let mut sim = Sim::new(());
+    sim.node(
+        "alice",
+        AsyncHandler::once(|_| async move {
+            current()
+                .prop::<TimeSeries<f64>>("series")
+                .unwrap()
+                .or_default()
+                .update(|r| r.record(2.0));
+
+            current()
+                .prop::<f64>("scalar")
+                .unwrap()
+                .set(42.0)
+                .make_statistic();
+        }),
+    );
+
+    sim.set_output_dir("tests/output".into());
+
+    let _ = Builder::seeded(123)
+        .build(sim.freeze())
+        .run()
+        .assert_no_err();
+
+    let stats =
+        serde_norway::from_reader::<_, Value>(File::open("tests/output/alice.statistics.yml")?)
+            .unwrap();
+    let stats = stats.as_mapping().unwrap();
+
+    assert_eq!(
+        stats["series"].as_mapping().unwrap().iter().next(),
+        Some((&0.0.into(), &2.0.into()))
+    );
+    assert_eq!(stats["scalar"].as_f64().unwrap(), 42.0);
 
     Ok(())
 }

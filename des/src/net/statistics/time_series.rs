@@ -1,44 +1,45 @@
 //! Time-series data
-use serde::{Deserialize, Serialize};
 
-use crate::{net::statistics::Statistic, prelude::current, time::SimTime};
+use serde_norway::{Mapping, Number, Value};
+
+use crate::{net::module::PropType, time::SimTime};
 
 /// Time series data collected as 64-bit floating point values.
 ///
 /// This object only records a point when the y value changes.
-#[derive(Debug, Clone)]
-pub struct TimeSeries {
-    key: String,
-}
-
-/// The result of a time series query.
-#[derive(Debug, Default, Serialize, Deserialize)]
-pub struct TimeSeriesResult {
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
+pub struct TimeSeries<T> {
     /// An ordered time series of values.
-    pub values: Vec<(SimTime, f64)>,
+    pub values: Vec<(SimTime, T)>,
 }
 
-impl TimeSeries {
-    /// Creates a new time series with the given key.
-    pub fn new(key: &str) -> Self {
-        Self {
-            key: key.to_string(),
-        }
-    }
-
+impl<T> TimeSeries<T> {
     /// Records a value in the time series.
-    pub fn record(&self, value: f64) {
-        let current = current();
-        let globals = current.globals();
-
-        let mut stats = globals.statistics.lock().expect("failed lock");
-        let collector = stats.get_collector::<TimeSeriesResult>(current.path(), self.key.clone());
-        if collector.values.last().is_none_or(|last| last.1 != value) {
-            collector.values.push((SimTime::now(), value));
-        }
+    pub fn record(&mut self, value: T) {
+        self.values.push((SimTime::now(), value));
     }
 }
 
-impl Statistic for TimeSeries {
-    type Result = TimeSeriesResult;
+impl<T: PropType> PropType for TimeSeries<T> {
+    fn as_value(&self) -> serde_norway::Value {
+        let mut mapping = Mapping::with_capacity(self.values.len());
+        for (time, value) in &self.values {
+            mapping.insert(
+                Value::Number(Number::from(time.as_secs_f64())),
+                value.as_value(),
+            );
+        }
+        Value::Mapping(mapping)
+    }
+
+    fn from_value(_: serde_norway::Value) -> Result<Self, crate::net::Error>
+    where
+        Self: Sized,
+    {
+        todo!()
+    }
+
+    fn is_statistic(&self) -> bool {
+        true
+    }
 }

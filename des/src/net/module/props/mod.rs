@@ -1,12 +1,24 @@
 //! Module properties
+//!
+//! Use cases:
+//! - Expose information without knowledge of module type
+//! - Read in config values from config files
+//! - Export statistics
+//!
+//! Issues:
+//! - `prop(..).unwrap()` only ever fails if T is not compatible (which is rare)
+//! - `prop(..)` can only be created in module context -> props as fields in M: Module is only possible using `WithContexts`
 
 use crate::{
-    net::{Error, ErrorKind},
+    net::{Error, ErrorKind, Failure, module::ModuleContext},
     sync::Mutex,
 };
 use std::{
     any::{Any, type_name},
+    collections::HashMap,
     fmt::Debug,
+    fs::File,
+    io::{BufWriter, Write},
     marker::PhantomData,
     sync::Arc,
 };
@@ -42,6 +54,13 @@ pub trait PropType: Any + Send {
     fn from_value(value: Value) -> Result<Self, Error>
     where
         Self: Sized;
+
+    /// Indicates whether this value is a statistic by default.
+    ///
+    /// If set to `true`, the value should be serializable so that it can be saved.
+    fn is_statistic(&self) -> bool {
+        false
+    }
 }
 
 impl<T: DeserializeOwned + Serialize + Any + Send> PropType for T {
@@ -79,9 +98,7 @@ impl RawProp {
 
     fn access_mut<R>(&mut self, f: impl FnOnce(&mut Entry) -> R) -> R {
         let mut slot = self.slot.lock();
-        let result = f(&mut slot);
-        slot.record();
-        result
+        f(&mut slot)
     }
 
     /// Clears the property, moving it into the `Absent` state.
@@ -101,6 +118,24 @@ impl RawProp {
             Entry::None => None,
             Entry::Yaml(value) => Some(value.clone()),
             Entry::Some { value, .. } => Some(value.as_value()),
+        })
+    }
+
+    /// Marks this prop as a statistic, that should be included in the statistics report.
+    pub fn make_statistic(&mut self) {
+        self.access_mut(|entry| {
+            if let Entry::Some { is_statistic, .. } = entry {
+                *is_statistic = true;
+            }
+        });
+    }
+
+    /// Indicates whether a prop is treated as a statistic
+    #[must_use]
+    pub fn is_statistic(&self) -> bool {
+        self.access(|entry| match entry {
+            Entry::Some { is_statistic, .. } => *is_statistic,
+            _ => false,
         })
     }
 
@@ -129,7 +164,7 @@ impl RawProp {
             if let Entry::Yaml(value) = &*lock {
                 *lock = Entry::Some {
                     value: Box::new(T::from_value(value.clone())?),
-                    tracers: Vec::new(),
+                    is_statistic: false,
                 };
             }
             drop(lock);
@@ -282,9 +317,10 @@ impl<T: PropType> Prop<T, false> {
     {
         self.raw.access_mut(|v| {
             if v.is_none() {
+                let value = f();
                 *v = Entry::Some {
-                    value: Box::new(f()),
-                    tracers: Vec::new(),
+                    is_statistic: value.is_statistic(),
+                    value: Box::new(value),
                 };
             }
         });
@@ -385,7 +421,7 @@ impl<T: PropType, const PRESENT: bool> Prop<T, PRESENT> {
     ///
     /// Panics if the properties type has changed, since the creation
     /// of the handle.
-    pub fn set(&mut self, value: T) {
+    pub fn set(&mut self, value: T) -> &mut Self {
         self.raw.access_mut(|slot| {
             assert!(
                 slot.as_option()
@@ -394,20 +430,19 @@ impl<T: PropType, const PRESENT: bool> Prop<T, PRESENT> {
             );
             slot.set(Box::new(value));
         });
+        self
     }
 
-    /// Adds a tracer to the property that tracks a subvalue at the given key.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the property is not yet set.
-    pub fn add_tracer(&mut self, key: &str) {
-        self.raw.access_mut(|slot| slot.add_tracer(key))
+    /// Marks this prop as a statistic, that should be included in the statistics report.
+    pub fn make_statistic(&mut self) -> &mut Self {
+        self.raw.make_statistic();
+        self
     }
 
-    /// Returns the current tracers of the property.
-    pub fn tracers(&self) -> Vec<PropTracer> {
-        self.raw.access(|slot| slot.tracers().to_vec())
+    /// Indicates whether this prop is marked as a statistic.
+    #[must_use]
+    pub fn is_statistic(&self) -> bool {
+        self.raw.is_statistic()
     }
 
     /// See [`RawProp::as_value`],
@@ -451,6 +486,36 @@ fn as_any(value: &dyn PropType) -> &dyn Any {
 
 fn as_any_mut(value: &mut dyn PropType) -> &mut dyn Any {
     value
+}
+
+impl ModuleContext {
+    pub(crate) fn export_statistics_report(&self) -> Result<(), Failure> {
+        if let Some(dir) = self.globals().dir() {
+            let mut statistics = HashMap::new();
+            for key in self.props_keys() {
+                let prop = self.prop_raw(&key);
+                if prop.is_statistic()
+                    && let Some(encoded) = prop.as_value()
+                {
+                    statistics.insert(key, encoded);
+                }
+            }
+
+            if !statistics.is_empty() {
+                let mut path = dir;
+                path.push(self.path.as_str());
+                path.set_extension("statistics.yml");
+
+                let mut file = BufWriter::new(File::create(path)?);
+                file.write_all(
+                    serde_norway::to_string(&statistics)
+                        .map_err(Error::other)?
+                        .as_bytes(),
+                )?;
+            }
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]

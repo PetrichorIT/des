@@ -4,7 +4,6 @@ use crate::{
         gate::Connection,
         module::{Cfg, DummyModule, MOD_CTX, Props, UnwindBehaviour, try_current},
         processing::{ProcessingStack, TokioRuntime},
-        statistics::Statistics,
     },
     prelude::{Application, GateRef, Message, Module, ModuleRef, ObjectPath, Runtime},
     time::SimTime,
@@ -83,9 +82,6 @@ pub struct Sim<A> {
     /// A inner field of a network simulation that can be used to attach
     /// custom lifetime handlers to a simulation
     pub inner: A,
-    /// Statistics collected from the simulation.
-    /// This value is only set after the simulation has finished.
-    pub statistics: Statistics,
 
     #[allow(unused)]
     guard: SimStaticsGuard,
@@ -120,7 +116,6 @@ impl<A> Sim<A> {
             guard,
             inner,
             globals,
-            statistics: Statistics::default(),
         }
         .into_builder(ProcessingStack::default)
     }
@@ -147,8 +142,9 @@ impl<A> Sim<A> {
     }
 
     /// Sets the output directory for this simulation.
+    #[allow(clippy::missing_panics_doc)]
     pub fn set_output_dir(&self, dir: PathBuf) {
-        *self.dir.lock().expect("failed") = dir;
+        *self.dir.lock().expect("failed") = Some(dir);
     }
 
     /// Returns a handle to the simulation globals.
@@ -525,6 +521,10 @@ impl<A: SimLifecycle> Application for Sim<A> {
     fn at_sim_end(rt: &mut Runtime<Sim<A>>) -> Result<(), Failure> {
         A::at_sim_end(rt)?;
 
+        if rt.app.dir().is_none() {
+            eprintln!("statistics report cannot be generated, since no output directory is set");
+        }
+
         let mut error = Vec::new();
         mem::swap(&mut error, &mut rt.app.error);
 
@@ -557,9 +557,6 @@ impl<A: SimLifecycle> Application for Sim<A> {
 
             ctx.finish(rt)?;
         }
-
-        let mut stats = rt.app.globals.statistics.lock().expect("failed lock");
-        mem::swap(&mut *stats, &mut rt.app.statistics);
 
         let _ = take_hook();
         if error.is_empty() {
@@ -641,8 +638,7 @@ fn panic_hook(info: &PanicHookInfo) {
 pub struct Globals {
     pub(crate) roots: Arc<Mutex<ModuleRoots>>,
     pub(crate) cfgs: Arc<Mutex<Vec<Cfg>>>,
-    pub(crate) dir: Arc<Mutex<PathBuf>>,
-    pub(crate) statistics: Mutex<Statistics>,
+    pub(crate) dir: Arc<Mutex<Option<PathBuf>>>,
 }
 
 impl Globals {
@@ -660,7 +656,8 @@ impl Globals {
     /// Returns the directory path of the
     /// out directory for this simulation.
     #[must_use]
-    pub fn dir(&self) -> PathBuf {
+    #[allow(clippy::missing_panics_doc)]
+    pub fn dir(&self) -> Option<PathBuf> {
         self.dir.lock().expect("failed").clone()
     }
 

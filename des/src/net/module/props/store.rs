@@ -18,7 +18,7 @@ pub(super) enum Entry {
     Yaml(Value), // Loaded from YAML
     Some {
         value: Box<dyn PropType>,
-        tracers: Vec<PropTracer>,
+        is_statistic: bool,
     }, // actual Value
 }
 
@@ -37,27 +37,10 @@ impl Entry {
             Entry::Some { value, .. } => *value = new,
             _ => {
                 *self = Entry::Some {
+                    is_statistic: new.is_statistic(),
                     value: new,
-                    tracers: Vec::new(),
                 }
             }
-        }
-    }
-
-    pub(super) fn add_tracer(&mut self, key: &str) {
-        let Entry::Some { tracers, .. } = self else {
-            panic!("Cannot add tracer to unset property");
-        };
-        tracers.push(PropTracer {
-            selector: key.to_string(),
-            history: Vec::new(),
-        });
-    }
-
-    pub(super) fn tracers(&self) -> &[PropTracer] {
-        match self {
-            Entry::Some { tracers, .. } => tracers,
-            _ => &[],
         }
     }
 
@@ -87,55 +70,6 @@ impl Entry {
             Entry::None | Entry::Yaml(_) => None,
             Entry::Some { value, .. } => Some(&mut **value),
         }
-    }
-
-    pub(super) fn record(&mut self) {
-        let Entry::Some { value, tracers } = self else {
-            return;
-        };
-
-        let encoded = value.as_value();
-        for tracer in tracers {
-            let Some(selected) = access(&encoded, &tracer.selector) else {
-                continue;
-            };
-            let is_eq = tracer.history.last().is_some_and(|(_, v)| v == &selected);
-            if !is_eq {
-                tracer.history.push((SimTime::now(), selected));
-            }
-        }
-    }
-}
-
-fn access(value: &Value, key: &str) -> Option<Value> {
-    match value {
-        other if key.is_empty() => Some(other.clone()),
-        Value::Mapping(map) => {
-            let mut include = key.len();
-            while include > 0 {
-                // TODO: This shit is still buggy
-                let pos = key[..include].rfind('.').unwrap_or(include);
-                let subkey = &key[..pos];
-                if let Some(val) = map.get(subkey) {
-                    return access(val, &key[(pos + 1).min(key.len())..]);
-                }
-                include = pos - 1;
-            }
-
-            // try full key
-            if let Some(val) = map.get(key) {
-                return access(val, "");
-            }
-
-            None
-        }
-        Value::Sequence(seq) => {
-            let (index, rem) = key.split_once('.').unwrap_or((key, ""));
-            let index = index.parse::<usize>().ok()?;
-            let element = seq.get(index)?;
-            access(element, rem)
-        }
-        _ => None,
     }
 }
 
