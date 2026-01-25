@@ -3,7 +3,7 @@ use std::sync::Arc;
 use fxhash::FxHashMap;
 use serde_norway::Value;
 
-use crate::{net::Error, sync::Mutex, time::SimTime};
+use crate::{net::Error, sync::Mutex};
 
 use super::{Prop, PropType, RawProp};
 
@@ -13,70 +13,70 @@ pub(crate) struct Props {
     mapping: FxHashMap<String, Arc<Mutex<Entry>>>,
 }
 
-pub(super) enum Entry {
-    None {
-        is_statistic: bool,
-    }, // Not set
-    Yaml(Value), // Loaded from YAML
-    Some {
-        value: Box<dyn PropType>,
-        is_statistic: bool,
-    }, // actual Value
-}
-
-/// A property tracer that tracks a subvalue at the given key.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct PropTracer {
-    /// The selector for the subvalue.
-    pub selector: String,
-    /// The history of the subvalue, only recording when a change occurs.
-    pub history: Vec<(SimTime, Value)>,
+pub(super) struct Entry {
+    pub(super) value: Option<Box<dyn PropType>>,
+    pub(super) is_statistic: bool,
 }
 
 impl Entry {
-    pub(super) fn set(&mut self, new: Box<dyn PropType>) {
-        match self {
-            Entry::Some { value, .. } => *value = new,
-            Entry::None { is_statistic } => {
-                *self = Entry::Some {
-                    is_statistic: *is_statistic | new.is_statistic(),
-                    value: new,
-                }
-            }
-            Entry::Yaml(_) => {
-                *self = Entry::Some {
-                    is_statistic: new.is_statistic(),
-                    value: new,
-                }
-            }
+    pub(super) const fn none() -> Self {
+        Entry {
+            value: None,
+            is_statistic: false,
         }
+    }
+
+    pub(super) fn some(value: impl PropType) -> Self {
+        Entry {
+            value: Some(Box::new(value)),
+            is_statistic: false,
+        }
+    }
+
+    pub(super) fn set(&mut self, new: Box<dyn PropType>) {
+        self.is_statistic |= new.is_statistic();
+        self.value = Some(new);
     }
 
     pub(super) fn is_some(&self) -> bool {
-        match self {
-            Entry::None { .. } | Entry::Yaml(_) => false,
-            Entry::Some { .. } => true,
-        }
+        matches!(self.value, Some(_))
     }
 
     pub(super) fn is_none(&self) -> bool {
-        match self {
-            Entry::None { .. } => true,
-            Entry::Yaml(_) | Entry::Some { .. } => false,
+        !self.is_some()
+    }
+
+    pub(super) fn as_value(&self) -> Option<Value> {
+        match &self.value {
+            Some(value) => Some(value.as_value()),
+            _ => None,
+        }
+    }
+
+    pub(super) fn try_transform<T: PropType>(&mut self) {
+        let value = self.value.take();
+        if let Some(value) = value {
+            self.value = match T::transform(value) {
+                Ok(value) => {
+                    let coerced: Box<dyn PropType> = value;
+                    Some(coerced)
+                }
+                Err(unchanged) => Some(unchanged),
+            };
         }
     }
 
     pub(super) fn as_option(&self) -> Option<&dyn PropType> {
-        match self {
-            Entry::None { .. } | Entry::Yaml(_) => None,
-            Entry::Some { value, .. } => Some(&**value),
+        match &self.value {
+            Some(value) => Some(&**value),
+            _ => None,
         }
     }
 
     pub(super) fn as_option_mut(&mut self) -> Option<&mut dyn PropType> {
-        match self {
-            Entry::None { .. } | Entry::Yaml(_) => None,
-            Entry::Some { value, .. } => Some(&mut **value),
+        match &mut self.value {
+            Some(value) => Some(&mut **value),
+            _ => None,
         }
     }
 }
@@ -87,7 +87,7 @@ impl Props {
     pub(crate) fn set(&mut self, key: String, val: Value) {
         self.mapping
             .entry(key)
-            .or_insert(Arc::new(Mutex::new(Entry::Yaml(val))));
+            .or_insert(Arc::new(Mutex::new(Entry::some(val))));
     }
 
     /// The keys of all properties.
@@ -97,11 +97,10 @@ impl Props {
     }
 
     pub(crate) fn get_raw(&mut self, key: &str) -> RawProp {
-        let entry = self.mapping.entry(key.to_string()).or_insert_with(|| {
-            Arc::new(Mutex::new(Entry::None {
-                is_statistic: false,
-            }))
-        });
+        let entry = self
+            .mapping
+            .entry(key.to_string())
+            .or_insert_with(|| Arc::new(Mutex::new(Entry::none())));
 
         RawProp {
             slot: entry.clone(),

@@ -32,13 +32,6 @@ impl<T: PropType> PropType for TimeSeries<T> {
         Value::Mapping(mapping)
     }
 
-    fn from_value(_: serde_norway::Value) -> Result<Self, crate::net::Error>
-    where
-        Self: Sized,
-    {
-        todo!()
-    }
-
     fn is_statistic(&self) -> bool {
         true
     }

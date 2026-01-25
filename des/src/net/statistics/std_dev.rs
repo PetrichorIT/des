@@ -83,11 +83,4 @@ impl PropType for StdDev {
     fn as_value(&self) -> serde_norway::Value {
         serde_norway::to_value(self).expect("failed encoding")
     }
-
-    fn from_value(_: serde_norway::Value) -> Result<Self, crate::net::Error>
-    where
-        Self: Sized,
-    {
-        todo!()
-    }
 }

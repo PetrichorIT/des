@@ -15,7 +15,6 @@ use crate::{
 };
 use std::{
     any::{Any, type_name},
-    collections::HashMap,
     fmt::Debug,
     fs::File,
     io::{BufWriter, Write},
@@ -26,14 +25,13 @@ use std::{
 mod store;
 mod yaml;
 
+use fxhash::FxHashMap;
 use serde::{Serialize, de::DeserializeOwned};
 use serde_norway::Value;
 
 use store::Entry;
 pub(crate) use store::Props;
 pub(crate) use yaml::Cfg;
-
-pub use store::PropTracer;
 
 /// A composite trait that needs to be implemented by all property types.
 ///
@@ -46,14 +44,13 @@ pub trait PropType: Any + Send {
     /// If no serialization is possible, a placeholder value should be returned.
     fn as_value(&self) -> Value;
 
-    /// Deserialize a `Value` into concrete propet tyoe.
-    ///
-    /// # Errors
-    ///
-    /// If no deserialization is possible, an error is returned.
-    fn from_value(value: Value) -> Result<Self, Error>
+    /// Transform a typed prop into another typed prop
+    fn transform(value: Box<dyn PropType>) -> Result<Box<Self>, Box<dyn PropType>>
     where
-        Self: Sized;
+        Self: Sized,
+    {
+        Err(value)
+    }
 
     /// Indicates whether this value is a statistic by default.
     ///
@@ -68,12 +65,19 @@ impl<T: DeserializeOwned + Serialize + Any + Send> PropType for T {
         serde_norway::from_str::<Value>(&serde_norway::to_string(&self).unwrap()).unwrap()
     }
 
-    fn from_value(value: Value) -> Result<Self, Error>
+    fn transform(value: Box<dyn PropType>) -> Result<Box<Self>, Box<dyn PropType>>
     where
         Self: Sized,
     {
-        serde_norway::from_value(value)
-            .map_err(|e| Error::new_current(ErrorKind::PropParsingError(Box::new(e))))
+        if as_any(&*value).is::<Value>() {
+            let any_box: Box<dyn Any> = value;
+            let yaml = any_box.downcast::<Value>().expect("illegal state");
+            let typed: Self = serde_norway::from_value(*yaml.clone())
+                .map_err::<Box<dyn PropType>, _>(|_| yaml)?;
+            return Ok(Box::new(typed));
+        }
+
+        Err(value)
     }
 }
 
@@ -106,9 +110,7 @@ impl RawProp {
     /// This method works independently of the property's type or state.
     pub fn clear(&mut self) {
         self.access_mut(|entry| {
-            *entry = Entry::None {
-                is_statistic: false,
-            }
+            *entry = Entry::none();
         });
     }
 
@@ -118,29 +120,18 @@ impl RawProp {
     /// This method returns the configuration value, if the property is in the `InitalizedFromParam` state.
     #[must_use]
     pub fn as_value(&self) -> Option<Value> {
-        self.access(|entry| match entry {
-            Entry::None { .. } => None,
-            Entry::Yaml(value) => Some(value.clone()),
-            Entry::Some { value, .. } => Some(value.as_value()),
-        })
+        self.access(|entry| entry.as_value())
     }
 
     /// Marks this prop as a statistic, that should be included in the statistics report.
     pub fn make_statistic(&mut self) {
-        self.access_mut(|entry| {
-            if let Entry::Some { is_statistic, .. } | Entry::None { is_statistic } = entry {
-                *is_statistic = true;
-            }
-        });
+        self.access_mut(|entry| entry.is_statistic = true);
     }
 
     /// Indicates whether a prop is treated as a statistic
     #[must_use]
     pub fn is_statistic(&self) -> bool {
-        self.access(|entry| match entry {
-            Entry::None { is_statistic } | Entry::Some { is_statistic, .. } => *is_statistic,
-            _ => false,
-        })
+        self.access(|entry| entry.is_statistic)
     }
 
     /// Checks, whether a property is able to hold a value of the given type `T`.
@@ -149,9 +140,9 @@ impl RawProp {
     /// a value of a different type.
     #[must_use]
     pub fn is<T: PropType>(&self) -> bool {
-        self.access(|entry| match entry {
-            Entry::None { .. } | Entry::Yaml(_) => true,
-            Entry::Some { value, .. } => as_any(&**value).is::<T>(),
+        self.access(|entry| match entry.as_option() {
+            None => true,
+            Some(value) => as_any(&*value).is::<T>(),
         })
     }
 
@@ -163,16 +154,13 @@ impl RawProp {
     /// - The precondition `RawHandle::is::<T>()` is not met.
     /// - The property is in the `InitializedFromParam` state and the deserialization into the type `T` fails.
     pub fn typed<T: PropType>(self) -> Result<Prop<T, false>, Error> {
-        if self.is::<T>() {
+        // Only transform for exclusive access (one in the store itself + one that accesses the type)
+        if Arc::strong_count(&self.slot) <= 2 {
             let mut lock = self.slot.lock();
-            if let Entry::Yaml(value) = &*lock {
-                *lock = Entry::Some {
-                    value: Box::new(T::from_value(value.clone())?),
-                    is_statistic: false,
-                };
-            }
-            drop(lock);
+            lock.try_transform::<T>();
+        }
 
+        if self.is::<T>() {
             Ok(Prop {
                 raw: self,
                 _phantom: PhantomData,
@@ -321,11 +309,7 @@ impl<T: PropType> Prop<T, false> {
     {
         self.raw.access_mut(|v| {
             if v.is_none() {
-                let value = f();
-                *v = Entry::Some {
-                    is_statistic: value.is_statistic(),
-                    value: Box::new(value),
-                };
+                v.set(Box::new(f()));
             }
         });
         Prop {
@@ -495,7 +479,7 @@ fn as_any_mut(value: &mut dyn PropType) -> &mut dyn Any {
 impl ModuleContext {
     pub(crate) fn export_statistics_report(&self) -> Result<(), Failure> {
         if let Some(dir) = self.globals().dir() {
-            let mut statistics = HashMap::new();
+            let mut statistics = FxHashMap::default();
             for key in self.props_keys() {
                 let prop = self.prop_raw(&key);
                 if prop.is_statistic()
