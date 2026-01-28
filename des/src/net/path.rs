@@ -1,6 +1,8 @@
 use core::fmt;
 use std::sync::Arc;
 
+use serde::{Deserialize, Serialize, de::Visitor};
+
 ///
 /// A unqiue identifier for a object, indicating its parental inheritance.
 ///
@@ -180,6 +182,38 @@ impl Default for ObjectPath {
             data: String::new().into(),
             is_gate: false,
         }
+    }
+}
+
+impl Serialize for ObjectPath {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.data)
+    }
+}
+
+impl<'de> Deserialize<'de> for ObjectPath {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct Vis;
+        impl<'de> Visitor<'de> for Vis {
+            type Value = ObjectPath;
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                write!(formatter, "string")
+            }
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(ObjectPath::from(v))
+            }
+        }
+
+        deserializer.deserialize_any(Vis)
     }
 }
 
