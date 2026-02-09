@@ -1,6 +1,6 @@
 use super::{
-    driver::{Driver, TimerSlotEntry, TimerSlotEntryHandle},
     SimTime,
+    driver::{Driver, TimerSlotEntry, TimerSlotEntryHandle},
 };
 use pin_project_lite::pin_project;
 use std::{future::Future, pin::Pin, sync::atomic::AtomicUsize, task::Poll, time::Duration};
@@ -183,6 +183,7 @@ impl Future for Sleep {
         let mut me = self.project();
         if *me.deadline > SimTime::now() {
             if !scheduled {
+                tracing::info!("scheduling timer for deadline {}", *me.deadline);
                 let handle = Driver::with_current(|ctx| {
                     ctx.queue.add(
                         TimerSlotEntry {

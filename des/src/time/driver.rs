@@ -1,6 +1,7 @@
 use super::SimTime;
 use std::cell::RefCell;
 use std::collections::VecDeque;
+use std::fmt::{self, Debug};
 use std::sync::{Arc, Weak};
 use std::task::Waker;
 
@@ -20,11 +21,19 @@ pub(super) struct TimerQueue {
     pending: RefCell<VecDeque<Arc<TimerSlot>>>,
 }
 
-#[derive(Debug)]
 pub(crate) struct TimerSlot {
     time: SimTime,
     entrys: RefCell<Vec<TimerSlotEntry>>,
     queue: Arc<TimerQueue>,
+}
+
+impl fmt::Debug for TimerSlot {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TimerSlot")
+            .field("time", &self.time)
+            .field("entrys", &self.entrys)
+            .finish()
+    }
 }
 
 #[derive(Debug)]
@@ -127,9 +136,10 @@ impl TimerQueue {
     pub(super) fn next(&self) -> Option<SimTime> {
         self.pending
             .borrow()
-            .front()
+            .iter()
             .filter(|slot| !slot.entrys.borrow().is_empty())
             .map(|s| s.time)
+            .next()
     }
 
     pub(crate) fn bump(&self) -> Vec<TimerSlot> {

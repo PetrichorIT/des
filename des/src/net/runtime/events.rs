@@ -148,7 +148,7 @@ impl MessageExitingConnection {
             "Gate '{}' forwarding message [{}] to module #{}",
             cur.endpoint.name(),
             msg,
-            cur.endpoint.owner().id()
+            cur.endpoint.owner().path()
         );
 
         let module = cur.endpoint.owner();
@@ -195,7 +195,7 @@ impl HandleMessageEvent {
         let ctx = EventExecutionContext::default();
 
         module.activate_with(Some(ctx.clone()));
-        rt.app.error.extend(module.handle_message(message).err());
+        rt.app.error.extend(module.handle_message(message).err()); // TODO_ appending to app.error will not treat failures correctly, only reports
         module.deactivate();
 
         ctx.finish(rt)
@@ -327,7 +327,7 @@ pub struct AsyncWakeupEvent {
 impl AsyncWakeupEvent {
     fn handle<A: SimLifecycle>(self, rt: &mut Runtime<Sim<A>>) -> Result<(), Failure> {
         #[cfg(feature = "tracing")]
-        tracing::info!("async wakeup");
+        tracing::info!("async wakeup {:?}", self.module.path());
 
         let module = &self.module;
         let ctx = EventExecutionContext::default();

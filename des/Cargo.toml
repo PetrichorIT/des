@@ -34,7 +34,7 @@ unstable-tokio-enable-time = ["async", "tokio/time"]
 [dependencies]
 # Rand primives must be set since they are bound to the
 # runtime and sould be seedable by the user.
-rand = { version = "*", features = ["std_rng"] }
+rand = { version = "0.9", features = ["std_rng"] }
 
 # Spin must be used in the logger event in single-threaded runnin
 # due to issues like #8
