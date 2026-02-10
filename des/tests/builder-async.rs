@@ -11,9 +11,9 @@ use std::{
 use des::{
     net::{ErrorKind, handlers::AsyncHandler},
     prelude::*,
-    time::sleep,
 };
 use serial_test::serial;
+use tokio::time::sleep;
 
 #[test]
 #[serial]

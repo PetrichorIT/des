@@ -53,6 +53,8 @@ tokio = { version = "*", features = [
     "sync",
     "macros",
     "io-util",
+    "time",
+    "test-util"
 ], optional = true }
 futures = { version = "*", optional = true }
 

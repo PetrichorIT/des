@@ -3,13 +3,13 @@
 use des::{
     net::{Error, ErrorKind, Failure, globals, handlers::ModuleFn, module::Module},
     prelude::*,
-    time::sleep,
 };
 use serial_test::serial;
 use std::sync::{
     Arc,
     atomic::{AtomicUsize, Ordering},
 };
+use tokio::time::sleep;
 
 struct DropTest {
     heap: Vec<usize>,

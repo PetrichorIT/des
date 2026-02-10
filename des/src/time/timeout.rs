@@ -4,14 +4,12 @@
 //!
 //! [`Timeout`]: struct@Timeout
 
-use crate::time::{error::Elapsed, sleep_until, Sleep};
-use pin_project_lite::pin_project;
 use std::future::Future;
-use std::pin::Pin;
-use std::task::{self, Poll};
 use std::time::Duration;
 
 use super::SimTime;
+
+pub use tokio::time::Timeout;
 
 /// Requires a `Future` to complete before the specified duration has elapsed.
 ///
@@ -62,12 +60,7 @@ pub fn timeout<T>(duration: Duration, future: T) -> Timeout<T>
 where
     T: Future,
 {
-    let deadline = SimTime::now().checked_add(duration);
-    let delay = match deadline {
-        Some(deadline) => Sleep::new(deadline),
-        None => Sleep::far_future(),
-    };
-    Timeout::new_with_delay(future, delay)
+    tokio::time::timeout(duration, future)
 }
 
 /// Requires a `Future` to complete before the specified instant in time.
@@ -108,69 +101,6 @@ pub fn timeout_at<T>(deadline: SimTime, future: T) -> Timeout<T>
 where
     T: Future,
 {
-    let delay = sleep_until(deadline);
-
-    Timeout {
-        value: future,
-        delay,
-    }
-}
-
-pin_project! {
-    /// Future returned by [`timeout`](timeout) and [`timeout_at`](timeout_at).
-    #[must_use = "futures do nothing unless you `.await` or poll them"]
-    pub struct Timeout<T> {
-        #[pin]
-        value: T,
-        #[pin]
-        delay: Sleep,
-    }
-}
-
-impl<T> Timeout<T> {
-    pub(crate) fn new_with_delay(value: T, delay: Sleep) -> Timeout<T> {
-        Timeout { value, delay }
-    }
-
-    /// Gets a reference to the underlying value in this timeout.
-    pub fn get_ref(&self) -> &T {
-        &self.value
-    }
-
-    /// Gets a mutable reference to the underlying value in this timeout.
-    pub fn get_mut(&mut self) -> &mut T {
-        &mut self.value
-    }
-
-    /// Consumes this timeout, returning the underlying value.
-    pub fn into_inner(self) -> T {
-        self.value
-    }
-}
-
-impl<T> Future for Timeout<T>
-where
-    T: Future,
-{
-    type Output = Result<T::Output, Elapsed>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
-        let me = self.project();
-
-        // First, try polling the future
-        if let Poll::Ready(v) = me.value.poll(cx) {
-            return Poll::Ready(Ok(v));
-        }
-
-        let delay = me.delay;
-
-        let poll_delay = || -> Poll<Self::Output> {
-            match delay.poll(cx) {
-                Poll::Ready(()) => Poll::Ready(Err(Elapsed::new())),
-                Poll::Pending => Poll::Pending,
-            }
-        };
-
-        poll_delay()
-    }
+    let duration = deadline.saturating_sub(SimTime::now().0);
+    tokio::time::timeout(duration, future)
 }

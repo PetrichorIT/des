@@ -30,17 +30,13 @@ pub use duration::*;
 use serde::de::Visitor;
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize};
+use tokio::time::Instant;
 
 use std::fmt::{Debug, Display};
 use std::ops::{Deref, Div, Sub, SubAssign};
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
 cfg_async! {
-    pub mod error;
-
-    mod driver;
-    pub(crate) use driver::*;
-
     mod sleep;
     pub use sleep::*;
 
@@ -92,6 +88,26 @@ impl SimTime {
     #[must_use]
     pub const fn from_duration(duration: Duration) -> Self {
         Self(duration)
+    }
+
+    /// Converts an instant from the local tokio-time driver into an instance of SimTime.
+    pub fn from_instant(instant: Instant) -> Self {
+        let now = Instant::now();
+        if instant >= now {
+            SimTime::now() + instant.duration_since(now)
+        } else {
+            SimTime::now() - now.duration_since(instant)
+        }
+    }
+
+    /// Converts an instance of SimTime into an instant from the local tokio-time driver.
+    pub fn to_instant(&self) -> Instant {
+        let now = SimTime::now();
+        if *self >= SimTime::now() {
+            Instant::now() + self.duration_since(SimTime::now())
+        } else {
+            Instant::now() - now.duration_since(*self)
+        }
     }
 
     ///

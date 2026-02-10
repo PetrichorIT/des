@@ -63,9 +63,9 @@
 //! once the next event arrives.
 //!
 
-use std::{any::Any, fmt::Debug, ops::Deref};
+use std::{any::Any, fmt::Debug, ops::Deref, time::Duration};
 
-use crate::{net::module::Module, prelude::Message};
+use crate::{net::module::Module, prelude::Message, time::SimTime};
 
 /// A subprogramm between the module application and the network layer.
 ///
@@ -274,10 +274,7 @@ impl Default for ProcessingStack {
     fn default() -> Self {
         #[cfg(feature = "async")]
         return ProcessingStack {
-            items: vec![
-                Box::new(TimeDriver::default()),
-                Box::new(TokioRuntime::default()),
-            ],
+            items: vec![Box::new(TokioRuntime::default())],
         };
 
         #[cfg(not(feature = "async"))]
@@ -340,7 +337,6 @@ cfg_async! {
             schedule_event,
         },
         prelude::{current, random},
-        time::Driver,
     };
 
     /// A processing element that provides a tokio runtime in the entered state.
@@ -349,6 +345,7 @@ cfg_async! {
         pub(super) tasks: Rc<LocalSet>,
         pub(super) rt: LazyCell<Arc<Runtime>>,
         pub(super) handles: Vec<(JoinHandle<()>, bool)>,
+        pub(super) last_poll: SimTime,
     }
 
     #[derive(Debug, Default)]
@@ -369,8 +366,8 @@ cfg_async! {
                 rt: LazyCell::new(|| {
                     #[allow(unused_mut)]
                     let mut builder = Builder::new_current_thread();
-                    #[cfg(feature = "unstable-tokio-enable-time")]
-                    builder.enable_time();
+                    builder.enable_time().start_paused(true);
+                    builder.on_thread_park(|| println!("!!! parking"));
 
                     Arc::new(
                         builder
@@ -380,6 +377,7 @@ cfg_async! {
                     )
                 }),
                 handles: Vec::new(),
+                last_poll: SimTime::ZERO,
             }
         }
     }
@@ -494,11 +492,26 @@ cfg_async! {
             shared.has_observed_panics = false;
             drop(shared);
 
+            let delta = SimTime::now() - self.last_poll;
             let res = self.tasks.block_on(&self.rt, async {
+                tokio::time::advance(delta).await;
                 let res = inner(msg);
                 yield_now().await;
                 res
             });
+            self.last_poll = SimTime::now();
+
+            if let Some(next_wakeup) = self.rt.handle().next_expiration()
+                && next_wakeup > SimTime::now().as_millis() as u64
+                && next_wakeup < 50_000_000  { // EFFECTIVE UPPER LIMIT
+                schedule_event(
+                    NetEvents::AsyncWakeupEvent(AsyncWakeupEvent {
+                        module: current().me(),
+                    }),
+                    SimTime::from_duration(Duration::from_millis(next_wakeup)),
+                );
+            }
+
 
             let mut shared = TOKIO_SHARED.lock().expect("failed to get lock");
             self.handles.append(&mut shared.threads);
@@ -514,74 +527,6 @@ cfg_async! {
                 }
             }
 
-            res
-        }
-    }
-
-    /// Timer Driver
-    #[derive(Debug)]
-    pub struct TimeDriver {
-        driver: Option<Driver>,
-    }
-
-    impl Default for TimeDriver {
-        fn default() -> Self {
-            Self {
-                driver: Some(Driver::new()),
-            }
-        }
-    }
-
-    impl ProcessingElement for TimeDriver {
-        fn process_with(
-            &mut self,
-            msg: Option<Message>,
-            inner: &mut dyn FnMut(Option<Message>) -> Option<Message>,
-        ) -> Option<Message> {
-            use crate::time::{SimTime, TimerSlot};
-
-            let driver = self.driver.take();
-            if let Some(mut driver) = driver {
-                let bumpable = driver.bump();
-                if driver.next_wakeup <= SimTime::now() {
-                    driver.next_wakeup = SimTime::MAX;
-                }
-                bumpable.into_iter().for_each(TimerSlot::wake_all);
-                driver.set();
-            }
-
-            let res = inner(msg);
-
-            let Some(mut driver) = Driver::unset() else {
-                // Somebody stole our driver
-                #[cfg(feature = "tracing")]
-                tracing::error!("IO time driver missing after event execution");
-
-                self.driver = Some(Driver::new());
-                return res;
-            };
-
-            if let Some(next_wakeup) = driver.next()
-                && next_wakeup < driver.next_wakeup
-            {
-                #[cfg(feature = "tracing")]
-                tracing::trace!(
-                    "scheduling new wakeup at {} (prev {})",
-                    next_wakeup,
-                    driver.next_wakeup
-                );
-
-                driver.next_wakeup = next_wakeup;
-
-                schedule_event(
-                    NetEvents::AsyncWakeupEvent(AsyncWakeupEvent {
-                        module: current().me(),
-                    }),
-                    next_wakeup,
-                );
-            }
-
-            self.driver = Some(driver);
             res
         }
     }

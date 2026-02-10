@@ -4,3 +4,6 @@ debug = true
 [workspace]
 resolver = "2"
 members = ["benches", "des", "des-*", "benches", "examples"]
+
+[patch.crates-io]
+tokio = { "path" = "../tokio/tokio"}

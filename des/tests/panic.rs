@@ -8,9 +8,9 @@ use des::{
     },
     prelude::{Message, current, schedule_at},
     runtime::Builder,
-    time::sleep,
 };
 use serial_test::serial;
+use tokio::time::sleep;
 
 struct PanicAtHandle;
 impl Module for PanicAtHandle {
