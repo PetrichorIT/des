@@ -476,6 +476,24 @@ fn as_any_mut(value: &mut dyn PropType) -> &mut dyn Any {
     value
 }
 
+impl<T: PropType + Serialize> Serialize for Prop<T, false> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.map(|value| value.serialize(serializer))
+    }
+}
+
+impl<T: PropType + Serialize> Serialize for Prop<T, true> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.map(|value| value.serialize(serializer))
+    }
+}
+
 impl ModuleContext {
     pub(crate) fn export_statistics_report(&self) -> Result<(), Failure> {
         if let Some(dir) = self.globals().dir() {

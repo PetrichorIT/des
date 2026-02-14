@@ -183,7 +183,6 @@ impl Future for Sleep {
         let mut me = self.project();
         if *me.deadline > SimTime::now() {
             if !scheduled {
-                tracing::info!("scheduling timer for deadline {}", *me.deadline);
                 let handle = Driver::with_current(|ctx| {
                     ctx.queue.add(
                         TimerSlotEntry {
