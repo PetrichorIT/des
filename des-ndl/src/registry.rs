@@ -18,8 +18,8 @@ pub trait RegistryCreatable {
     ///
     /// ```
     /// # use des::prelude::*;
-    /// # use des::net::ndl::*;
-    /// # use des::registry;
+    /// # use des_ndl::*;
+    /// # use des_ndl::registry;
     /// # fn extract_dns_from_oid(path: &ObjectPath) {}
     /// struct Server { /* ... */ }
     ///
@@ -106,7 +106,7 @@ impl Registry<EmptyLayer> {
     ///
     /// ```
     /// # use des::prelude::*;
-    /// # use des::net::ndl::*;
+    /// # use des_ndl::*;
     /// # #[derive(Default)]
     /// # struct HostModule;
     /// # impl Module for HostModule {}
@@ -125,8 +125,8 @@ impl Registry<EmptyLayer> {
     ///
     /// ```
     /// # use des::prelude::*;
-    /// # use des::net::ndl::*;
-    /// # use des::registry;
+    /// # use des_ndl::*;
+    /// # use des_ndl::registry;
     /// # #[derive(Default)]
     /// # struct HostModule;
     /// # impl Module for HostModule {}
@@ -155,7 +155,7 @@ impl<L: Layer> Registry<L> {
     /// # Examples
     ///
     /// ```
-    /// # use des::net::ndl::*;
+    /// # use des_ndl::*;
     /// # use des::prelude::*;
     /// # #[derive(Default)]
     /// struct Host { /* ... */ }
@@ -215,7 +215,7 @@ impl<L: Layer> Registry<L> {
     ///
     /// ```
     /// # use des::prelude::*;
-    /// # use des::net::ndl::*;
+    /// # use des_ndl::*;
     /// # struct GoogleGeneralHost;
     /// # impl GoogleGeneralHost { fn new(_: &ObjectPath) -> Self { Self }}
     /// # impl Module for GoogleGeneralHost {}
@@ -280,7 +280,7 @@ impl<L: Layer> Registry<L> {
     /// # Examples
     ///
     /// ```
-    /// # use des::net::ndl::*;
+    /// # use des_ndl::*;
     /// # use des::prelude::*;
     /// # #[derive(Default)]
     /// # struct HostModule;
@@ -414,7 +414,7 @@ where
 #[derive(Debug, Default)]
 pub struct DefaultFallbackModule;
 impl Module for DefaultFallbackModule {
-    fn handle_message(&mut self, msg: crate::prelude::Message) {
+    fn handle_message(&mut self, msg: des::prelude::Message) {
         tracing::error!(
             ?msg,
             "received message: fallback dummy should never receive any messages"

@@ -10,7 +10,7 @@
 ///
 /// ```rust
 /// # use des::prelude::*;
-/// # use des::registry;
+/// # use des_ndl::{registry, SimExt};
 /// #[derive(Default)]
 /// struct DnsServer;
 /// /* ... */
@@ -23,7 +23,7 @@
 /// struct Server;
 /// # impl Module for Server {}
 /// /* ... */
-/// # use des::net::ndl::lang::error::Result;
+/// # use des_ndl::lang::error::Result;
 /// fn main() -> Result<()> {
 ///     let registry = registry![DnsServer, Client, Server, else _];
 ///     # return Ok(());
@@ -35,7 +35,7 @@
 #[macro_export]
 macro_rules! registry {
     ($($t:ty),*) => {{
-        let registry = $crate::net::ndl::Registry::new();
+        let registry = $crate::Registry::new();
         $(
             let registry = registry.symbol::<$t>(stringify!($t));
         )*
@@ -44,7 +44,7 @@ macro_rules! registry {
     }};
 
     ($($t:ty),*, else _) => {{
-        let registry = $crate::net::ndl::Registry::new();
+        let registry = $crate::Registry::new();
         $(
             let registry = registry.symbol::<$t>(stringify!($t));
         )*
@@ -53,7 +53,7 @@ macro_rules! registry {
     }};
 
     ($($t:ty),*, else $f:ty) => {{
-        let registry = $crate::net::ndl::Registry::new();
+        let registry = $crate::Registry::new();
         $(
             let registry = registry.symbol::<$t>(stringify!($t));
         )*

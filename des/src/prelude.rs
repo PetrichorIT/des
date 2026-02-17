@@ -56,9 +56,6 @@ cfg_net! {
     pub use crate::net::ObjectPath;
     pub use crate::net::processing::ProcessingElement;
 
-    pub use crate::net::ndl::Registry;
-    pub use crate::net::ndl::RegistryCreatable;
-
     pub use std::net::IpAddr;
     pub use std::net::Ipv4Addr;
     pub use std::net::Ipv6Addr;

@@ -1,11 +1,10 @@
-use des::{prelude::*, registry};
+use des::prelude::*;
+use des_ndl::{SimExt, registry};
 
 mod modules;
 pub use modules::*;
 
 fn main() {
-    // Logger::new().try_set_logger().unwrap();
-
     let app = Sim::ndl("examples/ptrhell/main.yml", registry![Bob, Alice, Network]).unwrap();
 
     let rt = Builder::seeded(0x123).build(app.freeze());

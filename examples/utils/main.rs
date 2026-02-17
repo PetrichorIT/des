@@ -1,4 +1,5 @@
-use des::{prelude::*, registry};
+use des::prelude::*;
+use des_ndl::{SimExt, registry};
 
 #[derive(Debug, Default)]
 struct A;

@@ -277,6 +277,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "des-ndl"
+version = "0.1.0"
+dependencies = [
+ "des",
+ "fxhash",
+ "petgraph",
+ "serde",
+ "serde_json",
+ "serde_norway",
+ "serde_test",
+ "serial_test",
+ "tracing",
+]
+
+[[package]]
 name = "des-sync-utils"
 version = "0.1.0"
 dependencies = [
@@ -300,6 +315,7 @@ name = "examples"
 version = "0.1.0"
 dependencies = [
  "des",
+ "des-ndl",
  "rand",
  "tokio",
  "tracing",

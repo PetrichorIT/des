@@ -3,8 +3,8 @@ use std::io;
 use des::{
     net::{Error, Failure},
     prelude::*,
-    registry,
 };
+use des_ndl::{SimExt, registry};
 
 #[derive(Debug, Default)]
 struct A {}

@@ -1,4 +1,4 @@
-use crate::net::ndl::lang::{
+use crate::lang::{
     def::{Def, ModuleGenericsDef, TypClause},
     error::ErrorKind,
     transform,

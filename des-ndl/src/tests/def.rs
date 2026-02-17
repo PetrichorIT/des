@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::net::ndl::lang::def::{
+use crate::lang::def::{
     ConnectionDef, ConnectionEndpointDef, FieldDef, Kardinality, LinkDef, ModuleGenericsDef,
     TypClause,
 };

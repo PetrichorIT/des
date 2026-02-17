@@ -1,4 +1,5 @@
-use des::{net::Error, prelude::*, registry};
+use des::{net::Error, prelude::*};
+use des_ndl::{SimExt, registry};
 
 #[derive(Default)]
 struct Sub;

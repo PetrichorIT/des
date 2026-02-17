@@ -8,6 +8,7 @@ version = "0.1.0"
 
 [dev-dependencies]
 des = { path = "../des", features = ["full"] }
+des-ndl = { path = "../des-ndl" }
 rand = "*"
 tracing = "*"
 tokio = "*"

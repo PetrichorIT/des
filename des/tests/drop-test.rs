@@ -1,13 +1,11 @@
 #![cfg(feature = "net")]
 
 use std::{
-    error::Error,
     ops::Deref,
     sync::{Arc, atomic::AtomicUsize},
 };
 
 use des::{
-    net::ndl::Registry,
     net::{IntoModuleTree, Sim, module::Module},
     runtime::Builder,
 };
@@ -43,27 +41,6 @@ fn drop_check_modules_net_from_sim_builder() {
     drop(rtr);
 
     assert_eq!(drop_counter.load(std::sync::atomic::Ordering::SeqCst), 3);
-}
-
-#[test]
-#[serial]
-fn drop_check_modules_net_from_ndl() -> Result<(), Box<dyn Error>> {
-    let drop_counter = Arc::new(AtomicUsize::new(0));
-    let registry = Registry::new()
-        .symbol_fn("Alice", |_| B {
-            counter: drop_counter.clone(),
-        })
-        .symbol_fn("Bob", |_| B {
-            counter: drop_counter.clone(),
-        })
-        .with_default_fallback();
-
-    let sim = Sim::ndl("tests/ndl/drop-test.yml", registry)?;
-    let rtr = Builder::seeded(123).build(sim.freeze()).run();
-    drop(rtr);
-
-    assert_eq!(drop_counter.load(std::sync::atomic::Ordering::SeqCst), 2);
-    Ok(())
 }
 
 struct A {

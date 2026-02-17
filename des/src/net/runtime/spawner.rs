@@ -261,7 +261,10 @@ impl<'a, A> Spawner<'a, A> {
         }
     }
 
-    pub(crate) fn subscope(&mut self, path: impl Into<ObjectPath>) -> Spawner<'_, A> {
+    /// Create a new spawner with a subscope.
+    ///
+    /// The subscope is appended to the current scope.
+    pub fn subscope(&mut self, path: impl Into<ObjectPath>) -> Spawner<'_, A> {
         Spawner {
             scope: self.scope.appended(path.into()),
             inner: self.inner.as_ref_spawner(),
