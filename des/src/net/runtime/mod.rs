@@ -1,15 +1,16 @@
 use crate::{
     net::{
-        Error, Failure,
+        Error, ErrorKind, Failure,
         gate::Connection,
-        module::{Cfg, DummyModule, MOD_CTX, Props, UnwindBehaviour, try_current},
-        processing::{ProcessingStack, TokioRuntime},
+        module::{Cfg, DummyModule, MOD_CTX, ModuleContext, Props, UnwindBehaviour, try_current},
+        processing::ProcessingStack,
     },
     prelude::{Application, GateRef, Message, Module, ModuleRef, ObjectPath, Runtime},
     time::SimTime,
 };
 use serde_norway::{Value, from_str};
 use std::{
+    any::Any,
     fmt::Debug,
     fs, io, mem,
     ops::{Deref, DerefMut},
@@ -611,8 +612,7 @@ fn panic_hook(info: &PanicHookInfo) {
             );
         }
 
-        #[cfg(feature = "async")]
-        TokioRuntime::report_panic();
+        report_panic(&current, info);
     } else {
         eprintln!("thread 'main' panicked:");
     }
@@ -628,6 +628,32 @@ fn panic_hook(info: &PanicHookInfo) {
     }
 
     eprintln!("Box<dyn Any>");
+}
+
+fn into_payload_box(info: &PanicHookInfo) -> Box<dyn Any + Send + 'static> {
+    if let Some(s) = info.payload().downcast_ref::<&str>() {
+        return Box::new(s.to_string());
+    }
+    if let Some(s) = info.payload().downcast_ref::<String>() {
+        return Box::new(s.clone());
+    }
+    Box::new("dyn Any")
+}
+
+fn report_panic(handle: &ModuleContext, info: &PanicHookInfo) {
+    let behaviour = handle.unwind_behaviour();
+    if behaviour.ignore_panics {
+        return;
+    }
+
+    let payload = into_payload_box(info);
+    let error = Error::new_current(ErrorKind::ModulePanic(payload));
+
+    if behaviour.on_panic_abort {
+        handle.exec().report_failure(error);
+    } else {
+        handle.exec().report_error(error);
+    }
 }
 
 ///

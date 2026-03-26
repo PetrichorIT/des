@@ -73,9 +73,8 @@ struct SimPanicAtHandle;
 impl Module for SimPanicAtHandle {
     fn handle_message(&mut self, _msg: Message) {
         current().set_unwind_behaviour(UnwindBehaviour {
-            on_panic_catch: false,
-            on_panic_restart: false,
-            on_panic_drop_submodules: true,
+            on_panic_abort: true,
+            ..Default::default()
         });
         panic!("Oh no");
     }
@@ -98,7 +97,7 @@ struct SimPanicAtSimStart;
 impl Module for SimPanicAtSimStart {
     fn at_sim_start(&mut self, _stage: usize) {
         current().set_unwind_behaviour(UnwindBehaviour {
-            on_panic_catch: false,
+            on_panic_abort: true,
             ..Default::default()
         });
         panic!("Oh no");
@@ -122,7 +121,7 @@ struct SimPanicAtSimEnd;
 impl Module for SimPanicAtSimEnd {
     fn at_sim_end(&mut self) -> Result<(), Error> {
         current().set_unwind_behaviour(UnwindBehaviour {
-            on_panic_catch: false,
+            on_panic_abort: true,
             ..Default::default()
         });
         panic!("Oh no");
@@ -147,8 +146,8 @@ struct PanicWithUnwindAllways;
 impl Module for PanicWithUnwindAllways {
     fn at_sim_start(&mut self, _stage: usize) {
         current().set_unwind_behaviour(UnwindBehaviour {
-            on_panic_catch: false,
-            ..UnwindBehaviour::HOST
+            on_panic_abort: true,
+            ..UnwindBehaviour::default()
         });
     }
     fn handle_message(&mut self, _msg: Message) {
@@ -173,9 +172,9 @@ struct PanicAtRecvWithRestart;
 impl Module for PanicAtRecvWithRestart {
     fn at_sim_start(&mut self, _stage: usize) {
         current().set_unwind_behaviour(UnwindBehaviour {
-            on_panic_catch: true,
-            on_panic_restart: true,
-            on_panic_drop_submodules: false,
+            on_panic_recover: true,
+            ignore_panics: true,
+            ..Default::default()
         });
     }
 
@@ -187,6 +186,8 @@ impl Module for PanicAtRecvWithRestart {
 #[serial]
 #[test]
 fn unwind_and_restart() -> Result<(), Failure> {
+    des::tracing::init();
+
     let mut sim = Sim::new(());
     sim.node("alice", PanicAtRecvWithRestart);
     sim.node(
@@ -210,14 +211,14 @@ fn unwind_and_restart() -> Result<(), Failure> {
 #[test]
 fn task_panic_unobserved() -> Result<(), Failure> {
     let mut sim = Sim::new(());
+    sim.set_default_unwind_behavior(UnwindBehaviour {
+        ignore_panics: true,
+        ..Default::default()
+    });
+
     sim.node(
         "alice",
         AsyncHandler::once(|_| async move {
-            current().set_unwind_behaviour(UnwindBehaviour {
-                on_panic_catch: true,
-                ..Default::default()
-            });
-
             tokio::spawn(async move {
                 sleep(Duration::from_secs(10)).await;
             });
@@ -244,11 +245,6 @@ fn task_panic_will_only_report() -> Result<(), Failure> {
     sim.node(
         "alice",
         AsyncHandler::once(|_| async move {
-            current().set_unwind_behaviour(UnwindBehaviour {
-                on_panic_catch: true,
-                ..Default::default()
-            });
-
             current().join(tokio::spawn(async move {
                 sleep(Duration::from_secs(10)).await;
             }));
@@ -270,16 +266,15 @@ fn task_panic_will_only_report() -> Result<(), Failure> {
 
 #[serial]
 #[test]
-fn task_panic_will_fail() -> Result<(), Failure> {
+fn task_spawned_panic_will_crash() -> Result<(), Failure> {
     let mut sim = Sim::new(());
+    sim.set_default_unwind_behavior(UnwindBehaviour {
+        on_panic_abort: true,
+        ..Default::default()
+    });
     sim.node(
         "alice",
         AsyncHandler::once(|_| async move {
-            current().set_unwind_behaviour(UnwindBehaviour {
-                on_panic_catch: false,
-                ..Default::default()
-            });
-
             current().join(tokio::spawn(async move {
                 sleep(Duration::from_secs(10)).await;
             }));
@@ -288,6 +283,30 @@ fn task_panic_will_fail() -> Result<(), Failure> {
                 sleep(Duration::from_secs(1)).await;
                 panic!("tokio task paniced")
             }));
+        }),
+    );
+
+    let rt = Builder::seeded(123).build(sim.freeze());
+    let res = rt.run();
+    assert!(res.error.is_some());
+    assert_eq!(res.time, 1.0);
+
+    Ok(())
+}
+
+#[serial]
+#[test]
+fn task_async_handler_panic_will_crash() -> Result<(), Failure> {
+    let mut sim = Sim::new(());
+    sim.set_default_unwind_behavior(UnwindBehaviour {
+        on_panic_abort: true,
+        ..Default::default()
+    });
+    sim.node(
+        "alice",
+        AsyncHandler::once(|_| async move {
+            sleep(Duration::from_secs(1)).await;
+            panic!("tokio task paniced")
         }),
     );
 

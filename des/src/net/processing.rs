@@ -348,13 +348,12 @@ cfg_async! {
     pub struct TokioRuntime {
         pub(super) tasks: Rc<LocalSet>,
         pub(super) rt: LazyCell<Arc<Runtime>>,
-        pub(super) handles: Vec<(JoinHandle<()>, bool)>,
+        pub(super) handles: Vec<JoinHandle<()>>,
     }
 
     #[derive(Debug, Default)]
     struct TokioRuntimeStatics {
-        threads: Vec<(JoinHandle<()>, bool)>,
-        has_observed_panics: bool,
+        threads: Vec<JoinHandle<()>>,
     }
 
     #[allow(clippy::type_complexity)]
@@ -384,26 +383,13 @@ cfg_async! {
         }
     }
 
-    impl TokioRuntime {
-        /// Report a call to the panic hook
-        #[allow(clippy::missing_panics_doc)]
-        pub fn report_panic()  {
-            let mut shared = TOKIO_SHARED.lock().expect("failed to get lock");
-            shared.has_observed_panics = true;
-        }
 
+    impl TokioRuntime {
         /// Join a handle.
         #[allow(clippy::missing_panics_doc)]
         pub fn join(handle: JoinHandle<()>) {
             let mut shared = TOKIO_SHARED.lock().expect("failed to get lock");
-            shared.threads.push((handle, true));
-        }
-
-        /// Try to join a handle.
-        #[allow(clippy::missing_panics_doc)]
-        pub fn observe(handle: JoinHandle<()>) {
-            let mut shared = TOKIO_SHARED.lock().expect("failed to get lock");
-             shared.threads.push((handle, false));
+            shared.threads.push(handle);
         }
 
         /// Reset the join handles.
@@ -429,10 +415,11 @@ cfg_async! {
         /// # Errors
         ///
         /// Returns an error if any of the join handles panicked or a must-join failed to join.
-        pub fn check_for_panics(&mut self) -> Result<(), Vec<Error>> {
+        pub fn try_join_all(&mut self) -> Result<(), Vec<Error>> {
             if self.handles.is_empty() {
                 return Ok(());
             }
+
             let mut error = Vec::new();
 
             // NOTE: calling this requires RNG to be set, to seed the runtime;
@@ -441,17 +428,17 @@ cfg_async! {
             let _guard = self.rt.enter();
 
             let mut remaining_handles = Vec::new();
-            for (handle, must_join) in self.handles.drain(..) {
+            for handle in self.handles.drain(..) {
                 if !handle.is_finished() {
-                    remaining_handles.push((handle, must_join));
+                    remaining_handles.push(handle);
                     continue;
                 }
 
                 match self.rt.block_on(handle) {
                     Ok(()) => {}
-                    Err(e) if e.is_panic() => error.push(Error::new_current(
-                        ErrorKind::JoinError(JoinErrorKind::Paniced(e.into_panic())),
-                    )),
+                    Err(e) if e.is_panic() => {
+                        // Should be reported already using the panic-hook
+                    }
                     Err(e) => error.push(Error::new_current(ErrorKind::JoinError(
                         JoinErrorKind::Tokio(e),
                     ))),
@@ -469,13 +456,11 @@ cfg_async! {
         ///
         /// Erorors that occured in handles about to be joined.
         pub fn at_sim_end(&mut self) -> Result<(), Vec<Error>> {
-            let mut error = self.check_for_panics().err().unwrap_or_default();
-            for (_, must_join) in self.handles.drain(..) {
-                if must_join {
-                    error.push(Error::new_current(ErrorKind::JoinError(
-                        JoinErrorKind::NotFinished,
-                    )));
-                }
+            let mut error = self.try_join_all().err().unwrap_or_default();
+            for _ in self.handles.drain(..) {
+                error.push(Error::new_current(ErrorKind::JoinError(
+                    JoinErrorKind::NotFinished,
+                )));
             }
 
             if error.is_empty() { Ok(()) } else { Err(error) }
@@ -491,7 +476,6 @@ cfg_async! {
         ) -> Option<Message> {
             let mut shared = TOKIO_SHARED.lock().expect("failed to get lock");
             shared.threads.clear();
-            shared.has_observed_panics = false;
             drop(shared);
 
             let res = self.tasks.block_on(&self.rt, async {
@@ -503,16 +487,9 @@ cfg_async! {
             let mut shared = TOKIO_SHARED.lock().expect("failed to get lock");
             self.handles.append(&mut shared.threads);
 
-            if shared.has_observed_panics && let Err(err) = self.check_for_panics() {
-                let current = current();
-                let exec = current.exec();
-
-                if current.unwind_behaviour().on_panic_catch {
-                    err.into_iter().for_each(|e| exec.report_error(e));
-                } else {
-                    err.into_iter().for_each(|e| exec.report_failure(e));
-                }
-            }
+            // TODO: Join-checks only need to be completed if the simulation is about to end.
+            // The only failures which can occur before that are Tokio-JoinErrors. To
+            // prevent excessivly large lists, maybe try-join-all with some heuristic.
 
             res
         }

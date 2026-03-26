@@ -575,19 +575,6 @@ cfg_async! {
             assert!(self.is_currently_active(), "Cannot add join handle to the join group of another module");
             TokioRuntime::join(handle);
         }
-
-        /// Will try to join a task when the simulation ends.
-        ///
-        /// This will catch panics that occured within the task, but
-        /// if the task is still running, no error will be returned.
-        ///
-        /// # Panics
-        ///
-        /// Panics if the module context is not the currently active module context.
-        pub fn observe(&self, handle: JoinHandle<()>) {
-            assert!(self.is_currently_active(), "Cannot add join handle to the join group of another module");
-            TokioRuntime::observe(handle);
-        }
     }
 }
 
@@ -627,34 +614,18 @@ impl Drop for ModuleContext {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct UnwindBehaviour {
-    /// Indicates whether to catch an panic and allow the simulation to continue without error
-    /// or to record the module panic as an error in the runtime result.
-    ///
-    /// `true`:
-    /// - Panics in sync code will be caught and the module will shut down.
-    /// - Panics in observed tokio tasks will be reported, but will not terminate the module nor the simulation.
-    ///
-    /// `false`
-    /// - Panics in sync code will crash the entire simulation with an error.
-    /// - Panics in observed tokio tasks will crash the entire simulation with an error.
-    pub on_panic_catch: bool,
-    /// Indicates whether a node should be restared if it panicked.
-    pub on_panic_restart: bool,
-    /// Indicates whether a panic in this module should shut down all submodules.
-    pub on_panic_drop_submodules: bool,
+    /// Indicates whether the simulation should be aborted if a panic occurs. If set to `false`
+    /// the panic will be reported as an error but the simulation will continue.
+    pub on_panic_abort: bool,
+    /// Indicates whether a node should be restarted if it panicked. Only applicable
+    /// if `on_panic_abort` is `false`. If set to `true`, panics will not be reported as errors
+    pub on_panic_recover: bool,
+    /// Indicates whether async tasks should be excluded from panic handling. If set to `false`
+    /// async panics will be treated identically to sync panics.
+    pub ignore_panics: bool,
 }
 
 impl UnwindBehaviour {
-    /// The default behaviour of an independent node.
-    ///
-    /// Failures will be recorded & restarts attempted.
-    /// Submodules will be dropped in upon panic.
-    pub const HOST: UnwindBehaviour = UnwindBehaviour {
-        on_panic_catch: false,
-        on_panic_restart: true,
-        on_panic_drop_submodules: true,
-    };
-
     /// The default behaviour of a subprocess node.
     ///
     /// Failures will not be recorded & restarts not attempted.
@@ -663,15 +634,19 @@ impl UnwindBehaviour {
     /// Handeling the failure is the resposiblity of the managing node
     /// (aka the 'parent' process).
     pub const SUBPROCESS: UnwindBehaviour = UnwindBehaviour {
-        on_panic_catch: true,
-        on_panic_restart: false,
-        on_panic_drop_submodules: true,
+        on_panic_abort: false,
+        on_panic_recover: false,
+        ignore_panics: true,
     };
 }
 
 impl Default for UnwindBehaviour {
     fn default() -> Self {
-        Self::HOST
+        Self {
+            on_panic_abort: false,
+            on_panic_recover: false,
+            ignore_panics: false,
+        }
     }
 }
 

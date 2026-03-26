@@ -203,10 +203,10 @@ fn builder_handler_fn_failure_panic() {
     rt.add_message_onto(gate, Message::default(), 1.0.into());
 
     let e = rt.run().error.unwrap();
-    assert!(
-        e[0].to_string()
-            .starts_with("alice: ModulePanic(Any { .. })")
-    );
+
+    assert!(e[0].to_string().starts_with(
+        "alice: node 'alice' failed to process message, handler fn failed with: other"
+    ),);
 }
 
 #[test]

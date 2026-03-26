@@ -94,8 +94,9 @@ where
                 Ok(()) => {}
                 Err(e) => match policy {
                     FailabilityPolicy::Panic => panic!(
-                        "node '{}' failed to process message, handler fn failed with: {e} ",
-                        current().path
+                        "node '{}' failed to process message, handler fn failed with: {} ",
+                        current().path,
+                        e
                     ),
                     FailabilityPolicy::Continue | FailabilityPolicy::Restart => {
                         tracing::error!("failed to process message, handler fn failed with: {e}");
@@ -402,7 +403,7 @@ cfg_async! {
             if self.require_join {
                 current().join(tokio::spawn(fut));
             } else {
-                current().observe(tokio::spawn(fut));
+                tokio::spawn(fut);
             }
         }
 

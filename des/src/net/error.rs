@@ -131,6 +131,15 @@ impl ErrorKind {
     fn display(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Other(e) => write!(f, "{e}"),
+            Self::ModulePanic(panic) => {
+                if let Some(s) = panic.downcast_ref::<&str>() {
+                    return write!(f, "{s}");
+                }
+                if let Some(s) = panic.downcast_ref::<String>() {
+                    return write!(f, "{s}");
+                }
+                write!(f, "{panic:?}")
+            }
             _ => write!(f, "{self:?}"),
         }
     }
@@ -159,8 +168,6 @@ cfg_async! {
     pub enum JoinErrorKind {
         /// The task is not yet finished
         NotFinished,
-        /// A panic occurred in the task
-        Paniced(Box<dyn Any + Send + 'static>), // < this is not Sync thus we cannot pretend to be an IO error without to_string
         /// The join failed with an tokio error.
         Tokio(tokio::task::JoinError),
     }

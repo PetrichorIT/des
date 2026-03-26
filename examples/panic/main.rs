@@ -20,7 +20,7 @@ struct B;
 impl Module for B {
     fn at_sim_end(&mut self) -> Result<(), Error> {
         current().set_unwind_behaviour(des::net::module::UnwindBehaviour {
-            on_panic_catch: false,
+            on_panic_abort: true,
             ..Default::default()
         });
 

@@ -606,28 +606,21 @@ impl<'a> Harness<'a> {
     }
 
     pub(super) fn catch(self) -> Result<(), Error> {
-        if let Some(unwind) = self.unwind {
-            let bh = self.ctx.unwind_behaviour();
-
+        // The panic report procedure was completed within the panic hook.
+        // However sync panics will auto-crash the node, so start the
+        // unwind / restart process if required.
+        if let Some(_) = self.unwind {
+            let behaviour = self.ctx.unwind_behaviour();
             self.ctx.state.set(State::Shutdown);
-
             emit(SIGNAL_MODULE_PANICED, Body::empty());
 
-            if !bh.on_panic_catch {
-                return Err(Error::new(self.ctx.path(), ErrorKind::ModulePanic(unwind)));
-            }
-
-            if bh.on_panic_restart {
+            if behaviour.on_panic_recover {
                 schedule_event(
                     NetEvents::ModuleRestartEvent(ModuleRestartEvent {
                         module: self.ctx.me(),
                     }),
                     SimTime::now(),
                 );
-            }
-
-            if bh.on_panic_drop_submodules {
-                // TODO: impl drop submodules
             }
         }
         Ok(())

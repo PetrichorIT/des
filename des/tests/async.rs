@@ -654,8 +654,13 @@ fn async_join_paniced_will_join_but_fail() {
     let mut sim = Sim::new(());
     sim.node("main", PanicIsJoinable);
 
-    let v = Builder::seeded(123).build(sim.freeze()).run();
-    assert!(matches!(v.error.unwrap()[0].kind, ErrorKind::JoinError(_)));
+    let err = Builder::seeded(123)
+        .build(sim.freeze())
+        .run()
+        .error
+        .unwrap();
+    assert_eq!(err.len(), 1);
+    assert!(matches!(err[0].kind, ErrorKind::ModulePanic(_)));
 }
 
 struct SpawnButNeverJoin;
@@ -724,7 +729,7 @@ fn wait_for_sim_start_fin() -> Result<(), Failure> {
 fn panic_stops_sim_immediately() -> Result<(), Error> {
     let mut sim = Sim::new(());
     let cfg = UnwindBehaviour {
-        on_panic_catch: false,
+        on_panic_abort: true,
         ..Default::default()
     };
     sim.set_default_unwind_behavior(cfg);

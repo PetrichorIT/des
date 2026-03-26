@@ -166,7 +166,10 @@ fn builder_async_failable_with_fail() {
         }),
     );
     let v = Builder::new().build(sim.freeze()).run();
-    assert!(matches!(v.error.unwrap()[0].kind, ErrorKind::JoinError(_)));
+    assert!(matches!(
+        v.error.unwrap()[0].kind,
+        ErrorKind::ModulePanic(_)
+    ));
 }
 
 #[test]
