@@ -506,7 +506,7 @@ impl<A: SimLifecycle> Application for Sim<A> {
 
                     #[cfg(feature = "tracing")]
                     tracing::info!("Calling at_sim_start({}).", stage);
-                    rt.app.error.extend(module.at_sim_start(stage).err());
+                    module.at_sim_start(stage);
                     module.deactivate();
 
                     ctx.finish(rt)?;
@@ -632,7 +632,7 @@ fn panic_hook(info: &PanicHookInfo) {
 
 fn into_payload_box(info: &PanicHookInfo) -> Box<dyn Any + Send + 'static> {
     if let Some(s) = info.payload().downcast_ref::<&str>() {
-        return Box::new(s.to_string());
+        return Box::new((*s).to_string());
     }
     if let Some(s) = info.payload().downcast_ref::<String>() {
         return Box::new(s.clone());

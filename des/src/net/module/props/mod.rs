@@ -45,6 +45,10 @@ pub trait PropType: Any + Send {
     fn as_value(&self) -> Value;
 
     /// Transform a typed prop into another typed prop
+    ///
+    /// # Errors
+    ///
+    /// If the transform is not possible, return the original boxed value.
     fn transform(value: Box<dyn PropType>) -> Result<Box<Self>, Box<dyn PropType>>
     where
         Self: Sized,
@@ -120,7 +124,7 @@ impl RawProp {
     /// This method returns the configuration value, if the property is in the `InitalizedFromParam` state.
     #[must_use]
     pub fn as_value(&self) -> Option<Value> {
-        self.access(|entry| entry.as_value())
+        self.access(store::Entry::as_value)
     }
 
     /// Marks this prop as a statistic, that should be included in the statistics report.
@@ -142,7 +146,7 @@ impl RawProp {
     pub fn is<T: PropType>(&self) -> bool {
         self.access(|entry| match entry.as_option() {
             None => true,
-            Some(value) => as_any(&*value).is::<T>(),
+            Some(value) => as_any(value).is::<T>(),
         })
     }
 
@@ -422,6 +426,7 @@ impl<T: PropType, const PRESENT: bool> Prop<T, PRESENT> {
     }
 
     /// Marks this prop as a statistic, that should be included in the statistics report.
+    #[must_use]
     pub fn make_statistic(mut self) -> Self {
         self.raw.make_statistic();
         self

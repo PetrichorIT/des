@@ -200,7 +200,7 @@ impl<'de> Deserialize<'de> for ObjectPath {
         D: serde::Deserializer<'de>,
     {
         struct Vis;
-        impl<'de> Visitor<'de> for Vis {
+        impl Visitor<'_> for Vis {
             type Value = ObjectPath;
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
                 write!(formatter, "string")

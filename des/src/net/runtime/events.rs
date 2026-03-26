@@ -1,6 +1,6 @@
 use crate::{
     net::{
-        Error, ErrorKind, Failure, Sim,
+        Failure, Sim,
         channel::{ChannelRef, SendContext, SendError},
         gate::Connection,
         message::{Body, Message},
@@ -195,7 +195,7 @@ impl HandleMessageEvent {
         let ctx = EventExecutionContext::default();
 
         module.activate_with(Some(ctx.clone()));
-        rt.app.error.extend(module.handle_message(message).err()); // TODO_ appending to app.error will not treat failures correctly, only reports
+        module.handle_message(message);
         module.deactivate();
 
         ctx.finish(rt)
@@ -226,7 +226,7 @@ impl AtSimStartEvent {
                     module.activate_with(Some(ctx.clone()));
                     #[cfg(feature = "tracing")]
                     tracing::info!("Calling at_sim_start({}).", stage);
-                    rt.app.error.extend(module.at_sim_start(stage).err());
+                    module.at_sim_start(stage);
                     module.deactivate();
 
                     ctx.finish(rt)?;
@@ -253,9 +253,7 @@ impl SignalEvent {
             let ctx = EventExecutionContext::default();
 
             subscriber.activate_with(Some(ctx.clone()));
-            rt.app
-                .error
-                .extend(subscriber.handle_signal(self.signal.clone()).err());
+            subscriber.handle_signal(self.signal.clone());
             subscriber.deactivate();
 
             ctx.finish(rt)?;
@@ -283,9 +281,7 @@ impl ModuleShutdownEvent {
         let ctx = EventExecutionContext::default();
 
         module.activate_with(Some(ctx.clone()));
-        rt.app
-            .error
-            .extend(module.module_shutdown(self.restart_at).err());
+        module.module_shutdown(self.restart_at);
         module.deactivate();
 
         ctx.finish(rt)
@@ -308,7 +304,7 @@ impl ModuleRestartEvent {
         let ctx = EventExecutionContext::default();
 
         module.activate_with(Some(ctx.clone()));
-        rt.app.error.extend(module.module_restart().err());
+        module.module_restart();
         module.deactivate();
 
         ctx.finish(rt)
@@ -333,7 +329,7 @@ impl AsyncWakeupEvent {
         let ctx = EventExecutionContext::default();
 
         module.activate_with(Some(ctx.clone()));
-        rt.app.error.extend(module.async_wakeup().err());
+        module.async_wakeup();
         module.deactivate();
 
         ctx.finish(rt)
@@ -389,7 +385,7 @@ impl ModuleRef {
     /// - reset the modules internal state (this may be `self = Self::new()`), but maybe some
     ///   persistent state should be preserved.
     /// - reset the proc-chain
-    pub(crate) fn reset(&self) -> Result<(), Error> {
+    pub(crate) fn reset(&self) {
         let mut brw = self.processing.borrow_mut();
 
         // FIXME: the reset of the proc-chain would be easiers if we could
@@ -406,24 +402,22 @@ impl ModuleRef {
         // Reset does not capture any proc-elements -> correct ?
         Harness::new(&self.ctx)
             .exec(move || brw.handler.reset())
-            .pass()?;
-        Ok(())
+            .pass();
     }
 
     #[cfg(feature = "async")]
-    pub(crate) fn async_wakeup(&self) -> Result<(), Error> {
+    pub(crate) fn async_wakeup(&self) {
         if matches!(self.ctx.state.get(), State::Running) {
             self.processing
                 .borrow_mut()
-                .process_with(None, |_, _| Harness::new(&self.ctx).exec(|| {}).catch())?;
+                .process_with(None, |_, _| Harness::new(&self.ctx).exec(|| {}).catch());
         } else {
             #[cfg(feature = "tracing")]
             tracing::debug!("Ignoring message since module is inactive");
         }
-        Ok(())
     }
 
-    pub(crate) fn handle_signal(&self, signal: Signal) -> Result<(), Error> {
+    pub(crate) fn handle_signal(&self, signal: Signal) {
         // Custom signal handlers
         if signal.code == SIGNAL_SIM_START_DONE {
             self.state_change_wakers
@@ -437,14 +431,13 @@ impl ModuleRef {
             .process_with(None, move |handler, _| {
                 Harness::new(&self.ctx)
                     .exec(|| handler.handle_signal(signal))
-                    .catch()
-            })?;
-        Ok(())
+                    .catch();
+            });
     }
 
-    pub(crate) fn module_shutdown(&self, restart_at: Option<SimTime>) -> Result<(), Error> {
+    pub(crate) fn module_shutdown(&self, restart_at: Option<SimTime>) {
         if matches!(self.ctx.state.get(), State::Shutdown) {
-            return Ok(());
+            return;
         }
 
         // Mark the modules state
@@ -461,7 +454,7 @@ impl ModuleRef {
 
         // Reset the internal state
         // Note that the module is not active, so it must be manually reactivated
-        let res = self.reset();
+        self.reset();
 
         // Reschedule wakeup
         if let Some(restart_at) = restart_at {
@@ -472,10 +465,9 @@ impl ModuleRef {
                 restart_at,
             );
         }
-        res
     }
 
-    pub(crate) fn module_restart(&self) -> Result<(), Error> {
+    pub(crate) fn module_restart(&self) {
         #[cfg(feature = "tracing")]
         tracing::debug!("Restarting module");
         // restart the module itself.
@@ -484,35 +476,30 @@ impl ModuleRef {
         // Do sim start procedure
         let stages = self.num_sim_start_stages();
         for stage in 0..stages {
-            self.at_sim_start(stage)?;
+            self.at_sim_start(stage);
         }
-        Ok(())
     }
 
-    pub(crate) fn handle_message(&self, msg: Message) -> Result<(), Error> {
+    pub(crate) fn handle_message(&self, msg: Message) {
         if let State::Running = self.ctx.state.get() {
             self.processing
                 .borrow_mut()
                 .process_with(Some(msg), |handler, msg| {
-                    if let Some(msg) = msg {
-                        Harness::new(&self.ctx)
-                            .exec(|| {
-                                let msg = msg;
+                    Harness::new(&self.ctx)
+                        .exec(|| {
+                            if let Some(msg) = msg {
                                 handler.handle_message(msg);
-                            })
-                            .catch()
-                    } else {
-                        Harness::new(&self.ctx).exec(|| {}).catch()
-                    }
-                })?;
+                            }
+                        })
+                        .catch();
+                });
         } else {
             #[cfg(feature = "tracing")]
             tracing::debug!("Ignoring message since module is inactive");
         }
-        Ok(())
     }
 
-    pub(crate) fn at_sim_start(&self, stage: usize) -> Result<(), Error> {
+    pub(crate) fn at_sim_start(&self, stage: usize) {
         let mut max = 0;
         self.processing
             .borrow_mut()
@@ -522,8 +509,8 @@ impl ModuleRef {
                         max = handler.num_sim_start_stages();
                         handler.at_sim_start(stage);
                     })
-                    .catch()
-            })?;
+                    .catch();
+            });
 
         if stage + 1 == max {
             self.ctx.state.set(State::Running);
@@ -539,8 +526,6 @@ impl ModuleRef {
                 SimTime::now(),
             );
         }
-
-        Ok(())
     }
 
     pub(crate) fn num_sim_start_stages(&self) -> usize {
@@ -559,7 +544,7 @@ impl ModuleRef {
 
                 Harness::new(&self.ctx)
                     .exec(|| result = handler.at_sim_end())
-                    .catch()?;
+                    .catch();
 
                 result
             });
@@ -605,11 +590,11 @@ impl<'a> Harness<'a> {
         self
     }
 
-    pub(super) fn catch(self) -> Result<(), Error> {
+    pub(super) fn catch(self) {
         // The panic report procedure was completed within the panic hook.
         // However sync panics will auto-crash the node, so start the
         // unwind / restart process if required.
-        if let Some(_) = self.unwind {
+        if self.unwind.is_some() {
             let behaviour = self.ctx.unwind_behaviour();
             self.ctx.state.set(State::Shutdown);
             emit(SIGNAL_MODULE_PANICED, Body::empty());
@@ -623,13 +608,9 @@ impl<'a> Harness<'a> {
                 );
             }
         }
-        Ok(())
     }
 
-    pub(super) fn pass(self) -> Result<(), Error> {
-        if let Some(unwind) = self.unwind {
-            return Err(Error::new(self.ctx.path(), ErrorKind::ModulePanic(unwind)));
-        }
-        Ok(())
+    pub(super) fn pass(self) {
+        std::mem::drop(self);
     }
 }

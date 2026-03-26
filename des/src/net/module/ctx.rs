@@ -611,7 +611,7 @@ impl Drop for ModuleContext {
 ///  1. Node is either restarted or dropped
 ///  2. Children are droped if flag is set
 ///  3. Parent is informed
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct UnwindBehaviour {
     /// Indicates whether the simulation should be aborted if a panic occurs. If set to `false`
@@ -638,16 +638,6 @@ impl UnwindBehaviour {
         on_panic_recover: false,
         ignore_panics: true,
     };
-}
-
-impl Default for UnwindBehaviour {
-    fn default() -> Self {
-        Self {
-            on_panic_abort: false,
-            on_panic_recover: false,
-            ignore_panics: false,
-        }
-    }
 }
 
 // Panic behaviour

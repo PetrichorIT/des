@@ -39,7 +39,7 @@ impl Entry {
     }
 
     pub(super) fn is_some(&self) -> bool {
-        matches!(self.value, Some(_))
+        self.value.is_some()
     }
 
     pub(super) fn is_none(&self) -> bool {
@@ -47,10 +47,7 @@ impl Entry {
     }
 
     pub(super) fn as_value(&self) -> Option<Value> {
-        match &self.value {
-            Some(value) => Some(value.as_value()),
-            _ => None,
-        }
+        self.value.as_ref().map(|value| value.as_value())
     }
 
     pub(super) fn try_transform<T: PropType>(&mut self) {

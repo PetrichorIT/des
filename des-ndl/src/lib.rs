@@ -3,7 +3,6 @@
 //! # What is NDL ?
 //!
 //! NDL is a decriptory language for defining network topologies.
-//! Refer to [`ndl`](crate::net::ndl) for more information.
 //!
 //! # How to use it ?
 //!
@@ -12,7 +11,7 @@
 //! Users can create such an application by providing the path to the
 //! root file of the NDL description, and by providing a registry of modules.
 //! This registry is used to link names of network nodes in NDL to associated
-//! structs that implmenent [`Module`](crate::net::module::Module).
+//! structs that implmenent [`Module`].
 //! By proving both parameters, the application will load the topology and check
 //! whether the network can be build. If not an descriptive error will be returned.
 //!
@@ -84,7 +83,7 @@ pub use self::registry::*;
 ///   on the existence of gates in child nodes
 ///
 /// To initalize a node, the parameter `registry` is used to provide
-/// an implementation of the [`Module`](crate::net::module::Module) trait. Should the registry
+/// an implementation of the [`Module`] trait. Should the registry
 /// fail to provide an implementation, the node creation will fail.
 #[derive(Debug)]
 pub struct Ndl<'a, L: Layer> {
