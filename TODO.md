@@ -39,5 +39,37 @@ Equivalence to current features:
 - spawner -> no reason not to (model as part of dispatcher?)
 - props -> Part of state (conditional) or Props (custom extractor)
 
-# Application::Error to model a concrete error type for Runtime
-# Is EventSet / EventLifecycle Distinction required ?
+
+# v6.4
+
+### Issues
+
+1) Current unwind behaviour is inconsistent between sync and async 
+   -> will never be simple as long as this distinction exist
+
+2) Runtime/Builder is never used for other cases than Sim -> remove complexity
+
+3) Tokio Time integration
+
+### Solutions
+
+1)
+Remove the concept of sync-modules: async task-groups by default
+-> perhaps provide sync-module for backward compatibility
+-> main receive loop either via mspc::channel or seperate API (async fn current().recv(); maybe filtered by gate)
+
+trait Module {
+  start()
+  end()
+}
+
+trait SyncModule {}
+impl Module for SyncModule {}
+
+-> just async error model (catch, crash, restart, report_as)
+
+2)
+See branch "integrated-runtime"
+
+3)
+needs tokio PR

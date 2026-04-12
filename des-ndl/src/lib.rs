@@ -210,8 +210,6 @@ fn spawn_raw_node<A, L: Layer>(
 struct Dummy;
 impl Module for Dummy {}
 
-//
-
 pub trait SimExt {
     fn ndl<L: Layer>(
         path: impl AsRef<Path>,
@@ -233,87 +231,6 @@ impl SimExt for Sim<()> {
         Ok(sim)
     }
 }
-
-// impl Sim<()> {
-//     /// Creates a NDL application with the inner application `()`.
-//     ///
-//     /// See [`SimBuilder::with_ndl`] for more information.
-//     ///
-//     /// # Errors
-//     ///
-//     /// This function may return an error, if the provided NDL topology is
-//     /// erronous, or the software requirements cannot be fulfilled by the registry.
-//     pub fn ndl<L: Layer>(
-//         path: impl AsRef<Path>,
-//         registry: impl AsMut<Registry<L>>,
-//     ) -> Result<SimBuilder<()>> {
-//         Sim::new(()).with_ndl(path, registry)
-//     }
-// }
-
-// impl<A> SimBuilder<A> {
-//     /// Creates an NDL application from a topology description at `path`, with
-//     /// software defined by `registry` and an inner application `inner`.
-//     ///
-//     /// The NDL topology desciption found at `path` describes a module tree
-//     /// including a root module at the path `""`. Each node in this tree
-//     /// is derived from a NDL Module. The name of this module prototype
-//     /// is the symbol used in accessed to the registry. The NDL topology
-//     /// additionally includes gate and gate-chain definitions.
-//     ///
-//     /// The tree is initalized depth first. This means for each module:
-//     /// - First the gate of the current module are created
-//     /// - Then all children are created, including gates **and** connections
-//     /// - Then all connections are resolved, since connections statements may depend
-//     ///   on the existence of gates in child nodes
-//     ///
-//     /// The provided parameter `registry` is resposible for attaching software
-//     /// to the nodes defined by the topology description. Should the registry
-//     /// fail to provide software for a node, this function will fail.
-//     ///
-//     /// The inner application `inner` is equivalent the inner application
-//     /// object of a network simulation, which can be used to define custom
-//     /// actions at sim start / end.
-//     ///
-//     /// **NOTE** that the nodes will be created with a call to this function.
-//     ///
-//     /// # Errors
-//     ///
-//     /// Some Errors
-//     pub fn with_ndl<L: Layer>(
-//         mut self,
-//         path: impl AsRef<Path>,
-//         registry: impl AsMut<Registry<L>>,
-//     ) -> Result<Self> {
-//         let f = File::open(path).map_err(|e| lang::error::ErrorKind::Io(e.to_string()))?;
-//         let def =
-//             serde_norway::from_reader(f).map_err(|e| lang::error::ErrorKind::Io(e.to_string()))?;
-//         self.nodes_from_ndl(&def, registry)?;
-//         Ok(self)
-//     }
-
-//     /// Builds a NDL based application with onto an allready existing [`Sim`] object.
-//     ///
-//     /// See [`Sim::with_ndl`](Sim) for more infomation.
-//     ///
-//     /// # Errors
-//     ///
-//     /// This function will fail if either:
-//     /// a) some NDL error occures when parsing the NDL tree defined at `path`,
-//     /// b) or the registry fails to provide software for some NDL-defined module.
-//     pub fn nodes_from_ndl<L: Layer>(
-//         &mut self,
-//         def: &lang::def::Def,
-//         mut registry: impl AsMut<Registry<L>>,
-//     ) -> Result<()> {
-//         let parsed = lang::transform(def)?;
-
-//         let scoped = Spawner::new_at_buildtime(ObjectPath::default(), self);
-//         let _ = scoped.ndl2(&parsed, registry.as_mut())?;
-
-//         Ok(())
-//     }
-// }
 
 fn access_gate(
     ctx: &ModuleContext,

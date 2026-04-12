@@ -86,6 +86,14 @@ impl Builder {
     ///
     /// Suppressed runtime messages from the simulation framework.
     ///
+    pub fn seed(mut self, seed: u64) -> Self {
+        self.rng = Box::new(StdRng::seed_from_u64(seed));
+        self
+    }
+
+    ///
+    /// Suppressed runtime messages from the simulation framework.
+    ///
     pub fn quiet(mut self) -> Self {
         self.quiet = true;
         self
