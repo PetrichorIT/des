@@ -1,5 +1,5 @@
-use des::prelude::*;
-use des_ndl::{SimExt, registry};
+use des::{prelude::*, processing::TimeDriver};
+use des_ndl::{Ndl, registry};
 
 mod members;
 use members::*;
@@ -10,7 +10,12 @@ struct A;
 impl Module for A {}
 
 fn main() {
-    let app = Sim::ndl("examples/ndl/main.yml", registry![A, Alice, Bob]).unwrap();
+    let mut app = Sim::new(()).with_stack(|| TimeDriver::default()); // NO TOKIO
+    app.node(
+        "",
+        Ndl::from_str(&mut registry![A, Alice, Bob], include_str!("main.yml")).unwrap(),
+    )
+    .unwrap();
 
     let rt = app.seeded(0x123).build();
 

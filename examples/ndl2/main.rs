@@ -1,5 +1,5 @@
 use des::{Error, prelude::*};
-use des_ndl::{SimExt, registry};
+use des_ndl::{Ndl, registry};
 
 #[derive(Default)]
 struct Sub;
@@ -26,17 +26,12 @@ impl Module for Main {
 }
 
 fn main() {
-    // Logger::new()
-    //     .interal_max_log_level(log::LevelFilter::Debug)
-    //     .set_logger();
-
-    let app = match Sim::ndl("examples/ndl2/main.yml", registry![Main, Sub]) {
-        Ok(v) => v,
-        Err(e) => {
-            println!("{e}");
-            panic!("exiting due to previouis error")
-        }
-    };
+    let mut app = Sim::new(());
+    app.node(
+        "",
+        Ndl::from_str(&mut registry![Main, Sub], include_str!("main.yml")).unwrap(),
+    )
+    .unwrap();
     let rt = app.seeded(123).max_itr(10).build();
     let _ = rt.run();
 }
