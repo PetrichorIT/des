@@ -1,14 +1,11 @@
 use std::fs::File;
 
 use des::{
-    net::{
-        Failure, Sim,
-        handlers::{AsyncHandler, WithContext},
-        module::Prop,
-        statistics::time_series::TimeSeries,
-    },
-    prelude::{Message, Module, current},
-    runtime::Builder,
+    Failure, Sim,
+    module::{Prop, current},
+    prelude::{Message, Module},
+    runtime::handlers::{AsyncHandler, WithContext},
+    statistics::time_series::TimeSeries,
 };
 use serde_norway::Value;
 use serial_test::serial;
@@ -35,7 +32,7 @@ fn statistics_object_from_non_node_ctx() -> Result<(), Failure> {
     );
     let gate = sim.gate("alice", "gate");
 
-    let mut builder = Builder::seeded(123).build(sim.freeze());
+    let mut builder = sim.seeded(123).build();
     builder.add_message_onto(gate.clone(), Message::default().with_id(1), 1.0.into());
     builder.add_message_onto(gate.clone(), Message::default().with_id(2), 2.0.into());
     builder.add_message_onto(gate.clone(), Message::default().with_id(3), 3.0.into());
@@ -88,10 +85,7 @@ fn statistics_report_generated() -> Result<(), Failure> {
 
     sim.set_output_dir("tests/output".into());
 
-    let _ = Builder::seeded(123)
-        .build(sim.freeze())
-        .run()
-        .assert_no_err();
+    let _ = sim.seeded(123).build().run().assert_no_err();
 
     let stats =
         serde_norway::from_reader::<_, Value>(File::open("tests/output/alice.statistics.yml")?)

@@ -1,5 +1,5 @@
 #![cfg(feature = "macros")]
-use des::{net::module::Module, prelude::*};
+use des::{module::Module, prelude::*};
 use std::sync::atomic::AtomicUsize;
 
 struct Main;
@@ -33,9 +33,9 @@ fn deterministic_branching() {
         let mut rt = Sim::new(());
         rt.node("root", Main);
 
-        let rt = Builder::seeded(123).build(rt.freeze());
+        let rt = rt.seeded(123).build();
         let v = rt.run();
-        assert!(matches!(v.assert_no_err().profiler.event_count, 1));
+        assert!(matches!(v.assert_no_err().app.profiler.event_count, 1));
     }
 
     let a = A.load(std::sync::atomic::Ordering::SeqCst);

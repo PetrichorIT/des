@@ -1,14 +1,9 @@
-#![cfg(feature = "net")]
-
 use std::{
     ops::Deref,
     sync::{Arc, atomic::AtomicUsize},
 };
 
-use des::{
-    net::{IntoModuleTree, Sim, module::Module},
-    runtime::Builder,
-};
+use des::{Sim, module::Module, runtime::IntoModuleTree};
 use serial_test::serial;
 
 struct Harness<A>(pub A);
@@ -37,7 +32,7 @@ fn drop_check_modules_net_from_sim_builder() {
         }),
     );
 
-    let rtr = Builder::seeded(123).build(sim.freeze()).run();
+    let rtr = sim.seeded(123).build().run();
     drop(rtr);
 
     assert_eq!(drop_counter.load(std::sync::atomic::Ordering::SeqCst), 3);

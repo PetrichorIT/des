@@ -1,4 +1,4 @@
-/// Creates a registry of types that implement [`Module`](crate::net::module::Module),
+/// Creates a registry of types that implement [`Module`](des::module::Module),
 /// to link rust structs to NDL modules.
 ///
 /// The listing of types can be optionally suffixed with
@@ -28,7 +28,7 @@
 ///     let registry = registry![DnsServer, Client, Server, else _];
 ///     # return Ok(());
 ///     let app = Sim::ndl("path/to/ndl", registry)?;
-///     let rt = Builder::new().build(app.freeze());
+///     let rt = app.build();
 ///     let r = rt.run();
 /// }
 /// ```

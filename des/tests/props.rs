@@ -1,9 +1,4 @@
-#![cfg(feature = "net")]
-
-use des::{
-    net::{Failure, handlers::AsyncHandler},
-    prelude::*,
-};
+use des::{Failure, prelude::*, runtime::handlers::AsyncHandler};
 use serial_test::serial;
 
 #[test]
@@ -85,11 +80,11 @@ fn parse_props() -> Result<(), Failure> {
         }),
     );
 
-    Builder::seeded(132)
+    sim.seeded(132)
         .max_time(100.0.into())
-        .build(sim.freeze())
+        .build()
         .run()
-        .as_result()
+        .into_result()
         .map(|_| ())
 }
 
@@ -112,10 +107,10 @@ fn disallow_casting() -> Result<(), Failure> {
         }),
     );
 
-    Builder::seeded(132)
+    sim.seeded(132)
         .max_time(100.0.into())
-        .build(sim.freeze())
+        .build()
         .run()
-        .as_result()
+        .into_result()
         .map(|_| ())
 }

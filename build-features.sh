@@ -16,17 +16,17 @@ cargo build -p des --features cqueue
 echo "[des] serde"
 cargo build -p des --features cqueue
 echo "[des] net"
-cargo build -p des --features net
+cargo build -p des
 echo "[des] net + async"
-cargo build -p des --features net --features async
+cargo build -p des  --features async
 
 
 echo "[des] tracing"
 cargo build -p des --features tracing
 echo "[des] tracing + net"
-cargo build -p des --features tracing --features net
+cargo build -p des --features tracing
 echo "[des] tracing + net + async + unstable-tokio-enable-time"
-cargo build -p des --features tracing --features net --features async --features unstable-tokio-enable-time
+cargo build -p des --features tracing  --features async --features unstable-tokio-enable-time
 
 
 

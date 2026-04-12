@@ -1,6 +1,5 @@
-#![cfg(feature = "net")]
-use des::net::{Error, Failure, processing::*};
 use des::prelude::*;
+use des::{Error, Failure, processing::*};
 use serial_test::serial;
 use std::sync::Arc;
 use std::sync::atomic::Ordering::SeqCst;
@@ -42,15 +41,15 @@ impl Module for PluginCreation {
 #[test]
 #[serial]
 fn plugin_raw_creation() {
-    let mut app = Sim::new(());
-    app.set_stack(|| IncrementIncomingId);
-    app.node("root", PluginCreation::default());
+    let mut sim = Sim::new(());
+    sim.set_stack(|| IncrementIncomingId);
+    sim.node("root", PluginCreation::default());
 
-    let rt = Builder::seeded(123).build(app.freeze());
+    let rt = sim.seeded(123).build();
     let result = rt.run().assert_no_err();
 
     assert_eq!(result.time, SimTime::from_duration(Duration::from_secs(99)));
-    assert_eq!(result.profiler.event_count, 101); // (+1 start signal)
+    assert_eq!(result.app.profiler.event_count, 101); // (+1 start signal)
 }
 
 struct ActivitySensor {
@@ -110,14 +109,14 @@ impl Module for PluginPriorityDefer {
 #[test]
 #[serial]
 fn plugin_priority_defer() {
-    let mut app = Sim::new(());
-    app.node("root", PluginPriorityDefer::default());
+    let mut sim = Sim::new(());
+    sim.node("root", PluginPriorityDefer::default());
 
-    let rt = Builder::seeded(123).build(app.freeze());
+    let rt = sim.seeded(123).build();
     let result = rt.run().assert_no_err();
 
     assert_eq!(result.time, 99.0);
-    assert_eq!(result.profiler.event_count, 101); // (+1 start signal)
+    assert_eq!(result.app.profiler.event_count, 101); // (+1 start signal)
 }
 
 struct IncrementArcPlugin {
@@ -176,10 +175,10 @@ impl Module for PluginAtShutdown {
 #[test]
 #[serial]
 fn plugin_shutdown_non_persistent_data() {
-    let mut app = Sim::new(());
-    app.node("root", PluginAtShutdown::default());
+    let mut sim = Sim::new(());
+    sim.node("root", PluginAtShutdown::default());
 
-    let rt = Builder::seeded(123).build(app.freeze());
+    let rt = sim.seeded(123).build();
 
     let res = rt.run();
     let _res = res.assert_no_err();
@@ -210,7 +209,7 @@ fn custom_default_pe() {
     sim.node("a", A);
     let gate = sim.gate("a", "port");
 
-    let mut rt = Builder::seeded(123).build(sim.freeze());
+    let mut rt = sim.seeded(123).build();
     rt.add_message_onto(gate, Message::default(), 1.0.into());
 
     let _ = rt.run();
@@ -252,10 +251,10 @@ fn add_extension_in_plugin() -> Result<(), Failure> {
     sim.node("m", M { c: 0 });
     let gate = sim.gate("m", "port");
 
-    let mut rt = Builder::seeded(123).build(sim.freeze());
+    let mut rt = sim.seeded(123).build();
     rt.add_message_onto(gate, Message::default(), 1.0.into());
 
-    rt.run().as_result().map(|_| ())
+    rt.run().into_result().map(|_| ())
 }
 
 struct PEWithValue {
@@ -291,6 +290,6 @@ fn downcast_proc_elements_from_other_node() -> Result<(), Failure> {
     sim.node("alice", NodeWithPE);
     sim.node("alice.observer", NodeReadingPE);
 
-    let rt = Builder::seeded(123).build(sim.freeze());
-    rt.run().as_result().map(|_| ())
+    let rt = sim.seeded(123).build();
+    rt.run().into_result().map(|_| ())
 }

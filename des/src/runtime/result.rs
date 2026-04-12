@@ -1,27 +1,21 @@
-use crate::{
-    runtime::{Application, Profiler, Runtime},
-    time::SimTime,
-};
+use crate::{Failure, Sim, runtime::SimLifecycle, time::SimTime};
 
 /// The result of a simulation run.
 #[derive(Debug)]
-pub struct RuntimeResult<A: Application> {
+pub struct RuntimeResult<A> {
     /// The application instance.
-    pub app: A,
+    pub app: Sim<A>,
     /// The final timestamp within the simulation run.
     pub time: SimTime,
-    /// The profiler instance.
-    pub profiler: Profiler<A::EventSet>,
     /// Errors which may occur during simulation.
-    pub error: Option<A::Error>,
+    pub error: Option<Failure>,
 }
 
-impl<A: Application> RuntimeResult<A> {
-    pub(super) fn new(runtime: Runtime<A>, error: Option<A::Error>) -> Self {
+impl<A: SimLifecycle> RuntimeResult<A> {
+    pub(super) fn new(runtime: Sim<A>, error: Option<Failure>) -> Self {
         Self {
             time: runtime.sim_time(),
-            app: runtime.app,
-            profiler: runtime.profiler,
+            app: runtime,
             error,
         }
     }
@@ -41,13 +35,13 @@ impl<A: Application> RuntimeResult<A> {
     }
 }
 
-impl<A: Application> RuntimeResult<A> {
+impl<A> RuntimeResult<A> {
     /// Returns an Err variant if some error occurred during simulation.
     ///
     /// # Errors
     ///
     /// Returns an error if any errors occurred during simulation.
-    pub fn as_result(mut self) -> Result<RuntimeResult<A>, A::Error> {
+    pub fn into_result(mut self) -> Result<RuntimeResult<A>, Failure> {
         match self.error.take() {
             None => Ok(self),
             Some(error) => Err(error),

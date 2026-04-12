@@ -18,14 +18,13 @@ version = "0.6.2"
 default = ["full"]
 
 # Include everything used for default test runs.
-full = ["net", "cqueue", "async", "macros", "serde"]
+full = [ "cqueue", "async", "macros", "serde"]
 
-serde = ["dep:serde"]
+serde = []
 macros = ["dep:des-macros", "dep:futures"]
-async = ["net", "dep:tokio"]
+async = [ "dep:tokio"]
 cqueue = ["dep:des-cqueue"]
-net = ["dep:des-macros", "dep:des-sync-utils", "serde", "dep:serde_norway"]
-tracing = ["net"]
+tracing = []
 
 miri = []
 
@@ -46,8 +45,8 @@ fxhash = "0.2"
 pin-project-lite = "0.2"
 
 # All other dependencies are optional
-serde = { version = "*", optional = true, features = ["derive"] }
-serde_norway = { version = "*", optional = true }
+serde = { version = "*",  features = ["derive"] }
+serde_norway = { version = "*" }
 tokio = { version = "*", features = [
     "rt",
     "sync",
@@ -58,7 +57,7 @@ futures = { version = "*", optional = true }
 
 des-cqueue = { path = "../des-cqueue", optional = true }
 des-macros = { path = "../des-macros", optional = true }
-des-sync-utils = { path = "../des-sync-utils", optional = true }
+des-sync-utils = { path = "../des-sync-utils" }
 tracing-error = "0.2.1"
 petgraph = "0.8.3"
 

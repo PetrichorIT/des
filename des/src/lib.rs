@@ -16,65 +16,9 @@
 //! groud up, with a implemented module system or with a asynchronous context in
 //! mind.
 //!
-//! # Building a simple event simulation
-//!
-//! At its core DES provides the tools to easily and efficently build an event simulation
-//! with completely generic event set. This can be done independent of features used,
-//! but usually only optimization features like `cqueue` or montioring tools like `metrics`
-//! are used in this context.
-//!
-//! ```
-//! use des::prelude::*;
-//! use std::convert::Infallible;
-//!
-//! enum MyEventSet {
-//!     EventA { what_happend: String },
-//!     EventB { ack: bool },
-//! }
-//!
-//! impl Event<MyApp> for MyEventSet {
-//!     fn handle(self, _rt: &mut Runtime<MyApp>) -> Result<(), Infallible> {
-//!         // Do something
-//!         Ok(())
-//!     }
-//! }
-//!
-//! #[derive(Default)]
-//! struct MyApp {
-//!     global_value: usize,
-//!     logs: Vec<String>,
-//! }
-//!
-//! impl Application for MyApp {
-//!     type Error = Infallible;
-//!     type EventSet = MyEventSet;
-//! }
-//!
-//! fn main() {
-//!     let app = MyApp::default();
-//!     let rt = Builder::new().build(app);
-//!     let result = rt.run();
-//! }
-//! ```
-//!
-//! This simulation will now provide a [`runtime`] with
-//! [`time`] managment and a future event set to execute events.
-//! If a event is executed [`MyEventSet::handle`](crate::runtime::Event::handle)
-//! will be called with the runtime as parameter. If new events are to be created
-//! as result of a event execution this mutable reference can be used
-//! to add new events to the future event set.
-//!
-//! The [`Application`](crate::runtime::Application) object (in this case `MyApp`) is used as a global context handle that
-//! it stored inside the runtime. It can be accessed via 'rt.app' and can be used
-//! to record state during the simulation. Note that the [`Event`](crate::runtime::Event)
-//! and the [`Application`](crate::runtime::Application) are linked via a trait with generic parameters. This means
-//! that `MyEvents` could implement [`Event`](crate::runtime::Event) a second time for another application.
-//!
-//! # Using a module oriented system
-//!
-//! DES is able to provide tools for simulating network-like structures with [Modules](crate::net::module::Module).
-//! These modules are self contained units with their own state, connected via [Channels](crate::net::channel::Channel)
-//! (network links) that are attached to [Gates](crate::net::gate::Gate) (physical ports) on modules.
+//! DES is able to provide tools for simulating network-like structures with [Modules](crate::module::Module).
+//! These modules are self contained units with their own state, connected via [Channels](crate::channel::Channel)
+//! (network links) that are attached to [Gates](crate::gate::Gate) (physical ports) on modules.
 //! Modules can send messages (packtes) through these gates / channels to communicated
 //! with other modules. Additionally modules can be created in a tree like structure,
 //! providing links like [`parent`] or [`child`].
@@ -119,24 +63,41 @@
 //! Look for the `pingpong-*` examples for more detailed explanations.
 //!
 //! [`time`]: crate::time
-//! [`net`]: crate::net
+//! [`net`]: crate
 //! [`runtime`]: crate::runtime
-//! [`parent`]: crate::net::module::ModuleContext::parent
-//! [`child`]: crate::net::module::ModuleContext::child
+//! [`parent`]: crate::module::ModuleContext::parent
+//! [`child`]: crate::module::ModuleContext::child
 
 #[macro_use]
 #[doc(hidden)]
 pub mod macros;
 pub mod prelude;
-pub mod runtime;
+// pub mod runtime;
 pub mod time;
 
-cfg_net! {
-    pub mod net;
-    pub mod tracing;
-    pub(crate) use des_sync_utils as sync;
-}
+pub mod tracing;
+pub(crate) use des_sync_utils as sync;
 
 cfg_macros! {
     pub use des_macros::*;
 }
+
+mod error;
+mod path;
+
+/// The simulation runtime.
+pub mod runtime;
+
+pub mod channel;
+pub mod gate;
+pub mod message;
+pub mod module;
+pub mod processing;
+pub mod statistics;
+pub mod topology;
+
+pub use self::error::*;
+pub use self::path::*;
+pub use self::runtime::{
+    Sim, SimBuilder, fail, globals, random, report, rng, sample, schedule_event,
+};

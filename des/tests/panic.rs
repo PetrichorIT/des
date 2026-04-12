@@ -1,13 +1,10 @@
 use std::time::Duration;
 
 use des::{
-    net::{
-        Error, ErrorKind, Failure, Sim, globals,
-        handlers::{AsyncHandler, ModuleFn},
-        module::{Module, UnwindBehaviour},
-    },
+    Error, ErrorKind, Failure, Sim, globals,
+    module::{Module, UnwindBehaviour},
     prelude::{Message, current, schedule_at},
-    runtime::Builder,
+    runtime::handlers::{AsyncHandler, ModuleFn},
     time::sleep,
 };
 use serial_test::serial;
@@ -26,7 +23,7 @@ fn catch_panic_at_handle_message() {
     sim.node("alice", PanicAtHandle);
     let gate = sim.gate("alice", "port");
 
-    let mut rt = Builder::seeded(123).build(sim.freeze());
+    let mut rt = sim.seeded(123).build();
     rt.add_message_onto(gate, Message::default(), 5.0.into());
     let _ = rt.run();
 }
@@ -45,7 +42,7 @@ fn catch_panic_at_sim_start() {
     sim.node("alice", PanicAtSimStart);
     let gate = sim.gate("alice", "port");
 
-    let mut rt = Builder::seeded(123).build(sim.freeze());
+    let mut rt = sim.seeded(123).build();
     rt.add_message_onto(gate, Message::default(), 5.0.into());
     let _ = rt.run();
 }
@@ -64,7 +61,7 @@ fn catch_panic_at_sim_end() {
     sim.node("alice", PanicAtSimEnd);
     let gate = sim.gate("alice", "port");
 
-    let mut rt = Builder::seeded(123).build(sim.freeze());
+    let mut rt = sim.seeded(123).build();
     rt.add_message_onto(gate, Message::default(), 5.0.into());
     let _ = rt.run();
 }
@@ -87,7 +84,7 @@ fn unwind_sim_panic_at_handle_message() {
     sim.node("alice", SimPanicAtHandle);
     let gate = sim.gate("alice", "port");
 
-    let mut rt = Builder::seeded(123).build(sim.freeze());
+    let mut rt = sim.seeded(123).build();
     rt.add_message_onto(gate, Message::default(), 5.0.into());
     let err = rt.run().error.unwrap();
     assert!(matches!(err[0].kind, ErrorKind::ModulePanic(_)));
@@ -111,7 +108,7 @@ fn unwind_sim_panic_at_sim_start() {
     sim.node("alice", SimPanicAtSimStart);
     let gate = sim.gate("alice", "port");
 
-    let mut rt = Builder::seeded(123).build(sim.freeze());
+    let mut rt = sim.seeded(123).build();
     rt.add_message_onto(gate, Message::default(), 5.0.into());
     let err = rt.run().error.unwrap();
     assert!(matches!(err[0].kind, ErrorKind::ModulePanic(_)));
@@ -135,7 +132,7 @@ fn unwind_sim_panic_at_sim_end() {
     sim.node("alice", SimPanicAtSimEnd);
     let gate = sim.gate("alice", "port");
 
-    let mut rt = Builder::seeded(123).build(sim.freeze());
+    let mut rt = sim.seeded(123).build();
     rt.add_message_onto(gate, Message::default(), 5.0.into());
     let err = rt.run().error.unwrap();
 
@@ -162,7 +159,7 @@ fn unwind_behaviour_unwind_allways_panics() {
     sim.node("alice", PanicWithUnwindAllways);
     let gate = sim.gate("alice", "port");
 
-    let mut rt = Builder::seeded(123).build(sim.freeze());
+    let mut rt = sim.seeded(123).build();
     rt.add_message_onto(gate, Message::default(), 5.0.into());
     let err = rt.run().error.unwrap();
     assert!(matches!(err[0].kind, ErrorKind::ModulePanic(_)));
@@ -202,9 +199,9 @@ fn unwind_and_restart() -> Result<(), Failure> {
     );
     let gate = sim.gate("alice", "port");
 
-    let mut rt = Builder::seeded(123).build(sim.freeze());
+    let mut rt = sim.seeded(123).build();
     rt.add_message_onto(gate, Message::default(), 5.0.into());
-    rt.run().as_result().map(|_| ())
+    rt.run().into_result().map(|_| ())
 }
 
 #[serial]
@@ -230,7 +227,7 @@ fn task_panic_unobserved() -> Result<(), Failure> {
         }),
     );
 
-    let rt = Builder::seeded(123).build(sim.freeze());
+    let rt = sim.seeded(123).build();
     let res = rt.run();
     assert!(res.error.is_none());
     assert_eq!(res.time, 10.0);
@@ -256,7 +253,7 @@ fn task_panic_will_only_report() -> Result<(), Failure> {
         }),
     );
 
-    let rt = Builder::seeded(123).build(sim.freeze());
+    let rt = sim.seeded(123).build();
     let res = rt.run();
     assert!(res.error.is_some());
     assert_eq!(res.time, 10.0);
@@ -286,7 +283,7 @@ fn task_spawned_panic_will_crash() -> Result<(), Failure> {
         }),
     );
 
-    let rt = Builder::seeded(123).build(sim.freeze());
+    let rt = sim.seeded(123).build();
     let res = rt.run();
     assert!(res.error.is_some());
     assert_eq!(res.time, 1.0);
@@ -310,7 +307,7 @@ fn task_async_handler_panic_will_crash() -> Result<(), Failure> {
         }),
     );
 
-    let rt = Builder::seeded(123).build(sim.freeze());
+    let rt = sim.seeded(123).build();
     let res = rt.run();
     assert!(res.error.is_some());
     assert_eq!(res.time, 1.0);

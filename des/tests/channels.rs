@@ -1,13 +1,9 @@
-#![cfg(feature = "net")]
-
 use des::{
-    net::{
-        Error, Failure,
-        channel::DelayChannel,
-        handlers::{AsyncHandler, HandlerFn},
-        internals::{MessageExitingConnection, NetEvents},
-    },
+    Error, Failure,
+    channel::DelayChannel,
     prelude::*,
+    runtime::handlers::{AsyncHandler, HandlerFn},
+    runtime::{MessageExitingConnection, NetEvents},
     time::sleep_until,
 };
 use serial_test::serial;
@@ -54,7 +50,7 @@ fn channel_dropping_message() {
     });
     g_in.connect_with(g_out, Some(channel));
 
-    let rt = Builder::seeded(123).build(rt.freeze());
+    let rt = rt.seeded(123).build();
     let _ = rt.run();
 }
 
@@ -101,7 +97,7 @@ fn channel_buffering_message() {
     });
     g_in.connect_with(g_out, Some(channel));
 
-    let rt = Builder::seeded(123).build(rt.freeze());
+    let rt = rt.seeded(123).build();
     let _ = rt.run();
 }
 
@@ -139,7 +135,7 @@ fn channel_instant_busy() {
 
     g_in.connect_with(g_out, Some(channel));
 
-    let rt = Builder::seeded(123).build(rt.freeze());
+    let rt = rt.seeded(123).build();
     let _ = rt.run();
 }
 
@@ -179,7 +175,7 @@ fn latency_only_channel() {
         ))),
     );
 
-    let _ = Builder::seeded(123).build(sim.freeze()).run();
+    let _ = sim.seeded(123).build().run();
 }
 
 #[test]
@@ -232,13 +228,10 @@ fn simplex_shared_domain() {
         );
     }
 
-    let rt = Builder::seeded(123)
-        .build(sim.freeze())
-        .run()
-        .assert_no_err();
+    let rt = sim.seeded(123).build().run().assert_no_err();
 
     //
-    assert_eq!(rt.profiler.event_count, 130);
+    assert_eq!(rt.app.profiler.event_count, 130);
     assert_eq!(rt.time, 26.0)
 }
 
@@ -284,10 +277,7 @@ fn duplex_shared_domain() {
             .connect_with(switch[i].clone(), Some(chan.clone()));
     }
 
-    let rt = Builder::seeded(123)
-        .build(sim.freeze())
-        .run()
-        .assert_no_err();
+    let rt = sim.seeded(123).build().run().assert_no_err();
 
     // 50 messages over datarate channel with infinite buffer
     // - 50 handle message events
@@ -295,7 +285,7 @@ fn duplex_shared_domain() {
     // - 48 Channel Notif (only from once two events in queue, thus not for first and not for last message)
     // - 6 start signals
 
-    assert_eq!(rt.profiler.event_count, 50 + 50 + 48 + 6);
+    assert_eq!(rt.app.profiler.event_count, 50 + 50 + 48 + 6);
     assert_eq!(rt.time, 50.0)
 }
 
@@ -394,10 +384,7 @@ fn datarate_channel_can_send_at_tft_independent_of_event_order() {
     g1.connect_with(t1, Some(no_buffer));
     g2.connect_with(t2, Some(buffer));
 
-    let _ = Builder::seeded(123)
-        .build(sim.freeze())
-        .run()
-        .assert_no_err();
+    let _ = sim.seeded(123).build().run().assert_no_err();
 }
 
 #[derive(Debug, Clone, Default)]
@@ -419,8 +406,8 @@ impl Channel for CustomFwdChannel {
         &mut self,
         _: GateRef,
         msg: Message,
-        via: des::net::gate::Connection,
-        ctx: des::net::channel::SendContext<'_>,
+        via: des::gate::Connection,
+        ctx: des::channel::SendContext<'_>,
     ) -> Result<(), SendError> {
         ctx.sink.add(
             NetEvents::MessageExitingConnection(MessageExitingConnection { con: via, msg }),
@@ -436,7 +423,7 @@ impl Channel for CustomFwdChannel {
     fn unbusy_notify(
         &mut self,
         _: Box<dyn std::any::Any + Send>,
-        _: des::net::channel::SendContext<'_>,
+        _: des::channel::SendContext<'_>,
     ) {
     }
 }
@@ -490,9 +477,5 @@ fn register_unregister_custom_channel() -> Result<(), Failure> {
     a.connect_with(b, Some(chan.clone()));
     a2.connect_with(c, Some(chan));
 
-    Builder::seeded(123)
-        .build(sim.freeze())
-        .run()
-        .as_result()
-        .map(|_| ())
+    sim.seeded(123).build().run().into_result().map(|_| ())
 }

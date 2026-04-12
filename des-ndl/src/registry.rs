@@ -1,6 +1,6 @@
 use std::{fmt, marker::PhantomData};
 
-use crate::net::{ObjectPath, module::Module};
+use des::{ObjectPath, module::Module};
 
 /// A type that can be created based on the nodes path and a
 /// NDL symbol.
@@ -11,7 +11,7 @@ use crate::net::{ObjectPath, module::Module};
 pub trait RegistryCreatable {
     /// Creates a instance of `Self` from a path and symbol.
     ///
-    /// This function if called by [`Sim::ndl`](crate::net::Sim) will be called
+    /// This function if called by [`Sim::ndl`](crate::Sim) will be called
     /// within node-context.
     ///
     /// # Examples

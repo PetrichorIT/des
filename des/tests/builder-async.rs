@@ -8,11 +8,7 @@ use std::{
     },
 };
 
-use des::{
-    net::{ErrorKind, handlers::AsyncHandler},
-    prelude::*,
-    time::sleep,
-};
+use des::{ErrorKind, prelude::*, runtime::handlers::AsyncHandler, time::sleep};
 use serial_test::serial;
 
 #[test]
@@ -33,7 +29,7 @@ fn builder_async_fn_quasai_sync() {
     );
 
     assert_eq!(done.load(Ordering::SeqCst), false);
-    let _ = Builder::seeded(123).build(sim.freeze()).run();
+    let _ = sim.seeded(123).build().run();
     assert_eq!(done.load(Ordering::SeqCst), true);
 }
 
@@ -56,7 +52,7 @@ fn builder_async_fn_sleep() {
     );
 
     assert_eq!(time.load(Ordering::SeqCst), 0);
-    let _ = Builder::seeded(123).build(sim.freeze()).run();
+    let _ = sim.seeded(123).build().run();
     assert_eq!(time.load(Ordering::SeqCst), 10);
 }
 
@@ -80,7 +76,7 @@ fn builder_async_fn_message_recv() {
     );
     let gate = sim.gate("alice", "port");
 
-    let mut rt = Builder::seeded(123).build(sim.freeze());
+    let mut rt = sim.seeded(123).build();
     rt.add_message_onto(gate.clone(), Message::default().with_id(1), 1.0.into());
     rt.add_message_onto(gate.clone(), Message::default().with_id(2), 2.0.into());
     rt.add_message_onto(gate.clone(), Message::default().with_id(3), 3.0.into());
@@ -130,7 +126,7 @@ fn builder_async_fn_channeled() {
         })),
     );
 
-    let _ = Builder::seeded(123).build(sim.freeze()).run();
+    let _ = sim.seeded(123).build().run();
     assert_eq!(counter.load(Ordering::SeqCst), (0..16).sum());
 }
 
@@ -148,7 +144,7 @@ fn builder_async_failable() {
             Ok(())
         }),
     );
-    let _ = Builder::new().build(sim.freeze()).run();
+    let _ = sim.build().run();
 }
 
 #[test]
@@ -165,7 +161,7 @@ fn builder_async_failable_with_fail() {
             Ok(())
         }),
     );
-    let v = Builder::new().build(sim.freeze()).run();
+    let v = sim.build().run();
     assert!(matches!(
         v.error.unwrap()[0].kind,
         ErrorKind::ModulePanic(_)
@@ -181,7 +177,7 @@ fn builder_async_no_join() {
         AsyncHandler::new(|_| async move { std::future::pending().await }),
     );
 
-    let _ = Builder::seeded(123).build(sim.freeze()).run();
+    let _ = sim.seeded(123).build().run();
 }
 
 #[test]
@@ -193,7 +189,7 @@ fn builder_async_require_join() {
         AsyncHandler::io(|_| async move { std::future::pending().await }).require_join(),
     );
 
-    let v = Builder::seeded(123).build(sim.freeze()).run();
+    let v = sim.seeded(123).build().run();
     assert!(matches!(v.error.unwrap()[0].kind, ErrorKind::JoinError(_)));
 }
 
@@ -214,10 +210,7 @@ fn builder_async_restart() {
 
     sim.node("alice", software);
 
-    let _ = Builder::seeded(123)
-        .max_time(25.0.into())
-        .build(sim.freeze())
-        .run();
+    let _ = sim.seeded(123).max_time(25.0.into()).build().run();
 
     // once at 0, 15, next would be 30
     assert_eq!(COUNTER.load(Ordering::SeqCst), 2);

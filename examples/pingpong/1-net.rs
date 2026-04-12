@@ -12,10 +12,7 @@
 //! abstractions, macros and serialization implementations. By default this feature does NOT
 //! include `tokio`.
 
-use des::{
-    net::{Error, Failure},
-    prelude::*,
-};
+use des::{Error, Failure, prelude::*};
 use std::io;
 
 // ## The hosts
@@ -106,6 +103,7 @@ const PONG: MessageKind = 2;
 
 impl Module for Pinger {
     fn at_sim_start(&mut self, _stage: usize) {
+        println!("called");
         for i in 0..30 {
             schedule_in(
                 Message::default().with_kind(INTERVAL),
@@ -158,8 +156,7 @@ impl Module for Ponger {
 // At last the runtime is created and run using the `Builder`.
 
 fn main() -> Result<(), Failure> {
-    let sim = build_network();
-    let rt = Builder::new().build(sim);
-    let _ = rt.run().as_result()?;
+    let rt = build_network();
+    let _ = rt.run().into_result()?;
     Ok(())
 }

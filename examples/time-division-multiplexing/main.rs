@@ -1,15 +1,12 @@
 use std::{any::Any, time::Duration};
 
 use des::{
-    net::{
-        Sim,
-        channel::{SendContext, SendError},
-        gate::{Connection, IntoModuleGate},
-        handlers::HandlerFn,
-        internals::{ChannelUnbusyNotif, MessageExitingConnection, NetEvents},
-    },
+    Sim,
+    channel::{SendContext, SendError},
+    gate::{Connection, IntoModuleGate},
     prelude::{Channel, ChannelRef, GateRef, Message, Module, current, send},
-    runtime::Builder,
+    runtime::handlers::HandlerFn,
+    runtime::{ChannelUnbusyNotif, MessageExitingConnection, NetEvents},
     time::{SimTime, interval, sleep_until},
 };
 
@@ -261,9 +258,10 @@ fn main() {
         g.connect_with(gt, Some(shared.clone()));
     }
 
-    let _ = Builder::seeded(123)
+    let _ = sim
+        .seeded(123)
         .max_time(10.0.into())
-        .build(sim.freeze())
+        .build()
         .run()
         .assert_no_err();
 }

@@ -1,10 +1,8 @@
 use des::{
-    net::{
-        Error, Failure, globals,
-        handlers::{AsyncHandler, ModuleFn},
-        report,
-    },
+    Error, Failure, globals,
     prelude::*,
+    report,
+    runtime::handlers::{AsyncHandler, ModuleFn},
 };
 use serial_test::serial;
 
@@ -47,7 +45,7 @@ fn connectivity() {
         })),
     );
 
-    let app = Builder::seeded(123).build(app.freeze());
+    let app = app.seeded(123).build();
     let _ = app.run().assert_no_err();
 }
 
@@ -81,11 +79,7 @@ fn select_node_from_globals() -> Result<(), Failure> {
         }),
     );
 
-    Builder::seeded(123)
-        .build(sim.freeze())
-        .run()
-        .as_result()
-        .map(|_| ())
+    sim.seeded(123).build().run().into_result().map(|_| ())
 }
 
 #[test]
@@ -148,11 +142,7 @@ fn can_access_foreign_module_context() -> Result<(), Failure> {
     sim.gate("alice", "port").connect(sim.gate("bob", "port"));
     let _ = sim.gate("alice", "other-port");
 
-    Builder::seeded(123)
-        .build(sim.freeze())
-        .run()
-        .as_result()
-        .map(|_| ())
+    sim.seeded(123).build().run().into_result().map(|_| ())
 }
 
 #[test]
@@ -169,8 +159,9 @@ fn custom_fail() {
         ),
     );
 
-    let err = Builder::seeded(123)
-        .build(sim.freeze())
+    let err = sim
+        .seeded(123)
+        .build()
         .run()
         .error
         .expect("expected an error");
@@ -217,11 +208,7 @@ fn gate_disconnect() -> Result<(), Failure> {
 
     a.connect(b);
 
-    Builder::seeded(123)
-        .build(sim.freeze())
-        .run()
-        .as_result()
-        .map(|_| ())
+    sim.seeded(123).build().run().into_result().map(|_| ())
 }
 
 #[test]

@@ -1,12 +1,10 @@
 use des::{
-    net::{
-        Error, Failure, globals,
-        handlers::ModuleFn,
-        message::Body,
-        module::{SIGNAL_MODULE_PANICED, Signal, UnwindBehaviour, emit},
-        processing::ProcessingStack,
-    },
+    Error, Failure, globals,
+    message::Body,
+    module::{SIGNAL_MODULE_PANICED, Signal, UnwindBehaviour, emit},
     prelude::*,
+    processing::ProcessingStack,
+    runtime::handlers::ModuleFn,
 };
 use serial_test::serial;
 
@@ -53,11 +51,7 @@ fn signal_subscription_in_direct_parent() -> Result<(), Failure> {
     sim.node("parent", Parent(false));
     sim.node("parent.child", panicing_subprocess_at(2.0));
 
-    Builder::seeded(123)
-        .build(sim.freeze())
-        .run()
-        .as_result()
-        .map(|_| ())
+    sim.seeded(123).build().run().into_result().map(|_| ())
 }
 
 #[test]
@@ -72,11 +66,7 @@ fn signal_subscription_in_indirect_ancestor() -> Result<(), Failure> {
         panicing_subprocess_at(2.0),
     );
 
-    Builder::seeded(123)
-        .build(sim.freeze())
-        .run()
-        .as_result()
-        .map(|_| ())
+    sim.seeded(123).build().run().into_result().map(|_| ())
 }
 
 #[test]
@@ -103,11 +93,7 @@ fn signal_subscription_passed_to_created_child() -> Result<(), Failure> {
         ),
     );
 
-    Builder::seeded(123)
-        .build(sim.freeze())
-        .run()
-        .as_result()
-        .map(|_| ())
+    sim.seeded(123).build().run().into_result().map(|_| ())
 }
 
 struct ExpectNSignal<const SIGNAL: usize>(i32);
@@ -115,7 +101,7 @@ impl<const SIGNAL: usize> Module for ExpectNSignal<SIGNAL> {
     fn at_sim_start(&mut self, _stage: usize) {
         current().subscribe_to(SIGNAL);
     }
-    fn handle_signal(&mut self, signal: des::net::module::Signal) {
+    fn handle_signal(&mut self, signal: Signal) {
         if signal.code == SIGNAL {
             self.0 -= 1;
         }
@@ -152,11 +138,7 @@ fn signal_subscription_from_multiple_children() -> Result<(), Failure> {
     sim.node("parent.child", EmitSignal::<SIGNAL>(3));
     sim.node("parent.child.grandchild", EmitSignal::<SIGNAL>(7));
 
-    Builder::seeded(123)
-        .build(sim.freeze())
-        .run()
-        .as_result()
-        .map(|_| ())
+    sim.seeded(123).build().run().into_result().map(|_| ())
 }
 
 struct ExpectNSignalThenUnsubscribe<const SIGNAL: usize>(i32);
@@ -164,7 +146,7 @@ impl<const SIGNAL: usize> Module for ExpectNSignalThenUnsubscribe<SIGNAL> {
     fn at_sim_start(&mut self, _stage: usize) {
         current().subscribe_to(SIGNAL);
     }
-    fn handle_signal(&mut self, signal: des::net::module::Signal) {
+    fn handle_signal(&mut self, signal: Signal) {
         if signal.code == SIGNAL {
             self.0 -= 1;
             if self.0 == 0 {
@@ -203,9 +185,5 @@ fn signal_unsubscribe() -> Result<(), Failure> {
         ),
     );
 
-    Builder::seeded(123)
-        .build(sim.freeze())
-        .run()
-        .as_result()
-        .map(|_| ())
+    sim.seeded(123).build().run().into_result().map(|_| ())
 }

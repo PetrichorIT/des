@@ -3,10 +3,7 @@ use std::{
     sync::{Arc, atomic::AtomicUsize},
 };
 
-use des::{
-    net::{Sim, module::Module},
-    runtime::Builder,
-};
+use des::{Sim, module::Module};
 use des_ndl::{Ndl, Registry};
 use serial_test::serial;
 
@@ -28,7 +25,7 @@ fn drop_check_modules_net_from_ndl() -> Result<(), Box<dyn Error>> {
         "",
         Ndl::from_str(&mut registry, include_str!("ndl/drop-test.yml"))?,
     )?;
-    let rtr = Builder::seeded(123).build(sim.freeze()).run();
+    let rtr = sim.seeded(123).build().run();
     drop(rtr);
 
     assert_eq!(drop_counter.load(std::sync::atomic::Ordering::SeqCst), 2);

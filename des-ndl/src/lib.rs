@@ -38,16 +38,17 @@
 //!             return;
 //!         },
 //!     };
-//!     let rt = Builder::new().build(app.freeze());
-//!     let _ = rt.run();
+//!     let _ = app.build().run();
 //! }
 //! ```
 
 use des::{
-    net::{
-        self, IntoModuleTree, Sim, SimBuilder, channel::ChannelDropBehaviour, module::ModuleContext,
-    },
+    Sim, SimBuilder,
+    channel::ChannelDropBehaviour,
+    gate::GateRef,
+    module::ModuleContext,
     prelude::{DatarateChannel, DatarateChannelMetrics, Module, ModuleRef, ObjectPath, Spawner},
+    runtime::IntoModuleTree,
     time::Duration,
 };
 use std::{
@@ -235,7 +236,7 @@ impl SimExt for Sim<()> {
 fn access_gate(
     ctx: &ModuleContext,
     accessors: &[lang::tree::ConnectionEndpointAccessor],
-) -> Option<net::gate::GateRef> {
+) -> Option<GateRef> {
     assert!(!accessors.is_empty(), "accessors must be non-empty");
     let accessor = &accessors[0];
     if accessors.len() == 1 {
