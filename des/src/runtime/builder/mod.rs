@@ -7,12 +7,12 @@ use serde_norway::{Value, from_str};
 
 use crate::{
     ObjectPath, Sim,
-    gate::GateRef,
+    gate::{AbstractGateRef, GateRef},
     module::{Cfg, ModuleRef, UnwindBehaviour},
     processing::ProcessingStack,
-    runtime::IntoModuleTree,
     runtime::{
-        RunParameters, State, bench::Profiler, event::FutureEventSet, limit::RuntimeLimit, set_rng,
+        IntoModuleTree, RunParameters, State, bench::Profiler, event::FutureEventSet,
+        limit::RuntimeLimit, set_rng,
     },
     time::SimTime,
 };
@@ -309,6 +309,48 @@ impl<A> SimBuilder<A> {
             gate
         } else {
             module.create_gate(gate)
+        }
+    }
+
+    /// Creates a gate on a allready created module.
+    ///
+    /// The module will be defined `path` and the gate will be named `gate`.
+    /// Should such a gate allready exist, the allready existing gate will be
+    /// returned.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use des::prelude::*;
+    /// # struct SomeModule;
+    /// # impl Module for SomeModule {}
+    /// let mut sim = Sim::new(());
+    /// sim.node("alice", SomeModule);
+    /// sim.node("bob", SomeModule);
+    ///
+    /// let a = sim.gate("alice", "in");
+    /// let b = sim.gate("bob", "out");
+    ///
+    /// b.connect(a);
+    ///
+    /// let _ = sim.build().run();
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// This function panic if node modules exists at `path`.
+    #[track_caller]
+    pub fn abstract_gate(&mut self, path: impl Into<ObjectPath>, gate: &str) -> AbstractGateRef {
+        let path = path.into();
+        let Some(module) = self.get(path.as_ref()) else {
+            panic!(
+                "cannot create abstract gate '{path}.{gate}', because node '{path}' does not exist"
+            )
+        };
+        if let Some(gate) = module.abstract_gate(gate) {
+            gate
+        } else {
+            module.create_abstract_gate(gate)
         }
     }
 

@@ -3,10 +3,9 @@ use std::{any::Any, time::Duration};
 use des::{
     Sim,
     channel::{SendContext, SendError},
-    gate::{Connection, IntoModuleGate},
+    gate::{Connection, IntoGate, IntoModuleGate},
     prelude::{Channel, ChannelRef, GateRef, Message, Module, current, send},
-    runtime::handlers::HandlerFn,
-    runtime::{ChannelUnbusyNotif, MessageExitingConnection, NetEvents},
+    runtime::{ChannelUnbusyNotif, MessageExitingConnection, NetEvents, handlers::HandlerFn},
     time::{SimTime, interval, sleep_until},
 };
 

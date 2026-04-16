@@ -1,5 +1,6 @@
+use crate::gate::{AbstractGate, AbstractGateRef, Gate};
 use crate::module::State;
-use crate::prelude::{Gate, GateRef};
+use crate::prelude::GateRef;
 use crate::processing::{ModuleImpl, ProcessingStack};
 
 use super::{DummyModule, Module, ModuleContext};
@@ -179,18 +180,19 @@ impl ModuleRef {
     ///
     #[must_use]
     pub fn create_gate_cluster(&self, name: &str, size: usize) -> Vec<GateRef> {
-        (0..size)
-            .map(|id| self.create_raw_gate(name, size, id))
-            .collect()
+        (0..size).map(|id| self.create_raw_gate(name, id)).collect()
     }
 
     /// Creates a gate on the current module, returning its ID.
-    ///
     #[must_use]
-    pub fn create_raw_gate(&self, name: &str, size: usize, pos: usize) -> GateRef {
-        let gate = Gate::new(self, name, size, pos);
-        self.ctx.gates.write().push(gate.clone());
-        gate
+    pub fn create_raw_gate(&self, name: &str, pos: usize) -> GateRef {
+        Gate::new(self, name, Some(pos))
+    }
+
+    /// Creates an abstract gate on the current module.
+    #[must_use]
+    pub fn create_abstract_gate(&self, name: &str) -> AbstractGateRef {
+        AbstractGate::new(self, name.to_owned())
     }
 }
 

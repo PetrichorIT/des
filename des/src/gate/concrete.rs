@@ -1,12 +1,11 @@
-//! Module-specific network ports.
-
 use crate::channel::{ChannelRef, IntoDuplexChannel};
+use crate::gate::{Entry, IntoGate};
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::sync::{Arc, Mutex, Weak};
 
-use super::ObjectPath;
-use super::module::{ModuleContext, ModuleRef, ModuleRefWeak};
+use crate::ObjectPath;
+use crate::module::{ModuleRef, ModuleRefWeak};
 
 /// A  reference to a gate.
 pub type GateRef = Arc<Gate>;
@@ -17,10 +16,7 @@ pub(crate) type GateRefWeak = Weak<Gate>;
 pub struct Gate {
     owner: ModuleRefWeak,
     name: String,
-
-    size: usize,
     pos: usize,
-
     connections: Mutex<Connections>,
 }
 
@@ -189,7 +185,7 @@ impl Gate {
     /// or a single gate
     #[must_use]
     pub fn is_cluster(&self) -> bool {
-        self.size != 1
+        self.size() != 1 || self.pos() > 0 // TODO: remake this
     }
 
     /// The position index of the gate within the descriptor cluster.
@@ -201,7 +197,7 @@ impl Gate {
     /// The size of the gate cluster.
     #[must_use]
     pub fn size(&self) -> usize {
-        self.size
+        self.owner().gates.read().size_of(&self.name)
     }
 
     /// The human-readable name for the allocated gate cluster.
@@ -278,41 +274,11 @@ impl Gate {
     /// This function panic if either of the two gates is allready fully connected in a chain.
     /// This function also panics if only one gate is provided
     #[allow(clippy::needless_pass_by_value)]
-    pub fn connect(self: GateRef, other: GateRef) {
-        self.connect_with::<(ChannelRef, ChannelRef)>(other, None);
-    }
-
-    /// Connects two gates into a gate chain element.
-    ///
-    /// Gates can be organized into a bidirectional gate chain, that
-    /// forwards messages two the other end. Using this function two gates
-    /// are connected and both gates save their connection state. A gate
-    /// can have up to two other gates connected to it, forming a full gate
-    /// chain in response.
-    ///
-    /// If a channel was provided to enable message delaying on this chain element
-    /// both direction will have unique instances of the channel, with identical
-    /// configuration.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use des::prelude::*;
-    /// # fn a() -> Option<()>{
-    /// # return None;
-    /// let a = current().gate(("out", 0))?;
-    /// let b = current().parent().ok()?.gate(("in", 0))?;
-    /// a.connect(b);
-    /// # Some(())
-    /// # }
-    /// ```
-    ///
-    /// # Panics
-    ///
-    /// This function panic if either of the two gates is allready fully connected in a chain.
-    /// This function also panics if only one gate is provided
-    #[allow(clippy::needless_pass_by_value)]
-    pub fn connect_with<C: IntoDuplexChannel>(self: GateRef, other: GateRef, channel: Option<C>) {
+    pub(super) fn raw_connect_with<C: IntoDuplexChannel>(
+        self: GateRef,
+        other: GateRef,
+        channel: Option<C>,
+    ) {
         assert!(
             !Arc::ptr_eq(&self, &other),
             "Cannot connect gate to itself."
@@ -493,22 +459,71 @@ impl Gate {
             .expect("cannot refer to gate owner during drop")
     }
 
+    fn raw(owner: &ModuleRef, name: &str, pos: usize) -> GateRef {
+        GateRef::new(Gate {
+            owner: ModuleRefWeak::new(owner),
+            name: name.to_owned(),
+            pos,
+            connections: Mutex::new(Connections::new()),
+        })
+    }
+
     /// Creats a new gate using the given values.
     ///
     /// # Panics
     ///
     /// Panics if the provided size is not real positive.
     #[must_use]
-    pub fn new(owner: &ModuleRef, name: impl AsRef<str>, size: usize, pos: usize) -> GateRef {
-        assert!(size >= 1, "Cannot create with a non-postive size");
+    pub fn new(owner: &ModuleRef, name: &str, pos: Option<usize>) -> GateRef {
+        let mut handle = owner.gates.write();
 
-        GateRef::new(Self {
-            owner: ModuleRefWeak::new(owner),
-            name: name.as_ref().to_string(),
-            size,
-            pos,
-            connections: Mutex::new(Connections::new()),
-        })
+        // TODO: either disallow default gate creation for abstract clusters,
+        // or make counter more resillient to random choices
+        match (handle.namespaces.get_mut(name), pos) {
+            (Some(entry), Some(pos)) => {
+                let gate = Gate::raw(owner, name, pos);
+                entry.gates.push(gate.clone());
+                entry.gates.sort_by_key(|g| g.pos()); // Expensive
+                if let Some(counter) = &mut entry.prototype {
+                    *counter = entry
+                        .gates
+                        .iter()
+                        .map(|g| g.pos())
+                        .max()
+                        .unwrap_or_default()
+                        + 1;
+                }
+                gate
+            }
+            (None, Some(pos)) => {
+                let gate = Gate::raw(owner, name, pos);
+                handle.namespaces.insert(
+                    name.to_owned(),
+                    Entry {
+                        prototype: None,
+                        gates: vec![gate.clone()],
+                    },
+                );
+                gate
+            }
+            // We have ensured that counter i is an unoccupied number
+            (Some(entry), None) => {
+                if let Some(counter) = &mut entry.prototype {
+                    let gate = Gate::raw(owner, name, *counter);
+                    entry.gates.push(gate.clone());
+                    entry.gates.sort_by_key(|g| g.pos()); // Expensive
+                    *counter += 1;
+                    gate
+                } else {
+                    unreachable!(
+                        "calls with pos=None should only come from abstract gates, but this namespace is not abstract"
+                    )
+                }
+            }
+            (None, None) => unreachable!(
+                "calls with pos=None should only come from abstract gates, but none was found"
+            ),
+        }
     }
 
     pub(crate) fn dissolve_paths(&self) {
@@ -543,7 +558,6 @@ impl PartialEq for Gate {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name
             && Arc::ptr_eq(&self.owner().ctx, &other.owner().ctx)
-            && self.size == other.size
             && self.pos == other.pos
     }
 }
@@ -559,70 +573,23 @@ impl Hash for Gate {
     }
 }
 
-mod private {
-    pub trait Sealed {}
-}
-
-/// A trait for a type to refrence a module specific gate.
-pub trait IntoModuleGate: private::Sealed {
-    /// Extracts a gate identifier from a module using the given
-    /// value as implicit reference.
-    fn as_gate(&self, module: &ModuleContext) -> Option<GateRef>;
-}
-
-impl<T: IntoModuleGate> IntoModuleGate for &T {
-    fn as_gate(&self, module: &ModuleContext) -> Option<GateRef> {
-        T::as_gate(self, module)
+impl IntoGate for GateRef {
+    fn into_gate(&self) -> GateRef {
+        Arc::clone(self)
     }
 }
-impl<T: IntoModuleGate> private::Sealed for &T {}
-
-impl IntoModuleGate for GateRef {
-    fn as_gate(&self, _: &ModuleContext) -> Option<GateRef> {
-        Some(self.clone())
-    }
-}
-impl private::Sealed for GateRef {}
-
-impl IntoModuleGate for GateRefWeak {
-    fn as_gate(&self, _: &ModuleContext) -> Option<GateRef> {
-        self.upgrade()
-    }
-}
-impl private::Sealed for GateRefWeak {}
-
-impl IntoModuleGate for (&str, usize) {
-    fn as_gate(&self, module: &ModuleContext) -> Option<GateRef> {
-        module
-            .gates
-            .read()
-            .iter()
-            .find(|&g| g.name() == self.0 && g.pos() == self.1)
-            .cloned()
-    }
-}
-impl private::Sealed for (&str, usize) {}
-
-impl IntoModuleGate for &str {
-    fn as_gate(&self, module: &ModuleContext) -> Option<GateRef> {
-        module
-            .gates
-            .read()
-            .iter()
-            .find(|&g| g.name() == *self && g.size() == 1)
-            .cloned()
-    }
-}
-impl private::Sealed for &str {}
 
 #[cfg(test)]
 mod tests {
+    use crate::gate::IntoModuleGate;
+    use crate::module::ModuleContext;
+
     use super::*;
 
     #[test]
     fn fmt() {
         let owner = ModuleContext::new_root("root".into(), Weak::new());
-        let gate = Gate::new(&owner, "port", 4, 1);
+        let gate = Gate::new(&owner, "port", Some(1));
         assert_eq!(format!("{gate:?}"), "Gate { path: \"root.port[1]\" }");
         assert_eq!(gate.str(), "port[1]");
         assert_eq!(gate.path().as_str(), "root.port[1]");
@@ -631,14 +598,14 @@ mod tests {
     #[test]
     fn kind_and_iter() {
         let owner = ModuleContext::new_root("root".into(), Weak::new());
-        let gate_a = owner.create_raw_gate("port-a", 1, 0);
+        let gate_a = owner.create_raw_gate("port-a", 0);
         assert_eq!(gate_a.kind(), GateKind::Standalone);
 
-        let gate_b = owner.create_raw_gate("port-b", 1, 0);
+        let gate_b = owner.create_raw_gate("port-b", 0);
         gate_a.clone().connect(gate_b.clone());
         assert_eq!(gate_a.kind(), GateKind::Endpoint);
 
-        let gate_c = owner.create_raw_gate("port-c", 1, 0);
+        let gate_c = owner.create_raw_gate("port-c", 0);
         gate_a.clone().connect(gate_c.clone());
         assert_eq!(gate_a.kind(), GateKind::Transit);
 
@@ -656,10 +623,10 @@ mod tests {
     #[test]
     fn dedup() {
         let owner = ModuleContext::new_root("root".into(), Weak::new());
-        let gate = owner.create_raw_gate("port-a", 1, 0);
+        let gate = owner.create_raw_gate("port-a", 0);
         assert_eq!(gate.kind(), GateKind::Standalone);
 
-        let gate_b = owner.create_raw_gate("port-b", 1, 0);
+        let gate_b = owner.create_raw_gate("port-b", 0);
         gate.clone().connect(gate_b.clone());
         assert_eq!(gate.kind(), GateKind::Endpoint);
 
@@ -670,10 +637,10 @@ mod tests {
     #[test]
     fn disconnect() {
         let owner = ModuleContext::new_root("root".into(), Weak::new());
-        let gate_a = owner.create_raw_gate("port-a", 1, 0);
+        let gate_a = owner.create_raw_gate("port-a", 0);
         assert_eq!(gate_a.kind(), GateKind::Standalone);
 
-        let gate_b = owner.create_raw_gate("port-b", 1, 0);
+        let gate_b = owner.create_raw_gate("port-b", 0);
         gate_a.clone().connect(gate_b.clone());
         assert_eq!(gate_a.kind(), GateKind::Endpoint);
         assert_eq!(gate_b.kind(), GateKind::Endpoint);
@@ -707,7 +674,7 @@ mod tests {
     #[test]
     fn into_gate() {
         let ctx = ModuleContext::new_root("root".into(), Weak::new());
-        let gate_a = ctx.create_raw_gate("port-a", 1, 0);
+        let gate_a = ctx.create_raw_gate("port-a", 0);
 
         assert_eq!(gate_a.as_gate(&ctx.ctx), Some(gate_a.clone()));
         assert_eq!(

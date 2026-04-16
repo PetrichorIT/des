@@ -45,7 +45,7 @@
 use des::{
     Sim, SimBuilder,
     channel::ChannelDropBehaviour,
-    gate::GateRef,
+    gate::{GateRef, IntoGate},
     module::ModuleContext,
     prelude::{DatarateChannel, DatarateChannelMetrics, Module, ModuleRef, ObjectPath, Spawner},
     runtime::IntoModuleTree,

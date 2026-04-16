@@ -1,11 +1,12 @@
 use super::{DummyModule, ModuleRef, ModuleRefWeak, Prop, PropType, Props, RawProp};
 use crate::{
     Error, ErrorKind, ObjectPath,
-    gate::{GateRef, IntoModuleGate},
+    gate::{AbstractGateRef, GateRef, Gates, IntoModuleGate},
     module::SignalCode,
     processing::ProcessingStack,
-    runtime::Globals,
-    runtime::{EventExecutionContext, ModuleShutdownEvent, NetEvents, SimConfiguration, Spawner},
+    runtime::{
+        EventExecutionContext, Globals, ModuleShutdownEvent, NetEvents, SimConfiguration, Spawner,
+    },
     schedule_event,
     sync::SwapLock,
     time::SimTime,
@@ -55,7 +56,8 @@ pub struct ModuleContext {
 
     pub(crate) path: ObjectPath,
     pub(crate) state: Cell<State>,
-    pub(crate) gates: RwLock<Vec<GateRef>>,
+
+    pub(crate) gates: RwLock<Gates>,
     pub(crate) props: RwLock<Props>,
     pub(crate) unwind_behaviour: Cell<UnwindBehaviour>,
 
@@ -91,7 +93,6 @@ impl ModuleContext {
             unwind_behaviour: Cell::default(),
 
             gates: RwLock::default(),
-
             parent: None,
             children: RwLock::default(),
             state_change_wakers: RwLock::default(),
@@ -124,7 +125,6 @@ impl ModuleContext {
             unwind_behaviour: Cell::default(),
 
             gates: RwLock::default(),
-
             parent: Some(ModuleRefWeak::new(&parent)),
             children: RwLock::default(),
             state_change_wakers: RwLock::default(),
@@ -451,13 +451,18 @@ impl ModuleContext {
 
     /// Returns a unstructured list of all gates from the current module.
     pub fn gates(&self) -> Vec<GateRef> {
-        self.gates.read().clone()
+        self.gates.read().gates()
     }
 
     /// Returns a ref to a gate of the current module dependent on its name and cluster position
     /// if possible.
     pub fn gate(&self, desc: impl IntoModuleGate) -> Option<GateRef> {
         desc.as_gate(self)
+    }
+
+    /// Returns a ref to an abstract gate of the current module.
+    pub fn abstract_gate(&self, desc: &str) -> Option<AbstractGateRef> {
+        self.gates.read().get_abstract(&self.me(), desc)
     }
 
     /// Returns the unwind behaviour of this module.

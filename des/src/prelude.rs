@@ -34,6 +34,7 @@ pub use crate::channel::SendError;
 
 pub use crate::gate::Gate;
 pub use crate::gate::GateRef;
+pub use crate::gate::IntoGate;
 
 pub use crate::topology::Topology;
 
