@@ -26,7 +26,7 @@ pub use self::concrete::*;
 /// A type that can be used in gate-operations.
 pub trait IntoGate {
     /// Converts the value into a concrete gate reference.
-    fn into_gate(&self) -> GateRef;
+    fn into_gate(self) -> GateRef;
 
     /// Connects two gates into a gate chain element.
     ///
@@ -102,9 +102,9 @@ pub trait IntoGate {
     }
 }
 
-impl<'a, G: IntoGate> IntoGate for &'a G {
-    fn into_gate(&self) -> GateRef {
-        (*self).into_gate()
+impl<G: IntoGate + Clone> IntoGate for &G {
+    fn into_gate(self) -> GateRef {
+        self.clone().into_gate()
     }
 }
 

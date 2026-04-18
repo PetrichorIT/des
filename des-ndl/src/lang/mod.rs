@@ -404,5 +404,8 @@ fn iter_for_kardinality_access<'a>(
             name: ident.to_string(),
             index: Some(i),
         }))),
+
+        _ => todo!(),
+        // (ClusterUnsized, _) => panic!("unsized clusters are not allowed for submodules"),
     }
 }

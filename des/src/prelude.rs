@@ -24,6 +24,7 @@ pub use crate::message::{schedule_at, schedule_in, send, send_at, send_in};
 pub use crate::runtime::Globals;
 pub use crate::runtime::Sim;
 pub use crate::runtime::Spawner;
+pub use crate::runtime::random;
 
 pub use crate::channel::Channel;
 pub use crate::channel::ChannelDropBehaviour;

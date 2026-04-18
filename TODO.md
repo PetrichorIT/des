@@ -73,3 +73,22 @@ See branch "integrated-runtime"
 
 3)
 needs tokio PR
+
+4)
+Decide how to access abstract gates (maybe using gate(...) should already clone?)
+
+
+gate(<name>) will resolve to either a single-gate-cluster or an abstract gate (if present)
+  -> abstract gate will be prioritized
+  gate(<name>) if <name> abstract = <abstrac gate>
+  gate(<name>) if <name> has only one gate = <that gate>
+  game(<name>) if <name> namespace = error
+  game(<name>) else = error
+  
+gate(<name>, <pos>) will always resolve to a c agte
+
+Sim::gate maintains that behaviour
+
+trait IntoModuleTree for most gate APIs ?
+-> or just to resolve send(...) APIs
+-> into gate?

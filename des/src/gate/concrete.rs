@@ -574,8 +574,8 @@ impl Hash for Gate {
 }
 
 impl IntoGate for GateRef {
-    fn into_gate(&self) -> GateRef {
-        Arc::clone(self)
+    fn into_gate(self) -> GateRef {
+        self
     }
 }
 

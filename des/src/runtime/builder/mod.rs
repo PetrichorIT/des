@@ -312,11 +312,11 @@ impl<A> SimBuilder<A> {
         }
     }
 
-    /// Creates a gate on a allready created module.
+    /// Creates an abstrract gate on a already created module.
     ///
-    /// The module will be defined `path` and the gate will be named `gate`.
-    /// Should such a gate allready exist, the allready existing gate will be
-    /// returned.
+    /// The module will be defined `path` and the abstract gate will be in the namespace `gate`.
+    /// Should the namespace already exist (defined as abstract), a reference to the
+    /// existing abstract gate will be returned.
     ///
     /// # Examples
     ///
@@ -328,8 +328,8 @@ impl<A> SimBuilder<A> {
     /// sim.node("alice", SomeModule);
     /// sim.node("bob", SomeModule);
     ///
-    /// let a = sim.gate("alice", "in");
-    /// let b = sim.gate("bob", "out");
+    /// let a = sim.abstract_gate("alice", "in");
+    /// let b = sim.abstract_gate("bob", "out");
     ///
     /// b.connect(a);
     ///

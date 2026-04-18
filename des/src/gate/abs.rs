@@ -22,7 +22,12 @@ pub struct AbstractGate {
 
 impl AbstractGate {
     /// Creates a new abstract gate in a detached state.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the chosen namespace is already occupied.
     #[must_use]
+    #[track_caller]
     pub fn new(owner: &ModuleRef, name: String) -> AbstractGateRef {
         let mut handle = owner.gates.write();
         assert!(
@@ -80,7 +85,7 @@ impl AbstractGate {
 }
 
 impl IntoGate for AbstractGateRef {
-    fn into_gate(&self) -> GateRef {
+    fn into_gate(self) -> GateRef {
         let module = self.owner.upgrade().expect("could not access owner");
         Gate::new(&module, self.name(), None)
     }

@@ -150,6 +150,8 @@ pub enum Kardinality {
     Atom,
     /// A cluster or index defintion with a size or index.
     Cluster(usize),
+    /// Unsized cluster
+    ClusterUnsized,
 }
 
 //
@@ -338,6 +340,7 @@ impl Display for FieldDef {
         match self.kardinality {
             Kardinality::Atom => write!(f, "{}", self.ident),
             Kardinality::Cluster(n) => write!(f, "{}[{}]", self.ident, n),
+            Kardinality::ClusterUnsized => write!(f, "{}[]", self.ident),
         }
     }
 }
@@ -376,10 +379,11 @@ impl FromStr for FieldDef {
 
 impl Kardinality {
     #[must_use]
-    pub(crate) fn as_size(&self) -> usize {
+    pub(crate) fn as_size(&self) -> Option<usize> {
         match self {
-            Kardinality::Atom => 1,
-            Kardinality::Cluster(n) => *n,
+            Kardinality::Atom => Some(1),
+            Kardinality::Cluster(n) => Some(*n),
+            Kardinality::ClusterUnsized => None,
         }
     }
 }

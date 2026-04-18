@@ -147,7 +147,11 @@ fn build_tree<A, L: Layer>(
 
     let ctx = spawn_raw_node(&scope, &symbol, registry, &mut spawner)?;
     for gate in &node.gates {
-        let _ = ctx.create_gate_cluster(&gate.ident, gate.kardinality.as_size());
+        if let Some(size) = gate.kardinality.as_size() {
+            let _ = ctx.create_gate_cluster(&gate.ident, size);
+        } else {
+            let _ = ctx.create_abstract_gate(&gate.ident);
+        }
     }
 
     for submodule in &node.submodules {
@@ -162,6 +166,9 @@ fn build_tree<A, L: Layer>(
                     let subscope = spawner.subscope(format!("{ident}[{k}]"));
                     build_tree(&submodule.typ, registry, subscope)?;
                 }
+            }
+            lang::def::Kardinality::ClusterUnsized => {
+                panic!("unsized clusters are not allowed for submodules")
             }
         }
     }
