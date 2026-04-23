@@ -1,4 +1,4 @@
-use std::{fmt::Debug, sync::Arc};
+use std::{fmt::Debug, iter::from_fn, sync::Arc};
 
 use crate::{
     ObjectPath, SimBuilder, globals,
@@ -105,22 +105,17 @@ impl<'a, A> InnerSpawner<'a, A> {
         }
     }
 
+    // TODO: still a duplicate of the impl in SimBuilder -> remove if possible
     fn create_gates(&mut self, path: &ObjectPath, gate: &str, size: usize) -> Vec<GateRef> {
         let Some(module) = self.get(path.as_ref()) else {
             panic!("cannot create gate '{path}.{gate}', because node '{path}' does not exist")
         };
 
-        let mut gates = Vec::new();
-        for k in 0..size {
-            if let Some(gate) = module.gate((gate, k)) {
-                gates.push(gate);
-            } else {
-                break;
-            }
-        }
+        let mut iter = 0..size;
+        let gates = from_fn(|| module.gate((gate, iter.next()?))).collect::<Vec<_>>();
 
         match gates.len() {
-            0 => module.create_gate_cluster(gate, size),
+            0 => (0..size).map(|pos| module.create_gate(gate, pos)).collect(),
             s if s == size => gates,
             _ => panic!("cannot create gate cluster from partial gate cluster"),
         }

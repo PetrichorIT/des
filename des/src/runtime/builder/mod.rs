@@ -1,13 +1,13 @@
 #[cfg(feature = "cqueue")]
 use std::time::Duration;
-use std::{fmt, fs, io, ops::Deref, path::Path, sync::Arc};
+use std::{fmt, fs, io, iter::from_fn, ops::Deref, path::Path, sync::Arc};
 
 use rand::{RngCore, SeedableRng};
 use serde_norway::{Value, from_str};
 
 use crate::{
     ObjectPath, Sim,
-    gate::{AbstractGateRef, GateRef},
+    gate::{GateClusterRef, GateRef},
     module::{Cfg, ModuleRef, UnwindBehaviour},
     processing::ProcessingStack,
     runtime::{
@@ -308,7 +308,7 @@ impl<A> SimBuilder<A> {
         if let Some(gate) = module.gate((gate, 0)) {
             gate
         } else {
-            module.create_gate(gate)
+            module.create_singular_gate(gate)
         }
     }
 
@@ -328,8 +328,8 @@ impl<A> SimBuilder<A> {
     /// sim.node("alice", SomeModule);
     /// sim.node("bob", SomeModule);
     ///
-    /// let a = sim.abstract_gate("alice", "in");
-    /// let b = sim.abstract_gate("bob", "out");
+    /// let a = sim.gate_cluster("alice", "in");
+    /// let b = sim.gate_cluster("bob", "out");
     ///
     /// b.connect(a);
     ///
@@ -340,17 +340,17 @@ impl<A> SimBuilder<A> {
     ///
     /// This function panic if node modules exists at `path`.
     #[track_caller]
-    pub fn abstract_gate(&mut self, path: impl Into<ObjectPath>, gate: &str) -> AbstractGateRef {
+    pub fn gate_cluster(&mut self, path: impl Into<ObjectPath>, gate: &str) -> GateClusterRef {
         let path = path.into();
         let Some(module) = self.get(path.as_ref()) else {
             panic!(
                 "cannot create abstract gate '{path}.{gate}', because node '{path}' does not exist"
             )
         };
-        if let Some(gate) = module.abstract_gate(gate) {
+        if let Some(gate) = module.gate_cluster(gate) {
             gate
         } else {
-            module.create_abstract_gate(gate)
+            module.create_gate_cluster(gate)
         }
     }
 
@@ -369,22 +369,14 @@ impl<A> SimBuilder<A> {
         let Some(module) = self.get(path.as_ref()) else {
             panic!("cannot create gate '{path}.{gate}', because node '{path}' does not exist")
         };
-        let mut gates = Vec::new();
-        for k in 0..size {
-            if let Some(gate) = module.gate((gate, k)) {
-                gates.push(gate);
-            } else {
-                break;
-            }
-        }
-        if gates.len() == size {
-            gates
-        } else {
-            assert!(
-                gates.is_empty(),
-                "cannot create gate cluster from partial gate cluster"
-            );
-            module.create_gate_cluster(gate, size)
+
+        let mut iter = 0..size;
+        let gates = from_fn(|| module.gate((gate, iter.next()?))).collect::<Vec<_>>();
+
+        match gates.len() {
+            0 => (0..size).map(|pos| module.create_gate(gate, pos)).collect(),
+            s if s == size => gates,
+            _ => panic!("cannot create gate cluster from partial gate cluster"),
         }
     }
 

@@ -1,4 +1,4 @@
-use crate::gate::{AbstractGate, AbstractGateRef, Gate};
+use crate::gate::{Gate, GateCluster, GateClusterRef};
 use crate::module::State;
 use crate::prelude::GateRef;
 use crate::processing::{ModuleImpl, ProcessingStack};
@@ -73,8 +73,13 @@ impl ModuleRef {
         let stack = ModuleImpl::new(module.stack(ProcessingStack::default()), module);
         let processing = Arc::new(RefCell::new(stack));
         let this = Self { ctx, processing };
-        *this.ctx.me.write() = ModuleRefWeak::new(&this);
+        this.self_attach();
         this
+    }
+
+    pub(crate) fn self_attach(&self) {
+        *self.ctx.me.write() = ModuleRefWeak::new(self);
+        self.ctx.gates.write().attach(self);
     }
 
     #[allow(unused)]
@@ -169,30 +174,21 @@ impl ModuleRef {
     }
 
     /// Creates a gate on the current module, returning its ID.
-    ///
     #[must_use]
-    pub fn create_gate(&self, name: &str) -> GateRef {
-        self.create_gate_cluster(name, 1).remove(0)
-    }
-
-    ///
-    /// Createas a cluster of gates on the current module returning their IDs.
-    ///
-    #[must_use]
-    pub fn create_gate_cluster(&self, name: &str, size: usize) -> Vec<GateRef> {
-        (0..size).map(|id| self.create_raw_gate(name, id)).collect()
+    pub fn create_singular_gate(&self, name: &str) -> GateRef {
+        self.create_gate(name, 0)
     }
 
     /// Creates a gate on the current module, returning its ID.
     #[must_use]
-    pub fn create_raw_gate(&self, name: &str, pos: usize) -> GateRef {
+    pub fn create_gate(&self, name: &str, pos: usize) -> GateRef {
         Gate::new(self, name, Some(pos))
     }
 
     /// Creates an abstract gate on the current module.
     #[must_use]
-    pub fn create_abstract_gate(&self, name: &str) -> AbstractGateRef {
-        AbstractGate::new(self, name.to_owned())
+    pub fn create_gate_cluster(&self, name: &str) -> GateClusterRef {
+        GateCluster::new(self, name.to_owned(), true)
     }
 }
 

@@ -1,7 +1,7 @@
 use super::{DummyModule, ModuleRef, ModuleRefWeak, Prop, PropType, Props, RawProp};
 use crate::{
     Error, ErrorKind, ObjectPath,
-    gate::{AbstractGateRef, GateRef, Gates, IntoModuleGate},
+    gate::{GateClusterRef, GateRef, Gates, IntoModuleGate},
     module::SignalCode,
     processing::ProcessingStack,
     runtime::{
@@ -461,8 +461,8 @@ impl ModuleContext {
     }
 
     /// Returns a ref to an abstract gate of the current module.
-    pub fn abstract_gate(&self, desc: &str) -> Option<AbstractGateRef> {
-        self.gates.read().get_abstract(&self.me(), desc)
+    pub fn gate_cluster(&self, desc: &str) -> Option<GateClusterRef> {
+        self.gates.read().get_cluster(&self.me(), desc)
     }
 
     /// Returns the unwind behaviour of this module.

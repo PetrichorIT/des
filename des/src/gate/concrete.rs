@@ -1,5 +1,5 @@
 use crate::channel::{ChannelRef, IntoDuplexChannel};
-use crate::gate::{Entry, IntoGate};
+use crate::gate::{GateClusterRef, IntoGate};
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::sync::{Arc, Mutex, Weak};
@@ -198,6 +198,14 @@ impl Gate {
     #[must_use]
     pub fn size(&self) -> usize {
         self.owner().gates.read().size_of(&self.name)
+    }
+
+    /// Retrives the cluster descriptor for this gate.
+    #[must_use]
+    pub fn cluster(&self) -> GateClusterRef {
+        self.owner().gates.read().namespaces[self.name()]
+            .cluster
+            .clone()
     }
 
     /// The human-readable name for the allocated gate cluster.
@@ -459,9 +467,9 @@ impl Gate {
             .expect("cannot refer to gate owner during drop")
     }
 
-    fn raw(owner: &ModuleRef, name: &str, pos: usize) -> GateRef {
+    pub(super) fn raw(owner: ModuleRefWeak, name: &str, pos: usize) -> GateRef {
         GateRef::new(Gate {
-            owner: ModuleRefWeak::new(owner),
+            owner,
             name: name.to_owned(),
             pos,
             connections: Mutex::new(Connections::new()),
@@ -476,54 +484,7 @@ impl Gate {
     #[must_use]
     pub fn new(owner: &ModuleRef, name: &str, pos: Option<usize>) -> GateRef {
         let mut handle = owner.gates.write();
-
-        // TODO: either disallow default gate creation for abstract clusters,
-        // or make counter more resillient to random choices
-        match (handle.namespaces.get_mut(name), pos) {
-            (Some(entry), Some(pos)) => {
-                let gate = Gate::raw(owner, name, pos);
-                entry.gates.push(gate.clone());
-                entry.gates.sort_by_key(|g| g.pos()); // Expensive
-                if let Some(counter) = &mut entry.prototype {
-                    *counter = entry
-                        .gates
-                        .iter()
-                        .map(|g| g.pos())
-                        .max()
-                        .unwrap_or_default()
-                        + 1;
-                }
-                gate
-            }
-            (None, Some(pos)) => {
-                let gate = Gate::raw(owner, name, pos);
-                handle.namespaces.insert(
-                    name.to_owned(),
-                    Entry {
-                        prototype: None,
-                        gates: vec![gate.clone()],
-                    },
-                );
-                gate
-            }
-            // We have ensured that counter i is an unoccupied number
-            (Some(entry), None) => {
-                if let Some(counter) = &mut entry.prototype {
-                    let gate = Gate::raw(owner, name, *counter);
-                    entry.gates.push(gate.clone());
-                    entry.gates.sort_by_key(|g| g.pos()); // Expensive
-                    *counter += 1;
-                    gate
-                } else {
-                    unreachable!(
-                        "calls with pos=None should only come from abstract gates, but this namespace is not abstract"
-                    )
-                }
-            }
-            (None, None) => unreachable!(
-                "calls with pos=None should only come from abstract gates, but none was found"
-            ),
-        }
+        handle.create_gate(name, pos)
     }
 
     pub(crate) fn dissolve_paths(&self) {
@@ -541,8 +502,12 @@ impl Gate {
 #[allow(clippy::missing_fields_in_debug)]
 impl Debug for Gate {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Custom impl to take only weak locks
         f.debug_struct("Gate")
-            .field("path", &self.path().as_str())
+            .field(
+                "path",
+                &format!("{}.{}[{}]", self.owner().path, self.name(), self.pos()),
+            )
             .finish()
     }
 }
@@ -598,14 +563,14 @@ mod tests {
     #[test]
     fn kind_and_iter() {
         let owner = ModuleContext::new_root("root".into(), Weak::new());
-        let gate_a = owner.create_raw_gate("port-a", 0);
+        let gate_a = owner.create_gate("port-a", 0);
         assert_eq!(gate_a.kind(), GateKind::Standalone);
 
-        let gate_b = owner.create_raw_gate("port-b", 0);
+        let gate_b = owner.create_gate("port-b", 0);
         gate_a.clone().connect(gate_b.clone());
         assert_eq!(gate_a.kind(), GateKind::Endpoint);
 
-        let gate_c = owner.create_raw_gate("port-c", 0);
+        let gate_c = owner.create_gate("port-c", 0);
         gate_a.clone().connect(gate_c.clone());
         assert_eq!(gate_a.kind(), GateKind::Transit);
 
@@ -623,10 +588,10 @@ mod tests {
     #[test]
     fn dedup() {
         let owner = ModuleContext::new_root("root".into(), Weak::new());
-        let gate = owner.create_raw_gate("port-a", 0);
+        let gate = owner.create_gate("port-a", 0);
         assert_eq!(gate.kind(), GateKind::Standalone);
 
-        let gate_b = owner.create_raw_gate("port-b", 0);
+        let gate_b = owner.create_gate("port-b", 0);
         gate.clone().connect(gate_b.clone());
         assert_eq!(gate.kind(), GateKind::Endpoint);
 
@@ -637,10 +602,10 @@ mod tests {
     #[test]
     fn disconnect() {
         let owner = ModuleContext::new_root("root".into(), Weak::new());
-        let gate_a = owner.create_raw_gate("port-a", 0);
+        let gate_a = owner.create_gate("port-a", 0);
         assert_eq!(gate_a.kind(), GateKind::Standalone);
 
-        let gate_b = owner.create_raw_gate("port-b", 0);
+        let gate_b = owner.create_gate("port-b", 0);
         gate_a.clone().connect(gate_b.clone());
         assert_eq!(gate_a.kind(), GateKind::Endpoint);
         assert_eq!(gate_b.kind(), GateKind::Endpoint);
@@ -653,9 +618,9 @@ mod tests {
     #[test]
     fn disconnect_all() {
         let owner = ModuleContext::new_root("root".into(), Weak::new());
-        let a = owner.create_gate("a");
-        let b = owner.create_gate("b");
-        let c = owner.create_gate("c");
+        let a = owner.create_singular_gate("a");
+        let b = owner.create_singular_gate("b");
+        let c = owner.create_singular_gate("c");
 
         a.clone().connect(b.clone());
         a.clone().connect(c.clone());
@@ -672,9 +637,20 @@ mod tests {
     }
 
     #[test]
+    fn cluster_members() {
+        let owner = ModuleContext::new_root("root".into(), Weak::new());
+        let a0 = owner.create_gate("a", 0);
+        let a1 = owner.create_gate("a", 1);
+        let a2 = owner.create_gate("a", 2);
+
+        assert_eq!(a0.cluster(), a1.cluster());
+        assert_eq!(a1.cluster(), a2.cluster());
+    }
+
+    #[test]
     fn into_gate() {
         let ctx = ModuleContext::new_root("root".into(), Weak::new());
-        let gate_a = ctx.create_raw_gate("port-a", 0);
+        let gate_a = ctx.create_gate("port-a", 0);
 
         assert_eq!(gate_a.as_gate(&ctx.ctx), Some(gate_a.clone()));
         assert_eq!(

@@ -148,9 +148,11 @@ fn build_tree<A, L: Layer>(
     let ctx = spawn_raw_node(&scope, &symbol, registry, &mut spawner)?;
     for gate in &node.gates {
         if let Some(size) = gate.kardinality.as_size() {
-            let _ = ctx.create_gate_cluster(&gate.ident, size);
+            for pos in 0..size {
+                let _ = ctx.create_gate(&gate.ident, pos);
+            }
         } else {
-            let _ = ctx.create_abstract_gate(&gate.ident);
+            let _ = ctx.create_gate_cluster(&gate.ident);
         }
     }
 
