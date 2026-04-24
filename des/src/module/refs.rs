@@ -1,3 +1,5 @@
+use des_sync_utils::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+
 use crate::gate::{Gate, GateCluster, GateClusterRef};
 use crate::module::State;
 use crate::prelude::GateRef;
@@ -5,7 +7,6 @@ use crate::processing::{ModuleImpl, ProcessingStack};
 
 use super::{DummyModule, Module, ModuleContext};
 use std::any::Any;
-use std::cell::{Ref, RefCell, RefMut};
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::ops::Deref;
@@ -14,7 +15,7 @@ use std::sync::{Arc, Weak};
 #[derive(Clone)]
 pub(crate) struct ModuleRefWeak {
     ctx: Weak<ModuleContext>,
-    handler: Weak<RefCell<ModuleImpl>>,
+    handler: Weak<RwLock<ModuleImpl>>,
 }
 
 impl ModuleRefWeak {
@@ -54,7 +55,7 @@ impl Debug for ModuleRefWeak {
 #[derive(Clone)]
 pub struct ModuleRef {
     pub(crate) ctx: Arc<ModuleContext>,
-    pub(crate) processing: Arc<RefCell<ModuleImpl>>,
+    pub(crate) processing: Arc<RwLock<ModuleImpl>>,
 }
 
 impl Deref for ModuleRef {
@@ -71,7 +72,7 @@ impl ModuleRef {
         // all dyn Module calls would panic
         let module = Box::new(DummyModule {});
         let stack = ModuleImpl::new(module.stack(ProcessingStack::default()), module);
-        let processing = Arc::new(RefCell::new(stack));
+        let processing = Arc::new(RwLock::new(stack));
         let this = Self { ctx, processing };
         this.self_attach();
         this
@@ -86,9 +87,14 @@ impl ModuleRef {
     // Caller must ensure that handler is indeed a dummy
     #[doc(hidden)]
     pub fn upgrade_dummy(&self, module: ModuleImpl) {
-        let celled = RefCell::new(module);
-        self.processing.swap(&celled);
+        self.processing.set(module);
         self.ctx.state.set(State::Initialized);
+    }
+
+    /// Indicates whether the referenced module is of type T.
+    #[must_use]
+    pub fn is<T: Any>(&self) -> bool {
+        self.processing.read().downcast_element_ref::<T>().is_some()
     }
 
     /// Borrows the referenced module as a readonly reference
@@ -99,7 +105,7 @@ impl ModuleRef {
     /// Panics if either the module is not of type T,
     /// or the module is allready borrowed mutably.
     #[must_use]
-    pub fn as_ref<T: Any>(&self) -> Ref<'_, T> {
+    pub fn as_ref<T: Any>(&self) -> RwLockReadGuard<'_, T> {
         self.try_as_ref::<T>()
             .expect("Failed to cast ModuleRef to readonly reference to type T")
     }
@@ -118,14 +124,10 @@ impl ModuleRef {
     /// or the reference module is `self` and a module-specific function is called.
     ///
     #[must_use]
-    pub fn try_as_ref<T: Any>(&self) -> Option<Ref<'_, T>> {
-        Ref::filter_map(
-            self.processing.try_borrow()
-                .expect("could not aquire handle to node implementation, since the implementation is currently active"),
-            |processor| {
-                processor.downcast_element_ref::<T>()
-            }
-        ).ok()
+    pub fn try_as_ref<T: Any>(&self) -> Option<RwLockReadGuard<'_, T>> {
+        RwLockReadGuard::filter_map(self.processing.read(), |processor| {
+            processor.downcast_element_ref::<T>()
+        })
     }
 
     /// Borrows the referenced module as a mutable reference
@@ -136,7 +138,7 @@ impl ModuleRef {
     /// Panics if either the module is not of type T,
     /// or the module is allready borrowed on any way.
     #[must_use]
-    pub fn as_mut<T: Any>(&self) -> RefMut<'_, T> {
+    pub fn as_mut<T: Any>(&self) -> RwLockWriteGuard<'_, T> {
         self.try_as_mut()
             .expect("Failed to cast ModuleRef to mutable reference to type T")
     }
@@ -155,14 +157,10 @@ impl ModuleRef {
     /// or the reference module is `self` and a module-specific function is called.
     ///
     #[must_use]
-    pub fn try_as_mut<T: Any>(&self) -> Option<RefMut<'_, T>> {
-        RefMut::filter_map(
-            self.processing.try_borrow_mut()
-                .expect("could not aquire handle to node implementation, since the implementation is currently active"),
-            |processor| {
-                processor.downcast_element_mut::<T>()
-            }
-        ).ok()
+    pub fn try_as_mut<T: Any>(&self) -> Option<RwLockWriteGuard<'_, T>> {
+        RwLockWriteGuard::filter_map(self.processing.write(), |processor| {
+            processor.downcast_element_mut::<T>()
+        })
     }
 }
 
@@ -214,12 +212,6 @@ impl Debug for ModuleRef {
             .finish()
     }
 }
-
-unsafe impl Send for ModuleRef {}
-unsafe impl Send for ModuleRefWeak {}
-
-unsafe impl Sync for ModuleRef {}
-unsafe impl Sync for ModuleRefWeak {}
 
 #[cfg(test)]
 mod tests {

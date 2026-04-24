@@ -1,8 +1,10 @@
+use des_sync_utils::RwLock;
+
 use crate::channel::{ChannelRef, IntoDuplexChannel};
-use crate::gate::{GateClusterRef, IntoGate};
+use crate::gate::{GateCluster, GateClusterRef, IntoGate};
 use std::fmt::Debug;
 use std::hash::Hash;
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Weak};
 
 use crate::ObjectPath;
 use crate::module::{ModuleRef, ModuleRefWeak};
@@ -15,9 +17,10 @@ pub(crate) type GateRefWeak = Weak<Gate>;
 /// A gate, a message insertion or extraction point used for handeling channels.
 pub struct Gate {
     owner: ModuleRefWeak,
+    cluster: Weak<GateCluster>,
     name: String,
     pos: usize,
-    connections: Mutex<Connections>,
+    connections: RwLock<Connections>,
 }
 
 /// A kinds of operations supported on a gate.
@@ -47,35 +50,27 @@ struct Connections {
 pub struct Connection {
     /// The endpoint from the view of the owning gate
     pub endpoint: GateRef,
-    /// The index of the slot used at the endpoint
-    pub endpoint_id: usize,
     /// A channel to slow down the connection.
     pub channel: Option<ChannelRef>,
+
+    /// The index of the slot used at the endpoint to refer to the inverse link
+    pub(crate) endpoint_id: usize,
 }
 
 impl Connection {
-    /// Crease a new pseudo connection, channeling into the
-    /// provided gate
+    /// Creates a new sourceless connection that points to the provided gate.
     ///
     /// # Panics
     ///
-    /// Panics if the provided gate is not an endpoint.
-    pub fn new(gate: GateRef) -> Self {
-        assert!(
-            gate.connections
-                .lock()
-                .expect("locking failure: GateRef seems to be active on another thread")
-                .len()
-                <= 1
-        );
-        Self::new_unchecked(gate)
-    }
-
-    /// Create a connection, without checking the availability of the used gates.
-    pub fn new_unchecked(gate: GateRef) -> Self {
+    /// This function panics if the provided gate is of kind Transit, as it is
+    /// not clear in what direction the connection-chain should point
+    pub fn new_sourceless(endpoint: GateRef) -> Self {
+        assert!(endpoint.connections.read().len() <= 1);
+        // There will be at least one free slot
+        let endpoint_id = endpoint.connections.read().next_free().unwrap_or(0);
         Self {
-            endpoint: gate,
-            endpoint_id: 1, // TODO: smarter ??
+            endpoint,
+            endpoint_id,
             channel: None,
         }
     }
@@ -88,11 +83,7 @@ impl Connection {
     #[must_use]
     pub fn next_hop(&self) -> Option<Connection> {
         let idx = [1, 0][self.endpoint_id];
-        let lock = self
-            .endpoint
-            .connections
-            .lock()
-            .expect("failed to get lock");
+        let lock = self.endpoint.connections.read();
         lock.connections[idx].clone()
     }
 
@@ -103,11 +94,7 @@ impl Connection {
     /// May panic on lock poisoning
     #[must_use]
     pub fn prev_hop(&self) -> Option<GateRef> {
-        let lock = self
-            .endpoint
-            .connections
-            .lock()
-            .expect("failed to get lock");
+        let lock = self.endpoint.connections.read();
         Some(
             lock.connections[self.endpoint_id]
                 .as_ref()?
@@ -144,14 +131,16 @@ impl Connections {
         self.connections.iter().filter(|v| v.is_some()).count()
     }
 
-    fn put(&mut self, connection: Connection) {
-        for i in 0..2 {
-            if self.connections[i].is_none() {
-                self.connections[i] = Some(connection);
-                return;
-            }
-        }
-        unreachable!("Connections::put should not be called if no free slots are available")
+    fn next_free(&self) -> Option<usize> {
+        (0..2).find(|&i| self.connections[i].is_none())
+    }
+
+    fn put(&mut self, index: usize, connection: Connection) {
+        assert!(
+            self.connections[index].is_none(),
+            "Connections::put should only be called with a valid / empty slot index, obtained by next_index()"
+        );
+        self.connections[index] = Some(connection);
     }
 
     fn remove(&mut self, gate: &GateRef) -> Connection {
@@ -184,8 +173,8 @@ impl Gate {
     /// Indicator whether a descriptor describes a cluster
     /// or a single gate
     #[must_use]
-    pub fn is_cluster(&self) -> bool {
-        self.size() != 1 || self.pos() > 0 // TODO: remake this
+    pub fn is_standalone(&self) -> bool {
+        self.size() == 1 && self.pos() == 0
     }
 
     /// The position index of the gate within the descriptor cluster.
@@ -197,15 +186,17 @@ impl Gate {
     /// The size of the gate cluster.
     #[must_use]
     pub fn size(&self) -> usize {
-        self.owner().gates.read().size_of(&self.name)
+        self.cluster().size()
     }
 
     /// Retrives the cluster descriptor for this gate.
+    ///
+    /// # Panics
+    ///
+    /// This function panics when used during drop.
     #[must_use]
     pub fn cluster(&self) -> GateClusterRef {
-        self.owner().gates.read().namespaces[self.name()]
-            .cluster
-            .clone()
+        self.cluster.upgrade().expect("cannot use in drop")
     }
 
     /// The human-readable name for the allocated gate cluster.
@@ -215,10 +206,10 @@ impl Gate {
     }
 
     fn name_with_pos(&self) -> String {
-        if self.is_cluster() {
-            format!("{}[{}]", self.name(), self.pos())
+        if self.is_standalone() {
+            self.name().to_owned()
         } else {
-            self.name().to_string()
+            format!("{}[{}]", self.name(), self.pos())
         }
     }
 
@@ -240,12 +231,7 @@ impl Gate {
     ///
     /// Panics when accessed during teardown
     pub fn kind(&self) -> GateKind {
-        match self
-            .connections
-            .try_lock()
-            .expect("failed to get lock")
-            .len()
-        {
+        match self.connections.read().len() {
             0 => GateKind::Standalone,
             1 => GateKind::Endpoint,
             _ => GateKind::Transit,
@@ -292,8 +278,8 @@ impl Gate {
             "Cannot connect gate to itself."
         );
 
-        // Check whether the target is allready connected
-        let mut conns = self.connections.try_lock().expect("failed lock");
+        // (0) Check whether the target is already connected
+        let mut conns = self.connections.write();
         for i in 0..2 {
             if let Some(ref con) = conns.connections[i]
                 && Arc::ptr_eq(&con.endpoint, &other)
@@ -302,15 +288,16 @@ impl Gate {
             }
         }
 
-        let mut other_conns = other.connections.try_lock().expect("failed to get lock");
+        // (1) Determine the valid slots in both gates, where the connection could be stored.
+        let mut other_conns = other.connections.write();
+        let conns_pos = conns
+            .next_free()
+            .expect("cannot add connection, gates already connected to multiple points");
+        let other_conns_pos = other_conns
+            .next_free()
+            .expect("cannot add connection, gates already connected to multiple points");
 
-        let conns_pos = conns.len();
-        let other_conns_pos = other_conns.len();
-        assert!(
-            conns_pos < 2 && other_conns_pos < 2,
-            "Cannot add connection, gates allready connected to multiple points"
-        );
-
+        // (2) Register the channel(s) if required
         let (fwd, bck) = match channel {
             Some(channel) => {
                 let (a, b) = channel.into_duplex();
@@ -328,16 +315,23 @@ impl Gate {
             None => (None, None),
         };
 
-        conns.put(Connection {
-            endpoint: other.clone(),
-            endpoint_id: other_conns_pos,
-            channel: fwd,
-        });
-        other_conns.put(Connection {
-            endpoint: self.clone(),
-            endpoint_id: conns_pos,
-            channel: bck,
-        });
+        // (3) Store connection objects in the previously determined slots
+        conns.put(
+            conns_pos,
+            Connection {
+                endpoint: other.clone(),
+                endpoint_id: other_conns_pos,
+                channel: fwd,
+            },
+        );
+        other_conns.put(
+            other_conns_pos,
+            Connection {
+                endpoint: self.clone(),
+                endpoint_id: conns_pos,
+                channel: bck,
+            },
+        );
     }
 
     /// Disconnects a peer.
@@ -372,8 +366,8 @@ impl Gate {
             "cannot disconnect two unconnected gates"
         );
 
-        let mut conns = self.connections.lock().expect("failed to lock");
-        let mut other_conns = other.connections.try_lock().expect("failed to get lock");
+        let mut conns = self.connections.write();
+        let mut other_conns = other.connections.write();
 
         let local_con = conns.remove(other);
         let peer_con = other_conns.remove(self);
@@ -385,14 +379,10 @@ impl Gate {
     /// Disconnects all peers. This method cannot fail.
     #[allow(clippy::missing_panics_doc)]
     pub fn disconnect_all(self: &GateRef) {
-        let mut conns = self.connections.lock().expect("failed to lock");
+        let mut conns = self.connections.write();
         for i in 0..2 {
             if let Some(local_con) = conns.connections[i].take() {
-                let mut other_conns = local_con
-                    .endpoint
-                    .connections
-                    .try_lock()
-                    .expect("failed to get lock");
+                let mut other_conns = local_con.endpoint.connections.write();
 
                 let peer_con = other_conns.remove(self);
                 peer_con.unregister();
@@ -405,7 +395,7 @@ impl Gate {
     /// Checks whether two gates are direct neighbors, works even for transit gates.
     #[allow(clippy::missing_panics_doc)]
     pub fn is_neighbor_to(self: &GateRef, other: &GateRef) -> bool {
-        let conns = self.connections.lock().expect("failed to lock");
+        let conns = self.connections.read();
         for i in 0..2 {
             if conns.connections[i]
                 .as_ref()
@@ -435,7 +425,7 @@ impl Gate {
             None
         } else {
             Some(PathIter {
-                con: Some(Connection::new_unchecked(self.clone())),
+                con: Some(Connection::new_sourceless(self.clone())),
             })
         }
     }
@@ -467,12 +457,18 @@ impl Gate {
             .expect("cannot refer to gate owner during drop")
     }
 
-    pub(super) fn raw(owner: ModuleRefWeak, name: &str, pos: usize) -> GateRef {
+    pub(super) fn raw(
+        owner: ModuleRefWeak,
+        cluster: &GateClusterRef,
+        name: &str,
+        pos: usize,
+    ) -> GateRef {
         GateRef::new(Gate {
             owner,
+            cluster: GateClusterRef::downgrade(cluster),
             name: name.to_owned(),
             pos,
-            connections: Mutex::new(Connections::new()),
+            connections: RwLock::new(Connections::new()),
         })
     }
 
@@ -488,7 +484,7 @@ impl Gate {
     }
 
     pub(crate) fn dissolve_paths(&self) {
-        let Ok(mut conns) = self.connections.try_lock() else {
+        let Some(mut conns) = self.connections.try_write() else {
             return;
         };
         for con in &mut conns.connections {
@@ -511,11 +507,6 @@ impl Debug for Gate {
             .finish()
     }
 }
-
-// SAFTY:
-// Gates are never exposed by value to the user so they will be marked
-// as `Send` to fulfill the trait bound for Ptr<Gate> to be `Send`.
-unsafe impl Send for Gate {}
 
 // SOLVED ISSUE: stack overflow when comaring circular ptr
 // next_gate & previous_gate --> Custim PartialEq impl
@@ -597,6 +588,62 @@ mod tests {
 
         gate.clone().connect(gate_b);
         assert_eq!(gate.kind(), GateKind::Endpoint);
+    }
+
+    #[test]
+    fn connect_into_prev_occupied_slot() {
+        let owner = ModuleContext::new_root("root".into(), Weak::new());
+        let gate = owner.create_gate("port", 0);
+
+        let gate_a = owner.create_gate("port-a", 0);
+        let gate_b = owner.create_gate("port-b", 0);
+        let gate_c = owner.create_gate("port-c", 0);
+
+        gate.clone().connect(gate_a.clone());
+        gate.clone().connect(gate_b);
+
+        assert_eq!(gate.kind(), GateKind::Transit);
+        assert_eq!(gate.connections.read().next_free(), None);
+        assert_eq!(
+            gate.connections.read().connections[0]
+                .as_ref()
+                .unwrap()
+                .endpoint,
+            gate_a
+        );
+
+        gate.disconnect(&gate_a);
+        assert_eq!(gate.connections.read().next_free(), Some(0));
+
+        gate.clone().connect(gate_c.clone());
+
+        assert_eq!(gate.kind(), GateKind::Transit);
+        assert_eq!(gate.connections.read().next_free(), None);
+        assert_eq!(
+            gate.connections.read().connections[0]
+                .as_ref()
+                .unwrap()
+                .endpoint,
+            gate_c
+        );
+    }
+
+    #[test]
+    fn path_iter_at_prev_occupied_slot() {
+        let owner = ModuleContext::new_root("root".into(), Weak::new());
+        let gate = owner.create_gate("port", 0);
+
+        let gate_a = owner.create_gate("port-a", 0);
+        let gate_b = owner.create_gate("port-b", 0);
+
+        gate.clone().connect(gate_a.clone());
+        gate.clone().connect(gate_b.clone());
+        gate.disconnect(&gate_a);
+
+        assert!(gate.connections.read().connections[0].is_none());
+        assert_eq!(gate.kind(), GateKind::Endpoint);
+        let mut iter = gate.path_iter().unwrap();
+        assert_eq!(iter.next().map(|c| c.endpoint), Some(gate_b))
     }
 
     #[test]

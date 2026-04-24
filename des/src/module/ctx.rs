@@ -13,9 +13,8 @@ use crate::{
 };
 use fxhash::FxHashMap;
 
-use spin::RwLock;
+use des_sync_utils::RwLock;
 use std::{
-    cell::Cell,
     fmt::Debug,
     hash::Hash,
     sync::{Arc, Weak},
@@ -55,11 +54,11 @@ pub struct ModuleContext {
     pub(crate) me: RwLock<ModuleRefWeak>,
 
     pub(crate) path: ObjectPath,
-    pub(crate) state: Cell<State>,
+    pub(crate) state: RwLock<State>,
 
     pub(crate) gates: RwLock<Gates>,
     pub(crate) props: RwLock<Props>,
-    pub(crate) unwind_behaviour: Cell<UnwindBehaviour>,
+    pub(crate) unwind_behaviour: RwLock<UnwindBehaviour>,
 
     pub(crate) globals: Weak<Globals>,
     pub(crate) parent: Option<ModuleRefWeak>,
@@ -88,9 +87,9 @@ impl ModuleContext {
 
             props: RwLock::new(Props::default()),
 
-            state: Cell::new(State::Created),
+            state: RwLock::new(State::Created),
             path,
-            unwind_behaviour: Cell::default(),
+            unwind_behaviour: RwLock::default(),
 
             gates: RwLock::default(),
             parent: None,
@@ -120,9 +119,9 @@ impl ModuleContext {
 
             props: RwLock::new(Props::default()),
 
-            state: Cell::new(State::Created),
+            state: RwLock::new(State::Created),
             path,
-            unwind_behaviour: Cell::default(),
+            unwind_behaviour: RwLock::default(),
 
             gates: RwLock::default(),
             parent: Some(ModuleRefWeak::new(&parent)),
@@ -462,7 +461,7 @@ impl ModuleContext {
 
     /// Returns a ref to an abstract gate of the current module.
     pub fn gate_cluster(&self, desc: &str) -> Option<GateClusterRef> {
-        self.gates.read().get_cluster(&self.me(), desc)
+        self.gates.read().get_cluster(desc)
     }
 
     /// Returns the unwind behaviour of this module.
@@ -511,7 +510,7 @@ impl ModuleContext {
                 ));
             }
 
-            if strong.try_as_ref::<DummyModule>().is_some() {
+            if strong.is::<DummyModule>() {
                 Err(Error::new(
                     self.path.clone(),
                     ErrorKind::ModuleNotFound(
@@ -590,9 +589,6 @@ impl Hash for ModuleContext {
         self.path.hash(state);
     }
 }
-
-unsafe impl Send for ModuleContext {}
-unsafe impl Sync for ModuleContext {}
 
 impl Drop for ModuleContext {
     fn drop(&mut self) {

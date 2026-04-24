@@ -1,4 +1,6 @@
-use std::{cell::Cell, fmt::Debug, hash::Hash, sync::Arc};
+use std::{fmt::Debug, hash::Hash, sync::Arc};
+
+use des_sync_utils::RwLock;
 
 use crate::{
     ObjectPath,
@@ -10,11 +12,35 @@ use crate::{
 pub type GateClusterRef = Arc<GateCluster>;
 
 /// An abstract gate.
-#[derive(Clone)]
 pub struct GateCluster {
     pub(super) owner: ModuleRefWeak,
     pub(super) name: String,
-    pub(super) prototype: Cell<Option<usize>>,
+    pub(super) inner: RwLock<Inner>,
+}
+
+pub(crate) struct Inner {
+    pub(crate) automatic: bool,
+    pub(crate) members: Vec<GateRef>, // sorted vec
+}
+
+impl Inner {
+    pub(crate) fn get(&self, pos: usize) -> Option<&GateRef> {
+        match self.members.binary_search_by_key(&pos, |g| g.pos()) {
+            Ok(i) => Some(&self.members[i]),
+            Err(_) => None,
+        }
+    }
+
+    pub(crate) fn insert(&mut self, gate: GateRef) {
+        match self.members.binary_search_by_key(&gate.pos(), |g| g.pos()) {
+            Ok(i) | Err(i) => self.members.insert(i, gate),
+        }
+    }
+
+    pub(crate) fn next(&self) -> Option<usize> {
+        self.automatic
+            .then(|| self.members.last().map_or(0, |g| g.pos() + 1))
+    }
 }
 
 impl GateCluster {
@@ -32,12 +58,12 @@ impl GateCluster {
 
     /// Indicates whether a gate cluster is automatic (aka. can create gates on-demand or just manually).
     pub fn is_automatic(&self) -> bool {
-        self.prototype.get().is_some()
+        self.inner.read().automatic
     }
 
     /// Sets whether a gate cluster is automatic (aka. can create gates on-demand or just manually).
     pub fn set_automatic(&self, automatic: bool) {
-        self.prototype.set(if automatic { Some(0) } else { None });
+        self.inner.write().automatic = automatic;
     }
 
     /// The position index of the gate within the descriptor cluster.
@@ -74,16 +100,12 @@ impl GateCluster {
 
     /// Returns all concrete gates contained in this cluster.
     pub fn size(&self) -> usize {
-        self.owner().gates.read().namespaces[self.name()]
-            .gates
-            .len()
+        self.inner.read().members.len()
     }
 
     /// Returns all concreate gates contained in this cluster.
     pub fn members(&self) -> Vec<GateRef> {
-        self.owner().gates.read().namespaces[self.name()]
-            .gates
-            .clone()
+        self.inner.read().members.clone()
     }
 }
 
@@ -92,16 +114,14 @@ impl Debug for GateCluster {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("GateCluster")
             .field("path", &self.path())
-            .field("next", &self.prototype.get())
+            .field("next", &self.inner.read().next())
             .finish()
     }
 }
 
 impl PartialEq for GateCluster {
     fn eq(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.owner().ctx, &other.owner().ctx)
-            && self.name == other.name
-            && self.prototype == other.prototype
+        Arc::ptr_eq(&self.owner().ctx, &other.owner().ctx) && self.name == other.name
     }
 }
 
@@ -110,7 +130,6 @@ impl Eq for GateCluster {}
 impl Hash for GateCluster {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.name.hash(state);
-        self.prototype.get().hash(state);
         self.owner.upgrade().hash(state);
     }
 }
@@ -125,7 +144,7 @@ impl IntoGate for GateClusterRef {
             let mut members = self.members();
             if members.len() == 1
                 && let Some(first) = members.pop()
-                && !first.is_cluster()
+                && !first.is_standalone()
             {
                 first
             } else {

@@ -1,7 +1,12 @@
 // Lints
 #![deny(unused_must_use)]
 #![warn(clippy::pedantic)]
-#![warn(missing_docs, missing_debug_implementations, unreachable_pub)]
+#![warn(
+    missing_docs,
+    missing_debug_implementations,
+    unreachable_pub,
+    clippy::dbg_macro
+)]
 #![allow(
     clippy::needless_doctest_main,
     clippy::module_name_repetitions,
@@ -72,7 +77,6 @@
 #[doc(hidden)]
 pub mod macros;
 pub mod prelude;
-// pub mod runtime;
 pub mod time;
 
 pub mod tracing;

@@ -175,7 +175,7 @@ pub struct ChannelRef {
 }
 
 /// The implementation of a gate-to-gate link.
-pub trait Channel: Any {
+pub trait Channel: Any + Send + Sync {
     /// Returns the time at which the channel will be free again.
     fn transmission_finish_time(&self) -> Option<SimTime>;
 
@@ -311,5 +311,3 @@ impl Debug for SendContext<'_> {
         f.debug_struct("SendContext").finish()
     }
 }
-
-unsafe impl Send for ChannelRef {}

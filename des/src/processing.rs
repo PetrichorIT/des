@@ -169,6 +169,13 @@ pub struct ModuleImpl {
     pub(crate) handler: Box<dyn Module>,
 }
 
+// SAFETY:
+// This is safe, since the simulation core ensures that any instance of ModuleImpl is only used on the
+// 'main' thread. The type is public only for debugging purposes.
+
+unsafe impl Send for ModuleImpl {}
+unsafe impl Sync for ModuleImpl {}
+
 impl ModuleImpl {
     pub(super) fn new(stack: ProcessingStack, handler: Box<dyn Module>) -> Self {
         ModuleImpl { stack, handler }

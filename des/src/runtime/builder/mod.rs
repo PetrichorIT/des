@@ -166,6 +166,11 @@ impl<A> SimBuilder<A> {
 }
 
 impl<A> SimBuilder<A> {
+    /// Retrieves the globals for the simulation.
+    pub fn globals(&self) -> Arc<Globals> {
+        self.globals.clone()
+    }
+
     /// Retrieves a node.
     pub fn get(&self, path: impl AsRef<str>) -> Option<ModuleRef> {
         self.globals.get(path)
@@ -340,17 +345,17 @@ impl<A> SimBuilder<A> {
     ///
     /// This function panic if node modules exists at `path`.
     #[track_caller]
-    pub fn gate_cluster(&mut self, path: impl Into<ObjectPath>, gate: &str) -> GateClusterRef {
+    pub fn gate_cluster(&mut self, path: impl Into<ObjectPath>, name: &str) -> GateClusterRef {
         let path = path.into();
         let Some(module) = self.get(path.as_ref()) else {
             panic!(
-                "cannot create abstract gate '{path}.{gate}', because node '{path}' does not exist"
+                "cannot create abstract gate '{path}.{name}', because node '{path}' does not exist"
             )
         };
-        if let Some(gate) = module.gate_cluster(gate) {
-            gate
+        if let Some(cluster) = module.gate_cluster(name) {
+            cluster
         } else {
-            module.create_gate_cluster(gate)
+            module.create_gate_cluster(name)
         }
     }
 

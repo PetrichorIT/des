@@ -179,7 +179,10 @@ fn builder_handler_fn_with_err() {
 
 #[test]
 #[serial]
+
 fn builder_handler_fn_failure_panic() {
+    // des::tracing::init();
+
     let mut sim = Sim::new(());
     sim.node(
         "alice",

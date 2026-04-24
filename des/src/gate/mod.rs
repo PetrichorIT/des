@@ -10,8 +10,7 @@
 //! gates when topology operations require them. If not set to automatic, gate
 //! clusters only act as a collection of related gates.
 
-use std::cell::Cell;
-
+use des_sync_utils::RwLock;
 use fxhash::FxHashMap;
 
 use crate::channel::IntoDuplexChannel;
@@ -122,12 +121,8 @@ impl<G: IntoGate + Clone> IntoGate for &G {
 
 // # IntoModuleGates
 
-mod private {
-    pub trait Sealed {}
-}
-
 /// A trait for a type to refrence a module specific gate.
-pub trait IntoModuleGate: private::Sealed {
+pub trait IntoModuleGate {
     /// Extracts a gate identifier from a module using the given
     /// value as implicit reference.
     fn as_gate(&self, module: &ModuleContext) -> Option<GateRef>;
@@ -138,49 +133,34 @@ impl<T: IntoModuleGate> IntoModuleGate for &T {
         T::as_gate(self, module)
     }
 }
-impl<T: IntoModuleGate> private::Sealed for &T {}
 
 impl IntoModuleGate for GateRef {
     fn as_gate(&self, _: &ModuleContext) -> Option<GateRef> {
         Some(self.clone())
     }
 }
-impl private::Sealed for GateRef {}
 
 impl IntoModuleGate for GateRefWeak {
     fn as_gate(&self, _: &ModuleContext) -> Option<GateRef> {
         self.upgrade()
     }
 }
-impl private::Sealed for GateRefWeak {}
 
 impl IntoModuleGate for (&str, usize) {
     fn as_gate(&self, module: &ModuleContext) -> Option<GateRef> {
-        module
-            .gates
-            .read()
-            .namespaces
-            .get(self.0)
-            .and_then(|entry| entry.gates.iter().find(|g| g.pos() == self.1))
-            .cloned()
+        module.gates.read().get_gate(self.0, self.1)
     }
 }
-impl private::Sealed for (&str, usize) {}
 
 impl IntoModuleGate for &str {
     fn as_gate(&self, module: &ModuleContext) -> Option<GateRef> {
         module
             .gates
             .read()
-            .namespaces
-            .get(*self)
-            .and_then(|entry| {
-                (entry.gates.len() == 1).then(|| entry.gates.iter().find(|g| g.pos() == 0).cloned())
-            })
-            .flatten()
+            .get_gate(self, 0) // limit single gate exception only to index 0
+            .and_then(|g| (g.size() == 1).then_some(g))
     }
 }
-impl private::Sealed for &str {}
 
 //
 //  # Gates
@@ -189,13 +169,7 @@ impl private::Sealed for &str {}
 #[derive(Debug)]
 pub(crate) struct Gates {
     owner: ModuleRefWeak,
-    namespaces: FxHashMap<String, Entry>,
-}
-
-#[derive(Debug, PartialEq, Eq, Hash)]
-struct Entry {
-    cluster: GateClusterRef,
-    gates: Vec<GateRef>,
+    namespaces: FxHashMap<String, GateClusterRef>,
 }
 
 impl Gates {
@@ -203,60 +177,33 @@ impl Gates {
         self.owner = ModuleRefWeak::new(owner);
     }
 
-    pub(crate) fn size_of(&self, name: &str) -> usize {
-        self.namespaces[name].gates.len()
-    }
-
     pub(crate) fn gates(&self) -> Vec<GateRef> {
         self.namespaces
             .values()
-            .flat_map(|v| v.gates.iter())
-            .cloned()
+            .flat_map(|v| v.members().into_iter())
             .collect()
     }
 
     pub(crate) fn create_gate(&mut self, name: &str, pos: Option<usize>) -> GateRef {
-        // TODO: either disallow default gate creation for abstract clusters,
-        // or make counter more resillient to random choices
         match (self.namespaces.get_mut(name), pos) {
             (Some(entry), Some(pos)) => {
-                let gate = Gate::raw(self.owner.clone(), name, pos);
-                entry.gates.push(gate.clone());
-                entry.gates.sort_by_key(|g| g.pos()); // Expensive
-                if entry.cluster.prototype.get().is_some() {
-                    entry.cluster.prototype.set(Some(
-                        entry
-                            .gates
-                            .iter()
-                            .map(|g| g.pos())
-                            .max()
-                            .unwrap_or_default()
-                            + 1,
-                    ));
-                }
-
+                let gate = Gate::raw(self.owner.clone(), entry, name, pos);
+                entry.inner.write().insert(gate.clone());
                 gate
             }
             (None, Some(pos)) => {
-                // Since GateCluster::new requires write() access, but API does not allow for lock-transfer
-                let gate = Gate::raw(self.owner.clone(), name, pos);
                 let cluster = self.create_gate_cluster(name.to_owned(), false);
-                self.namespaces.insert(
-                    name.to_owned(),
-                    Entry {
-                        cluster,
-                        gates: vec![gate.clone()],
-                    },
-                );
+                let gate = Gate::raw(self.owner.clone(), &cluster, name, pos);
+                cluster.inner.write().insert(gate.clone());
+                self.namespaces.insert(name.to_owned(), cluster);
                 gate
             }
             // We have ensured that counter i is an unoccupied number
             (Some(entry), None) => {
-                if let Some(counter) = &mut entry.cluster.prototype.get() {
-                    let gate = Gate::raw(self.owner.clone(), name, *counter);
-                    entry.gates.push(gate.clone());
-                    entry.gates.sort_by_key(|g| g.pos()); // Expensive
-                    *counter += 1;
+                let mut inner = entry.inner.write();
+                if let Some(counter) = inner.next() {
+                    let gate = Gate::raw(self.owner.clone(), entry, name, counter);
+                    inner.insert(gate.clone());
                     gate
                 } else {
                     unreachable!(
@@ -279,20 +226,23 @@ impl Gates {
         let cluster = GateClusterRef::new(GateCluster {
             owner: self.owner.clone(),
             name: name.clone(),
-            prototype: Cell::new(if automatic { Some(0) } else { None }),
+            inner: RwLock::new(Inner {
+                automatic,
+                members: Vec::new(),
+            }),
         });
-        self.namespaces.insert(
-            name,
-            Entry {
-                cluster: cluster.clone(),
-                gates: Vec::new(),
-            },
-        );
+        self.namespaces.insert(name, cluster.clone());
         cluster
     }
 
-    pub(crate) fn get_cluster(&self, _: &ModuleRef, desc: &str) -> Option<GateClusterRef> {
-        self.namespaces.get(desc).map(|v| v.cluster.clone())
+    pub(crate) fn get_gate(&self, name: &str, pos: usize) -> Option<GateRef> {
+        self.namespaces
+            .get(name)
+            .and_then(|entry| entry.inner.read().get(pos).cloned())
+    }
+
+    pub(crate) fn get_cluster(&self, desc: &str) -> Option<GateClusterRef> {
+        self.namespaces.get(desc).cloned()
     }
 }
 

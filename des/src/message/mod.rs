@@ -187,7 +187,7 @@ impl Message {
     ///
     /// Panics if he cast fails.
     #[must_use]
-    pub fn into_content<T: 'static + MessageBody + Send>(self) -> (T, Header, Extensions) {
+    pub fn into_content<T: 'static + MessageBody>(self) -> (T, Header, Extensions) {
         self.try_into_content().expect("could not cast to type T")
     }
 
@@ -205,7 +205,7 @@ impl Message {
     ///
     /// Returns an error if either there is no content, or
     /// the content is not of type T.
-    pub fn try_into_content<T: 'static + MessageBody + Send>(
+    pub fn try_into_content<T: 'static + MessageBody>(
         self,
     ) -> Result<(T, Header, Extensions), Self> {
         let Message {
@@ -267,11 +267,6 @@ impl Display for Message {
         write!(f, "}}")
     }
 }
-
-// SAFTY:
-// A message only contains primitve data, ptrs that are threadsafe
-// and a untyped contained value.
-unsafe impl Send for Message {}
 
 impl UnwindSafe for Message {}
 

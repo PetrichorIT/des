@@ -183,7 +183,7 @@ impl Module for PanicAtRecvWithRestart {
 #[serial]
 #[test]
 fn unwind_and_restart() -> Result<(), Failure> {
-    des::tracing::init();
+    // des::tracing::init();
 
     let mut sim = Sim::new(());
     sim.node("alice", PanicAtRecvWithRestart);

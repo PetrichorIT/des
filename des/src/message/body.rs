@@ -9,8 +9,7 @@ use std::{
     ptr::null_mut,
 };
 
-// TODO: the constraints to content<T> that Empty is not allowed can be dropped, since
-// `Empty` is not public, thus the typeid will be unknown.
+#[derive(Clone)]
 struct Empty;
 
 /// A message body, which stores an arbitrary value, potentially cloneable and debuggable.
@@ -20,20 +19,23 @@ pub struct Body {
     vtable: &'static VTable,
 }
 
-// `!Send` since `Body` may contain non-send types.
+// SAFTY:
+// A body only contains primitve data that implements MessageBody, thus
+// Send is implemented for any contained type T.
+unsafe impl Send for Body {}
 
 impl Body {
     /// Any empty message body
     #[must_use]
     pub const fn empty() -> Self {
         Self {
-            data: null_mut(),
+            data: std::ptr::from_mut(&mut Empty).cast::<()>(),
             length: 0,
             vtable: &VTable {
                 type_id: vtype_id::<Empty>,
                 type_name: vtype_name::<Empty>,
                 debug: vdebug_empty,
-                try_clone: vclone_nullptr,
+                try_clone: vclone::<Empty>,
                 drop: vdrop::<Empty>,
             },
         }
@@ -148,7 +150,7 @@ impl Body {
     ///
     /// If the contained type is not `T`, this function returns `self` unchanged.
     pub fn try_into_content<T: Any>(mut self) -> Result<T, Self> {
-        if self.is::<T>() & !self.is_empty() {
+        if self.is::<T>() {
             // take the ptr so that drop does not do shit
             let boxed =
                 unsafe { Box::from_raw(mem::replace(&mut self.data, null_mut()).cast::<T>()) };
@@ -175,7 +177,7 @@ impl Body {
     /// See also `Any::downcast_ref`.
     #[must_use]
     pub fn try_content<T: Any>(&self) -> Option<&T> {
-        (self.is::<T>() && !self.is_empty()).then(|| unsafe { &*self.data.cast::<T>() })
+        (self.is::<T>()).then(|| unsafe { &*self.data.cast::<T>() })
     }
 
     /// Tries to cast the message body as a mutable reference to the given type.
@@ -195,7 +197,7 @@ impl Body {
     /// See also `Any::downcast_mut`.
     #[must_use]
     pub fn try_content_mut<T: Any>(&mut self) -> Option<&mut T> {
-        (self.is::<T>() && !self.is_empty()).then(|| unsafe { &mut *self.data.cast::<T>() })
+        (self.is::<T>()).then(|| unsafe { &mut *self.data.cast::<T>() })
     }
 
     /// Tries to clone the body. This operation fails if the inner type `T`
@@ -321,12 +323,6 @@ unsafe fn vclone_panic(_: *const ()) -> Option<*mut ()> {
     None
 }
 
-#[allow(clippy::unnecessary_wraps)]
-unsafe fn vclone_nullptr(ptr: *const ()) -> Option<*mut ()> {
-    assert!(ptr.is_null(), "expected internal pointer to be null");
-    Some(null_mut())
-}
-
 unsafe fn vdrop<T>(ptr: *mut ()) {
     if !ptr.is_null() {
         unsafe {
@@ -339,7 +335,7 @@ unsafe fn vdrop<T>(ptr: *mut ()) {
 ///
 /// * This type is only available of DES is build with the `"net"` feature.*
 #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
-pub trait MessageBody {
+pub trait MessageBody: Send {
     /// The length of the message body in bytes.
     fn byte_len(&self) -> usize;
 }
@@ -462,13 +458,7 @@ impl<T: MessageBody, const N: usize> MessageBody for [T; N] {
     }
 }
 
-impl<T: MessageBody> MessageBody for &[T] {
-    fn byte_len(&self) -> usize {
-        self.iter().fold(0, |acc, v| acc + v.byte_len())
-    }
-}
-
-impl<K: MessageBody, V: MessageBody, S> MessageBody for HashMap<K, V, S> {
+impl<K: MessageBody, V: MessageBody, S: Send> MessageBody for HashMap<K, V, S> {
     fn byte_len(&self) -> usize {
         let mut sum = 0;
         for (k, v) in self {
@@ -488,7 +478,7 @@ impl<K: MessageBody, V: MessageBody> MessageBody for BTreeMap<K, V> {
     }
 }
 
-impl<T: MessageBody, S> MessageBody for HashSet<T, S> {
+impl<T: MessageBody, S: Send> MessageBody for HashSet<T, S> {
     fn byte_len(&self) -> usize {
         let mut sum = 0;
         for v in self {
@@ -614,7 +604,7 @@ mod tests {
 
         assert!(empty.is_empty());
         assert!(empty.is::<Empty>());
-        assert!(empty.try_content::<Empty>().is_none()); // Empty messages cannot be casted (only internal check, since Empty is private)
+        assert!(empty.try_content::<Empty>().is_some()); // Empty messages cannot be casted (only internal check, since Empty is private)
 
         assert_eq!(
             format!("{empty:?}"),
@@ -623,7 +613,7 @@ mod tests {
 
         assert!(empty.try_clone().is_some()); // tests clone + drop
 
-        assert!(empty.try_into_content::<Empty>().is_err());
+        assert!(empty.try_into_content::<Empty>().is_ok());
     }
 
     #[test]
@@ -730,8 +720,6 @@ mod tests {
                 .byte_len(),
             12
         );
-
-        assert_eq!((&[1, 2, 3, 4u8][..3]).byte_len(), 3);
 
         assert_eq!(net::Ipv4Addr::new(1, 2, 3, 4).byte_len(), 4);
         assert_eq!(net::Ipv6Addr::new(1, 2, 3, 4, 0, 0, 0, 0).byte_len(), 16);

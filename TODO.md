@@ -68,15 +68,20 @@ impl Module for SyncModule {}
 
 -> just async error model (catch, crash, restart, report_as)
 
+> Dropped
+
 2)
 See branch "integrated-runtime"
+
+> Done
 
 3)
 needs tokio PR
 
+> Later
+
 4)
 Decide how to access abstract gates (maybe using gate(...) should already clone?)
-
 
 gate(<name>) will resolve to either a single-gate-cluster or an abstract gate (if present)
   -> abstract gate will be prioritized
@@ -92,3 +97,5 @@ Sim::gate maintains that behaviour
 trait IntoModuleTree for most gate APIs ?
 -> or just to resolve send(...) APIs
 -> into gate?
+
+> Done

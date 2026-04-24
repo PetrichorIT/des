@@ -390,7 +390,7 @@ impl ModuleRef {
     ///   persistent state should be preserved.
     /// - reset the proc-chain
     pub(crate) fn reset(&self) {
-        let mut brw = self.processing.borrow_mut();
+        let mut brw = self.processing.write();
 
         // FIXME: the reset of the proc-chain would be easiers if we could
         // rebuild the chain from scratch. However we would need the base_stack for
@@ -413,7 +413,7 @@ impl ModuleRef {
     pub(crate) fn async_wakeup(&self) {
         if matches!(self.ctx.state.get(), State::Running) {
             self.processing
-                .borrow_mut()
+                .write()
                 .process_with(None, |_, _| Harness::new(&self.ctx).exec(|| {}).catch());
         } else {
             #[cfg(feature = "tracing")]
@@ -431,7 +431,7 @@ impl ModuleRef {
         }
 
         self.processing
-            .borrow_mut()
+            .write()
             .process_with(None, move |handler, _| {
                 Harness::new(&self.ctx)
                     .exec(|| handler.handle_signal(signal))
@@ -452,7 +452,7 @@ impl ModuleRef {
         // drop the rt, to prevent all async activity from happening.
         #[cfg(feature = "async")]
         self.processing
-            .borrow_mut()
+            .write()
             .downcast_element_mut::<TokioRuntime>()
             .map(TokioRuntime::shutdown);
 
@@ -487,7 +487,7 @@ impl ModuleRef {
     pub(crate) fn handle_message(&self, msg: Message) {
         if let State::Running = self.ctx.state.get() {
             self.processing
-                .borrow_mut()
+                .write()
                 .process_with(Some(msg), |handler, msg| {
                     Harness::new(&self.ctx)
                         .exec(|| {
@@ -505,16 +505,14 @@ impl ModuleRef {
 
     pub(crate) fn at_sim_start(&self, stage: usize) {
         let mut max = 0;
-        self.processing
-            .borrow_mut()
-            .process_with(None, |handler, _| {
-                Harness::new(&self.ctx)
-                    .exec(|| {
-                        max = handler.num_sim_start_stages();
-                        handler.at_sim_start(stage);
-                    })
-                    .catch();
-            });
+        self.processing.write().process_with(None, |handler, _| {
+            Harness::new(&self.ctx)
+                .exec(|| {
+                    max = handler.num_sim_start_stages();
+                    handler.at_sim_start(stage);
+                })
+                .catch();
+        });
 
         if stage + 1 == max {
             self.ctx.state.set(State::Running);
@@ -535,25 +533,22 @@ impl ModuleRef {
     pub(crate) fn num_sim_start_stages(&self) -> usize {
         // No harness since this method bust be called before startin initalization to check the number of loops
         // Bypass the CTX variables, this should be safe maybe
-        self.processing.borrow().handler.num_sim_start_stages()
+        self.processing.read().handler.num_sim_start_stages()
     }
 
     pub(crate) fn at_sim_end(&self) -> Result<(), Failure> {
         #[allow(unused_mut)]
-        let mut result = self
-            .processing
-            .borrow_mut()
-            .process_with(None, |handler, _| {
-                let mut result = Ok(());
+        let mut result = self.processing.write().process_with(None, |handler, _| {
+            let mut result = Ok(());
 
-                Harness::new(&self.ctx)
-                    .exec(|| result = handler.at_sim_end())
-                    .catch();
+            Harness::new(&self.ctx)
+                .exec(|| result = handler.at_sim_end())
+                .catch();
 
-                result
-            });
+            result
+        });
 
-        let mut processing = self.processing.borrow_mut();
+        let mut processing = self.processing.write();
         processing.process_with(None, |_, _| {});
 
         #[cfg(feature = "async")]

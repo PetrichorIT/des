@@ -45,7 +45,7 @@ fn panicing_subprocess_at(t: impl Into<SimTime>) -> impl Module {
 #[test]
 #[serial]
 fn signal_subscription_in_direct_parent() -> Result<(), Failure> {
-    des::tracing::init();
+    // des::tracing::init();
 
     let mut sim = Sim::new(());
     sim.node("parent", Parent(false));

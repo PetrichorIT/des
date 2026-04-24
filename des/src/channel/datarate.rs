@@ -40,6 +40,8 @@ struct Buffer {
     acc_bytes: usize,
 }
 
+unsafe impl Sync for Buffer {}
+
 impl DatarateChannel {
     /// NEW
     #[must_use]

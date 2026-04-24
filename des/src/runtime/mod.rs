@@ -633,7 +633,7 @@ impl<A: SimLifecycle> Sim<A> {
     ///
     pub fn add_message_onto(&mut self, gate: GateRef, message: impl Into<Message>, time: SimTime) {
         let event = MessageExitingConnection {
-            con: Connection::new(gate),
+            con: Connection::new_sourceless(gate),
             msg: message.into(),
         };
 

@@ -52,7 +52,7 @@ impl EventExecutionContext {
         if send_time > SimTime::now() {
             ctx.events.push((
                 NetEvents::MessageExitingConnection(MessageExitingConnection {
-                    con: Connection::new(gate),
+                    con: Connection::new_sourceless(gate),
                     msg,
                 }),
                 send_time,
@@ -63,7 +63,7 @@ impl EventExecutionContext {
         // (0) Else handle the event inlined, for instant effects on the associated
         // channels.
         let event = MessageExitingConnection {
-            con: Connection::new(gate),
+            con: Connection::new_sourceless(gate),
             msg,
         };
         event.handle_with_sink(&mut ctx.events)
