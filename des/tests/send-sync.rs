@@ -39,9 +39,9 @@ require!(des::gate::GateCluster: Send + Sync);
 require!(des::message::Message: Send);
 require!(des::message::Body: Send);
 require!(des::message::Extensions: Send);
-require!(des::message::Header: Send);
-require!(des::message::MessageId: Send);
-require!(des::message::MessageKind: Send);
+require!(des::message::Header: Send + Sync);
+require!(des::message::MessageId: Send + Sync);
+require!(des::message::MessageKind: Send + Sync);
 
 require!(des::channel::ChannelRef: Send + Sync);
 require!(des::channel::DatarateChannel: Send + Sync);

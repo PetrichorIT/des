@@ -16,7 +16,7 @@ use super::{ModuleContext, try_with_mod_ctx};
 /// struct MyModule;
 /// impl Module for MyModule {
 ///     fn handle_message(&mut self, msg: Message) {
-///         // TODO: fix this test
+///         todo!();
 ///     }
 /// }
 /// ```

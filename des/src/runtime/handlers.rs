@@ -363,7 +363,7 @@ cfg_async! {
                 }),
                 tx,
                 rx: Some(rx),
-                require_join: false, // TODO: make error without join
+                require_join: false,
                 require_recv: false,
             }
         }

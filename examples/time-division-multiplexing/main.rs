@@ -187,7 +187,7 @@ impl Channel for TimeDividedRadioChannel {
                         con: via,
                         msg: message,
                     }),
-                    now + self.prop_delay, // TODO: + msg_transmit
+                    now + self.prop_delay + msg_transmit,
                 );
 
                 Ok(())

@@ -12,7 +12,6 @@ use super::Globals;
 ///
 /// This function panics if the no runtime is currently active.
 /// Note that a runtime is active if a instance of [`Sim`](super::Sim) exists.
-///
 #[must_use]
 #[track_caller]
 pub fn globals() -> Arc<Globals> {
@@ -29,7 +28,6 @@ pub fn globals() -> Arc<Globals> {
 ///
 /// This function panics if the no runtime is currently active.
 /// Note that a runtime is active if a instance of [`Sim`](super::Sim) exists.
-///
 #[track_caller]
 pub fn report<E: Into<Box<dyn StdError + Send + Sync>>>(e: E) {
     current().exec().report_error(Error::other(e));
@@ -44,7 +42,6 @@ pub fn report<E: Into<Box<dyn StdError + Send + Sync>>>(e: E) {
 ///
 /// This function panics if the no runtime is currently active.
 /// Note that a runtime is active if a instance of [`Sim`](super::Sim) exists.
-///
 #[track_caller]
 pub fn fail<E: Into<Box<dyn StdError + Send + Sync>>>(e: E) {
     current().exec().report_failure(Error::other(e));
@@ -61,7 +58,6 @@ pub fn fail<E: Into<Box<dyn StdError + Send + Sync>>>(e: E) {
 ///
 /// This function panics if the no runtime is currently active.
 /// Note that a runtime is active if a instance of [`Sim`](super::Sim) exists.
-///
 #[track_caller]
 pub fn schedule_event(event: NetEvents, time: SimTime) {
     current().exec().schedule_event(event, time);

@@ -332,9 +332,6 @@ unsafe fn vdrop<T>(ptr: *mut ()) {
 }
 
 /// A trait that allows a type to be mesured in bits / bytes.
-///
-/// * This type is only available of DES is build with the `"net"` feature.*
-#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub trait MessageBody: Send {
     /// The length of the message body in bytes.
     fn byte_len(&self) -> usize;

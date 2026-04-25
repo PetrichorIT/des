@@ -46,7 +46,6 @@ fn test_unresolvable_dependencies_cycle() {
     );
 }
 
-// TODO: needs clearer error message
 #[test]
 fn test_unresolvable_dependencies_unknown_typ() {
     let def: Def = serde_json::from_value(json!({

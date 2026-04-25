@@ -99,10 +99,6 @@ fn disallow_casting() -> Result<(), Failure> {
             // define prop
             current().prop::<i8>("i8")?.set(123);
             assert_eq!(current().prop::<i8>("i8")?.or_default().get(), 123);
-            // assert_eq!(
-            //     current().prop::<i32>("i8").unwrap_err().kind,
-            //     ErrorKind::InvalidInput
-            // ); TODO make errors more expresive
             Ok(())
         }),
     );

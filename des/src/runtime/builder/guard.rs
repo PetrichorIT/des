@@ -32,7 +32,6 @@ impl SimGuard {
 
 impl Drop for SimGuard {
     fn drop(&mut self) {
-        // buf_drop();
         module_ctx_drop();
     }
 }

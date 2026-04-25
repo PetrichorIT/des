@@ -49,16 +49,6 @@ impl<E> Profiler<E> {
     }
 }
 
-#[cfg(debug_assertions)]
-fn is_release() -> bool {
-    false
-}
-
-#[cfg(not(debug_assertions))]
-fn is_release() -> bool {
-    true
-}
-
 impl<E> Default for Profiler<E> {
     fn default() -> Self {
         let target = if cfg!(feature = "miri") {
@@ -67,7 +57,7 @@ impl<E> Default for Profiler<E> {
             std::env::current_exe().unwrap_or_default()
         };
 
-        let target_is_release = is_release();
+        let target_is_release = !cfg!(debug_assertions);
 
         let mut exec = target
             .file_name()

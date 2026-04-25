@@ -5,7 +5,6 @@ use std::{
 
 use crate::module::{Cfg, ModuleRef, Props};
 
-///
 /// The global parameters about a [`Sim`] that are publicly
 /// exposed.
 ///

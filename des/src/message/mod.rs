@@ -35,9 +35,6 @@ pub use extension::*;
 /// A message is composed from two parts:
 /// - a `Header` containing generic message parameters
 /// - and a optional `Body`, containing an arbitrary payload.
-///
-/// * This type is only available of DES is build with the `"net"` feature.*
-#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 #[derive(Debug)]
 #[must_use]
 pub struct Message {

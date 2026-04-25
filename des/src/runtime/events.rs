@@ -26,9 +26,6 @@ use crate::processing::TokioRuntime;
 
 ///
 /// The event set for a [`Sim`].
-///
-/// * This type is only available of DES is build with the `"net"` feature.
-#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 #[derive(Debug)]
 pub enum NetEvents {
     /// A message exiting a connection, implemented by a channel

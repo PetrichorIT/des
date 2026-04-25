@@ -37,7 +37,7 @@ use tree::{
 /// - The defined typ is a concrete type without generic args. The the node can be initialized with the already parsed
 ///   instance of this node type. Just clone it.
 /// - The defined typ is a concrete type with generic args. The base-node must be cloned, but all placeholder must be
-///   initialized with concrete types. (TODO: nested generics for concrete replacement)
+///   initialized with concrete types.
 /// - The defined type is a generic argument. A node of the interface type must be used as a placeholder, but its symbol
 ///   must be changed to the generics binding name.
 ///

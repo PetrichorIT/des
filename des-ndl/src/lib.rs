@@ -1,3 +1,10 @@
+#![warn(clippy::pedantic)]
+#![warn(
+    missing_docs,
+    missing_debug_implementations,
+    unreachable_pub,
+    clippy::dbg_macro
+)]
 //! Integration of the Network-Description-Language (NDL).
 //!
 //! # What is NDL ?
@@ -220,7 +227,13 @@ fn spawn_raw_node<A, L: Layer>(
 struct Dummy;
 impl Module for Dummy {}
 
+/// An extension trait for [`Sim`] that provides NDL-related functionality.
 pub trait SimExt {
+    /// Loads a NDL tree at the given path as the root of the tree.
+    ///
+    /// # Errors
+    ///
+    /// May return an NDL language error.
     fn ndl<L: Layer>(
         path: impl AsRef<Path>,
         registry: impl AsMut<Registry<L>>,

@@ -1,12 +1,13 @@
 use std::{fmt::Debug, iter::from_fn, sync::Arc};
 
 use crate::{
-    ObjectPath, SimBuilder, globals,
+    ObjectPath, SimBuilder,
+    gate::GateClusterRef,
+    globals,
     module::ModuleContext,
     prelude::{GateRef, Module, ModuleRef},
     processing::ModuleImpl,
-    runtime::IntoModuleTree,
-    runtime::{AtSimStartEvent, NetEvents, builder::cfg::SimConfiguration},
+    runtime::{AtSimStartEvent, IntoModuleTree, NetEvents, builder::cfg::SimConfiguration},
     schedule_event,
     time::SimTime,
 };
@@ -105,7 +106,7 @@ impl<'a, A> InnerSpawner<'a, A> {
         }
     }
 
-    // TODO: still a duplicate of the impl in SimBuilder -> remove if possible
+    #[track_caller]
     fn create_gates(&mut self, path: &ObjectPath, gate: &str, size: usize) -> Vec<GateRef> {
         let Some(module) = self.get(path.as_ref()) else {
             panic!("cannot create gate '{path}.{gate}', because node '{path}' does not exist")
@@ -293,9 +294,7 @@ impl<'a, A> Spawner<'a, A> {
         self.inner.get(self.scope.appended(path).as_ref())
     }
 
-    /// Creates or retrieves a gate at the specified module.
-    ///
-    /// See [`SimBuilder::gate`] for more information.
+    /// See [`SimBuilder::gate`].
     pub fn gate(&mut self, path: impl Into<ObjectPath>, gate: &str) -> GateRef {
         // FIXME: this alloc of vec is unnecessary, but maybe the compiler figures that out
         // TODO: check that
@@ -304,9 +303,23 @@ impl<'a, A> Spawner<'a, A> {
             .remove(0)
     }
 
-    /// Creates or retrieves a gate cluster at the specified module.
-    ///
-    /// See [`SimBuilder::gates`] for more information.
+    /// See [`SimBuilder::gate_cluster`].
+    #[allow(clippy::missing_panics_doc)]
+    pub fn gate_cluster(&mut self, path: impl Into<ObjectPath>, name: &str) -> GateClusterRef {
+        let path = path.into();
+        let Some(module) = self.get(path.as_ref()) else {
+            panic!(
+                "cannot create abstract gate '{path}.{name}', because node '{path}' does not exist"
+            )
+        };
+        if let Some(cluster) = module.gate_cluster(name) {
+            cluster
+        } else {
+            module.create_gate_cluster(name)
+        }
+    }
+
+    /// See [`SimBuilder::gates`].
     pub fn gates(&mut self, path: impl Into<ObjectPath>, gate: &str, size: usize) -> Vec<GateRef> {
         self.inner
             .create_gates(&self.scope.appended(path.into()), gate, size)

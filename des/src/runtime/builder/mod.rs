@@ -1,6 +1,6 @@
 #[cfg(feature = "cqueue")]
 use std::time::Duration;
-use std::{fmt, fs, io, iter::from_fn, ops::Deref, path::Path, sync::Arc};
+use std::{fmt, fs, io, ops::Deref, path::Path, sync::Arc};
 
 use rand::{RngCore, SeedableRng};
 use serde_norway::{Value, from_str};
@@ -84,10 +84,8 @@ impl<A> SimBuilder<A> {
         self
     }
 
-    ///
     /// Sets the cqueue options if this runtime uses a cqueue.
     /// NOP otherwise.
-    ///
     #[cfg(feature = "cqueue")]
     pub fn cqueue_options(mut self, n: usize, t: Duration) -> Self {
         self.cqueue_num_buckets = n;
@@ -96,50 +94,38 @@ impl<A> SimBuilder<A> {
         self
     }
 
-    ///
     /// Suppressed runtime messages from the simulation framework.
-    ///
     pub fn quiet(mut self) -> Self {
         self.quiet = true;
         self
     }
 
-    ///
     /// Changes the maximum iteration number of a runtime.
-    ///
     pub fn start_time(mut self, time: SimTime) -> Self {
         self.start_time = time;
         self
     }
 
-    ///
     /// Changes the maximum iteration number of a runtime.
-    ///
     pub fn max_itr(mut self, max_itr: usize) -> Self {
         self.limit.add(RuntimeLimit::EventCount(max_itr));
         self
     }
 
-    ///
     /// Changes the maximum time of the runtime (default: inf).
-    ///
     pub fn max_time(mut self, max_time: SimTime) -> Self {
         self.limit.add(RuntimeLimit::SimTime(max_time));
         self
     }
 
-    ///
     /// Sets a custom limit to the end of the runtime, overwriting
     /// all `max_itr` and `max_time` options.
-    ///
     pub fn limit(mut self, limit: RuntimeLimit) -> Self {
         self.limit.add(limit);
         self
     }
 
-    ///
     /// Builds the simulation with the given application.
-    ///
     pub fn build(self) -> Sim<A> {
         let guard = SimGuard::new();
         let future_event_set = FutureEventSet::new_with(&self);
@@ -306,15 +292,7 @@ impl<A> SimBuilder<A> {
     /// This function panic if node modules exists at `path`.
     #[track_caller]
     pub fn gate(&mut self, path: impl Into<ObjectPath>, gate: &str) -> GateRef {
-        let path = path.into();
-        let Some(module) = self.get(path.as_ref()) else {
-            panic!("cannot create gate '{path}.{gate}', because node '{path}' does not exist")
-        };
-        if let Some(gate) = module.gate((gate, 0)) {
-            gate
-        } else {
-            module.create_singular_gate(gate)
-        }
+        Spawner::new_at_buildtime(path.into(), self).gate("", gate)
     }
 
     /// Creates an abstrract gate on a already created module.
@@ -346,17 +324,7 @@ impl<A> SimBuilder<A> {
     /// This function panic if node modules exists at `path`.
     #[track_caller]
     pub fn gate_cluster(&mut self, path: impl Into<ObjectPath>, name: &str) -> GateClusterRef {
-        let path = path.into();
-        let Some(module) = self.get(path.as_ref()) else {
-            panic!(
-                "cannot create abstract gate '{path}.{name}', because node '{path}' does not exist"
-            )
-        };
-        if let Some(cluster) = module.gate_cluster(name) {
-            cluster
-        } else {
-            module.create_gate_cluster(name)
-        }
+        Spawner::new_at_buildtime(path.into(), self).gate_cluster("", name)
     }
 
     /// Creates a clust of gate gate on a allready created module.
@@ -369,20 +337,9 @@ impl<A> SimBuilder<A> {
     ///
     /// This function panics if either, not module exists at `path`, or
     /// some parts of the gate cluster allready exist, but others do not.
+    #[track_caller]
     pub fn gates(&mut self, path: impl Into<ObjectPath>, gate: &str, size: usize) -> Vec<GateRef> {
-        let path = path.into();
-        let Some(module) = self.get(path.as_ref()) else {
-            panic!("cannot create gate '{path}.{gate}', because node '{path}' does not exist")
-        };
-
-        let mut iter = 0..size;
-        let gates = from_fn(|| module.gate((gate, iter.next()?))).collect::<Vec<_>>();
-
-        match gates.len() {
-            0 => (0..size).map(|pos| module.create_gate(gate, pos)).collect(),
-            s if s == size => gates,
-            _ => panic!("cannot create gate cluster from partial gate cluster"),
-        }
+        Spawner::new_at_buildtime(path.into(), self).gates("", gate, size)
     }
 
     /// Creates a new module block within the simulation.

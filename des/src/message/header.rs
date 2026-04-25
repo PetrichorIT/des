@@ -8,23 +8,14 @@ use std::fmt::Debug;
 
 ///
 /// A ID that defines the meaning of the message in the simulation context.
-///
-///  * This type is only available of DES is build with the `"net"` feature.*
-#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub type MessageId = u16;
 
 ///
 /// The type of messages, similar to the TOS field in IP packets.
-///
-///  * This type is only available of DES is build with the `"net"` feature.*
-#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub type MessageKind = u16;
 
 ///
 /// The metadata attachted to a message, independent of its contents.
-///
-/// * This type is only available of DES is build with the `"net"` feature.*
-#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 #[derive(Debug, PartialEq, Eq)]
 #[allow(missing_docs)]
 pub struct Header {
@@ -70,6 +61,6 @@ impl Default for Header {
 
 impl MessageBody for Header {
     fn byte_len(&self) -> usize {
-        64 // TODO  compute correct header size
+        64 // Lets define this as 64 bytes
     }
 }
