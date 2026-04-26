@@ -13,7 +13,7 @@ use crate::{Error, ErrorKind, Failure, module::ModuleContext, sync::Mutex};
 use std::{
     any::{Any, type_name},
     fmt::Debug,
-    fs::File,
+    fs::{self, File},
     io::{BufWriter, Write},
     marker::PhantomData,
     sync::Arc,
@@ -513,6 +513,10 @@ impl ModuleContext {
                 let mut path = dir;
                 path.push(self.path.as_str());
                 path.set_extension("statistics.yml");
+
+                if let Some(parent) = path.parent() {
+                    let _ = fs::create_dir_all(parent);
+                }
 
                 let mut file = BufWriter::new(File::create(path)?);
                 file.write_all(
