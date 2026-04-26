@@ -1,15 +1,11 @@
 use std::{any::Any, time::Duration};
 
 use des::{
-    net::{
-        Sim,
-        channel::{SendContext, SendError},
-        gate::{Connection, IntoModuleGate},
-        handlers::HandlerFn,
-        internals::{ChannelUnbusyNotif, MessageExitingConnection, NetEvents},
-    },
+    Sim,
+    channel::{SendContext, SendError},
+    gate::{Connection, IntoGate, IntoModuleGate},
     prelude::{Channel, ChannelRef, GateRef, Message, Module, current, send},
-    runtime::Builder,
+    runtime::{ChannelUnbusyNotif, MessageExitingConnection, NetEvents, handlers::HandlerFn},
     time::{SimTime, interval, sleep_until},
 };
 
@@ -191,7 +187,7 @@ impl Channel for TimeDividedRadioChannel {
                         con: via,
                         msg: message,
                     }),
-                    now + self.prop_delay, // TODO: + msg_transmit
+                    now + self.prop_delay + msg_transmit,
                 );
 
                 Ok(())
@@ -245,7 +241,7 @@ fn main() {
     let mut sim = Sim::new(());
     sim.node(
         "tower",
-        HandlerFn::new(|msg| tracing::info!("#{} from {}", msg.id, msg.header.sender_module_id)),
+        HandlerFn::new(|msg| tracing::info!("#{} from", msg.id)),
     );
 
     // Create a channel, that will be shared by casting it to a ChannelRef
@@ -261,9 +257,10 @@ fn main() {
         g.connect_with(gt, Some(shared.clone()));
     }
 
-    let _ = Builder::seeded(123)
+    let _ = sim
+        .seeded(123)
         .max_time(10.0.into())
-        .build(sim.freeze())
+        .build()
         .run()
-        .unwrap();
+        .assert_no_err();
 }

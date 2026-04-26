@@ -5,7 +5,7 @@ use std::{
 
 use crate::time::SimTime;
 
-use super::{FT_ASYNC, FT_CQUEUE, FT_NET};
+use super::{FT_ASYNC, FT_CQUEUE};
 
 /// A run profiler
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -49,16 +49,6 @@ impl<E> Profiler<E> {
     }
 }
 
-#[cfg(debug_assertions)]
-fn is_release() -> bool {
-    false
-}
-
-#[cfg(not(debug_assertions))]
-fn is_release() -> bool {
-    true
-}
-
 impl<E> Default for Profiler<E> {
     fn default() -> Self {
         let target = if cfg!(feature = "miri") {
@@ -67,7 +57,7 @@ impl<E> Default for Profiler<E> {
             std::env::current_exe().unwrap_or_default()
         };
 
-        let target_is_release = is_release();
+        let target_is_release = !cfg!(debug_assertions);
 
         let mut exec = target
             .file_name()
@@ -81,9 +71,6 @@ impl<E> Default for Profiler<E> {
         let mut features = Vec::with_capacity(5);
         if FT_CQUEUE {
             features.push("cqueue".into());
-        }
-        if FT_NET {
-            features.push("net".into());
         }
         if FT_ASYNC {
             features.push("async".into());

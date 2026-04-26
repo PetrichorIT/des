@@ -1,7 +1,10 @@
-use crate::time::SimTime;
+use crate::{Sim, runtime::NetEvents, time::SimTime};
 
 mod event_set;
 pub(crate) use event_set::*;
+
+mod types;
+pub use types::*;
 
 /// A trait describing a sink for events, usually the future event set of the runtime.
 #[allow(unused)]
@@ -10,8 +13,8 @@ pub trait EventSink<E> {
     fn add(&mut self, event: E, time: SimTime);
 }
 
-impl<A: Application> EventSink<A::EventSet> for Runtime<A> {
-    fn add(&mut self, event: A::EventSet, time: SimTime) {
+impl<A: SimLifecycle> EventSink<NetEvents> for Sim<A> {
+    fn add(&mut self, event: NetEvents, time: SimTime) {
         self.add_event(event, time);
     }
 }
@@ -21,8 +24,3 @@ impl<E> EventSink<E> for Vec<(E, SimTime)> {
         self.push((event, time));
     }
 }
-
-mod types;
-pub use types::*;
-
-use super::Runtime;

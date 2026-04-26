@@ -3,6 +3,8 @@ tmp
 /queue
 .idea
 
+.DS_Store
+
 flamegraph*.svg
 perf.*
 

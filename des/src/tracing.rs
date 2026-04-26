@@ -1,5 +1,5 @@
 //! Alternative tracing impl
-use crate::{net::module::try_current, prelude::SimTime};
+use crate::{module::try_current, prelude::SimTime};
 use nu_ansi_term::{Color, Style};
 use tracing::{Level, Subscriber, dispatcher};
 use tracing_error::ErrorLayer;

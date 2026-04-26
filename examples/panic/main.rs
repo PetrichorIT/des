@@ -1,19 +1,19 @@
-use des::{net::handlers::AsyncHandler, prelude::*};
+use des::{Error, Failure, module::UnwindBehaviour, prelude::*, runtime::handlers::AsyncHandler};
 
-fn main() -> Result<(), RuntimeError> {
+fn main() -> Result<(), Failure> {
     let mut sim = Sim::new(());
     sim.node("alice", AsyncHandler::io(|_| async { Ok(()) }));
     sim.node("bob", B);
     sim.node("eve", B);
 
-    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
+    sim.seeded(123).build().run().into_result().map(|_| ())
 }
 
 struct B;
 impl Module for B {
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
-        current().set_unwind_behaviour(des::net::module::UnwindBehaviour {
-            on_panic_catch: false,
+    fn at_sim_end(&mut self) -> Result<(), Error> {
+        current().set_unwind_behaviour(UnwindBehaviour {
+            on_panic_abort: true,
             ..Default::default()
         });
 

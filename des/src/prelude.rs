@@ -6,72 +6,52 @@
 // # Generic core exports
 //
 
-pub use crate::runtime::Builder;
-pub use crate::runtime::Runtime;
-pub use crate::runtime::RuntimeError;
-
 pub use crate::time::Duration;
 pub use crate::time::SimTime;
-
-pub use crate::runtime::Application;
-pub use crate::runtime::Event;
-pub use crate::runtime::EventLifecycle;
-
-pub use crate::runtime::random;
-pub use crate::runtime::sample;
 
 //
 // # feature = "net"
 //
 
-cfg_net! {
-    pub use crate::net::message::Message;
-    pub use crate::net::message::MessageBody;
-    pub use crate::net::message::MessageId;
-    pub use crate::net::message::MessageKind;
-    pub use crate::net::message::Header;
+pub use crate::message::Header;
+pub use crate::message::Message;
+pub use crate::message::MessageBody;
+pub use crate::message::MessageId;
+pub use crate::message::MessageKind;
 
-    pub use crate::net::message::{send, send_in, send_at, schedule_in, schedule_at};
+pub use crate::message::{schedule_at, schedule_in, send, send_at, send_in};
 
-    pub use crate::net::Sim;
-    pub use crate::net::Globals;
-    pub use crate::net::Spawner;
+pub use crate::runtime::Globals;
+pub use crate::runtime::Sim;
+pub use crate::runtime::Spawner;
+pub use crate::runtime::random;
 
-    pub use crate::net::channel::Channel;
-    pub use crate::net::channel::DatarateChannel;
-    pub use crate::net::channel::DatarateChannelMetrics;
-    pub use crate::net::channel::ChannelRef;
-    pub use crate::net::channel::ChannelDropBehaviour;
-    pub use crate::net::channel::SendError;
+pub use crate::channel::Channel;
+pub use crate::channel::ChannelDropBehaviour;
+pub use crate::channel::ChannelRef;
+pub use crate::channel::DatarateChannel;
+pub use crate::channel::DatarateChannelMetrics;
+pub use crate::channel::SendError;
 
-    pub use crate::net::gate::Gate;
-    pub use crate::net::gate::GateRef;
+pub use crate::gate::Gate;
+pub use crate::gate::GateRef;
+pub use crate::gate::IntoGate;
 
-    pub use crate::net::topology::Topology;
+pub use crate::topology::Topology;
 
-    pub use crate::net::module::Module;
-    pub use crate::net::module::ModuleId;
-    pub use crate::net::module::ModuleRef;
+pub use crate::module::Module;
+pub use crate::module::ModuleRef;
 
+pub use crate::module::{current, try_current};
 
-    pub use crate::net::module::{current, try_current};
+pub use crate::ObjectPath;
+pub use crate::processing::ProcessingElement;
 
-    pub use crate::net::ObjectPath;
-    pub use crate::net::processing::ProcessingElement;
+pub use std::net::IpAddr;
+pub use std::net::Ipv4Addr;
+pub use std::net::Ipv6Addr;
+pub use std::net::SocketAddr;
+pub use std::net::SocketAddrV4;
+pub use std::net::SocketAddrV6;
 
-    pub use crate::net::ndl::Registry;
-    pub use crate::net::ndl::RegistryCreatable;
-
-    pub use std::net::IpAddr;
-    pub use std::net::Ipv4Addr;
-    pub use std::net::Ipv6Addr;
-    pub use std::net::SocketAddr;
-    pub use std::net::SocketAddrV4;
-    pub use std::net::SocketAddrV6;
-
-    //
-    // Export the derives if net
-    //
-
-    pub use des_macros::*;
-}
+pub use des_macros::*;

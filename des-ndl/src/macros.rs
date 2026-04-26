@@ -1,0 +1,63 @@
+/// Creates a registry of types that implement [`Module`](des::module::Module),
+/// to link rust structs to NDL modules.
+///
+/// The listing of types can be optionally suffixed with
+/// `else <some_type>`  to declare a fallback module
+/// in the [`Registry`](crate::Registry). The suffix `else _`
+/// declarse the default fallback module.
+///
+/// # Example
+///
+/// ```rust
+/// # use des::prelude::*;
+/// # use des_ndl::{registry, SimExt};
+/// #[derive(Default)]
+/// struct DnsServer;
+/// /* ... */
+/// # impl Module for DnsServer {}
+/// #[derive(Default)]
+/// struct Client;
+/// /* ... */
+/// # impl Module for Client {}
+/// #[derive(Default)]
+/// struct Server;
+/// # impl Module for Server {}
+/// /* ... */
+/// # use des_ndl::lang::error::Result;
+/// fn main() -> Result<()> {
+///     let registry = registry![DnsServer, Client, Server, else _];
+///     # return Ok(());
+///     let app = Sim::ndl("path/to/ndl", registry)?;
+///     let rt = app.build();
+///     let r = rt.run();
+/// }
+/// ```
+#[macro_export]
+macro_rules! registry {
+    ($($t:ty),*) => {{
+        let registry = $crate::Registry::new();
+        $(
+            let registry = registry.symbol::<$t>(stringify!($t));
+        )*
+
+        registry
+    }};
+
+    ($($t:ty),*, else _) => {{
+        let registry = $crate::Registry::new();
+        $(
+            let registry = registry.symbol::<$t>(stringify!($t));
+        )*
+
+        registry.with_default_fallback()
+    }};
+
+    ($($t:ty),*, else $f:ty) => {{
+        let registry = $crate::Registry::new();
+        $(
+            let registry = registry.symbol::<$t>(stringify!($t));
+        )*
+
+        registry.with_fallback(|| <$f as std::default::Default>::default())
+    }};
+}

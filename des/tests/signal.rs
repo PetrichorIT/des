@@ -1,12 +1,10 @@
 use des::{
-    net::{
-        globals,
-        handlers::ModuleFn,
-        message::Body,
-        module::{SIGNAL_MODULE_PANICED, Signal, UnwindBehaviour, emit},
-        processing::ProcessingStack,
-    },
+    Error, Failure, globals,
+    message::Body,
+    module::{SIGNAL_MODULE_PANICED, Signal, UnwindBehaviour, emit},
     prelude::*,
+    processing::ProcessingStack,
+    runtime::handlers::ModuleFn,
 };
 use serial_test::serial;
 
@@ -27,7 +25,7 @@ impl Module for Parent {
             _ => {}
         }
     }
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+    fn at_sim_end(&mut self) -> Result<(), Error> {
         assert!(self.0, "Must have observed child's panic");
         Ok(())
     }
@@ -46,17 +44,19 @@ fn panicing_subprocess_at(t: impl Into<SimTime>) -> impl Module {
 
 #[test]
 #[serial]
-fn signal_subscription_in_direct_parent() -> Result<(), RuntimeError> {
+fn signal_subscription_in_direct_parent() -> Result<(), Failure> {
+    // des::tracing::init();
+
     let mut sim = Sim::new(());
     sim.node("parent", Parent(false));
     sim.node("parent.child", panicing_subprocess_at(2.0));
 
-    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
+    sim.seeded(123).build().run().into_result().map(|_| ())
 }
 
 #[test]
 #[serial]
-fn signal_subscription_in_indirect_ancestor() -> Result<(), RuntimeError> {
+fn signal_subscription_in_indirect_ancestor() -> Result<(), Failure> {
     let mut sim = Sim::new(());
     sim.node("parent", Parent(false));
     sim.node("parent.child", NopModule);
@@ -66,12 +66,12 @@ fn signal_subscription_in_indirect_ancestor() -> Result<(), RuntimeError> {
         panicing_subprocess_at(2.0),
     );
 
-    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
+    sim.seeded(123).build().run().into_result().map(|_| ())
 }
 
 #[test]
 #[serial]
-fn signal_subscription_passed_to_created_child() -> Result<(), RuntimeError> {
+fn signal_subscription_passed_to_created_child() -> Result<(), Failure> {
     let mut sim = Sim::new(());
     sim.node("parent", Parent(false));
     sim.node(
@@ -79,16 +79,21 @@ fn signal_subscription_passed_to_created_child() -> Result<(), RuntimeError> {
         ModuleFn::new(
             || schedule_at(Message::default(), 2.0.into()),
             |_, _| {
-                globals()
-                    .get(&"parent".into())
-                    .unwrap()
-                    .spawner(ProcessingStack::default)
-                    .node("child", panicing_subprocess_at(4.0))
+                println!("[{}] 1 {}", SimTime::now(), current().path());
+
+                let g = globals();
+                println!("2");
+                let p = g.get(&"parent").unwrap();
+                println!("3");
+                p.spawner(ProcessingStack::default)
+                    .node("child", panicing_subprocess_at(4.0));
+
+                println!("[{}] 2 {}", SimTime::now(), current().path());
             },
         ),
     );
 
-    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
+    sim.seeded(123).build().run().into_result().map(|_| ())
 }
 
 struct ExpectNSignal<const SIGNAL: usize>(i32);
@@ -96,12 +101,12 @@ impl<const SIGNAL: usize> Module for ExpectNSignal<SIGNAL> {
     fn at_sim_start(&mut self, _stage: usize) {
         current().subscribe_to(SIGNAL);
     }
-    fn handle_signal(&mut self, signal: des::net::module::Signal) {
+    fn handle_signal(&mut self, signal: Signal) {
         if signal.code == SIGNAL {
             self.0 -= 1;
         }
     }
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+    fn at_sim_end(&mut self) -> Result<(), Error> {
         assert_eq!(self.0, 0, "expected {} more messages", self.0);
         Ok(())
     }
@@ -125,7 +130,7 @@ impl<const SIGNAL: usize> Module for EmitSignal<SIGNAL> {
 
 #[test]
 #[serial]
-fn signal_subscription_from_multiple_children() -> Result<(), RuntimeError> {
+fn signal_subscription_from_multiple_children() -> Result<(), Failure> {
     const SIGNAL: usize = 32;
 
     let mut sim = Sim::new(());
@@ -133,7 +138,7 @@ fn signal_subscription_from_multiple_children() -> Result<(), RuntimeError> {
     sim.node("parent.child", EmitSignal::<SIGNAL>(3));
     sim.node("parent.child.grandchild", EmitSignal::<SIGNAL>(7));
 
-    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
+    sim.seeded(123).build().run().into_result().map(|_| ())
 }
 
 struct ExpectNSignalThenUnsubscribe<const SIGNAL: usize>(i32);
@@ -141,7 +146,7 @@ impl<const SIGNAL: usize> Module for ExpectNSignalThenUnsubscribe<SIGNAL> {
     fn at_sim_start(&mut self, _stage: usize) {
         current().subscribe_to(SIGNAL);
     }
-    fn handle_signal(&mut self, signal: des::net::module::Signal) {
+    fn handle_signal(&mut self, signal: Signal) {
         if signal.code == SIGNAL {
             self.0 -= 1;
             if self.0 == 0 {
@@ -149,7 +154,7 @@ impl<const SIGNAL: usize> Module for ExpectNSignalThenUnsubscribe<SIGNAL> {
             }
         }
     }
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+    fn at_sim_end(&mut self) -> Result<(), Error> {
         assert_eq!(self.0, 0, "expected {} more messages", self.0);
         Ok(())
     }
@@ -157,7 +162,7 @@ impl<const SIGNAL: usize> Module for ExpectNSignalThenUnsubscribe<SIGNAL> {
 
 #[test]
 #[serial]
-fn signal_unsubscribe() -> Result<(), RuntimeError> {
+fn signal_unsubscribe() -> Result<(), Failure> {
     const SIGNAL: usize = 32;
 
     let mut sim = Sim::new(());
@@ -180,5 +185,5 @@ fn signal_unsubscribe() -> Result<(), RuntimeError> {
         ),
     );
 
-    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
+    sim.seeded(123).build().run().into_result().map(|_| ())
 }

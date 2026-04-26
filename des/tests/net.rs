@@ -1,9 +1,8 @@
 use des::{
-    net::{
-        fail, globals,
-        handlers::{AsyncHandler, ModuleFn},
-    },
+    Error, Failure, globals,
     prelude::*,
+    report,
+    runtime::handlers::{AsyncHandler, ModuleFn},
 };
 use serial_test::serial;
 
@@ -46,13 +45,13 @@ fn connectivity() {
         })),
     );
 
-    let app = Builder::seeded(123).build(app.freeze());
-    let _ = app.run().unwrap();
+    let app = app.seeded(123).build();
+    let _ = app.run().assert_no_err();
 }
 
 #[test]
 #[serial]
-fn select_node_from_globals() -> Result<(), RuntimeError> {
+fn select_node_from_globals() -> Result<(), Failure> {
     let mut sim = Sim::new(());
 
     sim.node("alice", NopModule);
@@ -63,35 +62,29 @@ fn select_node_from_globals() -> Result<(), RuntimeError> {
     sim.node(
         "tester",
         AsyncHandler::io(|_| async move {
+            assert_eq!(globals().get(&"alice").unwrap().path(), "alice");
             assert_eq!(
-                globals().get(&"alice".into()).unwrap().path(),
-                "alice".into()
+                globals().get(&"alice.submodule").unwrap().path(),
+                "alice.submodule"
             );
             assert_eq!(
-                globals().get(&"alice.submodule".into()).unwrap().path(),
-                "alice.submodule".into()
+                globals().get(&"alice.submodule.child").unwrap().path(),
+                "alice.submodule.child"
             );
-            assert_eq!(
-                globals()
-                    .get(&"alice.submodule.child".into())
-                    .unwrap()
-                    .path(),
-                "alice.submodule.child".into()
-            );
-            assert_eq!(globals().get(&"bob".into()).unwrap().path(), "bob".into());
+            assert_eq!(globals().get(&"bob").unwrap().path(), "bob");
 
-            assert!(globals().get(&"steve".into()).is_none());
+            assert!(globals().get(&"steve").is_none());
 
             Ok(())
         }),
     );
 
-    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
+    sim.seeded(123).build().run().into_result().map(|_| ())
 }
 
 #[test]
 #[serial]
-fn can_access_foreign_module_context() -> Result<(), RuntimeError> {
+fn can_access_foreign_module_context() -> Result<(), Failure> {
     let mut sim = Sim::new(());
 
     struct Alice;
@@ -100,7 +93,7 @@ fn can_access_foreign_module_context() -> Result<(), RuntimeError> {
             current().prop::<String>("key").unwrap().set("value".into());
         }
 
-        fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+        fn at_sim_end(&mut self) -> Result<(), Error> {
             assert_eq!(
                 current().prop::<String>("key").unwrap().get(),
                 Some("new_value".into())
@@ -129,7 +122,7 @@ fn can_access_foreign_module_context() -> Result<(), RuntimeError> {
 
             // simple data acces
             assert_eq!(other.gates().len(), 2);
-            assert_eq!(other.path(), "alice".into());
+            assert_eq!(other.path(), "alice");
 
             // prop access
             let mut prop = other.prop::<String>("key").unwrap();
@@ -149,7 +142,7 @@ fn can_access_foreign_module_context() -> Result<(), RuntimeError> {
     sim.gate("alice", "port").connect(sim.gate("bob", "port"));
     let _ = sim.gate("alice", "other-port");
 
-    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
+    sim.seeded(123).build().run().into_result().map(|_| ())
 }
 
 #[test]
@@ -161,23 +154,28 @@ fn custom_fail() {
         ModuleFn::new(
             || schedule_at(Message::default(), 1.0.into()),
             |_, _| {
-                fail(std::io::Error::other("failed because i like to"));
+                report(std::io::Error::other("failed because i like to"));
             },
         ),
     );
 
-    let err = Builder::seeded(123)
-        .build(sim.freeze())
+    let err = sim
+        .seeded(123)
+        .build()
         .run()
-        .err()
+        .error
         .expect("expected an error");
 
-    assert_eq!(err[0].to_string(), "failed because i like to");
+    assert!(
+        err[0]
+            .to_string()
+            .starts_with("alice: failed because i like to")
+    );
 }
 
 #[test]
 #[serial]
-fn gate_disconnect() -> Result<(), RuntimeError> {
+fn gate_disconnect() -> Result<(), Failure> {
     let mut sim = Sim::new(());
     sim.node(
         "alice",
@@ -193,7 +191,7 @@ fn gate_disconnect() -> Result<(), RuntimeError> {
 
             let _ = send(Message::default(), "a");
 
-            let other = globals().get(&"charlie".into()).unwrap().gate("c").unwrap();
+            let other = globals().get(&"charlie").unwrap().gate("c").unwrap();
             gate.connect(other);
 
             for _ in 0..7 {
@@ -210,7 +208,7 @@ fn gate_disconnect() -> Result<(), RuntimeError> {
 
     a.connect(b);
 
-    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
+    sim.seeded(123).build().run().into_result().map(|_| ())
 }
 
 #[test]
