@@ -125,7 +125,7 @@ impl ModuleRef {
     ///
     #[must_use]
     pub fn try_as_ref<T: Any>(&self) -> Option<RwLockReadGuard<'_, T>> {
-        RwLockReadGuard::filter_map(self.processing.read(), |processor| {
+        RwLockReadGuard::filter_map(self.processing.try_read()?, |processor| {
             processor.downcast_element_ref::<T>()
         })
     }
@@ -158,7 +158,7 @@ impl ModuleRef {
     ///
     #[must_use]
     pub fn try_as_mut<T: Any>(&self) -> Option<RwLockWriteGuard<'_, T>> {
-        RwLockWriteGuard::filter_map(self.processing.write(), |processor| {
+        RwLockWriteGuard::filter_map(self.processing.try_write()?, |processor| {
             processor.downcast_element_mut::<T>()
         })
     }

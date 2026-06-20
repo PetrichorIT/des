@@ -131,7 +131,7 @@ pub fn send_at(
     if let Some(gate) = gate {
         ctx.exec().send_in(msg, gate, send_time)
     } else {
-        #[cfg(feature = "tracing")]
+        #[cfg(feature = "log-internal")]
         tracing::error!("Error: Could not find gate in current module");
         Err(SendError {
             msg,

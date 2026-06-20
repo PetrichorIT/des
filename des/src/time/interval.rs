@@ -1,8 +1,8 @@
-use super::{sleep_until, SimTime, Sleep};
+use super::{SimTime, Sleep, sleep_until};
 use std::convert::TryInto;
-use std::future::{poll_fn, Future};
+use std::future::{Future, poll_fn};
 use std::pin::Pin;
-use std::task::{ready, Context, Poll};
+use std::task::{Context, Poll, ready};
 use std::time::Duration;
 
 /// Creates new [`Interval`] that yields with interval of `period`. The first
@@ -57,7 +57,10 @@ pub fn interval_at(start: SimTime, period: Duration) -> Interval {
     internal_interval_at(start, period)
 }
 
-#[cfg_attr(not(all(tokio_unstable, feature = "tracing")), allow(unused_variables))]
+#[cfg_attr(
+    not(all(tokio_unstable, feature = "log-internal")),
+    allow(unused_variables)
+)]
 fn internal_interval_at(start: SimTime, period: Duration) -> Interval {
     let delay = Box::pin(sleep_until(start));
 

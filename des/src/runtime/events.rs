@@ -100,7 +100,7 @@ impl MessageExitingConnection {
 
             // Drop message is owner is not active, but notfiy since this is an irregularity.
             if !cur.endpoint.owner().is_active() {
-                #[cfg(feature = "tracing")]
+                #[cfg(feature = "log-internal")]
                 tracing::warn!(
                     "Gate '{}' dropped message [{}] since owner module {} is inactive",
                     cur.endpoint.name(),
@@ -115,7 +115,7 @@ impl MessageExitingConnection {
             }
 
             // Log the current transition to the internal log stream.
-            #[cfg(feature = "tracing")]
+            #[cfg(feature = "log-internal")]
             tracing::info!(
                 "Gate '{}' forwarding message [{}] to next gate delayed: {}",
                 cur.endpoint.name(),
@@ -144,7 +144,7 @@ impl MessageExitingConnection {
         // The loop has ended. This means we are at the end of a gate chain
         // cur has not been checked for anything
 
-        #[cfg(feature = "tracing")]
+        #[cfg(feature = "log-internal")]
         tracing::info!(
             "Gate '{}' forwarding message [{}] to module #{}",
             cur.endpoint.name(),
@@ -190,7 +190,7 @@ impl HandleMessageEvent {
         let message = self.message;
         let module = &self.module;
 
-        #[cfg(feature = "tracing")]
+        #[cfg(feature = "log-internal")]
         tracing::info!("Handling message {:?}", message);
 
         let ctx = EventExecutionContext::default();
@@ -225,7 +225,7 @@ impl AtSimStartEvent {
                     let ctx = EventExecutionContext::default();
 
                     module.activate_with(Some(ctx.clone()));
-                    #[cfg(feature = "tracing")]
+                    #[cfg(feature = "log-internal")]
                     tracing::info!("Calling at_sim_start({}).", stage);
                     module.at_sim_start(stage);
                     module.deactivate();
@@ -275,7 +275,7 @@ pub struct ModuleShutdownEvent {
 
 impl ModuleShutdownEvent {
     fn handle<A: SimLifecycle>(self, rt: &mut Sim<A>) -> Result<(), Failure> {
-        #[cfg(feature = "tracing")]
+        #[cfg(feature = "log-internal")]
         tracing::info!("ModuleShutdownEvent");
 
         let module = &self.module;
@@ -298,7 +298,7 @@ pub struct ModuleRestartEvent {
 
 impl ModuleRestartEvent {
     fn handle<A: SimLifecycle>(self, rt: &mut Sim<A>) -> Result<(), Failure> {
-        #[cfg(feature = "tracing")]
+        #[cfg(feature = "log-internal")]
         tracing::info!("ModuleRestartEvent");
 
         let module = &self.module;
@@ -323,7 +323,7 @@ pub struct AsyncWakeupEvent {
 #[cfg(feature = "async")]
 impl AsyncWakeupEvent {
     fn handle<A: SimLifecycle>(self, rt: &mut Sim<A>) -> Result<(), Failure> {
-        #[cfg(feature = "tracing")]
+        #[cfg(feature = "log-internal")]
         tracing::info!("async wakeup {:?}", self.module.path());
 
         let module = &self.module;
@@ -413,7 +413,7 @@ impl ModuleRef {
                 .write()
                 .process_with(None, |_, _| Harness::new(&self.ctx).exec(|| {}).catch());
         } else {
-            #[cfg(feature = "tracing")]
+            #[cfg(feature = "log-internal")]
             tracing::debug!("Ignoring message since module is inactive");
         }
     }
@@ -442,7 +442,7 @@ impl ModuleRef {
         }
 
         // Mark the modules state
-        #[cfg(feature = "tracing")]
+        #[cfg(feature = "log-internal")]
         tracing::debug!("Shuttind down module and restaring at {:?}", restart_at);
         self.ctx.state.set(State::Shutdown);
 
@@ -469,7 +469,7 @@ impl ModuleRef {
     }
 
     pub(crate) fn module_restart(&self) {
-        #[cfg(feature = "tracing")]
+        #[cfg(feature = "log-internal")]
         tracing::debug!("Restarting module");
         // restart the module itself.
         self.ctx.state.set(State::Initialized);
@@ -495,7 +495,7 @@ impl ModuleRef {
                         .catch();
                 });
         } else {
-            #[cfg(feature = "tracing")]
+            #[cfg(feature = "log-internal")]
             tracing::debug!("Ignoring message since module is inactive");
         }
     }
@@ -511,6 +511,7 @@ impl ModuleRef {
                 .catch();
         });
 
+        eprintln!("{}: {stage} {max}", self.path);
         if stage + 1 == max {
             self.ctx.state.set(State::Running);
             schedule_event(

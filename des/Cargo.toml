@@ -24,6 +24,7 @@ serde = []
 macros = ["dep:des-macros", "dep:futures"]
 async = [ "dep:tokio"]
 cqueue = ["dep:des-cqueue"]
+log-internal = []
 tracing = []
 
 miri = []

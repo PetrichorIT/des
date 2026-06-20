@@ -538,7 +538,7 @@ cfg_async! {
 
             let Some(mut driver) = Driver::unset() else {
                 // Somebody stole our driver
-                #[cfg(feature = "tracing")]
+                #[cfg(feature = "log-internal")]
                 tracing::error!("IO time driver missing after event execution");
 
                 self.driver = Some(Driver::new());
@@ -548,7 +548,7 @@ cfg_async! {
             if let Some(next_wakeup) = driver.next()
                 && next_wakeup < driver.next_wakeup
             {
-                #[cfg(feature = "tracing")]
+                #[cfg(feature = "log-internal")]
                 tracing::trace!(
                     "scheduling new wakeup at {} (prev {})",
                     next_wakeup,

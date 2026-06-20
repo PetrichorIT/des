@@ -569,7 +569,7 @@ impl<A: SimLifecycle> Sim<A> {
 
                     module.activate_with(Some(ctx.clone()));
 
-                    #[cfg(feature = "tracing")]
+                    #[cfg(feature = "log-internal")]
                     tracing::info!("Calling at_sim_start({}).", stage);
                     module.at_sim_start(stage);
                     module.deactivate();
@@ -604,7 +604,7 @@ impl<A: SimLifecycle> Sim<A> {
             let ctx = EventExecutionContext::default();
             module.activate_with(Some(ctx.clone()));
 
-            #[cfg(feature = "tracing")]
+            #[cfg(feature = "log-internal")]
             tracing::info!("Calling 'at_sim_end'");
             error.extend(
                 module
