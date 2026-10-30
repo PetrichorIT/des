@@ -83,8 +83,8 @@ impl ModuleRef {
         self.ctx.gates.write().attach(self);
     }
 
-    #[allow(unused)]
     // Caller must ensure that handler is indeed a dummy
+    #[allow(unused)]
     #[doc(hidden)]
     pub fn upgrade_dummy(&self, module: ModuleImpl) {
         self.processing.set(module);
@@ -94,7 +94,7 @@ impl ModuleRef {
     /// Indicates whether the referenced module is of type T.
     #[must_use]
     pub fn is<T: Any>(&self) -> bool {
-        self.processing.read().downcast_element_ref::<T>().is_some()
+        self.processing.read().downcast_module_ref::<T>().is_some()
     }
 
     /// Borrows the referenced module as a readonly reference
@@ -103,7 +103,7 @@ impl ModuleRef {
     /// # Panics
     ///
     /// Panics if either the module is not of type T,
-    /// or the module is allready borrowed mutably.
+    /// or the module is already borrowed mutably.
     #[must_use]
     pub fn as_ref<T: Any>(&self) -> RwLockReadGuard<'_, T> {
         self.try_as_ref::<T>()
@@ -119,14 +119,14 @@ impl ModuleRef {
     ///
     /// # Panics
     ///
-    /// This function panics if the contained module is allready borrowed
-    /// mutably. This may be the case if another borrow has allready occured
+    /// This function panics if the contained module is already borrowed
+    /// mutably. This may be the case if another borrow has already occured
     /// or the reference module is `self` and a module-specific function is called.
     ///
     #[must_use]
     pub fn try_as_ref<T: Any>(&self) -> Option<RwLockReadGuard<'_, T>> {
         RwLockReadGuard::filter_map(self.processing.try_read()?, |processor| {
-            processor.downcast_element_ref::<T>()
+            processor.downcast_module_ref::<T>()
         })
     }
 
@@ -136,7 +136,7 @@ impl ModuleRef {
     /// # Panics
     ///
     /// Panics if either the module is not of type T,
-    /// or the module is allready borrowed on any way.
+    /// or the module is already borrowed on any way.
     #[must_use]
     pub fn as_mut<T: Any>(&self) -> RwLockWriteGuard<'_, T> {
         self.try_as_mut()
@@ -152,19 +152,17 @@ impl ModuleRef {
     ///
     /// # Panics
     ///
-    /// This function panics if the contained module is allready borrowed
-    /// in any way. This may be the case if another borrow has allready occured
+    /// This function panics if the contained module is already borrowed
+    /// in any way. This may be the case if another borrow has already occured
     /// or the reference module is `self` and a module-specific function is called.
     ///
     #[must_use]
     pub fn try_as_mut<T: Any>(&self) -> Option<RwLockWriteGuard<'_, T>> {
         RwLockWriteGuard::filter_map(self.processing.try_write()?, |processor| {
-            processor.downcast_element_mut::<T>()
+            processor.downcast_module_mut::<T>()
         })
     }
-}
 
-impl ModuleRef {
     /// Whether the module is currently active or shut down.
     #[must_use]
     pub fn is_active(&self) -> bool {
@@ -210,6 +208,91 @@ impl Debug for ModuleRef {
             .field("handler", &Arc::strong_count(&self.processing))
             .field("ctx", &Arc::strong_count(&self.ctx))
             .finish()
+    }
+}
+
+// # Stack
+
+/// A reference to the processing stack of a module.
+#[derive(Debug)]
+pub struct StackRef<'a> {
+    inner: &'a ModuleRef,
+}
+
+impl ModuleRef {
+    /// Returns a reference to the processing stack of this module.
+    pub fn stack(&self) -> StackRef<'_> {
+        StackRef { inner: self }
+    }
+}
+
+impl<'a> StackRef<'a> {
+    /// Indicates whether the referenced module has a stack element of type T.
+    #[must_use]
+    pub fn has<T: Any>(&self) -> bool {
+        self.inner
+            .processing
+            .read()
+            .downcast_stack_ref::<T>()
+            .is_some()
+    }
+
+    /// Retrives a reference to a stack element of type T.
+    ///
+    /// # Panics
+    ///
+    /// Panics if either the module is not of type T,
+    /// or the module is already borrowed on any way.
+    #[must_use]
+    pub fn get<T: Any>(&self) -> RwLockReadGuard<'_, T> {
+        self.try_get::<T>()
+            .expect("Failed to cast ModuleRef to readonly reference to type T")
+    }
+
+    /// Tries to retrive a reference to a stack element of type T.
+    ///
+    /// This function will return `None` is the contained module
+    /// has no stack element of type T.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the contained module is already borrowed
+    /// in any way. This may be the case if another borrow has already occured
+    /// or the reference module is `self` and a module-specific function is called.
+    #[must_use]
+    pub fn try_get<T: Any>(&self) -> Option<RwLockReadGuard<'_, T>> {
+        RwLockReadGuard::filter_map(self.inner.processing.try_read()?, |processor| {
+            processor.downcast_stack_ref::<T>()
+        })
+    }
+
+    /// Retrives a mutable reference to a stack element of type T.
+    ///
+    /// # Panics
+    ///
+    /// Panics if either the module is not of type T,
+    /// or the module is already borrowed on any way.
+    #[must_use]
+    pub fn get_mut<T: Any>(&self) -> RwLockWriteGuard<'_, T> {
+        self.try_get_mut()
+            .expect("Failed to cast ModuleRef to mutable reference to type T")
+    }
+
+    /// Tries to retrive a mutable reference to a stack element of type T.
+    ///
+    /// This function will return `None` is the contained module
+    /// has no stack element of type T.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the contained module is already borrowed
+    /// in any way. This may be the case if another borrow has already occured
+    /// or the reference module is `self` and a module-specific function is called.
+    #[must_use]
+    pub fn try_get_mut<T: Any>(&self) -> Option<RwLockWriteGuard<'_, T>> {
+        RwLockWriteGuard::filter_map(self.inner.processing.try_write()?, |processor| {
+            processor.downcast_stack_mut::<T>()
+        })
     }
 }
 

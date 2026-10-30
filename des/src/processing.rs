@@ -185,26 +185,26 @@ impl ModuleImpl {
     // This lookup operations scales O(n) with the amount of proc-elements
     // maybe make a lookup using a BTreeMap?
 
-    pub(super) fn downcast_element_ref<T: Any>(&self) -> Option<&T> {
-        for element in &self.stack.items {
+    pub(super) fn downcast_stack_ref<T: Any>(&self) -> Option<&T> {
+        self.stack.items.iter().find_map(|element| {
             let as_any: &dyn Any = &**element;
-            if let Some(element) = as_any.downcast_ref::<T>() {
-                return Some(element);
-            }
-        }
+            as_any.downcast_ref::<T>()
+        })
+    }
 
+    pub(super) fn downcast_module_ref<T: Any>(&self) -> Option<&T> {
         let as_any: &dyn Any = &*self.handler;
         as_any.downcast_ref::<T>()
     }
 
-    pub(super) fn downcast_element_mut<T: Any>(&mut self) -> Option<&mut T> {
-        for element in &mut self.stack.items {
+    pub(super) fn downcast_stack_mut<T: Any>(&mut self) -> Option<&mut T> {
+        self.stack.items.iter_mut().find_map(|element| {
             let as_any: &mut dyn Any = &mut **element;
-            if let Some(element) = as_any.downcast_mut::<T>() {
-                return Some(element);
-            }
-        }
+            as_any.downcast_mut::<T>()
+        })
+    }
 
+    pub(super) fn downcast_module_mut<T: Any>(&mut self) -> Option<&mut T> {
         let as_any: &mut dyn Any = &mut *self.handler;
         as_any.downcast_mut::<T>()
     }

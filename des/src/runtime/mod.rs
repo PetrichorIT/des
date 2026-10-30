@@ -617,6 +617,7 @@ impl<A: SimLifecycle> Sim<A> {
 
             ctx.finish(self)?;
         }
+        error.append(&mut self.error);
 
         let _ = take_hook();
         if error.is_empty() {
@@ -692,6 +693,7 @@ fn panic_hook(info: &PanicHookInfo) {
 fn report_panic(handle: &ModuleContext, info: &PanicHookInfo) {
     let behaviour = handle.unwind_behaviour();
     if behaviour.ignore_panics {
+        println!("< ig ori");
         return;
     }
 

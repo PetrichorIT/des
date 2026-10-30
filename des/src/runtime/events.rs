@@ -397,7 +397,7 @@ impl ModuleRef {
         // TODO: store the used base stack somehow or recreate it?
         // TODO: then call stack() on the reset module itself
         #[cfg(feature = "async")]
-        brw.downcast_element_mut::<TokioRuntime>()
+        brw.downcast_module_mut::<TokioRuntime>()
             .map(TokioRuntime::reset);
 
         // Reset does not capture any proc-elements -> correct ?
@@ -450,7 +450,7 @@ impl ModuleRef {
         #[cfg(feature = "async")]
         self.processing
             .write()
-            .downcast_element_mut::<TokioRuntime>()
+            .downcast_module_mut::<TokioRuntime>()
             .map(TokioRuntime::shutdown);
 
         // Reset the internal state
@@ -550,7 +550,7 @@ impl ModuleRef {
         processing.process_with(None, |_, _| {});
 
         #[cfg(feature = "async")]
-        if let Some(tokio) = processing.downcast_element_mut::<TokioRuntime>()
+        if let Some(tokio) = processing.downcast_stack_mut::<TokioRuntime>()
             && let Err(other) = tokio.at_sim_end()
         {
             match result {

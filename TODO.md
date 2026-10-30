@@ -24,3 +24,12 @@ this can be archived using at_sim_start-stages but not with any other way
 
 To be learned:
 - calling wakers of inactive runtimes
+
+
+## Serializability
+
+> according to serde / facet spec
+
+- Many things are Arc<T> -> must ensure that to just eq-by-content, but ptr-eq
+- Create eq-by-content first, onLoad match to appropriate instances
+- Make final state inspectable

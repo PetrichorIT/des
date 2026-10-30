@@ -227,6 +227,13 @@ impl Message {
     }
 }
 
+impl Clone for Message {
+    fn clone(&self) -> Self {
+        self.try_clone()
+            .expect("expected clonable message body: value not clonable")
+    }
+}
+
 //
 // # Extensions
 //
@@ -242,13 +249,6 @@ impl Message {
     pub fn with_extension<T: Any + Send>(mut self, extension: T) -> Self {
         self.extensions.set(extension);
         self
-    }
-}
-
-impl Clone for Message {
-    fn clone(&self) -> Self {
-        self.try_clone()
-            .expect("expected clonable message body: value not clonable")
     }
 }
 

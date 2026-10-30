@@ -276,8 +276,8 @@ impl Module for NodeReadingPE {
         let parent = current().parent().expect("parent must exist");
 
         assert!(parent.try_as_ref::<NodeWithPE>().is_some());
-        assert!(parent.try_as_ref::<PEWithValue>().is_some());
-        assert_eq!(parent.try_as_ref::<PEWithValue>().unwrap().value, 42);
+        assert!(parent.stack().try_get::<PEWithValue>().is_some());
+        assert_eq!(parent.stack().try_get::<PEWithValue>().unwrap().value, 42);
 
         Ok(())
     }

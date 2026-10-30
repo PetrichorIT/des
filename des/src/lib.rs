@@ -100,8 +100,6 @@ pub mod processing;
 pub mod statistics;
 pub mod topology;
 
-pub mod trace;
-
 pub use self::error::*;
 pub use self::path::*;
 pub use self::runtime::{

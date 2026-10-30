@@ -197,7 +197,7 @@ pub trait Channel: Any + Send + Sync {
     fn send(
         &mut self,
         src: GateRef,
-        message: Message,
+        msg: Message,
         via: Connection,
         ctx: SendContext<'_>,
     ) -> Result<(), SendError>;
