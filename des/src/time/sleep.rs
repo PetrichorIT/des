@@ -1,6 +1,6 @@
 use super::{
-    driver::{Driver, TimerSlotEntry, TimerSlotEntryHandle},
     SimTime,
+    driver::{Driver, TimerSlotEntry, TimerSlotEntryHandle},
 };
 use pin_project_lite::pin_project;
 use std::{future::Future, pin::Pin, sync::atomic::AtomicUsize, task::Poll, time::Duration};
@@ -203,3 +203,10 @@ impl Future for Sleep {
         }
     }
 }
+
+// SAFETY:
+// Sleep is sync, since sending `&Sleep` will not cause data races, as
+// any relevant operation on `&self` is thread-safe as they are read-only,
+// or pin-based which can only happen on the same thread as this should
+// only be used in current-thread runtimes.
+unsafe impl Sync for Sleep {}

@@ -1,12 +1,9 @@
-#![cfg(feature = "net")]
-
 use des::{
-    net::{
-        IntoModuleTree,
-        handlers::{FailabilityPolicy, HandlerFn, ModuleFn, WithContext},
-        module::Prop,
-    },
+    Failure,
+    module::Prop,
     prelude::*,
+    runtime::IntoModuleTree,
+    runtime::handlers::{FailabilityPolicy, HandlerFn, ModuleFn, WithContext},
 };
 use serial_test::serial;
 use spin::Mutex;
@@ -57,7 +54,7 @@ fn builder_builds_hierachie() {
         ),
     );
 
-    let _ = Builder::seeded(123).build(sim.freeze()).run();
+    let _ = sim.seeded(123).build().run();
 }
 
 #[test]
@@ -107,7 +104,7 @@ fn builder_gate_cluster() {
     sim.node("alice", Alice);
     let _ = sim.gates("alice", "cluster", 4);
 
-    let _ = Builder::seeded(123).build(sim.freeze()).run();
+    let _ = sim.seeded(123).build().run();
 }
 
 #[test]
@@ -130,7 +127,7 @@ fn builder_module_block() {
 
     let mut sim = Sim::new(());
     sim.node("alice", Block);
-    assert!(sim.get(&"alice.sub".into()).is_some());
+    assert!(sim.get(&"alice.sub").is_some());
 }
 
 #[test]
@@ -150,7 +147,7 @@ fn builder_handler_fn() {
     let other = sim.gate("alice", "port");
     assert!(Arc::ptr_eq(&gate, &other));
 
-    let mut rt = Builder::seeded(123).build(sim.freeze());
+    let mut rt = sim.seeded(123).build();
     rt.add_message_onto(gate.clone(), Message::default().with_id(1), 1.0.into());
     rt.add_message_onto(gate.clone(), Message::default().with_id(2), 2.0.into());
     rt.add_message_onto(gate.clone(), Message::default().with_id(3), 3.0.into());
@@ -177,12 +174,15 @@ fn builder_handler_fn_with_err() {
         ),
     );
 
-    let _ = Builder::seeded(123).build(sim.freeze()).run();
+    let _ = sim.seeded(123).build().run();
 }
 
 #[test]
 #[serial]
+
 fn builder_handler_fn_failure_panic() {
+    // des::tracing::init();
+
     let mut sim = Sim::new(());
     sim.node(
         "alice",
@@ -199,14 +199,14 @@ fn builder_handler_fn_failure_panic() {
     );
     let gate = sim.gate("alice", "port");
 
-    let mut rt = Builder::seeded(123).build(sim.freeze());
+    let mut rt = sim.seeded(123).build();
     rt.add_message_onto(gate, Message::default(), 1.0.into());
 
-    let e = rt.run().unwrap_err();
-    assert!(
-        e[0].to_string()
-            .starts_with("alice: ModulePanic(Any { .. })")
-    );
+    let e = rt.run().error.unwrap();
+
+    assert!(e[0].to_string().starts_with(
+        "alice: node 'alice' failed to process message, handler fn failed with: other"
+    ),);
 }
 
 #[test]
@@ -228,7 +228,7 @@ fn builder_handler_fn_failure_no_panic() {
     );
     let gate = sim.gate("alice", "port");
 
-    let mut rt = Builder::seeded(123).build(sim.freeze());
+    let mut rt = sim.seeded(123).build();
     rt.add_message_onto(gate, Message::default(), 1.0.into());
 
     let _ = rt.run();
@@ -255,7 +255,7 @@ fn builder_module_fn() {
     );
     let gate = sim.gate("alice", "port");
 
-    let mut rt = Builder::seeded(123).build(sim.freeze());
+    let mut rt = sim.seeded(123).build();
     for i in 0..10 {
         rt.add_message_onto(
             gate.clone(),
@@ -294,7 +294,7 @@ fn builder_module_fn_restart_at_failure() {
     );
     let gate = sim.gate("alice", "port");
 
-    let mut rt = Builder::seeded(123).build(sim.freeze());
+    let mut rt = sim.seeded(123).build();
     rt.add_message_onto(gate.clone(), Message::default().with_id(1), 1.0.into());
     rt.add_message_onto(gate.clone(), Message::default().with_id(1), 2.0.into());
     rt.add_message_onto(gate.clone(), Message::default().with_id(2), 3.0.into());
@@ -324,13 +324,13 @@ fn builder_module_fn_gen_in_module_scope() {
     );
 
     assert_eq!(stage.load(Ordering::SeqCst), 0);
-    let _ = Builder::seeded(123).build(sim.freeze()).run();
+    let _ = sim.seeded(123).build().run();
     assert_eq!(stage.load(Ordering::SeqCst), 1);
 }
 
 #[test]
 #[serial]
-fn builder_with_context_can_access_props() -> Result<(), RuntimeError> {
+fn builder_with_context_can_access_props() -> Result<(), Failure> {
     struct WithProp {
         #[allow(dead_code)]
         prop: Prop<u32, true>,
@@ -347,5 +347,5 @@ fn builder_with_context_can_access_props() -> Result<(), RuntimeError> {
         }),
     );
 
-    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
+    sim.seeded(123).build().run().into_result().map(|_| ())
 }

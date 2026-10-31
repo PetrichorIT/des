@@ -1,4 +1,5 @@
-use des::{prelude::*, registry};
+use des::{Error, prelude::*};
+use des_ndl::{Ndl, registry};
 
 #[derive(Default)]
 struct Sub;
@@ -18,24 +19,19 @@ impl Module for Sub {
 #[derive(Default)]
 struct Main;
 impl Module for Main {
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+    fn at_sim_end(&mut self) -> Result<(), Error> {
         tracing::info!(target: "custom", "at sim end");
         Ok(())
     }
 }
 
 fn main() {
-    // Logger::new()
-    //     .interal_max_log_level(log::LevelFilter::Debug)
-    //     .set_logger();
-
-    let app = match Sim::ndl("examples/ndl2/main.yml", registry![Main, Sub]) {
-        Ok(v) => v,
-        Err(e) => {
-            println!("{e}");
-            panic!("exiting due to previouis error")
-        }
-    };
-    let rt = Builder::seeded(123).max_itr(10).build(app.freeze());
+    let mut app = Sim::new(());
+    app.node(
+        "",
+        Ndl::from_str(&mut registry![Main, Sub], include_str!("main.yml")).unwrap(),
+    )
+    .unwrap();
+    let rt = app.seeded(123).max_itr(10).build();
     let _ = rt.run();
 }

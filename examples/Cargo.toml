@@ -8,13 +8,11 @@ version = "0.1.0"
 
 [dev-dependencies]
 des = { path = "../des", features = ["full"] }
+des-ndl = { path = "../des-ndl" }
 rand = "*"
 tracing = "*"
 tokio = "*"
 
-[[example]]
-name = "pingpong-custom-sim"
-path = "pingpong/0-custom-sim.rs"
 
 [[example]]
 name = "pingpong-net"
@@ -23,11 +21,6 @@ path = "pingpong/1-net.rs"
 [[example]]
 name = "pingpong-async"
 path = "pingpong/2-async.rs"
-
-
-[[example]]
-name = "waiter"
-path = "waiter.rs"
 
 [[example]]
 name = "ndl"
@@ -41,9 +34,6 @@ path = "utils/main.rs"
 name = "ptrhell"
 path = "ptrhell/main.rs"
 
-[[example]]
-name = "cqueue"
-path = "cqueue.rs"
 
 [[example]]
 name = "multisim"

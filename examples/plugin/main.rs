@@ -1,4 +1,7 @@
-use des::{net::Error, prelude::*, registry};
+use std::io;
+
+use des::{Error, ErrorKind, Failure, prelude::*};
+use des_ndl::{SimExt, registry};
 
 #[derive(Debug, Default)]
 struct A {}
@@ -12,7 +15,10 @@ impl A {
 
     #[tracing::instrument]
     fn method_two(&mut self) -> Result<(), Error> {
-        Err(Error::new(current().path(), des::net::ErrorKind::Other))
+        Err(Error::new(
+            current().path(),
+            ErrorKind::Other(Box::new(io::Error::other("a"))),
+        ))
     }
 }
 
@@ -28,7 +34,7 @@ impl Module for A {
         tracing::info!("recv: {} {}", msg, msg.body.content::<i32>());
     }
 
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+    fn at_sim_end(&mut self) -> Result<(), Error> {
         self.method_one(123)?;
         Ok(())
     }
@@ -47,7 +53,7 @@ impl Module for B {
 struct Main;
 impl Module for Main {}
 
-fn main() -> Result<(), RuntimeError> {
+fn main() -> Result<(), Failure> {
     // Logger::new().set_logger();
     // tracing_subscriber::fmt()
     //     .with_max_level(LevelFilter::TRACE)
@@ -58,6 +64,6 @@ fn main() -> Result<(), RuntimeError> {
     // Subscriber::default().init().unwrap();
 
     let app = Sim::ndl("examples/plugin/main.yml", registry![A, B, Main]).unwrap();
-    let rt = Builder::new().build(app.freeze());
-    rt.run().map(|_| ())
+    let rt = app.build();
+    rt.run().into_result().map(|_| ())
 }

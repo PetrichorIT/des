@@ -1,5 +1,5 @@
 use std::sync::atomic::Ordering::SeqCst;
-use std::sync::{atomic::AtomicUsize, Arc, Barrier};
+use std::sync::{Arc, Barrier, atomic::AtomicUsize};
 use std::thread;
 
 use des::prelude::*;
@@ -38,9 +38,7 @@ fn create_runtime_and_wait(
     barrier.wait();
 
     // Create runtime
-    let app = Sim::new(());
-
-    let rt = Builder::new().build(app.freeze());
+    let rt = Sim::new(()).build();
     let prev = active.fetch_add(1, SeqCst);
     assert_eq!(prev, 0);
     counter.fetch_add(1, SeqCst);

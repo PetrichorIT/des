@@ -9,6 +9,7 @@ use std::{
     cell::{Cell, UnsafeCell},
     marker::PhantomData,
     ops::{Deref, DerefMut},
+    panic::{RefUnwindSafe, UnwindSafe},
     ptr::NonNull,
 };
 
@@ -45,9 +46,19 @@ impl<T> RwLock<T> {
 
     /// # Panics
     /// Panics if there are any read handles still alive.
+    #[track_caller]
     pub fn read(&self) -> RwLockReadGuard<'_, T> {
         self.try_read()
             .expect("Failed to get read lock on single thread")
+    }
+
+    /// Syntatic sugar to auto-drop locks
+    #[track_caller]
+    pub fn get(&self) -> T
+    where
+        T: Copy,
+    {
+        *self.read()
     }
 
     pub fn try_read(&self) -> Option<RwLockReadGuard<'_, T>> {
@@ -58,9 +69,16 @@ impl<T> RwLock<T> {
 
     /// # Panics
     /// Panics if there are any read handles still alive.
+    #[track_caller]
     pub fn write(&self) -> RwLockWriteGuard<'_, T> {
         self.try_write()
             .expect("Failed to get read lock on single thread")
+    }
+
+    /// Syntatic sugar to auto-drop locks
+    #[track_caller]
+    pub fn set(&self, value: T) {
+        *self.write() = value;
     }
 
     pub fn try_write(&self) -> Option<RwLockWriteGuard<'_, T>> {
@@ -72,10 +90,33 @@ impl<T> RwLock<T> {
             marker: PhantomData,
         })
     }
+
+    pub fn info(&self) -> String {
+        self.flag.get().to_string()
+    }
+}
+
+impl<T> From<T> for RwLock<T> {
+    fn from(value: T) -> Self {
+        Self::new(value)
+    }
+}
+
+impl<T: Default> Default for RwLock<T> {
+    fn default() -> Self {
+        Self::new(T::default())
+    }
 }
 
 unsafe impl<T: Send> Send for RwLock<T> {}
 unsafe impl<T: Send + Sync> Sync for RwLock<T> {}
+
+impl<T> UnwindSafe for RwLock<T> {}
+impl<T> RefUnwindSafe for RwLock<T> {}
+
+//
+// # Read Guards
+//
 
 pub struct RwLockReadGuard<'a, T> {
     permit: ReadBorrow<'a>,
@@ -90,6 +131,28 @@ impl<T> Deref for RwLockReadGuard<'_, T> {
 }
 
 impl<'a, T> RwLockReadGuard<'a, T> {
+    pub fn map<U, F>(self, f: F) -> RwLockReadGuard<'a, U>
+    where
+        F: FnOnce(&T) -> &U,
+    {
+        let value = unsafe { f(self.value.as_ref()) };
+        RwLockReadGuard {
+            permit: self.permit,
+            value: NonNull::from(value),
+        }
+    }
+
+    pub fn filter_map<U, F>(self, f: F) -> Option<RwLockReadGuard<'a, U>>
+    where
+        F: FnOnce(&T) -> Option<&U>,
+    {
+        let value = unsafe { f(self.value.as_ref()) }?;
+        Some(RwLockReadGuard {
+            permit: self.permit,
+            value: NonNull::from(value),
+        })
+    }
+
     pub(crate) fn leak(self) -> &'a T {
         std::mem::forget(self.permit);
         unsafe { self.value.as_ref() }
@@ -98,6 +161,9 @@ impl<'a, T> RwLockReadGuard<'a, T> {
 
 unsafe impl<T: Send> Send for RwLockReadGuard<'_, T> {}
 unsafe impl<T: Send + Sync> Sync for RwLockReadGuard<'_, T> {}
+
+impl<T> UnwindSafe for RwLockReadGuard<'_, T> {}
+impl<T> RefUnwindSafe for RwLockReadGuard<'_, T> {}
 
 struct ReadBorrow<'b> {
     cell: &'b Cell<BorrowFlag>,
@@ -130,11 +196,40 @@ impl Clone for ReadBorrow<'_> {
     }
 }
 
+//
+// # Write Guards
+//
+
 pub struct RwLockWriteGuard<'a, T> {
     permit: WriteBorrow<'a>,
     value: NonNull<T>,
-
     marker: PhantomData<&'a mut T>,
+}
+
+impl<'a, T> RwLockWriteGuard<'a, T> {
+    pub fn map<U, F>(self, f: F) -> RwLockWriteGuard<'a, U>
+    where
+        F: FnOnce(&T) -> &U,
+    {
+        let value = unsafe { f(self.value.as_ref()) };
+        RwLockWriteGuard {
+            permit: self.permit,
+            value: NonNull::from(value),
+            marker: PhantomData,
+        }
+    }
+
+    pub fn filter_map<U, F>(mut self, f: F) -> Option<RwLockWriteGuard<'a, U>>
+    where
+        F: FnOnce(&mut T) -> Option<&mut U>,
+    {
+        let value = unsafe { f(self.value.as_mut()) }?;
+        Some(RwLockWriteGuard {
+            permit: self.permit,
+            value: NonNull::from(value),
+            marker: PhantomData,
+        })
+    }
 }
 
 impl<T> Deref for RwLockWriteGuard<'_, T> {
@@ -154,6 +249,9 @@ impl<T> DerefMut for RwLockWriteGuard<'_, T> {
 
 unsafe impl<T: Send + Sync> Send for RwLockWriteGuard<'_, T> {}
 unsafe impl<T: Send + Sync> Sync for RwLockWriteGuard<'_, T> {}
+
+impl<T> UnwindSafe for RwLockWriteGuard<'_, T> {}
+impl<T> RefUnwindSafe for RwLockWriteGuard<'_, T> {}
 
 struct WriteBorrow<'b> {
     cell: &'b Cell<BorrowFlag>,

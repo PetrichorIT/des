@@ -1,10 +1,8 @@
 use des::{
-    net::{
-        globals,
-        handlers::{ModuleFn, WithContext},
-        processing::ProcessingStack,
-    },
+    Error, Failure, globals,
     prelude::*,
+    processing::ProcessingStack,
+    runtime::handlers::{ModuleFn, WithContext},
 };
 use serial_test::serial;
 
@@ -13,7 +11,7 @@ impl Module for WithSimStartRequired {
     fn at_sim_start(&mut self, _stage: usize) {
         self.0 = true;
     }
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+    fn at_sim_end(&mut self) -> Result<(), Error> {
         assert!(self.0, "must be set by at_sim_start");
         Ok(())
     }
@@ -21,7 +19,7 @@ impl Module for WithSimStartRequired {
 
 #[test]
 #[serial]
-fn runtime_spawner_calls_sim_start() -> Result<(), RuntimeError> {
+fn runtime_spawner_calls_sim_start() -> Result<(), Failure> {
     let mut sim = Sim::new(());
     sim.node(
         "alice",
@@ -44,19 +42,19 @@ fn runtime_spawner_calls_sim_start() -> Result<(), RuntimeError> {
                     assert!(child.as_ref::<WithSimStartRequired>().0);
 
                     // check global access
-                    assert!(globals().get(&"alice.bob".into()).is_some())
+                    assert!(globals().get(&"alice.bob").is_some())
                 }
                 _ => {}
             },
         ),
     );
 
-    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
+    sim.seeded(123).build().run().into_result().map(|_| ())
 }
 
 #[test]
 #[serial]
-fn runtime_spawner_with_mod_ctx() -> Result<(), RuntimeError> {
+fn runtime_spawner_with_mod_ctx() -> Result<(), Failure> {
     let mut sim = Sim::new(());
     sim.node(
         "alice",
@@ -85,19 +83,19 @@ fn runtime_spawner_with_mod_ctx() -> Result<(), RuntimeError> {
                     assert!(child.as_ref::<WithSimStartRequired>().0);
 
                     // check global access
-                    assert!(globals().get(&"alice.bob".into()).is_some())
+                    assert!(globals().get(&"alice.bob").is_some())
                 }
                 _ => {}
             },
         ),
     );
 
-    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
+    sim.seeded(123).build().run().into_result().map(|_| ())
 }
 
 #[test]
 #[serial]
-fn runtime_spawner_cannot_use_root() -> Result<(), RuntimeError> {
+fn runtime_spawner_cannot_use_root() -> Result<(), Failure> {
     let mut sim = Sim::new(());
     sim.node(
         "alice",
@@ -122,16 +120,18 @@ fn runtime_spawner_cannot_use_root() -> Result<(), RuntimeError> {
         ),
     );
 
-    let _ = Builder::seeded(123)
-        .build(sim.freeze())
+    let _ = sim
+        .seeded(123)
+        .build()
         .run()
-        .expect_err("must have failed");
+        .error
+        .expect("must have failed");
     Ok(())
 }
 
 #[test]
 #[serial]
-fn runtime_spawner_reads_cfgs() -> Result<(), RuntimeError> {
+fn runtime_spawner_reads_cfgs() -> Result<(), Failure> {
     let mut sim = Sim::new(());
     sim.include_cfg("alice.bob.key: 123");
     sim.node(
@@ -158,7 +158,7 @@ fn runtime_spawner_reads_cfgs() -> Result<(), RuntimeError> {
         ),
     );
 
-    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
+    sim.seeded(123).build().run().into_result().map(|_| ())
 }
 
 struct ProcElementWithSubmodule {
@@ -206,7 +206,7 @@ impl Module for MyProcElementModule {
         self.c += 1;
     }
 
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+    fn at_sim_end(&mut self) -> Result<(), Error> {
         assert_eq!(self.c, 3);
         Ok(())
     }
@@ -214,10 +214,10 @@ impl Module for MyProcElementModule {
 
 #[test]
 #[serial]
-fn runtime_spawner_from_proc_element() -> Result<(), RuntimeError> {
+fn runtime_spawner_from_proc_element() -> Result<(), Failure> {
     let mut sim = Sim::new(());
     sim.include_cfg("alice.bob.key: 123");
     sim.node("alice", MyProcElementModule { c: 0 });
 
-    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
+    sim.seeded(123).build().run().into_result().map(|_| ())
 }

@@ -1,10 +1,10 @@
+use proc_macro_error::{Diagnostic, Level};
 use proc_macro2::Span as Span2;
 use proc_macro2::TokenStream;
-use proc_macro_error::{Diagnostic, Level};
-use quote::quote;
 use quote::ToTokens;
+use quote::quote;
 use syn::token::Plus;
-use syn::{parse2, Data, Fields, GenericParam, Generics, Ident, Index, TypeParamBound};
+use syn::{Data, Fields, GenericParam, Generics, Ident, Index, TypeParamBound, parse2};
 
 type Result<T> = std::result::Result<T, Diagnostic>;
 
@@ -37,7 +37,7 @@ pub fn derive_impl(ident: Ident, data: Data, generics: Generics) -> Result<Token
                         let field_ident = field.ident.unwrap();
 
                         ts.extend(quote! {
-                            <#ty as ::des::net::message::MessageBody>::byte_len(&self.#field_ident) +
+                            <#ty as ::des::message::MessageBody>::byte_len(&self.#field_ident) +
                         });
                     }
                     ts
@@ -51,7 +51,7 @@ pub fn derive_impl(ident: Ident, data: Data, generics: Generics) -> Result<Token
                         let field_ident = Index::from(i);
 
                         ts.extend(quote! {
-                            <#ty as ::des::net::message::MessageBody>::byte_len(&self.#field_ident) +
+                            <#ty as ::des::message::MessageBody>::byte_len(&self.#field_ident) +
                         });
                     }
 
@@ -65,7 +65,7 @@ pub fn derive_impl(ident: Ident, data: Data, generics: Generics) -> Result<Token
 
             let wrapped = WrappedTokenStream(impl_ts);
             Ok(quote! {
-                impl #impl_generics ::des::net::message::MessageBody for #ident #type_generics #where_clause {
+                impl #impl_generics ::des::message::MessageBody for #ident #type_generics #where_clause {
                     fn byte_len(&self) -> usize {
                         #wrapped 0
                     }
@@ -76,7 +76,7 @@ pub fn derive_impl(ident: Ident, data: Data, generics: Generics) -> Result<Token
             let mut gts = TokenStream::new();
             if data_enum.variants.is_empty() {
                 return Ok(quote! {
-                    impl ::des::net::message::MessageBody for #ident {
+                    impl ::des::message::MessageBody for #ident {
                         fn byte_len(&self) -> usize { 0 }
                     }
                 });
@@ -96,7 +96,7 @@ pub fn derive_impl(ident: Ident, data: Data, generics: Generics) -> Result<Token
 
                             prop_ts.extend(quote! { ref #field_ident, });
                             ts.extend(quote! {
-                                <#ty as ::des::net::message::MessageBody>::byte_len(#field_ident) +
+                                <#ty as ::des::message::MessageBody>::byte_len(#field_ident) +
                             });
                         }
 
@@ -116,7 +116,7 @@ pub fn derive_impl(ident: Ident, data: Data, generics: Generics) -> Result<Token
 
                             property_ts.extend(quote! { #field_ident,  });
                             ts.extend(quote! {
-                                <#ty as ::des::net::message::MessageBody>::byte_len(#field_ident) +
+                                <#ty as ::des::message::MessageBody>::byte_len(#field_ident) +
                             });
                         }
 
@@ -139,7 +139,7 @@ pub fn derive_impl(ident: Ident, data: Data, generics: Generics) -> Result<Token
             let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
 
             Ok(quote! {
-                impl #impl_generics ::des::net::message::MessageBody for #ident #type_generics #where_clause {
+                impl #impl_generics ::des::message::MessageBody for #ident #type_generics #where_clause {
                     fn byte_len(&self) -> usize {
                         match self {
                             #gts
@@ -164,7 +164,7 @@ fn generate_impl_generics(mut generics: Generics) -> Generics {
                 });
             }
 
-            let input = quote::quote! { ::des::net::message::MessageBody };
+            let input = quote::quote! { ::des::message::MessageBody };
             param
                 .bounds
                 .push_value(TypeParamBound::Trait(parse2(input).unwrap()));

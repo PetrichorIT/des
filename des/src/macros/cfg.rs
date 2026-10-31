@@ -1,15 +1,5 @@
 #![allow(unused_macros)]
 
-macro_rules! cfg_net {
-    ($($item:item)*) => {
-        $(
-            #[cfg(feature = "net")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "net")))]
-            $item
-        )*
-    }
-}
-
 macro_rules! cfg_macros {
     ($($item:item)*) => {
         $(

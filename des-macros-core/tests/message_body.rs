@@ -1,5 +1,5 @@
 use quote::quote;
-use syn::{parse2, DeriveInput};
+use syn::{DeriveInput, parse2};
 
 #[test]
 fn struct_unit() {
@@ -7,7 +7,13 @@ fn struct_unit() {
         struct Input;
     };
 
-    let Ok(DeriveInput { ident, data, generics, .. }) = parse2(input) else {
+    let Ok(DeriveInput {
+        ident,
+        data,
+        generics,
+        ..
+    }) = parse2(input)
+    else {
         panic!("Failed to parse input steam")
     };
     let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
@@ -17,7 +23,7 @@ fn struct_unit() {
     assert_eq!(
         output.to_string(),
         quote! {
-            impl ::des::net::message::MessageBody for Input {
+            impl ::des::message::MessageBody for Input {
                 fn byte_len(&self) -> usize {
                     0
                 }
@@ -37,7 +43,13 @@ fn struct_named() {
         }
     };
 
-    let Ok(DeriveInput { ident, data, generics, .. }) = parse2(input) else {
+    let Ok(DeriveInput {
+        ident,
+        data,
+        generics,
+        ..
+    }) = parse2(input)
+    else {
         panic!("Failed to parse input steam")
     };
     let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
@@ -47,11 +59,11 @@ fn struct_named() {
     assert_eq!(
         output.to_string(),
         quote! {
-            impl ::des::net::message::MessageBody for Input {
+            impl ::des::message::MessageBody for Input {
                 fn byte_len(&self) -> usize {
-                    <u32 as ::des::net::message::MessageBody>::byte_len(&self.a) +
-                    <Vec<u8> as ::des::net::message::MessageBody>::byte_len(&self.b) +
-                    <() as ::des::net::message::MessageBody>::byte_len(&self.c) +
+                    <u32 as ::des::message::MessageBody>::byte_len(&self.a) +
+                    <Vec<u8> as ::des::message::MessageBody>::byte_len(&self.b) +
+                    <() as ::des::message::MessageBody>::byte_len(&self.c) +
                     0
                 }
             }
@@ -70,7 +82,13 @@ fn struct_named_generic_nonbounded() {
         }
     };
 
-    let Ok(DeriveInput { ident, data, generics ,.. }) = parse2(input) else {
+    let Ok(DeriveInput {
+        ident,
+        data,
+        generics,
+        ..
+    }) = parse2(input)
+    else {
         panic!("Failed to parse input steam")
     };
     let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
@@ -80,11 +98,11 @@ fn struct_named_generic_nonbounded() {
     assert_eq!(
         output.to_string(),
         quote! {
-            impl<T: ::des::net::message::MessageBody> ::des::net::message::MessageBody for Input<T> {
+            impl<T: ::des::message::MessageBody> ::des::message::MessageBody for Input<T> {
                 fn byte_len(&self) -> usize {
-                    <u32 as ::des::net::message::MessageBody>::byte_len(&self.a) +
-                    <Vec<u8> as ::des::net::message::MessageBody>::byte_len(&self.b) +
-                    <T as ::des::net::message::MessageBody>::byte_len(&self.c) +
+                    <u32 as ::des::message::MessageBody>::byte_len(&self.a) +
+                    <Vec<u8> as ::des::message::MessageBody>::byte_len(&self.b) +
+                    <T as ::des::message::MessageBody>::byte_len(&self.c) +
                     0
                 }
             }
@@ -103,7 +121,13 @@ fn struct_named_generic_bounded() {
         }
     };
 
-    let Ok(DeriveInput { ident, data, generics ,.. }) = parse2(input) else {
+    let Ok(DeriveInput {
+        ident,
+        data,
+        generics,
+        ..
+    }) = parse2(input)
+    else {
         panic!("Failed to parse input steam")
     };
     let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
@@ -113,11 +137,11 @@ fn struct_named_generic_bounded() {
     assert_eq!(
         output.to_string(),
         quote! {
-            impl<T: Copy + Eq + ::des::net::message::MessageBody> ::des::net::message::MessageBody for Input<T> {
+            impl<T: Copy + Eq + ::des::message::MessageBody> ::des::message::MessageBody for Input<T> {
                 fn byte_len(&self) -> usize {
-                    <u32 as ::des::net::message::MessageBody>::byte_len(&self.a) +
-                    <Vec<u8> as ::des::net::message::MessageBody>::byte_len(&self.b) +
-                    <T as ::des::net::message::MessageBody>::byte_len(&self.c) +
+                    <u32 as ::des::message::MessageBody>::byte_len(&self.a) +
+                    <Vec<u8> as ::des::message::MessageBody>::byte_len(&self.b) +
+                    <T as ::des::message::MessageBody>::byte_len(&self.c) +
                     0
                 }
             }
@@ -136,7 +160,13 @@ fn struct_named_generic_where_clause() {
         }
     };
 
-    let Ok(DeriveInput { ident, data, generics ,.. }) = parse2(input) else {
+    let Ok(DeriveInput {
+        ident,
+        data,
+        generics,
+        ..
+    }) = parse2(input)
+    else {
         panic!("Failed to parse input steam")
     };
     let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
@@ -146,12 +176,12 @@ fn struct_named_generic_where_clause() {
     assert_eq!(
         output.to_string(),
         quote! {
-            impl<T: ::des::net::message::MessageBody> ::des::net::message::MessageBody for Input<T>
+            impl<T: ::des::message::MessageBody> ::des::message::MessageBody for Input<T>
             where T: Copy + std::hash::Hash {
                 fn byte_len(&self) -> usize {
-                    <u32 as ::des::net::message::MessageBody>::byte_len(&self.a) +
-                    <Vec<u8> as ::des::net::message::MessageBody>::byte_len(&self.b) +
-                    <T as ::des::net::message::MessageBody>::byte_len(&self.c) +
+                    <u32 as ::des::message::MessageBody>::byte_len(&self.a) +
+                    <Vec<u8> as ::des::message::MessageBody>::byte_len(&self.b) +
+                    <T as ::des::message::MessageBody>::byte_len(&self.c) +
                     0
                 }
             }
@@ -166,7 +196,13 @@ fn struct_unnamed() {
         struct Input(u32, Vec<u8>, ());
     };
 
-    let Ok(DeriveInput { ident, data, generics, .. }) = parse2(input) else {
+    let Ok(DeriveInput {
+        ident,
+        data,
+        generics,
+        ..
+    }) = parse2(input)
+    else {
         panic!("Failed to parse input steam")
     };
     let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
@@ -176,11 +212,11 @@ fn struct_unnamed() {
     assert_eq!(
         output.to_string(),
         quote! {
-            impl ::des::net::message::MessageBody for Input {
+            impl ::des::message::MessageBody for Input {
                 fn byte_len(&self) -> usize {
-                    <u32 as ::des::net::message::MessageBody>::byte_len(&self.0) +
-                    <Vec<u8> as ::des::net::message::MessageBody>::byte_len(&self.1) +
-                    <() as ::des::net::message::MessageBody>::byte_len(&self.2) +
+                    <u32 as ::des::message::MessageBody>::byte_len(&self.0) +
+                    <Vec<u8> as ::des::message::MessageBody>::byte_len(&self.1) +
+                    <() as ::des::message::MessageBody>::byte_len(&self.2) +
                     0
                 }
             }
@@ -195,7 +231,13 @@ fn struct_unnamed_generic_nonbounded() {
         struct Input<T>(u32, Vec<u8>, T);
     };
 
-    let Ok(DeriveInput { ident, data, generics ,.. }) = parse2(input) else {
+    let Ok(DeriveInput {
+        ident,
+        data,
+        generics,
+        ..
+    }) = parse2(input)
+    else {
         panic!("Failed to parse input steam")
     };
     let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
@@ -205,11 +247,11 @@ fn struct_unnamed_generic_nonbounded() {
     assert_eq!(
         output.to_string(),
         quote! {
-            impl<T: ::des::net::message::MessageBody> ::des::net::message::MessageBody for Input<T> {
+            impl<T: ::des::message::MessageBody> ::des::message::MessageBody for Input<T> {
                 fn byte_len(&self) -> usize {
-                    <u32 as ::des::net::message::MessageBody>::byte_len(&self.0) +
-                    <Vec<u8> as ::des::net::message::MessageBody>::byte_len(&self.1) +
-                    <T as ::des::net::message::MessageBody>::byte_len(&self.2) +
+                    <u32 as ::des::message::MessageBody>::byte_len(&self.0) +
+                    <Vec<u8> as ::des::message::MessageBody>::byte_len(&self.1) +
+                    <T as ::des::message::MessageBody>::byte_len(&self.2) +
                     0
                 }
             }
@@ -224,7 +266,13 @@ fn struct_unnamed_generic_bounded() {
         struct Input<T: Copy + Eq>(u32, Vec<u8>, T);
     };
 
-    let Ok(DeriveInput { ident, data, generics ,.. }) = parse2(input) else {
+    let Ok(DeriveInput {
+        ident,
+        data,
+        generics,
+        ..
+    }) = parse2(input)
+    else {
         panic!("Failed to parse input steam")
     };
     let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
@@ -234,11 +282,11 @@ fn struct_unnamed_generic_bounded() {
     assert_eq!(
         output.to_string(),
         quote! {
-            impl<T: Copy + Eq + ::des::net::message::MessageBody> ::des::net::message::MessageBody for Input<T> {
+            impl<T: Copy + Eq + ::des::message::MessageBody> ::des::message::MessageBody for Input<T> {
                 fn byte_len(&self) -> usize {
-                    <u32 as ::des::net::message::MessageBody>::byte_len(&self.0) +
-                    <Vec<u8> as ::des::net::message::MessageBody>::byte_len(&self.1) +
-                    <T as ::des::net::message::MessageBody>::byte_len(&self.2) +
+                    <u32 as ::des::message::MessageBody>::byte_len(&self.0) +
+                    <Vec<u8> as ::des::message::MessageBody>::byte_len(&self.1) +
+                    <T as ::des::message::MessageBody>::byte_len(&self.2) +
                     0
                 }
             }
@@ -253,7 +301,13 @@ fn struct_unnamed_generic_where_clause() {
         struct Input<T>(u32, Vec<u8>, T) where T: Copy + std::hash::Hash;
     };
 
-    let Ok(DeriveInput { ident, data, generics ,.. }) = parse2(input) else {
+    let Ok(DeriveInput {
+        ident,
+        data,
+        generics,
+        ..
+    }) = parse2(input)
+    else {
         panic!("Failed to parse input steam")
     };
     let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
@@ -263,12 +317,12 @@ fn struct_unnamed_generic_where_clause() {
     assert_eq!(
         output.to_string(),
         quote! {
-            impl<T: ::des::net::message::MessageBody> ::des::net::message::MessageBody for Input<T>
+            impl<T: ::des::message::MessageBody> ::des::message::MessageBody for Input<T>
             where T: Copy + std::hash::Hash {
                 fn byte_len(&self) -> usize {
-                    <u32 as ::des::net::message::MessageBody>::byte_len(&self.0) +
-                    <Vec<u8> as ::des::net::message::MessageBody>::byte_len(&self.1) +
-                    <T as ::des::net::message::MessageBody>::byte_len(&self.2) +
+                    <u32 as ::des::message::MessageBody>::byte_len(&self.0) +
+                    <Vec<u8> as ::des::message::MessageBody>::byte_len(&self.1) +
+                    <T as ::des::message::MessageBody>::byte_len(&self.2) +
                     0
                 }
             }
@@ -287,7 +341,13 @@ fn enum_unit_fields() {
         }
     };
 
-    let Ok(DeriveInput { ident, data, generics ,.. }) = parse2(input) else {
+    let Ok(DeriveInput {
+        ident,
+        data,
+        generics,
+        ..
+    }) = parse2(input)
+    else {
         panic!("Failed to parse input steam")
     };
     let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
@@ -297,7 +357,7 @@ fn enum_unit_fields() {
     assert_eq!(
         output.to_string(),
         quote! {
-            impl ::des::net::message::MessageBody for Input {
+            impl ::des::message::MessageBody for Input {
                 fn byte_len(&self) -> usize {
                     match self {
                           Input::A => 0,
@@ -321,7 +381,13 @@ fn enum_unnamed_fields() {
         }
     };
 
-    let Ok(DeriveInput { ident, data, generics ,.. }) = parse2(input) else {
+    let Ok(DeriveInput {
+        ident,
+        data,
+        generics,
+        ..
+    }) = parse2(input)
+    else {
         panic!("Failed to parse input steam")
     };
     let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
@@ -331,14 +397,14 @@ fn enum_unnamed_fields() {
     assert_eq!(
         output.to_string(),
         quote! {
-            impl ::des::net::message::MessageBody for Input {
+            impl ::des::message::MessageBody for Input {
                 fn byte_len(&self) -> usize {
                     match self {
-                          Input::A(v0,) => <u32 as ::des::net::message::MessageBody>::byte_len(v0) + 0,
-                          Input::B(v0,) => <Vec<u8> as ::des::net::message::MessageBody>::byte_len(v0) + 0,
-                          Input::CVariant(v0, v1, ) => 
-                            <f64 as ::des::net::message::MessageBody>::byte_len(v0) +
-                            <f32 as ::des::net::message::MessageBody>::byte_len(v1) + 
+                          Input::A(v0,) => <u32 as ::des::message::MessageBody>::byte_len(v0) + 0,
+                          Input::B(v0,) => <Vec<u8> as ::des::message::MessageBody>::byte_len(v0) + 0,
+                          Input::CVariant(v0, v1, ) =>
+                            <f64 as ::des::message::MessageBody>::byte_len(v0) +
+                            <f32 as ::des::message::MessageBody>::byte_len(v1) +
                             0,
                     }
                 }
@@ -347,7 +413,6 @@ fn enum_unnamed_fields() {
         .to_string()
     );
 }
-
 
 #[test]
 fn enum_unnamed_fields_generic_unbounded() {
@@ -359,7 +424,13 @@ fn enum_unnamed_fields_generic_unbounded() {
         }
     };
 
-    let Ok(DeriveInput { ident, data, generics ,.. }) = parse2(input) else {
+    let Ok(DeriveInput {
+        ident,
+        data,
+        generics,
+        ..
+    }) = parse2(input)
+    else {
         panic!("Failed to parse input steam")
     };
     let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
@@ -369,14 +440,14 @@ fn enum_unnamed_fields_generic_unbounded() {
     assert_eq!(
         output.to_string(),
         quote! {
-            impl<T: ::des::net::message::MessageBody> ::des::net::message::MessageBody for Input<T> {
+            impl<T: ::des::message::MessageBody> ::des::message::MessageBody for Input<T> {
                 fn byte_len(&self) -> usize {
                     match self {
-                          Input::A(v0,) => <T as ::des::net::message::MessageBody>::byte_len(v0) + 0,
-                          Input::B(v0,) => <Vec<u8> as ::des::net::message::MessageBody>::byte_len(v0) + 0,
-                          Input::CVariant(v0, v1, ) => 
-                            <f64 as ::des::net::message::MessageBody>::byte_len(v0) +
-                            <T as ::des::net::message::MessageBody>::byte_len(v1) + 
+                          Input::A(v0,) => <T as ::des::message::MessageBody>::byte_len(v0) + 0,
+                          Input::B(v0,) => <Vec<u8> as ::des::message::MessageBody>::byte_len(v0) + 0,
+                          Input::CVariant(v0, v1, ) =>
+                            <f64 as ::des::message::MessageBody>::byte_len(v0) +
+                            <T as ::des::message::MessageBody>::byte_len(v1) +
                             0,
                     }
                 }
@@ -385,7 +456,6 @@ fn enum_unnamed_fields_generic_unbounded() {
         .to_string()
     );
 }
-
 
 #[test]
 fn enum_unnamed_fields_generic_bounded() {
@@ -397,7 +467,13 @@ fn enum_unnamed_fields_generic_bounded() {
         }
     };
 
-    let Ok(DeriveInput { ident, data, generics ,.. }) = parse2(input) else {
+    let Ok(DeriveInput {
+        ident,
+        data,
+        generics,
+        ..
+    }) = parse2(input)
+    else {
         panic!("Failed to parse input steam")
     };
     let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
@@ -407,14 +483,14 @@ fn enum_unnamed_fields_generic_bounded() {
     assert_eq!(
         output.to_string(),
         quote! {
-            impl<T: Copy + ::des::net::message::MessageBody> ::des::net::message::MessageBody for Input<T> {
+            impl<T: Copy + ::des::message::MessageBody> ::des::message::MessageBody for Input<T> {
                 fn byte_len(&self) -> usize {
                     match self {
-                          Input::A(v0,) => <T as ::des::net::message::MessageBody>::byte_len(v0) + 0,
-                          Input::B(v0,) => <Vec<u8> as ::des::net::message::MessageBody>::byte_len(v0) + 0,
-                          Input::CVariant(v0, v1, ) => 
-                            <f64 as ::des::net::message::MessageBody>::byte_len(v0) +
-                            <T as ::des::net::message::MessageBody>::byte_len(v1) + 
+                          Input::A(v0,) => <T as ::des::message::MessageBody>::byte_len(v0) + 0,
+                          Input::B(v0,) => <Vec<u8> as ::des::message::MessageBody>::byte_len(v0) + 0,
+                          Input::CVariant(v0, v1, ) =>
+                            <f64 as ::des::message::MessageBody>::byte_len(v0) +
+                            <T as ::des::message::MessageBody>::byte_len(v1) +
                             0,
                     }
                 }
@@ -434,7 +510,13 @@ fn enum_unnamed_fields_generic_where_clause() {
         }
     };
 
-    let Ok(DeriveInput { ident, data, generics ,.. }) = parse2(input) else {
+    let Ok(DeriveInput {
+        ident,
+        data,
+        generics,
+        ..
+    }) = parse2(input)
+    else {
         panic!("Failed to parse input steam")
     };
     let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
@@ -444,15 +526,15 @@ fn enum_unnamed_fields_generic_where_clause() {
     assert_eq!(
         output.to_string(),
         quote! {
-            impl<T: ::des::net::message::MessageBody> ::des::net::message::MessageBody for Input<T> 
+            impl<T: ::des::message::MessageBody> ::des::message::MessageBody for Input<T>
              where T: std::hash::Hash {
                 fn byte_len(&self) -> usize {
                     match self {
-                          Input::A(v0,) => <T as ::des::net::message::MessageBody>::byte_len(v0) + 0,
-                          Input::B(v0,) => <Vec<u8> as ::des::net::message::MessageBody>::byte_len(v0) + 0,
-                          Input::CVariant(v0, v1, ) => 
-                            <f64 as ::des::net::message::MessageBody>::byte_len(v0) +
-                            <T as ::des::net::message::MessageBody>::byte_len(v1) + 
+                          Input::A(v0,) => <T as ::des::message::MessageBody>::byte_len(v0) + 0,
+                          Input::B(v0,) => <Vec<u8> as ::des::message::MessageBody>::byte_len(v0) + 0,
+                          Input::CVariant(v0, v1, ) =>
+                            <f64 as ::des::message::MessageBody>::byte_len(v0) +
+                            <T as ::des::message::MessageBody>::byte_len(v1) +
                             0,
                     }
                 }
@@ -462,7 +544,7 @@ fn enum_unnamed_fields_generic_where_clause() {
     );
 }
 
-// 
+//
 
 #[test]
 fn enum_named_fields() {
@@ -473,7 +555,13 @@ fn enum_named_fields() {
         }
     };
 
-    let Ok(DeriveInput { ident, data, generics ,.. }) = parse2(input) else {
+    let Ok(DeriveInput {
+        ident,
+        data,
+        generics,
+        ..
+    }) = parse2(input)
+    else {
         panic!("Failed to parse input steam")
     };
     let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
@@ -483,13 +571,13 @@ fn enum_named_fields() {
     assert_eq!(
         output.to_string(),
         quote! {
-            impl ::des::net::message::MessageBody for Input {
+            impl ::des::message::MessageBody for Input {
                 fn byte_len(&self) -> usize {
                     match self {
-                          Input::A { ref x, } => <u32 as ::des::net::message::MessageBody>::byte_len(x) + 0,
-                          Input::B { ref y, ref z, } => 
-                          <Vec<u8> as ::des::net::message::MessageBody>::byte_len(y) +
-                          <f64 as ::des::net::message::MessageBody>::byte_len(z) + 
+                          Input::A { ref x, } => <u32 as ::des::message::MessageBody>::byte_len(x) + 0,
+                          Input::B { ref y, ref z, } =>
+                          <Vec<u8> as ::des::message::MessageBody>::byte_len(y) +
+                          <f64 as ::des::message::MessageBody>::byte_len(z) +
                           0,
                     }
                 }
@@ -508,7 +596,13 @@ fn enum_named_fields_generic_unbounded() {
         }
     };
 
-    let Ok(DeriveInput { ident, data, generics ,.. }) = parse2(input) else {
+    let Ok(DeriveInput {
+        ident,
+        data,
+        generics,
+        ..
+    }) = parse2(input)
+    else {
         panic!("Failed to parse input steam")
     };
     let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
@@ -518,13 +612,13 @@ fn enum_named_fields_generic_unbounded() {
     assert_eq!(
         output.to_string(),
         quote! {
-            impl<T: ::des::net::message::MessageBody> ::des::net::message::MessageBody for Input<T> {
+            impl<T: ::des::message::MessageBody> ::des::message::MessageBody for Input<T> {
                 fn byte_len(&self) -> usize {
                     match self {
-                          Input::A { ref x, } => <T as ::des::net::message::MessageBody>::byte_len(x) + 0,
-                          Input::B { ref y, ref z, } => 
-                          <Vec<T> as ::des::net::message::MessageBody>::byte_len(y) +
-                          <f64 as ::des::net::message::MessageBody>::byte_len(z) + 
+                          Input::A { ref x, } => <T as ::des::message::MessageBody>::byte_len(x) + 0,
+                          Input::B { ref y, ref z, } =>
+                          <Vec<T> as ::des::message::MessageBody>::byte_len(y) +
+                          <f64 as ::des::message::MessageBody>::byte_len(z) +
                           0,
                     }
                 }
@@ -543,7 +637,13 @@ fn enum_named_fields_generic_bounded() {
         }
     };
 
-    let Ok(DeriveInput { ident, data, generics ,.. }) = parse2(input) else {
+    let Ok(DeriveInput {
+        ident,
+        data,
+        generics,
+        ..
+    }) = parse2(input)
+    else {
         panic!("Failed to parse input steam")
     };
     let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
@@ -553,13 +653,13 @@ fn enum_named_fields_generic_bounded() {
     assert_eq!(
         output.to_string(),
         quote! {
-            impl<T: Copy + ::des::net::message::MessageBody> ::des::net::message::MessageBody for Input<T> {
+            impl<T: Copy + ::des::message::MessageBody> ::des::message::MessageBody for Input<T> {
                 fn byte_len(&self) -> usize {
                     match self {
-                          Input::A { ref x, } => <T as ::des::net::message::MessageBody>::byte_len(x) + 0,
-                          Input::B { ref y, ref z, } => 
-                          <Vec<T> as ::des::net::message::MessageBody>::byte_len(y) +
-                          <f64 as ::des::net::message::MessageBody>::byte_len(z) + 
+                          Input::A { ref x, } => <T as ::des::message::MessageBody>::byte_len(x) + 0,
+                          Input::B { ref y, ref z, } =>
+                          <Vec<T> as ::des::message::MessageBody>::byte_len(y) +
+                          <f64 as ::des::message::MessageBody>::byte_len(z) +
                           0,
                     }
                 }
@@ -578,7 +678,13 @@ fn enum_named_fields_generic_where_clause() {
         }
     };
 
-    let Ok(DeriveInput { ident, data, generics ,.. }) = parse2(input) else {
+    let Ok(DeriveInput {
+        ident,
+        data,
+        generics,
+        ..
+    }) = parse2(input)
+    else {
         panic!("Failed to parse input steam")
     };
     let Ok(output) = des_macros_core::message_body::derive_impl(ident, data, generics) else {
@@ -588,13 +694,13 @@ fn enum_named_fields_generic_where_clause() {
     assert_eq!(
         output.to_string(),
         quote! {
-            impl<T: ::des::net::message::MessageBody> ::des::net::message::MessageBody for Input<T> where T: Copy {
+            impl<T: ::des::message::MessageBody> ::des::message::MessageBody for Input<T> where T: Copy {
                 fn byte_len(&self) -> usize {
                     match self {
-                          Input::A { ref x, } => <T as ::des::net::message::MessageBody>::byte_len(x) + 0,
-                          Input::B { ref y, ref z, } => 
-                          <Vec<T> as ::des::net::message::MessageBody>::byte_len(y) +
-                          <f64 as ::des::net::message::MessageBody>::byte_len(z) + 
+                          Input::A { ref x, } => <T as ::des::message::MessageBody>::byte_len(x) + 0,
+                          Input::B { ref y, ref z, } =>
+                          <Vec<T> as ::des::message::MessageBody>::byte_len(y) +
+                          <f64 as ::des::message::MessageBody>::byte_len(z) +
                           0,
                     }
                 }

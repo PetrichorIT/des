@@ -1,20 +1,5 @@
 use des::prelude::*;
-use petgraph::algo::tarjan_scc;
 use serial_test::serial;
-
-#[test]
-#[serial]
-fn main() {
-    let app = Sim::ndl("tests/ndl/top.yml", Registry::new().with_default_fallback())
-        .map_err(|e| println!("{e}"))
-        .unwrap();
-    let rt = Builder::new().build(app.freeze());
-    let app = rt.run().unwrap().0;
-    let topo = app.globals().topology();
-
-    let connected = dbg!(tarjan_scc(&topo)).len() == 1;
-    assert!(!connected);
-}
 
 struct Fallback;
 impl Module for Fallback {}
@@ -39,7 +24,7 @@ fn spanned_topology() {
     sim.gate("alice.eve", "to-sophie")
         .connect(sim.gate("alice.sophie", "to-eve"));
 
-    let root = sim.get(&"alice".into()).unwrap();
+    let root = sim.get(&"alice").unwrap();
 
     let topology = root.spanning_tree();
     assert_eq!(topology.node_count(), 4);

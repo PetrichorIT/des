@@ -1,12 +1,9 @@
-#![cfg(feature = "net")]
-
 use des::{
-    net::{
-        channel::DelayChannel,
-        handlers::{AsyncHandler, HandlerFn},
-        internals::{MessageExitingConnection, NetEvents},
-    },
+    Error, Failure,
+    channel::DelayChannel,
     prelude::*,
+    runtime::handlers::{AsyncHandler, HandlerFn},
+    runtime::{MessageExitingConnection, NetEvents},
     time::sleep_until,
 };
 use serial_test::serial;
@@ -30,7 +27,7 @@ impl Module for DropChanModule {
         self.received += 1;
     }
 
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+    fn at_sim_end(&mut self) -> Result<(), Error> {
         assert_ne!(self.send, self.received);
         Ok(())
     }
@@ -53,7 +50,7 @@ fn channel_dropping_message() {
     });
     g_in.connect_with(g_out, Some(channel));
 
-    let rt = Builder::seeded(123).build(rt.freeze());
+    let rt = rt.seeded(123).build();
     let _ = rt.run();
 }
 
@@ -76,7 +73,7 @@ impl Module for BufferChanModule {
         self.received += 1;
     }
 
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+    fn at_sim_end(&mut self) -> Result<(), Error> {
         assert_eq!(self.send, 3);
         assert_eq!(self.received, 2);
         Ok(())
@@ -100,7 +97,7 @@ fn channel_buffering_message() {
     });
     g_in.connect_with(g_out, Some(channel));
 
-    let rt = Builder::seeded(123).build(rt.freeze());
+    let rt = rt.seeded(123).build();
     let _ = rt.run();
 }
 
@@ -138,7 +135,7 @@ fn channel_instant_busy() {
 
     g_in.connect_with(g_out, Some(channel));
 
-    let rt = Builder::seeded(123).build(rt.freeze());
+    let rt = rt.seeded(123).build();
     let _ = rt.run();
 }
 
@@ -155,7 +152,7 @@ impl Module for LatencyOnly {
         self.0 += 1;
     }
 
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+    fn at_sim_end(&mut self) -> Result<(), Error> {
         assert_eq!(self.0, 10);
         Ok(())
     }
@@ -178,7 +175,7 @@ fn latency_only_channel() {
         ))),
     );
 
-    let _ = Builder::seeded(123).build(sim.freeze()).run();
+    let _ = sim.seeded(123).build().run();
 }
 
 #[test]
@@ -231,11 +228,11 @@ fn simplex_shared_domain() {
         );
     }
 
-    let rt = Builder::seeded(123).build(sim.freeze()).run().unwrap();
+    let rt = sim.seeded(123).build().run().assert_no_err();
 
     //
-    assert_eq!(rt.2.event_count, 130);
-    assert_eq!(rt.1, 26.0)
+    assert_eq!(rt.app.profiler.event_count, 130);
+    assert_eq!(rt.time, 26.0)
 }
 
 #[test]
@@ -280,7 +277,7 @@ fn duplex_shared_domain() {
             .connect_with(switch[i].clone(), Some(chan.clone()));
     }
 
-    let rt = Builder::seeded(123).build(sim.freeze()).run().unwrap();
+    let rt = sim.seeded(123).build().run().assert_no_err();
 
     // 50 messages over datarate channel with infinite buffer
     // - 50 handle message events
@@ -288,8 +285,8 @@ fn duplex_shared_domain() {
     // - 48 Channel Notif (only from once two events in queue, thus not for first and not for last message)
     // - 6 start signals
 
-    assert_eq!(rt.2.event_count, 50 + 50 + 48 + 6);
-    assert_eq!(rt.1, 50.0)
+    assert_eq!(rt.app.profiler.event_count, 50 + 50 + 48 + 6);
+    assert_eq!(rt.time, 50.0)
 }
 
 #[test]
@@ -387,7 +384,7 @@ fn datarate_channel_can_send_at_tft_independent_of_event_order() {
     g1.connect_with(t1, Some(no_buffer));
     g2.connect_with(t2, Some(buffer));
 
-    let _ = Builder::seeded(123).build(sim.freeze()).run().unwrap();
+    let _ = sim.seeded(123).build().run().assert_no_err();
 }
 
 #[derive(Debug, Clone, Default)]
@@ -409,8 +406,8 @@ impl Channel for CustomFwdChannel {
         &mut self,
         _: GateRef,
         msg: Message,
-        via: des::net::gate::Connection,
-        ctx: des::net::channel::SendContext<'_>,
+        via: des::gate::Connection,
+        ctx: des::channel::SendContext<'_>,
     ) -> Result<(), SendError> {
         ctx.sink.add(
             NetEvents::MessageExitingConnection(MessageExitingConnection { con: via, msg }),
@@ -426,14 +423,14 @@ impl Channel for CustomFwdChannel {
     fn unbusy_notify(
         &mut self,
         _: Box<dyn std::any::Any + Send>,
-        _: des::net::channel::SendContext<'_>,
+        _: des::channel::SendContext<'_>,
     ) {
     }
 }
 
 #[test]
 #[serial]
-fn register_unregister_custom_channel() -> Result<(), RuntimeError> {
+fn register_unregister_custom_channel() -> Result<(), Failure> {
     let mut sim = Sim::new(());
     sim.node(
         "alice",
@@ -480,5 +477,5 @@ fn register_unregister_custom_channel() -> Result<(), RuntimeError> {
     a.connect_with(b, Some(chan.clone()));
     a2.connect_with(c, Some(chan));
 
-    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
+    sim.seeded(123).build().run().into_result().map(|_| ())
 }

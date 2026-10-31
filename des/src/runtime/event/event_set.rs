@@ -1,5 +1,4 @@
 cfg_not_miri! {
-
     cfg_not_cqueue! {
         mod default_impl {
             use crate::{runtime::{Application, EventId}, time::SimTime};
@@ -171,20 +170,15 @@ cfg_not_miri! {
 
     cfg_cqueue! {
         mod cqueue_impl {
-            use crate::{runtime::{Application, Builder}, time::SimTime};
+            use crate::time::SimTime;
             use des_cqueue::CQueue;
 
-            pub(crate) struct FutureEventSet<A>
-            where
-                A: Application,
+            pub(crate) struct FutureEventSet<E>
             {
-                inner: CQueue<A::EventSet>,
+                inner: CQueue<E>,
             }
 
-            impl<A> FutureEventSet<A>
-            where
-                A: Application,
-            {
+            impl<E> FutureEventSet<E> {
                 #[allow(clippy::unused_self)]
                 pub(crate) fn descriptor(&self) -> String {
                     format!("FutureEventSet::CQueue::{}", self.inner.descriptor())
@@ -198,7 +192,7 @@ cfg_not_miri! {
                     self.inner.is_empty()
                 }
 
-                pub(crate) fn new_with(options: &Builder) -> Self {
+                pub(crate) fn new_with<A>(options: &crate::SimBuilder<A>) -> Self {
                     Self {
                         inner: CQueue::new(options.cqueue_num_buckets, options.cqueue_bucket_timespan),
                     }
@@ -207,7 +201,7 @@ cfg_not_miri! {
                 #[allow(clippy::needless_pass_by_value)]
                 pub(crate) fn fetch_next(
                     &mut self,
-                ) -> (A::EventSet, SimTime) {
+                ) -> (E, SimTime) {
 
                     let (event, time) = self.inner.fetch_next();
                     (event, SimTime::from_duration(time))
@@ -217,7 +211,7 @@ cfg_not_miri! {
                 pub(crate) fn add(
                     &mut self,
                     time: SimTime,
-                    event: impl Into<A::EventSet>,
+                    event: impl Into<E>,
                 ) {
                     self.inner.add(*time, event.into());
                 }
@@ -226,7 +220,6 @@ cfg_not_miri! {
 
         pub(crate) use self::cqueue_impl::*;
     }
-
 }
 
 cfg_miri! {

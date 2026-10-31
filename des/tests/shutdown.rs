@@ -1,8 +1,7 @@
 #![cfg(feature = "async")]
 
 use des::{
-    net::{ErrorKind, globals, handlers::ModuleFn, module::Module},
-    prelude::*,
+    Error, ErrorKind, Failure, globals, module::Module, prelude::*, runtime::handlers::ModuleFn,
     time::sleep,
 };
 use serial_test::serial;
@@ -70,14 +69,14 @@ fn stateless_module_shudown() {
     rt.node("root", StatelessModule);
     let gate = rt.gate("root", "in");
 
-    let mut rt = Builder::seeded(123).build(rt.freeze());
+    let mut rt = rt.seeded(123).build();
     rt.add_message_onto(
         gate,
         Message::default(),
         SimTime::from_duration(Duration::from_secs(10)),
     );
 
-    let _ = rt.run().unwrap();
+    let _ = rt.run().assert_no_err();
     assert_eq!(DROPPED_STATELESS_SHUTDOWN.load(Ordering::SeqCst), 1)
 }
 
@@ -114,7 +113,7 @@ fn stateless_module_restart() {
     rt.node("root", StatelessModuleRestart);
     let gate = rt.gate("root", "in");
 
-    let mut rt = Builder::seeded(123).build(rt.freeze());
+    let mut rt = rt.seeded(123).build();
     rt.add_message_onto(
         gate.clone(),
         Message::default().with_id(9),
@@ -126,7 +125,7 @@ fn stateless_module_restart() {
         SimTime::from_duration(Duration::from_secs(30)),
     );
 
-    let _ = rt.run().unwrap();
+    let _ = rt.run().assert_no_err();
     assert_eq!(DROPPED_STATLESS_RESTART.load(Ordering::SeqCst), 2)
 }
 
@@ -160,7 +159,7 @@ impl Module for StatefullModule {
         }
     }
 
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+    fn at_sim_end(&mut self) -> Result<(), Error> {
         assert_eq!(self.state, 5);
         Ok(())
     }
@@ -177,7 +176,7 @@ fn statefull_module_restart() {
     rt.node("root", StatefullModule::default());
     let gate = rt.gate("root", "in");
 
-    let mut rt = Builder::seeded(123).build(rt.freeze());
+    let mut rt = rt.seeded(123).build();
     rt.add_message_onto(
         gate.clone(),
         Message::default().with_id(9),
@@ -189,7 +188,7 @@ fn statefull_module_restart() {
         SimTime::from_duration(Duration::from_secs(30)),
     );
 
-    let _ = rt.run().unwrap();
+    let _ = rt.run().assert_no_err();
     assert_eq!(DROPPED_STATFULL_RESTART.load(Ordering::SeqCst), 2);
 }
 
@@ -219,9 +218,9 @@ fn shutdown_via_async_handle() {
     let mut rt = Sim::new(());
     rt.node("root", ShutdownViaHandleModule);
 
-    let rt = Builder::seeded(123).build(rt.freeze());
+    let rt = rt.seeded(123).build();
 
-    let _ = rt.run().unwrap();
+    let _ = rt.run().assert_no_err();
     assert_eq!(DROPPED_SHUTDOWN_VIA_HANDLE.load(Ordering::SeqCst), 1)
 }
 
@@ -259,9 +258,9 @@ fn restart_via_async_handle() {
     let mut rt = Sim::new(());
     rt.node("root", RestartViaHandleModule);
 
-    let rt = Builder::seeded(123).build(rt.freeze());
+    let rt = rt.seeded(123).build();
 
-    let _ = rt.run().unwrap();
+    let _ = rt.run().assert_no_err();
     assert_eq!(DROPPED_RESTART_VIA_HANDLE.load(Ordering::SeqCst), 2)
 }
 
@@ -312,7 +311,7 @@ impl Module for WillIgnoreInncomingInDowntime {
         msg.body.content_mut::<CountDropsMessage>().counter = Arc::new(AtomicUsize::new(0));
     }
 
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+    fn at_sim_end(&mut self) -> Result<(), Error> {
         assert_eq!(self.received.load(Ordering::SeqCst), 8);
         assert_eq!(self.drops.load(Ordering::SeqCst), 2);
         Ok(())
@@ -325,9 +324,9 @@ fn shutdown_will_ignore_incoming() {
     let mut rt = Sim::new(());
     rt.node("root", WillIgnoreInncomingInDowntime::default());
 
-    let rt = Builder::seeded(123).build(rt.freeze());
+    let rt = rt.seeded(123).build();
 
-    let _ = rt.run().unwrap();
+    let _ = rt.run().assert_no_err();
 }
 
 #[derive(Default)]
@@ -370,7 +369,7 @@ impl Module for EndNode {
         }
     }
 
-    fn at_sim_end(&mut self) -> Result<(), RuntimeError> {
+    fn at_sim_end(&mut self) -> Result<(), Error> {
         assert_eq!(self.sent, 10);
         assert_eq!(self.recv, 7);
         assert_eq!(self.drops.load(Ordering::SeqCst), 3);
@@ -409,8 +408,8 @@ fn shutdown_will_drop_transiting() {
     ping.connect(con.clone());
     con.connect(pong);
 
-    let rt = Builder::seeded(123).max_itr(500).build(app.freeze());
-    let _ = rt.run().unwrap();
+    let rt = app.seeded(123).max_itr(500).build();
+    let _ = rt.run().assert_no_err();
 }
 
 #[test]
@@ -446,8 +445,8 @@ fn shutdown_will_drop_transiting_delayed_channels() {
         })),
     );
 
-    let rt = Builder::seeded(123).max_itr(500).build(app.freeze());
-    let _ = rt.run().unwrap();
+    let rt = app.seeded(123).max_itr(500).build();
+    let _ = rt.run().assert_no_err();
 }
 
 #[test]
@@ -486,12 +485,12 @@ fn shutdown_prevents_accessing_parents() {
         ),
     );
 
-    let _ = Builder::seeded(123).build(sim.freeze()).run().unwrap();
+    let _ = sim.seeded(123).build().run().assert_no_err();
 }
 
 #[test]
 #[serial]
-fn shutdown_from_foreign_module() -> Result<(), RuntimeError> {
+fn shutdown_from_foreign_module() -> Result<(), Failure> {
     let mut sim = Sim::new(());
     sim.node(
         "alice",
@@ -513,12 +512,12 @@ fn shutdown_from_foreign_module() -> Result<(), RuntimeError> {
             || schedule_in(Message::default(), Duration::from_secs(2)),
             |_, _| {
                 globals()
-                    .get(&"alice".into())
+                    .get(&"alice")
                     .unwrap()
                     .shutdow_and_restart_at(8.0.into());
             },
         ),
     );
 
-    Builder::seeded(123).build(sim.freeze()).run().map(|_| ())
+    sim.seeded(123).build().run().into_result().map(|_| ())
 }

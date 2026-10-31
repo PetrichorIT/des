@@ -1,11 +1,9 @@
-#![cfg(feature = "net")]
-
-use des::{net::handlers::AsyncHandler, prelude::*};
+use des::{Failure, prelude::*, runtime::handlers::AsyncHandler};
 use serial_test::serial;
 
 #[test]
 #[serial]
-fn parse_props() -> Result<(), RuntimeError> {
+fn parse_props() -> Result<(), Failure> {
     let mut sim = Sim::new(());
 
     sim.include_cfg(
@@ -82,15 +80,17 @@ fn parse_props() -> Result<(), RuntimeError> {
         }),
     );
 
-    Builder::seeded(132)
+    sim.seeded(132)
         .max_time(100.0.into())
-        .build(sim.freeze())
+        .build()
         .run()
+        .into_result()
         .map(|_| ())
 }
 
 #[test]
-fn disallow_casting() -> Result<(), RuntimeError> {
+#[serial]
+fn disallow_casting() -> Result<(), Failure> {
     let mut sim = Sim::new(());
 
     sim.node(
@@ -99,17 +99,14 @@ fn disallow_casting() -> Result<(), RuntimeError> {
             // define prop
             current().prop::<i8>("i8")?.set(123);
             assert_eq!(current().prop::<i8>("i8")?.or_default().get(), 123);
-            // assert_eq!(
-            //     current().prop::<i32>("i8").unwrap_err().kind,
-            //     ErrorKind::InvalidInput
-            // ); TODO make errors more expresive
             Ok(())
         }),
     );
 
-    Builder::seeded(132)
+    sim.seeded(132)
         .max_time(100.0.into())
-        .build(sim.freeze())
+        .build()
         .run()
+        .into_result()
         .map(|_| ())
 }
